@@ -1754,6 +1754,7 @@ where
             archive_is_zip64: self.archive_is_zip64,
             central_directory_offset: self.central_directory_offset,
             descriptor_width: self.descriptor_width,
+            verified: None,
         }
     }
 
@@ -1947,6 +1948,11 @@ pub struct ZipVerifier<Decompressor, ReaderAt> {
     archive_is_zip64: bool,
     central_directory_offset: u64,
     descriptor_width: Option<DescriptorWidth>,
+    /// The observation this verifier last accepted, so the same observation is
+    /// not re-verified. `Read::read_to_end` must see one `Ok(0)` after the
+    /// payload is complete, which would otherwise repeat the verification, and
+    /// with it the data-descriptor read, for an unchanged CRC and size.
+    verified: Option<ZipVerification>,
 }
 
 impl<Decompressor, ReaderAt> ZipVerifier<Decompressor, ReaderAt> {
@@ -1978,6 +1984,17 @@ where
         })?;
 
         if read == 0 || self.size >= self.wayfinder.uncompressed_size_hint() {
+            let observed = ZipVerification {
+                crc: self.crc,
+                uncompressed_size: self.size,
+            };
+            // Verifying the same CRC and size twice can only reach the same
+            // conclusion, so skip the repeat and the data-descriptor read it
+            // would perform. A read that adds bytes changes `observed` and is
+            // verified normally.
+            if self.verified == Some(observed) {
+                return Ok(read);
+            }
             let expected_crc = if self.wayfinder.has_data_descriptor {
                 DataDescriptor::read_at(
                     &self.archive,
@@ -1999,12 +2016,10 @@ where
                         uncompressed_size: self.wayfinder.uncompressed_size_hint(),
                     };
 
-                    expected.valid(ZipVerification {
-                        crc: self.crc,
-                        uncompressed_size: self.size,
-                    })
+                    expected.valid(observed)
                 })
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            self.verified = Some(observed);
         }
 
         Ok(read)

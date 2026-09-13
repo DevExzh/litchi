@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "summary_kind": "litchi-opc-read-repetition",
+  "rows": [
+    {
+      "capture": "docx_file_source_full_text.pread.txt",
+      "pread64_calls": 236,
+      "distinct_ranges": 23,
+      "repeat_calls": 213,
+      "repeat_call_percent": 90.2542372881356,
+      "immediate_duplicate_calls": 19,
+      "immediate_duplicate_percent": 8.050847457627118,
+      "bytes_returned": 63652,
+      "mean_read_bytes": 269.7118644067797,
+      "repeat_count_distribution": {
+        "2": 2,
+        "6": 3,
+        "10": 15,
+        "20": 2,
+        "24": 1
+      },
+      "size_histogram_upper_bound_to_calls": {
+        "4": 20,
+        "8": 10,
+        "16": 46,
+        "32": 66,
+        "64": 10,
+        "256": 16,
+        "512": 20,
+        "1024": 28,
+        "2048": 20
+      }
+    },
+    {
+      "capture": "docx_file_source_open.pread.txt",
+      "pread64_calls": 224,
+      "distinct_ranges": 23,
+      "repeat_calls": 201,
+      "repeat_call_percent": 89.73214285714286,
+      "immediate_duplicate_calls": 19,
+      "immediate_duplicate_percent": 8.482142857142858,
+      "bytes_returned": 57772,
+      "mean_read_bytes": 257.9107142857143,
+      "repeat_count_distribution": {
+        "2": 2,
+        "6": 6,
+        "10": 12,
+        "20": 2,
+        "24": 1
+      },
+      "size_histogram_upper_bound_to_calls": {
+        "4": 20,
+        "8": 10,
+        "16": 42,
+        "32": 62,
+        "64": 10,
+        "256": 16,
+        "512": 20,
+        "1024": 28,
+        "2048": 16
+      }
+    },
+    {
+      "capture": "pptx_file_source_open.pread.txt.gz",
+      "pread64_calls": 10216,
+      "distinct_ranges": 1262,
+      "repeat_calls": 8954,
+      "repeat_call_percent": 87.64682850430697,
+      "immediate_duplicate_calls": 19,
+      "immediate_duplicate_percent": 0.1859827721221613,
+      "bytes_returned": 1585154,
+      "mean_read_bytes": 155.16386061080658,
+      "repeat_count_distribution": {
+        "2": 2,
+        "6": 603,
+        "10": 655,
+        "20": 1,
+        "24": 1
+      },
+      "size_histogram_upper_bound_to_calls": {
+        "4": 10,
+        "8": 10,
+        "16": 3376,
+        "32": 3396,
+        "64": 10,
+        "256": 2136,
+        "512": 10,
+        "1024": 1228,
+        "2048": 30,
+        "65536": 10
+      }
+    },
+    {
+      "capture": "pptx_file_source_selected_slide.pread.txt.gz",
+      "pread64_calls": 10228,
+      "distinct_ranges": 1262,
+      "repeat_calls": 8966,
+      "repeat_call_percent": 87.6613218615565,
+      "immediate_duplicate_calls": 19,
+      "immediate_duplicate_percent": 0.18576456785295267,
+      "bytes_returned": 1587426,
+      "mean_read_bytes": 155.2039499413375,
+      "repeat_count_distribution": {
+        "2": 2,
+        "6": 600,
+        "10": 658,
+        "20": 1,
+        "24": 1
+      },
+      "size_histogram_upper_bound_to_calls": {
+        "4": 10,
+        "8": 10,
+        "16": 3380,
+        "32": 3400,
+        "64": 10,
+        "256": 2136,
+        "512": 10,
+        "1024": 1232,
+        "2048": 30,
+        "65536": 10
+      }
+    }
+  ]
+}

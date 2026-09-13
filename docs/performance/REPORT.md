@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0562: one descriptor read per verified entry read
+
+[0562](0562-zip-descriptor-read-once.md) memoizes the observation
+`ZipVerifier::read` last accepted, so a descriptor-framed entry resolves its
+data descriptor once per verified read instead of twice. Whole-child `pread64`
+falls 24.84% on the PPTX captures and 15.79-16.31% on the DOCX ones with the
+distinct-range count unchanged. Three counted-read tests pin the behaviour and
+were confirmed to fail without the change.
+
 ## 0561: the OOXML file-source read pattern, attributed
 
 [0561](0561-opc-repeated-positional-reads.md) is attribution only. About nine of

@@ -97,6 +97,24 @@ read. Memoizing the resolved descriptor and the local-header framing per entry,
 coalescing the header/payload/descriptor span for small members, and giving
 structural members a retention policy remain open and unmeasured.
 
+After 0562, the `docx_file_source_open` capture's 224 remaining calls cover 23
+distinct ranges. Counting repeats names the next targets precisely: one
+840-byte span at offset 64 read 24 times, a 4-byte probe at offset 0 read 20
+times alongside the first local header at the same offset read 20 times, an
+8-byte probe at offset 30 read 10 times, and the end-of-central-directory and
+central-directory spans read 10 times each. The child performs about ten
+independent package opens, so most of that is per-open re-work that no
+within-open cache can remove; the within-open residual is the roughly 2.4 reads
+of the structural member and 2 reads of the first local header per open.
+
+The PPTX capture shows the same structure at scale. After 0562 its 10,216 calls
+group as 3,386 reads of 30 bytes, 3,376 of 16 bytes and 3,414 payload reads —
+one header, one descriptor and one payload per member read. Memoizing the
+resolved descriptor and the header framing per entry would therefore remove
+about two thirds of what remains. That is a count model derived from the
+retained trace, not a measured result, and neither change has been implemented
+or measured.
+
 ## Limitations
 
 No production change, latency, resource or cold-cache measurement is claimed

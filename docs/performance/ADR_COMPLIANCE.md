@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0562: ZIP grammar owner, unchanged contract
+
+[0562](0562-zip-descriptor-read-once.md) changes only `soapberry-zip`, which ADR
+0011 leaves as the ZIP grammar owner below `litchi-opc`; no facade or format
+crate learns about descriptors. The verified result, the error kind for a
+corrupt descriptor, and the bytes delivered to the caller are unchanged, and the
+memo is written only after a successful verification. No ADR exception is needed.
+
 ## 0561: attribution only, no contract movement
 
 [0561](0561-opc-repeated-positional-reads.md) changes no production code. It
