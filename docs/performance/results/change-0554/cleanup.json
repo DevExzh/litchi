@@ -1,0 +1,27 @@
+{
+  "accessible_process_references": [],
+  "binary_descriptor_sha256_by_kind": {
+    "baseline/alloc": "9645623b58b44785b2d1b8b35d29a6c9c17014f83a4e577e50f75eea07cdcf81",
+    "baseline/normal": "ba684901138a9a3defbe46ab32025674a8380d58c073b83f1abe390f6e5de7da",
+    "candidate/alloc": "90bcf3244565b61980b855f063e6229f6ef59fbde2e37cfeef4940bd81bd1a8c",
+    "candidate/normal": "9f6a2c28ad08140f358eb2bac0bae5a5478a736265d203a7cc7047b2e34c9832"
+  },
+  "binary_sha256_by_kind": {
+    "baseline/alloc": "f1db085f7e32f99022f74431c6c0fa889fe9c989a092789010141ae7adccf97a",
+    "baseline/normal": "075a61ea31d9441e12dcdfd03fb0d4e0b1f7d264f460eac465d65864cc4ae459",
+    "candidate/alloc": "4f70872e23d14ab8e9919b073018f1bacbf544271798a0793e255688982e1f20",
+    "candidate/normal": "7fe7a07b024c8fdd734771824bc51048434f45e72535edce72555bd0a5d5c9c3"
+  },
+  "observed_utc": "2026-09-13T12:04:02.333279+00:00",
+  "owned_paths_absent": true,
+  "plan_sha256": "d901c87af4e8d2585af997dbc850832db21db0ce0e359d3dcf7d90c7b415e98c",
+  "precleanup_verification_sha256": "7f134a78785ef87caf10bfb7a97c9501335e9f652365391f17649f7e4a35ee7b",
+  "process_reference_scope": "Accessible /proc cwd, executable and open file descriptors; cleanup process ancestors excluded.",
+  "python_cache_absent": true,
+  "removed": [
+    "/home/zhuhe/litchi-goal-0554-target"
+  ],
+  "schema": "ole2_0554_cleanup_v1",
+  "scope": "Remove only owned change0554 build/retained-binary target after passing precleanup and exact binary hash checks.",
+  "target": "/home/zhuhe/litchi-goal-0554-target"
+}

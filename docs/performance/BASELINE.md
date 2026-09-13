@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+Change 0554 retains a fresh matched CFB/XLS name-handoff campaign from `53330ff67`:
+nine XLS cases and three CFB shapes, two native ABBA repeats (1,000 samples,
+20 warmups), separate allocator regions (30 samples, three warmups), and matched
+constructor profiles with exact instruction mapping. The candidate passed its
+many-small and allocation gates but failed all eight primary XLS improvement
+checks and 19 native controls. Exact baseline source is restored; no production
+speedup is claimed. [Measurements and scope](0554-ole2-name-handoff.md).
+
 ## 0553: matched XLSX commit-local proof experiment
 
 [0553](0553-xlsx-commit-local-compact-proof.md) retains 119 baseline and 119

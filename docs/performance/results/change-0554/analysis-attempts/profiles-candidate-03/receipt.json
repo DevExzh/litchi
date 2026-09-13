@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0554/analyze_profiles.py",
+    "--stage",
+    "candidate",
+    "--output",
+    "docs/performance/results/change-0554/candidate/profile-analysis.json"
+  ],
+  "start_utc": "2026-09-13T11:49:26.843702+00:00",
+  "end_utc": "2026-09-13T11:49:27.602685+00:00",
+  "seconds": 0.7590015580062754,
+  "exit_code": 0,
+  "script_sha256": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+  "artifacts": {
+    "stdout": "466a1cf9b30edaee42bec51c40803127b95789e4613081fdff39e376afe0c96c",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

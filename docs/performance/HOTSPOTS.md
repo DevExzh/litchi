@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+Change 0554 measured validated-name transfer in CFB. Many-small open p50 improved
+9.41% and 12.99%, and allocation calls fell 47.06%, but every primary XLS p50
+regressed (2.31–10.93%). The candidate is rejected and exact baseline source is
+restored. Mapped instructions confirm removal of normal-entry duplicate decoding;
+that mechanism result does not establish a retained workflow improvement.
+See [the complete 0554 record](0554-ole2-name-handoff.md).
+
+Fresh XLS constructor profiles rank physical-sector reconciliation at 17.60% self
+Ir as the next independent leaf after the previously investigated collector.
+The [proof note](results/change-0554/proof-note.md) requires exact error precedence,
+FAT padding and bounded state; count-only and early-error shortcuts are rejected.
+This is a future experiment, with no measured candidate result. OLE2/OOXML remains
+the priority; ODF is deferred and iWork excluded.
+
 ## 0553: commit-local compact proof rejected by workflow gates
 
 [0553](0553-xlsx-commit-local-compact-proof.md) reduced main workflow allocated

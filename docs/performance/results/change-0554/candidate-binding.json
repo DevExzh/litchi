@@ -1,0 +1,15 @@
+{
+  "schema": "ole2_0554_candidate_binding_v1",
+  "frozen_utc": "2026-09-13T11:25:17.904349+00:00",
+  "base_revision": "53330ff6745dd7416f3bfb48ef891a020ee9d151",
+  "plan_sha256": "d901c87af4e8d2585af997dbc850832db21db0ce0e359d3dcf7d90c7b415e98c",
+  "admission_supplement_sha256": "832057a756fc45922ebd91e836c54a7ba9b832e364c0d145cc15171c07c51c1f",
+  "baseline_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "source_hashes": {
+    "crates/litchi-cfb/src/file.rs": "a96667162dbd8c3d7ebe88cad3bb0f07670296ebf2fd16279b7971cc375bbdd9"
+  },
+  "prepared_patch_sha256": "33f815a7fee8dac1aa13bd461d54235c5153a34b6e66044540eda4c6e47bc7ed",
+  "review_path": "candidate-review.md",
+  "review_sha256": "1266dbedb15a2da487c9c5125b9b97c5f8e06964798d035244aab992c1184ff6",
+  "scope": "N name-only ownership handoff plus focused tests, selected before live application and captures"
+}

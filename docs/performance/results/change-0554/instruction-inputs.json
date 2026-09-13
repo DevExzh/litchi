@@ -1,0 +1,11 @@
+{
+  "schema": "ole2_0554_instruction_inputs_v1",
+  "recorded_utc": "2026-09-13T11:50:51.792590+00:00",
+  "scope": "Post-capture instruction mapping consumer and immutable raw-parser bindings; does not alter source, captures or admission gates",
+  "files": {
+    "docs/performance/results/change-0547/instruction_analysis.py": "66cf49b960d0a964fbc0970c30a13ec4a69493b2263288f1b62849316a388745",
+    "docs/performance/results/change-0554/inspect_assembly.py": "8ea269afde9a167bb56ec2d224dc0eb0e8e0c93c97e5f3b2522e9f395df3e665",
+    "docs/performance/results/change-0554/instruction_analysis.py": "47044890b5ad13ea0e4abb783b7d4b1c283be241cbaafbe1826d33cb5a5a1908",
+    "docs/performance/results/change-0554/run.py": "f90f8285be651b1115086194e1c3660e88d2b8880bb71f6d4e9fc839075f06d3"
+  }
+}

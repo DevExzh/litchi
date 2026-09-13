@@ -1,0 +1,10 @@
+{
+  "schema": "ole2_0554_instruction_development_v1",
+  "recorded_utc": "2026-09-13T11:52:21.718625+00:00",
+  "scope": "Supplementary instruction consumer development after captures; original numerical/profile analysis freeze is unchanged except the separately bound profile receipt correction",
+  "observed_draft_script_sha256": "ac52bc817b8ba0dee9ca8b46130d6dd153e0d1dbeccd39069515da7d6a1b6a05",
+  "observed_draft_comparison_sha256": "2b9347a77f97df5c3d6e113ebe98fa63052511b337872755c83979bd6f2c307d",
+  "final_script_sha256": "47044890b5ad13ea0e4abb783b7d4b1c283be241cbaafbe1826d33cb5a5a1908",
+  "final_comparison_sha256": "916c19c492027a51300d79f661c49dd1a0b9ff53f476e919371dbe0aa972bbe1",
+  "development_note": "Root observed an unfrozen draft whose aggregate unique-static-instruction count summed per-dump values. Final consumer unions static addresses within each matched job and accepts the recorded baseline-r2 execution-stage identity. Earlier draft bytes were not retained; no historical byte replay of that draft is claimed. Final stage and comparison reports passed root CLI deterministic replay in analysis-attempts/instruction-*-01. Raw captures, binary descriptors, source and numerical gates are unchanged."
+}

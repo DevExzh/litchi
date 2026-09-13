@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0554/analyze_metrics.py",
+    "--output",
+    "docs/performance/results/change-0554/metrics-analysis.json"
+  ],
+  "start_utc": "2026-09-13T11:37:14.479364+00:00",
+  "end_utc": "2026-09-13T11:37:15.551785+00:00",
+  "seconds": 1.0724271389772184,
+  "exit_code": 0,
+  "script_sha256": "3aeff5aba7b6b212bf0b263bf5d43e614ed41d62bfb83b2c53ff3584f8652c82",
+  "artifacts": {
+    "stdout": "bad40c6cf7e4583446a2b94be7ade871e1d11770c8421077d160ca7ee483dda2",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "after_path": "docs/performance/results/change-0554/analyze_profiles.py",
+  "amended_sha256": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+  "before_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/analyze_profiles.py",
+  "changes": {
+    "analyze_profiles.py": {
+      "amended": "analyze_profiles.py",
+      "description": "For baseline repeat 2 only, expect execution_stage and execution_manifest_sha256 from candidate; all candidate jobs remain candidate and baseline repeat 1 remains baseline.",
+      "final_sha256": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+      "initial_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+      "original": "analyzer-attempts/profile-before-execution-stage/analyze_profiles.py"
+    }
+  },
+  "created_utc": "2026-09-13T11:48:06.857535217Z",
+  "failed_receipt_path": "docs/performance/results/change-0554/analysis-attempts/profiles-02/receipt.json",
+  "failed_receipt_reason": "The frozen profile analyzer rejected the valid retained baseline-r2 ABBA profile receipts because it required receipt execution_stage to equal the output folder stage. Baseline-r2 remains in the baseline folder and retains the baseline binary/source-manifest binding, while its deliberate live execution manifest and execution_stage are candidate.",
+  "failed_receipt_sha256": "48ea91e4baeedda67a9bf9e79bf3fbb6a75cdeb5443a5310f0180c951c7ff65f",
+  "original_analysis_inputs_path": "docs/performance/results/change-0554/analysis-inputs.json",
+  "original_analysis_inputs_sha256": "a37f42d08847159dd53355c07469d06b9abfd147ddfb93bd630c18d403cab877",
+  "original_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+  "path": "docs/performance/results/change-0554/analyze_profiles.py",
+  "preserved_analyzer_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/analyze_profiles.py",
+  "preserved_analyzer_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+  "preserved_failed_receipt_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-receipt.json",
+  "preserved_failed_receipt_sha256": "48ea91e4baeedda67a9bf9e79bf3fbb6a75cdeb5443a5310f0180c951c7ff65f",
+  "preserved_failed_stderr_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-stderr",
+  "preserved_failed_stderr_sha256": "5f30e5761493ff0ec8abfa37054f096228d61d6f4ec6c1a833d9fc6cb979d99b",
+  "preserved_failed_stdout_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-stdout",
+  "preserved_failed_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reason": "The frozen profile analyzer rejected the valid retained baseline-r2 ABBA profile receipts because it required receipt execution_stage to equal the output folder stage. Baseline-r2 remains in the baseline folder and retains the baseline binary/source-manifest binding, while its deliberate live execution manifest and execution_stage are candidate.",
+  "schema": "ole2_0554_analysis_amendment_v1",
+  "scope": "Analysis-consumer-only ABBA receipt identity correction after all captures; plan, Rust source, driver, captures, numeric gates, and original analysis inputs remain unchanged."
+}

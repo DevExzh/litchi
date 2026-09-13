@@ -1,0 +1,14 @@
+{
+  "adoption_allowed": false,
+  "disposition": "rejected",
+  "metrics_sha256": "30f4bc0923d5207129d690acf9c2ed59cf216531dc7545470ec08367f4f7d39c",
+  "observed_utc": "2026-09-13T12:02:05.263865+00:00",
+  "plan_sha256": "d901c87af4e8d2585af997dbc850832db21db0ce0e359d3dcf7d90c7b415e98c",
+  "profile_sha256": "243766cbfd383639cfd70c4276cd81274fe661810b3e3857ab7e17060462e562",
+  "quality_sha256": "09cfa267680b490c9bbaa72bafd37b9c57ec085659a2536f5da570a787ee2668",
+  "review_sha256": "cf0138f833ebe3f69cc6493bf68268307d03f79c5abedce43692aca9af34112a",
+  "schema": "ole2_0554_decision_v1",
+  "scope": "0554 full matched disposition; required XLS and native control gates failed; exact baseline restored",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "status": "pass"
+}

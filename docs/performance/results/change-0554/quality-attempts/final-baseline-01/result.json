@@ -1,0 +1,59 @@
+{
+  "schema": "ole2_0554_quality_v1",
+  "status": "pass",
+  "stage": "final",
+  "mode": "commands",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "inputs_sha256": "c60928f7aebf4fded543a0aea7a731249e284d1d9c621f5618d6abaa75592687",
+  "completed_utc": "2026-09-13T11:48:21.050185+00:00",
+  "rows": [
+    {
+      "name": "tests",
+      "path": "quality-attempts/final-baseline-01/tests",
+      "receipt_sha256": "fbb1be4bf25fd1fd294179f45a0028f5ac13d36c63ad3484a6d605368d67727b",
+      "exit_code": 0
+    },
+    {
+      "name": "workspace",
+      "path": "quality-attempts/final-baseline-01/workspace",
+      "receipt_sha256": "24ab8dba9f81007ad0053ae409ac91669da1a66ad6cd48ba308b620812708768",
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "path": "quality-attempts/final-baseline-01/clippy",
+      "receipt_sha256": "8535a0a693f9a292841af361c65fbb275051170deadccd52bf203544aa1a2bff",
+      "exit_code": 0
+    },
+    {
+      "name": "rustdoc",
+      "path": "quality-attempts/final-baseline-01/rustdoc",
+      "receipt_sha256": "a293c000adc6bf52eaa5add88560be9a6b27276135bdaa5024f61dec91a018f6",
+      "exit_code": 0
+    },
+    {
+      "name": "fmt",
+      "path": "quality-attempts/final-baseline-01/fmt",
+      "receipt_sha256": "6d900689fc400efcd7b0624cfedace0b8ddc737de2e3b207b3d5833801174682",
+      "exit_code": 0
+    },
+    {
+      "name": "boundaries",
+      "path": "quality-attempts/final-baseline-01/boundaries",
+      "receipt_sha256": "adb02fab842a991b36aad5f38bfddb008dd27bf64381e6accfa4621577446482",
+      "exit_code": 0
+    },
+    {
+      "name": "no-default",
+      "path": "quality-attempts/final-baseline-01/no-default",
+      "receipt_sha256": "e224868be1590b0beee1a2a54549ba73f0a1996bd365d0637df47b3bf0fe584b",
+      "exit_code": 0
+    },
+    {
+      "name": "claims",
+      "path": "quality-attempts/final-baseline-01/claims",
+      "receipt_sha256": "84c9df1a1a304dbf5af4ccd59ad0334e4a2f1361ee0261361f8c3e30cbb05ee4",
+      "exit_code": 0
+    }
+  ]
+}

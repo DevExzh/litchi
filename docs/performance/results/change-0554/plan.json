@@ -1,0 +1,91 @@
+{
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "order": [
+      "baseline r1 xls/cfb",
+      "candidate r1 xls/cfb",
+      "candidate r2 cfb/xls",
+      "baseline r2 cfb/xls"
+    ]
+  },
+  "allocation": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Existing constructor/operation clock with canonical operation-global System allocator region; excludes construction of input fixtures, correctness oracles, report construction and object drop"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "Exact timed constructor owner edges; distinguish setup dumps, preserve instruction attribution and all positive dumps. Name handoff only; unchanged scalar parse is a control.",
+    "instruction_flags": [
+      "--dump-instr=yes",
+      "--dump-line=no",
+      "--compress-pos=no",
+      "--collect-jumps=yes"
+    ]
+  },
+  "schema": "ole2_name_handoff_0554_plan_v1",
+  "revision": "53330ff6745dd7416f3bfb48ef891a020ee9d151",
+  "created_utc": "2026-09-13T11:14:53.412592+00:00",
+  "previous_turn": "progress:0553 rejected XLSX candidate, restored baseline, passed final quality, sealed, committed and cleaned",
+  "scope": "Matched private CFB validated-name ownership handoff N; NF field seed excluded",
+  "priority": "OLE2/OOXML first; ODF deferred; iWork excluded",
+  "hypothesis": "Eliminate repeat normal-entry UTF-16 decoding and name allocation by moving the exact SID validated String; retain root two-view decoding, scalar parse, validation order, bounded memory and atomic publication",
+  "cpu": 2,
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0554-target"
+  ],
+  "candidate_files": [
+    "crates/litchi-cfb/src/file.rs"
+  ],
+  "candidate_origin": "docs/performance/results/change-0553/ole2-name-candidate/candidate.patch",
+  "candidate_origin_sha256": "af6639d1ff99f9303031c4b51e26e3aa19a5154ad93314e6c949193ad067fb91",
+  "status": "frozen before build and capture",
+  "admission": {
+    "primary": "cfb_open/many-small p50 and mean improve >=3% in both native repeats",
+    "controls": "Every native XLS and CFB p50 and mean and process peak RSS increase <=5% in each paired repeat",
+    "allocation": "Every operation allocator status measured; calls, allocated bytes and incremental region peak increase <=5%; exact retained operation/source identity",
+    "mechanism": "All positive timed owner dumps retained. Baseline public decoder incoming calls reflect directory population; candidate normal decoder incoming calls exactly1 per open for standard roots. CFB many-small owner Ir decreases in both repeats. Attribute name work separately from retained scalar/CLSID and validation work; missing symbol alone is insufficient.",
+    "correctness": "Independent source review, root classic-Mac two-view, malformed/error precedence, public fields/cache and source/workflow tests; final source exact and all applicable quality commands pass",
+    "review": "Every matched >5% adverse and every absolute >5% same-build variation individually retained; no selective reruns or relaxed gates; reject production if any mandatory gate fails",
+    "no_claims": "No hardware cycles, parallel scaling, cold-cache or unrelated format claim from this matrix"
+  }
+}

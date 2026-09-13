@@ -1,0 +1,14 @@
+{
+  "result": {
+    "files": {
+      "docs/performance/0554-ole2-name-handoff.md": "e5e34e328c25a174dac4fb13d94bab85cff50d805b877514c9dade6ba5215675",
+      "docs/performance/BASELINE.md": "bb2e8d94d564d955460e71b9e5c6f07a98eecfd864e2fc28078e5ea012025375",
+      "docs/performance/HOTSPOTS.md": "12e7a588ca432d019c4e3ec3f1deb07f959c02cc58120a12c2badb55494c2a55"
+    },
+    "path": "documentation-manifest.json",
+    "sha256": "8da697e5318a12a692e64e3fc7caa3a60622ebb74354706de452306d4dcf798b"
+  },
+  "schema": "litchi.ole2.verification.0554.v1",
+  "scope": "documentation",
+  "status": "pass"
+}

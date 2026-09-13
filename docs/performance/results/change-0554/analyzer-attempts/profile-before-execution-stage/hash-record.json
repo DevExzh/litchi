@@ -1,0 +1,26 @@
+{
+  "amended_path": "docs/performance/results/change-0554/analyze_profiles.py",
+  "amended_sha256": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+  "amendment_path": "docs/performance/results/change-0554/analysis-amendment.json",
+  "amendment_schema": "ole2_0554_analysis_amendment_v1",
+  "analysis_inputs_path": "docs/performance/results/change-0554/analysis-inputs.json",
+  "analysis_inputs_sha256": "a37f42d08847159dd53355c07469d06b9abfd147ddfb93bd630c18d403cab877",
+  "failed_attempt": {
+    "preserved_receipt_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-receipt.json",
+    "preserved_stderr_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-stderr",
+    "preserved_stdout_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/failed-profile-stdout",
+    "reason": "The frozen analyzer required receipt execution_stage to equal the output folder stage, but the deliberate baseline-r2 ABBA profile receipts are retained under baseline and correctly record execution_stage: candidate.",
+    "receipt_path": "docs/performance/results/change-0554/analysis-attempts/profiles-02/receipt.json",
+    "receipt_sha256": "48ea91e4baeedda67a9bf9e79bf3fbb6a75cdeb5443a5310f0180c951c7ff65f",
+    "stderr_path": "docs/performance/results/change-0554/analysis-attempts/profiles-02/stderr",
+    "stderr_sha256": "5f30e5761493ff0ec8abfa37054f096228d61d6f4ec6c1a833d9fc6cb979d99b",
+    "stdout_path": "docs/performance/results/change-0554/analysis-attempts/profiles-02/stdout",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "original_path": "docs/performance/results/change-0554/analyze_profiles.py",
+  "original_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+  "preserved_path": "docs/performance/results/change-0554/analyzer-attempts/profile-before-execution-stage/analyze_profiles.py",
+  "preserved_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+  "purpose": "Preserve the frozen profile analyzer and its failed canonical comparison before the ABBA receipt expectation amendment.",
+  "schema": "ole2_0554_profile_analyzer_attempt_v1"
+}

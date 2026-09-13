@@ -1,0 +1,23 @@
+{
+  "result": {
+    "gate_passed": true,
+    "path": "profile-comparison.json",
+    "required": true,
+    "sha256": "243766cbfd383639cfd70c4276cd81274fe661810b3e3857ab7e17060462e562",
+    "stages": {
+      "baseline": {
+        "path": "baseline/profile-analysis.json",
+        "profiles": 8,
+        "sha256": "e4f9f7c5528eeb31387b0acc284c59ef029d29e094a117792dfb094ed74619b6"
+      },
+      "candidate": {
+        "path": "candidate/profile-analysis.json",
+        "profiles": 8,
+        "sha256": "a9c8fb41f31a1c1fcd5b3fc8a76a2087326842eca5b8637b700a4b16d51f8242"
+      }
+    }
+  },
+  "schema": "litchi.ole2.verification.0554.v1",
+  "scope": "profiles",
+  "status": "pass"
+}
