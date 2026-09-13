@@ -1,0 +1,101 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 0.39s
+     Running tests/ods_formula_matrix_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_matrix_evaluation-332bda0e297d348e)
+
+running 12 tests
+test matrix_functions_reject_invalid_shapes_singular_inverse_and_nonpositive_units ... FAILED
+test force_array_arguments_are_fully_materialized_in_scalar_context ... FAILED
+test matrix_function_names_are_case_insensitive ... FAILED
+test minverse_returns_a_square_inverse_with_finite_numeric_results ... FAILED
+test matrix_functions_return_value_errors_for_invalid_arity ... FAILED
+test mdeterm_returns_the_determinant_of_a_square_numeric_array ... FAILED
+test munit_returns_an_identity_array_and_uses_the_first_scalar_array_element ... FAILED
+test scalar_if_evaluates_a_selected_matrix_function_without_touching_unselected_reference ... FAILED
+test scalar_if_selects_the_matrix_function_in_the_else_branch_lazily ... FAILED
+test transpose_exchanges_rectangular_axes_and_can_feed_matrix_broadcasting ... FAILED
+test mmult_returns_the_rectangular_product_in_row_major_order ... FAILED
+test matrix_numeric_operations_propagate_element_errors_as_formula_values ... FAILED
+
+failures:
+
+---- matrix_functions_reject_invalid_shapes_singular_inverse_and_nonpositive_units stdout ----
+
+thread 'matrix_functions_reject_invalid_shapes_singular_inverse_and_nonpositive_units' (1193757) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:356:17:
+=MDETERM({1;2;3|4;5;6}) should return a formula shape error: ODS formula evaluation profile does not implement this function
+
+---- force_array_arguments_are_fully_materialized_in_scalar_context stdout ----
+
+thread 'force_array_arguments_are_fully_materialized_in_scalar_context' (1193755) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:395:10:
+ForceArray should evaluate a scalar-context array expression: Unsupported(Function)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- matrix_function_names_are_case_insensitive stdout ----
+
+thread 'matrix_function_names_are_case_insensitive' (1193756) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:303:77:
+called `Result::unwrap()` on an `Err` value: Unsupported(Function)
+
+---- minverse_returns_a_square_inverse_with_finite_numeric_results stdout ----
+
+thread 'minverse_returns_a_square_inverse_with_finite_numeric_results' (1193761) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:244:10:
+MINVERSE should evaluate a nonsingular square array: Unsupported(Function)
+
+---- matrix_functions_return_value_errors_for_invalid_arity stdout ----
+
+thread 'matrix_functions_return_value_errors_for_invalid_arity' (1193758) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:337:17:
+=MDETERM({1};{2}) should return a formula arity error: ODS formula evaluation profile does not implement this function
+
+---- mdeterm_returns_the_determinant_of_a_square_numeric_array stdout ----
+
+thread 'mdeterm_returns_the_determinant_of_a_square_numeric_array' (1193760) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:234:10:
+MDETERM should evaluate a square numeric array: Unsupported(Function)
+
+---- munit_returns_an_identity_array_and_uses_the_first_scalar_array_element stdout ----
+
+thread 'munit_returns_an_identity_array_and_uses_the_first_scalar_array_element' (1193763) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:265:10:
+MUNIT should construct a positive identity matrix: Unsupported(Function)
+
+---- scalar_if_evaluates_a_selected_matrix_function_without_touching_unselected_reference stdout ----
+
+thread 'scalar_if_evaluates_a_selected_matrix_function_without_touching_unselected_reference' (1193764) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:411:10:
+the selected matrix function should evaluate: Unsupported(Function)
+
+---- scalar_if_selects_the_matrix_function_in_the_else_branch_lazily stdout ----
+
+thread 'scalar_if_selects_the_matrix_function_in_the_else_branch_lazily' (1193765) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:423:10:
+the selected else matrix function should evaluate: Unsupported(Function)
+
+---- transpose_exchanges_rectangular_axes_and_can_feed_matrix_broadcasting stdout ----
+
+thread 'transpose_exchanges_rectangular_axes_and_can_feed_matrix_broadcasting' (1193766) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:288:10:
+TRANSPOSE should exchange rectangular dimensions: Unsupported(Function)
+
+---- mmult_returns_the_rectangular_product_in_row_major_order stdout ----
+
+thread 'mmult_returns_the_rectangular_product_in_row_major_order' (1193762) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:254:10:
+MMULT should evaluate compatible rectangular arrays: Unsupported(Function)
+
+---- matrix_numeric_operations_propagate_element_errors_as_formula_values stdout ----
+
+thread 'matrix_numeric_operations_propagate_element_errors_as_formula_values' (1193759) panicked at crates/litchi-ods/tests/ods_formula_matrix_evaluation.rs:382:10:
+an input formula error should be propagated as a value: Unsupported(Function)
+
+
+failures:
+    force_array_arguments_are_fully_materialized_in_scalar_context
+    matrix_function_names_are_case_insensitive
+    matrix_functions_reject_invalid_shapes_singular_inverse_and_nonpositive_units
+    matrix_functions_return_value_errors_for_invalid_arity
+    matrix_numeric_operations_propagate_element_errors_as_formula_values
+    mdeterm_returns_the_determinant_of_a_square_numeric_array
+    minverse_returns_a_square_inverse_with_finite_numeric_results
+    mmult_returns_the_rectangular_product_in_row_major_order
+    munit_returns_an_identity_array_and_uses_the_first_scalar_array_element
+    scalar_if_evaluates_a_selected_matrix_function_without_touching_unselected_reference
+    scalar_if_selects_the_matrix_function_in_the_else_branch_lazily
+    transpose_exchanges_rectangular_axes_and_can_feed_matrix_broadcasting
+
+test result: FAILED. 0 passed; 12 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_matrix_evaluation`
+error: 1 target failed:
+    `-p litchi-ods --test ods_formula_matrix_evaluation`
