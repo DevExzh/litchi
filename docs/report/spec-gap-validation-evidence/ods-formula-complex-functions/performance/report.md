@@ -66,6 +66,11 @@ match in this corpus. One requested/released-byte counter changes:
 `matrix-lazy-aggregate-4096` increases from 3,146,824 to 3,146,840 bytes per
 sample (+16 bytes). This is separate from the runner's deterministic-field
 comparison, which does not establish equality of every memory counter.
+Source inspection identifies a likely cause of the +16 bytes: adding the
+24-byte Complex payload widens `DemandCacheValue`, and this case inserts one
+cache entry for its AND branch. The unchanged 4,161 allocation calls and exact
+one-entry byte delta support transient cache-entry overhead; private type
+sizes were not measured, so this is an inference rather than layout proof.
 The RSS observations do not identify an allocator or code cause. They remain
 review items alongside the earlier matrix/common corpus flags.
 
