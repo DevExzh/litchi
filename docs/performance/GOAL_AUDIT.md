@@ -1,5 +1,37 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0564: the largest remaining OLE2 target, and why it is blocked
+
+[0564](0564-xls-open-read-attribution.md) locates the biggest measured remaining
+gap on the OLE2 priority path. A source-backed XLS open costs 655 positional
+reads and 636 freshness observations against an owned source's identical logical
+work, and 621 of those reads are a four-byte-at-a-time BIFF header scan whose
+bytes the following bulk read fetches again in full. Removing it is worth
+roughly the entire file-source penalty.
+
+It is blocked, and the blockage is a genuine design decision rather than a gap
+in the work. Four tests assert the current shape deliberately: the exact open
+range list, that a `FILEPASS` payload is never read, that a skipped payload is
+never read, and that open never touches a sheet body. The goal's own rule is to
+record such a conflict rather than implement through it, so this record
+enumerates the four things a fused pass would have to establish — a
+buffered-but-never-published rule, a bound on reading past an as-yet-unknown
+`global_end`, how the per-record limits fold into a chunk, and an accepted
+reduction in freshness granularity from 621 observations to about 9.
+
+This record also reopens a line the program had closed. Change 0325 rejected a
+prefetch candidate and concluded that the open and list selectors were
+"zero-opportunity"; that was true of the candidate it tested and false of the
+path, because 95% of open's reads are in a loop that record never examined.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, remote/range-source behaviour, peak RSS and allocation
+accounting, concurrency scaling, real-producer breadth, and cross-platform
+confirmation.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0563: the OOXML syscall line of work, and what it is worth
 
 [0563](0563-opc-single-warm-part-observation.md) removes one source observation

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "summary_kind": "litchi-xls-open-read-shape",
+  "detail": {
+    "capture": "xls_file_source_open.pread.txt",
+    "opens_in_capture": 2,
+    "pread64_calls": 1312,
+    "pread64_calls_per_open": 656.0,
+    "bytes_requested": 1137050,
+    "size_histogram": {
+      "4": 1242,
+      "512": 48,
+      "840": 2,
+      "1536": 2,
+      "43473": 2,
+      "49152": 2,
+      "65536": 14
+    },
+    "four_byte_reads": 1242,
+    "four_byte_share_percent": 94.66463414634147,
+    "reads_continuing_the_previous_read": 6
+  },
+  "isolation": {
+    "statx_per_open": 636.0,
+    "pread64_per_open": 655.0,
+    "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one open"
+  }
+}

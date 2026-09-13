@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0564: the XLS open read shape, and a corrected inference
+
+[0564](0564-xls-open-read-attribution.md) is attribution only. One source-backed
+XLS open costs 655 positional reads and 636 freshness observations, and 621 of
+the reads are the four-byte BIFF globals header pre-pass — 95% of the reads for
+0.44% of the bytes, all of which the following bulk read then fetches again.
+Removing that is worth roughly the entire file-source penalty, but conflicts
+with four tested contracts the record enumerates. It also corrects change 0325,
+which closed this line on an inference that did not follow from its own premise.
+
 ## 0563: warm OPC part reads observe the source twice
 
 [0563](0563-opc-single-warm-part-observation.md) removes the cache loop's

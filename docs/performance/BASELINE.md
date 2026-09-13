@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0564: XLS open read shape established
+
+The [0564 packet](0564-xls-open-read-attribution.md) retains a full `pread64` trace of one source-backed XLS open child and the `strace -f -c` isolation pair at 1 and 11 samples, plus a summarizer that reports only properties of the retained traces. It establishes 655 `pread64` and 636 `statx` per open, a 94.7% four-byte read share, and 0.5% read contiguity. No timing, resource or cold-cache measurement is added.
+
 ## Change 0563: warm and cold OPC observation counts established
 
 The [0563 packet](0563-opc-single-warm-part-observation.md) establishes the observation counts for a source-backed OPC part read as counted invariants rather than estimates: a warm-cache read takes two observations and zero source reads, a cold read takes five. Whole-child `statx` and `pread64` baselines for the four OOXML file-source captures are retained alongside the candidate counts.
