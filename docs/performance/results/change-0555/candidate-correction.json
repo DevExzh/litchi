@@ -1,0 +1,10 @@
+{
+  "schema": "ole2_0555_candidate_correction_v1",
+  "observed_utc": "2026-09-13T12:25:55.133231+00:00",
+  "reason": "Deny unused-qualifications rejects std::mem::size_of in new test; use prelude size_of",
+  "failed_quality_result_sha256": "0ab1ad9c659d35282a24c99c6f7dc8f101e28c712f30eb9073c181e69351c377",
+  "original_source_sha256": "9860e87ab34ce88c7e05d2914248a5d51acf1b4f34f1cc42406dacafd1836afa",
+  "corrected_source_sha256": "ae1383c3277d8695a5ff1495200079bd1a8f2156676d44058e1071a2de9fe173",
+  "corrected_patch_sha256": "709654664c2a57c25d031278871370d6c5960572a1a12558dec3ada6c45432a0",
+  "scope": "Test-only qualification; production candidate implementation identical; no candidate captures existed"
+}

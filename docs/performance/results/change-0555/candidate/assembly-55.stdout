@@ -1,0 +1,36 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f2a460 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within28_$u7b$$u7b$closure$u7d$$u7d$17hf23221f38a558c3eE>:
+ 2f2a460:	53                   	push   %rbx
+ 2f2a461:	48 89 fb             	mov    %rdi,%rbx
+ 2f2a464:	ff 15 26 0a 19 00    	call   *0x190a26(%rip)        # 30bae90 <_DYNAMIC+0x298>
+ 2f2a46a:	bf 1a 00 00 00       	mov    $0x1a,%edi
+ 2f2a46f:	be 01 00 00 00       	mov    $0x1,%esi
+ 2f2a474:	ff 15 1e 0a 19 00    	call   *0x190a1e(%rip)        # 30bae98 <_DYNAMIC+0x2a0>
+ 2f2a47a:	48 85 c0             	test   %rax,%rax
+ 2f2a47d:	74 32                	je     2f2a4b1 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within28_$u7b$$u7b$closure$u7d$$u7d$17hf23221f38a558c3eE+0x51>
+ 2f2a47f:	0f 10 05 d9 75 60 fd 	movups -0x29f8a27(%rip),%xmm0        # 531a5f <anon.5e899635af63395caccb147f006999be.8.llvm.8580323580471445977+0x5b1>
+ 2f2a486:	0f 11 40 0a          	movups %xmm0,0xa(%rax)
+ 2f2a48a:	0f 10 05 c4 75 60 fd 	movups -0x29f8a3c(%rip),%xmm0        # 531a55 <anon.5e899635af63395caccb147f006999be.8.llvm.8580323580471445977+0x5a7>
+ 2f2a491:	0f 11 00             	movups %xmm0,(%rax)
+ 2f2a494:	48 c7 43 08 1a 00 00 	movq   $0x1a,0x8(%rbx)
+ 2f2a49b:	00 
+ 2f2a49c:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2f2a4a0:	48 c7 43 18 1a 00 00 	movq   $0x1a,0x18(%rbx)
+ 2f2a4a7:	00 
+ 2f2a4a8:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f2a4af:	5b                   	pop    %rbx
+ 2f2a4b0:	c3                   	ret
+ 2f2a4b1:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f2a4b6:	be 1a 00 00 00       	mov    $0x1a,%esi
+ 2f2a4bb:	ff 15 07 0a 19 00    	call   *0x190a07(%rip)        # 30baec8 <_DYNAMIC+0x2d0>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

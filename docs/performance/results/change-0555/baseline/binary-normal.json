@@ -1,0 +1,8 @@
+{
+  "path": "/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal",
+  "sha256": "99be911319811de141ae0035c4e2d519fe05855f0d239ba94366925fee31dad1",
+  "bytes": 60099064,
+  "build_receipt_sha256": "8fef129bb477358c9de9a2d3675dbdda288d1b63a7982b1e78bb0181ab8d9d2e",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

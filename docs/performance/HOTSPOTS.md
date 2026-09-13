@@ -1,5 +1,11 @@
 # Performance hotspot inventory
 
+## Change 0555: physical-marker bookkeeping adds more work than it removes
+
+The [matched OLE2 experiment](0555-ole2-physical-accounting.md) rejects the allocation-free pending-role representation. Across five positive XLS timed dumps per repeat, final reconciliation self Ir fell from 1,991,710 to 829,930 while FAT-loading self Ir rose from 250,505 to 3,728,720. Total owner Ir increased about 20.5%; native XLS and few-large CFB controls regressed. These exclusive rows remain separate from overlapping inclusive totals. A shorter final pass does not establish lower constructor cost.
+
+The next independent OOXML target is [checked linear provenance merging](results/change-0555/ooxml-next-opportunity.md) in `Store::merge_omitted_cells`: sorted reduced-parse and omitted-source cells are currently combined and sorted again. Its retained owner attribution is 4.64–6.03% inclusive Ir, not a proven removable fraction. Fresh operation-local allocation evidence and end-to-end measurements are required; the rejected 0552/0553 compact collectors remain closed. ODF stays deferred.
+
 Change 0554 measured validated-name transfer in CFB. Many-small open p50 improved
 9.41% and 12.99%, and allocation calls fell 47.06%, but every primary XLS p50
 regressed (2.31–10.93%). The candidate is rejected and exact baseline source is

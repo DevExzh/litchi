@@ -1,0 +1,10 @@
+{
+  "schema": "ole2_0555_frozen_inputs_v1",
+  "frozen_utc": "2026-09-13T12:14:18.337692+00:00",
+  "files": {
+    "plan.json": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+    "run.py": "263918b60f17961d1c0261de9ac6d19294e0a113bb062434b3b7653b7898ad90",
+    "workspace-lock.json": "a9f083ce4e65d9149c3bf9d4e3b31619fe8cb00d2b2b836b8e73b75865120a02",
+    "adr-manifest.json": "63b2ce2853c7c548182cb4545cca7c490de914fa4a6791c939518e68a0871b59"
+  }
+}

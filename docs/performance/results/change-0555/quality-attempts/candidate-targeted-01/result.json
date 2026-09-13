@@ -1,0 +1,17 @@
+{
+  "schema": "ole2_0555_quality_v1",
+  "status": "failed",
+  "stage": "candidate",
+  "mode": "targeted",
+  "source_manifest_sha256": "05fb87fa0a53a6b30519e7c0ad5ac00d04835c6fe33db4bc01387cda42131ec4",
+  "inputs_sha256": "e14a34cdc9412b227be62b0959dfe99bf12298f39d0cb3f4946384c1754a3ca8",
+  "completed_utc": "2026-09-13T12:24:44.487432+00:00",
+  "rows": [
+    {
+      "name": "cfb-tests",
+      "path": "quality-attempts/candidate-targeted-01/cfb-tests",
+      "receipt_sha256": "f3dd190d442f63b70ddd057c2f2890ce4cf37349f1537cb98ea85dda8d12d855",
+      "exit_code": 101
+    }
+  ]
+}

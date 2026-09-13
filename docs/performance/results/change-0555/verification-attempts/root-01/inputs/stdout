@@ -1,0 +1,150 @@
+{
+  "result": {
+    "ADR": {
+      "entries": 30,
+      "path": "adr-manifest.json",
+      "sha256": "63b2ce2853c7c548182cb4545cca7c490de914fa4a6791c939518e68a0871b59"
+    },
+    "analysis_inputs": {
+      "amendments": {
+        "analyze_metrics.py": {
+          "amended_sha256": "d81ec3237dcf36dc3b47d5239d44e15f8f4a98960f5871997b0670257a75ca13",
+          "failed_receipt_sha256": "528f0938fed55bf0cc893bb72364304995ccad3f1b658c70ad6b4cd15d23b804",
+          "original_sha256": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+          "path": "analysis-amendment.json",
+          "sha256": "c5f100885e465b26c656d67906b2186a49fcc02617d66ea9736ff4169dbcf445"
+        },
+        "analyze_profiles.py": {
+          "amended_sha256": "05e24460aeab68384448312744efbd2c94ab1e3650f3c7c6b424b0f7e0bfafdd",
+          "failed_receipt_sha256": "96bba10cdcca3a5c339272e6bbda8f7936e8a21bfc96630c83c882dcb86fa712",
+          "original_sha256": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+          "path": "profile-amendment.json",
+          "sha256": "b826afdf2f8211fd0e6ca9add60ad1057649ec95b89bf8bba6b065dd972f929e"
+        }
+      },
+      "files": {
+        "docs/performance/results/change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+        "docs/performance/results/change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74",
+        "docs/performance/results/change-0536/analyze_profiles.py": "5ce0d3a0c9f9246f207b9be063791cf6ccf014f6582da47562de42c7e0d364a5",
+        "docs/performance/results/change-0554/analyze_profiles.py": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+        "docs/performance/results/change-0555/analyze_metrics.py": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+        "docs/performance/results/change-0555/analyze_profiles.py": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+        "docs/performance/results/change-0555/inspect_assembly.py": "7da85853d5fc7496ceafd8494cb1d29c9e426fe96ba63117bc095fbeadec3a67",
+        "docs/performance/results/change-0555/quality-plan.json": "3f4735be2ce055dbe58d666a26aa24c17e4595ba41c166c0e9422963c82d8f3f",
+        "docs/performance/results/change-0555/quality.py": "0d207dba5909b6ce039a15c3b74a2c79baa5ea6e33bc533d2016fea734db21c8",
+        "docs/performance/results/change-0555/representation-selection.json": "552acc7559586cd0c6e46268a0785114ab1f4abbb716d4a38aa630afe85ad2f4",
+        "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+        "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+        "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+      },
+      "frozen_utc": "2026-09-13T12:21:38.832393+00:00",
+      "path": "analysis-inputs.json",
+      "sha256": "064adcb6f2f11552da6eee5eb49c56a7fc1a675942478d5748927a271b92dde8"
+    },
+    "candidate": {
+      "application": {
+        "path": "candidate-application.json",
+        "sha256": "91c74b2f17e8bffdd9019321ebb7f1769ea559040df71bbda8379138211d4d4c"
+      },
+      "binding": {
+        "path": "candidate-binding.json",
+        "sha256": "7829455eb6d68ddec8c9d0aca5e06b48376e1041afd5e894835502721065704c"
+      },
+      "correction": {
+        "path": "candidate-correction.json",
+        "sha256": "c79edb049f409b91e8162f60b58dad5f88bd6dfc041d29a290c3e07533b612d7"
+      },
+      "correctness": {
+        "path": "candidate-correctness.json",
+        "sha256": "96a026c03836f6700ebdce96da72be05c77ed639b0da39632f1ac608f8a92977"
+      },
+      "preserved_attempt": {
+        "binding_sha256": "524dbe16f77a6d7ab1e66a85679e873b0c7d18b52e2e5e35c6a44836cd105ad1",
+        "quality_result_sha256": "0ab1ad9c659d35282a24c99c6f7dc8f101e28c712f30eb9073c181e69351c377",
+        "source_manifest_sha256": "05fb87fa0a53a6b30519e7c0ad5ac00d04835c6fe33db4bc01387cda42131ec4"
+      }
+    },
+    "frozen": {
+      "files": {
+        "adr-manifest.json": "63b2ce2853c7c548182cb4545cca7c490de914fa4a6791c939518e68a0871b59",
+        "plan.json": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+        "run.py": "263918b60f17961d1c0261de9ac6d19294e0a113bb062434b3b7653b7898ad90",
+        "workspace-lock.json": "a9f083ce4e65d9149c3bf9d4e3b31619fe8cb00d2b2b836b8e73b75865120a02"
+      },
+      "frozen_utc": "2026-09-13T12:14:18.337692+00:00",
+      "path": "frozen-inputs.json",
+      "sha256": "1093fafbd44cb59d7e0b649339f371aece7d9f1e5928754a9e9bc6e2d82c281e"
+    },
+    "host": {
+      "cpu_allowed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31
+      ],
+      "path": "host.json",
+      "sha256": "d1c8d3b9c24ebe9eceede3d3d29ee73ba57c526db174fc2b6c08fb76eb3a57c0"
+    },
+    "lock": {
+      "lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+      "path": "workspace-lock.json",
+      "sha256": "a9f083ce4e65d9149c3bf9d4e3b31619fe8cb00d2b2b836b8e73b75865120a02"
+    },
+    "plan": {
+      "revision": "d3c62f19a7632114f9cce5d1ad350e237215582d",
+      "sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef"
+    },
+    "quality_plan": {
+      "commands": {
+        "commands": [
+          "tests",
+          "workspace",
+          "clippy",
+          "rustdoc",
+          "fmt",
+          "boundaries",
+          "no-default",
+          "claims"
+        ],
+        "targeted": [
+          "cfb-tests",
+          "cfb-clippy",
+          "fmt"
+        ]
+      },
+      "path": "quality-plan.json",
+      "sha256": "3f4735be2ce055dbe58d666a26aa24c17e4595ba41c166c0e9422963c82d8f3f"
+    }
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "inputs",
+  "status": "pass"
+}

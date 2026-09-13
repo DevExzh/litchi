@@ -1,0 +1,335 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 9441de203..96ca3f2f2 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -134,6 +134,11 @@ struct ValidatedDirectoryEntry {
+ enum PhysicalSectorRole {
+     #[default]
+     Unclaimed,
++    /// A physical sector whose decoded FAT marker is non-free but which has
++    /// not yet been claimed by a validated owner.  This is an internal
++    /// accounting state, not an ownership role: a later successful claim
++    /// consumes it and prevents the final reconciliation error.
++    Pending,
+     Fat,
+     Difat,
+     Directory,
+@@ -154,6 +159,7 @@ impl PhysicalSectorRole {
+     fn label(self) -> &'static str {
+         match self {
+             Self::Unclaimed => "unclaimed",
++            Self::Pending => "unclaimed",
+             Self::Fat => "FAT",
+             Self::Difat => "DIFAT",
+             Self::Directory => "directory",
+@@ -885,14 +891,10 @@ impl<R: Read + Seek> OleFile<R> {
+ 
+             // Every chunk is a complete entry, and the exact fallible
+             // reservation covers this sector's entire extension.
+-            fat.extend(
+-                sector_data
+-                    .as_chunks::<4>()
+-                    .0
+-                    .iter()
+-                    .copied()
+-                    .map(u32::from_le_bytes),
+-            );
++            for chunk in sector_data.as_chunks::<4>().0 {
++                let entry = u32::from_le_bytes(*chunk);
++                self.record_decoded_fat_entry(&mut fat, entry);
++            }
+         }
+ 
+         for sector in fat_sectors {
+@@ -1054,6 +1056,24 @@ impl<R: Read + Seek> OleFile<R> {
+         Ok(())
+     }
+ 
++    #[inline]
++    fn record_decoded_fat_entry(&mut self, fat: &mut Vec<u32>, entry: u32) {
++        let sector = fat.len();
++        // `fat` has an exact fallible reservation in `load_fat`; retaining the
++        // infallible push here preserves the established allocation boundary.
++        fat.push(entry);
++        // The role map already contains the FAT/DIFAT claims made above. Fold
++        // only physical-prefix, non-free entries into that map while the FAT
++        // is decoded, so final reconciliation needs one ordered role scan
++        // instead of a paired role/FAT pass. FAT padding is excluded.
++        if sector < self.sector_roles.len()
++            && entry != FREESECT
++            && self.sector_roles[sector] == PhysicalSectorRole::Unclaimed
++        {
++            self.sector_roles[sector] = PhysicalSectorRole::Pending;
++        }
++    }
++
+     #[inline]
+     fn claim_sector(&mut self, sector: u32, role: PhysicalSectorRole) -> Result<(), OleError> {
+         let slot = self
+@@ -1062,9 +1082,18 @@ impl<R: Read + Seek> OleFile<R> {
+                 usize::try_from(sector).map_err(|_err| claim_sector_index_error(sector, role))?,
+             )
+             .ok_or_else(|| claim_sector_bounds_error(sector, role))?;
+-        if *slot != PhysicalSectorRole::Unclaimed {
++        if !matches!(
++            *slot,
++            PhysicalSectorRole::Unclaimed | PhysicalSectorRole::Pending
++        ) {
+             return Err(claim_sector_conflict_error(sector, *slot, role));
+         }
++        // `Unclaimed` is retained as a private role-test operation.  It must
++        // not erase the separate pending-marker fact if such a state is ever
++        // presented to this helper.
++        if *slot == PhysicalSectorRole::Pending && role == PhysicalSectorRole::Unclaimed {
++            return Ok(());
++        }
+         *slot = role;
+         Ok(())
+     }
+@@ -1176,17 +1205,25 @@ impl<R: Read + Seek> OleFile<R> {
+     /// markers are inert; rejecting them would refuse files that Word itself
+     /// opens.
+     fn validate_physical_sector_layout(&self) -> Result<(), OleError> {
+-        for (sector, role) in self.sector_roles.iter().enumerate() {
++        if let Some(sector) = self
++            .sector_roles
++            .iter()
++            .position(|role| *role == PhysicalSectorRole::Pending)
++        {
+             let entry = self.fat.get(sector).copied().ok_or_else(|| {
+                 OleError::CorruptedFile(format!(
+                     "FAT does not contain an entry for physical sector {sector}"
+                 ))
+             })?;
+-            if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
+-                return Err(OleError::CorruptedFile(format!(
+-                    "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
+-                )));
+-            }
++            return Err(OleError::CorruptedFile(format!(
++                "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
++            )));
++        }
++        if self.fat.len() < self.sector_roles.len() {
++            return Err(OleError::CorruptedFile(format!(
++                "FAT does not contain an entry for physical sector {}",
++                self.fat.len()
++            )));
+         }
+         Ok(())
+     }
+@@ -3473,7 +3510,15 @@ mod tests {
+         for &(role, role_label) in &CLAIM_ROLES {
+             for &(marker, marker_label) in &markers {
+                 let mut file = synthetic_fat_file(vec![marker], Vec::new());
+-                file.sector_roles = vec![role];
++                // The production loader folds a non-free physical-prefix
++                // marker into the role map while decoding the FAT.  Mirror
++                // that state transition in this direct unit fixture.
++                let stored_role = if role == PhysicalSectorRole::Unclaimed && marker != FREESECT {
++                    PhysicalSectorRole::Pending
++                } else {
++                    role
++                };
++                file.sector_roles = vec![stored_role];
+                 let roles_before = file.sector_roles.clone();
+                 let fat_before = file.fat.clone();
+                 let result = file.validate_physical_sector_layout();
+@@ -3538,7 +3583,7 @@ mod tests {
+             ),
+             (
+                 "prefix marker beats later missing",
+-                vec![PhysicalSectorRole::Unclaimed, PhysicalSectorRole::Fat],
++                vec![PhysicalSectorRole::Pending, PhysicalSectorRole::Fat],
+                 vec![ENDOFCHAIN],
+                 Some("unclaimed physical sector 0 has FAT marker 0xFFFFFFFE"),
+             ),
+@@ -3575,6 +3620,188 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn decoded_fat_entries_record_pending_prefix_without_padding_state() {
++        let mut file = synthetic_fat_file(Vec::new(), Vec::new());
++        file.sector_roles = vec![
++            PhysicalSectorRole::Unclaimed,
++            PhysicalSectorRole::Fat,
++            PhysicalSectorRole::Unclaimed,
++            PhysicalSectorRole::Unclaimed,
++        ];
++        let mut fat = Vec::with_capacity(5);
++        let role_capacity = file.sector_roles.capacity();
++        let fat_capacity = fat.capacity();
++        for entry in [FREESECT, ENDOFCHAIN, FREESECT, 7, MAXREGSECT] {
++            file.record_decoded_fat_entry(&mut fat, entry);
++        }
++
++        assert_eq!(size_of::<PhysicalSectorRole>(), 1);
++        assert_eq!(file.sector_roles.capacity(), role_capacity);
++        assert_eq!(fat.capacity(), fat_capacity);
++        assert_eq!(fat, [FREESECT, ENDOFCHAIN, FREESECT, 7, MAXREGSECT]);
++        assert_eq!(
++            file.sector_roles,
++            [
++                PhysicalSectorRole::Unclaimed,
++                PhysicalSectorRole::Fat,
++                PhysicalSectorRole::Unclaimed,
++                PhysicalSectorRole::Pending,
++            ]
++        );
++    }
++
++    fn baseline_physical_layout_error(roles: &[PhysicalSectorRole], fat: &[u32]) -> Option<String> {
++        for (sector, role) in roles.iter().enumerate() {
++            let Some(entry) = fat.get(sector).copied() else {
++                return Some(format!(
++                    "FAT does not contain an entry for physical sector {sector}"
++                ));
++            };
++            if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
++                return Some(format!(
++                    "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
++                ));
++            }
++        }
++        None
++    }
++
++    #[test]
++    fn pending_accounting_matches_original_layout_oracle_for_prefix_claims() {
++        let cases = [
++            (
++                "all-free",
++                vec![PhysicalSectorRole::Unclaimed; 3],
++                vec![FREESECT, FREESECT, FREESECT],
++                &[][..],
++            ),
++            (
++                "marker-before-missing",
++                vec![PhysicalSectorRole::Unclaimed; 4],
++                vec![ENDOFCHAIN, FREESECT],
++                &[][..],
++            ),
++            (
++                "missing-without-marker",
++                vec![PhysicalSectorRole::Unclaimed; 4],
++                vec![FREESECT, FREESECT],
++                &[][..],
++            ),
++            (
++                "padding-is-ignored",
++                vec![PhysicalSectorRole::Fat, PhysicalSectorRole::Unclaimed],
++                vec![FATSECT, FREESECT, ENDOFCHAIN, MAXREGSECT],
++                &[][..],
++            ),
++            (
++                "preclaims-and-later-claim",
++                vec![
++                    PhysicalSectorRole::Fat,
++                    PhysicalSectorRole::Difat,
++                    PhysicalSectorRole::Unclaimed,
++                    PhysicalSectorRole::Unclaimed,
++                ],
++                vec![FATSECT, DIFSECT, 7, FREESECT],
++                &[(2, PhysicalSectorRole::RegularStream)][..],
++            ),
++            (
++                "all-markers-consumed-out-of-order",
++                vec![PhysicalSectorRole::Unclaimed; 3],
++                vec![FREESECT, 7, 9],
++                &[
++                    (2, PhysicalSectorRole::RegularStream),
++                    (1, PhysicalSectorRole::Directory),
++                ][..],
++            ),
++            (
++                "marker-remains-after-later-claim",
++                vec![PhysicalSectorRole::Unclaimed; 3],
++                vec![FREESECT, 7, 9],
++                &[(2, PhysicalSectorRole::RegularStream)][..],
++            ),
++        ];
++
++        for (case, initial_roles, markers, claims) in cases {
++            let mut file = synthetic_fat_file(markers.clone(), Vec::new());
++            file.sector_roles = initial_roles.clone();
++            let mut decoded_fat = Vec::with_capacity(markers.len());
++            for marker in markers.iter().copied() {
++                file.record_decoded_fat_entry(&mut decoded_fat, marker);
++            }
++            file.fat = decoded_fat;
++
++            let mut oracle_roles = initial_roles;
++            for &(sector, role) in claims {
++                file.claim_sector(sector as u32, role).unwrap();
++                assert_eq!(
++                    oracle_roles[sector],
++                    PhysicalSectorRole::Unclaimed,
++                    "{case}"
++                );
++                oracle_roles[sector] = role;
++            }
++
++            let expected = baseline_physical_layout_error(&oracle_roles, &markers);
++            let actual = file
++                .validate_physical_sector_layout()
++                .map_err(|error| match error {
++                    OleError::CorruptedFile(message) => message,
++                    other => panic!("{case}: unexpected error {other:?}"),
++                });
++            assert_eq!(actual.err(), expected, "{case}");
++        }
++    }
++
++    #[test]
++    fn pending_claim_is_consumed_without_shifting_conflict_errors() {
++        let mut file = synthetic_fat_file(vec![ENDOFCHAIN, 7, 9, FREESECT], Vec::new());
++        file.sector_roles = vec![
++            PhysicalSectorRole::Pending,
++            PhysicalSectorRole::Pending,
++            PhysicalSectorRole::Pending,
++            PhysicalSectorRole::Unclaimed,
++        ];
++
++        assert!(matches!(
++            file.claim_sector(3, PhysicalSectorRole::Directory),
++            Ok(())
++        ));
++        assert!(matches!(
++            file.claim_sector(2, PhysicalSectorRole::RegularStream),
++            Ok(())
++        ));
++        let roles_before = file.sector_roles.clone();
++        assert!(matches!(
++            file.claim_sector(3, PhysicalSectorRole::Fat),
++            Err(OleError::CorruptedFile(message)) if message == "Sector 3 is claimed by both directory and FAT"
++        ));
++        assert_eq!(file.sector_roles, roles_before);
++
++        assert!(matches!(
++            file.claim_sector(0, PhysicalSectorRole::Directory),
++            Ok(())
++        ));
++        assert!(matches!(
++            file.claim_sector(1, PhysicalSectorRole::MiniFat),
++            Ok(())
++        ));
++        assert!(file.validate_physical_sector_layout().is_ok());
++
++        let mut still_pending = synthetic_fat_file(vec![ENDOFCHAIN], Vec::new());
++        still_pending.sector_roles = vec![PhysicalSectorRole::Pending];
++        assert!(matches!(
++            still_pending.claim_sector(0, PhysicalSectorRole::Unclaimed),
++            Ok(())
++        ));
++        assert_eq!(still_pending.sector_roles, [PhysicalSectorRole::Pending]);
++        assert!(matches!(
++            still_pending.validate_physical_sector_layout(),
++            Err(OleError::CorruptedFile(message))
++                if message == "unclaimed physical sector 0 has FAT marker 0xFFFFFFFE"
++        ));
++    }
++
+     fn synthetic_minifat_file(minifat: Vec<u32>, ministream: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
+         OleFile {
+             reader: Cursor::new(Vec::new()),

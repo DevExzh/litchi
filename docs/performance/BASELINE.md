@@ -1,5 +1,11 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0555: OLE2 physical-marker accounting rejected
+
+The [0555 record](0555-ole2-physical-accounting.md) retains fresh matched native, allocation and constructor-profile evidence for a pending-role representation. All eight primary XLS p50 rows regressed (+8.66% to +23.49%); few-large CFB p50 regressed +44.81%/+31.49%. All 72 allocation metrics were unchanged and all four group-process RSS controls passed. The role-only final scan became cheaper, but FAT-decoding self instructions increased enough to raise total XLS owner instructions about 20.5%. Exact baseline Rust source is restored; no production speedup is claimed.
+
+OLE2/OOXML remain first priority; ODF is deferred and iWork excluded.
+
 Change 0554 retains a fresh matched CFB/XLS name-handoff campaign from `53330ff67`:
 nine XLS cases and three CFB shapes, two native ABBA repeats (1,000 samples,
 20 warmups), separate allocator regions (30 samples, three warmups), and matched

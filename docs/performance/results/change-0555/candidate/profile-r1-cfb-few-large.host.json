@@ -1,0 +1,11 @@
+{
+  "observed_utc": "2026-09-13T12:37:09.952600+00:00",
+  "compiler_processes": [
+    {
+      "pid": 4075262,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-logical-worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

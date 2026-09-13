@@ -1,0 +1,173 @@
+{
+  "schema": "ole2_physical_marker_0555_plan_v1",
+  "revision": "d3c62f19a7632114f9cce5d1ad350e237215582d",
+  "created_utc": "2026-09-13T12:10:09.594589979Z",
+  "previous_turn": "progress:0554 rejected the validated-name handoff after matched XLS latency regressions; baseline production was restored and final quality passed",
+  "priority": "OLE2/OOXML first; ODF deferred until the OLE2/OOXML optimization goal completes; iWork excluded",
+  "scope": "Matched OLE2 physical-sector marker accounting experiment across the FAT, DIFAT, Directory, MiniFAT, MiniStream, and RegularStream roles; no public API or semantic format change",
+  "hypothesis": "Account for physical-sector progress with the existing role map's Pending marker and, where source review supports it, a monotonic cursor so FAT materialization and later ownership claims avoid repeated physical-marker bookkeeping while retaining exact traversal, source limits, allocation order, error precedence, and atomic publication",
+  "candidate_files": [
+    "crates/litchi-cfb/src/file.rs"
+  ],
+  "candidate_scope": {
+    "implementation": "Existing private physical-sector role accounting across every listed role; an existing-role Pending marker and optional monotonic cursor may replace repeated scans, while the exact scan/cursor representation remains subject to source review",
+    "physical_roles": [
+      "FAT",
+      "DIFAT",
+      "Directory",
+      "MiniFAT",
+      "MiniStream",
+      "RegularStream"
+    ],
+    "semantic_invariants": [
+      "Directory traversal order and duplicate/cycle/error decisions remain identical",
+      "All source, sector, FAT, MiniFAT, directory, name, and allocation limits remain enforced",
+      "Validation does not mutate and failed opens publish no partial graph",
+      "Public fields, root classic-Mac two-view behavior, names, CLSIDs, and scalar metadata remain byte/semantic compatible",
+      "FAT padding and out-of-file entries retain their existing acceptance boundary; every physical sector has the same final exclusive role",
+      "No new cache, global state, ambient I/O, unsafe code, or extra persistent metadata is introduced"
+    ],
+    "allocation_constraint": "Use existing checked/fallible storage where applicable; no candidate-specific allocation growth is admitted"
+  },
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ],
+      "primary_cases": [
+        "xls_source_backed_open",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "order": [
+      "baseline r1 xls/cfb",
+      "candidate r1 xls/cfb",
+      "candidate r2 cfb/xls",
+      "baseline r2 cfb/xls under candidate execution-stage binding"
+    ],
+    "source_identity": "Every receipt binds both output stage and live execution stage; retained baseline-r2 uses the baseline binary/output folder with candidate source execution identity"
+  },
+  "allocation": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "order": [
+      "baseline r1 xls/cfb",
+      "candidate r1 xls/cfb",
+      "candidate r2 cfb/xls",
+      "baseline r2 cfb/xls under candidate execution-stage binding"
+    ],
+    "scope": "Existing constructor/operation clock with the canonical operation-global System allocator region; excludes fixture construction, correctness oracles, report construction, and object drop",
+    "vector": "Every nine XLS case and three CFB shape in both repeats; calls, allocated bytes, and incremental region peak are retained per operation"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "positive_timed_dumps": "Exactly five positive timed constructor dumps per job and repeat; setup and termination dumps are retained and classified separately",
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "Exact timed constructor owner edges; preserve physical-marker/cursor attribution, setup classification, instruction positions, and all positive dumps",
+    "instruction_flags": [
+      "--dump-instr=yes",
+      "--dump-line=no",
+      "--compress-pos=no",
+      "--collect-jumps=yes"
+    ],
+    "runtime_flags": [
+      "--vgdb=no",
+      "--collect-atstart=no",
+      "--toggle-collect=<owner>",
+      "--zero-before=<owner>",
+      "--dump-after=<owner>"
+    ]
+  },
+  "assembly": {
+    "scope": "Static instruction bounds from the exact retained normal binary; dynamic positive owner and marker/cursor edges remain required for attribution",
+    "requested_owners": [
+      "validate_physical_sector_layout",
+      "load_fat",
+      "claim_sector",
+      "claim_chain",
+      "validate_stream_allocations",
+      "collect_exact",
+      "open_with_limits",
+      "pending",
+      "advance"
+    ],
+    "both_stages": true
+  },
+  "admission": {
+    "primary_xls_p50": "All four primary XLS cases must improve by at least 3% (candidate p50 <= 0.97 * matched baseline p50) in both paired repeats",
+    "primary_xls_mean": "Each of the four primary XLS cases must have mean increase no greater than 5% in both paired repeats",
+    "native_xls_controls": "Every non-primary XLS case must have p50 and mean increase no greater than 5% in each paired repeat",
+    "native_cfb_controls": "Every CFB shape, including many-small, must have p50 and mean increase no greater than 5% in each paired repeat",
+    "native_rss": "Each of the four paired process RSS comparisons (XLS group and CFB group in both repeats) must increase no greater than 5%; process RSS is reported at group-process scope, not synthesized per case",
+    "allocation": "All 72 operation metric rows (12 workloads x 2 repeats x calls/allocated-bytes/incremental-region-peak) must increase no greater than 5%; no geometric mean or selective row exemption",
+    "correctness": "Independent source review, exact directory-chain/error-order/limit/atomic-publication tests, public metadata and root compatibility checks, and all required quality commands must pass",
+    "mechanism": "Retain positive timed owner and physical-marker/cursor evidence for every physical role with caller ancestry, call counts, inclusive/self Ir, static bounds, and exact source/binary identities; total XLS owner Ir must decrease in both repeats and at least one physical-reconciliation leaf must decrease in both repeats or have an exact mapped-inline proof; a missing symbol or aggregate change is not proof of eliminated work",
+    "review": "Retain every matched adverse row above 5% and every absolute same-build drift above 5%; no selective reruns, gate relaxation, or post-observation scope change",
+    "disposition": "Every mandatory gate is required; reject and restore the baseline on any failure, while retaining independent tests and all evidence"
+  },
+  "prior_scope_note": "The 0554 many-small improvement requirement was a candidate-specific name-handoff premeasurement scope. This 0555 plan is frozen before any 0555 capture and treats many-small as a required CFB control while the physical-sector hypothesis spans all six roles; removing that candidate-specific positive target is based on the new physical-marker scope, not on observed 0555 results and does not relax the four-primary-XLS requirement inherited from the prior admission supplement.",
+  "source_binding": {
+    "baseline_revision": "d3c62f19a7632114f9cce5d1ad350e237215582d",
+    "source_manifest": "{stage}/source-manifest.json",
+    "workspace_lock_binding": "workspace-lock.json",
+    "workspace_lock_copy": "workspace-Cargo.lock",
+    "adr_manifest": "adr-manifest.json",
+    "receipt_requirements": [
+      "script_sha256",
+      "plan_sha256",
+      "source_manifest_sha256",
+      "execution_manifest_sha256",
+      "workspace_lock_sha256",
+      "workspace_lock_binding_sha256",
+      "binary_sha256 when a binary is used"
+    ]
+  },
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0555-target"
+  ],
+  "temporary_storage": "Use only the owned target and target/tmp; retain copied normal and allocator binaries by stage; do not use shared /tmp for campaign outputs",
+  "status": "frozen before build, capture, candidate application, and result observation",
+  "limitations": [
+    "No hardware counter, cold-cache, physical-device, remote-provider, native-producer, or scaling claim from this matrix",
+    "The timed constructor profile is diagnostic attribution and does not by itself authorize adoption",
+    "Many-small has a regression ceiling only; this plan makes no candidate-specific positive many-small claim",
+    "The exact pending-state/cursor implementation remains subject to source review and must preserve the listed invariants"
+  ]
+}

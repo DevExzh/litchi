@@ -1,0 +1,11 @@
+{
+  "result": {
+    "adoption_allowed": false,
+    "path": "adverse-review.json",
+    "reviewed_flags": 187,
+    "sha256": "632d48e81174425745f10a97607c155d3554316f00c9ce63bb2fff412facc457"
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "review",
+  "status": "pass"
+}

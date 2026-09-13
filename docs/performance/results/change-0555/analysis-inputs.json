@@ -1,0 +1,20 @@
+{
+  "schema": "ole2_0555_analysis_inputs_v1",
+  "frozen_utc": "2026-09-13T12:21:38.832393+00:00",
+  "scope": "Numerical/profile consumers and transitive helpers frozen before first capture; source, plan, admission and driver already frozen",
+  "files": {
+    "docs/performance/results/change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+    "docs/performance/results/change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74",
+    "docs/performance/results/change-0536/analyze_profiles.py": "5ce0d3a0c9f9246f207b9be063791cf6ccf014f6582da47562de42c7e0d364a5",
+    "docs/performance/results/change-0554/analyze_profiles.py": "268bd461a41e71921d47eb8fd11071290bd7d744b6b08fa531f95f805e9f3684",
+    "docs/performance/results/change-0555/analyze_metrics.py": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+    "docs/performance/results/change-0555/analyze_profiles.py": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+    "docs/performance/results/change-0555/inspect_assembly.py": "7da85853d5fc7496ceafd8494cb1d29c9e426fe96ba63117bc095fbeadec3a67",
+    "docs/performance/results/change-0555/quality-plan.json": "3f4735be2ce055dbe58d666a26aa24c17e4595ba41c166c0e9422963c82d8f3f",
+    "docs/performance/results/change-0555/quality.py": "0d207dba5909b6ce039a15c3b74a2c79baa5ea6e33bc533d2016fea734db21c8",
+    "docs/performance/results/change-0555/representation-selection.json": "552acc7559586cd0c6e46268a0785114ab1f4abbb716d4a38aa630afe85ad2f4",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+    "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  }
+}

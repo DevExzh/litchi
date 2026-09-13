@@ -1,0 +1,33 @@
+{
+  "after_path": "docs/performance/results/change-0555/analyze_profiles.py",
+  "amended_sha256": "05e24460aeab68384448312744efbd2c94ab1e3650f3c7c6b424b0f7e0bfafdd",
+  "before_path": "docs/performance/results/change-0555/analyzer-attempts/profile-before-comparison-state/analyze_profiles.py",
+  "changes": {
+    "analyze_profiles.py": {
+      "amended": "analyze_profiles.py",
+      "description": "Use the actual per-dump claim_sector attribution states when evaluating the inline/out-of-line evidence flag; no capture, source, profile target, mechanism threshold, or adoption rule changes.",
+      "final_sha256": "05e24460aeab68384448312744efbd2c94ab1e3650f3c7c6b424b0f7e0bfafdd",
+      "initial_sha256": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+      "original": "analyzer-attempts/profile-before-comparison-state/analyze_profiles.py"
+    }
+  },
+  "created_utc": "2026-09-13T12:43:00Z",
+  "failed_receipt_path": "docs/performance/results/change-0555/analysis-attempts/profiles-compare-01/receipt.json",
+  "failed_receipt_reason": "The frozen 0555 profile comparison consumer raised KeyError('state') after both canonical stage profile reports had passed; the comparison gate read a per-dump field from an aggregate comparison row. The failure occurred before any canonical comparison output was written.",
+  "failed_receipt_sha256": "96bba10cdcca3a5c339272e6bbda8f7936e8a21bfc96630c83c882dcb86fa712",
+  "original_analysis_inputs_path": "docs/performance/results/change-0555/analysis-inputs.json",
+  "original_analysis_inputs_sha256": "064adcb6f2f11552da6eee5eb49c56a7fc1a675942478d5748927a271b92dde8",
+  "original_sha256": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+  "path": "docs/performance/results/change-0555/analyze_profiles.py",
+  "preserved_analyzer_path": "docs/performance/results/change-0555/analyzer-attempts/profile-before-comparison-state/analyze_profiles.py",
+  "preserved_analyzer_sha256": "17a99876122d0cd2f7f17049bf124146c78f4dcae86b014678fdbef682c1a63e",
+  "preserved_failed_receipt_path": "docs/performance/results/change-0555/analyzer-attempts/profile-before-comparison-state/failed-profile-receipt.json",
+  "preserved_failed_receipt_sha256": "96bba10cdcca3a5c339272e6bbda8f7936e8a21bfc96630c83c882dcb86fa712",
+  "preserved_failed_stderr_path": "docs/performance/results/change-0555/analyzer-attempts/profile-before-comparison-state/failed-profile-stderr",
+  "preserved_failed_stderr_sha256": "472f85c8bd1bf7e8540e0f06460d3ef8d49efc72001788809fea82248add13da",
+  "preserved_failed_stdout_path": "docs/performance/results/change-0555/analyzer-attempts/profile-before-comparison-state/failed-profile-stdout",
+  "preserved_failed_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reason": "The frozen 0555 profile comparison consumer raised KeyError('state') after both canonical stage profile reports had passed; the comparison gate read a per-dump field from an aggregate comparison row. The failure occurred before any canonical comparison output was written.",
+  "schema": "ole2_0555_profile_amendment_v1",
+  "scope": "Analysis-consumer-only state-field correction after the matched 0555 profile stage reports; plan, Rust source, driver, captures, frozen analysis inputs, measurements, profile target set, mechanism thresholds, and adoption rules remain unchanged."
+}

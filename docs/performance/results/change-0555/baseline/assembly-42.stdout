@@ -1,0 +1,37 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000016f7e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h00d5975ea938c78aE>:
+ 16f7e60:	53                   	push   %rbx
+ 16f7e61:	48 89 fb             	mov    %rdi,%rbx
+ 16f7e64:	ff 15 e6 55 9c 01    	call   *0x19c55e6(%rip)        # 30bd450 <_DYNAMIC+0x298>
+ 16f7e6a:	bf 18 00 00 00       	mov    $0x18,%edi
+ 16f7e6f:	be 01 00 00 00       	mov    $0x1,%esi
+ 16f7e74:	ff 15 de 55 9c 01    	call   *0x19c55de(%rip)        # 30bd458 <_DYNAMIC+0x2a0>
+ 16f7e7a:	48 85 c0             	test   %rax,%rax
+ 16f7e7d:	74 35                	je     16f7eb4 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h00d5975ea938c78aE+0x54>
+ 16f7e7f:	0f 10 05 96 39 ad fe 	movups -0x152c66a(%rip),%xmm0        # 1cb81c <anon.b8394871a1415c43bb440f943de8f6fd.8.llvm.2662864827179425894+0x877>
+ 16f7e86:	0f 11 00             	movups %xmm0,(%rax)
+ 16f7e89:	48 b9 6f 76 65 72 66 	movabs $0x776f6c667265766f,%rcx
+ 16f7e90:	6c 6f 77 
+ 16f7e93:	48 89 48 10          	mov    %rcx,0x10(%rax)
+ 16f7e97:	48 c7 43 08 18 00 00 	movq   $0x18,0x8(%rbx)
+ 16f7e9e:	00 
+ 16f7e9f:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 16f7ea3:	48 c7 43 18 18 00 00 	movq   $0x18,0x18(%rbx)
+ 16f7eaa:	00 
+ 16f7eab:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 16f7eb2:	5b                   	pop    %rbx
+ 16f7eb3:	c3                   	ret
+ 16f7eb4:	bf 01 00 00 00       	mov    $0x1,%edi
+ 16f7eb9:	be 18 00 00 00       	mov    $0x18,%esi
+ 16f7ebe:	ff 15 c4 55 9c 01    	call   *0x19c55c4(%rip)        # 30bd488 <_DYNAMIC+0x2d0>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

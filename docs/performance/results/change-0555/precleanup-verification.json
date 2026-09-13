@@ -1,0 +1,110 @@
+{
+  "result": {
+    "campaign": {
+      "captures": {
+        "stages": [
+          "baseline",
+          "candidate"
+        ]
+      },
+      "decision": {
+        "adoption_allowed": false,
+        "disposition": "rejected",
+        "path": "decision.json",
+        "sha256": "36db80f0746e76b1e8b65c5b8097c0808b027d4dce9c17db6f22aa03211402fd",
+        "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9"
+      },
+      "documentation": {
+        "files": {
+          "docs/performance/0555-ole2-physical-accounting.md": "73f77fe90855456fd46237006ca8eb2337be0a7afd2a7fefb3fe0ad2b0836bc8",
+          "docs/performance/BASELINE.md": "67fa1121df64238ff54bed788f426ef77e55b63cad1c835c458a474cb9962c05",
+          "docs/performance/HOTSPOTS.md": "9f92d26112e30455aa73715782f9f1f48d75c177439f645bca9ebd2aea287286"
+        },
+        "path": "documentation-manifest.json",
+        "sha256": "0f2afd1dadf73e07c300afa8108e6e758392bc4e85b4fca785b7184db5044cd4"
+      },
+      "inputs": {
+        "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef"
+      },
+      "metrics": {
+        "gate_passed": false,
+        "sha256": "89f772dce89ebb81983d1ce3766cc3fa81a4ca7c793f37ec9b63966a7db05ef6"
+      },
+      "owned_binaries": {
+        "baseline": {
+          "alloc": {
+            "build_receipt_sha256": "069ae6bf85e7c001478cfa7b02df5f3843924967930b35735d060a4fd5e9be2e",
+            "bytes": 59747504,
+            "descriptor_path": "baseline/binary-alloc.json",
+            "descriptor_sha256": "5b6602692a9ced1abf62a4438ef7b3432d5f3452ed99568eef656f7ebcb81168",
+            "kind": "alloc",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/baseline/alloc",
+            "receipt_sha256": "069ae6bf85e7c001478cfa7b02df5f3843924967930b35735d060a4fd5e9be2e",
+            "sha256": "7214d58f885cd60c8b1977c72290431173a1bc947c5c4c691280d7bd65546856",
+            "stage": "baseline"
+          },
+          "normal": {
+            "build_receipt_sha256": "8fef129bb477358c9de9a2d3675dbdda288d1b63a7982b1e78bb0181ab8d9d2e",
+            "bytes": 60099064,
+            "descriptor_path": "baseline/binary-normal.json",
+            "descriptor_sha256": "c9400a8f5ce02c702234e21cb9b2e1181963764ffb3fd72699c32338d908ced4",
+            "kind": "normal",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal",
+            "receipt_sha256": "8fef129bb477358c9de9a2d3675dbdda288d1b63a7982b1e78bb0181ab8d9d2e",
+            "sha256": "99be911319811de141ae0035c4e2d519fe05855f0d239ba94366925fee31dad1",
+            "stage": "baseline"
+          }
+        },
+        "candidate": {
+          "alloc": {
+            "build_receipt_sha256": "3701419e0c342b7228de6d69cab30ce4c4bbf7231f614b43bfb5fe3ddaa926b8",
+            "bytes": 59968088,
+            "descriptor_path": "candidate/binary-alloc.json",
+            "descriptor_sha256": "932e4cc1ef3f24473e89905b9fe3b2e387e4dcdbfd6d4b8d03f03927b7f42c4b",
+            "kind": "alloc",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/candidate/alloc",
+            "receipt_sha256": "3701419e0c342b7228de6d69cab30ce4c4bbf7231f614b43bfb5fe3ddaa926b8",
+            "sha256": "37faf941060227805f30f6cefcd0743d09f796554c2456d805f170e09c87ac5c",
+            "stage": "candidate"
+          },
+          "normal": {
+            "build_receipt_sha256": "e71975e9cd99b48d8bab56a7f7644308f684b9c1aca2d33f8e40316d5cc77a06",
+            "bytes": 60100712,
+            "descriptor_path": "candidate/binary-normal.json",
+            "descriptor_sha256": "fefaabd2804cc22bf7089569e0242ab2db76bb6edd73770796a2ebf180b49589",
+            "kind": "normal",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/candidate/normal",
+            "receipt_sha256": "e71975e9cd99b48d8bab56a7f7644308f684b9c1aca2d33f8e40316d5cc77a06",
+            "sha256": "4bea5cb47f932aab7be4c4d724723e1a711832b89a371a8123fe7e9b7de4a260",
+            "stage": "candidate"
+          }
+        }
+      },
+      "profile": {
+        "gate_passed": false,
+        "required": true,
+        "sha256": "c4f929006c2d8a28bff42fab73e20099f776ca1e840083c70711bed56fa8ae96"
+      },
+      "quality": {
+        "rows": 8,
+        "sha256": "63dc04ddbb258f050624d1910b676165fb37b3888557b5df15401d5c4531727f"
+      },
+      "review": {
+        "adoption_allowed": false,
+        "sha256": "632d48e81174425745f10a97607c155d3554316f00c9ce63bb2fff412facc457"
+      },
+      "source": {
+        "baseline": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+        "candidate": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36",
+        "final": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9"
+      }
+    },
+    "observed_utc": "2026-09-13T12:52:00.428588+00:00",
+    "phase": "precleanup",
+    "status": "pass",
+    "target_present": true
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "precleanup",
+  "status": "pass"
+}

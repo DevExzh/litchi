@@ -1,0 +1,59 @@
+{
+  "schema": "ole2_0555_quality_v1",
+  "status": "pass",
+  "stage": "final",
+  "mode": "commands",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "inputs_sha256": "5b2b48f2e2ec380c241e2a40664b96bb934b4b11a2d2b8b99ae7e8df2a2f62a8",
+  "completed_utc": "2026-09-13T12:49:18.246130+00:00",
+  "rows": [
+    {
+      "name": "tests",
+      "path": "quality-attempts/final-baseline-01/tests",
+      "receipt_sha256": "cd9b36d05e571c5bd34cf94c9a6f7ca3a338c2c14a46a5e844fa7e19d44c8668",
+      "exit_code": 0
+    },
+    {
+      "name": "workspace",
+      "path": "quality-attempts/final-baseline-01/workspace",
+      "receipt_sha256": "f0374f0d34746c3455227dfa583f0678c18fcbbaadcc752309a9c1964699b6c3",
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "path": "quality-attempts/final-baseline-01/clippy",
+      "receipt_sha256": "1e831185337373d06f2b2c7cc67f93b66a8485f5c6d38b91c79dc609fdf27d36",
+      "exit_code": 0
+    },
+    {
+      "name": "rustdoc",
+      "path": "quality-attempts/final-baseline-01/rustdoc",
+      "receipt_sha256": "5381a1976dbacb984bb4a231d09bd5325fcac8c662d55d8bf318487767c9e87f",
+      "exit_code": 0
+    },
+    {
+      "name": "fmt",
+      "path": "quality-attempts/final-baseline-01/fmt",
+      "receipt_sha256": "900912b8a390e5820b27084c94db88dfa59ce328abd1f56715178023e99a6c59",
+      "exit_code": 0
+    },
+    {
+      "name": "boundaries",
+      "path": "quality-attempts/final-baseline-01/boundaries",
+      "receipt_sha256": "5dffb508c684ac09b3bf7ef03b02a6947bb571239ebdd2598f849d228db24128",
+      "exit_code": 0
+    },
+    {
+      "name": "no-default",
+      "path": "quality-attempts/final-baseline-01/no-default",
+      "receipt_sha256": "a91fef226f2e2bc4829d0495d32b4cfd3c346172a84010f05057627ae4082075",
+      "exit_code": 0
+    },
+    {
+      "name": "claims",
+      "path": "quality-attempts/final-baseline-01/claims",
+      "receipt_sha256": "2b940f4656ccba6742166a0b9ffc3c39653abe53663cd030dc21cd90d40bb256",
+      "exit_code": 0
+    }
+  ]
+}

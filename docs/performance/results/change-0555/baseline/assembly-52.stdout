@@ -1,0 +1,114 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f27940 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E>:
+ 2f27940:	41 57                	push   %r15
+ 2f27942:	41 56                	push   %r14
+ 2f27944:	53                   	push   %rbx
+ 2f27945:	48 83 ec 50          	sub    $0x50,%rsp
+ 2f27949:	49 89 ff             	mov    %rdi,%r15
+ 2f2794c:	48 8b 02             	mov    (%rdx),%rax
+ 2f2794f:	48 c7 02 00 00 00 00 	movq   $0x0,(%rdx)
+ 2f27956:	48 83 f8 01          	cmp    $0x1,%rax
+ 2f2795a:	0f 85 96 00 00 00    	jne    2f279f6 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0xb6>
+ 2f27960:	0f 10 42 08          	movups 0x8(%rdx),%xmm0
+ 2f27964:	0f 10 4a 18          	movups 0x18(%rdx),%xmm1
+ 2f27968:	0f 29 04 24          	movaps %xmm0,(%rsp)
+ 2f2796c:	0f 29 4c 24 10       	movaps %xmm1,0x10(%rsp)
+ 2f27971:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+ 2f27976:	4c 8b 54 24 10       	mov    0x10(%rsp),%r10
+ 2f2797b:	4c 89 d3             	mov    %r10,%rbx
+ 2f2797e:	48 01 fb             	add    %rdi,%rbx
+ 2f27981:	0f 82 f5 00 00 00    	jb     2f27a7c <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x13c>
+ 2f27987:	49 89 f6             	mov    %rsi,%r14
+ 2f2798a:	48 8b 34 24          	mov    (%rsp),%rsi
+ 2f2798e:	49 8b 46 10          	mov    0x10(%r14),%rax
+ 2f27992:	4c 8b 98 f0 00 00 00 	mov    0xf0(%rax),%r11
+ 2f27999:	49 29 f3             	sub    %rsi,%r11
+ 2f2799c:	76 61                	jbe    2f279ff <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0xbf>
+ 2f2799e:	4d 39 da             	cmp    %r11,%r10
+ 2f279a1:	4d 0f 42 da          	cmovb  %r10,%r11
+ 2f279a5:	45 84 c9             	test   %r9b,%r9b
+ 2f279a8:	0f 84 86 00 00 00    	je     2f27a34 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0xf4>
+ 2f279ae:	4d 85 db             	test   %r11,%r11
+ 2f279b1:	74 43                	je     2f279f6 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0xb6>
+ 2f279b3:	4c 89 d8             	mov    %r11,%rax
+ 2f279b6:	48 01 f8             	add    %rdi,%rax
+ 2f279b9:	0f 82 e5 00 00 00    	jb     2f27aa4 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x164>
+ 2f279bf:	4c 39 c0             	cmp    %r8,%rax
+ 2f279c2:	0f 87 dc 00 00 00    	ja     2f27aa4 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x164>
+ 2f279c8:	49 8b 06             	mov    (%r14),%rax
+ 2f279cb:	4d 8b 46 08          	mov    0x8(%r14),%r8
+ 2f279cf:	49 8b 50 10          	mov    0x10(%r8),%rdx
+ 2f279d3:	48 ff ca             	dec    %rdx
+ 2f279d6:	48 83 e2 f0          	and    $0xfffffffffffffff0,%rdx
+ 2f279da:	48 01 d0             	add    %rdx,%rax
+ 2f279dd:	48 83 c0 10          	add    $0x10,%rax
+ 2f279e1:	48 01 f9             	add    %rdi,%rcx
+ 2f279e4:	48 89 c7             	mov    %rax,%rdi
+ 2f279e7:	48 89 ca             	mov    %rcx,%rdx
+ 2f279ea:	4c 89 d9             	mov    %r11,%rcx
+ 2f279ed:	41 ff 50 30          	call   *0x30(%r8)
+ 2f279f1:	48 85 c0             	test   %rax,%rax
+ 2f279f4:	75 71                	jne    2f27a67 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x127>
+ 2f279f6:	49 c7 07 0b 00 00 00 	movq   $0xb,(%r15)
+ 2f279fd:	eb 73                	jmp    2f27a72 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x132>
+ 2f279ff:	48 8d 44 24 18       	lea    0x18(%rsp),%rax
+ 2f27a04:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 2f27a09:	48 8b 05 00 5d 19 00 	mov    0x195d00(%rip),%rax        # 30bd710 <_DYNAMIC+0x558>
+ 2f27a10:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f27a15:	49 8d 7f 08          	lea    0x8(%r15),%rdi
+ 2f27a19:	48 8d 35 51 5b 1b fd 	lea    -0x2e4a4af(%rip),%rsi        # dd571 <anon.fe21f686ecc9c6db7577757d05467d2e.1068.llvm.14939676856770229077+0x229>
+ 2f27a20:	48 8d 54 24 20       	lea    0x20(%rsp),%rdx
+ 2f27a25:	ff 15 95 5d 19 00    	call   *0x195d95(%rip)        # 30bd7c0 <_DYNAMIC+0x608>
+ 2f27a2b:	49 c7 07 08 00 00 00 	movq   $0x8,(%r15)
+ 2f27a32:	eb 3e                	jmp    2f27a72 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x132>
+ 2f27a34:	4c 39 c3             	cmp    %r8,%rbx
+ 2f27a37:	77 7e                	ja     2f27ab7 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x177>
+ 2f27a39:	49 8b 06             	mov    (%r14),%rax
+ 2f27a3c:	4d 8b 46 08          	mov    0x8(%r14),%r8
+ 2f27a40:	49 8b 50 10          	mov    0x10(%r8),%rdx
+ 2f27a44:	48 ff ca             	dec    %rdx
+ 2f27a47:	48 83 e2 f0          	and    $0xfffffffffffffff0,%rdx
+ 2f27a4b:	48 01 d0             	add    %rdx,%rax
+ 2f27a4e:	48 83 c0 10          	add    $0x10,%rax
+ 2f27a52:	48 01 f9             	add    %rdi,%rcx
+ 2f27a55:	48 89 c7             	mov    %rax,%rdi
+ 2f27a58:	48 89 ca             	mov    %rcx,%rdx
+ 2f27a5b:	4c 89 d1             	mov    %r10,%rcx
+ 2f27a5e:	41 ff 50 30          	call   *0x30(%r8)
+ 2f27a62:	48 85 c0             	test   %rax,%rax
+ 2f27a65:	74 8f                	je     2f279f6 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0xb6>
+ 2f27a67:	49 c7 07 00 00 00 00 	movq   $0x0,(%r15)
+ 2f27a6e:	49 89 47 08          	mov    %rax,0x8(%r15)
+ 2f27a72:	48 83 c4 50          	add    $0x50,%rsp
+ 2f27a76:	5b                   	pop    %rbx
+ 2f27a77:	41 5e                	pop    %r14
+ 2f27a79:	41 5f                	pop    %r15
+ 2f27a7b:	c3                   	ret
+ 2f27a7c:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+ 2f27a81:	e8 4a 00 00 00       	call   2f27ad0 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range28_$u7b$$u7b$closure$u7d$$u7d$17hfc7e0dc849efecdfE>
+ 2f27a86:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+ 2f27a8b:	49 89 47 20          	mov    %rax,0x20(%r15)
+ 2f27a8f:	0f 28 44 24 30       	movaps 0x30(%rsp),%xmm0
+ 2f27a94:	41 0f 11 47 10       	movups %xmm0,0x10(%r15)
+ 2f27a99:	0f 28 44 24 20       	movaps 0x20(%rsp),%xmm0
+ 2f27a9e:	41 0f 11 07          	movups %xmm0,(%r15)
+ 2f27aa2:	eb ce                	jmp    2f27a72 <_ZN10litchi_cfb6shared13SharedOleFile19flush_pending_range17h94cbd753d9768fd0E+0x132>
+ 2f27aa4:	48 8d 0d 65 b9 18 00 	lea    0x18b965(%rip),%rcx        # 30b3410 <anon.d00dbc7dc7a2f97f576ff7feddf84097.1.llvm.9674563019715341993+0x328>
+ 2f27aab:	48 89 c6             	mov    %rax,%rsi
+ 2f27aae:	4c 89 c2             	mov    %r8,%rdx
+ 2f27ab1:	ff 15 51 59 19 00    	call   *0x195951(%rip)        # 30bd408 <_DYNAMIC+0x250>
+ 2f27ab7:	48 8d 0d 3a b9 18 00 	lea    0x18b93a(%rip),%rcx        # 30b33f8 <anon.d00dbc7dc7a2f97f576ff7feddf84097.1.llvm.9674563019715341993+0x310>
+ 2f27abe:	48 89 de             	mov    %rbx,%rsi
+ 2f27ac1:	4c 89 c2             	mov    %r8,%rdx
+ 2f27ac4:	ff 15 3e 59 19 00    	call   *0x19593e(%rip)        # 30bd408 <_DYNAMIC+0x250>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

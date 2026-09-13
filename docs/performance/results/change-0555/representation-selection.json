@@ -1,0 +1,9 @@
+{
+  "schema": "ole2_0555_representation_selection_v1",
+  "selected_utc": "2026-09-13T12:17:06.272448+00:00",
+  "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+  "representation": "Pending variant in existing PhysicalSectorRole; final ordered role-only scan; no cursor field or marker allocation",
+  "reason": "A monotonic cursor still traverses the physical-role prefix in aggregate, while adding state and branches to individual claims. The selected role-only scan removes repeated final FAT lookups without that cursor state. Added decoding and claim work is not assumed free and remains within mandatory whole-XLS-owner instruction and native gates.",
+  "prior_design": "0554 bitset/cursor was a proof hypothesis. This prospective representation uses the same exact pending-marker invariant in already allocated role storage, with an ordered final scan instead of a separate bitset or cursor.",
+  "captures_present": false
+}

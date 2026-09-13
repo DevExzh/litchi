@@ -1,0 +1,86 @@
+{
+  "result": {
+    "source": {
+      "baseline": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+      "candidate": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36"
+    },
+    "stages": {
+      "baseline": {
+        "assembly_rows": 56,
+        "builds": {
+          "alloc": {
+            "build_receipt_sha256": "069ae6bf85e7c001478cfa7b02df5f3843924967930b35735d060a4fd5e9be2e",
+            "bytes": 59747504,
+            "descriptor_path": "baseline/binary-alloc.json",
+            "descriptor_sha256": "5b6602692a9ced1abf62a4438ef7b3432d5f3452ed99568eef656f7ebcb81168",
+            "kind": "alloc",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/baseline/alloc",
+            "receipt_sha256": "069ae6bf85e7c001478cfa7b02df5f3843924967930b35735d060a4fd5e9be2e",
+            "sha256": "7214d58f885cd60c8b1977c72290431173a1bc947c5c4c691280d7bd65546856",
+            "stage": "baseline"
+          },
+          "normal": {
+            "build_receipt_sha256": "8fef129bb477358c9de9a2d3675dbdda288d1b63a7982b1e78bb0181ab8d9d2e",
+            "bytes": 60099064,
+            "descriptor_path": "baseline/binary-normal.json",
+            "descriptor_sha256": "c9400a8f5ce02c702234e21cb9b2e1181963764ffb3fd72699c32338d908ced4",
+            "kind": "normal",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal",
+            "receipt_sha256": "8fef129bb477358c9de9a2d3675dbdda288d1b63a7982b1e78bb0181ab8d9d2e",
+            "sha256": "99be911319811de141ae0035c4e2d519fe05855f0d239ba94366925fee31dad1",
+            "stage": "baseline"
+          }
+        },
+        "counts": {
+          "alloc": 4,
+          "native": 4,
+          "profile": 8
+        },
+        "intervals": 75,
+        "manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+        "profiles": true,
+        "stage": "baseline"
+      },
+      "candidate": {
+        "assembly_rows": 56,
+        "builds": {
+          "alloc": {
+            "build_receipt_sha256": "3701419e0c342b7228de6d69cab30ce4c4bbf7231f614b43bfb5fe3ddaa926b8",
+            "bytes": 59968088,
+            "descriptor_path": "candidate/binary-alloc.json",
+            "descriptor_sha256": "932e4cc1ef3f24473e89905b9fe3b2e387e4dcdbfd6d4b8d03f03927b7f42c4b",
+            "kind": "alloc",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/candidate/alloc",
+            "receipt_sha256": "3701419e0c342b7228de6d69cab30ce4c4bbf7231f614b43bfb5fe3ddaa926b8",
+            "sha256": "37faf941060227805f30f6cefcd0743d09f796554c2456d805f170e09c87ac5c",
+            "stage": "candidate"
+          },
+          "normal": {
+            "build_receipt_sha256": "e71975e9cd99b48d8bab56a7f7644308f684b9c1aca2d33f8e40316d5cc77a06",
+            "bytes": 60100712,
+            "descriptor_path": "candidate/binary-normal.json",
+            "descriptor_sha256": "fefaabd2804cc22bf7089569e0242ab2db76bb6edd73770796a2ebf180b49589",
+            "kind": "normal",
+            "path": "/home/zhuhe/litchi-goal-0555-target/retained/candidate/normal",
+            "receipt_sha256": "e71975e9cd99b48d8bab56a7f7644308f684b9c1aca2d33f8e40316d5cc77a06",
+            "sha256": "4bea5cb47f932aab7be4c4d724723e1a711832b89a371a8123fe7e9b7de4a260",
+            "stage": "candidate"
+          }
+        },
+        "counts": {
+          "alloc": 4,
+          "native": 4,
+          "profile": 8
+        },
+        "intervals": 75,
+        "manifest_sha256": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36",
+        "profiles": true,
+        "stage": "candidate"
+      }
+    },
+    "status": "pass"
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "captures",
+  "status": "pass"
+}
