@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-13T19:12:45Z",
+  "batch": [
+    "0563-opc-single-warm-part-observation"
+  ],
+  "removed": [
+    "the session scratchpad in full, 125,145,332 bytes: staged release binaries for the baseline and candidate stages, build and gate logs, the strace and ABBA working directories, and the temporary source copies used to confirm the counted tests fail without the change",
+    "tools/perf-baseline/target, the gitignored build directory for the harness workspace"
+  ],
+  "retained_in_the_repository": [
+    "the eight whole-child strace summaries and the sixteen non-regression children cited by the record",
+    "the three counted-observation tests, which are the change's primary evidence and live in the production crate rather than in this packet"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commits",
+  "background_tasks": "all monitors and background waits stopped; no measurement process remains",
+  "revision": "5005e8f4b0810ee28392c5a24db604eb207acc16"
+}
