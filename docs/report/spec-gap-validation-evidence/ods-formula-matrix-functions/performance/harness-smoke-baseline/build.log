@@ -1,0 +1,5 @@
+     Locking 163 packages to latest Rust 1.95.0 compatible versions
+      Adding generic-array v0.14.7 (available: v0.14.9)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+   Compiling ods-formula-matrix-functions-performance v0.0.0 (/home/zhuhe/code/litchi-array-worktree/docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness)
+    Finished `dev` profile [unoptimized] target(s) in 7.43s
