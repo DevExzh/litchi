@@ -66,6 +66,44 @@ where
         }
     }
 
+    /// Project a demanded single-cell reference without retaining the
+    /// transient area/record vectors used by first-class reference values.
+    ///
+    /// This path is selected only by scalar-demand value frames.  Every
+    /// other reference, including a one-cell reference used by a reference
+    /// operator or a generic function argument, remains on
+    /// [`reference_value`] so its area and lexical metadata stay available.
+    pub(super) fn reference_scalar_value(
+        &mut self,
+        reference: &'expr Reference,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let endpoint = match reference {
+            Reference::Local(Address::Cell(endpoint))
+                if matches!(&endpoint.value, EndpointValue::Cell(_)) =>
+            {
+                endpoint
+            },
+            _ => return self.reference_value(reference),
+        };
+        let Some(area) = self.endpoint_area(endpoint, None)? else {
+            return Ok(RuntimeValue::Scalar(WorkingValue::Error(
+                ScalarError::Reference,
+            )));
+        };
+        self.check_reference_cells(area.rect.count()?)?;
+        // The normal path enforces this through the record, flat-area, and
+        // public-area reservations.  Keep the logical admission check when
+        // those transient vectors are deliberately omitted.
+        self.check_reference_areas(1)?;
+
+        // Defer the current-sheet probe and provider read until the scalar
+        // consumer projects this token.  The old area path evaluates both
+        // infix operands before projecting either one; deferral preserves
+        // that resolver/read ordering while still avoiding all three fresh
+        // metadata vectors.
+        Ok(RuntimeValue::ScalarCell(area))
+    }
+
     pub(super) fn reference_areas(
         &mut self,
         reference: &'expr Reference,
@@ -622,6 +660,7 @@ where
             RuntimeValue::Empty
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_) => Err(EvaluationFailure::Unsupported(
                 super::super::UnsupportedKind::ReferenceOperator,
             )),
