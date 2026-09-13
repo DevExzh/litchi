@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0544: bounded event preflight remains unadmitted
+
+[0544](changes/0544-xlsx-event-preflight-rejected.md) retains a public benchmark example, with no production optimization.
+Direct-reader oracle coverage and source review support the conservative bound
+under pinned XML defaults; typed fallback, source and publication fences remain.
+Performance admission fails despite correctness and Clippy passing. Candidate
+code/tests remain in evidence, and Region metrics imply no general OOM guarantee.
+
 ## 0543: shared traversal remains unadmitted
 
 [0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) restores production after a valid event-cap regression and candidate

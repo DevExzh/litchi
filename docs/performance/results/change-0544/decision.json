@@ -1,0 +1,144 @@
+{
+  "decision": "reject",
+  "final_stage": "baseline",
+  "runtime_restored": true,
+  "native_passed": false,
+  "allocation_passed": true,
+  "guard_passed": true,
+  "cap_boundary_passed": false,
+  "full_test_count": 1299,
+  "performance_claim": "No retained runtime speedup; measured candidate only.",
+  "rationale": "Medium repeat2 workflow p50 and mean gains fall short of3%; cap164repeat1 and256repeat2 p50/mean exceed1.05x baseline. Correctness andClippy passed; reject on frozen performance gates.",
+  "retained_enabler": [
+    "crates/litchi-xlsx/examples/perf_cap_boundary.rs"
+  ],
+  "conditional_lanes": "Not executed: main native andcap pilot gates failed. Prepared scripts are not performance evidence.",
+  "native_failure_rows": [
+    {
+      "native_primary_planning_p50": {
+        "baseline": 7285649,
+        "candidate": 5796143,
+        "metric": "plan_ns",
+        "passed": true,
+        "reduction_percent": 20.444383197708262,
+        "required_reduction_percent": 10.0
+      },
+      "native_primary_total_mean": {
+        "baseline": 21996185.510000005,
+        "candidate": 21354558.064999986,
+        "passed": false,
+        "reduction_percent": 2.9169941520465867,
+        "required_reduction_percent": 3.0
+      },
+      "native_primary_total_p50": {
+        "baseline": 21987543,
+        "candidate": 21359286,
+        "passed": false,
+        "reduction_percent": 2.8573315354062068,
+        "required_reduction_percent": 3.0
+      },
+      "passed": false,
+      "planning_ir_conditional": {
+        "baseline": null,
+        "candidate": null,
+        "metric": "planning_ir",
+        "note": "Callgrind planning Ir is conditional and is not manufactured by native analysis.",
+        "required_reduction_percent": 5.0,
+        "status": "unmeasured",
+        "used_for_gate": false
+      },
+      "repeat": 2,
+      "shape": "medium"
+    }
+  ],
+  "cap_failure_rows": [
+    {
+      "baseline": "cap-native-r1-164",
+      "candidate": "cap-native-r1-164",
+      "fixture": {
+        "bytes": 751863,
+        "files": [
+          "baseline/cap-native-r1-164.fixture.bin",
+          "candidate/cap-native-r1-164.fixture.bin",
+          "candidate/cap-native-r2-164.fixture.bin",
+          "baseline/cap-native-r2-164.fixture.bin"
+        ],
+        "sha256": "c8608d872c25ff5635226050ca6dbf04c0f6114d63b10243a123e57280216209"
+      },
+      "metrics": {
+        "mean": {
+          "baseline": 16595967.88,
+          "candidate": 17485189.65,
+          "candidate_to_baseline_ratio": 1.0535805911670635,
+          "change_percent": 5.3580591167063485,
+          "max_allowed_ratio": 1.05,
+          "passed": false
+        },
+        "p50": {
+          "baseline": 16331712,
+          "candidate": 17221634,
+          "candidate_to_baseline_ratio": 1.05449042941732,
+          "change_percent": 5.449042941732007,
+          "max_allowed_ratio": 1.05,
+          "passed": false
+        }
+      },
+      "repeat": 1,
+      "rss": {
+        "baseline": 25020.0,
+        "candidate": 24712.0,
+        "candidate_to_baseline_ratio": 0.9876898481215028,
+        "change_percent": -1.2310151878497155
+      },
+      "size": 164
+    },
+    {
+      "baseline": "cap-native-r2-256",
+      "candidate": "cap-native-r2-256",
+      "fixture": {
+        "bytes": 1861843,
+        "files": [
+          "baseline/cap-native-r1-256.fixture.bin",
+          "candidate/cap-native-r1-256.fixture.bin",
+          "candidate/cap-native-r2-256.fixture.bin",
+          "baseline/cap-native-r2-256.fixture.bin"
+        ],
+        "sha256": "c31ee57584523ec4f1b83073798af40e9fc4298e2c8839efa541ad10f5d491b9"
+      },
+      "metrics": {
+        "mean": {
+          "baseline": 39817749.63,
+          "candidate": 42560106.97,
+          "candidate_to_baseline_ratio": 1.0688727355383694,
+          "change_percent": 6.887273553836937,
+          "max_allowed_ratio": 1.05,
+          "passed": false
+        },
+        "p50": {
+          "baseline": 39746170,
+          "candidate": 42504495,
+          "candidate_to_baseline_ratio": 1.0693985105986312,
+          "change_percent": 6.9398510598631225,
+          "max_allowed_ratio": 1.05,
+          "passed": false
+        }
+      },
+      "repeat": 2,
+      "rss": {
+        "baseline": 51304.0,
+        "candidate": 51636.0,
+        "candidate_to_baseline_ratio": 1.0064712303134258,
+        "change_percent": 0.647123031342578
+      },
+      "size": 256
+    }
+  ],
+  "plan_sha256": "66fcb7321c637963b20e43e2fd91e87cd9749e928f24a5c94206ef4cccfd2a65",
+  "comparison_sha256": "e87456ab9169beef2318497e5d2032bc95cc4fc645b3c6a003d41af6a5ef531a",
+  "allocation_analysis_sha256": "2f9ac59d84ca0db67822f459389cf9af305d599cf48fb4fa916a13ce930335c9",
+  "guard_analysis_sha256": "c958c735e949ed99d98f04972f7979d76d206f592c0c6ecdec4bbad34bb3a60b",
+  "cap_analysis_sha256": "5504ba11cccc1a818c66714268d9f05465e216d7ff5770fad777e818ef8cda88",
+  "baseline_manifest_sha256": "139d784ae44d173f4aa1d2d573139ed6eeee63902f491df46eab64a66b64ff90",
+  "candidate_manifest_sha256": "fada10910fbb27b802baeac9404afd47af31bab4d0a182fffddb2eb1d8def1dc",
+  "final_source_manifest_sha256": "139d784ae44d173f4aa1d2d573139ed6eeee63902f491df46eab64a66b64ff90"
+}

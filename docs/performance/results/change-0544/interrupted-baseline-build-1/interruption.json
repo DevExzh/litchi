@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-13T00:13:30.448026+00:00",
+  "status": "interrupted-no-terminal-receipt",
+  "session_id": 63734,
+  "session_missing": true,
+  "matching_build_processes": [],
+  "artifacts": {
+    "build-normal.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build-normal.stderr": "34c80fd9325f8d625ef760f371450a917c4577cd106c7a40167bbc068516eb72"
+  },
+  "source_manifest_sha256": "139d784ae44d173f4aa1d2d573139ed6eeee63902f491df46eab64a66b64ff90",
+  "action": "Preserve partial logs; resume baseline normal build with same frozen source and command. No exit status or successful binary attributed to interrupted attempt.",
+  "resumed_build_receipt": "baseline/build-normal.receipt.json",
+  "resumed_build_receipt_sha256": "edb0284958a49d94f2c1213edb391479522586318ddeaa575733853b635c29d3",
+  "resumed_build_exit_code": 0
+}

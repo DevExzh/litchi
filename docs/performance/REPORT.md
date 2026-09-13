@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0544: no retained runtime speedup
+
+[0544](changes/0544-xlsx-event-preflight-rejected.md) rejects the two-scan preflight. It passes 1,305 candidate tests and
+Clippy, but medium repeat 2 workflow gains miss 3% and two valid cap comparisons
+exceed 5% overhead. Main allocation and refusal envelopes pass without erasing
+same-invalid validator regressions. Production is restored; the cap benchmark
+and full evidence remain. Conditional profiling was not admitted.
+
 ## 0543: candidate rejected despite pilot gains
 
 [0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) rejects the shared-traversal revision. Original workflow p50 improves

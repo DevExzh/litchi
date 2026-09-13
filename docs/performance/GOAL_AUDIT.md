@@ -1,5 +1,12 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0544: oracle and cap benchmark progress; runtime restored
+
+[0544](changes/0544-xlsx-event-preflight-rejected.md) completes a fresh preflight campaign and direct XML-reader oracle.
+The candidate fails native and cap admission, so production is restored and
+only the measured benchmark example is retained. All 450 adverse/drift rows
+remain explicit. OLE2/OOXML goal remains active; ODF waits until it completes.
+
 ## 0543: valid-input regression prevents retention
 
 [0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) completes the main pilot and conditional lanes, then rejects the

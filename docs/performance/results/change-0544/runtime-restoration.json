@@ -1,0 +1,14 @@
+{
+  "created_utc": "2026-09-13T00:38:20.891901+00:00",
+  "final_stage": "baseline",
+  "candidate_files_restored": [
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+    "crates/litchi-xlsx/src/cell_values/validation.rs",
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs"
+  ],
+  "final_source_manifest_sha256": "139d784ae44d173f4aa1d2d573139ed6eeee63902f491df46eab64a66b64ff90",
+  "retained_enabler": "crates/litchi-xlsx/examples/perf_cap_boundary.rs",
+  "reason": "Native primary medium repeat2 misses both3percent workflow gates; cap164repeat1 and256repeat2 miss5percent p50/mean envelopes. No conditional capture admitted."
+}

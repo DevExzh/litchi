@@ -1,0 +1,1186 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/snapshot.rs b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -443,8 +443,12 @@
+         }
+         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
+         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+-        validation::worksheet_xml(worksheet_xml.as_bytes())?;
+-        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?;
++        let cells = if raw::worksheet::source_stream_eligible(worksheet_xml.as_bytes()) {
++            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes())?
++        } else {
++            validation::worksheet_xml(worksheet_xml.as_bytes())?;
++            raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?
++        };
+         package.check_execution()?;
+         validate_style_references(&cells, capture.style_count)?;
+         validate_scalar_cells(&cells)?;
+diff --git a/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+@@ -0,0 +1,425 @@
++#![allow(
++    clippy::expect_used,
++    clippy::unwrap_used,
++    reason = "focused shared-traversal boundary assertions"
++)]
++
++use std::{fmt::Write as _, sync::Arc};
++
++use litchi_core::OwnedSource;
++use litchi_opc::constants::content_type as ct;
++use quick_xml::events::Event;
++use quick_xml::reader::NsReader;
++use soapberry_zip::office::StreamingArchiveWriter;
++
++use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
++use crate::{Address, Error, Number, Value};
++
++const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
++const COMMENT: &str = "<!--x-->";
++const VALID_TAIL: &str =
++    "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData></worksheet>";
++const LATE_VALIDATOR_TAIL: &str =
++    "<mergeCells/><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData></worksheet>";
++const LATE_RAW_TAIL: &str =
++    "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v><v>2</v></c></row></sheetData></worksheet>";
++const LATE_VALIDATOR_ERROR: &str =
++    "value-only edits refuse dependency-bearing or unknown element 'mergeCells'";
++const LATE_RAW_ERROR: &str = "duplicate worksheet cell value";
++const DELIMITER_COMMENT: &str = "<!-->>>>>>>>>>;;;;;;;;;;-->";
++
++#[derive(Debug, Eq, PartialEq)]
++enum DirectEventCount {
++    Complete(usize),
++    ReaderError(usize),
++}
++
++impl DirectEventCount {
++    fn emitted(&self) -> usize {
++        match self {
++            Self::Complete(count) | Self::ReaderError(count) => *count,
++        }
++    }
++}
++
++fn worksheet_with_comments(comment_count: usize, tail: &str) -> Vec<u8> {
++    let mut xml = String::with_capacity(64 + comment_count * COMMENT.len() + tail.len());
++    xml.push_str("<worksheet xmlns=\"");
++    xml.push_str(SML);
++    xml.push_str("\">");
++    for _ in 0..comment_count {
++        xml.push_str(COMMENT);
++    }
++    xml.push_str(tail);
++    xml.into_bytes()
++}
++
++fn worksheet_over_byte_cap(tail: &str) -> Vec<u8> {
++    let count = crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES / COMMENT.len() + 1;
++    let xml = worksheet_with_comments(count, tail);
++    assert!(xml.len() > crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
++    assert!(!crate::raw::worksheet::source_stream_eligible(&xml));
++    xml
++}
++
++fn worksheet_over_event_cap(tail: &str) -> Vec<u8> {
++    let count = crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS + 1;
++    let xml = worksheet_with_comments(count, tail);
++    assert!(xml.len() < crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
++    assert!(crate::raw::worksheet::source_stream_eligible(&xml));
++    assert!(!crate::raw::worksheet::shared_event_bound_within_cap(&xml));
++    xml
++}
++
++fn worksheet_with_delimiter_comments(comment_count: usize, tail: &str) -> Vec<u8> {
++    let mut xml = String::with_capacity(64 + comment_count * DELIMITER_COMMENT.len() + tail.len());
++    xml.push_str("<worksheet xmlns=\"");
++    xml.push_str(SML);
++    xml.push_str("\">");
++    for _ in 0..comment_count {
++        xml.push_str(DELIMITER_COMMENT);
++    }
++    xml.push_str(tail);
++    xml.into_bytes()
++}
++
++fn direct_ns_reader_event_count(content: &[u8]) -> DirectEventCount {
++    let mut reader = NsReader::from_reader(content);
++    reader.config_mut().check_end_names = true;
++    let mut count = 0usize;
++    loop {
++        let event = match reader.read_event() {
++            Ok(event) => event,
++            Err(_) => return DirectEventCount::ReaderError(count),
++        };
++        let eof = matches!(event, Event::Eof);
++        let _ = reader.resolver().resolve_event(event);
++        count += 1;
++        if eof {
++            return DirectEventCount::Complete(count);
++        }
++    }
++}
++
++fn independent_lexical_event_bound(content: &[u8]) -> usize {
++    let mut bound = 1usize;
++    if content
++        .first()
++        .is_some_and(|&first| !matches!(first, b'<' | b'&'))
++    {
++        bound += 1;
++    }
++    for &byte in content {
++        if matches!(byte, b'<' | b'&') {
++            bound += 1;
++        }
++    }
++    for (index, &byte) in content.iter().enumerate() {
++        if matches!(byte, b'>' | b';')
++            && content
++                .get(index + 1)
++                .is_some_and(|&next| !matches!(next, b'<' | b'&'))
++        {
++            bound += 1;
++        }
++    }
++    bound
++}
++
++fn assert_conservative_event_bound(name: &str, content: &[u8]) -> DirectEventCount {
++    let direct = direct_ns_reader_event_count(content);
++    let independent_bound = independent_lexical_event_bound(content);
++    let bound_within_cap = crate::raw::worksheet::shared_event_bound_within_cap(content);
++    assert_eq!(
++        bound_within_cap,
++        independent_bound <= crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS,
++        "{name}: production bound disagrees with independent bound {independent_bound}"
++    );
++    assert!(
++        direct.emitted() <= independent_bound,
++        "{name}: direct event prefix exceeded independent bound: {direct:?} > {independent_bound}"
++    );
++    if direct.emitted() > crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS {
++        assert!(
++            !bound_within_cap,
++            "{name}: lexical bound admitted an over-cap reader stream: {direct:?}"
++        );
++    }
++    direct
++}
++
++fn worksheet_numeric_grid(side: usize) -> Vec<u8> {
++    fn column_name(mut index: usize) -> String {
++        let mut name = String::new();
++        loop {
++            name.push((b'A' + (index % 26) as u8) as char);
++            if index < 26 {
++                break;
++            }
++            index = index / 26 - 1;
++        }
++        name.chars().rev().collect()
++    }
++
++    let columns: Vec<String> = (0..side).map(column_name).collect();
++    let mut xml = String::with_capacity(side * side * 32);
++    xml.push_str("<worksheet xmlns=\"");
++    xml.push_str(SML);
++    xml.push_str("\"><sheetData>");
++    for row in 1..=side {
++        write!(xml, "<row r=\"{row}\">").expect("row XML");
++        for column in &columns {
++            write!(xml, "<c r=\"{column}{row}\"><v>1</v></c>").expect("cell XML");
++        }
++        xml.push_str("</row>");
++    }
++    xml.push_str("</sheetData></worksheet>");
++    xml.into_bytes()
++}
++
++fn package_with_sheet(sheet: &[u8]) -> Vec<u8> {
++    let content_types = format!(
++        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"{}\"/></Types>",
++        ct::SML_SHEET_MAIN,
++        ct::SML_WORKSHEET,
++    );
++    let workbook = format!(
++        "<workbook xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheets><sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rIdSheet\"/></sheets></workbook>"
++    );
++    let workbook_relationships = format!(
++        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdSheet\" Type=\"{REL}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
++    );
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("[Content_Types].xml", content_types.as_bytes())
++        .expect("content-types member");
++    writer
++        .write_stored(
++            "_rels/.rels",
++            b"<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdRoot\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
++        )
++        .expect("package relationships member");
++    writer
++        .write_stored("xl/workbook.xml", workbook.as_bytes())
++        .expect("workbook member");
++    writer
++        .write_stored(
++            "xl/_rels/workbook.xml.rels",
++            workbook_relationships.as_bytes(),
++        )
++        .expect("workbook relationships member");
++    writer
++        .write_stored("xl/worksheets/sheet1.xml", sheet)
++        .expect("worksheet member");
++    writer.finish_to_bytes().expect("test XLSX archive")
++}
++
++fn source_and_editor(sheet: &[u8]) -> (Vec<u8>, Arc<OwnedSource>, SourceBackedEditor) {
++    let bytes = package_with_sheet(sheet);
++    let source = Arc::new(OwnedSource::new(bytes.clone()));
++    let editor = SourceBackedEditor::from_read_at(source.clone()).expect("accepted XLSX source");
++    (bytes, source, editor)
++}
++
++fn assert_invalid<T>(result: crate::Result<T>, expected: &str) {
++    match result {
++        Err(Error::Invalid(actual)) => assert_eq!(actual, expected),
++        Err(other) => panic!("expected typed Invalid error, got {other:?}"),
++        Ok(_) => panic!("expected source-backed edit to be rejected"),
++    }
++}
++
++fn assert_valid_noop(sheet: &[u8]) {
++    let (bytes, source, editor) = source_and_editor(sheet);
++    let commit = editor
++        .edit_sheets(["Sheet1".into()])
++        .expect("cap fallback should accept valid worksheet")
++        .commit()
++        .expect("valid no-op commit");
++    assert!(!commit.changed());
++    assert!(commit.patch().is_empty());
++    assert_eq!(
++        commit
++            .snapshot()
++            .value(0, Address::from_a1("A1").expect("A1 address")),
++        Some(&Value::Number(Number::new("1").expect("source number")))
++    );
++    assert_eq!(source.as_slice(), bytes.as_slice());
++}
++
++fn assert_rejected_with_retry(sheet: &[u8], expected: &str) {
++    let (bytes, source, editor) = source_and_editor(sheet);
++    for attempt in 0..2 {
++        assert_invalid(editor.edit_sheets(["Sheet1".into()]), expected);
++        assert_eq!(
++            source.as_slice(),
++            bytes.as_slice(),
++            "source changed after rejected attempt {attempt}"
++        );
++    }
++}
++
++#[test]
++fn source_size_cap_falls_back_without_refusing_valid_or_late_failures() {
++    assert_valid_noop(&worksheet_over_byte_cap(VALID_TAIL));
++    assert_rejected_with_retry(
++        &worksheet_over_byte_cap(LATE_VALIDATOR_TAIL),
++        LATE_VALIDATOR_ERROR,
++    );
++    assert_rejected_with_retry(&worksheet_over_byte_cap(LATE_RAW_TAIL), LATE_RAW_ERROR);
++}
++
++#[test]
++fn provisional_event_cap_falls_back_without_refusing_valid_or_late_failures() {
++    assert_valid_noop(&worksheet_over_event_cap(VALID_TAIL));
++    assert_rejected_with_retry(
++        &worksheet_over_event_cap(LATE_VALIDATOR_TAIL),
++        LATE_VALIDATOR_ERROR,
++    );
++    assert_rejected_with_retry(&worksheet_over_event_cap(LATE_RAW_TAIL), LATE_RAW_ERROR);
++}
++
++#[test]
++fn event_bound_admits_main_numeric_grids() {
++    for side in [96, 128] {
++        let xml = worksheet_numeric_grid(side);
++        assert!(xml.len() < crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
++        assert!(crate::raw::worksheet::source_stream_eligible(&xml));
++        assert!(crate::raw::worksheet::shared_event_bound_within_cap(&xml));
++    }
++}
++
++#[test]
++fn lexical_event_bound_matches_direct_ns_reader_edge_oracle() {
++    let mut bom = vec![0xef, 0xbb, 0xbf];
++    bom.extend_from_slice(b"<a/>");
++    let cases = vec![
++        ("empty", b"".to_vec(), true),
++        ("whitespace", b" \t\r\n".to_vec(), true),
++        ("bom", bom, true),
++        ("declaration", b"<?xml version=\"1.0\"?><a/>".to_vec(), true),
++        ("processing_instruction", b"<?pi data?><a/>".to_vec(), true),
++        ("comment", b"<!--comment--><a/>".to_vec(), true),
++        (
++            "comment_embedded_delimiters",
++            b"<!-- > & ; --><a/>".to_vec(),
++            true,
++        ),
++        ("cdata", b"<![CDATA[data]]><a/>".to_vec(), true),
++        (
++            "cdata_embedded_delimiters",
++            b"<![CDATA[ > & ; ]]> <a/>".to_vec(),
++            true,
++        ),
++        ("doctype", b"<!DOCTYPE a><a/>".to_vec(), true),
++        (
++            "doctype_embedded_delimiters",
++            b"<!DOCTYPE a [ <!ELEMENT a ANY> <!ENTITY x \"a > & ;\"> ]><a/>".to_vec(),
++            true,
++        ),
++        (
++            "attribute_and_text_delimiters",
++            b"<a attr=\"> &amp;\">text>;></a>".to_vec(),
++            true,
++        ),
++        ("ordinary_text_delimiters", b"<a>text>;></a>".to_vec(), true),
++        ("named_reference", b"<a>x&amp;y</a>".to_vec(), true),
++        ("numeric_reference", b"<a>x&#65;y</a>".to_vec(), true),
++        ("hex_numeric_reference", b"<a>x&#x41;y</a>".to_vec(), true),
++        ("reference_chain", b"<a>&amp;&#65;</a>".to_vec(), true),
++        ("dangling_reference", b"<a>x&broken</a>".to_vec(), false),
++        (
++            "reference_before_markup",
++            b"<a>x&broken<b/></a>".to_vec(),
++            false,
++        ),
++        (
++            "reference_before_reference",
++            b"<a>x&broken&ok;</a>".to_vec(),
++            false,
++        ),
++        (
++            "unterminated_numeric_reference",
++            b"<a>&#65</a>".to_vec(),
++            false,
++        ),
++        ("malformed_reference_body", b"<a>&#;</a>".to_vec(), true),
++        ("malformed_nested", b"<a><b></a>".to_vec(), false),
++        ("malformed_tail", b"<a><".to_vec(), false),
++        ("nested_and_empty", b"<a><b/><c>v</c></a>".to_vec(), true),
++    ];
++
++    for (name, content, expected_complete) in cases {
++        let direct = assert_conservative_event_bound(name, &content);
++        assert_eq!(
++            matches!(&direct, DirectEventCount::Complete(_)),
++            expected_complete,
++            "{name}: direct NsReader outcome was {direct:?}"
++        );
++    }
++
++    let base = worksheet_with_comments(0, VALID_TAIL);
++    let base_events = match direct_ns_reader_event_count(&base) {
++        DirectEventCount::Complete(count) => count,
++        other => panic!("base cap fixture did not reach EOF: {other:?}"),
++    };
++    let cap = crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS;
++    assert!(base_events < cap);
++    assert_eq!(cap, 131_072);
++
++    let exact = worksheet_with_comments(cap - base_events, VALID_TAIL);
++    assert_eq!(independent_lexical_event_bound(&exact), cap);
++    assert_eq!(
++        direct_ns_reader_event_count(&exact),
++        DirectEventCount::Complete(cap)
++    );
++    assert!(crate::raw::worksheet::shared_event_bound_within_cap(&exact));
++
++    let over = worksheet_with_comments(cap - base_events + 1, VALID_TAIL);
++    assert_eq!(independent_lexical_event_bound(&over), 131_073);
++    assert_eq!(
++        direct_ns_reader_event_count(&over),
++        DirectEventCount::Complete(131_073)
++    );
++    assert!(!crate::raw::worksheet::shared_event_bound_within_cap(&over));
++}
++
++#[test]
++fn lexical_event_bound_false_positive_still_uses_authoritative_fallback() {
++    let sheet = worksheet_with_delimiter_comments(7_000, VALID_TAIL);
++    let direct = direct_ns_reader_event_count(&sheet);
++    let independent_bound = independent_lexical_event_bound(&sheet);
++    assert!(matches!(&direct, DirectEventCount::Complete(_)));
++    assert!(direct.emitted() < crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS);
++    assert!(independent_bound > crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS);
++    assert!(direct.emitted() < independent_bound);
++    assert!(crate::raw::worksheet::source_stream_eligible(&sheet));
++    assert!(!crate::raw::worksheet::shared_event_bound_within_cap(&sheet));
++    assert_valid_noop(&sheet);
++}
++
++#[test]
++fn eligible_small_source_uses_successful_value_edit_control() {
++    let sheet = worksheet_with_comments(3, VALID_TAIL);
++    assert!(crate::raw::worksheet::source_stream_eligible(&sheet));
++    let (bytes, source, editor) = source_and_editor(&sheet);
++    let mut edit = editor
++        .edit_sheets(["Sheet1".into()])
++        .expect("eligible worksheet");
++    edit.apply_batch([SheetCellValueEdit::set(
++        "Sheet1",
++        Address::from_a1("A1").expect("A1 address"),
++        2u32,
++    )])
++    .expect("stage value edit");
++    let commit = edit.commit().expect("commit value edit");
++    assert!(commit.changed());
++    assert_eq!(
++        commit
++            .snapshot()
++            .value(0, Address::from_a1("A1").expect("A1 address")),
++        Some(&Value::Number(Number::new("2").expect("edited number")))
++    );
++    assert_eq!(source.as_slice(), bytes.as_slice());
++}
+diff --git a/crates/litchi-xlsx/src/cell_values/validation.rs b/crates/litchi-xlsx/src/cell_values/validation.rs
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -5,7 +5,8 @@
+ use quick_xml::name::{Namespace, ResolveResult};
+ use quick_xml::reader::NsReader;
+ 
+-use crate::error::{Result, invalid};
++use crate::error::{Error, Result, allocation, invalid};
++use crate::raw;
+ 
+ const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+ const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+@@ -13,6 +14,9 @@
+ #[cfg(test)]
+ #[path = "validation_borrow_tests.rs"]
+ mod borrow_tests;
++#[cfg(test)]
++#[path = "shared_traversal_tests.rs"]
++mod shared_traversal_tests;
+ 
+ pub(super) fn workbook_xml(content: &[u8]) -> Result<()> {
+     validate_xml(content, XmlOwner::Workbook)
+@@ -28,6 +32,195 @@
+     Worksheet,
+ }
+ 
++/// Validation state for the shared source traversal.
++///
++/// The state owns only the local element names required by the existing
++/// closure checks. Event payloads remain borrowed for the duration of the
++/// callback. On an observer failure the driver stops immediately and the
++/// retained error is discarded before authoritative fallback validation.
++struct Validator {
++    owner: XmlOwner,
++    depth: usize,
++    elements: Vec<Box<[u8]>>,
++    dialect: Option<Box<[u8]>>,
++    saw_root: bool,
++    first_error: Option<Error>,
++}
++
++impl Validator {
++    fn new(owner: XmlOwner) -> Self {
++        Self {
++            owner,
++            depth: 0,
++            elements: Vec::new(),
++            dialect: None,
++            saw_root: false,
++            first_error: None,
++        }
++    }
++
++    fn observe(&mut self, namespace: &ResolveResult<'_>, event: &Event<'_>) -> bool {
++        if self.first_error.is_some() {
++            return false;
++        }
++        if let Err(error) = self.observe_inner(namespace, event) {
++            self.first_error = Some(error);
++            return false;
++        }
++        if matches!(event, Event::Eof) && (!self.saw_root || self.depth != 0) {
++            self.first_error = Some(invalid("value-only XML has no complete root element"));
++            return false;
++        }
++        true
++    }
++
++    fn observe_inner(&mut self, namespace: &ResolveResult<'_>, event: &Event<'_>) -> Result<()> {
++        match event {
++            Event::Start(element) => {
++                bind_dialect(namespace, &mut self.dialect)?;
++                let local = element
++                    .name()
++                    .local_name()
++                    .as_ref()
++                    .to_vec()
++                    .into_boxed_slice();
++                validate_element(
++                    self.owner,
++                    namespace,
++                    element,
++                    &local,
++                    self.elements.last().map(AsRef::as_ref),
++                    self.depth,
++                )?;
++                self.saw_root = true;
++                self.depth = self
++                    .depth
++                    .checked_add(1)
++                    .ok_or_else(|| invalid("value-only XML depth overflow"))?;
++                self.elements
++                    .try_reserve(1)
++                    .map_err(|source| allocation("value-only XML element stack", source))?;
++                self.elements.push(local);
++            },
++            Event::Empty(element) => {
++                bind_dialect(namespace, &mut self.dialect)?;
++                let local = element.name().local_name().as_ref().to_vec();
++                validate_element(
++                    self.owner,
++                    namespace,
++                    element,
++                    &local,
++                    self.elements.last().map(AsRef::as_ref),
++                    self.depth,
++                )?;
++                self.saw_root = true;
++            },
++            Event::End(element) => {
++                self.depth = self
++                    .depth
++                    .checked_sub(1)
++                    .ok_or_else(|| invalid("value-only XML has an unmatched closing element"))?;
++                let expected = self
++                    .elements
++                    .pop()
++                    .ok_or_else(|| invalid("value-only XML has no open element to close"))?;
++                if element.local_name().as_ref() != expected.as_ref()
++                    || !matches!((namespace, self.dialect.as_deref()), (ResolveResult::Bound(Namespace(value)), Some(expected)) if *value == expected)
++                {
++                    return Err(invalid(
++                        "value-only XML has a mismatched or foreign closing element",
++                    ));
++                }
++            },
++            Event::DocType(_) => {
++                return Err(invalid(
++                    "value-only edits refuse XML document type declarations",
++                ));
++            },
++            Event::Eof => {},
++            Event::Text(value) => {
++                let decoded = value
++                    .decode()
++                    .map_err(|error| invalid(format!("invalid value-only XML text: {error}")))?;
++                if !text_allowed(
++                    self.owner,
++                    self.elements.last().map(AsRef::as_ref),
++                    &decoded,
++                ) {
++                    return Err(invalid(
++                        "value-only XML has text outside a scalar value element",
++                    ));
++                }
++            },
++            Event::CData(value) => {
++                let decoded = value
++                    .decode()
++                    .map_err(|error| invalid(format!("invalid value-only XML text: {error}")))?;
++                if !text_allowed(
++                    self.owner,
++                    self.elements.last().map(AsRef::as_ref),
++                    &decoded,
++                ) {
++                    return Err(invalid(
++                        "value-only XML has text outside a scalar value element",
++                    ));
++                }
++            },
++            Event::GeneralRef(_) => {
++                if !text_context_allowed(self.owner, self.elements.last().map(AsRef::as_ref)) {
++                    return Err(invalid(
++                        "value-only XML has a reference outside a scalar value element",
++                    ));
++                }
++            },
++            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
++        }
++        Ok(())
++    }
++
++    fn finish(self) -> Result<()> {
++        if let Some(error) = self.first_error {
++            return Err(error);
++        }
++        if !self.saw_root || self.depth != 0 {
++            return Err(invalid("value-only XML has no complete root element"));
++        }
++        Ok(())
++    }
++}
++
++/// Validate and parse an eligible source using one borrowed `NsReader`.
++///
++/// Early reader, parser-transition, or provisional-cap uncertainty is
++/// converted into a provisional failure. After the observer accepts the
++/// complete source, parser materialization is carried as a `Complete` result;
++/// the caller finishes validation before forwarding that result through the
++/// raw facade. No speculative diagnostic escapes the established error order.
++pub(super) fn worksheet_xml_and_parse_source(content: &[u8]) -> Result<crate::cell::Store> {
++    let mut validator = Validator::new(XmlOwner::Worksheet);
++    let attempt = raw::worksheet::parse_source_with_observer(
++        content,
++        || Ok(None),
++        |namespace, event| validator.observe(namespace, event),
++    );
++    match attempt {
++        raw::worksheet::SourceParseAttempt::Complete(parsed) => {
++            validator.finish()?;
++            raw::worksheet::complete_source_parse(content, parsed)
++        },
++        raw::worksheet::SourceParseAttempt::ProvisionalFailed => {
++            drop(validator);
++            worksheet_xml(content)?;
++            raw::worksheet::parse(content, || Ok(None))
++        },
++        raw::worksheet::SourceParseAttempt::ReaderFailed => {
++            drop(validator);
++            worksheet_xml(content)?;
++            raw::worksheet::parse(content, || Ok(None))
++        },
++    }
++}
++
+ fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {
+     let mut reader = NsReader::from_reader(content);
+     let mut depth = 0usize;
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -23,7 +23,143 @@
+ use crate::cell::{Store, Text};
+ use crate::error::{Result, invalid};
+ use crate::layout::Defaults;
+-use litchi_ooxml_common::mce::process_ooxml;
++use litchi_ooxml_common::mce::{self, process_ooxml};
++use quick_xml::events::Event;
++use quick_xml::name::ResolveResult;
++
++/// Keep speculative source parsing below the aggregate multi-sheet limit. A
++/// larger worksheet takes the established validation-then-parse path.
++pub(crate) const MAX_SHARED_SOURCE_BYTES: usize = 8 * 1024 * 1024;
++
++/// Bound the parser state retained while validation is still provisional.
++/// This is deliberately below the ordinary parser event limit: after this
++/// count the driver returns a provisional failure, drops the parser, and the
++/// caller repeats the authoritative passes.
++pub(crate) const MAX_SHARED_PROVISIONAL_EVENTS: usize = 131_072;
++
++#[expect(
++    clippy::large_enum_variant,
++    reason = "short-lived owned parser result avoids an extra heap allocation"
++)]
++pub(crate) enum SourceParseAttempt {
++    Complete(Result<Store>),
++    ProvisionalFailed,
++    ReaderFailed,
++}
++
++/// Admit only byte-identical, UTF-8, no-MCE/no-x14ac worksheets to the shared
++/// reader. The original source bytes remain owned by `SourcePayload`; this
++/// predicate only decides whether a temporary borrowed traversal is safe.
++pub(crate) fn source_stream_eligible(content: &[u8]) -> bool {
++    content.len() <= MAX_SHARED_SOURCE_BYTES
++        && within_mce_limits(content)
++        && std::str::from_utf8(content).is_ok()
++        && !contains(content, mce::NAMESPACE.as_bytes())
++        && !contains(content, b"AlternateContent")
++        && !contains(content, x14ac::NAMESPACE)
++        && !contains(content, b"dyDescent")
++}
++
++fn within_mce_limits(content: &[u8]) -> bool {
++    let limits = mce::Limits::default();
++    content.len() <= limits.max_input_bytes && content.len() <= limits.max_output_bytes
++}
++
++fn contains(content: &[u8], marker: &[u8]) -> bool {
++    memchr::memmem::find(content, marker).is_some()
++}
++
++/// Return whether a conservative lexical upper bound fits the provisional
++/// shared-reader event cap. This runs before constructing `NsReader` or the
++/// raw parser. False positives fall back to the authoritative two-pass path;
++/// this predicate can never admit a source whose reader event count exceeds
++/// the cap.
++pub(crate) fn shared_event_bound_within_cap(content: &[u8]) -> bool {
++    let mut bound = 1usize; // The reader emits one terminal `Event::Eof`.
++
++    if let Some(&first) = content.first()
++        && !matches!(first, b'<' | b'&')
++        && !add_shared_event_bound(&mut bound)
++    {
++        return false;
++    }
++
++    // Every markup or general reference event begins at one of these bytes.
++    for _ in memchr::memchr2_iter(b'<', b'&', content) {
++        if !add_shared_event_bound(&mut bound) {
++            return false;
++        }
++    }
++
++    // A text event can begin after markup (`>`) or a completed reference
++    // (`;`) when the next source byte is neither another delimiter nor EOF.
++    // Delimiters inside attributes, comments, CDATA, and ordinary text make
++    // this deliberately over-count, which only causes a safe fallback.
++    for index in memchr::memchr2_iter(b'>', b';', content) {
++        if content
++            .get(index + 1)
++            .is_some_and(|&next| !matches!(next, b'<' | b'&'))
++            && !add_shared_event_bound(&mut bound)
++        {
++            return false;
++        }
++    }
++
++    true
++}
++
++#[inline]
++fn add_shared_event_bound(bound: &mut usize) -> bool {
++    let Some(next) = bound.checked_add(1) else {
++        return false;
++    };
++    if next > MAX_SHARED_PROVISIONAL_EVENTS {
++        return false;
++    }
++    *bound = next;
++    true
++}
++
++pub(crate) fn parse_source_with_observer<'a, F, O>(
++    content: &[u8],
++    strings: F,
++    observer: O,
++) -> SourceParseAttempt
++where
++    F: FnOnce() -> Result<Option<&'a [Text]>>,
++    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
++{
++    if !shared_event_bound_within_cap(content) {
++        return SourceParseAttempt::ProvisionalFailed;
++    }
++    codec::parse_source_with_observer(content, strings, observer)
++}
++
++/// Finish a source-backed raw parse while retaining the historical x14ac
++/// retry that follows a plain worksheet parser failure.
++pub(crate) fn complete_source_parse(content: &[u8], parsed: Result<Store>) -> Result<Store> {
++    if parsed.is_ok() {
++        // Eligibility already proved that the shared source is marker-free;
++        // a successful completed parse needs no redundant x14ac scan.
++        return parsed;
++    }
++    let needs_extension_capture = x14ac::may_contain_descent(content);
++    complete_source_parse_with_extension_state(content, needs_extension_capture, parsed)
++}
++
++fn complete_source_parse_with_extension_state(
++    content: &[u8],
++    needs_extension_capture: bool,
++    parsed: Result<Store>,
++) -> Result<Store> {
++    if parsed.is_err() && !needs_extension_capture {
++        // The extension scan historically ran first. Repeat it only on a
++        // rejected plain worksheet so its typed error and error precedence
++        // remain unchanged without charging successful no-extension reads.
++        x14ac::capture(content)?;
++    }
++    parsed
++}
+ 
+ pub(crate) fn parse<'a, F>(content: &[u8], strings: F) -> Result<Store>
+ where
+@@ -42,13 +178,7 @@
+         model::Parser::parse(content, strings, extensions)
+     })();
+ 
+-    if parsed.is_err() && !needs_extension_capture {
+-        // The extension scan historically ran first. Repeat it only on a
+-        // rejected plain worksheet so its typed error and error precedence
+-        // remain unchanged without charging successful no-extension reads.
+-        x14ac::capture(content)?;
+-    }
+-    parsed
++    complete_source_parse_with_extension_state(content, needs_extension_capture, parsed)
+ }
+ 
+ pub(crate) fn parse_defaults(content: &[u8]) -> Result<Option<Defaults>> {
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -15,8 +15,8 @@
+ use super::super::strings::decode_spreadsheet_text;
+ use super::model::{
+     Context, MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_COLUMN_STYLE, MAX_ENCODED_CELL_BYTES,
+-    MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, Parser, PendingCell, PendingRow,
+-    RawCell, RawFormula, RawFormulaKind, TextTarget, merge_successor,
++    MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, MAX_XML_EVENTS, Parser, PendingCell,
++    PendingRow, RawCell, RawFormula, RawFormulaKind, TextTarget, merge_successor,
+ };
+ use super::semantic::{materialize, resolve_shared_formulas};
+ use super::validation::{
+@@ -283,125 +283,159 @@
+             let (namespace, event) = reader.resolver().resolve_event(event);
+             let decoder = reader.decoder();
+             let resolver = reader.resolver();
+-            match event {
+-                Event::Start(element) if stack.is_empty() => {
+-                    if closed_root
+-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+-                    {
+-                        return Err(invalid(
+-                            "worksheet XML must have one SpreadsheetML worksheet root",
+-                        ));
+-                    }
+-                    stack.push(Context::Worksheet);
+-                },
+-                Event::Empty(element) if stack.is_empty() => {
+-                    if closed_root
+-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+-                    {
+-                        return Err(invalid(
+-                            "worksheet XML must have one SpreadsheetML worksheet root",
+-                        ));
+-                    }
+-                    closed_root = true;
+-                },
+-                Event::Start(element) => {
+-                    if stack.len() >= MAX_XML_DEPTH {
+-                        return Err(invalid(format!(
+-                            "worksheet XML exceeds {MAX_XML_DEPTH} levels"
+-                        )));
+-                    }
+-                    let parent = current(&stack)?;
+-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
+-                    stack.push(child);
+-                },
+-                Event::Empty(element) => {
+-                    let parent = current(&stack)?;
+-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
+-                    parser.finish(child)?;
+-                },
+-                Event::Text(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
+-                        && !value
+-                            .decode()
+-                            .map_err(|error| invalid(error.to_string()))?
+-                            .trim()
+-                            .is_empty()
+-                    {
+-                        return Err(invalid("worksheet leaf property cannot contain text"));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(
+-                            target,
+-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
+-                        )?;
+-                    }
+-                },
+-                Event::CData(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+-                        return Err(invalid("worksheet leaf property cannot contain CDATA"));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(
+-                            target,
+-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
+-                        )?;
+-                    }
+-                },
+-                Event::GeneralRef(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+-                        return Err(invalid(
+-                            "worksheet leaf property cannot contain character references",
+-                        ));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(target, &decode_xml_reference(&value)?)?;
+-                    }
+-                },
+-                Event::End(element) => {
+-                    let ended = stack.pop().ok_or_else(|| {
+-                        invalid("worksheet XML has a closing element outside its root")
+-                    })?;
+-                    parser.finish(ended)?;
+-                    if ended == Context::Worksheet {
+-                        if !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
+-                            return Err(invalid(
+-                                "worksheet XML has an invalid root closing element",
+-                            ));
+-                        }
+-                        closed_root = true;
+-                    }
+-                },
+-                Event::Eof if !closed_root || !stack.is_empty() => {
+-                    return Err(invalid(
+-                        "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
+-                    ));
+-                },
+-                Event::Eof => break,
+-                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
++            if parser.transition(
++                &mut stack,
++                &mut closed_root,
++                &namespace,
++                event,
++                decoder,
++                resolver,
++            )? {
++                break;
+             }
+         }
+ 
+-        resolve_shared_formulas(&mut parser.cells)?;
+-        let needs_strings = parser
++        parser.finish_parse(strings)
++    }
++
++    fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
++    where
++        F: FnOnce() -> Result<Option<&'a [Text]>>,
++    {
++        resolve_shared_formulas(&mut self.cells)?;
++        let needs_strings = self
+             .cells
+             .iter()
+             .any(|cell| cell.cell_type.as_deref() == Some("s"));
+         let strings = if needs_strings { strings()? } else { None };
+         let mut cells = Vec::new();
+         cells
+-            .try_reserve(parser.cells.len())
++            .try_reserve(self.cells.len())
+             .map_err(|source| allocation("sparse worksheet cells", source))?;
+-        let declared_extent = parser.declared_extent;
+-        let rows = parser.rows;
+-        let columns = column::resolve(parser.columns)?;
+-        let defaults = parser.defaults;
+-        let merges = parser.merges;
+-        for cell in parser.cells {
++        let declared_extent = self.declared_extent;
++        let rows = self.rows;
++        let columns = column::resolve(self.columns)?;
++        let defaults = self.defaults;
++        let merges = self.merges;
++        for cell in self.cells {
+             cells.push(materialize(cell, strings)?);
+         }
+         Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)
+     }
+ 
++    /// Advance the ordinary worksheet parser by one XML event.
++    ///
++    /// The source-backed shared reader uses this same transition function so
++    /// its speculative parser cannot drift from the established materialized
++    /// parser. `true` is returned only for a complete end-of-file event.
++    fn transition(
++        &mut self,
++        stack: &mut Vec<Context>,
++        closed_root: &mut bool,
++        namespace: &ResolveResult<'_>,
++        event: Event<'_>,
++        decoder: Decoder,
++        resolver: &NamespaceResolver,
++    ) -> Result<bool> {
++        match event {
++            Event::Start(element) if stack.is_empty() => {
++                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
++                    return Err(invalid(
++                        "worksheet XML must have one SpreadsheetML worksheet root",
++                    ));
++                }
++                stack
++                    .try_reserve(1)
++                    .map_err(|source| allocation("worksheet parser element stack", source))?;
++                stack.push(Context::Worksheet);
++            },
++            Event::Empty(element) if stack.is_empty() => {
++                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
++                    return Err(invalid(
++                        "worksheet XML must have one SpreadsheetML worksheet root",
++                    ));
++                }
++                *closed_root = true;
++            },
++            Event::Start(element) => {
++                if stack.len() >= MAX_XML_DEPTH {
++                    return Err(invalid(format!(
++                        "worksheet XML exceeds {MAX_XML_DEPTH} levels"
++                    )));
++                }
++                let parent = current(stack)?;
++                let child = self.start(parent, namespace, &element, decoder, resolver)?;
++                stack
++                    .try_reserve(1)
++                    .map_err(|source| allocation("worksheet parser element stack", source))?;
++                stack.push(child);
++            },
++            Event::Empty(element) => {
++                let parent = current(stack)?;
++                let child = self.start(parent, namespace, &element, decoder, resolver)?;
++                self.finish(child)?;
++            },
++            Event::Text(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
++                    && !value
++                        .decode()
++                        .map_err(|error| invalid(error.to_string()))?
++                        .trim()
++                        .is_empty()
++                {
++                    return Err(invalid("worksheet leaf property cannot contain text"));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(
++                        target,
++                        &value.decode().map_err(|error| invalid(error.to_string()))?,
++                    )?;
++                }
++            },
++            Event::CData(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
++                    return Err(invalid("worksheet leaf property cannot contain CDATA"));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(
++                        target,
++                        &value.decode().map_err(|error| invalid(error.to_string()))?,
++                    )?;
++                }
++            },
++            Event::GeneralRef(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
++                    return Err(invalid(
++                        "worksheet leaf property cannot contain character references",
++                    ));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(target, &decode_xml_reference(&value)?)?;
++                }
++            },
++            Event::End(element) => {
++                let ended = stack.pop().ok_or_else(|| {
++                    invalid("worksheet XML has a closing element outside its root")
++                })?;
++                self.finish(ended)?;
++                if ended == Context::Worksheet {
++                    if !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
++                        return Err(invalid("worksheet XML has an invalid root closing element"));
++                    }
++                    *closed_root = true;
++                }
++            },
++            Event::Eof if !*closed_root || !stack.is_empty() => {
++                return Err(invalid(
++                    "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
++                ));
++            },
++            Event::Eof => return Ok(true),
++            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
++        }
++        Ok(false)
++    }
++
+     fn start(
+         &mut self,
+         parent: Context,
+@@ -568,6 +602,9 @@
+                 .filter(|value| *value <= ROWS)
+                 .ok_or_else(|| invalid("inferred worksheet row exceeds the spreadsheet grid"))?,
+         };
++        self.seen_rows
++            .try_reserve(1)
++            .map_err(|source| allocation("worksheet parser row index set", source))?;
+         if !self.seen_rows.insert(number) {
+             return Err(invalid(format!("duplicate worksheet row {number}")));
+         }
+@@ -1070,3 +1107,67 @@
+         Ok(())
+     }
+ }
++
++/// Traverse one eligible source with the ordinary parser while giving a
++/// caller-owned validator a borrowed view of each event first.
++///
++/// Early parser failures are deliberately not returned here. The source-backed
++/// caller repeats the established two-pass path so the historical error text
++/// and precedence remain authoritative. Returning immediately on any
++/// provisional failure drops the parser before fallback starts. Once the
++/// observer accepts EOF, the finalization result is carried to the raw facade
++/// so its historical extension-error retry can still run.
++pub(super) fn parse_source_with_observer<'a, F, O>(
++    content: &[u8],
++    strings: F,
++    mut observer: O,
++) -> super::SourceParseAttempt
++where
++    F: FnOnce() -> Result<Option<&'a [Text]>>,
++    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
++{
++    let mut reader = NsReader::from_reader(content);
++    reader.config_mut().check_end_names = true;
++    let mut parser = Parser::new(x14ac::Values::default());
++    let mut stack = Vec::new();
++    let mut closed_root = false;
++    let mut event_count = 0usize;
++
++    loop {
++        let event = match reader.read_event() {
++            Ok(event) => event,
++            Err(_) => return super::SourceParseAttempt::ReaderFailed,
++        };
++        let event_limit_exceeded = match event_count.checked_add(1) {
++            Some(count) => {
++                event_count = count;
++                count > MAX_XML_EVENTS || count > super::MAX_SHARED_PROVISIONAL_EVENTS
++            },
++            None => true,
++        };
++        let (namespace, event) = reader.resolver().resolve_event(event);
++        let decoder = reader.decoder();
++        let resolver = reader.resolver();
++        let parser_allowed = observer(&namespace, &event);
++        if !parser_allowed || event_limit_exceeded {
++            return super::SourceParseAttempt::ProvisionalFailed;
++        }
++
++        let complete = match parser.transition(
++            &mut stack,
++            &mut closed_root,
++            &namespace,
++            event,
++            decoder,
++            resolver,
++        ) {
++            Ok(complete) => complete,
++            Err(_) => return super::SourceParseAttempt::ProvisionalFailed,
++        };
++        if complete {
++            break;
++        }
++    }
++
++    super::SourceParseAttempt::Complete(parser.finish_parse(strings))
++}
