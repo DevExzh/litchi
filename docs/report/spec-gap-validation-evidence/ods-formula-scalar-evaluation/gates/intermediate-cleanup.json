@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-09-13T11:55:56.362616+00:00",
+  "removed": [
+    {
+      "path": "performance/baseline/ods-formula-expression-profile",
+      "bytes": 1074128,
+      "sha256": "f359e853b887d121655b7e51d766c7de90421caedf22f8a4759bb5483ab72c70"
+    },
+    {
+      "path": "performance/ascii-candidate/ods-formula-expression-profile",
+      "bytes": 1074104,
+      "sha256": "5be86d8b7c3d7d2d77cc7844fa905f4e203df40e31d80fb570596dc2be732149"
+    },
+    {
+      "path": "performance/ast-candidate/ods-formula-expression-profile",
+      "bytes": 1074616,
+      "sha256": "2d3ae0bdd1e174d6aaa47b8fbceb428a567c8f61f875094041e7336d6f90fab1"
+    },
+    {
+      "path": "performance/evaluation-candidate/ods-formula-scalar-evaluation-profile",
+      "bytes": 1226672,
+      "sha256": "acf4e57d11c301cbaad0cc318dabb70638d9686be631abd51d299b6c99d580b8"
+    },
+    {
+      "path": "performance/evaluation-provisional",
+      "reason": "Superseded incomplete build; final source, build, and profiles are retained."
+    },
+    {
+      "path": "performance/baseline/build.log",
+      "reason": "Exact duplicate of performance/baseline-build.log"
+    },
+    {
+      "path": "performance/ascii-candidate/build.log",
+      "reason": "Exact duplicate of performance/ascii-candidate-build.log"
+    }
+  ]
+}

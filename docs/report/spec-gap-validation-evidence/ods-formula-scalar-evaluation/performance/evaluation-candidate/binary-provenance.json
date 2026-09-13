@@ -1,0 +1,12 @@
+{
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/evaluation-candidate/ods-formula-scalar-evaluation-profile",
+  "sha256": "acf4e57d11c301cbaad0cc318dabb70638d9686be631abd51d299b6c99d580b8",
+  "size_bytes": 1226672,
+  "build_status": 0,
+  "source_status": "final-gates-source-after",
+  "captured_at": "2026-09-13T11:45:31.421207Z",
+  "target_binary": "/var/tmp/ods-scalar-target/release/ods-formula-scalar-evaluation-profile",
+  "base_commit": "9072e969e34263be73d5b8d2eb2700478d182101",
+  "source_manifest": "source-sha256.json",
+  "harness_manifest": "harness-sha256.txt"
+}

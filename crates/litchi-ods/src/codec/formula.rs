@@ -1,18 +1,18 @@
 //! ODF formula parsing and representation.
 //!
-//! This module tokenizes the supported subset of `OpenFormula` expressions and
-//! represents formulas stored in ODS files. Function-name recognition covers
-//! the complete normative Part 4, chapter 6 catalog; this remains a tokenizer,
-//! not a complete expression grammar or evaluator, and it does not validate
-//! function arity.
+//! The legacy tokenizer represents formulas stored in ODS files and recognizes
+//! the normative Part 4, chapter 6 function catalog without validating arity.
+//! Use [`expression`] for the strict, inert OpenFormula expression tree and
+//! [`evaluation`] for explicit, bounded scalar execution. Function recognition
+//! does not imply that a function can be evaluated.
 //!
 //! # Formula Syntax
 //!
 //! ODF uses `OpenFormula` syntax (similar to Excel but with some differences):
-//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (sheet-qualified)
-//! - Functions: `SUM(A1:A10)`, `IF(A1>0, "Positive", "Negative")`
+//! - Cell references: `[.A1]`, `[.$A$1]` (absolute), `[Sheet1.A1]` (sheet-qualified)
+//! - Functions: `SUM([.A1:.A10])`, `IF([.A1]>0;"Positive";"Negative")`
 //! - Operators: `+`, `-`, `*`, `/`, `^`, `&` (concatenation)
-//! - References: `.A1` (relative to current sheet), `[$Inputs.$A$1]` (bracketed)
+//! - References: `[.A1]` (current sheet), `[$Inputs.$A$1]` (absolute sheet/cell)
 //!
 //! # References
 //!
@@ -22,6 +22,8 @@ use litchi_core::{Error, Resource, ResourceLimit, Result};
 use smallvec::SmallVec;
 use std::{borrow::Cow, convert::TryFrom, sync::Arc};
 
+/// Bounded, read-only evaluation of scalar OpenFormula expressions.
+pub mod evaluation;
 /// Strict, inert OpenFormula 1.4 expression grammar and flat syntax tree.
 pub mod expression;
 mod functions;
