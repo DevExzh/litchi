@@ -1,0 +1,85 @@
+{
+  "scope": "isolated private primitives; full value evaluator and worksheet adapter pending",
+  "files": [
+    {
+      "path": "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+      "bytes": 16944,
+      "sha256": "4e133e7ccab7e3c4632d955a2479f2660bff30da0a494cde565b812ba4940b07"
+    },
+    {
+      "path": "crates/litchi-ods/src/codec/formula/evaluation/value/geometry.rs",
+      "bytes": 14580,
+      "sha256": "ad94bd57f5aee96e90b1d9ec79217b4689c5bfbe422c3a4d62e278da7b22ff7d"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/spec-review.md",
+      "bytes": 31368,
+      "sha256": "ba282bbb2f97638dc162033ca3b2bbc0c93d4b5f49de31eb1a0fc427a13112ce"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-test.json",
+      "bytes": 1395,
+      "sha256": "ebb127a8997a0a0527a0fd7978737b0631fa6ab1c82c404209a898a91b4938c1"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-test.log",
+      "bytes": 1098,
+      "sha256": "555eecf1aa062122edba4b72dd9c3d5be12d05db6cba0241dd35373808ca21e1"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-clippy.json",
+      "bytes": 1338,
+      "sha256": "04438db4e0c60d317f1442bff1e51e254b60c5dd44144b073d2e4a0494db77fd"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-clippy.log",
+      "bytes": 150,
+      "sha256": "4a0c175d0742feffdac861386e3df1f580d63c1d58b281f0f35a0182cc007cef"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-test-context.txt",
+      "bytes": 157,
+      "sha256": "d215ceb67cd03c664b2cd4cb28cd400e95ef0911cde3ce6927e505225b4eab44"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/scalar-bridge-review.md",
+      "bytes": 4611,
+      "sha256": "df73b2d6b7fe03bdee2b5de621e1f9c70dc719be29cc186a2fbec14ee0c89e90"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/primitive-validation.md",
+      "bytes": 2722,
+      "sha256": "bdb6f9570c359c62fcdc83e6d808338e637985519ceea96dfe1f2ceb3771f0fa"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/primitive-workspace.Cargo.lock",
+      "bytes": 138837,
+      "sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/geometry-test.compiler",
+      "bytes": 36,
+      "sha256": "f4d034f5660bb49f22bfcba3f3445be67e25b704c193ff421b53863b4faee148"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/geometry-test.source-sha256",
+      "bytes": 131,
+      "sha256": "695540fa48dee24d6226ae66bc6868ed832389991fbcba427d56a11efb523a89"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/geometry-test.status",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/gates/geometry-test.stdout",
+      "bytes": 383,
+      "sha256": "143108f7c29fabfd3caf50be42608597d057fc66822686be47ecc6bb199b7da2"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/.gitattributes",
+      "bytes": 130,
+      "sha256": "60bd366d8922c5e27591c6bfdba16878e0dde58445bf996af94546978a1c3295"
+    }
+  ]
+}

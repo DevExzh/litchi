@@ -1,0 +1,8 @@
+
+running 3 tests
+test value::geometry::tests::constructor_rejects_empty_and_checked_extent_overflow ... ok
+test value::geometry::tests::intersection_is_half_open_and_bounding_spans_gaps ... ok
+test value::geometry::tests::two_dimensional_projection_broadcasts_only_its_named_axis ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
