@@ -9,6 +9,80 @@
 //! or recursively evaluate a formula cell.  Such cells are reported as
 //! `CellRead::Unsupported` until a future calculation layer supplies those
 //! capabilities.
+//!
+//! # Choosing an evaluation API
+//!
+//! Use [`super::evaluate_scalar`] for constant scalar expressions without a
+//! worksheet. Use [`evaluate`] here for local references and arrays. Both
+//! profiles implement scalar operators and the logical, bitwise, and number
+//! representation function families; neither implements all OpenFormula functions.
+//!
+//! [`Context::new`] defaults to [`Mode::Matrix`]. A bare reference in that mode
+//! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
+//! reading its cells. A consuming operation, such as adding a number to a range,
+//! materializes its values. [`Mode::Scalar`] instead applies implicit intersection
+//! at the caller's zero-based [`Position`]. Reference lists retain their distinct
+//! type: they cannot be converted to a scalar or rectangular array. `AND` and `OR`
+//! accept reference sequences and omit referenced text, logical, and empty cells.
+//!
+//! Matrix arithmetic broadcasts singleton dimensions. Lazy `IF`, `IFERROR`, and
+//! `IFNA` evaluate selected cells only; unselected branches do not resolve missing
+//! references. Formula errors are [`Value::Error`] results. Cancellation, resource
+//! exhaustion, unsupported capabilities, and provider failures are
+//! [`EvaluationFailure`] values and are not caught by formula error handlers.
+//!
+//! # Reusing worksheets and keeping a result
+//!
+//! [`crate::worksheet::formula::Resolver`] indexes physical repetition runs once.
+//! Supply finite grid dimensions explicitly and reuse the index while the sheets
+//! stay immutable. Borrowed results share the expression/resolver lifetime. Use
+//! [`Evaluated::to_owned`] when a result must outlive them; the copy is separately
+//! bounded and never reads or evaluates referenced cells.
+//!
+//! ```
+//! use litchi_core::ExecutionContext;
+//! use litchi_ods::{Cell, CellValue, Row, Sheet};
+//! use litchi_ods::codec::formula::{
+//!     expression::Expression,
+//!     evaluation::value::{self, Context, Limits, Mode, OwnedEvaluated,
+//!         OwnedValueView, Position, SheetExtent, Value},
+//! };
+//! use litchi_ods::worksheet::formula::Resolver;
+//!
+//! fn calculate(execution: &ExecutionContext) -> Result<OwnedEvaluated, Box<dyn std::error::Error>> {
+//!     let owned = {
+//!         let mut row = Row::new();
+//!         row.push_cell(Cell::new(CellValue::Number(10.0), "10"))?;
+//!         row.push_cell(Cell::new(CellValue::Number(20.0), "20"))?;
+//!         let mut sheet = Sheet::new("Data")?;
+//!         sheet.push_row(row)?;
+//!         let sheets = [sheet];
+//!         let resolver = Resolver::new(&sheets, SheetExtent::new(100, 26), execution)?;
+//!         let expression = Expression::parse("=[.A1:.B1]+1")?;
+//!         let context = Context::new(execution, Position::new("Data", 0, 0))
+//!             .with_mode(Mode::Matrix);
+//!         let limits = Limits::default();
+//!         let result = value::evaluate(&expression, &resolver, &context, &limits)?;
+//!         let array = result.as_array().expect("range arithmetic produces an array");
+//!         assert_eq!((array.shape().rows(), array.shape().columns()), (1, 2));
+//!         assert!(matches!(array.get(0), Some(Value::Number(11.0))));
+//!         result.to_owned(execution, &limits)?
+//!     }; // The expression, worksheet, and resolver are now dropped.
+//!     assert!(matches!(owned.as_array().unwrap().get(1), Some(OwnedValueView::Number(21.0))));
+//!     Ok(owned)
+//! }
+//! ```
+//!
+//! # Capability boundaries
+//!
+//! This API does not build a dependency graph, recalculate formula cells, spill
+//! results into a sheet, or publish caches. The worksheet adapter refuses formula
+//! cells even when they contain cached values. Dates, times, and unsupported cell
+//! payloads also receive typed refusals. Names, labels, external sources,
+//! host-defined/volatile functions, and remaining function families are not
+//! resolved or executed. A custom [`Resolver`] must obey the same read-only,
+//! finite, immutable-source contract. Caller cancellation and resource budgets
+//! constrain preparation, evaluation, and optional owned conversion separately.
 
 use super::{
     EvaluationContext, EvaluationFailure, EvaluationLimits, EvaluationResult, Evaluator,
