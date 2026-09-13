@@ -1,0 +1,2 @@
+config workload=Parse case=parse-new-name input_bytes=24 repeat=1000 warmups=3 iterations=15
+result mean_ns=212110 p50_ns=210501 p95_ns=222861 p99_ns=222861 alloc_calls_p50=4000 alloc_calls_max=4000 dealloc_calls_p50=4000 dealloc_calls_max=4000 requested_bytes_p50=489000 requested_bytes_max=489000 released_bytes_p50=489000 released_bytes_max=489000 live_before_p50=3305 live_after_p50=3305 live_after_max=3305 peak_live_delta_p50=489 peak_live_delta_max=489 successes_p50=1000 successes_max=1000 checksum_p50=28000 checksum_max=28000

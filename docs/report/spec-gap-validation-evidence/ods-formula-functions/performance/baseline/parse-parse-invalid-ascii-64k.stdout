@@ -1,0 +1,2 @@
+config workload=Parse case=parse-invalid-ascii-64k input_bytes=65536 repeat=4 warmups=3 iterations=15
+result mean_ns=508948 p50_ns=509162 p95_ns=520312 p99_ns=520312 alloc_calls_p50=32 alloc_calls_max=32 dealloc_calls_p50=24 dealloc_calls_max=24 requested_bytes_p50=1049492 requested_bytes_max=1049492 released_bytes_p50=1049492 released_bytes_max=1049492 live_before_p50=89225 live_after_p50=89225 live_after_max=89225 peak_live_delta_p50=196638 peak_live_delta_max=196638 successes_p50=0 successes_max=0 checksum_p50=262360 checksum_max=262360
