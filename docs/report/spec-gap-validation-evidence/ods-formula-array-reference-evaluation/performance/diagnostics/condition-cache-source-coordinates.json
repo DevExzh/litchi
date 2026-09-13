@@ -1,0 +1,62 @@
+{
+  "scope": "HEAD7651b92e8 plus isolated condition-cache normalization fix, without concurrent reference handler draft",
+  "sources": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "7766e372d346aa9e8473776a40e00c5127e14289417ce124a27a1ca5a3892b4d",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "730ed0ea2933d483a324394bd7afefff356e7b7985b582e78991a6a214320a6b",
+    "crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "7ee6fda3a4140eaf28872a701c6742cf3931192672dcf5588f5cf63524ba4da3"
+  },
+  "commands": [
+    {
+      "name": "lib",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--lib"
+      ],
+      "status": 0,
+      "seconds": 8.154485702514648
+    },
+    {
+      "name": "finite-cache",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--test",
+        "ods_formula_array_reference_evaluation",
+        "finite_inner_condition_does_not_cache_out_of_shape_broadcast_positions"
+      ],
+      "status": 0,
+      "seconds": 6.776886224746704
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "status": 0,
+      "seconds": 7.66553521156311
+    }
+  ],
+  "archive": "condition-cache-source-coordinates.tar.gz",
+  "sha256": "7ba3b84ebb6bb4892a37dc1a3b1f66bfeae651d1e773e5048007880444f859ea"
+}
