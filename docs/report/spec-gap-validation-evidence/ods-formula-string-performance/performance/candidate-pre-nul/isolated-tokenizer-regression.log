@@ -1,0 +1,11 @@
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-string-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running tests/ods_formula_tokenizer_regression.rs (/var/tmp/ods-string-target/debug/deps/ods_formula_tokenizer_regression-fcd075db6a49d513)
+
+running 4 tests
+test legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved ... ok
+test malformed_identifier_suffixes_remain_typed_syntax_errors ... ok
+test repeated_function_and_cell_scans_keep_each_lexical_boundary ... ok
+test speculative_cell_allocation_failure_is_not_swallowed_by_fallback ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

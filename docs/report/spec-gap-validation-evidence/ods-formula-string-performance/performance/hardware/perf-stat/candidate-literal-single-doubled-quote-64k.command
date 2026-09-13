@@ -1,0 +1,1 @@
+perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -- taskset -c 2 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate/ods-formula-reference-profile --workload parse --case literal-single-doubled-quote-64k --warmups 3 --iterations 15 --repeat 8

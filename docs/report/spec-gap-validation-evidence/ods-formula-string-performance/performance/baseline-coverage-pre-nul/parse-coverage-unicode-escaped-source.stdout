@@ -1,0 +1,2 @@
+config workload=parse case=coverage-unicode-escaped-source input_bytes=49 repeat=1000 warmups=3 iterations=15 expected_success=true
+result mean_ns=437157 p50_ns=436962 p95_ns=444782 p99_ns=444782 alloc_calls_p50=5000 alloc_calls_max=5000 dealloc_calls_p50=5000 dealloc_calls_max=5000 requested_bytes_p50=758000 requested_bytes_max=758000 released_bytes_p50=758000 released_bytes_max=758000 live_before_p50=2941 live_after_p50=2941 live_after_max=2941 peak_live_delta_p50=758 peak_live_delta_max=758 successes_p50=1000 successes_max=1000 checksum_p50=50000 checksum_max=50000

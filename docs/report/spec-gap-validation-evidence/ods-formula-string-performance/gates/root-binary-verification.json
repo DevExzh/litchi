@@ -1,0 +1,24 @@
+{
+  "utc": "2026-09-13T08:50:48.379052+00:00",
+  "binaries": {
+    "baseline": {
+      "sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "bytes": 1173352,
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline/ods-formula-reference-profile"
+    },
+    "candidate-initial": {
+      "sha256": "641b7d901c7eba8f944e1d0efb2a92fbbfb8d87d96110ba70bb0fb8ee5c20d71",
+      "bytes": 1174496,
+      "captured_path": "/var/tmp/ods-string-target/release/ods-formula-reference-profile",
+      "utc": "2026-09-13T08:54:45.382064+00:00",
+      "worktree_sources_match_gates": true
+    },
+    "candidate": {
+      "sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "bytes": 1140352,
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate/ods-formula-reference-profile",
+      "utc": "2026-09-13T09:08:05.554760+00:00",
+      "worktree_sources_match_gates": true
+    }
+  }
+}

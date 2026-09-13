@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-string-worktree",
+  "CARGO_TARGET_DIR": "/var/tmp/ods-string-target",
+  "TMPDIR": "/var/tmp/ods-string-tmp",
+  "status": 0
+}

@@ -1,0 +1,13 @@
+{
+  "label": "baseline-coverage",
+  "group": "coverage",
+  "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline-coverage",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T08:57:45Z",
+  "status": 0,
+  "raw_sha256": "19d131dc29578cf3bb55114d392e963df4795ae8d6b3fb82d01352fe19d50dd9",
+  "row_count": 16
+}

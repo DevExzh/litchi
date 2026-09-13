@@ -1,0 +1,13 @@
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-string-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.45s
+     Running tests/ods_formula_string_regression.rs (/var/tmp/ods-string-target/debug/deps/ods_formula_string_regression-d9b545b6dea15423)
+
+running 6 tests
+test byte_and_token_limits_are_exact_for_string_formulas ... ok
+test literal_allocation_failure_is_typed_and_targeted ... ok
+test doubled_quotes_multibyte_values_and_source_text_are_exact ... ok
+test unterminated_and_malformed_quotes_remain_typed_syntax_errors ... ok
+test nul_is_rejected_while_non_nul_controls_remain_valid ... ok
+test many_short_and_empty_utf8_literals_retain_bounded_capacity ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

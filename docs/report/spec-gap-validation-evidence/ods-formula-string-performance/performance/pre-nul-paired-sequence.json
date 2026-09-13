@@ -1,0 +1,75 @@
+{
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "baseline-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "17739109b2bad1e5e14fc8bce4b00cb3b4a8d1b20b22f4acf78360ef7809929c",
+      "row_count": 12,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T08:57:38Z",
+      "finished_at": "2026-09-13T08:57:38Z"
+    },
+    {
+      "label": "candidate-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "641b7d901c7eba8f944e1d0efb2a92fbbfb8d87d96110ba70bb0fb8ee5c20d71",
+      "raw_sha256": "30c58ad4e6b415ee82b3aeebae3105cbcd5c04afc16a8c694804d44b319091f2",
+      "row_count": 12,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T08:57:56Z",
+      "finished_at": "2026-09-13T08:57:56Z"
+    },
+    {
+      "label": "baseline-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "19d131dc29578cf3bb55114d392e963df4795ae8d6b3fb82d01352fe19d50dd9",
+      "row_count": 16,
+      "elapsed_seconds": 0.76,
+      "started_at": "2026-09-13T08:57:45Z",
+      "finished_at": "2026-09-13T08:57:45Z"
+    },
+    {
+      "label": "candidate-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "641b7d901c7eba8f944e1d0efb2a92fbbfb8d87d96110ba70bb0fb8ee5c20d71",
+      "raw_sha256": "44a7f1981800acc16d54a4e421ba57efabce0d0643599e99c8750f3f79b52ace",
+      "row_count": 16,
+      "elapsed_seconds": 0.82,
+      "started_at": "2026-09-13T08:58:02Z",
+      "finished_at": "2026-09-13T08:58:02Z"
+    },
+    {
+      "label": "baseline-literals",
+      "group": "literals",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "73d43d84d6038eeeb54d8532822afc742809921d46c09ca09043ebe250ce0215",
+      "row_count": 9,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T08:57:50Z",
+      "finished_at": "2026-09-13T08:57:50Z"
+    },
+    {
+      "label": "candidate-literals",
+      "group": "literals",
+      "status": 0,
+      "binary_sha256": "641b7d901c7eba8f944e1d0efb2a92fbbfb8d87d96110ba70bb0fb8ee5c20d71",
+      "raw_sha256": "07a287af6633d06936c68c6ecffe49e983173abeb93c659abe7ca3fc7f9b793e",
+      "row_count": 9,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T08:58:07Z",
+      "finished_at": "2026-09-13T08:58:07Z"
+    }
+  ],
+  "order": "baseline-comparable, baseline-coverage, baseline-literals, candidate-comparable, candidate-coverage, candidate-literals",
+  "measurement_note": "Outputs were executed in the recorded order; raw rows and per-lane /usr/bin/time files are authoritative. Elapsed values are runner wall-clock receipts."
+}

@@ -299,47 +299,109 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
-    /// Parse a string literal
+    /// Parse an OpenFormula string literal (ODF 1.4 Part 4, §5.4).
     fn parse_string(&mut self) -> Result<Token> {
         self.advance(); // Skip opening quote
-        let mut result = String::new();
-        result
-            .try_reserve_exact(self.input.len().saturating_sub(self.position))
-            .map_err(|source| Error::Allocation {
-                resource: "formula string literal",
-                source,
-            })?;
-        let mut segment_start = self.position;
+        let content_start = self.position;
+        let mut cursor = content_start;
+        let mut escaped_quote_pairs = 0_usize;
 
-        while let Some(ch) = self.peek() {
-            if ch == b'"' {
-                // Formula input has already been validated as UTF-8. Copy
-                // complete UTF-8 segments instead of treating each byte as a
-                // character; this preserves non-ASCII literals verbatim.
-                if segment_start < self.position {
-                    let segment = std::str::from_utf8(&self.input[segment_start..self.position])
-                        .map_err(|_error| {
-                            Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
-                        })?;
-                    result.push_str(segment);
-                }
-                self.advance();
-                // Check for escaped quote
-                if self.peek() == Some(b'"') {
-                    result.push('"');
-                    self.advance();
-                    segment_start = self.position;
-                } else {
-                    return Ok(Token::String(result));
-                }
-            } else {
-                self.advance();
+        // First pass: find the real closing quote and count doubled-quote
+        // pairs. Formula input has already passed the outer UTF-8 validation,
+        // so no temporary decoded string is needed for this pass. Each pair
+        // removes one byte from the source span's decoded length.
+        let closing = loop {
+            let Some(ch) = self.input.get(cursor).copied() else {
+                return Err(Error::InvalidFormat(
+                    "Unterminated string literal".to_string(),
+                ));
+            };
+            if ch != b'"' {
+                cursor += 1;
+                continue;
             }
+
+            if self.input.get(cursor + 1) == Some(&b'"') {
+                escaped_quote_pairs = escaped_quote_pairs.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Formula string literal length overflow".to_string())
+                })?;
+                cursor += 2;
+                continue;
+            }
+            break cursor;
+        };
+        // Part 4 §5.4 excludes U+0000 from the string grammar. Check the
+        // admitted content in one optimized slice operation, after the scan
+        // has established a complete literal and before allocating its value.
+        let content = &self.input[content_start..closing];
+        if content.contains(&0) {
+            return Err(Error::InvalidFormat(
+                "NUL is not allowed in string literal".to_string(),
+            ));
+        }
+        let decoded_bytes = (closing - content_start)
+            .checked_sub(escaped_quote_pairs)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Formula string literal length overflow".to_string())
+            })?;
+
+        // Reserve only the decoded payload after the complete syntax has been
+        // admitted. Empty literals keep String::new's zero-allocation state.
+        let mut result = String::new();
+        if decoded_bytes != 0 {
+            result
+                .try_reserve_exact(decoded_bytes)
+                .map_err(|source| Error::Allocation {
+                    resource: "formula string literal",
+                    source,
+                })?;
         }
 
-        Err(Error::InvalidFormat(
-            "Unterminated string literal".to_string(),
-        ))
+        // With no doubled quotes, the decoded and source spans have the same
+        // byte length. Reuse the first pass's result to avoid rescanning every
+        // byte of the common plain-literal case.
+        if escaped_quote_pairs == 0 {
+            let segment =
+                std::str::from_utf8(&self.input[content_start..closing]).map_err(|_error| {
+                    Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                })?;
+            result.push_str(segment);
+            self.position = closing + 1;
+            return Ok(Token::String(result));
+        }
+
+        // Second pass: copy complete UTF-8 spans and collapse doubled quotes.
+        // The exact reservation above means these pushes cannot grow the
+        // string; they only populate the admitted buffer.
+        let mut segment_start = content_start;
+        cursor = content_start;
+        while cursor < closing {
+            if self.input[cursor] == b'"' {
+                if segment_start < cursor {
+                    let segment = std::str::from_utf8(&self.input[segment_start..cursor]).map_err(
+                        |_error| {
+                            Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                        },
+                    )?;
+                    result.push_str(segment);
+                }
+                result.push('"');
+                cursor += 2;
+                segment_start = cursor;
+            } else {
+                cursor += 1;
+            }
+        }
+        if segment_start < closing {
+            let segment =
+                std::str::from_utf8(&self.input[segment_start..closing]).map_err(|_error| {
+                    Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                })?;
+            result.push_str(segment);
+        }
+
+        self.position = closing + 1;
+        Ok(Token::String(result))
     }
 
     /// Parse a number literal
@@ -1272,6 +1334,22 @@ mod tests {
             .parse()
             .expect("test fixture or operation should succeed");
         assert!(matches!(&formula.tokens[0], Token::String(value) if value == "a\"b"));
+
+        let formula = FormulaParser::new("=\"\"+A1")
+            .parse()
+            .expect("empty string literals should retain token boundaries");
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::String(value) if value.is_empty() && value.capacity() == 0
+        ));
+        assert!(matches!(formula.tokens[1], Token::Operator('+')));
+        assert!(matches!(formula.tokens[2], Token::CellRef(_)));
+
+        let error = FormulaParser::new("=\"a\0b\"").parse();
+        assert!(matches!(
+            error,
+            Err(Error::InvalidFormat(message)) if message.contains("NUL")
+        ));
 
         assert!(FormulaParser::new("=\"unterminated").parse().is_err());
     }
