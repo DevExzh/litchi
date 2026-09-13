@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0551: retained XLSX scanner attribution refined
+
+[0551](changes/0551-xlsx-layout-handoff-feasibility.md) replays the eight
+sealed 0550 commit profiles into disjoint scanner self/direct-child partitions.
+Named reader and namespace dispatch account for 29.04–34.39% of scanner Ir;
+cell setup remains substantial. No fresh runtime capture or baseline change.
+
 ## 0550: current XLSX commit attribution
 
 [0550](changes/0550-xlsx-source-commit-attribution.md) Current source-backed

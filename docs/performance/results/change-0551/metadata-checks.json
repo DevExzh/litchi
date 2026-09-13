@@ -1,0 +1,36 @@
+{
+  "checked_utc": "2026-09-13T05:51:15.519414+00:00",
+  "scope": "metadata checks only; no Rust build or runtime tests",
+  "checks": [
+    {
+      "name": "boundaries",
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "returncode": 0,
+      "stdout_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "claims",
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "returncode": 0,
+      "stdout_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

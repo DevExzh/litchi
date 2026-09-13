@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0551: compact cell facts selected over full layout or row reparsing
+
+[0551](changes/0551-xlsx-layout-handoff-feasibility.md) shows that edited-row
+reparsing would visit rows containing 16,769 of 17,792 cells in the dense/sparse
+1% workload. Full Layout caching would retain repeated tag/address work during
+planning. Next implement and differentially validate compact per-cell source
+facts, preserving latent attribute-decoding errors on unchanged tags. Neither
+alternative has a measured candidate latency result; no optimization is admitted.
+
 ## 0550: current XLSX commit attribution
 
 [0550](changes/0550-xlsx-source-commit-attribution.md) Fresh rewrite-to-
