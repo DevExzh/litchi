@@ -6,7 +6,10 @@
 //! Every source uses a deliberately nonexistent application/topic and disables
 //! automatic updates; these tests never resolve or refresh an external target.
 
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::{
+    fmt::Write as _,
+    num::{NonZeroU64, NonZeroUsize},
+};
 
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits, Profile,
@@ -23,6 +26,24 @@ use litchi_ods::dde::{
 /// selected by source order in the transaction tests; a name-only selector
 /// must report ambiguity rather than silently selecting one of them.
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><?producer before?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:opaque-dde" office:version="1.4"><office:body><office:spreadsheet><?spreadsheet before?><table:table table:name="Data"><office:dde-source office:dde-application="never-contacted-dde" office:dde-topic="file:///never-contacted-dde.ods" office:dde-item="Data.A1:B2" office:name="DataSource" office:conversion-mode="keep-text" office:automatic-update="false"/><table:table-row><table:table-cell office:value-type="string"><text:p>untouched</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Second"><office:dde-source office:dde-application="never-contacted-dde" office:dde-topic="file:///never-contacted-dde.ods" office:dde-item="Second.A1" office:name="SecondSource" office:conversion-mode="into-english-number" office:automatic-update="false"/><table:table-row><table:table-cell office:value-type="string"><text:p>second</text:p></table:table-cell></table:table-row></table:table><?spreadsheet before links?><table:dde-links><!-- keep link-owner comment --><table:dde-link><?link-one?><office:dde-source office:dde-application="never-contacted-dde" office:dde-topic="file:///never-contacted-dde.ods" office:dde-item="Data.A1:B2" office:name="Shared" office:conversion-mode="keep-text" office:automatic-update="false"/><table:table table:name="CacheOne"><table:table-column table:number-columns-repeated="3"/><!-- opaque cache comment --><?cache-opaque keep?><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="float" office:value="7" table:number-columns-repeated="2"/><table:table-cell office:value-type="string" office:string-value="repeat-tail"/></table:table-row></table:table></table:dde-link><table:dde-link><office:dde-source office:dde-application="never-contacted-dde" office:dde-topic="file:///never-contacted-dde.ods" office:dde-item="Second.C3" office:name="Shared" office:conversion-mode="into-english-number" office:automatic-update="false"/><table:table table:name="CacheTwo"><table:table-column/><table:table-row><table:table-cell office:value-type="string" office:string-value="second-cache"/><table:table-cell office:value-type="string" office:string-value="second-cache"/></table:table-row></table:table></table:dde-link></table:dde-links><vendor:spreadsheet-extension vendor:keep="yes"><vendor:value>untouched sibling</vendor:value></vendor:spreadsheet-extension><?producer after?></office:spreadsheet></office:body></office:document-content>"#;
+
+fn many_links_content(link_count: usize) -> String {
+    let mut content = String::from(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-column/><table:table-row><table:table-cell/></table:table-row></table:table><table:dde-links>"#,
+    );
+    for index in 0..link_count {
+        write!(
+            content,
+            r#"<table:dde-link><office:dde-source office:dde-application="never-contacted-dde" office:dde-topic="file:///never-contacted-dde.ods" office:dde-item="Data.A1" office:name="Link{index}" office:conversion-mode="keep-text" office:automatic-update="false"/><table:table table:name="Cache{index}"><table:table-column/><table:table-row><table:table-cell office:value-type="string" office:string-value="value{index}"/></table:table-row></table:table></table:dde-link>"#,
+            index = index
+        )
+        .expect("many-link fixture formatting");
+    }
+    content.push_str(
+        r#"</table:dde-links></office:spreadsheet></office:body></office:document-content>"#,
+    );
+    content
+}
 
 fn snapshot() -> dde::Snapshot {
     dde::Snapshot::parse(CONTENT).expect("synthetic DDE fixture should parse")
@@ -1159,4 +1180,76 @@ fn source_only_long_payload_admission_is_atomic_and_bounded() {
     );
     drop(sufficient_source);
     assert_eq!(sufficient_budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn many_link_scan_commits_and_inverts_under_a_finite_memory_profile() {
+    let content = many_links_content(1_024);
+    let (budget, _cancellation, execution) =
+        bounded_context("ods-dde-many-link-scan-success", 64 * 1024 * 1024);
+    let source = dde::Snapshot::parse_with_context(&content, dde::Limits::default(), &execution)
+        .expect("many-link snapshot should fit the finite memory profile");
+    assert_eq!(source.links().len(), 1_024);
+
+    let mut edit = source.edit();
+    edit.move_link(0usize, 1_023usize)
+        .expect("stage a many-link reorder");
+    let committed = edit
+        .commit(&execution)
+        .expect("many-link scan and reorder should fit the finite profile");
+    assert!(committed.changed());
+    assert_eq!(committed.snapshot().links().len(), 1_024);
+    assert_eq!(
+        committed.snapshot().links()[1_023].source().name(),
+        Some("Link0")
+    );
+    assert_eq!(
+        committed.snapshot().links()[0].source().name(),
+        Some("Link1")
+    );
+
+    let restored = committed
+        .patch()
+        .inverse()
+        .apply(committed.snapshot())
+        .expect("many-link inverse should apply exactly");
+    assert_eq!(restored.snapshot().source_xml(), content);
+    drop(restored);
+    drop(committed);
+    drop(edit);
+    drop(source);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn many_link_scan_memory_refusal_releases_temporary_admission_atomically() {
+    let content = many_links_content(1_024);
+    let (budget, _cancellation, execution) =
+        bounded_context("ods-dde-many-link-scan-tight", 2 * 1024 * 1024);
+    let source = dde::Snapshot::parse_with_context(&content, dde::Limits::default(), &execution)
+        .expect("many-link snapshot should fit before commit admission");
+    assert_eq!(source.links().len(), 1_024);
+    let mut edit = source.edit();
+    edit.move_link(0usize, 1_023usize)
+        .expect("many-link reorder should fit before scan admission");
+    let staged_memory = budget.used(Resource::Memory);
+    let before = source.source_xml().to_owned();
+    let error = match edit.commit(&execution) {
+        Err(error) => error,
+        Ok(_) => panic!("the tight profile must refuse many-link scan scratch memory"),
+    };
+    let message = error.to_string().to_ascii_lowercase();
+    assert!(
+        message.contains("memory"),
+        "many-link refusal should identify memory admission: {error}"
+    );
+    assert!(
+        !edit.is_noop(),
+        "the staged reorder must remain available for retry"
+    );
+    assert_eq!(edit.before().source_xml(), before);
+    assert_eq!(budget.used(Resource::Memory), staged_memory);
+    drop(edit);
+    drop(source);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
