@@ -1,0 +1,10 @@
+{
+  "verified_at": "2026-09-13T10:36:10.582004+00:00",
+  "absent_paths": [
+    "/var/tmp/ods-expression-worktree",
+    "/var/tmp/ods-expression-target",
+    "/var/tmp/ods-expression-tmp"
+  ],
+  "duplicate_build_logs_removed": true,
+  "no_evidence_python_cache": true
+}

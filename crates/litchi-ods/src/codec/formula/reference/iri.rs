@@ -14,7 +14,7 @@ use std::net::Ipv6Addr;
 /// input, a fixed-size scalar state, or the standard library's lexical IPv6
 /// parser. In particular, it never allocates while checking a caller-owned
 /// reference.
-pub(super) fn is_valid_iri_reference(value: &str) -> bool {
+pub(crate) fn is_valid_iri_reference(value: &str) -> bool {
     let (without_fragment, fragment) = split_first(value, b'#');
     if let Some(fragment) = fragment {
         if !validate_component(fragment, Component::Fragment) {

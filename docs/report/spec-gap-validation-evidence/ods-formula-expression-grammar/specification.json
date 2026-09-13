@@ -1,0 +1,57 @@
+{
+  "base_commit": "b609407cc672896f6954491ac9501cd1a131e941",
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "scope": "OpenFormula expression syntax, Part4 chapter5; no evaluation or name/source resolution",
+  "requirements": [
+    {
+      "section": "5.2",
+      "requirement": "Optional equals and forced-recalculation marker; complete expression; preserved original spelling."
+    },
+    {
+      "section": "5.3",
+      "requirement": "Strict number grammar including leading-decimal form and signed exponent; numeric lexemes do not require conversion to finite f64."
+    },
+    {
+      "section": "5.4",
+      "requirement": "Double-quoted strings with doubled quotes; NUL excluded."
+    },
+    {
+      "section": "5.5",
+      "requirement": "All operators, exact precedence, left-associative exponentiation and comparisons, right-associative prefix signs."
+    },
+    {
+      "section": "5.6-5.7",
+      "requirement": "XML Letter/Digit/CombiningChar function names; immediate opening parenthesis; semicolon parameters with empty slots; host functions remain inert."
+    },
+    {
+      "section": "5.8-5.9",
+      "requirement": "Existing bounded references plus infix range/intersection/union operators."
+    },
+    {
+      "section": "5.10",
+      "requirement": "Quoted labels and automatic label intersection syntax; no lookup."
+    },
+    {
+      "section": "5.11",
+      "requirement": "Simple, sheet-local and external named-expression syntax with inert validated source IRIs."
+    },
+    {
+      "section": "5.12",
+      "requirement": "Constant error lexical grammar, retaining specific spelling."
+    },
+    {
+      "section": "5.13",
+      "requirement": "Inline array expressions with nonempty rows/cells, semicolon columns and vertical-bar rows; retain ragged row syntax without asserting evaluability."
+    },
+    {
+      "section": "5.14",
+      "requirement": "Only SPACE, TAB, LF, CR lexical whitespace; preserve original source and reject whitespace splitting terminal grammar rules."
+    },
+    {
+      "section": "ADRs0001/0004/0005/0006/0023/0024",
+      "requirement": "Format-owned ergonomic inspection; bounded fallible allocation and parsing depth; flat ownership avoids recursive destruction; no ambient execution/I/O."
+    }
+  ]
+}

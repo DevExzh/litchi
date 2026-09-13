@@ -12,7 +12,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 mod iri;
 
-use self::iri::is_valid_iri_reference;
+pub(crate) use self::iri::is_valid_iri_reference;
 
 /// Default maximum number of bytes in one bracketed reference body.
 pub const DEFAULT_MAX_REFERENCE_BYTES: usize = 64 * 1024;
@@ -454,7 +454,7 @@ pub fn parse(value: &str) -> Result<Reference> {
 
 /// Parse one OpenFormula reference with explicit finite limits.
 pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Reference> {
-    let value = value.trim();
+    let value = trim_reference_whitespace(value);
     if !value.starts_with('[') || !value.ends_with(']') || value.len() < 2 {
         return Err(invalid("a reference must be enclosed in brackets"));
     }
@@ -469,9 +469,9 @@ pub(crate) fn parse_body(value: &str, limits: &Limits) -> Result<Reference> {
             limits.max_bytes,
         ));
     }
-    // The public wrapper may be surrounded by formula whitespace, but bytes
-    // inside the brackets belong to the reference grammar.  Keep them intact
-    // so whitespace cannot be silently accepted inside a sheet or coordinate.
+    // The body is kept byte-for-byte for limits and lexical components. The
+    // parser skips only the four OpenFormula whitespace characters at grammar
+    // boundaries; whitespace inside a terminating component remains visible.
     let mut parser = Parser::new(value, *limits);
     parser.parse()
 }
@@ -496,16 +496,23 @@ impl<'a> Parser<'a> {
     }
 
     fn parse(&mut self) -> Result<Reference> {
-        if self.input.is_empty() {
+        self.skip_whitespace();
+        if self.at_end() {
             return Err(invalid("empty OpenFormula reference"));
         }
 
-        if self.input == "#REF!" {
-            return Ok(Reference::Error);
+        if self.starts_with(b"#REF!") {
+            self.position += 5;
+            self.skip_whitespace();
+            if self.at_end() {
+                return Ok(Reference::Error);
+            }
+            return Err(invalid("trailing bytes in OpenFormula reference error"));
         }
 
         let source = self.parse_source_prefix()?;
         let first = self.parse_first_endpoint()?;
+        self.skip_whitespace();
         let address = if self.at_end() {
             match first.value {
                 EndpointValue::Cell(_) => Address::Cell(first),
@@ -515,7 +522,9 @@ impl<'a> Parser<'a> {
             }
         } else {
             self.expect_byte(b':', "reference range separator")?;
+            self.skip_whitespace();
             let second = if self.consume_byte(b'.') {
+                self.skip_whitespace();
                 Endpoint {
                     sheet: SheetSelector::Inherited,
                     value: self.parse_coordinate()?,
@@ -529,12 +538,14 @@ impl<'a> Parser<'a> {
                 self.parse_explicit_endpoint()?
             };
 
+            self.skip_whitespace();
             if !self.at_end() {
                 return Err(invalid("trailing bytes in OpenFormula reference"));
             }
             self.combine_range(first, second)?
         };
 
+        self.skip_whitespace();
         if !self.at_end() {
             return Err(invalid("trailing bytes in OpenFormula reference"));
         }
@@ -553,7 +564,8 @@ impl<'a> Parser<'a> {
 
         let checkpoint = self.position;
         let close = self.scan_quoted(checkpoint)?;
-        if self.bytes.get(close + 1) != Some(&b'#') {
+        let marker = self.skip_whitespace_from(close + 1);
+        if self.bytes.get(marker) != Some(&b'#') {
             return Ok(None);
         }
 
@@ -562,7 +574,9 @@ impl<'a> Parser<'a> {
         let (iri, close) = self.parse_quoted_text(true)?;
         debug_assert_eq!(self.bytes.get(close), Some(&b'\''));
         self.position = close + 1;
+        self.skip_whitespace();
         self.expect_byte(b'#', "source IRI terminator")?;
+        self.skip_whitespace();
         if iri.len() > self.limits.max_name_bytes {
             return Err(limit_error(
                 "source IRI bytes",
@@ -577,7 +591,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_first_endpoint(&mut self) -> Result<Endpoint> {
+        self.skip_whitespace();
         if self.consume_byte(b'.') {
+            self.skip_whitespace();
             return Ok(Endpoint {
                 sheet: SheetSelector::Current,
                 value: self.parse_coordinate()?,
@@ -591,7 +607,9 @@ impl<'a> Parser<'a> {
         let mut subtables = Vec::new();
 
         loop {
+            self.skip_whitespace();
             self.expect_byte(b'.', "sheet and coordinate separator")?;
+            self.skip_whitespace();
             if self.peek() == Some(b'\'') || self.peek_dollar_quote() {
                 let name = self.parse_sheet_name()?;
                 self.push_subtable_into(&mut subtables, Subtable::Name(name))?;
@@ -599,6 +617,7 @@ impl<'a> Parser<'a> {
             }
 
             let coordinate = self.parse_coordinate()?;
+            self.skip_whitespace();
             if matches!(coordinate, EndpointValue::Cell(_)) && self.peek() == Some(b'.') {
                 let EndpointValue::Cell(cell) = coordinate else {
                     unreachable!("coordinate was checked as a cell")
@@ -649,6 +668,7 @@ impl<'a> Parser<'a> {
                 ));
             }
 
+            self.skip_whitespace();
             let row_absolute = self.consume_byte(b'$');
             let row_start = self.position;
             if self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
@@ -686,6 +706,7 @@ impl<'a> Parser<'a> {
             if row_absolute {
                 return Err(invalid("absolute column must be followed by a row"));
             }
+            self.skip_whitespace();
             if self.peek() == Some(b':') || self.at_end() || self.peek() == Some(b'.') {
                 self.bump_component()?;
                 return Ok(EndpointValue::Column(Column {
@@ -716,6 +737,7 @@ impl<'a> Parser<'a> {
                 self.limits.max_name_bytes,
             ));
         }
+        self.skip_whitespace();
         if !self.at_end() && self.peek() != Some(b':') && self.peek() != Some(b'.') {
             return Err(invalid("invalid OpenFormula row endpoint"));
         }
@@ -731,6 +753,15 @@ impl<'a> Parser<'a> {
 
     fn parse_sheet_name(&mut self) -> Result<SheetName> {
         let absolute = self.consume_byte(b'$');
+        if absolute {
+            let marker_end = self.position;
+            self.skip_whitespace();
+            if self.position != marker_end && self.peek() != Some(b'\'') {
+                return Err(invalid(
+                    "whitespace after '$' is allowed only before a quoted sheet name",
+                ));
+            }
+        }
         if self.peek() == Some(b'\'') {
             self.bump_component()?;
             let (name, close) = self.parse_quoted_text(false)?;
@@ -912,7 +943,29 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_dollar_quote(&self) -> bool {
-        self.peek() == Some(b'$') && self.bytes.get(self.position + 1) == Some(&b'\'')
+        self.peek() == Some(b'$')
+            && self.bytes.get(self.skip_whitespace_from(self.position + 1)) == Some(&b'\'')
+    }
+
+    fn skip_whitespace(&mut self) {
+        self.position = self.skip_whitespace_from(self.position);
+    }
+
+    fn skip_whitespace_from(&self, mut position: usize) -> usize {
+        while self
+            .bytes
+            .get(position)
+            .is_some_and(|byte| is_reference_whitespace(*byte))
+        {
+            position += 1;
+        }
+        position
+    }
+
+    fn starts_with(&self, expected: &[u8]) -> bool {
+        self.bytes
+            .get(self.position..self.position.saturating_add(expected.len()))
+            .is_some_and(|value| value == expected)
     }
 
     fn expect_byte(&mut self, expected: u8, label: &str) -> Result<()> {
@@ -943,6 +996,30 @@ impl<'a> Parser<'a> {
     fn at_end(&self) -> bool {
         self.position == self.bytes.len()
     }
+}
+
+fn is_reference_whitespace(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
+}
+
+fn trim_reference_whitespace(value: &str) -> &str {
+    let bytes = value.as_bytes();
+    let mut start = 0usize;
+    while bytes
+        .get(start)
+        .is_some_and(|byte| is_reference_whitespace(*byte))
+    {
+        start += 1;
+    }
+    let mut end = bytes.len();
+    while end > start
+        && bytes
+            .get(end - 1)
+            .is_some_and(|byte| is_reference_whitespace(*byte))
+    {
+        end -= 1;
+    }
+    &value[start..end]
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -993,10 +1070,10 @@ mod tests {
 
     #[test]
     fn parses_local_cell_and_preserves_absolute_metadata() {
-        let reference = parse("[. $A$1]");
-        assert!(reference.is_err(), "interior whitespace is not grammar");
+        let spaced = parse("[. $A$1]").expect("whitespace after the current-sheet dot");
 
         let reference = parse("[.$A$1]").expect("relative cell reference");
+        assert_eq!(spaced, reference);
         let endpoint = cell_endpoint(&reference);
         assert!(matches!(endpoint.sheet, SheetSelector::Current));
         assert!(matches!(
@@ -1110,10 +1187,28 @@ mod tests {
     #[test]
     fn rejects_non_normative_columns_and_second_endpoint_without_dot() {
         assert!(parse("[.a1]").is_err());
-        assert!(parse("[ .A1 ]").is_err());
         assert!(parse("[Sheet.A1:B2]").is_err());
         assert!(parse("[.A1:Sheet.B2]").is_err());
         assert!(parse("[Sheet.A1:.B]").is_err());
+    }
+
+    #[test]
+    fn accepts_whitespace_only_at_reference_grammar_boundaries() {
+        for value in [
+            "[ . A1 ]",
+            "[.A 1]",
+            "[.$A $1]",
+            "[.A $1]",
+            "[Sheet . A1 : . B2]",
+            "[ $ 'Sheet' . A1 ]",
+            "['file:///tmp/a.ods' # . A1 ]",
+        ] {
+            parse(value).unwrap_or_else(|error| panic!("{value:?} should parse: {error}"));
+        }
+
+        for value in ["[.$ A1]", "[.A$ 1]", "[$ Sheet.A1]"] {
+            assert!(parse(value).is_err(), "{value:?} splits a lexical terminal");
+        }
     }
 
     #[test]

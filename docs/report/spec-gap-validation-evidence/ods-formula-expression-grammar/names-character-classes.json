@@ -1,0 +1,86 @@
+{
+  "artifact": "OpenFormula XML character classes",
+  "scope": {
+    "odf_reference": "ODF 1.4 Part 4, Sections 5.6 and 5.11",
+    "classes": [
+      "LetterXML",
+      "DigitXML",
+      "CombiningCharXML"
+    ],
+    "implementation": "Finite XML 1.0 character tables with allocation-free binary search"
+  },
+  "primary_source": {
+    "edition": "XML 1.0 Fourth Edition",
+    "url": "https://www.w3.org/TR/2006/REC-xml-20060816/",
+    "retrieved_at_utc": "2026-09-13T09:42:19Z",
+    "bytes": 214369,
+    "sha256": "a520bc8c34a6ae9a6b9f80440f0edc5d017c8562f6ec259d3888f2a2a3520021",
+    "productions": [
+      {
+        "id": "[84]",
+        "name": "Letter",
+        "definition": "BaseChar | Ideographic"
+      },
+      {
+        "id": "[85]",
+        "name": "BaseChar"
+      },
+      {
+        "id": "[86]",
+        "name": "Ideographic"
+      },
+      {
+        "id": "[87]",
+        "name": "CombiningChar"
+      },
+      {
+        "id": "[88]",
+        "name": "Digit"
+      }
+    ]
+  },
+  "helper": {
+    "path": "crates/litchi-ods/src/codec/formula/expression/names.rs",
+    "sha256": "79631c602b587391baa9efe695da6e6c480434a12a7ab826e32d4076c9fb53b2",
+    "api": [
+      "pub(super) fn is_letter(char) -> bool",
+      "pub(super) fn is_digit(char) -> bool",
+      "pub(super) fn is_combining(char) -> bool"
+    ]
+  },
+  "independent_expanded_set_check": {
+    "source_interval_counts": {
+      "Letter (BaseChar + Ideographic)": 205,
+      "CombiningChar": 95,
+      "Digit": 15
+    },
+    "helper_interval_counts": {
+      "LETTER_RANGES": 205,
+      "COMBINING_RANGES": 91,
+      "DIGIT_RANGES": 15
+    },
+    "source_code_point_counts": {
+      "Letter (BaseChar + Ideographic)": 34514,
+      "CombiningChar": 437,
+      "Digit": 149
+    },
+    "helper_code_point_counts": {
+      "LETTER_RANGES": 34514,
+      "COMBINING_RANGES": 437,
+      "DIGIT_RANGES": 149
+    },
+    "exact_expanded_set_match": true,
+    "helper_ranges_sorted_and_disjoint": true,
+    "normalization": "Four adjacent CombiningChar source singleton/range boundaries are represented as merged inclusive intervals; point-set equality is checked.",
+    "script": "from hashlib import sha256\nfrom html import unescape\nfrom pathlib import Path\nfrom urllib.request import Request, urlopen\nimport re\n\nURL = \"https://www.w3.org/TR/2006/REC-xml-20060816/\"\nSOURCE_SHA256 = \"a520bc8c34a6ae9a6b9f80440f0edc5d017c8562f6ec259d3888f2a2a3520021\"\nHEX = re.compile(r\"#x([0-9A-Fa-f]+)(?:-#x([0-9A-Fa-f]+))?\")\n\ndef source_ranges(html, production):\n    start = html.index(f'id=\"NT-{production}\"')\n    end = html.find('id=\"NT-', start + 1)\n    block = html[start:end if end >= 0 else None]\n    return [(int(a, 16), int(b or a, 16)) for a, b in HEX.findall(block)]\n\ndef code_ranges(source, table):\n    start = source.index(f\"const {table}:\")\n    end = source.index(\"\\n];\", start)\n    return [(int(a, 16), int(b, 16)) for a, b in re.findall(\n        r\"\\(0x([0-9A-Fa-f]+),\\s*0x([0-9A-Fa-f]+)\\)\", source[start:end]\n    )]\n\ndef expand(ranges):\n    result = set()\n    for start, end in ranges:\n        result.update(range(start, end + 1))\n    return result\n\ndef sorted_disjoint(ranges):\n    return all(start <= end for start, end in ranges) and all(\n        left_end < right_start\n        for (_, left_end), (right_start, _) in zip(ranges, ranges[1:])\n    )\n\nraw = urlopen(Request(URL, headers={\"User-Agent\": \"litchi-spec-gaps-names-evidence/1.0\"}), timeout=30).read()\nassert sha256(raw).hexdigest() == SOURCE_SHA256\nhtml = unescape(raw.decode(\"utf-8\"))\nsource = Path(\"crates/litchi-ods/src/codec/formula/expression/names.rs\").read_text()\nchecks = {\n    \"LETTER_RANGES\": source_ranges(html, \"BaseChar\") + source_ranges(html, \"Ideographic\"),\n    \"COMBINING_RANGES\": source_ranges(html, \"CombiningChar\"),\n    \"DIGIT_RANGES\": source_ranges(html, \"Digit\"),\n}\nfor table, production in checks.items():\n    actual = code_ranges(source, table)\n    expected_points = expand(production)\n    actual_points = expand(actual)\n    print(table, len(expected_points), len(actual_points), len(production), len(actual))\n    assert actual_points == expected_points\n    assert sorted_disjoint(actual)\n"
+  },
+  "standalone_tests": {
+    "command": "TMPDIR=/dev/shm rustc --edition=2024 --test -D warnings -o /dev/shm/litchi_names_test - <<'RS'\n#[path = \"/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods/src/codec/formula/expression/names.rs\"]\nmod names;\nRS\n/dev/shm/litchi_names_test\nunlink /dev/shm/litchi_names_test",
+    "status": "passed",
+    "tests_passed": 4,
+    "tests_failed": 0,
+    "cargo_used": false,
+    "persistent_test_artifact": false,
+    "working_directory": "/home/zhuhe/code/litchi-spec-gaps"
+  }
+}
