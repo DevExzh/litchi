@@ -1,0 +1,495 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:385:6
+    |
+385 | impl litchi_ods::codec::formula::evaluation::value::Resolver for ComplexResolver {
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+385 - impl litchi_ods::codec::formula::evaluation::value::Resolver for ComplexResolver {
+385 + impl evaluation::value::Resolver for ComplexResolver {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:391:16
+    |
+391 |         Option<litchi_ods::codec::formula::evaluation::value::SheetExtent>,
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+391 -         Option<litchi_ods::codec::formula::evaluation::value::SheetExtent>,
+391 +         Option<evaluation::value::SheetExtent>,
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:394:13
+    |
+394 |             litchi_ods::codec::formula::evaluation::value::SheetExtent::new(1, self.cells.len()),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+394 -             litchi_ods::codec::formula::evaluation::value::SheetExtent::new(1, self.cells.len()),
+394 +             evaluation::value::SheetExtent::new(1, self.cells.len()),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:404:39
+    |
+404 |     ) -> evaluation::EvaluationResult<litchi_ods::codec::formula::evaluation::value::CellRead<'a>>
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+404 -     ) -> evaluation::EvaluationResult<litchi_ods::codec::formula::evaluation::value::CellRead<'a>>
+404 +     ) -> evaluation::EvaluationResult<evaluation::value::CellRead<'a>>
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:408:23
+    |
+408 |             return Ok(litchi_ods::codec::formula::evaluation::value::CellRead::Empty);
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+408 -             return Ok(litchi_ods::codec::formula::evaluation::value::CellRead::Empty);
+408 +             return Ok(evaluation::value::CellRead::Empty);
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:412:17
+    |
+412 |                 litchi_ods::codec::formula::evaluation::value::CellRead::Empty
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+412 -                 litchi_ods::codec::formula::evaluation::value::CellRead::Empty
+412 +                 evaluation::value::CellRead::Empty
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:415:17
+    |
+415 |                 litchi_ods::codec::formula::evaluation::value::CellRead::Logical(*value)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+415 -                 litchi_ods::codec::formula::evaluation::value::CellRead::Logical(*value)
+415 +                 evaluation::value::CellRead::Logical(*value)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:418:17
+    |
+418 |                 litchi_ods::codec::formula::evaluation::value::CellRead::Number(*value)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+418 -                 litchi_ods::codec::formula::evaluation::value::CellRead::Number(*value)
+418 +                 evaluation::value::CellRead::Number(*value)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:421:17
+    |
+421 |                 litchi_ods::codec::formula::evaluation::value::CellRead::Text(value.as_str())
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+421 -                 litchi_ods::codec::formula::evaluation::value::CellRead::Text(value.as_str())
+421 +                 evaluation::value::CellRead::Text(value.as_str())
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:424:17
+    |
+424 |                 litchi_ods::codec::formula::evaluation::value::CellRead::Error(*error)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+424 -                 litchi_ods::codec::formula::evaluation::value::CellRead::Error(*error)
+424 +                 evaluation::value::CellRead::Error(*error)
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:456:18
+    |
+456 |     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+456 -     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+456 +     let result = evaluation::value::evaluate(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:459:10
+    |
+459 |         &litchi_ods::codec::formula::evaluation::value::Context::new(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+459 -         &litchi_ods::codec::formula::evaluation::value::Context::new(
+459 +         &evaluation::value::Context::new(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:461:13
+    |
+461 |             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+461 -             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+461 +             evaluation::value::Position::new("Main", 0, 0),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:463:20
+    |
+463 |         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+463 -         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+463 +         .with_mode(evaluation::value::Mode::Scalar),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:464:10
+    |
+464 |         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+464 -         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+464 +         &evaluation::value::Limits::default(),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:468:9
+    |
+468 |         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+468 -         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+468 +         evaluation::value::Value::Number(value) => {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:476:18
+    |
+476 |     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+476 -     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+476 +     let result = evaluation::value::evaluate(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:479:10
+    |
+479 |         &litchi_ods::codec::formula::evaluation::value::Context::new(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+479 -         &litchi_ods::codec::formula::evaluation::value::Context::new(
+479 +         &evaluation::value::Context::new(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:481:13
+    |
+481 |             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+481 -             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+481 +             evaluation::value::Position::new("Main", 0, 0),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:483:20
+    |
+483 |         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+483 -         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+483 +         .with_mode(evaluation::value::Mode::Scalar),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:484:10
+    |
+484 |         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+484 -         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+484 +         &evaluation::value::Limits::default(),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:488:9
+    |
+488 |         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+488 -         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+488 +         evaluation::value::Value::Number(value) => {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:496:18
+    |
+496 |     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+496 -     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+496 +     let result = evaluation::value::evaluate(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:499:10
+    |
+499 |         &litchi_ods::codec::formula::evaluation::value::Context::new(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+499 -         &litchi_ods::codec::formula::evaluation::value::Context::new(
+499 +         &evaluation::value::Context::new(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:501:13
+    |
+501 |             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+501 -             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+501 +             evaluation::value::Position::new("Main", 0, 0),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:503:20
+    |
+503 |         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+503 -         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+503 +         .with_mode(evaluation::value::Mode::Scalar),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:504:10
+    |
+504 |         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+504 -         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+504 +         &evaluation::value::Limits::default(),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:508:9
+    |
+508 |         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+508 -         litchi_ods::codec::formula::evaluation::value::Value::Number(value) => {
+508 +         evaluation::value::Value::Number(value) => {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:515:18
+    |
+515 |     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+515 -     let result = litchi_ods::codec::formula::evaluation::value::evaluate(
+515 +     let result = evaluation::value::evaluate(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:518:10
+    |
+518 |         &litchi_ods::codec::formula::evaluation::value::Context::new(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+518 -         &litchi_ods::codec::formula::evaluation::value::Context::new(
+518 +         &evaluation::value::Context::new(
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:520:13
+    |
+520 |             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+520 -             litchi_ods::codec::formula::evaluation::value::Position::new("Main", 0, 0),
+520 +             evaluation::value::Position::new("Main", 0, 0),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:522:20
+    |
+522 |         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+522 -         .with_mode(litchi_ods::codec::formula::evaluation::value::Mode::Scalar),
+522 +         .with_mode(evaluation::value::Mode::Scalar),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:523:10
+    |
+523 |         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+523 -         &litchi_ods::codec::formula::evaluation::value::Limits::default(),
+523 +         &evaluation::value::Limits::default(),
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:527:9
+    |
+527 |         litchi_ods::codec::formula::evaluation::value::Value::Error(error) => {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+527 -         litchi_ods::codec::formula::evaluation::value::Value::Error(error) => {
+527 +         evaluation::value::Value::Error(error) => {
+    |
+
+error[E0282]: type annotations needed for `Result<(), _>`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:187:22
+    |
+187 |             .or_else(|error| panic!("{source:?} should evaluate: {error:?}"));
+    |                      ^^^^^^^
+    |
+help: try giving this closure an explicit return type
+    |
+187 |             .or_else(|error| -> Result<_, F> panic!("{source:?} should evaluate: {error:?}"));
+    |                              +++++++++++++++
+
+error[E0282]: type annotations needed for `Result<(), _>`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:210:22
+    |
+210 |             .or_else(|error| panic!("{source:?} should evaluate: {error:?}"));
+    |                      ^^^^^^^
+    |
+help: try giving this closure an explicit return type
+    |
+210 |             .or_else(|error| -> Result<_, F> panic!("{source:?} should evaluate: {error:?}"));
+    |                              +++++++++++++++
+
+error[E0282]: type annotations needed for `Result<(), _>`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:273:22
+    |
+273 |             .or_else(|error| panic!("{source:?} should evaluate: {error:?}"));
+    |                      ^^^^^^^
+    |
+help: try giving this closure an explicit return type
+    |
+273 |             .or_else(|error| -> Result<_, F> panic!("{source:?} should evaluate: {error:?}"));
+    |                              +++++++++++++++
+
+error[E0282]: type annotations needed for `Result<(), _>`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:310:22
+    |
+310 |             .or_else(|error| panic!("{source:?} should evaluate: {error:?}"));
+    |                      ^^^^^^^
+    |
+help: try giving this closure an explicit return type
+    |
+310 |             .or_else(|error| -> Result<_, F> panic!("{source:?} should evaluate: {error:?}"));
+    |                              +++++++++++++++
+
+error[E0614]: type `f64` cannot be dereferenced
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:469:26
+    |
+469 |             assert_close(*value, 5.0, "reference sequence sum")
+    |                          ^^^^^^ can't be dereferenced
+
+error[E0614]: type `f64` cannot be dereferenced
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:489:26
+    |
+489 |             assert_close(*value, 4.0, "reference sequence imaginary sum")
+    |                          ^^^^^^ can't be dereferenced
+
+error[E0614]: type `f64` cannot be dereferenced
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:509:26
+    |
+509 |             assert_close(*value, 1.0, "direct logical scalar")
+    |                          ^^^^^^ can't be dereferenced
+
+error[E0614]: type `ScalarError` cannot be dereferenced
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:528:24
+    |
+528 |             assert_eq!(*error, ScalarError::NotAvailable)
+    |                        ^^^^^^ can't be dereferenced
+
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:545:46
+    |
+ 25 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+537 |     let (budget, cancellation, execution) = execution("ods-formula-complex-cancel");
+    |                                --------- `execution` has type `ExecutionContext`
+...
+545 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-text-limit");
+    |                                              ^^^^^^^^^----------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+Some errors have detailed explanations: E0282, E0614, E0618.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `litchi-ods` (test "ods_formula_complex_evaluation") due to 43 previous errors
