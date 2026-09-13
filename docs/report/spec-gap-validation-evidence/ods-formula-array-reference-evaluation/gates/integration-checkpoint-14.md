@@ -34,8 +34,12 @@ retain commands, toolchain, environment, both test logs and SHA-256 hashes of th
 from those tested isolated bytes while the coder continued later changes in the
 working tree. The loose archived logs were removed after verification.
 
-Full all-target gates, warning-denied Clippy/rustdoc, doctests and release
-performance captures remain pending for the final implementation. The
+Supplemental checks on this same snapshot subsequently passed warning-denied
+all-target Clippy, warning-denied rustdoc, all four doctests (including the
+compile-fail lifetime example), and formatting. Their complete logs are in the
+[supplemental receipt](integration-checkpoint-14-extra-checks.json). Full runtime
+gates and release performance captures remain pending for the final
+implementation. The
 [API integration requirements](value-api-integration.md), including structural
 view equality, explicit limit contracts and budgeted owned conversion, also
 remain open. No feature matrix is promoted by this checkpoint.
