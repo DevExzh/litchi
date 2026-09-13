@@ -1,0 +1,26 @@
+{
+  "utc": "2026-09-13T07:09:36.759148+00:00",
+  "commit": "b7a66574a541ac0efc443056c4d11f6b829fffa9",
+  "worktree": "/var/tmp/litchi-ods-formula-references-baseline-20260913",
+  "target": "/var/tmp/litchi-ods-formula-references-target-20260913",
+  "scoped_source_status": "",
+  "whole_worktree_status": "?? docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/Cargo.toml\n?? docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/run.py\n?? docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/src/main.rs\n",
+  "scoped_source_unchanged": true,
+  "note": "Harness is intentionally untracked in isolated baseline; production source scope remains clean.",
+  "source_files": [
+    "Cargo.toml",
+    "crates/litchi-core/Cargo.toml",
+    "crates/litchi-core/src/lib.rs",
+    "crates/litchi-ods/Cargo.toml",
+    "crates/litchi-ods/src/lib.rs",
+    "crates/litchi-ods/src/codec/mod.rs",
+    "crates/litchi-ods/src/codec/formula.rs"
+  ],
+  "harness_files": [
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/Cargo.toml",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/Cargo.lock",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/src/main.rs",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/run.py"
+  ],
+  "binary": "/var/tmp/litchi-ods-formula-references-target-20260913/release/ods-formula-reference-profile"
+}

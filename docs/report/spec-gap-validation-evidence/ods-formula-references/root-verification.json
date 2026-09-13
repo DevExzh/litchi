@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/verify.py"
+  ],
+  "status": 0,
+  "result": {
+    "verified": true,
+    "tests": 810,
+    "targets": 47,
+    "performance_lanes": 40,
+    "iri_observations": 37016,
+    "iri_allocation_calls": 0
+  }
+}

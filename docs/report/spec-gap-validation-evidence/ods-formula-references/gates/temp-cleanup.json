@@ -1,0 +1,732 @@
+{
+  "generated_build_directories": [
+    "/tmp/litchi-data-style-target",
+    "/tmp/oth-meta-probe/target",
+    "/tmp/litchi-form-control-check/target",
+    "/tmp/qxml_probe/target",
+    "/tmp/xlsx_relationship_check/target",
+    "/tmp/graphcheck/target",
+    "/tmp/styles_limits_probe/target",
+    "/tmp/styles_probe/target",
+    "/tmp/litchi-xlsb-model-identity-smoke-target",
+    "/tmp/litchi-docx-svg-lifecycle-profile-target",
+    "/tmp/litchi-ink-current-target",
+    "/tmp/litchi-ink-compile-target",
+    "/tmp/litchi-ink-edit-target",
+    "/tmp/litchi-ink-profile-ns-target",
+    "/tmp/docx_probe2/target",
+    "/tmp/litchi-svg-check2/target",
+    "/tmp/opc_frag_probe/target",
+    "/tmp/docx_svg_probe/target",
+    "/tmp/litchi-xlsx-svg-profile",
+    "/tmp/litchi-svg-probe/target",
+    "/tmp/qxml-bom-gz2r/target",
+    "/tmp/svg_probe/target",
+    "/tmp/litchi-svg-native-read-probe-20260911/target",
+    "/tmp/litchi-svg-native-probe-20260911/target",
+    "/tmp/theme-family-check/target",
+    "/var/tmp/litchi-xlsx-profile-adapter-check2",
+    "/var/tmp/litchi-form-owner-review-target-v6",
+    "/var/tmp/litchi-xlsx-svg-scaffold-review-target",
+    "/var/tmp/docx-styles-effects-cap-build",
+    "/var/tmp/docx-styles-effects-build.d6GtcN",
+    "/var/tmp/litchi-xlsx-svg-detach-target",
+    "/var/tmp/ods-address-model-explore-20260913T0130Z/target",
+    "/var/tmp/docx-styles-effects-build.1a2p3p",
+    "/var/tmp/litchi-xlsx-local-check-2/target",
+    "/var/tmp/litchi-theme-family-profile-target",
+    "/var/tmp/odf-ns-probe-encoding-target",
+    "/var/tmp/docx-styles-effects-phase-build",
+    "/var/tmp/litchi-xlsb-identity-review2-target",
+    "/var/tmp/litchi-xlsx-profile-adapter-check3",
+    "/var/tmp/litchi-ods-owner-review-target",
+    "/var/tmp/odf-common-namespace-review-target2",
+    "/var/tmp/litchi-xlsx-profile-adapter-check",
+    "/var/tmp/litchi-target-odt-coder",
+    "/var/tmp/litchi-xlsx-pivot-final-uwchw4qr/target",
+    "/var/tmp/litchi-xlsx-custom-data-limits-root-z4w9ojx0/target",
+    "/var/tmp/litchi-xlsx-custom-data-limits-root-z4w9ojx0/worktree/target",
+    "/var/tmp/quickxml-ns-probe-target-20260912",
+    "/var/tmp/docx-styles-effects-check",
+    "/var/tmp/docx-styles-effects-build.plKpwN",
+    "/var/tmp/litchi-xlsb-identity-review-target",
+    "/var/tmp/litchi-form-owner-review-target",
+    "/var/tmp/litchi-xlsx-svg-before-target",
+    "/var/tmp/litchi-form-owner-read-opt-doc-target",
+    "/var/tmp/litchi-docx-ink-ancestry-check"
+  ],
+  "removed_build_directories": [
+    {
+      "path": "/tmp/litchi-data-style-target",
+      "allocated_bytes_before": 0
+    },
+    {
+      "path": "/tmp/oth-meta-probe/target",
+      "allocated_bytes_before": 1309229056
+    },
+    {
+      "path": "/tmp/litchi-form-control-check/target",
+      "allocated_bytes_before": 125181952
+    },
+    {
+      "path": "/tmp/qxml_probe/target",
+      "allocated_bytes_before": 85753856
+    },
+    {
+      "path": "/tmp/xlsx_relationship_check/target",
+      "allocated_bytes_before": 259604480
+    },
+    {
+      "path": "/tmp/graphcheck/target",
+      "allocated_bytes_before": 1433817088
+    },
+    {
+      "path": "/tmp/styles_limits_probe/target",
+      "allocated_bytes_before": 1857753088
+    },
+    {
+      "path": "/tmp/styles_probe/target",
+      "allocated_bytes_before": 1661624320
+    },
+    {
+      "path": "/tmp/litchi-xlsb-model-identity-smoke-target",
+      "allocated_bytes_before": 1663647744
+    },
+    {
+      "path": "/tmp/litchi-docx-svg-lifecycle-profile-target",
+      "allocated_bytes_before": 1733632000
+    },
+    {
+      "path": "/tmp/litchi-ink-current-target",
+      "allocated_bytes_before": 4002938880
+    },
+    {
+      "path": "/tmp/litchi-ink-compile-target",
+      "allocated_bytes_before": 7045591040
+    },
+    {
+      "path": "/tmp/litchi-ink-edit-target",
+      "allocated_bytes_before": 1440092160
+    },
+    {
+      "path": "/tmp/litchi-ink-profile-ns-target",
+      "allocated_bytes_before": 990298112
+    },
+    {
+      "path": "/tmp/docx_probe2/target",
+      "allocated_bytes_before": 2074861568
+    },
+    {
+      "path": "/tmp/litchi-svg-check2/target",
+      "allocated_bytes_before": 4957335552
+    },
+    {
+      "path": "/tmp/opc_frag_probe/target",
+      "allocated_bytes_before": 557809664
+    },
+    {
+      "path": "/tmp/docx_svg_probe/target",
+      "allocated_bytes_before": 2106986496
+    },
+    {
+      "path": "/tmp/litchi-xlsx-svg-profile",
+      "allocated_bytes_before": 368783360
+    },
+    {
+      "path": "/tmp/litchi-svg-probe/target",
+      "allocated_bytes_before": 1559093248
+    },
+    {
+      "path": "/tmp/qxml-bom-gz2r/target",
+      "allocated_bytes_before": 16453632
+    },
+    {
+      "path": "/tmp/svg_probe/target",
+      "allocated_bytes_before": 3832750080
+    },
+    {
+      "path": "/tmp/litchi-svg-native-read-probe-20260911/target",
+      "allocated_bytes_before": 1559711744
+    },
+    {
+      "path": "/tmp/litchi-svg-native-probe-20260911/target",
+      "allocated_bytes_before": 1559580672
+    },
+    {
+      "path": "/tmp/theme-family-check/target",
+      "allocated_bytes_before": 1034702848
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-profile-adapter-check2",
+      "allocated_bytes_before": 511528960
+    },
+    {
+      "path": "/var/tmp/litchi-form-owner-review-target-v6",
+      "allocated_bytes_before": 4033855488
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-svg-scaffold-review-target",
+      "allocated_bytes_before": 2097647616
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-cap-build",
+      "allocated_bytes_before": 2199662592
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-build.d6GtcN",
+      "allocated_bytes_before": 1804107776
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-svg-detach-target",
+      "allocated_bytes_before": 853143552
+    },
+    {
+      "path": "/var/tmp/ods-address-model-explore-20260913T0130Z/target",
+      "allocated_bytes_before": 4979503104
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-build.1a2p3p",
+      "allocated_bytes_before": 1640624128
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-local-check-2/target",
+      "allocated_bytes_before": 4275871744
+    },
+    {
+      "path": "/var/tmp/litchi-theme-family-profile-target",
+      "allocated_bytes_before": 707584000
+    },
+    {
+      "path": "/var/tmp/odf-ns-probe-encoding-target",
+      "allocated_bytes_before": 829505536
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-phase-build",
+      "allocated_bytes_before": 1804136448
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-identity-review2-target",
+      "allocated_bytes_before": 2012966912
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-profile-adapter-check3",
+      "allocated_bytes_before": 511324160
+    },
+    {
+      "path": "/var/tmp/litchi-ods-owner-review-target",
+      "allocated_bytes_before": 1155756032
+    },
+    {
+      "path": "/var/tmp/odf-common-namespace-review-target2",
+      "allocated_bytes_before": 2778529792
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-profile-adapter-check",
+      "allocated_bytes_before": 577478656
+    },
+    {
+      "path": "/var/tmp/litchi-target-odt-coder",
+      "allocated_bytes_before": 12089679872
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-pivot-final-uwchw4qr/target",
+      "allocated_bytes_before": 31870910464
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-custom-data-limits-root-z4w9ojx0/target",
+      "allocated_bytes_before": 5575151616
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-custom-data-limits-root-z4w9ojx0/worktree/target",
+      "allocated_bytes_before": 9524580352
+    },
+    {
+      "path": "/var/tmp/quickxml-ns-probe-target-20260912",
+      "allocated_bytes_before": 17371136
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-check",
+      "allocated_bytes_before": 547745792
+    },
+    {
+      "path": "/var/tmp/docx-styles-effects-build.plKpwN",
+      "allocated_bytes_before": 1820676096
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-identity-review-target",
+      "allocated_bytes_before": 2145521664
+    },
+    {
+      "path": "/var/tmp/litchi-form-owner-review-target",
+      "allocated_bytes_before": 6165475328
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-svg-before-target",
+      "allocated_bytes_before": 369856512
+    },
+    {
+      "path": "/var/tmp/litchi-form-owner-read-opt-doc-target",
+      "allocated_bytes_before": 543649792
+    },
+    {
+      "path": "/var/tmp/litchi-docx-ink-ancestry-check",
+      "allocated_bytes_before": 1669414912
+    }
+  ],
+  "preserved_active": [],
+  "removed_build_bytes": 148350492672,
+  "utc": "2026-09-13T07:31:16.594547+00:00",
+  "unregistered_copy_cleanup": {
+    "source": "/var/tmp/ods-address-model-explore-20260913T0130Z",
+    "duplicate_files_retained_in_workspace": 42083,
+    "unique_files_archived": 34,
+    "archive": "/home/zhuhe/code/litchi-tmp-recovery-20260913/ods-address-model-explore-unique.tar.gz",
+    "archive_sha256": "278eec87a95324a19644af63de28c6730ba6c2508a071246e49bed7624053f73",
+    "allocated_bytes_removed": 2588696576
+  },
+  "removed_inactive_probe_binaries": [
+    {
+      "path": "/tmp/trimprobe.stdin.f1e77d75472484e3-cgu.0.rcgu.o",
+      "allocated_bytes_before": 20480
+    },
+    {
+      "path": "/tmp/custom_probe.tmpb731e2c",
+      "allocated_bytes_before": 21082112
+    },
+    {
+      "path": "/tmp/custom_probe.462916c4la0cqis4a35az9fjg.rcgu.o",
+      "allocated_bytes_before": 4096
+    },
+    {
+      "path": "/tmp/custom_probe.stdin.f1e77d75472484e3-cgu.0.rcgu.o",
+      "allocated_bytes_before": 94208
+    },
+    {
+      "path": "/tmp/litchi_bindings_harness",
+      "allocated_bytes_before": 7139328
+    },
+    {
+      "path": "/tmp/arceq2",
+      "allocated_bytes_before": 4345856
+    },
+    {
+      "path": "/tmp/arcborrow",
+      "allocated_bytes_before": 4399104
+    },
+    {
+      "path": "/tmp/check_try",
+      "allocated_bytes_before": 4333568
+    },
+    {
+      "path": "/tmp/qpos",
+      "allocated_bytes_before": 5808128
+    },
+    {
+      "path": "/tmp/relationship_ids_check_warnings",
+      "allocated_bytes_before": 32874496
+    },
+    {
+      "path": "/tmp/relationship_ids_check",
+      "allocated_bytes_before": 32874496
+    },
+    {
+      "path": "/tmp/ink_action_edit_manual",
+      "allocated_bytes_before": 68780032
+    },
+    {
+      "path": "/tmp/check_temp",
+      "allocated_bytes_before": 4341760
+    },
+    {
+      "path": "/tmp/docx_scan",
+      "allocated_bytes_before": 116428800
+    },
+    {
+      "path": "/tmp/lifetime_check",
+      "allocated_bytes_before": 4333568
+    },
+    {
+      "path": "/tmp/ns_reserved3_probe",
+      "allocated_bytes_before": 63143936
+    },
+    {
+      "path": "/tmp/comment_probe",
+      "allocated_bytes_before": 63143936
+    },
+    {
+      "path": "/tmp/theme_probe",
+      "allocated_bytes_before": 63430656
+    },
+    {
+      "path": "/tmp/ns_reserved2_probe",
+      "allocated_bytes_before": 63123456
+    },
+    {
+      "path": "/tmp/theme_probe_now",
+      "allocated_bytes_before": 63430656
+    },
+    {
+      "path": "/tmp/ns_reserved_probe_now",
+      "allocated_bytes_before": 63139840
+    },
+    {
+      "path": "/tmp/ns_probe_now",
+      "allocated_bytes_before": 63139840
+    },
+    {
+      "path": "/tmp/theme_probe_x",
+      "allocated_bytes_before": 63324160
+    },
+    {
+      "path": "/tmp/ns_probe_latest2",
+      "allocated_bytes_before": 63021056
+    },
+    {
+      "path": "/tmp/theme_probe_latest2",
+      "allocated_bytes_before": 63123456
+    },
+    {
+      "path": "/tmp/mce_ext_probe",
+      "allocated_bytes_before": 82173952
+    },
+    {
+      "path": "/tmp/theme_probe_latest",
+      "allocated_bytes_before": 82341888
+    },
+    {
+      "path": "/tmp/ns_reserved_probe_latest",
+      "allocated_bytes_before": 82100224
+    },
+    {
+      "path": "/tmp/ns_probe_latest",
+      "allocated_bytes_before": 82096128
+    },
+    {
+      "path": "/tmp/part_delim_probe",
+      "allocated_bytes_before": 62910464
+    },
+    {
+      "path": "/tmp/ns_probe",
+      "allocated_bytes_before": 62877696
+    },
+    {
+      "path": "/tmp/cdata_delim_probe",
+      "allocated_bytes_before": 62578688
+    },
+    {
+      "path": "/tmp/dupns_probe",
+      "allocated_bytes_before": 62578688
+    },
+    {
+      "path": "/tmp/entity_probe",
+      "allocated_bytes_before": 62885888
+    },
+    {
+      "path": "/tmp/ns_reserved_probe",
+      "allocated_bytes_before": 62861312
+    },
+    {
+      "path": "/tmp/mce_probe",
+      "allocated_bytes_before": 63053824
+    },
+    {
+      "path": "/tmp/decl_probe",
+      "allocated_bytes_before": 62820352
+    },
+    {
+      "path": "/tmp/bom_probe",
+      "allocated_bytes_before": 62820352
+    },
+    {
+      "path": "/tmp/check_family2",
+      "allocated_bytes_before": 61939712
+    },
+    {
+      "path": "/tmp/check_family",
+      "allocated_bytes_before": 61943808
+    },
+    {
+      "path": "/var/tmp/deref_field",
+      "allocated_bytes_before": 4333568
+    },
+    {
+      "path": "/var/tmp/hashcap",
+      "allocated_bytes_before": 4370432
+    },
+    {
+      "path": "/var/tmp/check_args_copy",
+      "allocated_bytes_before": 4333568
+    },
+    {
+      "path": "/var/tmp/ns_entity_check",
+      "allocated_bytes_before": 4345856
+    }
+  ],
+  "probe_binary_bytes_removed": 1974247424,
+  "worktree_cleanup": [
+    {
+      "path": "/tmp/litchi-docx-svg-lifecycle-892441d95",
+      "head": "892441d95db29da4351390716ef5c65b4c7c97de",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-svg-lifecycle-892441d95-892441d95db2",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-svg-lifecycle-892441d95",
+      "unique_files": 0,
+      "allocated_bytes_before": 2350202880,
+      "removed": true
+    },
+    {
+      "path": "/tmp/litchi-ink-compile",
+      "head": "1de3a7e411b755d1a8bfd38b53738106c0da1dc1",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-ink-compile-1de3a7e411b7",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-ink-compile",
+      "unique_files": 3,
+      "allocated_bytes_before": 2349973504,
+      "removed": true
+    },
+    {
+      "path": "/tmp/litchi-svg-check2",
+      "head": "930305a935e659ebfa60d63af192ce1f1da964c4",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-svg-check2-930305a935e6",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-svg-check2",
+      "unique_files": 6,
+      "allocated_bytes_before": 2254958592,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-after-smoke-506e6f8e5-a",
+      "head": "0aa99593cb609487cf85230c361be23ca34d4367",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-after-smoke-506e6f8e5-a-0aa99593cb60",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-after-smoke-506e6f8e5-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 2513088512,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-clean-20260912-a",
+      "head": "995820ee18bf9b8647a6f79f9ad0efbb938ffffd",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-clean-20260912-a-995820ee18bf",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-clean-20260912-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 3084791808,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-clean-46c456-20260912-a",
+      "head": "46c4568483848faa5522b8cd8f2c999e74537af7",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-clean-46c456-20260912-a-46c456848384",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-clean-46c456-20260912-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 2422829056,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-current-baseline-8702-20260912",
+      "head": "637082e318ae6bee2bd47ef317e4a417c1176996",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-current-baseline-8702-20260912-637082e318ae",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-current-baseline-8702-20260912",
+      "unique_files": 0,
+      "allocated_bytes_before": 2470633472,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-after-506e6f8e5-a",
+      "head": "5f4dd8954acef1fea9e9d7de01c90b3f3f0c2721",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-after-506e6f8e5-a-5f4dd8954ace",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-after-506e6f8e5-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 2515472384,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-capture-20260912-a",
+      "head": "96958498f88e263b3bc7f0a9e544f2144ff156c5",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-capture-20260912-a-96958498f88e",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-capture-20260912-a",
+      "unique_files": 1,
+      "allocated_bytes_before": 2458451968,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-preflight-4bdf706d2-20260912-a",
+      "head": "4bdf706d2d3e591c4e3354b7cf2b14ebcb387d9c",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-preflight-4bdf706d2-20260912-a-4bdf706d2d3e",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-preflight-4bdf706d2-20260912-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 2480177152,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-preflight-bf21536b3-20260912-a",
+      "head": "bf21536b35380005041917e7aee03a39804b2659",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-preflight-bf21536b3-20260912-a-bf21536b3538",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-preflight-bf21536b3-20260912-a",
+      "unique_files": 0,
+      "allocated_bytes_before": 2480181248,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-pins",
+      "head": "8e4d7de0f91917cabe15bc0f0b545d24c032effe",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-pins-8e4d7de0f919",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-pins",
+      "unique_files": 0,
+      "allocated_bytes_before": 2551758848,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b",
+      "head": "a1d545b4c5626a014912a6ae0f137e4620d828d1",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-docx-styles-effects-profile-projection-reuse-d000d977b-a1d545b4c562",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-docx-styles-effects-profile-projection-reuse-d000d977b",
+      "unique_files": 0,
+      "allocated_bytes_before": 2553606144,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-form-owner-read-perf-worktree",
+      "head": "1ae5d7b4504a248ea24ac52cb2bdd1f08859ddd7",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-form-owner-read-perf-worktree-1ae5d7b4504a",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-form-owner-read-perf-worktree",
+      "unique_files": 0,
+      "allocated_bytes_before": 2579533824,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-pptx-ink-actions-profiler-2a2ffa1c",
+      "head": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-pptx-ink-actions-profiler-2a2ffa1c-2a2ffa1cae4e",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-pptx-ink-actions-profiler-2a2ffa1c",
+      "unique_files": 0,
+      "allocated_bytes_before": 2473426944,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-pptx-ink-actions-profiler-3e9ef2d01-preflight",
+      "head": "3e9ef2d014a2f70bbbca18b824aa50a1567cdcc7",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-pptx-ink-actions-profiler-3e9ef2d01-preflight-3e9ef2d014a2",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-pptx-ink-actions-profiler-3e9ef2d01-preflight",
+      "unique_files": 0,
+      "allocated_bytes_before": 2507673600,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-pptx-ink-actions-profiler-732f3beca-preflight",
+      "head": "732f3beca1418553c1db8ae4dcb5899e06b7a7db",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-pptx-ink-actions-profiler-732f3beca-preflight-732f3beca141",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-pptx-ink-actions-profiler-732f3beca-preflight",
+      "unique_files": 0,
+      "allocated_bytes_before": 2480222208,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-custom-data-source.VlUqp7",
+      "head": "16102fe751d7c5492042330f1bd1f49c304495f0",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsb-custom-data-source.VlUqp7-16102fe751d7",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsb-custom-data-source.VlUqp7",
+      "unique_files": 1,
+      "allocated_bytes_before": 17780736,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-custom-data-source.WKUOB0",
+      "head": "16102fe751d7c5492042330f1bd1f49c304495f0",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsb-custom-data-source.WKUOB0-16102fe751d7",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsb-custom-data-source.WKUOB0",
+      "unique_files": 1,
+      "allocated_bytes_before": 17780736,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-identity-clean",
+      "head": "2a726ded6feb79f36b23980ed89c350aafd3cb55",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsb-identity-clean-2a726ded6feb",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsb-identity-clean",
+      "unique_files": 2,
+      "allocated_bytes_before": 2388684800,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsb-identity-clean.vRFKKx",
+      "head": "0deae575dbecd3d5b351eadd51b87c39a6dc11df",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsb-identity-clean.vRFKKx-0deae575dbec",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsb-identity-clean.vRFKKx",
+      "unique_files": 46,
+      "allocated_bytes_before": 2453544960,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-custom-data-limits-root-z4w9ojx0/worktree",
+      "head": "1809544331a7508353e7ab78d73bc4c4bf21db79",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsx-custom-data-limits-root-z4w9ojx0-1809544331a7",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsx-custom-data-limits-root-z4w9ojx0",
+      "unique_files": 0,
+      "allocated_bytes_before": 2580979712,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-local-check-2",
+      "head": "d99c2b0f247188335c1c71661575755b1fc46ab3",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsx-local-check-2-d99c2b0f2471",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsx-local-check-2",
+      "unique_files": 5,
+      "allocated_bytes_before": 2365566976,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-svg-lifecycle-clean-ab954d91d",
+      "head": "ab954d91dd6d6ca3e0df18b59ee826cef99bcae8",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsx-svg-lifecycle-clean-ab954d91d-ab954d91dd6d",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsx-svg-lifecycle-clean-ab954d91d",
+      "unique_files": 2,
+      "allocated_bytes_before": 2413821952,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/litchi-xlsx-svg-phase-ac288-historical",
+      "head": "3ab5a3078274d0aae3d01c4bb620061d7a45778c",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/litchi-xlsx-svg-phase-ac288-historical-3ab5a3078274",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/litchi-xlsx-svg-phase-ac288-historical",
+      "unique_files": 2,
+      "allocated_bytes_before": 2425020416,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "head": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/pptx-ink-actions-correctness-0090bc68f-clean-0090bc68f949",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/pptx-ink-actions-correctness-0090bc68f-clean",
+      "unique_files": 1,
+      "allocated_bytes_before": 2521001984,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL",
+      "head": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL-a8dff0f606ea",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL",
+      "unique_files": 1,
+      "allocated_bytes_before": 2526171136,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/pptx-ink-actions-correctness-cc435619c-clean",
+      "head": "cc435619cfe96264c40889e6012f139fb8dcff9e",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/pptx-ink-actions-correctness-cc435619c-clean-cc435619cfe9",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/pptx-ink-actions-correctness-cc435619c-clean",
+      "unique_files": 1,
+      "allocated_bytes_before": 2515480576,
+      "removed": true
+    },
+    {
+      "path": "/var/tmp/pptx-ink-actions-profile-260eafd39-src.Q436KY",
+      "head": "260eafd391237d49373ad0ea1d73bd9348ab6226",
+      "archive_ref": "refs/archive/tmp-cleanup-20260913/pptx-ink-actions-profile-260eafd39-src.Q436KY-260eafd39123",
+      "recovery": "/home/zhuhe/code/litchi-tmp-recovery-20260913/pptx-ink-actions-profile-260eafd39-src.Q436KY",
+      "unique_files": 0,
+      "allocated_bytes_before": 2531794944,
+      "removed": true
+    }
+  ],
+  "recovery_directory": "/home/zhuhe/code/litchi-tmp-recovery-20260913",
+  "total_allocated_bytes_removed": 220198047744,
+  "unrelated_active_temp_references_preserved": 3
+}

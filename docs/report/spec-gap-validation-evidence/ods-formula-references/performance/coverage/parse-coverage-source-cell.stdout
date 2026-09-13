@@ -1,0 +1,2 @@
+config workload=parse case=coverage-source-cell input_bytes=28 repeat=1000 warmups=3 iterations=15 expected_success=true
+result mean_ns=316506 p50_ns=316081 p95_ns=323891 p99_ns=323891 alloc_calls_p50=5000 alloc_calls_max=5000 dealloc_calls_p50=5000 dealloc_calls_max=5000 requested_bytes_p50=717000 requested_bytes_max=717000 released_bytes_p50=717000 released_bytes_max=717000 live_before_p50=2920 live_after_p50=2920 live_after_max=2920 peak_live_delta_p50=717 peak_live_delta_max=717 successes_p50=1000 successes_max=1000 checksum_p50=29000 checksum_max=29000
