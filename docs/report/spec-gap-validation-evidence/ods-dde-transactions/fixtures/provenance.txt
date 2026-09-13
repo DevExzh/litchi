@@ -1,0 +1,6 @@
+Source: authoring-runner/src/main.rs, executed through public dde::Snapshot/Edit APIs.
+Kind: API-authored synthetic ODF 1.4 XML; no native producer save or DDE execution.
+The fixture covers string attribute controls and an empty cached table.
+Automatic updates are disabled; source identifiers are deliberately nonexistent.
+Content SHA-256: c325938c04decebaf32eb0296ade4189a9da3a5d7d8df50c50e8db3659d631b8
+Validation: gates/api-authoring-schema-validation-final.txt and gates/api-authoring-lxml-decode-final.txt.

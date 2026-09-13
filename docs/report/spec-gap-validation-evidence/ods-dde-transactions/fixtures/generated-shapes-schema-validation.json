@@ -1,0 +1,39 @@
+{
+  "generator_harness_sha256": "40f7783c6ac51e8c81762ec58f4ae57dd28e115f5b668a34b65db1298e07ac20",
+  "schema_sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f",
+  "cases": [
+    {
+      "case": "large-cache",
+      "content_sha256": "039174d357930a00a7bfd0bc66f191d2a18138ed44140909b2c7dfc38d8212ee",
+      "source_bytes": 4132098,
+      "whole_content_valid": true,
+      "whole_content_diagnostics": [],
+      "owners_valid": true,
+      "owner_count": 3,
+      "cache_semantics_valid": true,
+      "cache_count": 1
+    },
+    {
+      "case": "many-links",
+      "content_sha256": "fa2711e69845597e2c4fe3b0b2879d9c3480b957a6a9b6c6ab7f3e33f2c4c22b",
+      "source_bytes": 863375,
+      "whole_content_valid": true,
+      "whole_content_diagnostics": [],
+      "owners_valid": true,
+      "owner_count": 2053,
+      "cache_semantics_valid": true,
+      "cache_count": 2048
+    },
+    {
+      "case": "small",
+      "content_sha256": "d2ece0c42213b51302990560c765b1061aaffb51e090d0d47bfd0765b8de33e2",
+      "source_bytes": 9845,
+      "whole_content_valid": true,
+      "whole_content_diagnostics": [],
+      "owners_valid": true,
+      "owner_count": 4,
+      "cache_semantics_valid": true,
+      "cache_count": 2
+    }
+  ]
+}

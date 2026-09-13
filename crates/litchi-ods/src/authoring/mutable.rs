@@ -148,6 +148,48 @@ impl MutableSpreadsheet {
         self.spreadsheet.edit_table_templates(update)
     }
 
+    /// Capture inert DDE source declarations and cached tables.
+    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
+        self.spreadsheet.dde()
+    }
+
+    /// Capture DDE metadata under explicit limits and execution policy.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::Snapshot> {
+        self.spreadsheet.dde_with(limits, context)
+    }
+
+    /// Publish a failure-atomic inert DDE metadata edit.
+    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_dde(update)
+    }
+
+    /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
+    /// Package replacement and rehydration retain the package policy.
+    pub fn edit_dde_with_context<F>(
+        &mut self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.spreadsheet
+            .edit_dde_with_context(limits, context, update)
+    }
+
+    /// Apply an exact-source DDE patch atomically.
+    pub fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
+        self.spreadsheet.apply_dde_patch(patch)
+    }
+
     /// Capture the inert, source-bound scenario metadata catalog.
     pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
         self.spreadsheet.scenarios()

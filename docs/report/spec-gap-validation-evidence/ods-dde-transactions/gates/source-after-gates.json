@@ -1,0 +1,11 @@
+{
+  "crates/litchi-ods/src/authoring/mutable.rs": "cf50c89c0dc4aea48ef37362199ea4cd3103a1198ed12a8409e9b10c172ae57f",
+  "crates/litchi-ods/src/facade/mod.rs": "5e5a23698cdf3918dc9576ead1cc43bed2c6354c09a7674ea7a49e03910be9ec",
+  "crates/litchi-ods/src/facade/source.rs": "af69bfa318bec97ade9da279ee7cb19fd3fe302d84e4acb8a53e3565fffd0daa",
+  "crates/litchi-ods/src/model/dde/lexical.rs": "cc67145d64775ea993797c927639b4c98c100ada47e23df06e6429139686e427",
+  "crates/litchi-ods/src/model/dde/source_backed.rs": "38225c1d3d40008fe60008b86cc81a398d64ff95955cab964d73fd0829fdc35b",
+  "crates/litchi-ods/src/model/dde/transaction.rs": "bce59b24064e017d0a3f3cf945594fdd9870e84cdeda513d076ea9c86fc1bc4c",
+  "crates/litchi-ods/src/model/dde.rs": "98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8",
+  "crates/litchi-ods/tests/ods_dde_facades.rs": "cd952632f5cb8252a5e6ad47a78a3179fb1864501c2afd0a207705ab4d285468",
+  "crates/litchi-ods/tests/ods_dde_transactions.rs": "5bad85510fcf7b2444e9b37ea254bd16d14c42b13ff6b6ab97b982da2660064b"
+}

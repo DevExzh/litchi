@@ -1,0 +1,5 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods)
+   Compiling ods-dde-authoring-capture v0.0.0 (/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-dde-transactions/authoring-runner)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.39s
+     Running `/var/tmp/litchi-ods-dde-root-target/debug/ods-dde-authoring-capture docs/report/spec-gap-validation-evidence/ods-dde-transactions/fixtures/api-authored-content.xml`
+wrote 1978 bytes to docs/report/spec-gap-validation-evidence/ods-dde-transactions/fixtures/api-authored-content.xml (changed=true, links=2)
