@@ -72,6 +72,7 @@ source and passing runtime/documentation checks.
 The [owned source review](value-owned-review.md) clears the allocation and
 cancellation boundaries. Release profiling is still under review. In particular,
 the ownership harness exposed quadratic admission work in a 4,096-entry union
-expression during preparation; the copy boundary itself has not yet received a
-complete successful large-list capture. These API implementation checks do not
+expression during preparation. The isolated union-count fix resolves that failure:
+[all 54 debug ownership lanes now pass](reference-union-count-fix.json) under
+unchanged limits. Release ownership measurements remain pending. These API implementation checks do not
 constitute complete performance or specification acceptance.
