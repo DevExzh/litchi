@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0552-target/retained/candidate/normal",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/preflight-r1-vendor-extension-c1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/preflight-r1-vendor-extension-c1.catalog.json"
+  ],
+  "start_utc": "2026-09-13T07:57:46.359521+00:00",
+  "end_utc": "2026-09-13T07:57:47.361876+00:00",
+  "seconds": 1.002376106014708,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "binary_sha256": "05ab92e0b34b579f0da96454a1309ab4e8207115fbebc0f06a60b9e4f2b48d55",
+  "source_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "script_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "preflight-r1-vendor-extension-c1.catalog.json": "ff585b7e7c58da869aff108fa8ca29e431e753258147f856b6d704f90c732833",
+    "preflight-r1-vendor-extension-c1.host.json": "37d22e8960b85626cae5016d306a2526ff9c4d517405481fd5164ab0747b7a8e",
+    "preflight-r1-vendor-extension-c1.json": "35c7f0d851da00cc336f58a838fdee29d34b7128606eaecc5216bd5af1fd6bce",
+    "preflight-r1-vendor-extension-c1.stderr": "cd07e4ef2302467ec6a75b5db0ef364d7bdbc92e0b7a59e6f08ded09beabea54",
+    "preflight-r1-vendor-extension-c1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

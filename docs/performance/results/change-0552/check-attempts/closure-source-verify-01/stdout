@@ -1,0 +1,6 @@
+{
+  "error": "candidate untracked source has no retained byte witness: crates/litchi-xlsx/src/cell_values/source_proof.rs",
+  "schema": "litchi.xlsx.verification.0552.v1",
+  "scope": "source",
+  "status": "fail"
+}

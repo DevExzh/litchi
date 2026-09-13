@@ -1,0 +1,11 @@
+--- a/docs/performance/results/change-0552/decide.py
++++ b/docs/performance/results/change-0552/decide.py
+@@ -317,7 +317,7 @@
+     result[PARENT_TEST] = hash_value(
+         extract(read_json(PUBLIC_EXACT_PATH / "inputs.json",
+                           "public-exact-test-sources/inputs.json"),
+-                "source_hashes." + PARENT_TEST),
++                "source_hashes").get(PARENT_TEST),
+         "public exact parent test hash",
+     )
+     result[EXACT_CHILD] = hash_value(terminal_child_sha,

@@ -1,0 +1,14 @@
+--- a/docs/performance/results/change-0552/decide.py
++++ b/docs/performance/results/change-0552/decide.py
+@@ -385,9 +385,9 @@
+     require(digest(root_patch, "public exact root patch") == inputs["patch_sha256"],
+             "public exact root patch digest differs")
+     hash_value(inputs["parent_before_sha256"], "public exact parent-before hash")
+-    baseline_manifest, _ = verify.stage_manifest("baseline")
++    baseline_manifest = verify.public_augmented_manifest()
+     require(baseline_manifest.get(PARENT_TEST) == inputs["parent_before_sha256"],
+-            "public exact root parent-before hash is not the frozen baseline")
++            "public exact root parent-before hash is not the validated first public-test stage")
+ 
+     attempt_rows: list[dict[str, Any]] = []
+     previous = source_hashes[EXACT_CHILD]

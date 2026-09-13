@@ -1,0 +1,9 @@
+{
+  "frozen_utc": "2026-09-13T07:35:53.205576+00:00",
+  "scope": "Retain observed baseline formatting-whitespace publication refusal as a separate exact-error/retry regression, alongside accepted whole-worksheet byte oracle.",
+  "path": "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs",
+  "before_sha256": "f2696dfc26bc4c90d68396355c6cc2e48c2fd36a1a2bb31301d16d910931f15f",
+  "after_sha256": "20b2917530a2795b1ee08f488eefdeedd658d2d83435ac80c5cd003c183ea012",
+  "patch_sha256": "d33c1d5e5070f4294124483e92cfd2f29878b5526f8251e5033e6e211e3f7e9d",
+  "prior_check_receipt_sha256": "b2a7b57a45d92a4e626fd7e3d76735850efbd8349427842222579a087d836775"
+}

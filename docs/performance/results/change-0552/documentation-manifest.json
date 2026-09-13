@@ -1,0 +1,9 @@
+{
+  "scope": "Files outside this evidence bundle included in completed change0552",
+  "files": {
+    "docs/performance/0552-xlsx-compact-source-proof.md": "63f00c2c44ccd16b14040bd68ebf80d5a7c640b4d637044dd729d649aa55b0be",
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs": "e32fac36e09f17c3d2192d123ca78905f4be66c045d9e23d62342c4eeefd1cde",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/compact_source_proof.rs": "4ac965cec723205b62316d18985353296bb18c48464fe1172d3d2ba039f4fbc9",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs": "2cb65491b9dbaf110fe24912670da829e02d90c829e8e80910426b511b9aea2d"
+  }
+}

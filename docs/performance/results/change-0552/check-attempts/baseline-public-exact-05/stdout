@@ -1,0 +1,7 @@
+
+running 2 tests
+test public_exact_output::public_multi_edit_preserves_formatting_whitespace_publication_refusal ... ok
+test public_exact_output::public_multi_edit_matches_baseline_whole_worksheet_output ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.01s
+

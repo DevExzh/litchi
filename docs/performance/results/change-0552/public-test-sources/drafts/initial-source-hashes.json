@@ -1,0 +1,10 @@
+{
+  "crates/litchi-xlsx/tests/source_backed_cell_values/compact_source_proof.rs": {
+    "baseline_sha256": null,
+    "test_sha256": "50992f7d3ed010b9e3bb2baffae266a680210c7c585eb4a24c8ef671928d8dd8"
+  },
+  "crates/litchi-xlsx/tests/source_backed_cell_values.rs": {
+    "baseline_sha256": "d3a30e7577bad6a0f2b832fe730b6734abbf1635d48704a96dea352f7b381cdb",
+    "test_sha256": "6e6fd04fd59f20996e055b20e31d584789d46c9ba0adefdb99e791b83f2c18cc"
+  }
+}

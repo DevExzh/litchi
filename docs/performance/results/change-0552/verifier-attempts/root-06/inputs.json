@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:56:28.773948+00:00",
+  "reason": "Serialize internal validated datetime objects as ISO strings only at CLI JSON output; preserve timestamp comparisons and all verification logic. Other unsupported types still fail.",
+  "before_sha256": "fb8d1f68ce9f74367b744c0982115737ea1c243c7db02f9cab5507c4fc9e53f5",
+  "after_sha256": "754da750fac5b9cad9c1dbb14ab749361e4d32216e294a5586260a1d60aedf5c",
+  "patch_sha256": "e234550a935e6f2b4dfcceba9fb085ef493a9a27ff8d792afae865dcec652c99",
+  "observed_failure_sha256": "7b9e0b2d7a7a99caec9cfc39944d195e39d66d3984ffbaa76ed35306e9bfc3cc"
+}

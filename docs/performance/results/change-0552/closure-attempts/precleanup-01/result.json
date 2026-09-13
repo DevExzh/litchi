@@ -1,0 +1,6 @@
+{
+  "error": "decision.json final_source must select final stage",
+  "schema": "litchi.xlsx.verification.0552.v1",
+  "scope": "precleanup",
+  "status": "fail"
+}

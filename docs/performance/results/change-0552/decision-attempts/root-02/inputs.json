@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:34:24.123731+00:00",
+  "reason": "Source hash keys are literal file paths containing .rs; access literal key after extracting source_hashes object instead of splitting filename as a dotted object path.",
+  "before_sha256": "82663d28208ea479ba5fdea88840503984f77a4f865560d94647061632e847da",
+  "after_sha256": "d59e251019520b9420f21ac0a0d81d12e4b6a1e782e1b8e2744b3703841e3312",
+  "patch_sha256": "7a073ee195aef8a8b0afaa5c2dc7bd6a24469e311386e938bf9a42c4fbf81209",
+  "failed_receipt_sha256": "41cf5d640cffd5f84e325e40c4d03602144579a0e9443c25c53bb75c08e70868"
+}

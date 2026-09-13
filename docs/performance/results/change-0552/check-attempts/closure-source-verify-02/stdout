@@ -1,0 +1,45 @@
+{
+  "result": {
+    "baseline": {
+      "entries": 8593,
+      "manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+      "patch": {
+        "changed_tracked": [],
+        "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "candidate": {
+      "entries": 8597,
+      "manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+      "patch": {
+        "changed_tracked": [
+          "crates/litchi-xlsx/src/cell_values/mod.rs",
+          "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+          "crates/litchi-xlsx/src/cell_values/source.rs",
+          "crates/litchi-xlsx/src/cell_values/validation.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/model.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+          "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+          "crates/litchi-xlsx/tests/source_backed_cell_values.rs"
+        ],
+        "patch_sha256": "320036d8307cb9dcd6d2276b1f1665e0e26e89458bf1e62a49c9c28d7d314949",
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "live_manifest_entries": 8595,
+    "status": "pass"
+  },
+  "schema": "litchi.xlsx.verification.0552.v1",
+  "scope": "source",
+  "status": "pass"
+}

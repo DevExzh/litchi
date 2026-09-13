@@ -1,0 +1,8 @@
+{
+  "checked_utc": "2026-09-13T06:23:53.060278+00:00",
+  "status": "pass",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "baseline_capture_exit_code": 0,
+  "baseline_session": 37254,
+  "scope": "Separately frozen before workspace build; unchanged at complete baseline pipeline. No claim of per-child workspace-lock checks in this original pipeline."
+}

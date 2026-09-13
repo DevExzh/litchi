@@ -1,0 +1,1374 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/mod.rs b/crates/litchi-xlsx/src/cell_values/mod.rs
+index f305d3bb6..0e3a47b42 100644
+--- a/crates/litchi-xlsx/src/cell_values/mod.rs
++++ b/crates/litchi-xlsx/src/cell_values/mod.rs
+@@ -14,6 +14,7 @@
+ mod patch;
+ mod snapshot;
+ mod source;
++mod source_proof;
+ mod validation;
+ 
+ pub use patch::Patch;
+diff --git a/crates/litchi-xlsx/src/cell_values/snapshot.rs b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+index cb73f73da..3be1da9b3 100644
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -419,6 +419,7 @@ impl Snapshot {
+                 context: None,
+                 source_lineage: None,
+                 source_version: None,
++                compact_proof: None,
+             },
+         })
+     }
+@@ -443,12 +444,16 @@ impl Snapshot {
+         }
+         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
+         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+-        let cells = if raw::worksheet::source_stream_eligible(worksheet_xml.as_bytes()) {
+-            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes())?
+-        } else {
+-            validation::worksheet_xml(worksheet_xml.as_bytes())?;
+-            raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?
+-        };
++        let (cells, compact_proof) =
++            if raw::worksheet::source_stream_eligible(worksheet_xml.as_bytes()) {
++                validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes())?
++            } else {
++                validation::worksheet_xml(worksheet_xml.as_bytes())?;
++                (
++                    raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?,
++                    None,
++                )
++            };
+         package.check_execution()?;
+         validate_style_references(&cells, capture.style_count)?;
+         validate_scalar_cells(&cells)?;
+@@ -478,6 +483,7 @@ impl Snapshot {
+                 context: package.execution_context(),
+                 source_lineage: Some(capture.source_lineage.clone()),
+                 source_version: Some(capture.source_version),
++                compact_proof: compact_proof.map(Arc::new),
+             },
+         })
+     }
+@@ -690,6 +696,7 @@ impl Snapshot {
+                 context,
+                 source_lineage,
+                 source_version,
++                compact_proof: None,
+             },
+         })
+     }
+@@ -701,6 +708,7 @@ impl Snapshot {
+         let mut result = source.clone();
+         result.cells = Arc::new(cells);
+         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        result.source.compact_proof = None;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -729,6 +737,7 @@ impl Snapshot {
+         let mut result = source.clone();
+         result.cells = Arc::new(cells);
+         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
++        result.source.compact_proof = None;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -800,6 +809,7 @@ impl Snapshot {
+         validation::worksheet_xml(&bytes)?;
+         let mut result = source.clone();
+         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        result.source.compact_proof = None;
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -1037,6 +1047,14 @@ impl Snapshot {
+         self.source.worksheet.bytes.as_bytes()
+     }
+ 
++    pub(crate) fn compact_proof(&self) -> Option<&raw::worksheet::edit::CompactLayout> {
++        self.source.compact_proof.as_deref()
++    }
++
++    pub(crate) fn compact_entries(&self) -> &[Stored] {
++        self.cells.entries()
++    }
++
+     /// Selected worksheet Part URI.
+     #[must_use]
+     pub const fn worksheet_part_name(&self) -> &PackURI {
+@@ -1305,6 +1323,7 @@ struct SourceState {
+     context: Option<ExecutionContext>,
+     source_lineage: Option<SourceLineage>,
+     source_version: Option<SourceVersion>,
++    compact_proof: Option<Arc<raw::worksheet::edit::CompactLayout>>,
+ }
+ 
+ impl SourceState {
+diff --git a/crates/litchi-xlsx/src/cell_values/source.rs b/crates/litchi-xlsx/src/cell_values/source.rs
+index 34b89ad0b..81cfd1d16 100644
+--- a/crates/litchi-xlsx/src/cell_values/source.rs
++++ b/crates/litchi-xlsx/src/cell_values/source.rs
+@@ -18,7 +18,9 @@ use crate::Selector;
+ use crate::cell::{Cell, Content, Number, Value};
+ use crate::error::{Error, Result, invalid};
+ use crate::formula::Formula;
+-use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
++use crate::raw::worksheet::edit::{
++    Action, rewrite_value_only_with_compact_proof, rewrite_value_only_with_provenance,
++};
+ 
+ /// Maximum unique cells in one atomic value transaction.
+ pub const MAX_BATCH_EDITS: usize = 256;
+@@ -1174,10 +1176,12 @@ impl MultiSourceEdit {
+             }
+             changed_cells += actions.len();
+             touched_worksheets += 1;
+-            let output = rewrite_value_only_with_provenance(
++            let output = rewrite_value_only_with_compact_proof(
+                 snapshot.source_xml(),
+                 snapshot.sheet_name(),
+                 actions,
++                snapshot.compact_proof(),
++                snapshot.compact_entries(),
+             )?;
+             aggregate_bytes = super::snapshot::checked_multi_bytes(
+                 aggregate_bytes,
+diff --git a/crates/litchi-xlsx/src/cell_values/validation.rs b/crates/litchi-xlsx/src/cell_values/validation.rs
+index d853c4efc..4d189c11e 100644
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -5,6 +5,7 @@ use quick_xml::events::Event;
+ use quick_xml::name::{Namespace, ResolveResult};
+ use quick_xml::reader::NsReader;
+ 
++use super::source_proof::CompactProofBuilder;
+ use crate::error::{Error, Result, allocation, invalid};
+ use crate::raw;
+ 
+@@ -196,27 +197,45 @@ impl Validator {
+ /// complete source, parser materialization is carried as a `Complete` result;
+ /// the caller finishes validation before forwarding that result through the
+ /// raw facade. No speculative diagnostic escapes the established error order.
+-pub(super) fn worksheet_xml_and_parse_source(content: &[u8]) -> Result<crate::cell::Store> {
++pub(super) fn worksheet_xml_and_parse_source(
++    content: &[u8],
++) -> Result<(
++    crate::cell::Store,
++    Option<raw::worksheet::edit::CompactLayout>,
++)> {
+     let mut validator = Validator::new(XmlOwner::Worksheet);
+-    let attempt = raw::worksheet::parse_source_with_observer(
++    let mut proof = CompactProofBuilder::new(content);
++    let attempt = raw::worksheet::parse_source_with_observer_and_handoff(
+         content,
+         || Ok(None),
+-        |namespace, event| validator.observe(namespace, event),
++        &mut proof,
++        |proof, namespace, event, span| {
++            let allowed = validator.observe(namespace, event);
++            proof.observe(namespace, event, span);
++            allowed
++        },
++        |proof, handoff| proof.handoff(handoff),
+     );
+     match attempt {
+         raw::worksheet::SourceParseAttempt::Complete(parsed) => {
+             validator.finish()?;
+-            raw::worksheet::complete_source_parse(content, parsed)
++            let parsed = raw::worksheet::complete_source_parse(content, parsed)?;
++            let compact = proof.finish(parsed.entries()).filter(|compact| {
++                usize::try_from(compact.cell_count).ok() == Some(parsed.stored_cell_count())
++            });
++            Ok((parsed, compact))
+         },
+         raw::worksheet::SourceParseAttempt::ProvisionalFailed => {
+             drop(validator);
++            drop(proof);
+             worksheet_xml(content)?;
+-            raw::worksheet::parse(content, || Ok(None))
++            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
+         },
+         raw::worksheet::SourceParseAttempt::ReaderFailed => {
+             drop(validator);
++            drop(proof);
+             worksheet_xml(content)?;
+-            raw::worksheet::parse(content, || Ok(None))
++            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
+         },
+     }
+ }
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+index 9b82e18ba..e4d35cdf2 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -30,6 +30,8 @@ use crate::error::{Result, allocation, invalid};
+ use crate::layout::{self, Defaults};
+ use crate::row;
+ 
++use super::{SourceEventSpan, SourceHandoff};
++
+ pub(super) fn parse_processed_defaults(
+     content: &str,
+     mut descent: Option<layout::Descent>,
+@@ -1125,6 +1127,149 @@ pub(super) fn parse_source_with_observer<'a, F, O>(
+ where
+     F: FnOnce() -> Result<Option<&'a [Text]>>,
+     O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
++{
++    let mut context = ();
++    parse_source_with_observer_and_handoff(
++        content,
++        strings,
++        &mut context,
++        |_, namespace, event, _span| observer(namespace, event),
++        |_, _| {},
++    )
++}
++
++#[derive(Debug, Clone, Copy)]
++enum SourceHandoffKind {
++    CellStart,
++    CellEmpty,
++    CellEnd,
++    RowStart,
++    RowEmpty,
++    RowEnd,
++}
++
++fn source_handoff_kind(
++    stack: &[Context],
++    namespace: &ResolveResult<'_>,
++    event: &Event<'_>,
++) -> Option<SourceHandoffKind> {
++    let parent = stack.last().copied();
++    match event {
++        Event::Start(element)
++            if parent == Some(Context::Row)
++                && is_spreadsheetml_name(namespace, element.name(), b"c") =>
++        {
++            Some(SourceHandoffKind::CellStart)
++        },
++        Event::Empty(element)
++            if parent == Some(Context::Row)
++                && is_spreadsheetml_name(namespace, element.name(), b"c") =>
++        {
++            Some(SourceHandoffKind::CellEmpty)
++        },
++        Event::End(element)
++            if parent == Some(Context::Cell) && element.local_name().as_ref() == b"c" =>
++        {
++            Some(SourceHandoffKind::CellEnd)
++        },
++        Event::Start(element)
++            if parent == Some(Context::SheetData)
++                && is_spreadsheetml_name(namespace, element.name(), b"row") =>
++        {
++            Some(SourceHandoffKind::RowStart)
++        },
++        Event::Empty(element)
++            if parent == Some(Context::SheetData)
++                && is_spreadsheetml_name(namespace, element.name(), b"row") =>
++        {
++            Some(SourceHandoffKind::RowEmpty)
++        },
++        Event::End(element)
++            if parent == Some(Context::Row) && element.local_name().as_ref() == b"row" =>
++        {
++            Some(SourceHandoffKind::RowEnd)
++        },
++        _ => None,
++    }
++}
++
++fn emit_source_handoff<C: ?Sized>(
++    kind: SourceHandoffKind,
++    span: SourceEventSpan,
++    cells_before: usize,
++    rows_before: usize,
++    parser: &Parser,
++    context: &mut C,
++    handoff: &mut impl FnMut(&mut C, SourceHandoff),
++) {
++    match kind {
++        SourceHandoffKind::CellStart => {
++            let Some(cell) = parser.cell.as_ref() else {
++                return;
++            };
++            let Ok(address) = Address::at(cell.row - 1, cell.column - 1) else {
++                return;
++            };
++            handoff(context, SourceHandoff::CellStart { address, span });
++        },
++        SourceHandoffKind::CellEmpty | SourceHandoffKind::CellEnd => {
++            let Some(cell) = parser.cells.get(cells_before) else {
++                return;
++            };
++            let kind = match kind {
++                SourceHandoffKind::CellEmpty => SourceHandoff::CellEmpty {
++                    address: cell.address,
++                    span,
++                },
++                SourceHandoffKind::CellEnd => SourceHandoff::CellEnd {
++                    address: cell.address,
++                    span,
++                },
++                _ => return,
++            };
++            handoff(context, kind);
++        },
++        SourceHandoffKind::RowStart => {
++            let Some(row) = parser.row.as_ref() else {
++                return;
++            };
++            handoff(
++                context,
++                SourceHandoff::RowStart {
++                    number: row.number,
++                    span,
++                },
++            );
++        },
++        SourceHandoffKind::RowEmpty | SourceHandoffKind::RowEnd => {
++            let Some(row) = parser.rows.get(rows_before) else {
++                return;
++            };
++            let number = row.index.get().saturating_add(1);
++            let kind = match kind {
++                SourceHandoffKind::RowEmpty => SourceHandoff::RowEmpty { number, span },
++                SourceHandoffKind::RowEnd => SourceHandoff::RowEnd { number, span },
++                _ => return,
++            };
++            handoff(context, kind);
++        },
++    }
++}
++
++/// Variant of the shared source traversal that also supplies original event
++/// positions and post-transition resolved cell/row handoffs.
++pub(super) fn parse_source_with_observer_and_handoff<'a, F, C, O, H>(
++    content: &[u8],
++    strings: F,
++    context: &mut C,
++    mut observer: O,
++    mut handoff: H,
++) -> super::SourceParseAttempt
++where
++    F: FnOnce() -> Result<Option<&'a [Text]>>,
++    C: ?Sized,
++    O: for<'event> FnMut(&mut C, &ResolveResult<'event>, &Event<'event>, SourceEventSpan) -> bool,
++    H: FnMut(&mut C, SourceHandoff),
+ {
+     let mut reader = NsReader::from_reader(content);
+     reader.config_mut().check_end_names = true;
+@@ -1134,10 +1279,18 @@ where
+     let mut event_count = 0usize;
+ 
+     loop {
++        let event_start = match usize::try_from(reader.buffer_position()) {
++            Ok(position) => position,
++            Err(_) => return super::SourceParseAttempt::ReaderFailed,
++        };
+         let event = match reader.read_event() {
+             Ok(event) => event,
+             Err(_) => return super::SourceParseAttempt::ReaderFailed,
+         };
++        let event_end = match usize::try_from(reader.buffer_position()) {
++            Ok(position) => position,
++            Err(_) => return super::SourceParseAttempt::ReaderFailed,
++        };
+         let event_limit_exceeded = match event_count.checked_add(1) {
+             Some(count) => {
+                 event_count = count;
+@@ -1148,7 +1301,15 @@ where
+         let (namespace, event) = reader.resolver().resolve_event(event);
+         let decoder = reader.decoder();
+         let resolver = reader.resolver();
+-        let parser_allowed = observer(&namespace, &event);
++        let span = SourceEventSpan {
++            start: event_start,
++            end: event_end,
++            decoder,
++        };
++        let handoff_kind = source_handoff_kind(&stack, &namespace, &event);
++        let cells_before = parser.cells.len();
++        let rows_before = parser.rows.len();
++        let parser_allowed = observer(context, &namespace, &event, span);
+         if !parser_allowed || event_limit_exceeded {
+             return super::SourceParseAttempt::ProvisionalFailed;
+         }
+@@ -1167,6 +1328,17 @@ where
+         if complete {
+             break;
+         }
++        if let Some(kind) = handoff_kind {
++            emit_source_handoff(
++                kind,
++                span,
++                cells_before,
++                rows_before,
++                &parser,
++                context,
++                &mut handoff,
++            );
++        }
+     }
+ 
+     super::SourceParseAttempt::Complete(parser.finish_parse(strings))
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
+index ff464f85e..5a6554631 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
+@@ -24,8 +24,9 @@ pub(super) use snapshot::scan_with_event_limit;
+ pub(super) use snapshot::{
+     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
+     MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
+-    write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+-    write_sheet_data, write_sheet_data_with_provenance,
++    write_columns, write_compact_dimension, write_defaults, write_new_columns, write_new_defaults,
++    write_root, write_sheet_data, write_sheet_data_with_compact_provenance,
++    write_sheet_data_with_provenance,
+ };
+ #[allow(
+     unused_imports,
+@@ -37,3 +38,8 @@ pub(super) use validation::ExtensionNames;
+     reason = "the facade retains the package-facing XML wire seam"
+ )]
+ pub(super) use wire::{sibling_name, write_close, write_tag};
++
++pub(crate) use snapshot::{
++    CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
++    CompactSpan,
++};
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs
+index 8771d92b7..607a2a238 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs
+@@ -8,13 +8,16 @@ mod scan;
+ mod write;
+ 
+ pub(crate) use model::{
+-    Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
+-    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
++    Attribute, CellSlot, ColumnSlot, ColumnsSlot, CompactCellSlot, CompactDimensionTag,
++    CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag,
++    Layout, MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span,
++    Tag,
+ };
+ pub(crate) use scan::scan;
+ #[cfg(test)]
+ pub(crate) use scan::scan_with_event_limit;
+ pub(crate) use write::{
+-    write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+-    write_sheet_data, write_sheet_data_with_provenance,
++    write_columns, write_compact_dimension, write_defaults, write_new_columns, write_new_defaults,
++    write_root, write_sheet_data, write_sheet_data_with_compact_provenance,
++    write_sheet_data_with_provenance,
+ };
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+index 20a1b013e..93aef20bd 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+@@ -151,6 +151,91 @@ pub(crate) struct Layout {
+     pub(crate) merge_compatibility: bool,
+ }
+ 
++/// A bounded source proof used by value-only edits. Unlike [`Layout`], this
++/// representation retains only original row/cell boundaries and one scalar
++/// payload span per cell. Tags and primary vectors are decoded while the
++/// shared parser is traversing the source, but are not retained for every
++/// unchanged cell.
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct CompactSpan {
++    pub(crate) start: u32,
++    pub(crate) end: u32,
++}
++
++impl CompactSpan {
++    pub(crate) const fn start(self) -> usize {
++        self.start as usize
++    }
++
++    pub(crate) const fn end(self) -> usize {
++        self.end as usize
++    }
++}
++
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct CompactCellSlot {
++    /// The source byte interval for this cell. Its semantic address is
++    /// supplied ephemerally by the parser-owned Store after finalization, so
++    /// every cell retains only two bounded offsets.
++    pub(crate) span: CompactSpan,
++}
++
++#[derive(Debug, Clone)]
++pub(crate) struct CompactRowSlot {
++    pub(crate) number: u32,
++    pub(crate) span: CompactSpan,
++    pub(crate) tag_end: u32,
++    pub(crate) close_start: u32,
++    pub(crate) cells: Box<[CompactCellSlot]>,
++    pub(crate) empty: bool,
++}
++
++#[derive(Debug, Clone)]
++pub(crate) struct CompactSheetData {
++    pub(crate) span: CompactSpan,
++    pub(crate) tag_end: u32,
++    pub(crate) close_start: u32,
++    pub(crate) rows: Box<[CompactRowSlot]>,
++    pub(crate) empty: bool,
++}
++
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct CompactDimensionTag {
++    pub(crate) span: CompactSpan,
++    pub(crate) empty: bool,
++    pub(crate) declared: Rect,
++}
++
++/// Immutable, source-bound facts sufficient for an existing-row scalar
++/// replacement. The identity fields are checked again at commit time before
++/// any offset is used.
++#[derive(Debug, Clone)]
++pub(crate) struct CompactLayout {
++    pub(crate) source_ptr: usize,
++    pub(crate) source_len: usize,
++    /// Identity of the parser-owned Store entry slice used to publish the
++    /// proof. The compact writer never dereferences this pointer; it checks
++    /// the caller supplied slice before using any source offsets.
++    pub(crate) entries_ptr: usize,
++    pub(crate) entries_len: usize,
++    /// Number of source cell events represented by the compact rows. The
++    /// source parser checks this against its materialized Store before the
++    /// proof is published.
++    pub(crate) cell_count: u32,
++    pub(crate) sheet_data: CompactSheetData,
++    pub(crate) dimension: Option<CompactDimensionTag>,
++}
++
++impl CompactLayout {
++    pub(crate) fn matches_source(&self, source: &[u8]) -> bool {
++        self.source_ptr == source.as_ptr() as usize && self.source_len == source.len()
++    }
++
++    pub(crate) fn matches_entries(&self, entries: &[crate::cell::Stored]) -> bool {
++        self.entries_ptr == entries.as_ptr() as usize && self.entries_len == entries.len()
++    }
++}
++
+ #[derive(Debug)]
+ pub(crate) struct RootEffect {
+     pub(crate) removed: Option<Box<str>>,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
+index 3966bb648..d1b04a990 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
+@@ -6,4 +6,7 @@ mod sheet_data;
+ 
+ pub(crate) use columns::{write_columns, write_new_columns};
+ pub(crate) use root::{write_defaults, write_new_defaults, write_root};
+-pub(crate) use sheet_data::{write_sheet_data, write_sheet_data_with_provenance};
++pub(crate) use sheet_data::{
++    write_compact_dimension, write_sheet_data, write_sheet_data_with_compact_provenance,
++    write_sheet_data_with_provenance,
++};
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+index c50324062..4c8896813 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -4,15 +4,20 @@ use std::collections::BTreeMap;
+ 
+ use litchi_core::xml::escape_xml;
+ use litchi_sheet::{Cell as Address, Row};
++use quick_xml::events::Event;
++use quick_xml::reader::NsReader;
+ 
+ use super::super::super::wire::{
+-    sibling_name, write_attribute, write_cell_tag, write_close, write_tag,
++    cell_tag, sibling_name, tag, write_attribute, write_cell_tag, write_close, write_tag,
+ };
+-use super::super::model::{CellSlot, RowSlot, SheetData, Span, Tag};
+-use crate::cell::{Content, Value};
++use super::super::model::{
++    CellSlot, CompactCellSlot, CompactRowSlot, CompactSheetData, RowSlot, SheetData, Span, Tag,
++};
++use crate::cell::{Content, Stored, Value};
+ use crate::error::{Result, invalid};
+ use crate::outline::Outline;
+ use crate::raw::strings::encode_spreadsheet_text;
++use crate::raw::worksheet::edit::CompactDimensionTag;
+ use crate::raw::worksheet::edit::OmittedCells;
+ use crate::raw::worksheet::edit::model::{
+     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
+@@ -186,6 +191,385 @@ pub(crate) fn write_sheet_data_with_provenance(
+     })
+ }
+ 
++/// Rewrite an existing-row scalar plan from a compact source proof.
++///
++/// The proof route intentionally accepts only updates to existing cells. Any
++/// membership, row, formula, or empty-sheet effect remains on the complete
++/// scanner/writer path. Unchanged cell bytes are copied directly and only the
++/// changed cell tag is materialized.
++pub(crate) fn write_sheet_data_with_compact_provenance(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    data: &CompactSheetData,
++    entries: &[Stored],
++    cells: BTreeMap<Address, Action>,
++) -> Result<Box<[OmittedCells]>> {
++    let data_start = data.span.start();
++    let data_end = data.span.end();
++    let data_tag_end = data.tag_end as usize;
++    let data_close_start = data.close_start as usize;
++    if data.empty || cells.is_empty() {
++        output.extend_from_slice(&source[data_start..data_end]);
++        return Ok(Box::new([]));
++    }
++
++    let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
++    for (address, action) in cells {
++        let number = address
++            .row()
++            .get()
++            .checked_add(1)
++            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
++        by_row.entry(number).or_default().insert(address, action);
++    }
++    let mut omitted = Vec::new();
++    let mut recording = omitted.try_reserve_exact(data.rows.len()).is_ok();
++    if !recording {
++        omitted.clear();
++    }
++    output.extend_from_slice(&source[data_start..data_tag_end]);
++    let mut cursor = data_tag_end;
++    let mut entry_index = 0usize;
++    for row in &data.rows {
++        let row_start = row.span.start();
++        let row_end = row.span.end();
++        let row_tag_end = row.tag_end as usize;
++        let row_close_start = row.close_start as usize;
++        output.extend_from_slice(&source[cursor..row_start]);
++        if let Some(edits) = by_row.remove(&row.number) {
++            write_compact_replacement_row(
++                output,
++                source,
++                row,
++                entries,
++                &mut entry_index,
++                edits,
++                &mut omitted,
++                &mut recording,
++            )?;
++        } else {
++            let (first, last) = compact_row_addresses(entries, &mut entry_index, row)?;
++            output.extend_from_slice(&source[row_start..row_tag_end]);
++            let body_start = output.len();
++            output.extend_from_slice(&source[row_tag_end..row_close_start]);
++            let body_end = output.len();
++            if let (Some(first), Some(last)) = (first, last) {
++                record_omitted(
++                    &mut omitted,
++                    &mut recording,
++                    first,
++                    last,
++                    body_start,
++                    body_end,
++                )?;
++            }
++            output.extend_from_slice(&source[row_close_start..row_end]);
++        }
++        cursor = row_end;
++    }
++    if !by_row.is_empty() {
++        return Err(invalid("compact worksheet proof lost an edited row"));
++    }
++    if entry_index != entries.len() {
++        return Err(invalid("compact worksheet proof lost a source cell"));
++    }
++    output.extend_from_slice(&source[cursor..data_close_start]);
++    output.extend_from_slice(&source[data_close_start..data_end]);
++    Ok(if recording {
++        omitted.into_boxed_slice()
++    } else {
++        Box::new([])
++    })
++}
++
++pub(crate) fn write_compact_dimension(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    dimension: &CompactDimensionTag,
++    range: litchi_sheet::Rect,
++) -> Result<()> {
++    let start = dimension.span.start();
++    let end = dimension.span.end();
++    if start > end || end > source.len() {
++        return Err(invalid(
++            "compact worksheet dimension span is outside its source",
++        ));
++    }
++    let mut reader = NsReader::from_reader(&source[start..end]);
++    let event = reader
++        .read_event()
++        .map_err(|error| invalid(error.to_string()))?;
++    let (element, empty) = match event {
++        Event::Start(element) => (element, false),
++        Event::Empty(element) => (element, true),
++        _ => return Err(invalid("compact worksheet dimension has no opening tag")),
++    };
++    if empty != dimension.empty {
++        return Err(invalid(
++            "compact worksheet dimension form changed under its proof",
++        ));
++    }
++    let captured = tag(&element, reader.decoder())?;
++    write_tag(output, &captured, empty, &["ref"], &[("ref", range.a1())]);
++    Ok(())
++}
++
++fn write_compact_replacement_row(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    row: &CompactRowSlot,
++    entries: &[Stored],
++    entry_index: &mut usize,
++    edits: BTreeMap<Address, Action>,
++    omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
++) -> Result<()> {
++    if row.empty {
++        return Err(invalid("compact worksheet proof selected an empty row"));
++    }
++    let row_start = row.span.start();
++    let row_end = row.span.end();
++    let row_tag_end = row.tag_end as usize;
++    let row_close_start = row.close_start as usize;
++    output.extend_from_slice(&source[row_start..row_tag_end]);
++    let mut cursor = row_tag_end;
++    let mut pending = edits.into_iter().peekable();
++    let mut run = None::<(usize, Address, Address)>;
++    for cell in &row.cells {
++        let cell_start_offset = cell.span.start();
++        let cell_end_offset = cell.span.end();
++        let address = compact_next_address(entries, entry_index, row.number)?;
++        output.extend_from_slice(&source[cursor..cell_start_offset]);
++        let cell_start = output.len();
++        while pending
++            .peek()
++            .is_some_and(|(pending, _)| *pending < address)
++        {
++            return Err(invalid("compact worksheet proof lost an edited cell"));
++        }
++        if pending
++            .peek()
++            .is_some_and(|(pending, _)| *pending == address)
++        {
++            let (_, action) = pending
++                .next()
++                .ok_or_else(|| invalid("compact worksheet edit ordering was lost"))?;
++            if let Some((start, first, last)) = run.take() {
++                record_omitted(omitted, recording, first, last, start, cell_start)?;
++            }
++            if matches!(
++                action,
++                Action::Remove
++                    | Action::Update {
++                        payload: Some(Payload::SharedFormula { .. }),
++                        ..
++                    }
++            ) {
++                return Err(invalid(
++                    "compact worksheet proof does not support membership edits",
++                ));
++            }
++            write_compact_cell(output, source, address, cell, &action)?;
++        } else {
++            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
++            let first = run.map(|(_, first, _)| first).unwrap_or(address);
++            run = Some((start, first, address));
++            output.extend_from_slice(&source[cell_start_offset..cell_end_offset]);
++        }
++        cursor = cell_end_offset;
++    }
++    if pending.next().is_some() {
++        return Err(invalid("compact worksheet proof lost an edited cell"));
++    }
++    output.extend_from_slice(&source[cursor..row_close_start]);
++    if let Some((start, first, last)) = run {
++        record_omitted(omitted, recording, first, last, start, output.len())?;
++    }
++    output.extend_from_slice(&source[row_close_start..row_end]);
++    Ok(())
++}
++
++fn compact_next_address(
++    entries: &[Stored],
++    entry_index: &mut usize,
++    row_number: u32,
++) -> Result<Address> {
++    let entry = entries
++        .get(*entry_index)
++        .ok_or_else(|| invalid("compact worksheet proof lost a source cell"))?;
++    if entry.address.row().get().checked_add(1) != Some(row_number) {
++        return Err(invalid(
++            "compact worksheet proof source row ordering changed",
++        ));
++    }
++    *entry_index = (*entry_index)
++        .checked_add(1)
++        .ok_or_else(|| invalid("compact worksheet proof source cell count overflow"))?;
++    Ok(entry.address)
++}
++
++fn compact_row_addresses(
++    entries: &[Stored],
++    entry_index: &mut usize,
++    row: &CompactRowSlot,
++) -> Result<(Option<Address>, Option<Address>)> {
++    let mut first = None;
++    let mut last = None;
++    for _cell in &row.cells {
++        let address = compact_next_address(entries, entry_index, row.number)?;
++        first.get_or_insert(address);
++        last = Some(address);
++    }
++    Ok((first, last))
++}
++
++fn compact_absolute_offset(base: usize, offset: usize) -> Result<usize> {
++    base.checked_add(offset)
++        .ok_or_else(|| invalid("compact worksheet cell offset overflows usize"))
++}
++
++fn write_compact_cell(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    address: Address,
++    compact: &CompactCellSlot,
++    action: &Action,
++) -> Result<()> {
++    let start = compact.span.start();
++    let end = compact.span.end();
++    if start > end || end > source.len() {
++        return Err(invalid("compact worksheet cell span is outside its source"));
++    }
++    let slot = compact_cell_slot(source, address, start, end)?;
++    write_cell(output, source, &slot, action)
++}
++
++fn compact_cell_slot(
++    source: &[u8],
++    address: Address,
++    start: usize,
++    end: usize,
++) -> Result<CellSlot> {
++    let mut reader = NsReader::from_reader(&source[start..end]);
++    reader.config_mut().check_end_names = true;
++    let opening = reader
++        .read_event()
++        .map_err(|error| invalid(error.to_string()))?;
++    let (tag, empty) = match opening {
++        Event::Start(element) => (cell_tag(&element, reader.decoder())?, false),
++        Event::Empty(element) => (cell_tag(&element, reader.decoder())?, true),
++        _ => return Err(invalid("compact worksheet cell has no opening tag")),
++    };
++    let mut primary = None::<Span>;
++    let mut depth = 1usize;
++    let tag_end = compact_absolute_offset(
++        start,
++        usize::try_from(reader.buffer_position())
++            .map_err(|_| invalid("compact worksheet cell offset exceeds usize"))?,
++    )?;
++    if empty {
++        return Ok(CellSlot {
++            address,
++            span: Span { start, end },
++            tag_end,
++            close_start: tag_end,
++            tag,
++            primary: Box::new([]),
++            mce_payload: false,
++            empty: true,
++        });
++    }
++    let mut close_start = tag_end;
++    loop {
++        let event_start = compact_absolute_offset(
++            start,
++            usize::try_from(reader.buffer_position())
++                .map_err(|_| invalid("compact worksheet cell offset exceeds usize"))?,
++        )?;
++        let event = reader
++            .read_event()
++            .map_err(|error| invalid(error.to_string()))?;
++        let event_end = compact_absolute_offset(
++            start,
++            usize::try_from(reader.buffer_position())
++                .map_err(|_| invalid("compact worksheet cell offset exceeds usize"))?,
++        )?;
++        match event {
++            Event::Start(element) => {
++                let direct_primary = depth == 1
++                    && matches!(element.name().local_name().as_ref(), b"f" | b"v" | b"is");
++                if direct_primary {
++                    if primary.is_some() {
++                        return Err(invalid("compact worksheet cell has duplicate primary"));
++                    }
++                    primary = Some(Span {
++                        start: event_start,
++                        end: event_end,
++                    });
++                }
++                depth = depth
++                    .checked_add(1)
++                    .ok_or_else(|| invalid("compact worksheet cell depth overflow"))?;
++            },
++            Event::Empty(element) if depth == 1 => {
++                if matches!(element.name().local_name().as_ref(), b"f" | b"v" | b"is") {
++                    if primary.is_some() {
++                        return Err(invalid("compact worksheet cell has duplicate primary"));
++                    }
++                    primary = Some(Span {
++                        start: event_start,
++                        end: event_end,
++                    });
++                }
++            },
++            Event::End(element) => {
++                let previous = depth;
++                depth = depth
++                    .checked_sub(1)
++                    .ok_or_else(|| invalid("compact worksheet cell has unmatched close"))?;
++                if previous == 2 && matches!(element.local_name().as_ref(), b"f" | b"v" | b"is") {
++                    let Some(primary) = primary.as_mut() else {
++                        return Err(invalid("compact worksheet cell primary close is unmatched"));
++                    };
++                    primary.end = event_end;
++                }
++                if previous == 1 {
++                    if element.local_name().as_ref() != b"c" || depth != 0 {
++                        return Err(invalid("compact worksheet cell close is invalid"));
++                    }
++                    close_start = event_start;
++                    break;
++                }
++            },
++            Event::Eof => {
++                return Err(invalid("compact worksheet cell has no closing tag"));
++            },
++            Event::Text(_)
++            | Event::CData(_)
++            | Event::GeneralRef(_)
++            | Event::Comment(_)
++            | Event::Decl(_)
++            | Event::PI(_)
++            | Event::DocType(_) => {},
++        }
++    }
++    let primary: Box<[Span]> = match primary {
++        Some(span) => vec![span].into_boxed_slice(),
++        None => Box::new([]),
++    };
++    let slot = CellSlot {
++        address,
++        span: Span { start, end },
++        tag_end,
++        close_start,
++        tag,
++        primary,
++        mce_payload: false,
++        empty,
++    };
++    Ok(slot)
++}
++
+ fn write_replacement_row(
+     output: &mut Vec<u8>,
+     source: &[u8],
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+index 404f6d5ed..1f51b6384 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+@@ -11,6 +11,10 @@ mod validation;
+ #[cfg(test)]
+ mod tests;
+ 
++pub(crate) use codec::{
++    CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
++    CompactSpan,
++};
+ #[allow(
+     unused_imports,
+     reason = "the raw edit facade retains the complete crate-visible effect vocabulary"
+@@ -21,5 +25,5 @@ pub(crate) use model::{
+ };
+ pub(crate) use package::{
+     OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
+-    rewrite_value_only_with_provenance,
++    rewrite_value_only_with_compact_proof, rewrite_value_only_with_provenance,
+ };
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/model.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/model.rs
+index ca104faa0..64c7703c4 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/model.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/model.rs
+@@ -12,7 +12,7 @@ use crate::layout::{self, Descent};
+ use crate::outline::Outline;
+ use crate::row::Height;
+ 
+-#[derive(Debug, PartialEq, Eq)]
++#[derive(Debug, Clone, PartialEq, Eq)]
+ pub(crate) enum Payload {
+     Set(Content),
+     /// Reuse one exact workbook shared-string item, retaining rich runs.
+@@ -43,7 +43,7 @@ pub(crate) enum StyleEffect {
+ ///
+ /// `Remove` owns the whole record. An `Update` may independently change its
+ /// payload and local style, allowing proven-disjoint effects to be joined.
+-#[derive(Debug, PartialEq, Eq)]
++#[derive(Debug, Clone, PartialEq, Eq)]
+ pub(crate) enum Action {
+     Update {
+         payload: Option<Payload>,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+index 3ec1f282e..624e9c389 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -5,22 +5,24 @@ use std::collections::BTreeMap;
+ use litchi_sheet::{Cell as Address, Rect};
+ 
+ use super::codec::{
+-    ExtensionNames, Layout, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close,
+-    write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+-    write_sheet_data, write_sheet_data_with_provenance, write_tag,
++    CompactLayout, ExtensionNames, Layout, MergeCellsSlot, Span, Tag, scan, sibling_name,
++    write_close, write_columns, write_compact_dimension, write_defaults, write_new_columns,
++    write_new_defaults, write_root, write_sheet_data, write_sheet_data_with_compact_provenance,
++    write_sheet_data_with_provenance, write_tag,
+ };
+ use super::model::{MergePlan, Payload, Plan};
+ use super::validation::{
+     expanded_dimension, plan_sets_descent, validate_actions, validate_column_actions,
+     validate_defaults_action, validate_row_actions,
+ };
++use crate::cell::Stored;
+ use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
+ use crate::merge;
+ 
+ /// One contiguous range of cell records omitted from the independent
+ /// readback representation. The offsets always refer to the actual complete
+ /// rewritten output, not to a reduced buffer.
+-#[derive(Debug, Clone, Copy)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub(crate) struct OmittedCells {
+     pub(crate) row: u32,
+     pub(crate) first_column: u32,
+@@ -164,6 +166,193 @@ pub(crate) fn rewrite_value_only_with_provenance<'a>(
+     content: &'a [u8],
+     sheet: &str,
+     cells: BTreeMap<Address, super::model::Action>,
++) -> Result<ValueOnlyRewrite<'a>> {
++    rewrite_value_only_with_complete_provenance(content, sheet, cells)
++}
++
++/// Try the compact source proof before falling back to the complete scanner.
++/// The compact route is intentionally restricted to existing-cell scalar
++/// updates; every refusal is silent and leaves the established implementation
++/// responsible for validation, diagnostics, and output.
++pub(crate) fn rewrite_value_only_with_compact_proof<'a>(
++    content: &'a [u8],
++    sheet: &str,
++    cells: BTreeMap<Address, super::model::Action>,
++    proof: Option<&CompactLayout>,
++    entries: &[Stored],
++) -> Result<ValueOnlyRewrite<'a>> {
++    if let Some(proof) = proof
++        && proof.matches_source(content)
++        && proof.matches_entries(entries)
++        && compact_layout_offsets_valid(content, proof)
++        && compact_plan_eligible(proof, entries, &cells)
++        && let Some(rewrite) = try_compact_rewrite(content, proof, entries, cells.clone())
++    {
++        return Ok(rewrite);
++    }
++    rewrite_value_only_with_complete_provenance(content, sheet, cells)
++}
++
++fn compact_layout_offsets_valid(content: &[u8], proof: &CompactLayout) -> bool {
++    fn valid_span(content_len: usize, span: super::codec::CompactSpan) -> bool {
++        span.start() <= span.end() && span.end() <= content_len
++    }
++
++    let content_len = content.len();
++    let data = &proof.sheet_data;
++    if !valid_span(content_len, data.span)
++        || data.span.start() > data.tag_end as usize
++        || data.tag_end as usize > data.close_start as usize
++        || data.close_start as usize > data.span.end()
++    {
++        return false;
++    }
++    if data.empty {
++        return data.rows.is_empty() && data.tag_end == data.close_start;
++    }
++    let mut previous_row_end = data.tag_end as usize;
++    for row in &data.rows {
++        if !valid_span(content_len, row.span)
++            || row.span.start() < previous_row_end
++            || row.span.start() > row.tag_end as usize
++            || row.tag_end as usize > row.close_start as usize
++            || row.close_start as usize > row.span.end()
++            || row.span.end() > data.close_start as usize
++        {
++            return false;
++        }
++        let mut previous_cell_end = row.tag_end as usize;
++        for cell in &row.cells {
++            if !valid_span(content_len, cell.span)
++                || cell.span.start() < previous_cell_end
++                || cell.span.end() > row.close_start as usize
++            {
++                return false;
++            }
++            previous_cell_end = cell.span.end();
++        }
++        previous_row_end = row.span.end();
++    }
++    if let Some(dimension) = proof.dimension
++        && (!valid_span(content_len, dimension.span) || dimension.span.end() > data.span.start())
++    {
++        return false;
++    }
++    true
++}
++
++fn compact_plan_eligible(
++    proof: &CompactLayout,
++    entries: &[Stored],
++    cells: &BTreeMap<Address, super::model::Action>,
++) -> bool {
++    if cells.is_empty() || usize::try_from(proof.cell_count).ok() != Some(entries.len()) {
++        return false;
++    }
++    let mut entry_index = 0usize;
++    let mut matched = 0usize;
++    let mut previous_row = None;
++    for row in &proof.sheet_data.rows {
++        if previous_row.is_some_and(|previous| row.number <= previous) {
++            return false;
++        }
++        previous_row = Some(row.number);
++        let mut previous_column = None;
++        for _slot in &row.cells {
++            let Some(entry) = entries.get(entry_index) else {
++                return false;
++            };
++            if entry.address.row().get().checked_add(1) != Some(row.number)
++                || previous_column.is_some_and(|previous| entry.address.column().get() <= previous)
++            {
++                return false;
++            }
++            previous_column = Some(entry.address.column().get());
++            if let Some(action) = cells.get(&entry.address) {
++                if matches!(
++                    action,
++                    super::model::Action::Remove
++                        | super::model::Action::Update {
++                            payload: Some(Payload::SharedFormula { .. }),
++                            ..
++                        }
++                ) {
++                    return false;
++                }
++                let Some(next) = matched.checked_add(1) else {
++                    return false;
++                };
++                matched = next;
++            }
++            let Some(next) = entry_index.checked_add(1) else {
++                return false;
++            };
++            entry_index = next;
++        }
++    }
++    entry_index == entries.len() && matched == cells.len()
++}
++
++fn compact_dimension(
++    proof: &CompactLayout,
++    entries: &[Stored],
++    cells: &BTreeMap<Address, super::model::Action>,
++) -> Option<(super::codec::CompactDimensionTag, Rect)> {
++    let dimension = proof.dimension?;
++    let mut bounds = None::<Rect>;
++    for entry in entries {
++        if !matches!(
++            cells.get(&entry.address),
++            Some(super::model::Action::Remove)
++        ) {
++            let cell = Rect::single(entry.address);
++            bounds = Some(bounds.map_or(cell, |range| range.union(cell)));
++        }
++    }
++    for (address, action) in cells {
++        if action.creates_missing() {
++            let cell = Rect::single(*address);
++            bounds = Some(bounds.map_or(cell, |range| range.union(cell)));
++        }
++    }
++    let expanded = dimension.declared.union(bounds?);
++    (expanded != dimension.declared).then_some((dimension, expanded))
++}
++
++fn try_compact_rewrite<'a>(
++    content: &'a [u8],
++    proof: &CompactLayout,
++    entries: &[Stored],
++    cells: BTreeMap<Address, super::model::Action>,
++) -> Option<ValueOnlyRewrite<'a>> {
++    let dimension = compact_dimension(proof, entries, &cells);
++    let effects = cells.len();
++    let extra = effects.checked_mul(128)?.checked_add(content.len())?;
++    let mut output = Vec::new();
++    output.try_reserve(extra).ok()?;
++    let mut cursor = 0usize;
++    if let Some((dimension, range)) = dimension {
++        output.extend_from_slice(&content[cursor..dimension.span.start()]);
++        write_compact_dimension(&mut output, content, &dimension, range).ok()?;
++        cursor = dimension.span.end();
++    }
++    let data = &proof.sheet_data;
++    output.extend_from_slice(&content[cursor..data.span.start()]);
++    let omitted =
++        write_sheet_data_with_compact_provenance(&mut output, content, data, entries, cells)
++            .ok()?;
++    output.extend_from_slice(&content[data.span.end()..]);
++    Some(ValueOnlyRewrite {
++        source: content,
++        bytes: output,
++        omitted,
++    })
++}
++
++fn rewrite_value_only_with_complete_provenance<'a>(
++    content: &'a [u8],
++    sheet: &str,
++    cells: BTreeMap<Address, super::model::Action>,
+ ) -> Result<ValueOnlyRewrite<'a>> {
+     let plan = Plan::cells(cells);
+     if plan.is_empty() {
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+index 328bc9e14..f577f93cc 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -24,6 +24,7 @@ use crate::cell::{Store, Text};
+ use crate::error::{Result, invalid};
+ use crate::layout::Defaults;
+ use litchi_ooxml_common::mce::{self, process_ooxml};
++use quick_xml::encoding::Decoder;
+ use quick_xml::events::Event;
+ use quick_xml::name::ResolveResult;
+ 
+@@ -54,6 +55,47 @@ pub(crate) enum SourceParseAttempt {
+     ReaderFailed,
+ }
+ 
++/// Byte positions for one event in the original, byte-identical worksheet.
++/// The optional proof observer receives these positions before the ordinary
++/// parser advances to its next event.
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct SourceEventSpan {
++    pub(crate) start: usize,
++    pub(crate) end: usize,
++    pub(crate) decoder: Decoder,
++}
++
++/// A resolved address handoff emitted after the ordinary parser accepts an
++/// event. Inferred addresses consequently come from the parser's checked
++/// state rather than from a second address decoder.
++#[derive(Debug, Clone, Copy)]
++pub(crate) enum SourceHandoff {
++    CellStart {
++        address: litchi_sheet::Cell,
++        span: SourceEventSpan,
++    },
++    CellEmpty {
++        address: litchi_sheet::Cell,
++        span: SourceEventSpan,
++    },
++    CellEnd {
++        address: litchi_sheet::Cell,
++        span: SourceEventSpan,
++    },
++    RowStart {
++        number: u32,
++        span: SourceEventSpan,
++    },
++    RowEmpty {
++        number: u32,
++        span: SourceEventSpan,
++    },
++    RowEnd {
++        number: u32,
++        span: SourceEventSpan,
++    },
++}
++
+ /// Admit only byte-identical, UTF-8, no-MCE/no-x14ac worksheets to the shared
+ /// reader. The original source bytes remain owned by `SourcePayload`; this
+ /// predicate only decides whether a temporary borrowed traversal is safe.
+@@ -151,11 +193,35 @@ pub(crate) fn parse_source_with_observer<'a, F, O>(
+ where
+     F: FnOnce() -> Result<Option<&'a [Text]>>,
+     O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
++{
++    codec::parse_source_with_observer(content, strings, observer)
++}
++
++/// Parse an eligible source with the ordinary parser and an optional
++/// position-aware proof observer.
++///
++/// The event observer remains at the historical pre-transition point and can
++/// request the established provisional fallback. The handoff runs only after
++/// a transition succeeds and is deliberately infallible: a proof
++/// implementation may disable itself, but it cannot alter parser errors or
++/// force a replay.
++pub(crate) fn parse_source_with_observer_and_handoff<'a, F, C, O, H>(
++    content: &[u8],
++    strings: F,
++    context: &mut C,
++    observer: O,
++    handoff: H,
++) -> SourceParseAttempt
++where
++    F: FnOnce() -> Result<Option<&'a [Text]>>,
++    C: ?Sized,
++    O: for<'event> FnMut(&mut C, &ResolveResult<'event>, &Event<'event>, SourceEventSpan) -> bool,
++    H: FnMut(&mut C, SourceHandoff),
+ {
+     if !shared_event_bound_within_cap(content) {
+         return SourceParseAttempt::ProvisionalFailed;
+     }
+-    codec::parse_source_with_observer(content, strings, observer)
++    codec::parse_source_with_observer_and_handoff(content, strings, context, observer, handoff)
+ }
+ 
+ /// Finish a source-backed raw parse while retaining the historical x14ac
+diff --git a/crates/litchi-xlsx/tests/source_backed_cell_values.rs b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+index b764469b0..eb4bb4c54 100644
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -20,6 +20,8 @@ use litchi_xlsx::cell_values::{
+ use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
+ use soapberry_zip::office::ArchiveReader;
+ 
++#[path = "source_backed_cell_values/compact_source_proof.rs"]
++mod compact_source_proof;
+ #[path = "source_backed_cell_values/planning_error_order.rs"]
+ mod planning_error_order;
+ #[path = "source_backed_cell_values/post_eof_raw_differential.rs"]

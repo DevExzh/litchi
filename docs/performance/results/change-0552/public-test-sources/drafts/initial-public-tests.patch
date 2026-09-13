@@ -1,0 +1,325 @@
+--- /dev/null
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values/compact_source_proof.rs
+@@ -0,0 +1,311 @@
++//! Public regression guards for the compact source-cell proof experiment.
++//!
++//! This module deliberately uses only the source-backed cell-values API.  It
++//! keeps the old scanner's planning/commit boundary observable while also
++//! exercising the XML forms whose lexical facts are easy for a compact proof
++//! to omit: allowed but undecoded attributes, namespace declarations, ordered
++//! rows/cells, empty owners, and prefixed scalar payloads.
++
++use super::*;
++
++const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
++const UNKNOWN_ENTITY_ATTRIBUTE_ERROR: &str = "at 1..8: unrecognized entity `missing`";
++
++fn worksheet(body: &str) -> String {
++    format!(r#"<worksheet xmlns="{SML}">{body}</worksheet>"#)
++}
++
++fn source_with_sheet1(sheet1: &str) -> Vec<u8> {
++    // The source-backed facade accepts this package boundary even when the
++    // worksheet deliberately contains an entity that the full edit scanner
++    // must reject.  PackageWriter validates XML eagerly, so use the same
++    // lower-level ZIP construction as the existing error-order tests.
++    let source = two_sheets();
++    let archive = ArchiveReader::new(&source).unwrap();
++    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
++    for member in archive.file_names() {
++        let bytes = if member == "xl/worksheets/sheet1.xml" {
++            sheet1.as_bytes().to_vec()
++        } else {
++            archive.read(member).unwrap()
++        };
++        writer.write_deflated(member, &bytes).unwrap();
++    }
++    writer.finish_to_bytes().unwrap()
++}
++
++fn assert_invalid_exact(error: Error, expected: &str, label: &str) {
++    match error {
++        Error::Invalid(actual) => assert_eq!(actual, expected, "{label}"),
++        actual => panic!("{label}: expected Error::Invalid({expected:?}), got {actual:?}"),
++    }
++}
++
++#[test]
++fn compact_public_guard_preserves_late_unused_attribute_decode_errors() {
++    let cases = [
++        (
++            "allowed row spans",
++            worksheet(
++                r#"<sheetData><row r="1" spans="&missing;"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
++            ),
++        ),
++        (
++            "row namespace declaration",
++            worksheet(
++                r#"<sheetData><row r="1" xmlns:q="&missing;"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
++            ),
++        ),
++        (
++            "cell namespace declaration",
++            worksheet(
++                r#"<sheetData><row r="1"><c r="A1" xmlns:q="&missing;"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
++            ),
++        ),
++    ];
++
++    for (label, sheet1) in cases {
++        let bytes = source_with_sheet1(&sheet1);
++        let source = Arc::new(VersionedSource::new(bytes.clone()));
++        let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
++
++        // The validator and ordinary semantic parser intentionally leave
++        // these allowed/namespace attributes undecoded.  The commit-time
++        // layout scan must still decode them before replacing another cell.
++        for attempt in 0..2 {
++            let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
++            edit.set("Sheet1", address("B1"), 9u32).unwrap();
++            let error = match edit.commit() {
++                Ok(_) => panic!("{label}: malformed attribute unexpectedly committed"),
++                Err(error) => error,
++            };
++            assert_invalid_exact(error, UNKNOWN_ENTITY_ATTRIBUTE_ERROR, label);
++            assert_eq!(
++                source.bytes.as_slice(),
++                bytes.as_slice(),
++                "{label}: source changed after attempt {attempt}"
++            );
++        }
++
++        // A failed selected owner must not poison a later owner transaction.
++        let unaffected = editor
++            .edit_sheets(["Sheet2".into()])
++            .unwrap()
++            .commit()
++            .unwrap();
++        assert!(!unaffected.changed(), "{label}: unaffected sheet changed");
++        assert_eq!(
++            unaffected.snapshot().value(0, address("A1")),
++            Some(&Value::Number(Number::new("20").unwrap())),
++            "{label}: unaffected value"
++        );
++    }
++}
++
++#[test]
++fn compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit() {
++    let row_order = worksheet(
++        r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
++    );
++    let row_bytes = fixture(row_order, false);
++    let row_source = Arc::new(VersionedSource::new(row_bytes.clone()));
++    let row_editor = SourceBackedEditor::from_read_at(row_source.clone()).unwrap();
++    let row_error = match row_editor.edit_sheets(["Sheet1".into()]) {
++        Ok(_) => panic!("out-of-order rows unexpectedly entered planning"),
++        Err(error) => error,
++    };
++    assert_invalid_exact(
++        row_error,
++        "worksheet row 1 appears after row 2",
++        "row order remains a planning error",
++    );
++    assert_eq!(row_source.bytes.as_slice(), row_bytes.as_slice());
++
++    let cell_order = worksheet(
++        r#"<sheetData><row r="1"><c r="B1"><v>2</v></c><c r="A1"><v>1</v></c></row></sheetData>"#,
++    );
++    let cell_bytes = fixture(cell_order, false);
++    let cell_source = Arc::new(VersionedSource::new(cell_bytes.clone()));
++    let cell_editor = SourceBackedEditor::from_read_at(cell_source.clone()).unwrap();
++
++    // The ordinary source parser sorts semantic entries, so the public
++    // snapshot opens.  The edit scanner owns lexical cell ordering and must
++    // report its exact historical error only when a rewrite is requested.
++    for attempt in 0..2 {
++        let mut edit = cell_editor.edit_sheets(["Sheet1".into()]).unwrap();
++        edit.set("Sheet1", address("A1"), 9u32).unwrap();
++        let error = match edit.commit() {
++            Ok(_) => panic!("out-of-order cells unexpectedly committed"),
++            Err(error) => error,
++        };
++        assert_invalid_exact(
++            error,
++            "cell edits require strictly increasing cell references within each row",
++            "cell order remains a commit error",
++        );
++        assert_eq!(
++            cell_source.bytes.as_slice(),
++            cell_bytes.as_slice(),
++            "cell source changed after attempt {attempt}"
++        );
++    }
++}
++
++#[test]
++fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
++    let bytes = fixture(worksheet(r#"<sheetData/>"#), false);
++
++    // An empty transaction remains a source-sharing no-op at the public
++    // multi-sheet boundary and publishes the original ZIP byte-for-byte.
++    let noop_editor =
++        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
++    let noop = noop_editor
++        .edit_sheets(["Sheet1".into()])
++        .unwrap()
++        .commit()
++        .unwrap();
++    assert!(!noop.changed());
++    assert!(noop.patch().is_empty());
++    let mut noop_output = Vec::new();
++    noop_editor
++        .publish_multi_commit_to_stream(&mut noop_output, &noop)
++        .unwrap();
++    assert_eq!(noop_output, bytes);
++
++    // Inserting into empty sheetData exercises the new-row/empty-form path.
++    // Keep a cloned immutable snapshot alive while the original patch is
++    // applied and inverted, then reopen the published result for a second
++    // independent edit.
++    let editor =
++        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
++    let mut insert = editor.edit_sheets(["Sheet1".into()]).unwrap();
++    insert
++        .insert("Sheet1", address("A1"), Number::new("7").unwrap())
++        .unwrap();
++    let commit = insert.commit().unwrap();
++    assert!(commit.changed());
++    assert_eq!(
++        commit.snapshot().value(0, address("A1")),
++        Some(&Value::Number(Number::new("7").unwrap()))
++    );
++    let cloned_snapshot = commit.snapshot().clone();
++    assert_eq!(
++        cloned_snapshot.value(0, address("A1")),
++        Some(&Value::Number(Number::new("7").unwrap()))
++    );
++
++    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
++    commit.patch().apply(&mut replay).unwrap();
++    assert_eq!(
++        litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1")
++            .unwrap()
++            .value(address("A1")),
++        Some(&Value::Number(Number::new("7").unwrap()))
++    );
++    commit.patch().inverse().apply(&mut replay).unwrap();
++    assert!(
++        !litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1")
++            .unwrap()
++            .contains_cell(address("A1"))
++    );
++
++    let mut published_bytes = Vec::new();
++    editor
++        .publish_multi_commit_to_stream(&mut published_bytes, &commit)
++        .unwrap();
++    let reopened = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(
++        published_bytes,
++    )))
++    .unwrap();
++    let mut reedit = reopened.edit_sheets(["Sheet1".into()]).unwrap();
++    reedit.set("Sheet1", address("A1"), 9u32).unwrap();
++    let recommit = reedit.commit().unwrap();
++    assert_eq!(
++        recommit.snapshot().value(0, address("A1")),
++        Some(&Value::Number(Number::new("9").unwrap()))
++    );
++}
++
++#[test]
++fn compact_public_guard_preserves_empty_rows_and_cells() {
++    let sheet = worksheet(
++        r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"/></row><row r="2"/><row><c/><c r="C3"><v>3</v></c></row></sheetData>"#,
++    );
++    let bytes = fixture(sheet, false);
++    let editor =
++        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
++    let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
++    edit.set("Sheet1", address("C3"), 4u32).unwrap();
++    let commit = edit.commit().unwrap();
++
++    assert!(commit.snapshot().contains_cell(0, address("B1")));
++    assert!(commit.snapshot().contains_cell(0, address("A3")));
++    assert_eq!(commit.snapshot().value(0, address("A3")), None);
++    assert_eq!(
++        commit.snapshot().value(0, address("C3")),
++        Some(&Value::Number(Number::new("4").unwrap()))
++    );
++
++    let mut output = Vec::new();
++    editor
++        .publish_multi_commit_to_stream(&mut output, &commit)
++        .unwrap();
++    let xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
++    assert!(xml.contains(r#"<row r="2"/>"#));
++    assert!(xml.contains(r#"<c r="B1"/>"#));
++    assert!(xml.contains(r#"<c/>"#));
++    assert!(xml.contains(r#"<c r="C3"><v>4</v></c>"#));
++}
++
++#[test]
++fn compact_public_guard_preserves_typed_prefixed_scalar_forms() {
++    let strict_prefixed = format!(
++        r#"<?worksheet-test?><x:worksheet xmlns:x="{STRICT_SML}"><x:sheetData><x:row r="1"><x:c r="A1" t="b"><x:v>1</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
++    );
++    let rebound = format!(
++        r#"<s:worksheet xmlns:s="{SML}" xmlns:f="urn:fixture:foreign"><s:sheetData><s:row r="1"><f:c xmlns:f="{SML}" r="A1" t="b"><s:v>1</s:v></f:c></s:row></s:sheetData></s:worksheet>"#
++    );
++    let cases = vec![
++        (
++            "transitional typed scalar",
++            worksheet(r#"<sheetData><row r="1"><c r="A1" t="b"><v>1</v></c></row></sheetData>"#),
++            "worksheet",
++            "c",
++            "v",
++        ),
++        ("strict prefixed typed scalar", strict_prefixed, "x:worksheet", "x:c", "x:v"),
++        ("transitional rebound typed scalar", rebound, "s:worksheet", "f:c", "f:v"),
++    ];
++
++    for (label, sheet, root, cell, value) in cases {
++        let bytes = fixture(sheet, false);
++        let editor =
++            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
++        let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
++        edit.set("Sheet1", address("A1"), false).unwrap();
++        let commit = edit.commit().unwrap();
++        assert_eq!(
++            commit.snapshot().value(0, address("A1")),
++            Some(&Value::Bool(false)),
++            "{label}: typed semantic value"
++        );
++
++        let mut output = Vec::new();
++        editor
++            .publish_multi_commit_to_stream(&mut output, &commit)
++            .unwrap();
++        let xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
++        assert!(xml.contains(&format!("<{root}")), "{label}: root name");
++        assert!(xml.contains(&format!("<{cell}")), "{label}: cell name");
++        assert!(
++            xml.contains(&format!("<{value}>0</{value}>")),
++            "{label}: boolean payload"
++        );
++        assert!(xml.contains(r#"t="b""#), "{label}: boolean type");
++
++        let package = OpcPackage::from_bytes(&output).unwrap();
++        let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&package, "Sheet1")
++            .unwrap();
++        assert_eq!(snapshot.value(address("A1")), Some(&Value::Bool(false)));
++    }
++}
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -24,6 +24,8 @@
+ mod planning_error_order;
+ #[path = "source_backed_cell_values/post_eof_raw_differential.rs"]
+ mod post_eof_raw_differential;
++#[path = "source_backed_cell_values/compact_source_proof.rs"]
++mod compact_source_proof;
+ 
+ const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+ const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";

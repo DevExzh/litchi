@@ -1,0 +1,15 @@
+
+running 10 tests
+test cell_values::source_proof::tests::compact_cap_refusal_drops_all_builder_scratch ... ok
+test cell_values::source_proof::tests::compact_dimension_variants_and_noop_match_complete_writer ... ok
+test cell_values::source_proof::tests::compact_populated_cap_refusal_drops_retained_stack ... ok
+test cell_values::source_proof::tests::compact_empty_styled_inferred_cdata_and_ordered_rows_match_complete_writer ... ok
+test cell_values::source_proof::tests::compact_prefixed_typed_cells_match_complete_writer ... ok
+test cell_values::source_proof::tests::compact_source_identity_mismatch_falls_back_without_byte_drift ... ok
+test cell_values::source_proof::tests::compact_store_identity_mismatch_falls_back_without_byte_drift ... ok
+test cell_values::source_proof::tests::compact_strict_prefixed_and_rebound_namespaces_match_complete_writer ... ok
+test cell_values::source_proof::tests::formula_source_declines_compact_proof_and_matches_fallback ... ok
+test cell_values::source_proof::tests::late_attribute_decode_refusal_preserves_complete_error ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 991 filtered out; finished in 0.00s
+

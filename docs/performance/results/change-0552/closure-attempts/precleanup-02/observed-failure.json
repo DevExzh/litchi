@@ -1,0 +1,17 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0552/verify.py",
+    "--component",
+    "precleanup",
+    "--strict",
+    "--output",
+    "/home/zhuhe/litchi-goal-0552-target/precleanup-02.json"
+  ],
+  "exit_code": 1,
+  "verifier_sha256": "fb8d1f68ce9f74367b744c0982115737ea1c243c7db02f9cab5507c4fc9e53f5",
+  "failure": "TypeError: Object of type datetime is not JSON serializable",
+  "location": "main json.dumps; result.receipt_inventory.check_attempts.rows[0].times[0]",
+  "scope": "Root observation of terminal tool output; no JSON output file was emitted."
+}

@@ -1,0 +1,86 @@
+{
+  "observed_utc": "2026-09-13T07:58:35.927667+00:00",
+  "compiler_processes": [
+    {
+      "pid": 2940904,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 2941007,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.56"
+    },
+    {
+      "pid": 2941057,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uppsala-0.9.0"
+    },
+    {
+      "pid": 2941402,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rayon-1.12.0"
+    },
+    {
+      "pid": 2941470,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-bigint-0.5.5"
+    },
+    {
+      "pid": 2941511,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zip-8.6.0"
+    },
+    {
+      "pid": 2941585,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/argon2-0.5.3"
+    },
+    {
+      "pid": 2941608,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/x509-cert-0.2.5"
+    },
+    {
+      "pid": 2941706,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sec1-0.7.3"
+    },
+    {
+      "pid": 2941707,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/pkcs1-0.7.5"
+    },
+    {
+      "pid": 2941718,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.11.3"
+    },
+    {
+      "pid": 2941719,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/universal-hash-0.6.1"
+    },
+    {
+      "pid": 2941720,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cipher-0.5.2"
+    },
+    {
+      "pid": 2941721,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aead-0.6.1"
+    },
+    {
+      "pid": 2941724,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229"
+    },
+    {
+      "pid": 2941734,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

@@ -1,0 +1,11 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -341,7 +341,7 @@
+         let address = compact_next_address(entries, entry_index, row.number)?;
+         output.extend_from_slice(&source[cursor..cell_start_offset]);
+         let cell_start = output.len();
+-        while pending
++        if pending
+             .peek()
+             .is_some_and(|(pending, _)| *pending < address)
+         {

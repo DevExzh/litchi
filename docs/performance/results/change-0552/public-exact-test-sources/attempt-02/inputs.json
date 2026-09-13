@@ -1,0 +1,9 @@
+{
+  "frozen_utc": "2026-09-13T07:28:58.625494+00:00",
+  "scope": "Fixture construction correction only; explicit expected worksheet bytes unchanged.",
+  "path": "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs",
+  "before_sha256": "18c3e9578a2017cf2d223506aee3c8a548937442efa01ad54b40d7d2d4d5319a",
+  "after_sha256": "352e820d60544365d91a9925d3133f3b169ef000a79b29dc8e54d6754fc7c5b2",
+  "patch_sha256": "8a49e790bfa5e8fa137cf33b883fba5ca967c14eb04199438f379a2aef131433",
+  "failed_check_receipt_sha256": "0d89a6490e4ac7d2ece164992b2327db97a38af50a57af0ef05b0dd291bf43ba"
+}

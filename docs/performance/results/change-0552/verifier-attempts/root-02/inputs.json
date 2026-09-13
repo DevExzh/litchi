@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:38:06.636059+00:00",
+  "reason": "Allow source-manifest reader to read explicit final restored source stage required by decision validation. Measured stage matrices remain baseline/candidate only.",
+  "before_sha256": "8cea7a0a3591a8f901901b324cbabf4cdea1ba19976bcce7663cfdac7cd3f233",
+  "after_sha256": "d52b90c76636637a0929c66c360893ccd9321fd5b1035212021f7b8a36a97d60",
+  "patch_sha256": "8e535a8d554387cea8ce0cd358b7957e300010d7040fb164408b2404a6c10661",
+  "failed_receipt_sha256": "b1721a2a838cfd4cbf00bea51e688da2ea12de8e85620853b18cb6a9455bfdfa"
+}

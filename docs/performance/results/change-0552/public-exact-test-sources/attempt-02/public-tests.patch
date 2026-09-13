@@ -1,0 +1,24 @@
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
+@@ -13,7 +13,20 @@
+   <row r="2" spans="1:3"><c r="A2"><v>2</v></c><!--keep-row-two--><c r="C2"><v>3</v></c></row>
+ </sheetData></worksheet>"#
+     );
+-    let bytes = fixture(source_xml, false);
++    // Preserve a noncompact external source; the authored-package writer
++    // deliberately requires compact XML and is not this test's input route.
++    let base = two_sheets();
++    let archive = ArchiveReader::new(&base).unwrap();
++    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
++    for member in archive.file_names() {
++        let content = if member == "xl/worksheets/sheet1.xml" {
++            source_xml.as_bytes().to_vec()
++        } else {
++            archive.read(member).unwrap()
++        };
++        writer.write_deflated(member, &content).unwrap();
++    }
++    let bytes = writer.finish_to_bytes().unwrap();
+     let source = Arc::new(VersionedSource::new(bytes.clone()));
+     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+ 

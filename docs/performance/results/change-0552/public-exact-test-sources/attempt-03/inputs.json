@@ -1,0 +1,9 @@
+{
+  "frozen_utc": "2026-09-13T07:33:58.240258+00:00",
+  "scope": "Baseline changed publication refuses FormattingWhitespace; keep accepted exact-byte oracle within compact element-spacing contract while preserving comment/quote/value-whitespace bytes. This changes the test fixture, not baseline behavior.",
+  "path": "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs",
+  "before_sha256": "352e820d60544365d91a9925d3133f3b169ef000a79b29dc8e54d6754fc7c5b2",
+  "after_sha256": "f2696dfc26bc4c90d68396355c6cc2e48c2fd36a1a2bb31301d16d910931f15f",
+  "patch_sha256": "9761d936c6fdf2ce390add7e39fda9428513f8304211ad788476e3ab2678d2e7",
+  "failed_check_receipt_sha256": "8f1612777e712799235c2efffe8b84cd2c5607c5fa5c6e81af5f2b36e77d0c9e"
+}

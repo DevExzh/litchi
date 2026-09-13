@@ -1,0 +1,578 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+    Checking typenum v1.20.1
+    Checking zeroize v1.9.0
+   Compiling syn v2.0.114
+    Checking hybrid-array v0.4.14
+    Checking cfg-if v1.0.4
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.189
+   Compiling synstructure v0.13.2
+    Checking cmov v0.5.4
+   Compiling crossbeam-utils v0.8.22
+    Checking cpufeatures v0.3.1
+    Checking stable_deref_trait v1.2.1
+    Checking ctutils v0.4.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+    Checking zerofrom v0.1.4
+   Compiling zerovec-derive v0.10.4
+    Checking yoke v0.7.4
+    Checking smallvec v1.16.0
+    Checking const-oid v0.10.2
+   Compiling crossbeam-epoch v0.9.20
+   Compiling autocfg v1.5.1
+    Checking zerovec v0.10.4
+   Compiling num-traits v0.2.19
+    Checking digest v0.11.3
+   Compiling displaydoc v0.2.6
+   Compiling syn v3.0.4
+    Checking memchr v2.8.3
+   Compiling zmij v1.0.19
+   Compiling crossbeam-deque v0.8.7
+    Checking rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.149
+   Compiling version_check v0.9.5
+   Compiling zerocopy v0.8.56
+   Compiling rayon-core v1.13.0
+   Compiling serde_derive v1.0.229
+   Compiling thiserror v2.0.18
+   Compiling generic-array v0.14.9
+    Checking chacha20 v0.10.2
+    Checking tinystr v0.7.6
+   Compiling thiserror-impl v2.0.18
+    Checking itoa v1.0.18
+    Checking litemap v0.7.3
+    Checking iana-time-zone v0.1.65
+    Checking once_cell v1.21.4
+    Checking writeable v0.5.5
+   Compiling icu_locid_transform_data v1.5.1
+    Checking chrono v0.4.45
+    Checking icu_locid v1.5.0
+    Checking rand v0.10.2
+    Checking sha2 v0.11.0
+   Compiling icu_provider_macros v1.5.0
+   Compiling icu_properties_data v1.5.1
+    Checking fast-float2 v0.2.4
+    Checking base64 v0.22.1
+    Checking either v1.18.0
+    Checking rayon v1.12.0
+    Checking icu_provider v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking block-padding v0.4.2
+   Compiling icu_normalizer_data v1.5.1
+    Checking inout v0.2.2
+    Checking icu_locid_transform v1.5.0
+    Checking icu_collections v1.5.0
+    Checking cipher v0.5.2
+    Checking block-buffer v0.10.4
+    Checking icu_properties v1.5.1
+    Checking crypto-common v0.1.6
+    Checking quick-xml v0.41.0
+   Compiling zerocopy-derive v0.8.56
+    Checking bitflags v2.13.1
+    Checking encoding_rs v0.8.35
+    Checking fixedbitset v0.5.7
+   Compiling rustversion v1.0.23
+   Compiling crc32fast v1.5.1
+    Checking write16 v1.0.0
+    Checking utf16_iter v1.0.5
+   Compiling rustix v1.1.4
+    Checking utf8_iter v1.0.4
+   Compiling getrandom v0.3.4
+    Checking icu_normalizer v1.5.0
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking digest v0.10.7
+    Checking cpufeatures v0.2.17
+    Checking tinyvec_macros v0.1.1
+    Checking linux-raw-sys v0.12.1
+    Checking zlib-rs v0.6.7
+    Checking flate2 v1.1.10
+    Checking tinyvec v1.12.0
+    Checking sha2 v0.10.9
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking idna_adapter v1.2.0
+    Checking fastrand v2.5.0
+    Checking percent-encoding v2.3.2
+    Checking debug_unsafe v0.1.4
+    Checking cpubits v0.1.1
+    Checking form_urlencoded v1.2.2
+    Checking aes v0.9.3
+    Checking atoi_simd v0.18.1
+    Checking tempfile v3.27.0
+    Checking idna v1.1.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking unicode-normalization v0.1.25
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking hmac v0.13.0
+    Checking sha1 v0.11.0
+    Checking subtle v2.6.1
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking caseless v0.2.2
+    Checking url v2.5.8
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking ryu v1.0.22
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error[E0365]: `CompactCellSlot` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:5
+   |
+27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+   |     ^^^^^^^^^^^^^^^ re-export of private `CompactCellSlot`
+   |
+   = note: consider declaring type or module `CompactCellSlot` with `pub`
+
+error[E0365]: `CompactDimensionTag` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:22
+   |
+27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+   |                      ^^^^^^^^^^^^^^^^^^^ re-export of private `CompactDimensionTag`
+   |
+   = note: consider declaring type or module `CompactDimensionTag` with `pub`
+
+error[E0365]: `CompactLayout` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:43
+   |
+27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+   |                                           ^^^^^^^^^^^^^ re-export of private `CompactLayout`
+   |
+   = note: consider declaring type or module `CompactLayout` with `pub`
+
+error[E0365]: `CompactRowSlot` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:58
+   |
+27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+   |                                                          ^^^^^^^^^^^^^^ re-export of private `CompactRowSlot`
+   |
+   = note: consider declaring type or module `CompactRowSlot` with `pub`
+
+error[E0365]: `CompactSheetData` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:74
+   |
+27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+   |                                                                          ^^^^^^^^^^^^^^^^ re-export of private `CompactSheetData`
+   |
+   = note: consider declaring type or module `CompactSheetData` with `pub`
+
+error[E0365]: `CompactSpan` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:28:5
+   |
+28 |     CompactSpan, Span,
+   |     ^^^^^^^^^^^ re-export of private `CompactSpan`
+   |
+   = note: consider declaring type or module `CompactSpan` with `pub`
+
+error[E0365]: `Span` is private, and cannot be re-exported
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:28:18
+   |
+28 |     CompactSpan, Span,
+   |                  ^^^^ re-export of private `Span`
+   |
+   = note: consider declaring type or module `Span` with `pub`
+
+error[E0603]: struct import `CompactCellSlot` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:18:5
+    |
+ 18 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |     ^^^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactCellSlot` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:5
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |     ^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactCellSlot` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:25:51
+    |
+ 25 |     Attribute, CellSlot, ColumnSlot, ColumnsSlot, CompactCellSlot, CompactDimensionTag,
+    |                                                   ^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactCellSlot` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:11:51
+    |
+ 11 |     Attribute, CellSlot, ColumnSlot, ColumnsSlot, CompactCellSlot, CompactDimensionTag,
+    |                                                   ^^^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactCellSlot` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:176:1
+    |
+176 | pub(crate) struct CompactCellSlot {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactDimensionTag` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:18:22
+    |
+ 18 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                      ^^^^^^^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactDimensionTag` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:22
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                      ^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactDimensionTag` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:25:68
+    |
+ 25 |     Attribute, CellSlot, ColumnSlot, ColumnsSlot, CompactCellSlot, CompactDimensionTag,
+    |                                                                    ^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactDimensionTag` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:11:68
+    |
+ 11 |     Attribute, CellSlot, ColumnSlot, ColumnsSlot, CompactCellSlot, CompactDimensionTag,
+    |                                                                    ^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactDimensionTag` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:203:1
+    |
+203 | pub(crate) struct CompactDimensionTag {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactLayout` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:18:43
+    |
+ 18 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                           ^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactLayout` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:43
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                           ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:5
+    |
+ 26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |     ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:5
+    |
+ 12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |     ^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactLayout` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:213:1
+    |
+213 | pub(crate) struct CompactLayout {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactRowSlot` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:18:58
+    |
+ 18 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                                          ^^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactRowSlot` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:58
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                                          ^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactRowSlot` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:20
+    |
+ 26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                    ^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactRowSlot` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:20
+    |
+ 12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                    ^^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactRowSlot` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:184:1
+    |
+184 | pub(crate) struct CompactRowSlot {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactSheetData` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:18:74
+    |
+ 18 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                                                          ^^^^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactSheetData` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:74
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                                                          ^^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactSheetData` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:36
+    |
+ 26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                                    ^^^^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactSheetData` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:36
+    |
+ 12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                                    ^^^^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactSheetData` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:194:1
+    |
+194 | pub(crate) struct CompactSheetData {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactSpan` is private
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:19:5
+    |
+ 19 |     CompactSpan,
+    |     ^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactSpan` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:28:5
+    |
+ 28 |     CompactSpan, Span,
+    |     ^^^^^^^^^^^
+note: ...and refers to the struct import `CompactSpan` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:54
+    |
+ 26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                                                      ^^^^^^^^^^^
+note: ...and refers to the struct import `CompactSpan` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:54
+    |
+ 12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |                                                      ^^^^^^^^^^^
+note: ...and refers to the struct `CompactSpan` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:160:1
+    |
+160 | pub(crate) struct CompactSpan {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactLayout` is private
+    --> crates/litchi-xlsx/src/cell_values/snapshot.rs:1048:40
+     |
+1048 |     ) -> Option<&raw::worksheet::edit::CompactLayout> {
+     |                                        ^^^^^^^^^^^^^ private struct import
+     |
+note: the struct import `CompactLayout` is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:43
+     |
+  27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+     |                                           ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:5
+     |
+  26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+     |     ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:5
+     |
+  12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+     |     ^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactLayout` which is defined here
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:213:1
+     |
+ 213 | pub(crate) struct CompactLayout {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactLayout` is private
+    --> crates/litchi-xlsx/src/cell_values/snapshot.rs:1324:53
+     |
+1324 |     compact_proof: Option<Arc<raw::worksheet::edit::CompactLayout>>,
+     |                                                     ^^^^^^^^^^^^^ private struct import
+     |
+note: the struct import `CompactLayout` is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:43
+     |
+  27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+     |                                           ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:5
+     |
+  26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+     |     ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:5
+     |
+  12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+     |     ^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactLayout` which is defined here
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:213:1
+     |
+ 213 | pub(crate) struct CompactLayout {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct import `CompactLayout` is private
+   --> crates/litchi-xlsx/src/cell_values/validation.rs:202:70
+    |
+202 | ) -> Result<(crate::cell::Store, Option<crate::raw::worksheet::edit::CompactLayout>)> {
+    |                                                                      ^^^^^^^^^^^^^ private struct import
+    |
+note: the struct import `CompactLayout` is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:27:43
+    |
+ 27 |     CompactCellSlot, CompactDimensionTag, CompactLayout, CompactRowSlot, CompactSheetData,
+    |                                           ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs:26:5
+    |
+ 26 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |     ^^^^^^^^^^^^^
+note: ...and refers to the struct import `CompactLayout` which is defined here...
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs:12:5
+    |
+ 12 |     CompactLayout, CompactRowSlot, CompactSheetData, CompactSpan, DefaultsSlot, DimensionTag, Layout,
+    |     ^^^^^^^^^^^^^
+note: ...and refers to the struct `CompactLayout` which is defined here
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs:213:1
+    |
+213 | pub(crate) struct CompactLayout {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/cell_values/source_proof.rs:24:27
+   |
+24 | const CELL_BYTES: usize = std::mem::size_of::<CompactCellSlot>();
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+   |
+24 - const CELL_BYTES: usize = std::mem::size_of::<CompactCellSlot>();
+24 + const CELL_BYTES: usize = size_of::<CompactCellSlot>();
+   |
+
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/cell_values/source_proof.rs:25:26
+   |
+25 | const ROW_BYTES: usize = std::mem::size_of::<CompactRowSlot>();
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: remove the unnecessary path segments
+   |
+25 - const ROW_BYTES: usize = std::mem::size_of::<CompactRowSlot>();
+25 + const ROW_BYTES: usize = size_of::<CompactRowSlot>();
+   |
+
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/cell_values/source_proof.rs:26:33
+   |
+26 | const SHEET_DATA_BYTES: usize = std::mem::size_of::<CompactSheetData>();
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: remove the unnecessary path segments
+   |
+26 - const SHEET_DATA_BYTES: usize = std::mem::size_of::<CompactSheetData>();
+26 + const SHEET_DATA_BYTES: usize = size_of::<CompactSheetData>();
+   |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:103:5
+    |
+103 |     std::mem::size_of::<CompactProofBuilder>() + std::mem::size_of::<CompactLayout>();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+103 -     std::mem::size_of::<CompactProofBuilder>() + std::mem::size_of::<CompactLayout>();
+103 +     size_of::<CompactProofBuilder>() + std::mem::size_of::<CompactLayout>();
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:103:50
+    |
+103 |     std::mem::size_of::<CompactProofBuilder>() + std::mem::size_of::<CompactLayout>();
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+103 -     std::mem::size_of::<CompactProofBuilder>() + std::mem::size_of::<CompactLayout>();
+103 +     std::mem::size_of::<CompactProofBuilder>() + size_of::<CompactLayout>();
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:181:53
+    |
+181 |         let Some(amount) = STACK_GROWTH.checked_mul(std::mem::size_of::<ElementKind>()) else {
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+181 -         let Some(amount) = STACK_GROWTH.checked_mul(std::mem::size_of::<ElementKind>()) else {
+181 +         let Some(amount) = STACK_GROWTH.checked_mul(size_of::<ElementKind>()) else {
+    |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/cell_values/validation.rs:202:41
+    |
+202 | ) -> Result<(crate::cell::Store, Option<crate::raw::worksheet::edit::CompactLayout>)> {
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+202 - ) -> Result<(crate::cell::Store, Option<crate::raw::worksheet::edit::CompactLayout>)> {
+202 + ) -> Result<(crate::cell::Store, Option<raw::worksheet::edit::CompactLayout>)> {
+    |
+
+error: unused import: `Span`
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs:28:18
+   |
+28 |     CompactSpan, Span,
+   |                  ^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error[E0308]: mismatched types
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:686:32
+    |
+657 |     pub(super) fn handoff(&mut self, handoff: SourceHandoff) {
+    |                                                             - help: try adding a return type: `-> bool`
+...
+686 |                         return false;
+    |                                ^^^^^ expected `()`, found `bool`
+
+error[E0277]: the size for values of type `C` cannot be known at compilation time
+    --> crates/litchi-xlsx/src/raw/worksheet/codec.rs:1331:17
+     |
+1249 | pub(super) fn parse_source_with_observer_and_handoff<'a, F, C, O, H>(
+     |                                                             - this type parameter needs to be `Sized`
+...
+1325 |             emit_source_handoff(
+     |             ------------------- required by a bound introduced by this call
+...
+1331 |                 context,
+     |                 ^^^^^^^ doesn't have a size known at compile-time
+     |
+note: required by an implicit `Sized` bound in `emit_source_handoff`
+    --> crates/litchi-xlsx/src/raw/worksheet/codec.rs:1196:24
+     |
+1196 | fn emit_source_handoff<C>(
+     |                        ^ required by the implicit `Sized` requirement on this type parameter in `emit_source_handoff`
+help: consider removing the `?Sized` bound to make the type parameter `Sized`
+     |
+1258 -     C: ?Sized,
+     |
+help: consider relaxing the implicit `Sized` restriction
+     |
+1196 | fn emit_source_handoff<C: ?Sized>(
+     |                         ++++++++
+
+error[E0308]: mismatched types
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs:556:63
+    |
+556 |     let primary = primary.map_or_else(|| Box::new([]), |span| vec![span].into_boxed_slice());
+    |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Box<[_; 0]>`, found `Box<[Span]>`
+    |
+    = note: expected struct `std::boxed::Box<[_; 0]>`
+               found struct `std::boxed::Box<[raw::worksheet::edit::codec::snapshot::model::Span]>`
+
+error: trivial numeric cast: `u32` as `u32`
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/package.rs:211:56
+    |
+211 |         return data.rows.is_empty() && data.tag_end == data.close_start as u32;
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: cast can be replaced by coercion; this might require a temporary variable
+    = note: requested on the command line with `-D trivial-numeric-casts`
+
+Some errors have detailed explanations: E0277, E0308, E0365, E0603.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-xlsx` (lib) due to 28 previous errors

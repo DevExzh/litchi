@@ -1,0 +1,7 @@
+{
+  "schema": "xlsx_0552_final_restoration_completion_v1",
+  "completed_utc": "2026-09-13T08:18:14.359226+00:00",
+  "restoration_sha256": "a74d62f3a05317c57fac16ab0b4c998354b245da8094db04e74424c30d6b9cee",
+  "all_paths_match": true,
+  "public_tests_unchanged": true
+}

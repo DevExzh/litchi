@@ -1,0 +1,99 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1108,34 +1108,6 @@
+         ));
+         Ok(())
+     }
+-}
+-
+-/// Traverse one eligible source with the ordinary parser while giving a
+-/// caller-owned validator a borrowed view of each event first.
+-///
+-/// Early parser failures are deliberately not returned here. The source-backed
+-/// caller repeats the established two-pass path so the historical error text
+-/// and precedence remain authoritative. Returning immediately on any
+-/// provisional failure drops the parser before fallback starts. Once the
+-/// observer accepts EOF, the finalization result is carried to the raw facade
+-/// so its historical extension-error retry can still run.
+-pub(super) fn parse_source_with_observer<'a, F, O>(
+-    content: &[u8],
+-    strings: F,
+-    mut observer: O,
+-) -> super::SourceParseAttempt
+-where
+-    F: FnOnce() -> Result<Option<&'a [Text]>>,
+-    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+-{
+-    let mut context = ();
+-    parse_source_with_observer_and_handoff(
+-        content,
+-        strings,
+-        &mut context,
+-        |_, namespace, event, _span| observer(namespace, event),
+-        |_, _| {},
+-    )
+ }
+ 
+ #[derive(Debug, Clone, Copy)]
+@@ -1256,8 +1228,16 @@
+     }
+ }
+ 
+-/// Variant of the shared source traversal that also supplies original event
+-/// positions and post-transition resolved cell/row handoffs.
++/// Traverse one eligible source with the ordinary parser while giving a
++/// caller-owned validator a borrowed view of each event first.
++///
++/// Early parser failures are deliberately not returned here. The source-backed
++/// caller repeats the established two-pass path so the historical error text
++/// and precedence remain authoritative. Returning immediately on any
++/// provisional failure drops the parser before fallback starts. Once the
++/// observer accepts EOF, the finalization result is carried to the raw facade
++/// so its historical extension-error retry can still run.
++/// Original event positions and post-transition cell/row handoffs are also supplied.
+ pub(super) fn parse_source_with_observer_and_handoff<'a, F, C, O, H>(
+     content: &[u8],
+     strings: F,
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -269,13 +269,13 @@
+             }
+             previous_column = Some(entry.address.column().get());
+             if let Some(action) = cells.get(&entry.address) {
+-                if matches!(
++                if !matches!(
+                     action,
+-                    super::model::Action::Remove
+-                        | super::model::Action::Update {
+-                            payload: Some(Payload::SharedFormula { .. }),
+-                            ..
+-                        }
++                    super::model::Action::Update {
++                        payload: None
++                            | Some(Payload::Set(_) | Payload::Clear | Payload::ClearIfPresent),
++                        ..
++                    }
+                 ) {
+                     return false;
+                 }
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -183,18 +183,6 @@
+     }
+     *bound = next;
+     true
+-}
+-
+-pub(crate) fn parse_source_with_observer<'a, F, O>(
+-    content: &[u8],
+-    strings: F,
+-    observer: O,
+-) -> SourceParseAttempt
+-where
+-    F: FnOnce() -> Result<Option<&'a [Text]>>,
+-    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+-{
+-    codec::parse_source_with_observer(content, strings, observer)
+ }
+ 
+ /// Parse an eligible source with the ordinary parser and an optional

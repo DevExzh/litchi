@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:31:15.007296+00:00",
+  "reason": "Include final frozen draft07 source snapshots as byte witnesses after baseline restoration; every witness still must match the exact manifest hash.",
+  "before_sha256": "ca0c60e12660a80ce5147bb5ba873152ac7c7bf1664551e4ee874b8975a9e416",
+  "after_sha256": "8cea7a0a3591a8f901901b324cbabf4cdea1ba19976bcce7663cfdac7cd3f233",
+  "patch_sha256": "eb78b5fcfc36dc73175ad3c80ac21c10952905d32f6afce0d10f941429487580",
+  "failed_receipt_sha256": "0ef69d09196eec8bbf34dedfae49bee4c01a0ec96302d21baaea34c0c1c63d11"
+}

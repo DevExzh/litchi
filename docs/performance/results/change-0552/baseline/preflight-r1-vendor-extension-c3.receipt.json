@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0552-target/retained/baseline/normal",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/baseline/preflight-r1-vendor-extension-c3.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/baseline/preflight-r1-vendor-extension-c3.catalog.json"
+  ],
+  "start_utc": "2026-09-13T06:11:34.970657+00:00",
+  "end_utc": "2026-09-13T06:11:35.943075+00:00",
+  "seconds": 0.9724362079869024,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": "411f9b902f01f1128baffea2a3739010e9d06a09983598b0747365a74fff5c49",
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "preflight-r1-vendor-extension-c3.catalog.json": "230e99da932ad3bf9767558e31bfa43b2c4ee40a7ba74e1fc52e893bd93a29fe",
+    "preflight-r1-vendor-extension-c3.host.json": "6d1bde5c6e3998e77496e93e38513d1149c3d17cf66e6d098a381f825ead7c6a",
+    "preflight-r1-vendor-extension-c3.json": "49e608b84241dfafd549afcfd13b363b5d4a9b6b780d9e1e717417fc2b54faff",
+    "preflight-r1-vendor-extension-c3.stderr": "aa26019958137c7cb4bd16766aef8424540750ca873eb120f41c53d354b2be3d",
+    "preflight-r1-vendor-extension-c3.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

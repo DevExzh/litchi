@@ -1,0 +1,42 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--all-features",
+    "--test",
+    "source_backed_cell_values",
+    "public_multi_edit_matches_baseline_whole_worksheet_output",
+    "--",
+    "--test-threads=2"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "start_utc": "2026-09-13T07:28:58.855014+00:00",
+  "end_utc": "2026-09-13T07:29:24.464977+00:00",
+  "seconds": 25.609954158979235,
+  "exit_code": 101,
+  "source_stable": true,
+  "source_manifest_sha256": "6c58b582fddc5c7a1aca94b805007886b806f8623f80c6fadb3e5b6ff7270a03",
+  "script_sha256": "3b480df03d2d4854c96f26e0b00a1e3a240333a056e60d07f72b9b4093aa2096",
+  "run_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "TMPDIR": "/home/zhuhe/litchi-goal-0552-target/tmp",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0552-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null
+  },
+  "artifacts": {
+    "source-manifest.json": "6c58b582fddc5c7a1aca94b805007886b806f8623f80c6fadb3e5b6ff7270a03",
+    "stderr": "32d11d415bfdc074d7830732065f8ccfc1bde24ec804268c351a961ecbd878bd",
+    "stdout": "20c9851dc3106cbad598830da96de663fe13b265cce7a181fb8d2c73da507f92",
+    "tracked-source.patch": "19509c3183922e8053ea9c60cf15f074610191001d10805e88238b00967d01b3"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "observed_utc": "2026-09-13T09:02:23.550865+00:00",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "removed": [
+    "/home/zhuhe/litchi-goal-0552-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "process_reference_scope": "Accessible /proc cwd, executable and open file descriptors; cleanup process ancestors excluded.",
+  "binary_sha256_by_kind": {
+    "baseline/normal": "411f9b902f01f1128baffea2a3739010e9d06a09983598b0747365a74fff5c49",
+    "baseline/alloc": "4a65774dcb808fb1231c1514e4a5b077ad97615bdb1069274d827a19f438a7bf",
+    "baseline/guard-normal": "704e1a71115769aed0b6f6124f20f5f3eb56a27dba8a6e00e3d2c8fa71c19171",
+    "baseline/guard-alloc": "1db1c8bc8ee42cb54efb992f54e97d90e9cbe842e53c817871ef8d5b56ab159a",
+    "baseline/cap": "d3bdd1d51de213c96e4ed37b912fe59cea2836ba943379f9f14d37a4f3de8eff",
+    "candidate/normal": "05ab92e0b34b579f0da96454a1309ab4e8207115fbebc0f06a60b9e4f2b48d55",
+    "candidate/alloc": "75a3edaaeb75eac3aa7544551ce19fe2fdf7fb5eee869e6be208700a5c93dbca",
+    "candidate/guard-normal": "5f23296f6f253f53a74496c41d27014b9ffcd02039f0c2c461d72de067e2ba6e",
+    "candidate/guard-alloc": "e1f9a36b781733078692300ba2577c65de76083fd3dc1fd8f54c6649db515f80",
+    "candidate/cap": "39b283ba3785215978eda24b4f2ba15ece1578a267c9926f330c99e1060fe0cc"
+  },
+  "python_cache_absent": true,
+  "input_sha256": {
+    "plan.json": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+    "decision.json": "df2fb73e62c0800898b585a04ac2a1eb2bc86f8b6f340f938bd0d557c3fc6a78",
+    "quality.json": "8a47d3a452e2db1cb6db3b1e64c70b4d1dd9caa1f5d399bff165a9b61b6beaaa",
+    "verify.py": "754da750fac5b9cad9c1dbb14ab749361e4d32216e294a5586260a1d60aedf5c",
+    "decide.py": "d59e251019520b9420f21ac0a0d81d12e4b6a1e782e1b8e2744b3703841e3312",
+    "metrics-analysis.json": "c0dd9f49b7006c5d426211624e36217fc680af1ad37d1febaa5d82a6f10c2a3c",
+    "guards-analysis.json": "b59becde85b91b30303a765441450c073ab2167feebb7427423f0509cde002bb",
+    "closure-attempts/precleanup-03/result.json": "94c3215ed268ae406d9d0157189bf352d4b1f49ebd56a1f07b8db2116970d49a"
+  },
+  "scope": "Remove only owned change0552 build/retained-binary target after passing precleanup and exact binary hash checks."
+}

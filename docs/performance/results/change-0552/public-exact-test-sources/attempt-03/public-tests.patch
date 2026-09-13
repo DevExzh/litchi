@@ -1,0 +1,35 @@
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
+@@ -8,13 +8,10 @@
+ #[test]
+ fn public_multi_edit_matches_baseline_whole_worksheet_output() {
+     let source_xml = format!(
+-        r#"<worksheet xmlns="{SML}"><sheetData>
+-  <row r="1" spans="1:3"><c r="A1"><v>1</v></c><!--keep-row-one--><c r='B1' t='b'><v>1</v></c></row>
+-  <row r="2" spans="1:3"><c r="A2"><v>2</v></c><!--keep-row-two--><c r="C2"><v>3</v></c></row>
+-</sheetData></worksheet>"#
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1" spans="1:3"><c r="A1"><v>1</v></c><!--keep-row-one--><c r='B1' t='b'><v>1</v></c></row><row r="2" spans="1:3"><c r="A2"><v> 2 </v></c><!--keep-row-two--><c r="C2"><v>3</v></c></row></sheetData></worksheet>"#
+     );
+-    // Preserve a noncompact external source; the authored-package writer
+-    // deliberately requires compact XML and is not this test's input route.
++    // Build a ZIP source fixture so the public source-backed path owns
++    // worksheet validation. Changed publication requires compact element spacing.
+     let base = two_sheets();
+     let archive = ArchiveReader::new(&base).unwrap();
+     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+@@ -44,13 +41,10 @@
+         .unwrap();
+ 
+     // This is the explicit baseline writer output: only the two selected
+-    // primary value spans change; row tags, comments, whitespace, and the
++    // primary value spans change; row tags, comments, value whitespace, and the
+     // untouched B1/A2 cell bytes remain exactly as authored above.
+     let expected_sheet = format!(
+-        r#"<worksheet xmlns="{SML}"><sheetData>
+-  <row r="1" spans="1:3"><c r="A1"><v>10</v></c><!--keep-row-one--><c r='B1' t='b'><v>1</v></c></row>
+-  <row r="2" spans="1:3"><c r="A2"><v>2</v></c><!--keep-row-two--><c r="C2"><v>30</v></c></row>
+-</sheetData></worksheet>"#
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1" spans="1:3"><c r="A1"><v>10</v></c><!--keep-row-one--><c r='B1' t='b'><v>1</v></c></row><row r="2" spans="1:3"><c r="A2"><v> 2 </v></c><!--keep-row-two--><c r="C2"><v>30</v></c></row></sheetData></worksheet>"#
+     );
+     assert_eq!(
+         zip_member(&published, "xl/worksheets/sheet1.xml"),

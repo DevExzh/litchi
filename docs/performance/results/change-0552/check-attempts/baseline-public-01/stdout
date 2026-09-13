@@ -1,0 +1,10 @@
+
+running 5 tests
+test compact_source_proof::compact_public_guard_handles_empty_sheet_data_inverse_and_recommit ... ok
+test compact_source_proof::compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit ... ok
+test compact_source_proof::compact_public_guard_preserves_empty_rows_and_cells ... ok
+test compact_source_proof::compact_public_guard_preserves_typed_prefixed_scalar_forms ... ok
+test compact_source_proof::compact_public_guard_preserves_late_unused_attribute_decode_errors ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 67 filtered out; finished in 0.03s
+

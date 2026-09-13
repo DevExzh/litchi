@@ -1,0 +1,12 @@
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs
+@@ -76,8 +76,8 @@
+     );
+     let bytes = source_with_worksheet_xml(&xml);
+     let source = Arc::new(VersionedSource::new(bytes.clone()));
+-    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+     for _ in 0..2 {
++        let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+         let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
+         edit.set("Sheet1", address("A1"), 10u32).unwrap();
+         let commit = edit.commit().unwrap();
