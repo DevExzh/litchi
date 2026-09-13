@@ -1,0 +1,9 @@
+{
+  "schema": "xlsx_0553_documentation_manifest_v1",
+  "scope": "Files outside this evidence bundle included in completed change0553",
+  "files": {
+    "docs/performance/0553-xlsx-commit-local-compact-proof.md": "d37a7a27f8b242cdbf651e1dab9c3e84ce1599ad371e71d4ce863ba545b07be5",
+    "docs/performance/BASELINE.md": "27fe3be964409af96fd43f8de7d06dd823f8ab39e6d9876e16c66823f24b85fe",
+    "docs/performance/HOTSPOTS.md": "f910801ec7ed1c5085dca3b7114acd97ebb93b130a9984337d0d867076d61086"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-09-13T10:44:01.974201+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3813669,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-scalar-worktree"
+    },
+    {
+      "pid": 3816343,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-scalar-worktree/crates/litchi-odf-common"
+    },
+    {
+      "pid": 3816530,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-scalar-worktree/crates/litchi-ods"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

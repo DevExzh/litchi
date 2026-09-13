@@ -1,0 +1,12 @@
+{
+  "schema": "xlsx_0553_candidate_application_v1",
+  "applied_utc": "2026-09-13T09:48:37.039592+00:00",
+  "binding_sha256": "f8dc9142973c405dcc667e8ccdf44dedd54ea7f53a7baf383942c001e3bd9f00",
+  "patch_sha256": "8348403e5c42a64f28fc951903e70a6b504df1b635d871c378a3758810020fbd",
+  "transition_sha256": "a34c039b714fe3ebe5daaecbca54fd6ebc0fc2a608f35ddfb458c6400ac323cc",
+  "source_verified": true,
+  "removed_owned_duplicate_tests": [
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/dimension_expansion.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/layout_order_fallback.rs"
+  ]
+}

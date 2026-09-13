@@ -1,0 +1,9 @@
+{
+  "schema": "xlsx_0553_candidate_application_v1",
+  "applied_utc": "2026-09-13T10:09:35.468140+00:00",
+  "binding_sha256": "87923028fc6e786408093bc1db95fd0e2321e6820cc4b860ee25d4f0eec735ce",
+  "patch_sha256": "f27b5efc2e60cc467c1e7500d68d898ae2918712e71123289c3b0060037d30cd",
+  "transition_sha256": "e1d2cc84ed03ecb05fdacdc1f477fd873b6ad04a308dc0faffabc0cdc1e36731",
+  "source_verified": true,
+  "new_paths": []
+}

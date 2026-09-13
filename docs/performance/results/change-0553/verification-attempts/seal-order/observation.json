@@ -1,0 +1,7 @@
+{
+  "observed_utc": "2026-09-13T11:11:37.536405+00:00",
+  "failed_check": "all --strict",
+  "exit_code": 1,
+  "error": "SHA256SUMS paths are not sorted",
+  "correction": "Sort relative POSIX path strings rather than pathlib component ordering."
+}

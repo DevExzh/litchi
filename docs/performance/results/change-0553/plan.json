@@ -1,0 +1,100 @@
+{
+  "revision": "8aa0c5baf0616d16c79eba0c6c28dc1716338ad6",
+  "created_utc": "2026-09-13T09:13:11.405574+00:00",
+  "previous_turn": "progress: committed sealed0552 rejected planning-time proof experiment; baseline production restored, seven publicguards retained, fullquality passed and ownedtarget cleaned",
+  "priority": "OLE2/OOXML first; ODF deferred until that goal completes; iWork excluded",
+  "scope": "Matched commit-local compact source-cell proof experiment for source-backed XLSX MultiSourceEdit",
+  "hypothesis": "Collect an ephemeral compact source-cell layout only at commit for effective existing-cell edits, using a direct borrowed XML walk to avoid complete unchanged-tag layout materialization. Leave planning and no-op paths unchanged; no second semantic Store and no proof retained in Snapshot.",
+  "cpu": 2,
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0553-target"
+  ],
+  "cases": [
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "xlsx_source_backed_managed_cell_values_one_edit_save",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save"
+  ],
+  "shapes": [
+    "medium",
+    "dense-sparse",
+    "noncompact",
+    "vendor-extension"
+  ],
+  "native": {
+    "repeats": 2,
+    "samples": 200,
+    "warmup": 20
+  },
+  "alloc": {
+    "repeats": 2,
+    "samples": 20,
+    "warmup": 3
+  },
+  "profile": {
+    "repeats": 2,
+    "samples": 1,
+    "warmup": 0,
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save"
+  },
+  "guard": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "cases": [
+      "valid",
+      "late-validator",
+      "late-raw"
+    ],
+    "repeats": 2,
+    "native_samples": 200,
+    "native_warmup": 20,
+    "alloc_samples": 20,
+    "alloc_warmup": 3
+  },
+  "cap": {
+    "sizes": [
+      1,
+      2,
+      160,
+      164,
+      256
+    ],
+    "repeats": 2,
+    "samples": 200,
+    "warmup": 20
+  },
+  "native_order": [
+    "baseline r1",
+    "candidate r1",
+    "candidate r2",
+    "retained baseline r2 under candidate source manifest"
+  ],
+  "allocator_order": [
+    "baseline r1",
+    "candidate r1",
+    "candidate r2",
+    "retained baseline r2 under candidate source manifest"
+  ],
+  "admission": {
+    "primary": "Every one-percent case/shape/repeat, including managed, workflow p50 and mean improve at least 3%.",
+    "latency_guards": "Every one-cell case/shape/repeat and valid-noop planning/cap control p50 and mean <= 1.05x matched baseline.",
+    "refusals": "Exact errors/retry identities unchanged; each invalid guard p50 and mean <= max(1.05x corresponding baseline invalid,2x baseline valid); each invalid attributable peak <= 1.10x baseline valid attributable peak.",
+    "workflow_memory": "For each main case/shape/repeat, max planning/commit/publication absolute region peak minus planning live_bytes_before <= 1.05x baseline; process peakRSS <= 1.05x baseline. Use allocation-instrumented comparisons only for allocation metrics.",
+    "noop_memory": "Valid planning guard region peak minus live_bytes_before <= 1.05x baseline. Decline if durable metadata cannot fit representative no-op memory envelope.",
+    "allocation": "Workflow sum allocated bytes <= 1.05x baseline; allocation/reallocation calls and per-phase retained-after values reported individually. Any >5% adverse/drift row requires explicit review; no hidden geometric mean.",
+    "proof_resources": "Explicit checked byte/event caps and fallible reservation before growth required; immutable original-source binding and complete fallback. Concrete candidate cap/source hash frozen before application.",
+    "correctness": "Exact scanner/writer differential tests, source fallback/error-order, no-op, managed execution/cancellation, source identity, inverse/clone/re-edit, preservation and quality gates required.",
+    "profile": "Exact commit Ir must decrease for every shape/repeat if pilot native/memory gates pass; absence of scan symbol alone is insufficient.",
+    "disposition": "All mandatory gates required; reject and restore baseline on failure. No exception for a necessary enabler without measured justification."
+  },
+  "limitations": [
+    "No hardware/cold/provider/scaling claim from this campaign.",
+    "Current single-sheet SourceEdit API is outside measured owner.",
+    "Profiles conditional on native/memory pilot; all failures retained.",
+    "Historical guards use no-op oracle after planning interval; full no-op publication time is not measured."
+  ]
+}

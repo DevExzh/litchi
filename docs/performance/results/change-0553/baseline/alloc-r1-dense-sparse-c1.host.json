@@ -1,0 +1,86 @@
+{
+  "observed_utc": "2026-09-13T09:33:17.541306+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3391952,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3392117,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3"
+    },
+    {
+      "pid": 3392579,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7"
+    },
+    {
+      "pid": 3392627,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libm-0.2.16"
+    },
+    {
+      "pid": 3392688,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/uppsala-0.9.0"
+    },
+    {
+      "pid": 3392747,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/base64-0.22.1"
+    },
+    {
+      "pid": 3392756,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189"
+    },
+    {
+      "pid": 3392848,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-utils-0.8.23"
+    },
+    {
+      "pid": 3392894,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32fast-1.5.2"
+    },
+    {
+      "pid": 3392984,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0"
+    },
+    {
+      "pid": 3393330,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.57"
+    },
+    {
+      "pid": 3393366,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-common-0.1.7"
+    },
+    {
+      "pid": 3393382,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107"
+    },
+    {
+      "pid": 3393420,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/block-buffer-0.12.1"
+    },
+    {
+      "pid": 3393423,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-traits-0.2.19"
+    },
+    {
+      "pid": 3393453,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crossbeam-epoch-0.9.21"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

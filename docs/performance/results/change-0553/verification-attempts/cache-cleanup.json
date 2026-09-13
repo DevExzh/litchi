@@ -1,0 +1,11 @@
+{
+  "observed_utc": "2026-09-13T11:01:03.040065+00:00",
+  "scope": "Remove only generated Python bytecode caches in change0553 evidence bundle; source files and capture artifacts retained.",
+  "removed": [
+    {
+      "path": "docs/performance/results/change-0553/__pycache__/verify.cpython-314.pyc",
+      "sha256": "df10918ebe656495548dbe1f62427af16a940426ffa9ba808f4bb1bf6d3538ab"
+    }
+  ],
+  "cache_absent": true
+}

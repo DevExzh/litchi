@@ -1,0 +1,6 @@
+{
+  "observed_utc": "2026-09-13T11:08:04.629081+00:00",
+  "failure": "precleanup-01: canonical report field is missing: comparisons.adverse",
+  "cause": "CLI terminal consumers pass validated report references while decision API passes complete documents. Resolve references and verify exact digest before individual row comparison.",
+  "measurements_and_analyzers_unchanged": true
+}

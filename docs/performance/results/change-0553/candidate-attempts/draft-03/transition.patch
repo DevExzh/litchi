@@ -1,0 +1,20 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
+@@ -320,7 +320,7 @@
+                 self.stack.push(FrameKind::Defaults);
+                 true
+             },
+-            b"cols" if !self.seen_columns && !self.seen_sheet_data && !self.seen_defaults => {
++            b"cols" if !self.seen_columns && !self.seen_sheet_data => {
+                 self.seen_columns = true;
+                 self.columns_count = 0;
+                 self.last_column_end = 0;
+@@ -497,7 +497,7 @@
+                 self.seen_defaults = true;
+                 true
+             },
+-            b"cols" if !self.seen_columns && !self.seen_sheet_data && !self.seen_defaults => {
++            b"cols" if !self.seen_columns && !self.seen_sheet_data => {
+                 self.seen_columns = true;
+                 // The authoritative scanner rejects an empty `<cols>`
+                 // container after its structural pass.

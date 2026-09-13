@@ -1,0 +1,326 @@
+   Compiling typenum v1.20.1
+   Compiling syn v2.0.114
+   Compiling zeroize v1.9.0
+   Compiling hybrid-array v0.4.14
+   Compiling cfg-if v1.0.4
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling serde_core v1.0.229
+   Compiling synstructure v0.13.2
+   Compiling stable_deref_trait v1.2.1
+   Compiling cmov v0.5.4
+   Compiling cpufeatures v0.3.1
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling ctutils v0.4.2
+   Compiling zerofrom v0.1.4
+   Compiling libc v0.2.189
+   Compiling yoke v0.7.4
+   Compiling zerovec-derive v0.10.4
+   Compiling smallvec v1.16.0
+   Compiling const-oid v0.10.2
+   Compiling zerovec v0.10.4
+   Compiling digest v0.11.3
+   Compiling crossbeam-utils v0.8.22
+   Compiling displaydoc v0.2.6
+   Compiling rand_core v0.10.1
+   Compiling memchr v2.8.3
+   Compiling crossbeam-epoch v0.9.20
+   Compiling num-traits v0.2.19
+   Compiling crossbeam-deque v0.8.7
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling zmij v1.0.19
+   Compiling tinystr v0.7.6
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.18
+   Compiling writeable v0.5.5
+   Compiling once_cell v1.21.4
+   Compiling itoa v1.0.18
+   Compiling litemap v0.7.3
+   Compiling iana-time-zone v0.1.65
+   Compiling chrono v0.4.45
+   Compiling icu_locid v1.5.0
+   Compiling thiserror v2.0.18
+   Compiling serde_json v1.0.149
+   Compiling rand v0.10.2
+   Compiling rayon-core v1.13.0
+   Compiling zerocopy v0.8.56
+   Compiling sha2 v0.11.0
+   Compiling icu_provider_macros v1.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling either v1.18.0
+   Compiling base64 v0.22.1
+   Compiling rayon v1.12.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling icu_provider v1.5.0
+   Compiling generic-array v0.14.9
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling icu_locid_transform v1.5.0
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_collections v1.5.0
+   Compiling icu_properties v1.5.1
+   Compiling cipher v0.5.2
+   Compiling icu_normalizer_data v1.5.1
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling quick-xml v0.41.0
+   Compiling bitflags v2.13.1
+   Compiling zerocopy-derive v0.8.56
+   Compiling encoding_rs v0.8.35
+   Compiling utf16_iter v1.0.5
+   Compiling fixedbitset v0.5.7
+   Compiling write16 v1.0.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer v1.5.0
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling tinyvec_macros v0.1.1
+   Compiling zlib-rs v0.6.7
+   Compiling linux-raw-sys v0.12.1
+   Compiling rustix v1.1.4
+   Compiling flate2 v1.1.10
+   Compiling tinyvec v1.12.0
+   Compiling sha2 v0.10.9
+   Compiling crc32fast v1.5.1
+   Compiling getrandom v0.3.4
+   Compiling idna_adapter v1.2.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling cpubits v0.1.1
+   Compiling debug_unsafe v0.1.4
+   Compiling percent-encoding v2.3.2
+   Compiling fastrand v2.5.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling tempfile v3.27.0
+   Compiling form_urlencoded v1.2.2
+   Compiling atoi_simd v0.18.1
+   Compiling aes v0.9.3
+   Compiling idna v1.1.0
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling unicode-normalization v0.1.25
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling cbc v0.2.1
+   Compiling rc4 v0.2.0
+   Compiling sha1 v0.11.0
+   Compiling hmac v0.13.0
+   Compiling subtle v2.6.1
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling caseless v0.2.2
+   Compiling url v2.5.8
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling ryu v1.0.22
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/cell_values/snapshot.rs:841:46
+    |
+841 |     pub(crate) fn stored_entries(&self) -> &[crate::cell::Stored] {
+    |                                              ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+841 -     pub(crate) fn stored_entries(&self) -> &[crate::cell::Stored] {
+841 +     pub(crate) fn stored_entries(&self) -> &[Stored] {
+    |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/compact/dimension_expansion.rs:53:82
+   |
+53 |     let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+   |                                                                                  ^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 | pub(crate) enum Action {
+   | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+   |
+   = note: the following trait bounds were not satisfied:
+           `raw::worksheet::edit::model::Action: Clone`
+           which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 + #[derive(Clone)]
+48 | pub(crate) enum Action {
+   |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/compact/layout_order_fallback.rs:71:82
+   |
+71 |     let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+   |                                                                                  ^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 | pub(crate) enum Action {
+   | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+   |
+   = note: the following trait bounds were not satisfied:
+           `raw::worksheet::edit::model::Action: Clone`
+           which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 + #[derive(Clone)]
+48 | pub(crate) enum Action {
+   |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/compact/layout_order_fallback.rs:149:86
+    |
+149 |         let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone());
+    |                                                                                      ^^^^^ method cannot be called due to unsatisfied trait bounds
+    |
+   ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 | pub(crate) enum Action {
+    | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+    |
+    = note: the following trait bounds were not satisfied:
+            `raw::worksheet::edit::model::Action: Clone`
+            which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 + #[derive(Clone)]
+ 48 | pub(crate) enum Action {
+    |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/compact/layout_order_fallback.rs:154:21
+    |
+154 |             actions.clone(),
+    |                     ^^^^^ method cannot be called due to unsatisfied trait bounds
+    |
+   ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 | pub(crate) enum Action {
+    | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+    |
+    = note: the following trait bounds were not satisfied:
+            `raw::worksheet::edit::model::Action: Clone`
+            which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 + #[derive(Clone)]
+ 48 | pub(crate) enum Action {
+    |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs:53:82
+   |
+53 |     let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+   |                                                                                  ^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 | pub(crate) enum Action {
+   | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+   |
+   = note: the following trait bounds were not satisfied:
+           `raw::worksheet::edit::model::Action: Clone`
+           which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 + #[derive(Clone)]
+48 | pub(crate) enum Action {
+   |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs:71:82
+   |
+71 |     let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+   |                                                                                  ^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 | pub(crate) enum Action {
+   | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+   |
+   = note: the following trait bounds were not satisfied:
+           `raw::worksheet::edit::model::Action: Clone`
+           which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+  --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+   |
+47 + #[derive(Clone)]
+48 | pub(crate) enum Action {
+   |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs:149:86
+    |
+149 |         let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone());
+    |                                                                                      ^^^^^ method cannot be called due to unsatisfied trait bounds
+    |
+   ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 | pub(crate) enum Action {
+    | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+    |
+    = note: the following trait bounds were not satisfied:
+            `raw::worksheet::edit::model::Action: Clone`
+            which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 + #[derive(Clone)]
+ 48 | pub(crate) enum Action {
+    |
+
+error[E0599]: the method `clone` exists for struct `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>`, but its trait bounds were not satisfied
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs:154:21
+    |
+154 |             actions.clone(),
+    |                     ^^^^^ method cannot be called due to unsatisfied trait bounds
+    |
+   ::: crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 | pub(crate) enum Action {
+    | ---------------------- doesn't satisfy `raw::worksheet::edit::model::Action: Clone`
+    |
+    = note: the following trait bounds were not satisfied:
+            `raw::worksheet::edit::model::Action: Clone`
+            which is required by `std::collections::BTreeMap<litchi_sheet::Cell, raw::worksheet::edit::model::Action>: Clone`
+help: consider annotating `raw::worksheet::edit::model::Action` with `#[derive(Clone)]`
+   --> crates/litchi-xlsx/src/raw/worksheet/edit/model.rs:47:1
+    |
+ 47 + #[derive(Clone)]
+ 48 | pub(crate) enum Action {
+    |
+
+error[E0004]: non-exhaustive patterns: `quick_xml::events::Event::PI(_)` not covered
+    --> crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs:214:15
+     |
+ 214 |         match event {
+     |               ^^^^^ pattern `quick_xml::events::Event::PI(_)` not covered
+     |
+note: `quick_xml::events::Event<'_>` defined here
+    --> /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/mod.rs:1797:1
+     |
+1797 | pub enum Event<'a> {
+     | ^^^^^^^^^^^^^^^^^^
+...
+1813 |     PI(BytesPI<'a>),
+     |     -- not covered
+     = note: the matched value is of type `quick_xml::events::Event<'_>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+     |
+ 229 ~             Event::Eof => self.closed_root && self.stack.is_empty(),
+ 230 ~             quick_xml::events::Event::PI(_) => todo!(),
+     |
+
+Some errors have detailed explanations: E0004, E0599.
+For more information about an error, try `rustc --explain E0004`.
+error: could not compile `litchi-xlsx` (lib test) due to 10 previous errors

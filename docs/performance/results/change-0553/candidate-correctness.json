@@ -1,0 +1,42 @@
+{
+  "schema": "xlsx_0553_candidate_correctness_v1",
+  "status": "pass",
+  "created_utc": "2026-09-13T10:31:11.539058+00:00",
+  "candidate_binding_sha256": "32c5d8a39e534a54d6546ff352387815d741cc7c162da96b1b31f6d027e44b24",
+  "candidate_manifest_sha256": "c17a88f6ddaec2ade4d053e07cacc40e9e263b80c43689d900ebded80f614bf7",
+  "independent_review": {
+    "path": "collector-design-review.md",
+    "sha256": "e21e47e2350d3b90d24ead42ee01c115901ac97fea118c9bea1ea166da841087",
+    "status": "pass",
+    "reviewer": "/root/xlsx_0553_collector_review"
+  },
+  "checks": [
+    {
+      "kind": "compact-success",
+      "name": "direct compact writer output and action differentials",
+      "attempt": "check-attempts/candidate-draft-07-edit-tests",
+      "receipt_sha256": "e622365c85e915b7a0803dea92067e377fd884fef544d1a432e483fc0de718b2",
+      "source_manifest_sha256": "d94dc91c2aa5eec910c1596665cdbd09d98f09641b138eb4d893ae799acb5f03",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "kind": "compact-fallback",
+      "name": "namespace/order/formula and populated metadata refusal differentials",
+      "attempt": "check-attempts/candidate-draft-07-edit-tests",
+      "receipt_sha256": "e622365c85e915b7a0803dea92067e377fd884fef544d1a432e483fc0de718b2",
+      "source_manifest_sha256": "d94dc91c2aa5eec910c1596665cdbd09d98f09641b138eb4d893ae799acb5f03",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "kind": "resource",
+      "name": "bounded growth, source identity and actual no-op invocation guards",
+      "attempt": "check-attempts/candidate-draft-07-edit-tests",
+      "receipt_sha256": "e622365c85e915b7a0803dea92067e377fd884fef544d1a432e483fc0de718b2",
+      "source_manifest_sha256": "d94dc91c2aa5eec910c1596665cdbd09d98f09641b138eb4d893ae799acb5f03",
+      "exit_code": 0,
+      "source_stable": true
+    }
+  ]
+}

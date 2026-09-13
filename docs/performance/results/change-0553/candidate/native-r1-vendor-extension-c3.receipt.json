@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0553-target/retained/candidate/normal",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--samples",
+    "200",
+    "--warmup",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0553/candidate/native-r1-vendor-extension-c3.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0553/candidate/native-r1-vendor-extension-c3.catalog.json"
+  ],
+  "start_utc": "2026-09-13T10:36:36.529077+00:00",
+  "end_utc": "2026-09-13T10:36:49.533987+00:00",
+  "seconds": 13.004933282994898,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "c17a88f6ddaec2ade4d053e07cacc40e9e263b80c43689d900ebded80f614bf7",
+  "binary_sha256": "dd3bf36c74da74f32f1a07216fb4ad3104f80b7d43a986264bfc32c9c83200d6",
+  "source_manifest_sha256": "c17a88f6ddaec2ade4d053e07cacc40e9e263b80c43689d900ebded80f614bf7",
+  "script_sha256": "f1398fcc87dc7bccfc05930276e26a4a8a21106480613238eab49310ae1c23f0",
+  "plan_sha256": "17d810a24912065fde8c71de6109be983f7c5b3bdcea5fd6584f4725c6499ea4",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r1-vendor-extension-c3.catalog.json": "c8ac916442aff2d0462cf862181a6a4c87aa967a43346c3c9095797b64110fb9",
+    "native-r1-vendor-extension-c3.host.json": "4e1ecd33c7c575ff19ec6dff5b9fbbe1ea7966f7fa14cdacf5cd1e5902e246fb",
+    "native-r1-vendor-extension-c3.json": "08f1e6cd77de12c2aab9124f93a83ec214533212d7733b24c01e432aab34e198",
+    "native-r1-vendor-extension-c3.stderr": "cf9c6ff092073af7e750d4c7b839916919ea7b3a7f67d3264214366fb76dccc5",
+    "native-r1-vendor-extension-c3.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "recorded_utc": "2026-09-13T10:09:35.465290+00:00",
+  "status": "previous global compiler guard stopped before application",
+  "observed_commands": [
+    "cargo test --locked --offline -p litchi-ods --test ods_formula_expressions",
+    "rustc litchi_odf_common with /var/tmp/ods-expression-target output"
+  ],
+  "observation": "Previously observed processes have exited; no compiler or campaign check was live at current inspection. Ownership and former working directory cannot now be established. Draft-04 source hashes verified unchanged.",
+  "checks_started": false
+}

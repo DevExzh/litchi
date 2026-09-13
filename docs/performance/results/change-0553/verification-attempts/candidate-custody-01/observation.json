@@ -1,0 +1,15 @@
+{
+  "observed_utc": "2026-09-13T10:32:49.495170+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0553/verify.py",
+    "--component",
+    "candidate-custody",
+    "--strict"
+  ],
+  "exit_code": 1,
+  "status": "CLI result serialization failure; no successful CLI custody claim",
+  "reported_error": "Object of type datetime is not JSON serializable",
+  "stdout_sha256": "1b78b7d6ced6c94c0df6ea32458f53107571c509507955f150f547e66929fad8"
+}

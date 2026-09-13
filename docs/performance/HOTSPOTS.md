@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0553: commit-local compact proof rejected by workflow gates
+
+[0553](0553-xlsx-commit-local-compact-proof.md) reduced main workflow allocated
+bytes by 15.87–25.43%, but unmanaged vendor-extension one-percent latency
+missed three required 3% improvement checks and one dense-sparse RSS result
+exceeded the 5% ceiling. Planning and cap gates passed. The candidate is
+restored to baseline; instruction profiles were skipped under the failed-pilot
+rule. No runtime optimization is retained from this experiment.
+
+Next OLE2 work is fresh directory-name handoff attribution. An isolated
+name-only prototype preserves scalar extraction and the classic-Mac root
+exception; it is unbuilt and unmeasured. ODF remains deferred until the
+OLE2/OOXML performance goal is complete.
+
 ## 0551: compact cell facts selected over full layout or row reparsing
 
 [0551](changes/0551-xlsx-layout-handoff-feasibility.md) shows that edited-row

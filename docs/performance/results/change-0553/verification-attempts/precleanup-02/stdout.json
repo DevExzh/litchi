@@ -1,0 +1,6 @@
+{
+  "error": "adverse review source report is missing or is a symlink",
+  "schema": "litchi.xlsx.verification.0553.v1",
+  "scope": "precleanup",
+  "status": "incomplete"
+}

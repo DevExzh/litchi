@@ -1,0 +1,9 @@
+{
+  "recorded_utc": "2026-09-13T09:53:44.511091+00:00",
+  "status": "application_not_performed",
+  "reason": "Preapplication pgrep cargo/rustc quiescence assertion failed before git apply. The following shell command nevertheless ran the check on unchanged draft02; no draft03 validation claim.",
+  "unchanged_source_binding_sha256": "f8dc9142973c405dcc667e8ccdf44dedd54ea7f53a7baf383942c001e3bd9f00",
+  "old_source_check_receipt_sha256": "c675ada2a8d4e4cb68f1a5c87f19cd8f1906c72939e4e45353c8b565e3ee9952",
+  "old_source_check_manifest_matches_draft02": true,
+  "correction": "Keep frozen draft03, apply after current process/source checks; launch a distinct check attempt only from successful application code."
+}
