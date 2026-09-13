@@ -6,8 +6,8 @@
 //! allocation. Keeping this state and all arithmetic safe lets the shared
 //! harness library retain `#![forbid(unsafe_code)]`.
 //!
-//! Counters are absolute process counters. A region records two snapshots and
-//! publishes checked differences; it never resets a counter. The region guard
+//! Counters are absolute process counters. A region records boundary snapshots
+//! and publishes checked differences; it never resets a counter. The region guard
 //! is deliberately non-reentrant so a nested operation cannot publish a
 //! misleading partial interval. One observer mutex linearizes each callback,
 //! boundary, and snapshot after the system allocator has returned, so worker
@@ -212,6 +212,13 @@ impl Sample {
         }
     }
 
+    fn overflow() -> Self {
+        Self {
+            status: Status::Overflow,
+            ..Self::unavailable()
+        }
+    }
+
     fn measured(
         before: CountersSnapshot,
         after: CountersSnapshot,
@@ -243,10 +250,7 @@ impl Sample {
                 })
                 .unwrap_or(true);
         if overflow {
-            return Self {
-                status: Status::Overflow,
-                ..Self::unavailable()
-            };
+            return Self::overflow();
         }
         Self {
             status: Status::Measured,
@@ -269,7 +273,23 @@ impl Sample {
 enum RegionState {
     Disabled,
     Unavailable,
-    Active(CountersSnapshot),
+    Active(ActiveRegion),
+}
+
+struct ActiveRegion {
+    /// The snapshot at the beginning of the complete operation.  This is
+    /// intentionally retained across segment boundaries so `finish` keeps
+    /// the historical combined-operation contract.
+    before: CountersSnapshot,
+    /// The snapshot at the beginning of the current non-overlapping segment.
+    segment_before: CountersSnapshot,
+    /// The maximum of every segment peak observed so far.  The observer's
+    /// live peak is rebased at each split, so this field preserves the exact
+    /// peak that one unsplit region would have published.
+    combined_peak_live_bytes: Option<u64>,
+    /// Sticky failure for a split boundary whose evidence was not complete.
+    /// This is separate from observer invalidity, which reports unavailable.
+    split_overflowed: bool,
 }
 
 /// A region that owns the non-overlap token until it is finished or dropped.
@@ -278,6 +298,86 @@ pub(crate) struct Region {
 }
 
 impl Region {
+    /// Publishes the current segment and rebases the same region for the next
+    /// segment without releasing its non-overlap token.  The observer lock is
+    /// held while the snapshot and rebase occur, so callbacks cannot fall into
+    /// an unaccounted gap between the two segments.
+    ///
+    /// The complete region remains active until [`Region::finish`].  Its
+    /// returned sample therefore still covers the original start through the
+    /// eventual finish, including the maximum peak from every split segment.
+    pub(crate) fn split(&mut self) -> Option<Sample> {
+        match &mut self.state {
+            RegionState::Disabled => None,
+            RegionState::Unavailable => Some(Sample::unavailable()),
+            RegionState::Active(active) => {
+                let (after, segment_peak_live_bytes, observer_valid) = COUNTERS.split_region();
+                if let Some(segment_peak) = segment_peak_live_bytes {
+                    active.combined_peak_live_bytes = Some(
+                        active
+                            .combined_peak_live_bytes
+                            .map_or(segment_peak, |combined_peak| {
+                                combined_peak.max(segment_peak)
+                            }),
+                    );
+                }
+                let sample = if !observer_valid {
+                    Sample::unavailable()
+                } else if active.split_overflowed || segment_peak_live_bytes.is_none() {
+                    active.split_overflowed = true;
+                    Sample::overflow()
+                } else {
+                    Sample::measured(active.segment_before, after, segment_peak_live_bytes)
+                };
+                if sample.status == Status::Overflow {
+                    active.split_overflowed = true;
+                }
+                active.segment_before = after;
+                Some(sample)
+            },
+        }
+    }
+
+    /// Finishes the current segment and the complete region at one observer
+    /// boundary.  Returning both samples together prevents callbacks from
+    /// landing between the commit-core endpoint and the combined-operation
+    /// endpoint.
+    pub(crate) fn finish_split(mut self) -> (Option<Sample>, Option<Sample>) {
+        let state = std::mem::replace(&mut self.state, RegionState::Disabled);
+        match state {
+            RegionState::Disabled => (None, None),
+            RegionState::Unavailable => {
+                let sample = Sample::unavailable();
+                (Some(sample.clone()), Some(sample))
+            },
+            RegionState::Active(active) => {
+                let (after, final_peak_live_bytes, observer_valid) = COUNTERS.finish_region();
+                if !observer_valid {
+                    return (Some(Sample::unavailable()), Some(Sample::unavailable()));
+                }
+                if active.split_overflowed {
+                    let sample = Sample::overflow();
+                    return (Some(sample.clone()), Some(sample));
+                }
+                let segment = Sample::measured(active.segment_before, after, final_peak_live_bytes);
+                if segment.status == Status::Overflow {
+                    let sample = Sample::overflow();
+                    return (Some(sample.clone()), Some(sample));
+                }
+                let combined_peak_live_bytes =
+                    match (active.combined_peak_live_bytes, final_peak_live_bytes) {
+                        (Some(combined_peak), Some(final_peak)) => {
+                            Some(combined_peak.max(final_peak))
+                        },
+                        (None, final_peak) => final_peak,
+                        (Some(_), None) => None,
+                    };
+                let combined = Sample::measured(active.before, after, combined_peak_live_bytes);
+                (Some(segment), Some(combined))
+            },
+        }
+    }
+
     /// Ends the region and releases its token. No allocator counters are
     /// reset, and this method performs no heap allocation itself.
     pub(crate) fn finish(mut self) -> Option<Sample> {
@@ -285,7 +385,27 @@ impl Region {
         match state {
             RegionState::Disabled => None,
             RegionState::Unavailable => Some(Sample::unavailable()),
-            RegionState::Active(before) => Some(COUNTERS.finish_sample(before)),
+            RegionState::Active(active) => {
+                let sample = if active.split_overflowed {
+                    // The sticky split failure still owns the observer token.
+                    // Consume its boundary before returning the fail-closed
+                    // sample so a normal `finish` cannot strand the marker.
+                    let (_, _, observer_valid) = COUNTERS.finish_region();
+                    if observer_valid {
+                        Sample::overflow()
+                    } else {
+                        Sample::unavailable()
+                    }
+                } else if active.combined_peak_live_bytes.is_none() {
+                    COUNTERS.finish_sample(active.before)
+                } else {
+                    COUNTERS.finish_sample_with_combined_peak(
+                        active.before,
+                        active.combined_peak_live_bytes,
+                    )
+                };
+                Some(sample)
+            },
         }
     }
 }
@@ -310,7 +430,12 @@ pub(crate) fn begin() -> Region {
     }
     match COUNTERS.begin_region() {
         Some(before) => Region {
-            state: RegionState::Active(before),
+            state: RegionState::Active(ActiveRegion {
+                before,
+                segment_before: before,
+                combined_peak_live_bytes: None,
+                split_overflowed: false,
+            }),
         },
         None => Region {
             state: RegionState::Unavailable,
@@ -427,6 +552,25 @@ impl Counters {
         Some(before)
     }
 
+    fn split_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
+        let mut observer = self.lock_observer();
+        let after = self.snapshot_locked();
+        let region_peak_live_bytes = observer.region_peak_live_bytes;
+        let observer_valid = !self.observer_invalid.load(Ordering::Acquire);
+        if observer_valid {
+            if region_peak_live_bytes.is_none() {
+                // An active region must always own an observer peak. Keep
+                // this accounting failure sticky so a later valid boundary
+                // cannot repair an earlier incomplete sample.
+                self.overflowed.store(true, Ordering::Release);
+            }
+            observer.region_peak_live_bytes = Some(after.live_bytes);
+        } else {
+            observer.region_peak_live_bytes = None;
+        }
+        (after, region_peak_live_bytes, observer_valid)
+    }
+
     fn finish_region(&self) -> (CountersSnapshot, Option<u64>, bool) {
         let mut observer = self.lock_observer();
         let after = self.snapshot_locked();
@@ -436,8 +580,24 @@ impl Counters {
     }
 
     fn finish_sample(&self, before: CountersSnapshot) -> Sample {
-        let (after, region_peak_live_bytes, observer_valid) = self.finish_region();
+        self.finish_sample_with_combined_peak(before, None)
+    }
+
+    fn finish_sample_with_combined_peak(
+        &self,
+        before: CountersSnapshot,
+        combined_peak_live_bytes: Option<u64>,
+    ) -> Sample {
+        let (after, final_peak_live_bytes, observer_valid) = self.finish_region();
         if observer_valid {
+            let region_peak_live_bytes = match (combined_peak_live_bytes, final_peak_live_bytes) {
+                (Some(combined_peak), Some(final_peak)) => Some(combined_peak.max(final_peak)),
+                (None, Some(final_peak)) => Some(final_peak),
+                // A split region must still have a live final segment peak.
+                // Do not conceal a broken observer state with an earlier peak.
+                (Some(_), None) => None,
+                (None, None) => None,
+            };
             Sample::measured(before, after, region_peak_live_bytes)
         } else {
             Sample::unavailable()
@@ -619,7 +779,9 @@ mod tests {
     fn disabled_region_publishes_no_sample() {
         let _lock = TEST_LOCK.lock().unwrap();
         let was_enabled = super::ENABLED.swap(false, std::sync::atomic::Ordering::SeqCst);
-        assert!(super::begin().finish().is_none());
+        let mut region = super::begin();
+        assert!(region.split().is_none());
+        assert!(region.finish().is_none());
         super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 
@@ -1000,6 +1162,384 @@ mod tests {
         assert_eq!(inner.finish().unwrap().status, Status::Unavailable);
         assert_eq!(super::COUNTERS.snapshot(), before);
         assert_eq!(outer.finish().unwrap().status, Status::Measured);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn split_regions_are_sequential_and_preserve_the_combined_interval() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_invalid = super::COUNTERS
+            .observer_invalid
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let was_overflowed = super::COUNTERS
+            .overflowed
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        let mut region = super::begin();
+
+        super::COUNTERS.allocation(16);
+        super::COUNTERS.deallocation(4);
+        let staging = region.split().expect("active staging segment");
+        assert_eq!(staging.status, Status::Measured);
+
+        // The same region retains the non-overlap token across the boundary;
+        // a concurrent/nested region cannot create an unobserved callback gap.
+        let nested = super::begin();
+        assert_eq!(nested.finish().unwrap().status, Status::Unavailable);
+
+        super::COUNTERS.allocation(40);
+        super::COUNTERS.reallocation(40, 8);
+        let (commit_core, combined) = region.finish_split();
+        let commit_core = commit_core.expect("active commit segment");
+        assert_eq!(commit_core.status, Status::Measured);
+        let combined = combined.expect("active combined region");
+        assert_eq!(combined.status, Status::Measured);
+        assert_eq!(staging.live_bytes_before, Some(baseline.live_bytes));
+        assert_eq!(staging.live_bytes_after, commit_core.live_bytes_before);
+        assert_eq!(combined.live_bytes_before, staging.live_bytes_before);
+        assert_eq!(combined.live_bytes_after, commit_core.live_bytes_after);
+        assert_eq!(
+            combined.peak_live_bytes_before,
+            staging.peak_live_bytes_before
+        );
+        assert_eq!(
+            combined.peak_live_bytes_after,
+            commit_core.peak_live_bytes_after
+        );
+        assert_eq!(
+            combined.region_peak_live_bytes,
+            Some(
+                staging
+                    .region_peak_live_bytes
+                    .unwrap()
+                    .max(commit_core.region_peak_live_bytes.unwrap()),
+            )
+        );
+        for (staging_value, core_value, combined_value) in [
+            (
+                staging.allocation_calls,
+                commit_core.allocation_calls,
+                combined.allocation_calls,
+            ),
+            (
+                staging.deallocation_calls,
+                commit_core.deallocation_calls,
+                combined.deallocation_calls,
+            ),
+            (
+                staging.reallocation_calls,
+                commit_core.reallocation_calls,
+                combined.reallocation_calls,
+            ),
+            (
+                staging.failed_allocation_calls,
+                commit_core.failed_allocation_calls,
+                combined.failed_allocation_calls,
+            ),
+            (
+                staging.allocated_bytes,
+                commit_core.allocated_bytes,
+                combined.allocated_bytes,
+            ),
+            (
+                staging.deallocated_bytes,
+                commit_core.deallocated_bytes,
+                combined.deallocated_bytes,
+            ),
+        ] {
+            assert_eq!(
+                Some(staging_value.unwrap() + core_value.unwrap()),
+                combined_value
+            );
+        }
+        super::COUNTERS.deallocation(20);
+        super::COUNTERS
+            .overflowed
+            .store(was_overflowed, std::sync::atomic::Ordering::SeqCst);
+        super::COUNTERS
+            .observer_invalid
+            .store(was_invalid, std::sync::atomic::Ordering::SeqCst);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn split_regions_publish_measured_zero_and_repeated_boundaries() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_invalid = super::COUNTERS
+            .observer_invalid
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let was_overflowed = super::COUNTERS
+            .overflowed
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let baseline = super::COUNTERS.snapshot();
+        let mut region = super::begin();
+
+        let staging = region.split().expect("zero staging segment");
+        assert_eq!(staging.status, Status::Measured);
+        assert_eq!(staging.allocation_calls, Some(0));
+        assert_eq!(staging.deallocation_calls, Some(0));
+        assert_eq!(staging.live_bytes_before, Some(baseline.live_bytes));
+        assert_eq!(staging.live_bytes_after, Some(baseline.live_bytes));
+        assert_eq!(staging.region_peak_live_bytes, Some(baseline.live_bytes));
+
+        let (commit_core, combined) = region.finish_split();
+        let commit_core = commit_core.expect("zero commit-core segment");
+        let combined = combined.expect("zero combined segment");
+        assert_eq!(commit_core.status, Status::Measured);
+        assert_eq!(commit_core.allocation_calls, Some(0));
+        assert_eq!(commit_core.live_bytes_before, Some(baseline.live_bytes));
+        assert_eq!(commit_core.live_bytes_after, Some(baseline.live_bytes));
+        assert_eq!(
+            commit_core.region_peak_live_bytes,
+            Some(baseline.live_bytes)
+        );
+        assert_eq!(combined.status, Status::Measured);
+        assert_eq!(combined.allocation_calls, Some(0));
+        assert_eq!(combined.live_bytes_before, Some(baseline.live_bytes));
+        assert_eq!(combined.live_bytes_after, Some(baseline.live_bytes));
+        assert_eq!(combined.region_peak_live_bytes, Some(baseline.live_bytes));
+
+        let mut repeated = super::begin();
+        assert_eq!(repeated.split().unwrap().status, Status::Measured);
+        assert_eq!(repeated.split().unwrap().status, Status::Measured);
+        assert_eq!(repeated.finish().unwrap().status, Status::Measured);
+        let mut dropped = super::begin();
+        assert_eq!(dropped.split().unwrap().status, Status::Measured);
+        drop(dropped);
+        assert_eq!(super::begin().finish().unwrap().status, Status::Measured);
+
+        super::COUNTERS
+            .overflowed
+            .store(was_overflowed, std::sync::atomic::Ordering::SeqCst);
+        super::COUNTERS
+            .observer_invalid
+            .store(was_invalid, std::sync::atomic::Ordering::SeqCst);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn split_phase_counter_faults_remain_overflow_without_partial_values() {
+        fn assert_staging_fault<F>(inject: F)
+        where
+            F: FnOnce(&Counters),
+        {
+            let counters = Counters::default();
+            let before = counters.begin_region().expect("fault test region");
+            inject(&counters);
+            let (middle, middle_peak, middle_valid) = counters.split_region();
+            assert!(middle_valid);
+            let staging = Sample::measured(before, middle, middle_peak);
+            assert_eq!(staging.status, Status::Overflow);
+            assert!(staging.allocation_calls.is_none());
+
+            let (after, final_peak, final_valid) = counters.finish_region();
+            assert!(final_valid);
+            let commit_core = Sample::measured(middle, after, final_peak);
+            let combined = Sample::measured(before, after, final_peak);
+            assert_eq!(commit_core.status, Status::Overflow);
+            assert_eq!(combined.status, Status::Overflow);
+            assert!(commit_core.allocated_bytes.is_none());
+            assert!(combined.region_peak_live_bytes.is_none());
+        }
+
+        fn assert_core_fault<F>(inject: F)
+        where
+            F: FnOnce(&Counters),
+        {
+            let counters = Counters::default();
+            let before = counters.begin_region().expect("core fault test region");
+            let (middle, middle_peak, middle_valid) = counters.split_region();
+            assert!(middle_valid);
+            let staging = Sample::measured(before, middle, middle_peak);
+            assert_eq!(staging.status, Status::Measured);
+
+            inject(&counters);
+            let (after, final_peak, final_valid) = counters.finish_region();
+            assert!(final_valid);
+            let commit_core = Sample::measured(middle, after, final_peak);
+            let combined = Sample::measured(before, after, final_peak);
+            assert_eq!(commit_core.status, Status::Overflow);
+            assert_eq!(combined.status, Status::Overflow);
+            assert!(commit_core.allocation_calls.is_none());
+            assert!(combined.allocated_bytes.is_none());
+        }
+
+        assert_staging_fault(|counters| {
+            counters
+                .allocation_calls
+                .store(u64::MAX, std::sync::atomic::Ordering::Relaxed);
+            counters.allocation(1);
+        });
+        assert_staging_fault(|counters| counters.live_sub(1));
+
+        assert_core_fault(|counters| {
+            counters
+                .allocation_calls
+                .store(u64::MAX, std::sync::atomic::Ordering::Relaxed);
+            counters.allocation(1);
+        });
+        assert_core_fault(|counters| counters.live_sub(1));
+
+        let before = super::CountersSnapshot {
+            allocation_calls: 1,
+            ..super::CountersSnapshot::default()
+        };
+        let after = super::CountersSnapshot::default();
+        let staging_reversed = Sample::measured(before, after, Some(0));
+        assert_eq!(staging_reversed.status, Status::Overflow);
+        assert!(staging_reversed.deallocation_calls.is_none());
+
+        let before = super::CountersSnapshot::default();
+        let middle = super::CountersSnapshot {
+            allocation_calls: 1,
+            ..super::CountersSnapshot::default()
+        };
+        let core_reversed = Sample::measured(middle, before, Some(0));
+        assert_eq!(core_reversed.status, Status::Overflow);
+        assert!(core_reversed.deallocation_calls.is_none());
+    }
+
+    #[test]
+    fn split_boundary_observer_poison_and_reentry_remain_unavailable() {
+        fn assert_unavailable(sample: Sample) {
+            assert_eq!(sample.status, Status::Unavailable);
+            assert!(sample.allocation_calls.is_none());
+            assert!(sample.region_peak_live_bytes.is_none());
+        }
+
+        let counters = std::sync::Arc::new(Counters::default());
+        let before = counters.begin_region().expect("poison test region");
+        let poisoned = std::sync::Arc::clone(&counters);
+        let handle = std::thread::spawn(move || {
+            let _observer = poisoned.observer.lock().unwrap();
+            panic!("deliberately poison the split observer mutex");
+        });
+        assert!(handle.join().is_err());
+        let (middle, middle_peak, middle_valid) = counters.split_region();
+        assert!(!middle_valid);
+        assert_unavailable(Sample::measured(before, middle, middle_peak));
+        let (after, final_peak, final_valid) = counters.finish_region();
+        assert!(!final_valid);
+        assert_unavailable(Sample::measured(middle, after, final_peak));
+        assert_unavailable(Sample::measured(before, after, final_peak));
+
+        let counters = Counters::default();
+        let before = counters.begin_region().expect("reentry test region");
+        let entry = counters.enter_callback().expect("outer callback entry");
+        counters.allocation(8);
+        drop(entry);
+        let (middle, middle_peak, middle_valid) = counters.split_region();
+        assert!(!middle_valid);
+        assert_unavailable(Sample::measured(before, middle, middle_peak));
+        let (after, final_peak, final_valid) = counters.finish_region();
+        assert!(!final_valid);
+        assert_unavailable(Sample::measured(middle, after, final_peak));
+    }
+
+    #[test]
+    fn missing_split_peak_is_sticky_overflow_for_both_finish_paths() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_invalid = super::COUNTERS
+            .observer_invalid
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let was_overflowed = super::COUNTERS
+            .overflowed
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+
+        let mut split_finish = super::begin();
+        {
+            let mut observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes = None;
+        }
+        assert_eq!(split_finish.split().unwrap().status, Status::Overflow);
+        let (core, combined) = split_finish.finish_split();
+        assert_eq!(core.unwrap().status, Status::Overflow);
+        assert_eq!(combined.unwrap().status, Status::Overflow);
+
+        super::COUNTERS
+            .overflowed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let mut ordinary_finish = super::begin();
+        {
+            let mut observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes = None;
+        }
+        assert_eq!(ordinary_finish.split().unwrap().status, Status::Overflow);
+        assert_eq!(ordinary_finish.finish().unwrap().status, Status::Overflow);
+
+        super::COUNTERS
+            .overflowed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let mut invalid_after_overflow = super::begin();
+        {
+            let mut observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes = None;
+        }
+        assert_eq!(
+            invalid_after_overflow.split().unwrap().status,
+            Status::Overflow
+        );
+        super::COUNTERS
+            .observer_invalid
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let invalid_sample = invalid_after_overflow.finish().unwrap();
+        assert_eq!(invalid_sample.status, Status::Unavailable);
+        assert!(invalid_sample.region_peak_live_bytes.is_none());
+        super::COUNTERS
+            .observer_invalid
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        super::COUNTERS
+            .overflowed
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+
+        let mut missing_final = super::begin();
+        assert_eq!(missing_final.split().unwrap().status, Status::Measured);
+        {
+            let mut observer = super::COUNTERS.lock_observer();
+            observer.region_peak_live_bytes = None;
+        }
+        let (core, combined) = missing_final.finish_split();
+        assert_eq!(core.unwrap().status, Status::Overflow);
+        assert_eq!(combined.unwrap().status, Status::Overflow);
+
+        super::COUNTERS
+            .overflowed
+            .store(was_overflowed, std::sync::atomic::Ordering::SeqCst);
+        super::COUNTERS
+            .observer_invalid
+            .store(was_invalid, std::sync::atomic::Ordering::SeqCst);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn dropping_a_split_region_after_an_error_releases_the_token() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_invalid = super::COUNTERS
+            .observer_invalid
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+        let was_overflowed = super::COUNTERS
+            .overflowed
+            .swap(false, std::sync::atomic::Ordering::SeqCst);
+
+        fn fail_after_staging() -> Result<(), &'static str> {
+            let mut region = super::begin();
+            assert_eq!(region.split().unwrap().status, Status::Measured);
+            Err("simulated edit.set or edit.commit failure")
+        }
+
+        assert!(fail_after_staging().is_err());
+        assert_eq!(super::begin().finish().unwrap().status, Status::Measured);
+
+        super::COUNTERS
+            .overflowed
+            .store(was_overflowed, std::sync::atomic::Ordering::SeqCst);
+        super::COUNTERS
+            .observer_invalid
+            .store(was_invalid, std::sync::atomic::Ordering::SeqCst);
         super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 

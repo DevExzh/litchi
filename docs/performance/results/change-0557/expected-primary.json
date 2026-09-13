@@ -1,0 +1,333 @@
+{
+  "scope": "Retained deterministic generator identities for validation; these are not fresh measurements. Telemetry-only harness changes must leave generators unchanged, and every fresh capture must independently match these identities.",
+  "rows": [
+    {
+      "shape": "medium",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-medium-c0.json",
+      "reference_sha256": "8384a37d54356ca4f3e454474368a909cf19a2c31e028c3fa375d24909e64fd7"
+    },
+    {
+      "shape": "medium",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-medium-c1.json",
+      "reference_sha256": "fb26e270a7d6eecb9c08962e6289ea4a8041fb98471e3b49ba5a4f5475b97c2f"
+    },
+    {
+      "shape": "dense-sparse",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-sparse",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 17792,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4265472,
+        "archive_bytes": 4251863,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-dense-sparse-c0.json",
+      "reference_sha256": "3e00d766f03ba488a575941c66d2ea5a6b62efacae61a2a68e4b9372c738cd02"
+    },
+    {
+      "shape": "dense-sparse",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-sparse",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 17792,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4265472,
+        "archive_bytes": 4251863,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-dense-sparse-c1.json",
+      "reference_sha256": "c8c1fb80869758589b2a2ae77b1436fe33f87dde8fa7dac838d2b88bf48e7547"
+    },
+    {
+      "shape": "noncompact",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-noncompact",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "noncompact",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media-and-noncompact-cell-tags",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4230850,
+        "archive_sha256": "5650660e80b143be215d0d77b3a8456dc7b7cd685cee03aa27e8f48da163cea9",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "469eda7653a529dc4dbd301aced004ab0e01c646560856fd35bece568e9ae42d",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-noncompact-c0.json",
+      "reference_sha256": "bfbf15083ed152446088cdb1c888aa0c7e2065d462709600c9b1b7542cf8fa09"
+    },
+    {
+      "shape": "noncompact",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-noncompact",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "noncompact",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media-and-noncompact-cell-tags",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4230850,
+        "archive_sha256": "5650660e80b143be215d0d77b3a8456dc7b7cd685cee03aa27e8f48da163cea9",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "b61d213ae083578d722a2a10b0982f01064a82917ca51eb0308cbb571cea6881",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-noncompact-c1.json",
+      "reference_sha256": "deac67ddc163608d883389a6a4b9bf4e2e0277563cb59d580e5a329d3dec1a2b"
+    },
+    {
+      "shape": "vendor-extension",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-vendor-extension",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "vendor-extension",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media-and-unknown-vendor-extension",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 20,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231356,
+        "archive_bytes": 4227295,
+        "archive_sha256": "b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "087ba2e1753bfe0734fa40f8329f7e87d432d99e4ac5e4e5e70cc02221f49cda",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-vendor-extension-c0.json",
+      "reference_sha256": "b20789e4a4ea6b83c93130a14185ddc120d6efec74b8edd01bb6c8b4aaa3b431"
+    },
+    {
+      "shape": "vendor-extension",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-vendor-extension",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "vendor-extension",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media-and-unknown-vendor-extension",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 20,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231356,
+        "archive_bytes": 4227295,
+        "archive_sha256": "b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "output_sha256": "263a6b845b33a808a2910b2aaa81de051ae28cd1ba0a542133c7ddd0517348c4",
+      "reference_path": "docs/performance/results/change-0550/baseline/native-r1-vendor-extension-c1.json",
+      "reference_sha256": "0a5e0075f8d84f2d6db76e83bc02a116b4d9fd0d76aaf2e4d89251d3fe02498e"
+    }
+  ]
+}

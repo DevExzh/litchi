@@ -1,0 +1,158 @@
+{
+  "artifacts": {
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.catalog.json": "554d0257a2e8dfb4493a46027ac1a9f24cdcd1341f0c58478b4739c9d32033ec",
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.host.json": "bb54903306773af9c2ad065cdcf3dd6bb3e99a4b0f1517bd383e416cbf551b72",
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.json": "8ad812cabd041f5e00b9c9efd2ccdaeaff6ae54ef5eda4c1ba735f7792946ebc",
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.rss.json": "27ed7bf66a1116e9f27879d08d2e5e2ff29ec72f467ab9d0580bb0d5e9d5591d",
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary_after_sha256": "fa69fc4675d67a1f3c73d056f77ccccf7d795befcfa6458b2a014fa86d0778c4",
+  "binary_before_sha256": "fa69fc4675d67a1f3c73d056f77ccccf7d795befcfa6458b2a014fa86d0778c4",
+  "binary_descriptor_after_sha256": "e433f0710f54f803865543825b0a802b2a669effb42e51d3ec00b294ed551641",
+  "binary_descriptor_before_sha256": "e433f0710f54f803865543825b0a802b2a669effb42e51d3ec00b294ed551641",
+  "binary_descriptor_error": null,
+  "binary_descriptor_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/binary-normal.json",
+  "binary_descriptor_unchanged": true,
+  "binary_error": null,
+  "binary_path": "/home/zhuhe/litchi-goal-0557-target/retained/baseline/normal",
+  "binary_sha256": "fa69fc4675d67a1f3c73d056f77ccccf7d795befcfa6458b2a014fa86d0778c4",
+  "binary_unchanged": true,
+  "child_started": true,
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.rss.json",
+    "/home/zhuhe/litchi-goal-0557-target/retained/baseline/normal",
+    "--case",
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--warmup",
+    "20",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save.catalog.json"
+  ],
+  "end_utc": "2026-09-13T14:57:27.719122+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0557-target",
+    "GLIBC_TUNABLES": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "RUSTDOCFLAGS": null,
+    "RUSTFLAGS": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0557-target/tmp"
+  },
+  "execution_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "execution_manifest_unchanged": true,
+  "execution_stage": "baseline",
+  "execution_stage_after": {
+    "identity": {
+      "guard_scope": "live-source",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "execution_stage_before": {
+    "identity": {
+      "guard_scope": "live-source",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "execution_stage_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "exit_code": 0,
+  "name": "noise-r2-medium-xlsx_source_backed_cell_values_one_edit_save",
+  "output_manifest_unchanged": true,
+  "output_stage_after": {
+    "identity": {
+      "guard_scope": "manifest-only",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "output_stage_before": {
+    "identity": {
+      "guard_scope": "manifest-only",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "output_stage_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "plan_sha256": "d8111317e6d6d44219c844aaf740ea50fc149c361601bb6483a47d33843f88d8",
+  "schema": "xlsx_linear_merge_0557_run_receipt_v1",
+  "script_sha256": "c9c0db8ac91da2d8604c3a7d70b77f5927f0b6ac9c6fb8066e4b7c350b8b8999",
+  "seconds": 41.79198002800695,
+  "source_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "spawn_error": null,
+  "stage": "baseline",
+  "start_utc": "2026-09-13T14:56:45.927152+00:00",
+  "success": true,
+  "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+  "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

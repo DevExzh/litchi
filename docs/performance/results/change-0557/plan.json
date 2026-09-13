@@ -1,0 +1,413 @@
+{
+  "schema": "xlsx_linear_merge_0557_plan_v1",
+  "status": "prospective; frozen before candidate source, build, capture, and result observation",
+  "revision": "0d812aca92b608f9de8f9398fad1c379077ce708",
+  "created_utc": "2026-09-13T13:38:55Z",
+  "priority": "OLE2 and OOXML first; ODF deferred until the OLE2/OOXML optimization goal completes; iWork excluded",
+  "scope": "Source-backed XLSX cell-value edit/save with one private provenance merge candidate; complete validation, preservation, fallback, and publication behavior remain authoritative",
+  "target": {
+    "function": "litchi_xlsx::cell::Store::merge_omitted_cells",
+    "source": "crates/litchi-xlsx/src/cell.rs",
+    "caller": "litchi_xlsx::cell_values::snapshot::try_rewritten_value_cells",
+    "hypothesis": "A checked linear merge of the address-ordered parsed and omitted-source cell sequences can remove redundant sorting and duplicate scanning while preserving every Store field, derived index, extent, error boundary, and fallback route.",
+    "candidate_boundaries": [
+      "Retain complete rewritten-output validation and reduced readback.",
+      "Retain source/parsed eligibility checks and the omission producer.",
+      "Refuse an uncertain ordering, overlap, collision, row invariant, count, reservation, or allocation condition and use the complete parser.",
+      "Preserve all Stored provenance, rows, columns, defaults, merge ranges, indexes, bounds, source identity, cancellation, execution, and publication checks.",
+      "Do not add persistent metadata, unsafe code, ambient I/O, global parallelism, or candidate-specific allocation growth."
+    ],
+    "required_mechanism": "Fresh positive owner and leaf attribution is required after a numeric pass; a missing or inlined symbol is not zero-cost evidence."
+  },
+  "corpus": {
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "format": "XLSX/OPC/ZIP",
+    "shapes": [
+      "medium",
+      "dense-sparse",
+      "noncompact",
+      "vendor-extension"
+    ],
+    "shape_purpose": {
+      "medium": "Four ordinary 48x48 worksheets with fixed media members.",
+      "dense-sparse": "Dense, strided sparse, and diagonal worksheet locality at the larger 128x128 scale.",
+      "noncompact": "Alternating qualified XML forms and lexical preservation.",
+      "vendor-extension": "Opaque extension XML/binary parts and a relationship preservation control."
+    },
+    "shape_selector": "--xlsx-cell-crud-shape",
+    "expected_shape_count": 4,
+    "expected_matrix_rows": 32
+  },
+  "workloads": {
+    "primary": [
+      {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "updates": "1"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "updates": "ceil(total stored cells / 100)"
+      }
+    ],
+    "controls": [
+      {
+        "case": "xlsx_source_backed_cell_values_batch_edit_save",
+        "updates": "litchi_xlsx::cell_values::MAX_BATCH_EDITS"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_multi_sheet_edit_save",
+        "updates": "2 on distinct worksheets"
+      },
+      {
+        "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+        "updates": "1"
+      },
+      {
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "updates": "one-percent workload"
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_edit_save",
+        "updates": "1"
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "updates": "one-percent workload"
+      }
+    ],
+    "primary_row_count": 8,
+    "control_row_count": 24,
+    "case_shape_rule": "Every listed case runs once per listed shape. An inapplicable row requires a retained typed receipt and cannot be silently omitted."
+  },
+  "timing": {
+    "cpu": 2,
+    "fresh_child_per_case_shape": true,
+    "sidecar": {
+      "program": "/usr/bin/time",
+      "fields": [
+        "max_rss_kib",
+        "elapsed_seconds",
+        "user_seconds",
+        "system_seconds"
+      ],
+      "scope": "One isolated benchmark process for one case and one shape; the sidecar is diagnostic and does not replace benchmark elapsed samples."
+    },
+    "normal": {
+      "warmup": 20,
+      "samples": 1000,
+      "repeats": 2,
+      "order": [
+        "baseline R1: all 32 rows",
+        "candidate R1: all 32 rows",
+        "candidate R2: all 32 rows in reverse matrix order",
+        "baseline R2: all 32 rows in reverse matrix order, output stage baseline and execution stage candidate"
+      ]
+    },
+    "allocation": {
+      "warmup": 3,
+      "samples": 30,
+      "repeats": 2,
+      "binary": "litchi-perf-baseline-alloc",
+      "order": "The same four ABBA legs and 32 case-shape rows as normal timing.",
+      "scope": "Measured source-backed planning, staging, combined staging+commit, commit-core, and publication intervals, with their exact counter/endpoints/peaks. Internal temporary destruction within each phase is included. Final returned-object destruction, fixture construction, correctness oracles, and report assembly outside those intervals are not attributed to the phases. Eager allocation vectors are unavailable; every child still has process RSS evidence.",
+      "source_phase_vectors": [
+        "plan_allocation_metrics",
+        "staging_allocation_metrics",
+        "commit_allocation_metrics",
+        "commit_core_allocation_metrics",
+        "publication_allocation_metrics"
+      ],
+      "phase_boundary": "The staging vector ends after the final edit.set; the commit-core vector begins immediately before edit.commit() and ends after its returned value; the combined vector retains the original enclosing interval."
+    },
+    "noise": {
+      "stage": "baseline",
+      "execution_stage": "baseline",
+      "rows": "The 8 primary case-shape rows only",
+      "repeats": 2,
+      "warmup": 20,
+      "samples": 1000,
+      "must_complete_before_candidate": true,
+      "purpose": "Descriptive baseline-only run used to freeze the primary improvement floor; it is not a candidate result and cannot be substituted by an older repeat or profile."
+    }
+  },
+  "threshold": {
+    "status": "pending baseline noise; candidate output must not be observed before this record is frozen",
+    "noise_definition": {
+      "N": "The largest absolute relative p50 change across the 8 primary rows between baseline noise R1 and R2.",
+      "p50_unit": "nanoseconds",
+      "relative_change_percent": "100 * abs(noise_r2_p50_ns - noise_r1_p50_ns) / noise_r1_p50_ns",
+      "N_unit": "percentage points",
+      "row_requirement": "Both p50 values must be positive finite nanosecond values; retain the row that determines N.",
+      "instability_limit_percent": 5.0,
+      "instability_rule": "If N > 5.0 percentage points, the pilot is too unstable for an adoption decision. Retain both noise repeats and stop the candidate gate; do not rerun noise to seek a smaller N."
+    },
+    "primary_floor_percent": "max(1.0, 3 * N, 100 * 50000 / matched_baseline_p50_ns)",
+    "floor_units": "percentage points; 50000 is nanoseconds and matched_baseline_p50_ns is nanoseconds, so 100 * 50000 / matched_baseline_p50_ns is a percentage-point value",
+    "stable_pilot_rule": "Only when N <= 5.0 percentage points may the computed floor be frozen and candidate output be collected.",
+    "paired_primary_gate": "For each of the 8 primary rows in each paired repeat, candidate_p50_ns <= matched_baseline_p50_ns * (1 - primary_floor_percent / 100). The matched baseline is R1 for candidate R1 and R2 for candidate R2.",
+    "primary_mean_gate": "Each primary mean must not increase by more than 5% in either paired repeat.",
+    "control_gate": "Every control p50 and mean must not increase by more than 5% in either paired repeat.",
+    "rss_gate": "Every retained process-RSS comparison must not increase by more than 5%; report each case-shape child sidecar without synthesizing an unscoped group value.",
+    "allocation_gate": "Every reported allocation metric row for every case-shape child and repeat must not increase by more than 5%, including calls, reallocations, bytes, live endpoints, and region peak for each available source phase vector. The combined interval remains a separate diagnostic and is not added to either split interval.",
+    "allocation_unavailable_policy": "Source-backed XLSX reports plan, staging, combined staging+commit, commit-core, and publication phase vectors. Eager controls omit allocation vectors in the harness JSON; the analyzer must explicitly record that absence as unavailable, with native elapsed and process RSS controls retained. No unavailable or absent field is a measured zero. These phase vectors do not measure all workflow allocations.",
+    "adverse_review": "Retain and individually review every absolute adverse or same-build drift above 5%; no selective rerun, mean-only rescue, geometric-mean masking, or post-result threshold relaxation.",
+    "gate_lanes": {
+      "native_timing": "native only; primary and control elapsed p50/mean admission gates",
+      "allocator_timing": "allocator diagnostics only; no elapsed admission gate",
+      "process_rss": "native and allocator per-case-shape child sidecars",
+      "allocation_metrics": "allocator only; source-backed phase vectors when measured; eager is unavailable"
+    }
+  },
+  "capture": {
+    "output_stage": "The folder holding the retained binary and child output.",
+    "execution_stage": "The source manifest checked before and after the live child; baseline R2 intentionally uses output stage baseline with execution stage candidate.",
+    "guard_asymmetry": "The output-stage guard validates the retained manifest file, lock identities, and before/after manifest immutability without comparing output-stage source hashes to live source. The execution-stage guard validates its manifest against the current full source path set and hashes before and after every child.",
+    "artifact_names": [
+      "<job>.json",
+      "<job>.catalog.json",
+      "<job>.rss.json",
+      "<job>.stdout",
+      "<job>.stderr",
+      "<job>.host.json",
+      "<job>.receipt.json"
+    ],
+    "identity_requirements": [
+      "Full source manifest for crates, tools/perf-baseline, workspace manifests, toolchain, and relevant cargo configuration.",
+      "Ignored workspace Cargo.lock, retained workspace-Cargo.lock copy, and workspace-lock.json binding.",
+      "Binary hash before and after every binary-backed child.",
+      "Output-stage and execution-stage manifest hashes and full before/after guard records.",
+      "Plan and driver hashes, exact argv, selected environment, timing, exit status, and artifact hashes."
+    ],
+    "no_overwrite": "Every evidence path is opened or reserved exclusively before a child starts. A colliding receipt, host record, stdout/stderr, JSON, catalog, or time sidecar aborts before execution."
+  },
+  "source_guard_test": {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0557/run.py",
+      "guard-test",
+      "--stage",
+      "baseline",
+      "--execution-stage",
+      "candidate"
+    ],
+    "when": "After baseline and candidate manifests are frozen and before the first candidate build or capture.",
+    "proof": "The retained baseline output manifest is accepted in manifest-only scope while the candidate execution manifest is checked against live source; a synthetic execution digest mutation is refused without mutating repository files."
+  },
+  "quality": {
+    "commands": [
+      {
+        "name": "xlsx-tests",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "litchi-xlsx",
+          "--all-features"
+        ]
+      },
+      {
+        "name": "xlsx-clippy",
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "-p",
+          "litchi-xlsx",
+          "--all-features",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      },
+      {
+        "name": "workspace-check",
+        "argv": [
+          "cargo",
+          "check",
+          "--locked",
+          "--workspace",
+          "--all-features"
+        ]
+      },
+      {
+        "name": "xlsx-doc",
+        "argv": [
+          "cargo",
+          "doc",
+          "--locked",
+          "-p",
+          "litchi-xlsx",
+          "--all-features",
+          "--no-deps"
+        ],
+        "environment": {
+          "RUSTDOCFLAGS": "-D warnings"
+        }
+      },
+      {
+        "name": "xlsx-minimal",
+        "argv": [
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "litchi-xlsx",
+          "--no-default-features"
+        ]
+      },
+      {
+        "name": "format",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--all",
+          "--",
+          "--check"
+        ]
+      }
+    ],
+    "harness_commands": [
+      {
+        "name": "perf-baseline-lib-tests",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--lib",
+          "--all-features",
+          "--",
+          "--test-threads=1"
+        ]
+      },
+      {
+        "name": "perf-baseline-alloc-tests",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline-alloc",
+          "--features",
+          "allocator-metrics",
+          "--",
+          "--test-threads=1"
+        ]
+      },
+      {
+        "name": "perf-baseline-xlsx-planning-allocations",
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--test",
+          "xlsx_planning_allocations",
+          "--features",
+          "allocator-metrics",
+          "--",
+          "--test-threads=1"
+        ]
+      },
+      {
+        "name": "perf-baseline-clippy",
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--all-targets",
+          "--all-features",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      },
+      {
+        "name": "perf-baseline-doc",
+        "argv": [
+          "cargo",
+          "doc",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--all-features",
+          "--no-deps"
+        ],
+        "environment": {
+          "RUSTDOCFLAGS": "-D warnings"
+        }
+      },
+      {
+        "name": "perf-baseline-format",
+        "argv": [
+          "cargo",
+          "fmt",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--all",
+          "--",
+          "--check"
+        ]
+      }
+    ],
+    "runner": "The driver check action binds an arbitrary argv to a frozen stage; callers record any command-specific environment such as RUSTDOCFLAGS in the receipt."
+  },
+  "diagnostics": {
+    "profiling": {
+      "status": "deferred until numeric gates pass",
+      "required_owner": "litchi_xlsx::cell::Store::merge_omitted_cells",
+      "companion_owner": "litchi_xlsx::cell::Store::from_unsorted",
+      "rule": "Positive timed attribution with caller ancestry, including an inline mapping if the target symbol is absent, is required for adoption."
+    },
+    "hardware": {
+      "status": "optional diagnostic; not an admission gate or a portability claim",
+      "available_probe_events": [
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-references",
+        "cache-misses"
+      ],
+      "owner": "Root may retain a separately receipt-bound probe if the environment permits it."
+    }
+  },
+  "correctness": {
+    "required": [
+      "Strict address ordering and duplicate refusal for both input sequences.",
+      "Ordered non-overlapping one-row omission rectangles and source/parsed collision refusal.",
+      "All Stored fields, rows, columns, defaults, merge ranges, cell_rows, merge index, and three cell bounds match the complete parser.",
+      "Checked count/reservation and allocation-failure fallback retain existing error precedence and publication behavior.",
+      "No-op source sharing, exact output bytes, malformed/unsupported fallback, source conflicts, cancellation, execution interruption, and partial sink failure retain their existing behavior.",
+      "Full workspace and feature quality checks pass for the selected candidate and restored baseline if the candidate is rejected."
+    ],
+    "disposition": "Reject and restore the baseline on any mandatory gate failure; preserve all measurements, failures, drifts, and review records."
+  },
+  "exclusions": [
+    "No ODF or iWork work in this campaign.",
+    "No cold-cache, hardware-independent, physical-device, remote-provider, native-producer, or scaling claim.",
+    "No adoption from a profile-only improvement, a missing symbol, a lower instruction count, or an absent allocation field."
+  ],
+  "source_binding": {
+    "source_manifest": "{stage}/source-manifest.json",
+    "workspace_lock_binding": "workspace-lock.json",
+    "workspace_lock_copy": "workspace-Cargo.lock",
+    "receipt_schema": "xlsx_linear_merge_0557_run_receipt_v1",
+    "owned_target": "/home/zhuhe/litchi-goal-0557-target",
+    "temporary_storage": "/home/zhuhe/litchi-goal-0557-target/tmp",
+    "cargo_target_dir": "/home/zhuhe/litchi-goal-0557-target",
+    "build_jobs": 2,
+    "incremental": false
+  }
+}

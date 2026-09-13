@@ -1,0 +1,1353 @@
+#!/usr/bin/env python3
+"""Validate and compare the 0557 matched XLSX measurements.
+
+The driver and the Rust binary own execution and serialization.  This module
+only consumes their retained JSON artifacts.  It performs the baseline noise
+calculation, validates the four-stage matched matrix, and emits a deterministic
+report.  No build, benchmark, or external command is run here.
+
+``--noise-only`` is useful immediately after the required baseline pilot.  The
+normal invocation requires the complete noise, native, and allocator matrix.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as _datetime
+import hashlib
+import importlib.util
+import json
+import math
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+
+sys.dont_write_bytecode = True
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parents[3]
+
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+REVISION = re.compile(r"^[0-9a-f]{40}$")
+SHAPES = ("medium", "dense-sparse", "noncompact", "vendor-extension")
+PRIMARY = (
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+)
+CONTROLS = (
+    "xlsx_source_backed_cell_values_batch_edit_save",
+    "xlsx_source_backed_cell_values_multi_sheet_edit_save",
+    "xlsx_source_backed_managed_cell_values_one_edit_save",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "xlsx_eager_cell_values_one_edit_save",
+    "xlsx_eager_cell_values_one_percent_edit_save",
+)
+CASES = PRIMARY + CONTROLS
+LANES = ("native", "alloc")
+STAGES = ("baseline", "candidate", "final")
+TIMING_STATS = (
+    "min", "p50", "p95", "p99", "max", "mean", "standard_deviation",
+)
+CI_STATS = ("confidence_interval_95.lower", "confidence_interval_95.upper")
+COMPARE_STATS = TIMING_STATS + CI_STATS
+ALLOC_FIELDS = (
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after",
+    "region_peak_live_bytes",
+    "incremental_region_peak_live_bytes",
+)
+ALLOC_PHASES = (
+    ("plan", "plan_allocation_metrics"),
+    ("staging", "staging_allocation_metrics"),
+    ("commit", "commit_allocation_metrics"),
+    ("commit_core", "commit_core_allocation_metrics"),
+    ("publication", "publication_allocation_metrics"),
+)
+ALLOC_SAMPLE_FIELDS = (
+    "allocation_calls", "deallocation_calls", "reallocation_calls",
+    "failed_allocation_calls", "allocated_bytes", "deallocated_bytes",
+    "live_bytes_before", "live_bytes_after", "peak_live_bytes_before",
+    "peak_live_bytes_after", "region_peak_live_bytes",
+)
+RSS_FIELDS = ("max_rss_kib", "elapsed_seconds", "user_seconds", "system_seconds")
+RECEIPT_ENVIRONMENT = (
+    "TMPDIR", "CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL",
+    "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "LD_PRELOAD",
+    "MALLOC_CONF", "GLIBC_TUNABLES",
+)
+HOST_SCOPE = "Accessible compiler processes only; no host quiescence guarantee"
+CATALOG_BINDING = REPO / "tools" / "validate_perf_corpus_binding.py"
+
+
+class EvidenceError(ValueError):
+    """A missing, malformed, or contradictory retained artifact."""
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise EvidenceError(message)
+
+
+def read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise EvidenceError(f"cannot read JSON {path}: {error}") from error
+
+
+def digest(path: Path) -> str:
+    try:
+        with path.open("rb") as stream:
+            return hashlib.file_digest(stream, "sha256").hexdigest()
+    except OSError as error:
+        raise EvidenceError(f"cannot hash {path}: {error}") from error
+
+
+def hash_value(value: Any, label: str) -> str:
+    require(isinstance(value, str) and SHA256.fullmatch(value) is not None,
+            f"{label} is not a lowercase SHA-256")
+    return value
+
+
+def revision(value: Any, label: str) -> str:
+    require(isinstance(value, str) and REVISION.fullmatch(value) is not None,
+            f"{label} is not a lowercase revision")
+    return value
+
+
+def integer(value: Any, label: str, positive: bool = False) -> int:
+    require(isinstance(value, int) and not isinstance(value, bool) and value >= 0,
+            f"{label} is not a nonnegative integer")
+    if positive:
+        require(value > 0, f"{label} is not positive")
+    return value
+
+
+def number(value: Any, label: str, positive: bool = False) -> float:
+    require(isinstance(value, (int, float)) and not isinstance(value, bool),
+            f"{label} is not numeric")
+    result = float(value)
+    require(math.isfinite(result), f"{label} is not finite")
+    if positive:
+        require(result > 0.0, f"{label} is not positive")
+    return result
+
+
+def timestamp(value: Any, label: str) -> _datetime.datetime:
+    require(isinstance(value, str), f"{label} timestamp is missing")
+    try:
+        result = _datetime.datetime.fromisoformat(value)
+    except ValueError as error:
+        raise EvidenceError(f"{label} timestamp is malformed") from error
+    require(result.tzinfo is not None, f"{label} timestamp has no timezone")
+    return result
+
+
+def vector(value: Any, count: int, label: str) -> list[Any]:
+    require(isinstance(value, list), f"{label} is not a vector")
+    require(len(value) == count, f"{label} has {len(value)} values, expected {count}")
+    return value
+
+
+def integer_vector(value: Any, count: int, label: str) -> list[int]:
+    values = vector(value, count, label)
+    for index, item in enumerate(values):
+        integer(item, f"{label}[{index}]")
+    return values  # type: ignore[return-value]
+
+
+def nearest_rank(values: list[int], percentile: int) -> int:
+    index = min((percentile * len(values) + 99) // 100 - 1, len(values) - 1)
+    return sorted(values)[index]
+
+
+def student_t_critical_95(degrees: int) -> float:
+    table = (
+        12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306,
+        2.262, 2.228, 2.201, 2.179, 2.160, 2.145, 2.131, 2.120,
+        2.110, 2.101, 2.093, 2.086, 2.080, 2.074, 2.069, 2.064,
+        2.060, 2.056, 2.052, 2.048, 2.045, 2.042,
+    )
+    if degrees == 0:
+        return 0.0
+    if degrees <= len(table):
+        return table[degrees - 1]
+    z = 1.959963984540054
+    z2 = z * z
+    z3 = z2 * z
+    z5 = z3 * z2
+    z7 = z5 * z2
+    d = float(degrees)
+    return (z + (z3 + z) / (4 * d)
+            + (5 * z5 + 16 * z3 + 3 * z) / (96 * d * d)
+            + (3 * z7 + 19 * z5 + 17 * z3 - 15 * z)
+            / (384 * d * d * d))
+
+
+def statistics(values: list[int], unit: str) -> dict[str, Any]:
+    require(values, "statistics vector is empty")
+    for index, value in enumerate(values):
+        integer(value, f"statistics[{index}]")
+    ordered = sorted(values)
+    left = ordered[(len(ordered) - 1) // 2]
+    right = ordered[len(ordered) // 2]
+    # Match the Rust harness' overflow-safe integer midpoint for an even
+    # sample count rather than selecting only the upper middle observation.
+    p50 = left // 2 + right // 2 + (left % 2 + right % 2) // 2
+    mean = sum(values) / len(values)
+    deviation = (math.sqrt(sum((value - mean) ** 2 for value in values)
+                            / (len(values) - 1)) if len(values) > 1 else 0.0)
+    margin = student_t_critical_95(len(values) - 1) * deviation / math.sqrt(len(values))
+    return {
+        "unit": unit,
+        # The harness report uses ``samples`` for the sorted raw vector.  Keep
+        # that vector in the derived object too; a count-only check would let
+        # a report replace the retained observations with a different vector.
+        "samples": list(values),
+        "min": min(values),
+        "p50": p50,
+        "p95": nearest_rank(values, 95),
+        "p99": nearest_rank(values, 99),
+        "max": max(values),
+        "mean": mean,
+        "standard_deviation": deviation,
+        "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": max(0.0, mean - margin),
+            "upper": mean + margin,
+        },
+    }
+
+
+def close(actual: Any, expected: Any, label: str) -> None:
+    number(actual, label)
+    number(expected, f"expected {label}")
+    require(math.isclose(float(actual), float(expected), rel_tol=1e-12, abs_tol=1e-6),
+            f"{label} differs: {actual!r} != {expected!r}")
+
+
+def validate_statistics(actual: Any, values: list[int], label: str,
+                        unit: str = "ns") -> dict[str, Any]:
+    require(isinstance(actual, dict), f"{label} is not an object")
+    expected = statistics(values, unit)
+    require(actual.get("unit") == unit, f"{label}.unit differs")
+    require(actual.get("samples") == values, f"{label}.samples differs")
+    for field in TIMING_STATS:
+        close(actual.get(field), expected[field], f"{label}.{field}")
+    interval = actual.get("confidence_interval_95")
+    require(isinstance(interval, dict), f"{label}.confidence_interval_95 is missing")
+    require(interval.get("method") == expected["confidence_interval_95"]["method"],
+            f"{label}.confidence_interval_95.method differs")
+    for field in ("lower", "upper"):
+        close(interval.get(field), expected["confidence_interval_95"][field],
+              f"{label}.confidence_interval_95.{field}")
+    return expected
+
+
+def recursive_values(value: Any, label: str, vector_count: int | None = None) -> None:
+    if value is None or isinstance(value, (bool, str)):
+        return
+    if isinstance(value, int):
+        integer(value, label)
+    elif isinstance(value, float):
+        number(value, label)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            recursive_values(item, f"{label}[{index}]")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            require(isinstance(key, str), f"{label} has a non-string key")
+            if key == "values" and isinstance(item, list) and vector_count is not None:
+                require(len(item) == vector_count,
+                        f"{label}.values has {len(item)} values, expected {vector_count}")
+            recursive_values(item, f"{label}.{key}", vector_count)
+    else:
+        raise EvidenceError(f"{label} has an unsupported JSON value")
+
+
+def plan_data() -> dict[str, Any]:
+    plan = read_json(HERE / "plan.json")
+    require(isinstance(plan, dict), "plan is not an object")
+    revision(plan.get("revision"), "plan.revision")
+    require(plan.get("schema") == "xlsx_linear_merge_0557_plan_v1",
+            "plan schema differs")
+    require(plan.get("priority") == (
+        "OLE2 and OOXML first; ODF deferred until the OLE2/OOXML optimization goal completes; iWork excluded"
+    ), "plan priority differs")
+    require(plan.get("corpus", {}).get("shapes") == list(SHAPES),
+            "plan shape order differs")
+    require(plan.get("corpus", {}).get("expected_matrix_rows") == 32,
+            "plan matrix count differs")
+    workloads = plan.get("workloads")
+    require(isinstance(workloads, dict), "plan workloads are missing")
+    require([item.get("case") for item in workloads.get("primary", [])] == list(PRIMARY),
+            "plan primary cases differ")
+    require([item.get("case") for item in workloads.get("controls", [])] == list(CONTROLS),
+            "plan control cases differ")
+    require(workloads.get("primary_row_count") == 8
+            and workloads.get("control_row_count") == 24,
+            "plan workload row counts differ")
+    timing = plan.get("timing")
+    require(isinstance(timing, dict) and timing.get("cpu") == 2,
+            "plan timing CPU differs")
+    require(timing.get("normal", {}).get("repeats") == 2
+            and timing["normal"].get("warmup") == 20
+            and timing["normal"].get("samples") == 1000,
+            "plan native counts differ")
+    require(timing.get("allocation", {}).get("repeats") == 2
+            and timing["allocation"].get("warmup") == 3
+            and timing["allocation"].get("samples") == 30,
+            "plan allocation counts differ")
+    noise = timing.get("noise")
+    require(isinstance(noise, dict) and noise.get("repeats") == 2
+            and noise.get("warmup") == 20 and noise.get("samples") == 1000,
+            "plan noise counts differ")
+    require(noise.get("rows") == "The 8 primary case-shape rows only",
+            "plan noise scope differs")
+    threshold = plan.get("threshold")
+    require(isinstance(threshold, dict), "plan threshold is missing")
+    definition = threshold.get("noise_definition")
+    require(isinstance(definition, dict), "plan noise definition is missing")
+    require(definition.get("relative_change_percent") == (
+        "100 * abs(noise_r2_p50_ns - noise_r1_p50_ns) / noise_r1_p50_ns"
+    ), "plan noise formula differs")
+    require(definition.get("instability_limit_percent") == 5.0,
+            "plan noise instability limit differs")
+    require(threshold.get("primary_floor_percent") == (
+        "max(1.0, 3 * N, 100 * 50000 / matched_baseline_p50_ns)"
+    ), "plan primary floor formula differs")
+    require(threshold.get("floor_units") == (
+        "percentage points; 50000 is nanoseconds and matched_baseline_p50_ns is nanoseconds, so 100 * 50000 / matched_baseline_p50_ns is a percentage-point value"
+    ), "plan primary floor units differ")
+    return plan
+
+
+def expected_corpus() -> tuple[dict[tuple[str, str], dict[str, Any]], dict[str, dict[str, Any]]]:
+    source = HERE / "expected-primary.json"
+    value = read_json(source)
+    require(isinstance(value, dict), "expected-primary is not an object")
+    require(value.get("scope") == (
+        "Retained deterministic generator identities for validation; these are not fresh measurements. "
+        "Telemetry-only harness changes must leave generators unchanged, and every fresh capture must "
+        "independently match these identities."
+    ), "expected-primary scope differs")
+    rows = value.get("rows")
+    require(isinstance(rows, list) and len(rows) == len(PRIMARY) * len(SHAPES),
+            "expected-primary row count differs")
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    by_shape: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        require(isinstance(row, dict), "expected-primary row is not an object")
+        key = (row.get("case"), row.get("shape"))
+        require(key not in by_key and key[0] in PRIMARY and key[1] in SHAPES,
+                f"duplicate or invalid expected-primary key {key}")
+        corpus = row.get("corpus")
+        require(isinstance(corpus, dict), f"expected corpus missing for {key}")
+        hash_value(corpus.get("archive_sha256"), f"expected {key} archive")
+        hash_value(row.get("output_sha256"), f"expected {key} output")
+        by_key[key] = row
+        if key[1] in by_shape:
+            require(by_shape[key[1]] == corpus, f"expected corpus differs within {key[1]}")
+        else:
+            by_shape[key[1]] = corpus
+        reference = REPO / row["reference_path"]
+        require(reference.is_file(), f"expected reference is missing: {reference}")
+        require(digest(reference) == row["reference_sha256"],
+                f"expected reference hash differs: {reference}")
+    require(set(by_shape) == set(SHAPES), "expected corpus shape coverage differs")
+    return by_key, by_shape
+
+
+def source_manifest(stage: str) -> dict[str, str]:
+    path = HERE / stage / "source-manifest.json"
+    require(path.is_file(), f"{stage} source manifest is missing")
+    value = read_json(path)
+    require(isinstance(value, dict) and value, f"{stage} source manifest is empty")
+    for name, item in value.items():
+        require(isinstance(name, str) and name and not Path(name).is_absolute(),
+                f"{stage} source manifest has an invalid path")
+        hash_value(item, f"{stage} source manifest {name}")
+    return value
+
+
+def validate_host(path: Path) -> dict[str, Any]:
+    value = read_json(path)
+    require(isinstance(value, dict), f"{path.name} host record is not an object")
+    require(value.get("scope") == HOST_SCOPE, f"{path.name} host scope differs")
+    processes = value.get("compiler_processes")
+    require(isinstance(processes, list), f"{path.name} compiler process list is missing")
+    for index, process in enumerate(processes):
+        require(isinstance(process, dict), f"{path.name} process {index} is not an object")
+        integer(process.get("pid"), f"{path.name} process {index}.pid", positive=True)
+        require(process.get("comm") in ("cargo", "rustc", "rustdoc"),
+                f"{path.name} process {index}.comm differs")
+        require(isinstance(process.get("cwd"), str) and process["cwd"],
+                f"{path.name} process {index}.cwd is missing")
+    return value
+
+
+def validate_rss(path: Path) -> dict[str, Any]:
+    value = read_json(path)
+    require(isinstance(value, dict) and set(value) == set(RSS_FIELDS),
+            f"{path.name} RSS schema differs")
+    integer(value["max_rss_kib"], f"{path.name}.max_rss_kib")
+    for field in RSS_FIELDS[1:]:
+        number(value[field], f"{path.name}.{field}")
+    return value
+
+
+def validate_receipt(path: Path, name: str, stage: str, execution: str,
+                     kind: str, folder: Path, binary: dict[str, Any],
+                     plan: dict[str, Any], case: str, shape: str,
+                     warmup: int, samples: int, lane: str) -> dict[str, Any]:
+    value = read_json(path)
+    require(isinstance(value, dict), f"{path.name} receipt is not an object")
+    require(value.get("schema") == "xlsx_linear_merge_0557_run_receipt_v1",
+            f"{path.name} receipt schema differs")
+    require(value.get("name") == name and value.get("stage") == stage
+            and value.get("execution_stage") == execution,
+            f"{path.name} receipt identity differs")
+    require(value.get("child_started") is True and value.get("success") is True
+            and value.get("exit_code") == 0 and value.get("spawn_error") is None,
+            f"{path.name} child did not succeed")
+    start = timestamp(value.get("start_utc"), f"{path.name}.start_utc")
+    end = timestamp(value.get("end_utc"), f"{path.name}.end_utc")
+    require(start < end, f"{path.name} timestamps are not increasing")
+    number(value.get("seconds"), f"{path.name}.seconds", positive=True)
+    require(value.get("plan_sha256") == digest(HERE / "plan.json"),
+            f"{path.name} plan hash differs")
+    require(value.get("script_sha256") == digest(HERE / "run.py"),
+            f"{path.name} driver hash differs")
+    stage_manifest = source_manifest(stage)
+    execution_manifest = source_manifest(execution)
+    require(value.get("output_stage_manifest_sha256") == digest(
+        HERE / stage / "source-manifest.json"), f"{path.name} output manifest differs")
+    require(value.get("execution_stage_manifest_sha256") == digest(
+        HERE / execution / "source-manifest.json"), f"{path.name} execution manifest differs")
+    require(value.get("output_stage_before", {}).get("ok") is True
+            and value["output_stage_before"]["identity"]["manifest_sha256"]
+            == digest(HERE / stage / "source-manifest.json")
+            and value["output_stage_before"]["identity"].get("guard_scope")
+            == "manifest-only",
+            f"{path.name} output pre-guard differs")
+    require(value.get("execution_stage_before", {}).get("ok") is True
+            and value["execution_stage_before"]["identity"]["manifest_sha256"]
+            == digest(HERE / execution / "source-manifest.json")
+            and value["execution_stage_before"]["identity"].get("guard_scope")
+            == "live-source",
+            f"{path.name} execution pre-guard differs")
+    require(value.get("output_stage_after", {}).get("ok") is True
+            and value["output_stage_after"]["identity"]["manifest_sha256"]
+            == digest(HERE / stage / "source-manifest.json")
+            and value["output_stage_after"]["identity"].get("guard_scope")
+            == "manifest-only",
+            f"{path.name} output post-guard differs")
+    require(value.get("execution_stage_after", {}).get("ok") is True
+            and value["execution_stage_after"]["identity"]["manifest_sha256"]
+            == digest(HERE / execution / "source-manifest.json")
+            and value["execution_stage_after"]["identity"].get("guard_scope")
+            == "live-source",
+            f"{path.name} execution post-guard differs")
+    require(value.get("binary_path") == binary["path"]
+            and value.get("binary_sha256") == binary["sha256"]
+            and value.get("binary_before_sha256") == binary["sha256"]
+            and value.get("binary_after_sha256") == binary["sha256"]
+            and value.get("binary_unchanged") is True,
+            f"{path.name} binary custody differs")
+    descriptor = folder / f"binary-{kind}.json"
+    require(value.get("binary_descriptor_path") == str(descriptor)
+            and value.get("binary_descriptor_before_sha256") == binary["descriptor_sha256"]
+            and value.get("binary_descriptor_after_sha256") == binary["descriptor_sha256"]
+            and value.get("binary_descriptor_unchanged") is True
+            and value.get("binary_descriptor_error") is None,
+            f"{path.name} binary descriptor custody differs")
+    require(value.get("output_manifest_unchanged") is True
+            and value.get("execution_manifest_unchanged") is True,
+            f"{path.name} manifest custody differs")
+    require(value.get("source_manifest_sha256") == digest(
+        HERE / stage / "source-manifest.json")
+            and value.get("execution_manifest_sha256") == digest(
+                HERE / execution / "source-manifest.json"),
+            f"{path.name} source manifest bindings differ")
+    lock_binding = read_json(HERE / "workspace-lock.json")
+    require(value.get("workspace_lock_sha256") == lock_binding.get("sha256")
+            and value.get("workspace_lock_copy_sha256") == lock_binding.get("sha256")
+            and value.get("workspace_lock_binding_sha256") == digest(HERE / "workspace-lock.json"),
+            f"{path.name} workspace lock bindings differ")
+    environment = value.get("environment")
+    require(isinstance(environment, dict) and set(environment) == set(RECEIPT_ENVIRONMENT),
+            f"{path.name} environment schema differs")
+    require(environment.get("TMPDIR") == str(Path(plan["source_binding"]["owned_target"]) / "tmp"),
+            f"{path.name} TMPDIR differs")
+    require(environment.get("CARGO_TARGET_DIR") == str(plan["source_binding"]["owned_target"])
+            and environment.get("CARGO_BUILD_JOBS") == "2"
+            and environment.get("CARGO_INCREMENTAL") == "0",
+            f"{path.name} build environment differs")
+    for field in ("CARGO_TARGET_DIR", "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS",
+                  "RUSTDOCFLAGS", "LD_PRELOAD", "MALLOC_CONF", "GLIBC_TUNABLES"):
+        if field != "CARGO_TARGET_DIR":
+            require(environment.get(field) is None, f"{path.name} has uncontrolled {field}")
+    binary_path = binary["path"]
+    expected = [
+        "taskset", "-c", str(plan["timing"]["cpu"]), "/usr/bin/time", "-f",
+        '{"max_rss_kib":%M,"elapsed_seconds":%e,"user_seconds":%U,"system_seconds":%S}',
+        "-o", str(folder / f"{name}.rss.json"), binary_path, "--case", case,
+        "--xlsx-cell-crud-shape", shape, "--warmup", str(warmup), "--samples",
+        str(samples), "--json", str(folder / f"{name}.json"), "--corpus-manifest",
+        str(folder / f"{name}.catalog.json"),
+    ]
+    require(value.get("command") == expected, f"{path.name} command differs")
+    artifacts = value.get("artifacts")
+    expected_artifacts = {
+        f"{name}.json", f"{name}.catalog.json", f"{name}.rss.json",
+        f"{name}.stdout", f"{name}.stderr", f"{name}.host.json",
+    }
+    require(isinstance(artifacts, dict) and set(artifacts) == expected_artifacts,
+            f"{path.name} artifact inventory differs")
+    for artifact_name, expected_hash in artifacts.items():
+        hash_value(expected_hash, f"{path.name}.{artifact_name}")
+        artifact = folder / artifact_name
+        require(artifact.is_file() and not artifact.is_symlink(),
+                f"{path.name} artifact is missing: {artifact_name}")
+        require(digest(artifact) == expected_hash,
+                f"{path.name} artifact hash differs: {artifact_name}")
+    # Keep these fields in the report even though process-time sidecar values
+    # are diagnostic and never enter the elapsed comparison.
+    host = validate_host(folder / f"{name}.host.json")
+    rss = validate_rss(folder / f"{name}.rss.json")
+    return {
+        "receipt": value,
+        "receipt_sha256": digest(path),
+        "manifest_entries": {"output": len(stage_manifest), "execution": len(execution_manifest)},
+        "host": host,
+        "rss": rss,
+        "artifacts": {key: artifacts[key] for key in sorted(artifacts)},
+    }
+
+
+def validate_binary(stage: str, kind: str, plan: dict[str, Any]) -> dict[str, Any]:
+    folder = HERE / stage
+    descriptor_path = folder / f"binary-{kind}.json"
+    value = read_json(descriptor_path)
+    require(isinstance(value, dict), f"{descriptor_path.name} is not an object")
+    require(value.get("schema") == "xlsx_linear_merge_0557_binary_identity_v1"
+            and value.get("kind") == kind and value.get("stage") == stage,
+            f"{descriptor_path.name} identity differs")
+    path = Path(value.get("path", ""))
+    require(not path.is_symlink(), f"{descriptor_path.name} names a symlink")
+    hash_value(value.get("sha256"), f"{descriptor_path.name}.sha256")
+    integer(value.get("bytes"), f"{descriptor_path.name}.bytes", positive=True)
+    if path.is_file():
+        require(digest(path) == value["sha256"] and path.stat().st_size == value["bytes"],
+                f"{descriptor_path.name} binary bytes differ")
+    else:
+        cleanup = read_json(HERE / "cleanup.json") if (HERE / "cleanup.json").is_file() else {}
+        custody = cleanup.get("binary_sha256_by_kind", {}) if isinstance(cleanup, dict) else {}
+        require(value["sha256"] in custody.values(),
+                f"{descriptor_path.name} has no retained post-cleanup custody")
+    require(value.get("source_manifest_sha256") == digest(folder / "source-manifest.json"),
+            f"{descriptor_path.name} source manifest differs")
+    require(value.get("build_receipt_sha256") == digest(folder / "build-{0}.receipt.json".format(kind)),
+            f"{descriptor_path.name} build receipt differs")
+    build = read_json(folder / f"build-{kind}.receipt.json")
+    require(build.get("schema") == "xlsx_linear_merge_0557_run_receipt_v1"
+            and build.get("name") == f"build-{kind}" and build.get("exit_code") == 0
+            and build.get("success") is True,
+            f"build-{kind} receipt is not successful")
+    require(build.get("plan_sha256") == digest(HERE / "plan.json")
+            and build.get("script_sha256") == digest(HERE / "run.py"),
+            f"build-{kind} receipt bindings differ")
+    require(build.get("binary_path") is None and build.get("binary_sha256") is None,
+            f"build-{kind} receipt unexpectedly carries a binary child hash")
+    return {
+        "path": str(path), "sha256": value["sha256"], "bytes": value["bytes"],
+        "descriptor_sha256": digest(descriptor_path),
+        "build_receipt_sha256": value["build_receipt_sha256"],
+        "kind": kind,
+    }
+
+
+def validate_operation_metrics(value: Any, count: int, label: str) -> dict[str, Any]:
+    require(isinstance(value, dict), f"{label}.operation_metrics is missing")
+    require(value.get("sample_count") == count
+            and value.get("sample_indices") == list(range(count)),
+            f"{label}.operation_metrics sample identity differs")
+    require(value.get("alignment") == "elapsed_ns.samples_by_elapsed_then_sample_index",
+            f"{label}.operation_metrics alignment differs")
+    require(value.get("latency_claim") == "comparable_timed_operation",
+            f"{label}.operation_metrics latency claim differs")
+    # Every optional operation section remains in the source report.  Validate
+    # its status and vectors when present, but do not turn a missing eager-only
+    # phase into a fabricated zero or a universal allocation claim.
+    for section_name in ("source", "process", "sink", "publication", "materialization", "cfb_phases"):
+        section = value.get(section_name)
+        require(isinstance(section, dict), f"{label}.operation_metrics.{section_name} is missing")
+        require(section.get("status") in ("measured", "not_applicable", "unavailable"),
+                f"{label}.operation_metrics.{section_name}.status differs")
+        recursive_values(section, f"{label}.operation_metrics.{section_name}", count)
+    for section_name in ("allocation", "opc_zip"):
+        section = value.get(section_name)
+        if section is None:
+            continue
+        require(isinstance(section, dict),
+                f"{label}.operation_metrics.{section_name} is malformed")
+        require(section.get("status") in ("measured", "not_applicable", "unavailable", "overflow"),
+                f"{label}.operation_metrics.{section_name}.status differs")
+        recursive_values(section, f"{label}.operation_metrics.{section_name}", count)
+    return value
+
+
+def allocation_sample(value: Any, label: str, measured: bool) -> dict[str, Any]:
+    require(isinstance(value, dict), f"{label} is not an object")
+    require(value.get("scope") == "operation_global_system_allocator",
+            f"{label}.scope differs")
+    status = value.get("status")
+    if not measured:
+        require(status == "unavailable" and set(value) == {"status", "scope"},
+                f"{label} is not an explicit unavailable sample")
+        return {"status": status, "scope": value["scope"]}
+    require(status == "measured" and set(value) == {"status", "scope", *ALLOC_SAMPLE_FIELDS},
+            f"{label} measured schema differs")
+    values = {field: integer(value.get(field), f"{label}.{field}") for field in ALLOC_SAMPLE_FIELDS}
+    require(values["failed_allocation_calls"] == 0, f"{label} records a failed allocation")
+    require(values["live_bytes_before"] + values["allocated_bytes"]
+            == values["live_bytes_after"] + values["deallocated_bytes"],
+            f"{label} live-byte balance differs")
+    require(values["peak_live_bytes_after"] >= values["peak_live_bytes_before"]
+            and values["peak_live_bytes_after"] >= values["live_bytes_after"],
+            f"{label} process peak moved backwards")
+    region = values["region_peak_live_bytes"]
+    require(region >= values["live_bytes_before"]
+            and region >= values["live_bytes_after"]
+            and region <= values["peak_live_bytes_after"],
+            f"{label} region peak is outside process bounds")
+    return {**values, "incremental_region_peak_live_bytes": region - values["live_bytes_before"]}
+
+
+def validate_source(source: Any, count: int, label: str, measured: bool,
+                    require_split: bool = True) -> dict[str, Any]:
+    if source is None:
+        return {"status": "not_applicable"}
+    require(isinstance(source, dict), f"{label}.source is not an object")
+    for field in ("read_calls", "read_bytes", "ordinary_payload_read_calls",
+                  "ordinary_payload_read_bytes", "max_in_flight_reads",
+                  "ordinary_payload_materializations"):
+        integer_vector(source.get(field), count, f"{label}.source.{field}")
+    xlsx = source.get("xlsx_cell_values")
+    if xlsx is None:
+        return {"status": "present_without_xlsx_phase"}
+    require(isinstance(xlsx, dict), f"{label}.source.xlsx_cell_values is not an object")
+    require(xlsx.get("implementation") in ("source-backed", "managed-source-backed"),
+            f"{label} source implementation differs")
+    integer(xlsx.get("update_count"), f"{label}.update_count")
+    integer(xlsx.get("selected_worksheet_count"), f"{label}.selected_worksheet_count")
+    phases: dict[str, list[int]] = {}
+    for phase in ("open_ns", "plan_ns", "commit_ns", "publication_ns", "reopen_ns"):
+        phases[phase] = integer_vector(xlsx.get(phase), count,
+                                       f"{label}.source.xlsx_cell_values.{phase}")
+    allocations: dict[str, dict[str, list[Any]]] = {}
+    for phase, field in ALLOC_PHASES:
+        if field not in xlsx:
+            require(not require_split,
+                    f"{label}.source.xlsx_cell_values.{field} is missing")
+            allocations[phase] = {"status": ["unavailable"] * count}
+            continue
+        samples = vector(xlsx.get(field), count,
+                         f"{label}.source.xlsx_cell_values.{field}")
+        entries = [allocation_sample(item, f"{label}.{field}[{index}]", measured)
+                   for index, item in enumerate(samples)]
+        allocations[phase] = {name: [item[name] for item in entries]
+                              for name in entries[0] if name != "status" and name != "scope"}
+        allocations[phase]["status"] = [item.get("status", "measured") for item in entries]
+    output_values = vector(xlsx.get("output_sha256"), count,
+                           f"{label}.source.xlsx_cell_values.output_sha256")
+    for index, item in enumerate(output_values):
+        hash_value(item, f"{label}.source output {index}")
+    require(len(set(output_values)) == 1,
+            f"{label}.source output changes between samples")
+    semantic_values = vector(xlsx.get("semantic_sha256"), count,
+                             f"{label}.source.xlsx_cell_values.semantic_sha256")
+    for index, item in enumerate(semantic_values):
+        hash_value(item, f"{label}.source semantic {index}")
+    require(len(set(semantic_values)) == 1,
+            f"{label}.source semantic output changes between samples")
+    integer(xlsx.get("untouched_member_count"), f"{label}.untouched_member_count")
+    untouched_values = vector(xlsx.get("untouched_member_sha256"), count,
+                              f"{label}.source untouched hashes")
+    for index, item in enumerate(untouched_values):
+        hash_value(item, f"{label}.source untouched hash {index}")
+    require(len(set(untouched_values)) == 1,
+            f"{label}.source untouched identity changes between samples")
+    # Check all other diagnostic arrays for cardinality and safe JSON values.
+    skip = {field for _, field in ALLOC_PHASES} | {
+        "open_ns", "plan_ns", "commit_ns", "publication_ns", "reopen_ns",
+        "output_sha256", "semantic_sha256", "untouched_member_sha256",
+    }
+    for field, item in xlsx.items():
+        if field in skip or not isinstance(item, list):
+            continue
+        vector(item, count, f"{label}.source.xlsx_cell_values.{field}")
+        for index, entry in enumerate(item):
+            recursive_values(entry, f"{label}.source.xlsx_cell_values.{field}[{index}]")
+    return {
+        "status": "measured" if measured else "unavailable",
+        "implementation": xlsx.get("implementation"),
+        "update_count": xlsx["update_count"],
+        "selected_worksheet_count": xlsx["selected_worksheet_count"],
+        "phases": phases,
+        "allocations": allocations,
+        "source_identity": {
+            key: value for key, value in xlsx.items()
+            if key not in skip and not isinstance(value, list)
+        },
+        "source_output_sha256": output_values[0],
+        "semantic_sha256": semantic_values[0],
+        "untouched_member_count": xlsx["untouched_member_count"],
+        "untouched_member_sha256": untouched_values[0],
+    }
+
+
+def catalog_binding(report: dict[str, Any], catalog_path: Path,
+                    label: str) -> dict[str, Any]:
+    catalog = read_json(catalog_path)
+    require(isinstance(catalog, dict), f"{label} catalog is not an object")
+    reference = report.get("corpus_catalog")
+    require(isinstance(reference, dict), f"{label}.corpus_catalog is missing")
+    for key in ("catalog_sha256", "content_set_sha256"):
+        hash_value(catalog.get(key), f"{label}.catalog.{key}")
+        require(reference.get(key) == catalog[key], f"{label} catalog {key} differs")
+    require(catalog.get("manifest_version") == 2
+            and catalog.get("catalog_id") == "litchi-perf-corpus-v2",
+            f"{label} catalog identity differs")
+    if CATALOG_BINDING.is_file():
+        spec = importlib.util.spec_from_file_location("binding_0557", CATALOG_BINDING)
+        require(spec is not None and spec.loader is not None, "cannot load catalog validator")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        try:
+            module.validate_binding(report, catalog)
+        except Exception as error:
+            raise EvidenceError(f"{label} catalog binding failed: {error}") from error
+    return {
+        "manifest_version": catalog["manifest_version"],
+        "catalog_id": catalog["catalog_id"],
+        "catalog_sha256": catalog["catalog_sha256"],
+        "content_set_sha256": catalog["content_set_sha256"],
+        "sha256": digest(catalog_path),
+    }
+
+
+def validate_report(path: Path, catalog_path: Path, info: dict[str, Any],
+                    binary: dict[str, Any], plan: dict[str, Any],
+                    expected_by_key: dict[tuple[str, str], dict[str, Any]],
+                    expected_by_shape: dict[str, dict[str, Any]],
+                    lane: str, label: str) -> dict[str, Any]:
+    report = read_json(path)
+    require(isinstance(report, dict) and report.get("schema_version") == 1,
+            f"{label} report schema differs")
+    tool = report.get("tool")
+    require(isinstance(tool, dict), f"{label}.tool is missing")
+    require(tool.get("binary") == ("litchi-perf-baseline-alloc" if lane == "alloc"
+                                    else "litchi-perf-baseline")
+            and tool.get("profile") == "release"
+            and tool.get("instrumentation") == (
+                "system_allocator_operation_scoped" if lane == "alloc" else "none"),
+            f"{label}.tool identity differs")
+    identity = report.get("binary_identity")
+    require(isinstance(identity, dict) and identity.get("path") == binary["path"]
+            and identity.get("binary_sha256") == binary["sha256"]
+            and identity.get("binary_bytes") == binary["bytes"]
+            and identity.get("profile") == "release",
+            f"{label}.binary_identity differs")
+    environment = report.get("environment")
+    require(isinstance(environment, dict)
+            and environment.get("git_revision") == plan["revision"]
+            and environment.get("cpu_affinity") == str(plan["timing"]["cpu"]),
+            f"{label}.environment differs")
+    configuration = report.get("configuration")
+    require(isinstance(configuration, dict)
+            and configuration.get("cases") == [info["case"]]
+            and configuration.get("xlsx_cell_crud_shapes") == [info["shape"]]
+            and configuration.get("samples_per_case") == info["samples"]
+            and configuration.get("warmup_iterations_per_case") == info["warmup"],
+            f"{label}.configuration differs")
+    results = report.get("results")
+    require(isinstance(results, list) and len(results) == 1 and isinstance(results[0], dict),
+            f"{label} result count differs")
+    result = results[0]
+    require(result.get("case") == info["case"], f"{label} result case differs")
+    corpus = result.get("corpus")
+    require(isinstance(corpus, dict) and corpus.get("shape") == info["shape"]
+            and corpus == expected_by_shape[info["shape"]],
+            f"{label} corpus identity differs")
+    output = hash_value(result.get("output_sha256"), f"{label}.output_sha256")
+    key = (info["case"], info["shape"])
+    if key in expected_by_key:
+        require(output == expected_by_key[key]["output_sha256"],
+                f"{label} primary output identity differs")
+    elapsed = result.get("elapsed_ns")
+    require(isinstance(elapsed, dict), f"{label}.elapsed_ns is missing")
+    elapsed_values = integer_vector(elapsed.get("samples"), info["samples"],
+                                    f"{label}.elapsed_ns.samples")
+    require(elapsed_values == sorted(elapsed_values), f"{label} elapsed samples are not sorted")
+    order = vector(elapsed.get("sample_order"), info["samples"], f"{label}.sample_order")
+    require(sorted(order) == list(range(info["samples"])), f"{label} sample order is not a permutation")
+    validate_statistics(elapsed, elapsed_values, f"{label}.elapsed_ns")
+    operation = validate_operation_metrics(result.get("operation_metrics"), info["samples"], label)
+    source = validate_source(result.get("source"), info["samples"], label, lane == "alloc")
+    if source.get("source_output_sha256") is not None:
+        require(source["source_output_sha256"] == output, f"{label} source output differs")
+        phases = source["phases"]
+        summed = [phases["open_ns"][i] + phases["plan_ns"][i]
+                  + phases["commit_ns"][i] + phases["publication_ns"][i]
+                  for i in range(info["samples"])]
+        require([summed[index] for index in order] == elapsed_values,
+                f"{label} source phase sum does not reconcile")
+    catalog = catalog_binding(report, catalog_path, label)
+    row = {
+        "lane": lane, "name": info["name"], "stage": info["stage"],
+        "execution_stage": info["execution_stage"], "repeat": info["repeat"],
+        "case": info["case"], "shape": info["shape"], "warmup": info["warmup"],
+        "samples": info["samples"], "report": str(path.relative_to(HERE)),
+        "catalog": str(catalog_path.relative_to(HERE)),
+        "report_sha256": digest(path), "receipt_sha256": info["receipt_sha256"],
+        "catalog_sha256": catalog["sha256"], "binary_sha256": binary["sha256"],
+        "identity": {
+            "corpus": corpus, "output_sha256": output,
+            "source": stable_source_identity(source),
+            "operation_metrics": stable_operation_identity(operation),
+        },
+        "elapsed_ns": {
+            "statistics": {field: elapsed[field] for field in TIMING_STATS},
+            "confidence_interval_95": elapsed["confidence_interval_95"],
+            "samples": elapsed_values, "sample_order": order,
+        },
+        "rss": info["rss"],
+        "source": source,
+    }
+    return row
+
+
+def stable_source_identity(source: dict[str, Any]) -> dict[str, Any]:
+    """Drop per-sample vectors while retaining source/output identity fields."""
+    return {key: value for key, value in source.items()
+            if key not in {"phases", "allocations"}}
+
+
+def stable_operation_identity(operation: dict[str, Any]) -> dict[str, Any]:
+    """Retain operation envelope/status identity without timing counters."""
+    sections = {}
+    for key, value in operation.items():
+        if not isinstance(value, dict) or key in {
+                "sample_count", "sample_indices", "alignment", "latency_claim"}:
+            continue
+        sections[key] = {field: value[field] for field in ("status", "scope")
+                         if field in value}
+    return {
+        "sample_count": operation["sample_count"],
+        "sample_indices": operation["sample_indices"],
+        "alignment": operation["alignment"],
+        "latency_claim": operation["latency_claim"],
+        "sections": sections,
+    }
+
+
+def matched_identity(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Require corpus/output/source identity across all matched stage legs."""
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault((row["lane"], row["case"], row["shape"]), []).append(row)
+    checks = []
+    expected_legs = {("baseline", 1), ("baseline", 2),
+                     ("candidate", 1), ("candidate", 2)}
+    for key, values in sorted(grouped.items()):
+        observed = {(row["stage"], row["repeat"]) for row in values}
+        require(observed == expected_legs,
+                f"matched identity legs differ for {key}: {sorted(observed)}")
+        identity = values[0]["identity"]
+        for row in values[1:]:
+            require(row["identity"] == identity,
+                    f"matched corpus/output/source identity differs for {key}")
+        checks.append({"lane": key[0], "case": key[1], "shape": key[2],
+                       "legs": len(values), "identity": identity})
+    require(len(checks) == len(LANES) * len(CASES) * len(SHAPES),
+            "matched identity row count differs")
+    return checks
+
+
+def jobs(plan: dict[str, Any], lane: str, stage: str, execution: str,
+         primary_only: bool = False) -> list[dict[str, Any]]:
+    if lane == "noise":
+        config = plan["timing"]["noise"]
+        entries = PRIMARY
+    elif lane == "native":
+        config = plan["timing"]["normal"]
+        entries = CASES
+    else:
+        config = plan["timing"]["allocation"]
+        entries = CASES
+    output: list[dict[str, Any]] = []
+    for repeat in range(1, config["repeats"] + 1):
+        ordered_shapes = list(SHAPES)
+        ordered_entries = list(entries)
+        if lane != "noise" and repeat == 2:
+            ordered_shapes.reverse()
+            ordered_entries.reverse()
+        for shape in ordered_shapes:
+            for case in ordered_entries:
+                name = f"{lane}-r{repeat}-{shape}-{case}"
+                output.append({
+                    "lane": lane, "stage": stage, "execution_stage": execution,
+                    "repeat": repeat, "case": case, "shape": shape, "name": name,
+                    "warmup": config["warmup"], "samples": config["samples"],
+                })
+    return output
+
+
+def stage_jobs(plan: dict[str, Any], lane: str, stage: str, execution: str,
+               repeat: int | None,
+               expected_by_key: dict[tuple[str, str], dict[str, Any]],
+               expected_by_shape: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    kind = "alloc" if lane == "alloc" else "normal"
+    folder = HERE / stage
+    binary = validate_binary(stage, kind, plan)
+    result: list[dict[str, Any]] = []
+    selected = [item for item in jobs(plan, lane, stage, execution)
+                if repeat is None or item["repeat"] == repeat]
+    expected_names = {item["name"] for item in selected}
+    receipts = {p.name.removesuffix(".receipt.json")
+                for p in folder.glob(f"{lane}-*.receipt.json")}
+    require(expected_names <= receipts,
+            f"{stage} {lane} receipt matrix is missing selected rows: "
+            f"{sorted(expected_names - receipts)}")
+    for info in selected:
+        receipt_path = folder / f"{info['name']}.receipt.json"
+        receipt = validate_receipt(
+            receipt_path, info["name"], stage, execution, kind, folder, binary,
+            plan, info["case"], info["shape"], info["warmup"], info["samples"], lane,
+        )
+        info = {**info, "receipt_sha256": receipt["receipt_sha256"], "rss": receipt["rss"]}
+        result.append(validate_report(
+            folder / f"{info['name']}.json", folder / f"{info['name']}.catalog.json",
+            info, binary, plan, expected_by_key, expected_by_shape, lane, info["name"],
+        ))
+    return result
+
+
+def validate_stage_receipt_matrix(plan: dict[str, Any], lane: str, stage: str) -> None:
+    expected = {item["name"] for item in jobs(plan, lane, stage, stage)}
+    actual = {path.name.removesuffix(".receipt.json")
+              for path in (HERE / stage).glob(f"{lane}-*.receipt.json")}
+    require(actual == expected,
+            f"{stage} {lane} receipt matrix differs: {sorted(actual ^ expected)}")
+
+
+def noise_rows(plan: dict[str, Any], expected_by_key: dict[tuple[str, str], dict[str, Any]],
+               expected_by_shape: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    selected = jobs(plan, "noise", "baseline", "baseline")
+    folder = HERE / "baseline"
+    binary = validate_binary("baseline", "normal", plan)
+    names = {item["name"] for item in selected}
+    actual = {p.name.removesuffix(".receipt.json")
+              for p in folder.glob("noise-*.receipt.json")}
+    require(actual == names, f"baseline noise receipt matrix differs: {sorted(actual ^ names)}")
+    output = []
+    for info in selected:
+        receipt = validate_receipt(
+            folder / f"{info['name']}.receipt.json", info["name"], "baseline", "baseline",
+            "normal", folder, binary, plan, info["case"], info["shape"],
+            info["warmup"], info["samples"], "noise",
+        )
+        info = {**info, "receipt_sha256": receipt["receipt_sha256"], "rss": receipt["rss"]}
+        output.append(validate_report(
+            folder / f"{info['name']}.json", folder / f"{info['name']}.catalog.json",
+            info, binary, plan, expected_by_key, expected_by_shape, "native", info["name"],
+        ))
+    return output
+
+
+def percent_change(first: float, second: float) -> tuple[float | None, bool]:
+    if first == 0.0:
+        if second == 0.0:
+            return 0.0, False
+        return None, True
+    return (second / first - 1.0) * 100.0, False
+
+
+def change_record(first: Any, second: Any, *, family: str, key: Any,
+                  metric: str, threshold: float = 5.0) -> dict[str, Any]:
+    left = number(first, f"{family} {key} {metric}.first")
+    right = number(second, f"{family} {key} {metric}.second")
+    change, zero = percent_change(left, right)
+    over = zero or (change is not None and abs(change) > threshold)
+    adverse = zero or (change is not None and change > threshold)
+    return {
+        "family": family, "key": list(key) if isinstance(key, tuple) else key,
+        "metric": metric, "first": first, "second": second,
+        "delta": right - left, "change_percent": change,
+        "zero_denominator": zero, "threshold_percent": threshold,
+        "over_five_percent": over, "adverse": adverse,
+    }
+
+
+def stat_value(row: dict[str, Any], metric: str) -> Any:
+    if metric.startswith("elapsed_ns."):
+        path = metric.split(".")[1:]
+        value: Any = row["elapsed_ns"]
+    elif metric == "rss.max_rss_kib":
+        return row["rss"]["max_rss_kib"]
+    else:
+        raise KeyError(metric)
+    for item in path:
+        value = value[item]
+    return value
+
+
+def timing_records(first: dict[str, Any], second: dict[str, Any], family: str,
+                   key: Any) -> list[dict[str, Any]]:
+    return [change_record(
+        stat_value(first, f"elapsed_ns.{field}"),
+        stat_value(second, f"elapsed_ns.{field}"),
+        family=family, key=key, metric=f"elapsed_ns.{field}",
+    ) for field in COMPARE_STATS] + [change_record(
+        first["rss"]["max_rss_kib"], second["rss"]["max_rss_kib"],
+        family=family, key=key, metric="rss.max_rss_kib",
+    )]
+
+
+def allocation_records(first: dict[str, Any], second: dict[str, Any],
+                       family: str, key: Any) -> list[dict[str, Any]]:
+    left = first.get("source", {}).get("allocations", {})
+    right = second.get("source", {}).get("allocations", {})
+    output: list[dict[str, Any]] = []
+    for phase, _field in ALLOC_PHASES:
+        if phase not in left or phase not in right:
+            # Eager controls have no provenance phase.  Preserve this as an
+            # explicit absence in the row; there is no synthetic zero gate.
+            continue
+        for field in ALLOC_FIELDS:
+            lvalues = left[phase].get(field)
+            rvalues = right[phase].get(field)
+            if lvalues is None or rvalues is None:
+                continue
+            for statistic in ("p50", "mean"):
+                lstat = statistics(lvalues, "count" if "calls" in field
+                                    else "bytes")[statistic]
+                rstat = statistics(rvalues, "count" if "calls" in field
+                                    else "bytes")[statistic]
+                output.append(change_record(
+                    lstat, rstat, family=family, key=key,
+                    metric=f"allocation.{phase}.{field}.{statistic}",
+                ))
+    return output
+
+
+def allocation_availability(row: dict[str, Any]) -> dict[str, Any]:
+    source = row.get("source", {})
+    if source.get("status") == "not_applicable":
+        return {
+            "status": "unavailable", "scope": "operation_global_system_allocator",
+            "reason": "eager control omits source-backed allocation phase vectors",
+        }
+    allocations = source.get("allocations")
+    if not isinstance(allocations, dict):
+        return {
+            "status": "unavailable", "scope": "operation_global_system_allocator",
+            "reason": "allocation phase vectors are absent",
+        }
+    statuses = [status for phase in allocations.values() if isinstance(phase, dict)
+                for status in phase.get("status", [])]
+    return {
+        "status": "measured" if statuses and all(status == "measured" for status in statuses)
+        else "unavailable",
+        "scope": "operation_global_system_allocator",
+        "phases": sorted(allocations),
+    }
+
+
+def noise_analysis(rows: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, Any]:
+    grouped = {(row["case"], row["shape"], row["repeat"]): row for row in rows}
+    records = []
+    for case in PRIMARY:
+        for shape in SHAPES:
+            first = grouped[(case, shape, 1)]
+            second = grouped[(case, shape, 2)]
+            p1 = first["elapsed_ns"]["statistics"]["p50"]
+            p2 = second["elapsed_ns"]["statistics"]["p50"]
+            number(p1, f"noise {case}/{shape} R1 p50", positive=True)
+            number(p2, f"noise {case}/{shape} R2 p50", positive=True)
+            change, zero = percent_change(float(p1), float(p2))
+            records.append({
+                "case": case, "shape": shape, "repeat_first": 1,
+                "repeat_second": 2, "p50_r1_ns": p1, "p50_r2_ns": p2,
+                "change_percent": change, "zero_denominator": zero,
+                "absolute_change_percent": float("inf") if change is None else abs(change),
+            })
+    determinant = max(records, key=lambda item: item["absolute_change_percent"])
+    n_value = determinant["absolute_change_percent"]
+    limit = float(plan["threshold"]["noise_definition"]["instability_limit_percent"])
+    unstable = n_value > limit
+    floor = []
+    for case in PRIMARY:
+        for shape in SHAPES:
+            for repeat in (1, 2):
+                baseline = grouped[(case, shape, repeat)]["elapsed_ns"]["statistics"]["p50"]
+                absolute_term = 100.0 * 50000.0 / float(baseline)
+                floor.append({
+                    "case": case, "shape": shape, "repeat": repeat,
+                    "matched_baseline_p50_ns": baseline,
+                    "noise_term_percent": 3.0 * n_value,
+                    "absolute_50000_ns_term_percent": absolute_term,
+                    "primary_floor_percent": max(1.0, 3.0 * n_value, absolute_term),
+                })
+    return {
+        "rows": records,
+        "N_percent": n_value,
+        "N_determining_row": {
+            "case": determinant["case"], "shape": determinant["shape"],
+            "change_percent": determinant["change_percent"],
+        },
+        "instability_limit_percent": limit,
+        "too_unstable": unstable,
+        "candidate_gate_preregistered": not unstable,
+        "floors": floor,
+        "formula": "max(1.0, 3 * N, 100 * 50000 / matched_baseline_p50_ns)",
+        "absolute_floor_ns": 50000,
+        "no_noise_rescue": True,
+    }
+
+
+def matched_analysis(native: list[dict[str, Any]], alloc: list[dict[str, Any]],
+                     noise: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    all_rows = native + alloc
+    by_key = {(row["lane"], row["stage"], row["case"], row["shape"], row["repeat"]): row
+              for row in all_rows}
+    comparisons: list[dict[str, Any]] = []
+    adverse: list[dict[str, Any]] = []
+    drift: list[dict[str, Any]] = []
+    primary_gates = []
+    control_gates = []
+    rss_gates = []
+    allocation_gates = []
+    for lane in LANES:
+        for case in CASES:
+            for shape in SHAPES:
+                for repeat in (1, 2):
+                    baseline = by_key[(lane, "baseline", case, shape, repeat)]
+                    candidate = by_key[(lane, "candidate", case, shape, repeat)]
+                    key = (lane, case, shape, repeat)
+                    records = timing_records(baseline, candidate, "candidate_vs_baseline", key)
+                    records += allocation_records(baseline, candidate, "candidate_vs_baseline", key)
+                    comparisons.append({"lane": lane, "case": case, "shape": shape,
+                                        "repeat": repeat, "records": records})
+                    adverse.extend(record for record in records if record["adverse"])
+                    if case in PRIMARY:
+                        floor_row = next(item for item in noise["floors"]
+                                         if item["case"] == case and item["shape"] == shape
+                                         and item["repeat"] == repeat)
+                        p50 = baseline["elapsed_ns"]["statistics"]["p50"]
+                        candidate_p50 = candidate["elapsed_ns"]["statistics"]["p50"]
+                        primary_ok = (not noise["too_unstable"]
+                                      and candidate_p50 <= p50
+                                      * (1.0 - floor_row["primary_floor_percent"] / 100.0))
+                        mean_record = next(item for item in records
+                                           if item["metric"] == "elapsed_ns.mean")
+                        mean_ok = not mean_record["adverse"]
+                        primary_gates.append({"lane": lane, "case": case, "shape": shape,
+                                              "repeat": repeat, "floor": floor_row,
+                                              "p50": primary_ok, "mean": mean_ok,
+                                              "pass": primary_ok and mean_ok})
+                    else:
+                        p50_record = next(item for item in records if item["metric"] == "elapsed_ns.p50")
+                        mean_record = next(item for item in records if item["metric"] == "elapsed_ns.mean")
+                        control_gates.append({"lane": lane, "case": case, "shape": shape,
+                                              "repeat": repeat, "p50": not p50_record["adverse"],
+                                              "mean": not mean_record["adverse"],
+                                              "pass": not p50_record["adverse"] and not mean_record["adverse"]})
+                    rss_record = next(item for item in records if item["metric"] == "rss.max_rss_kib")
+                    rss_gates.append({"lane": lane, "case": case, "shape": shape,
+                                      "repeat": repeat, "pass": not rss_record["adverse"],
+                                      "record": rss_record})
+                    allocation = [item for item in records if item["metric"].startswith("allocation.")]
+                    allocation_gates.append({"lane": lane, "case": case, "shape": shape,
+                                             "repeat": repeat, "reported": bool(allocation),
+                                             "baseline_availability": allocation_availability(baseline),
+                                             "candidate_availability": allocation_availability(candidate),
+                                             "pass": all(not item["adverse"] for item in allocation),
+                                             "records": allocation})
+                for stage in ("baseline", "candidate"):
+                    first = by_key[(lane, stage, case, shape, 1)]
+                    second = by_key[(lane, stage, case, shape, 2)]
+                    drift_records = timing_records(first, second, "same_build_drift",
+                                                    (lane, stage, case, shape))
+                    drift_records += allocation_records(first, second, "same_build_drift",
+                                                         (lane, stage, case, shape))
+                    drift.extend(record for record in drift_records if record["over_five_percent"])
+    primary_pass = all(item["pass"] for item in primary_gates)
+    control_pass = all(item["pass"] for item in control_gates)
+    rss_pass = all(item["pass"] for item in rss_gates)
+    allocation_pass = all(item["pass"] for item in allocation_gates)
+    return {
+        "comparisons": comparisons,
+        "adverse_over_five_percent": adverse,
+        "same_build_drift_over_five_percent": drift,
+        "gates": {
+            "noise_stable": not noise["too_unstable"],
+            "primary": {"pass": primary_pass, "rows": primary_gates},
+            "controls": {"pass": control_pass, "rows": control_gates},
+            "rss": {"pass": rss_pass, "rows": rss_gates},
+            "allocation": {"pass": allocation_pass, "rows": allocation_gates},
+            "numeric_pass": (not noise["too_unstable"] and primary_pass and control_pass
+                             and rss_pass and allocation_pass),
+        },
+    }
+
+
+def analyze(noise_only: bool = False) -> dict[str, Any]:
+    plan = plan_data()
+    expected_by_key, expected_by_shape = expected_corpus()
+    # Source manifests are checked before any receipt or report is trusted.
+    stages = ("baseline", "candidate") if not noise_only else ("baseline",)
+    manifests = {stage: {"sha256": digest(HERE / stage / "source-manifest.json"),
+                          "entries": len(source_manifest(stage))}
+                 for stage in stages}
+    noise = noise_rows(plan, expected_by_key, expected_by_shape)
+    noise_result = noise_analysis(noise, plan)
+    if noise_only:
+        return {
+            "schema": "xlsx_linear_merge_0557_metrics_v1",
+            "status": "too_unstable" if noise_result["too_unstable"] else "noise_pass",
+            "scope": plan["scope"], "performance_claim": "none: baseline noise pilot only",
+            "plan_sha256": digest(HERE / "plan.json"), "run_sha256": digest(HERE / "run.py"),
+            "expected_primary_sha256": digest(HERE / "expected-primary.json"),
+            "source_manifests": manifests, "noise": noise_result,
+            "limits": ["Noise is descriptive and cannot be substituted by a prior repeat.",
+                        "A noise N above 5 percentage points stops candidate admission; no rescue rerun is allowed."],
+        }
+    native = []
+    native.extend(stage_jobs(plan, "native", "baseline", "baseline", 1,
+                              expected_by_key, expected_by_shape))
+    native.extend(stage_jobs(plan, "native", "candidate", "candidate", None,
+                              expected_by_key, expected_by_shape))
+    # Baseline R2 is retained in baseline output while its execution identity is candidate.
+    # stage_jobs validates both stage and execution manifests for this final ABBA leg.
+    # It would otherwise re-read baseline R1; restrict this call to repeat two below.
+    native.extend(stage_jobs(plan, "native", "baseline", "candidate", 2,
+                              expected_by_key, expected_by_shape))
+    alloc = []
+    alloc.extend(stage_jobs(plan, "alloc", "baseline", "baseline", 1,
+                            expected_by_key, expected_by_shape))
+    alloc.extend(stage_jobs(plan, "alloc", "candidate", "candidate", None,
+                            expected_by_key, expected_by_shape))
+    alloc.extend(stage_jobs(plan, "alloc", "baseline", "candidate", 2,
+                            expected_by_key, expected_by_shape))
+    for lane in LANES:
+        for stage in ("baseline", "candidate"):
+            validate_stage_receipt_matrix(plan, lane, stage)
+    # The final ABBA call above sees both repeats.  Keep only one logical copy
+    # of each baseline row while validating the complete receipt matrix.
+    def unique_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        result: dict[tuple[str, str, str, str, int], dict[str, Any]] = {}
+        for row in rows:
+            result[(row["lane"], row["stage"], row["case"], row["shape"], row["repeat"])] = row
+        return list(result.values())
+    native = unique_rows(native)
+    alloc = unique_rows(alloc)
+    # Require the complete 4-stage matrix: baseline contains R1/R2 and
+    # candidate contains R1/R2.  The stage_jobs calls above also validate every
+    # receipt; this count check prevents accidental partial analysis.
+    require(len(native) == 4 * len(CASES) * len(SHAPES), "native matrix row count differs")
+    require(len(alloc) == 4 * len(CASES) * len(SHAPES), "allocation matrix row count differs")
+    identity_checks = matched_identity(native + alloc)
+    matched = matched_analysis(native, alloc, noise_result, plan)
+    return {
+        "schema": "xlsx_linear_merge_0557_metrics_v1",
+        "status": "pass",
+        "scope": plan["scope"],
+        "performance_claim": "numeric comparison only; source proof, quality, preservation, and mechanism review remain required",
+        "plan_sha256": digest(HERE / "plan.json"),
+        "run_sha256": digest(HERE / "run.py"),
+        "expected_primary_sha256": digest(HERE / "expected-primary.json"),
+        "source_manifests": manifests,
+        "matrix": {"shapes": list(SHAPES), "primary": list(PRIMARY),
+                    "controls": list(CONTROLS), "native_rows": len(native),
+                    "allocation_rows": len(alloc),
+                    "native_samples_per_row": 1000, "allocation_samples_per_row": 30},
+        "noise": noise_result,
+        "matched_identity": identity_checks,
+        "native": {"rows": native, "timing_statistics": list(COMPARE_STATS)},
+        "allocation": {"rows": alloc, "reported_fields": list(ALLOC_FIELDS),
+                        "phase_fields": [field for _, field in ALLOC_PHASES],
+                        "instrumented_elapsed_excluded": True},
+        **matched,
+        "limits": [
+            "Every retained report, receipt, binary, source manifest, corpus, expected identity, and sample count is checked.",
+            "Allocator counters are compared only when both matched rows report measured fields; absent eager phases remain explicit absence.",
+            "Allocation region_peak_live_bytes is reported as incremental_region_peak_live_bytes = region_peak_live_bytes - live_bytes_before.",
+            "No selective discard, rerun rescue, geometric mean, cold-cache, native Office, scaling, or hardware-independent claim is made.",
+            "ODF remains deferred until the OLE2/OOXML optimization goal completes; iWork is excluded.",
+        ],
+    }
+
+
+def write_identical(path: Path, value: dict[str, Any]) -> None:
+    encoded = (json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()
+    require(path.parent.is_dir(), f"output parent is missing: {path.parent}")
+    try:
+        with path.open("xb") as stream:
+            stream.write(encoded)
+    except FileExistsError:
+        require(path.read_bytes() == encoded, f"existing output differs: {path}")
+
+
+def self_test() -> None:
+    assert percent_change(100.0, 100.0) == (0.0, False)
+    assert percent_change(0.0, 0.0) == (0.0, False)
+    assert percent_change(0.0, 1.0) == (None, True)
+    # 50 microseconds = 50,000 nanoseconds; after conversion to percent this
+    # is 5,000,000 / baseline_ns, not 500,000,000 / baseline_ns.
+    assert math.isclose(100.0 * 50000.0 / 5_000_000.0, 1.0)
+    assert math.isclose(100.0 * 50000.0 / 1_000_000.0, 5.0)
+    assert math.isclose(100.0 * 50000.0 / 10_000_000.0, 0.5)
+    assert max(1.0, 3 * 0.5, 100 * 50000 / 10_000_000) == 1.5
+    sample = {"status": "measured", "scope": "operation_global_system_allocator",
+              **{field: 0 for field in ALLOC_SAMPLE_FIELDS}}
+    sample.update({"live_bytes_before": 10, "live_bytes_after": 10,
+                   "region_peak_live_bytes": 10, "peak_live_bytes_before": 10,
+                   "peak_live_bytes_after": 10})
+    result = allocation_sample(sample, "self-test", True)
+    assert result["incremental_region_peak_live_bytes"] == 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--noise-only", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--output", type=Path,
+                        default=HERE / "metrics-analysis.json")
+    args = parser.parse_args(argv)
+    try:
+        if args.self_test:
+            self_test()
+            print("0557 analyzer pure self-test: PASS")
+            return 0
+        result = analyze(args.noise_only)
+        write_identical(args.output, result)
+    except EvidenceError as error:
+        print(f"evidence check failed: {error}", file=sys.stderr)
+        return 1
+    print(f"0557 metrics {result['status']}: {args.output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

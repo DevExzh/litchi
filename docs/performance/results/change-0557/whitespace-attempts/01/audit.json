@@ -1,0 +1,214 @@
+{
+  "exit_code": 2,
+  "finding_count": 36,
+  "findings": [
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-alloc-tests.stdout",
+      "line": 10,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-lib-tests.stdout",
+      "line": 504,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-xlsx-planning-allocations.stdout",
+      "line": 6,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 19,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 65,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 69,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 200,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 225,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 259,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 263,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 677,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 870,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 937,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 987,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 1045,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 1081,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 19,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 65,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 69,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 196,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 221,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 255,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 259,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 605,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 799,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 856,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 906,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 964,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 1000,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 16,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 27,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 53,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 87,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 122,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/metrics-final-review.md",
+      "line": 74,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/results-review.md",
+      "line": 94,
+      "message": "new blank line at EOF."
+    }
+  ],
+  "unexpected_findings": [
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-alloc-tests.stdout",
+      "line": 10,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-lib-tests.stdout",
+      "line": 504,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-xlsx-planning-allocations.stdout",
+      "line": 6,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/metrics-final-review.md",
+      "line": 74,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/results-review.md",
+      "line": 94,
+      "message": "new blank line at EOF."
+    }
+  ],
+  "scope": "Intentional verbatim patch-context whitespace or captured failed-format output only; production/harness source whitespace check passed separately."
+}

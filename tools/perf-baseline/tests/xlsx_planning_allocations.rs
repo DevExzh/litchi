@@ -141,6 +141,59 @@ fn measured_sample(sample: &serde_json::Value, require_positive_activity: bool) 
     assert!(region_peak <= peak_after);
 }
 
+fn assert_split_metrics_reconstruct_combined(source: &serde_json::Value, sample_count: usize) {
+    let staging = vector(source, "staging_allocation_metrics");
+    let core = vector(source, "commit_core_allocation_metrics");
+    let combined = vector(source, "commit_allocation_metrics");
+    assert_eq!(staging.len(), sample_count);
+    assert_eq!(core.len(), sample_count);
+    assert_eq!(combined.len(), sample_count);
+
+    for ((staging, core), combined) in staging.iter().zip(core).zip(combined) {
+        assert_eq!(staging["status"], "measured");
+        assert_eq!(core["status"], "measured");
+        assert_eq!(combined["status"], "measured");
+        assert_eq!(staging["scope"], ALLOCATION_SCOPE);
+        assert_eq!(core["scope"], ALLOCATION_SCOPE);
+        assert_eq!(combined["scope"], ALLOCATION_SCOPE);
+
+        for name in [
+            "allocation_calls",
+            "deallocation_calls",
+            "reallocation_calls",
+            "failed_allocation_calls",
+            "allocated_bytes",
+            "deallocated_bytes",
+        ] {
+            let split_sum = metric(staging, name)
+                .checked_add(metric(core, name))
+                .expect("split allocation counters fit u64");
+            assert_eq!(split_sum, metric(combined, name), "counter {name}");
+        }
+
+        assert_eq!(
+            staging["live_bytes_after"], core["live_bytes_before"],
+            "the two sequential regions must share a live endpoint"
+        );
+        assert_eq!(combined["live_bytes_before"], staging["live_bytes_before"]);
+        assert_eq!(combined["live_bytes_after"], core["live_bytes_after"]);
+        assert_eq!(
+            combined["peak_live_bytes_before"],
+            staging["peak_live_bytes_before"]
+        );
+        assert_eq!(
+            combined["peak_live_bytes_after"],
+            core["peak_live_bytes_after"]
+        );
+        let expected_region_peak =
+            metric(staging, "region_peak_live_bytes").max(metric(core, "region_peak_live_bytes"));
+        assert_eq!(
+            metric(combined, "region_peak_live_bytes"),
+            expected_region_peak
+        );
+    }
+}
+
 fn assert_phase_sum(result: &serde_json::Value, source: &serde_json::Value) {
     let elapsed = result["elapsed_ns"]["samples"]
         .as_array()
@@ -220,17 +273,19 @@ fn xlsx_source_cell_values_planning_allocations_are_scoped_and_aligned() {
 
     for name in [
         "plan_allocation_metrics",
+        "staging_allocation_metrics",
         "commit_allocation_metrics",
+        "commit_core_allocation_metrics",
         "publication_allocation_metrics",
     ] {
         assert_eq!(vector(normal_source, name).len(), SAMPLE_COUNT);
         assert_eq!(vector(allocator_source, name).len(), SAMPLE_COUNT);
     }
-    for sample in vector(normal_source, "plan_allocation_metrics") {
-        unavailable_sample(sample);
-    }
     for name in [
+        "plan_allocation_metrics",
+        "staging_allocation_metrics",
         "commit_allocation_metrics",
+        "commit_core_allocation_metrics",
         "publication_allocation_metrics",
     ] {
         for sample in vector(normal_source, name) {
@@ -241,13 +296,16 @@ fn xlsx_source_cell_values_planning_allocations_are_scoped_and_aligned() {
         measured_sample(sample, true);
     }
     for name in [
+        "staging_allocation_metrics",
         "commit_allocation_metrics",
+        "commit_core_allocation_metrics",
         "publication_allocation_metrics",
     ] {
         for sample in vector(allocator_source, name) {
             measured_sample(sample, false);
         }
     }
+    assert_split_metrics_reconstruct_combined(allocator_source, SAMPLE_COUNT);
 
     assert_eq!(normal_result["corpus"], allocator_result["corpus"]);
     assert_eq!(
