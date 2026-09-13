@@ -1,0 +1,20 @@
+{
+  "build_receipt_sha256": "47375343d8697857c27682dd249612ba3e641e1dbc4f1869a3cbee0d84bd8201",
+  "bytes": 59892784,
+  "kind": "normal",
+  "path": "/home/zhuhe/litchi-goal-0557-target/retained/baseline/normal",
+  "schema": "xlsx_linear_merge_0557_binary_identity_v1",
+  "sha256": "fa69fc4675d67a1f3c73d056f77ccccf7d795befcfa6458b2a014fa86d0778c4",
+  "source_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "stage": "baseline",
+  "workspace_lock": {
+    "workspace_lock_binding": {
+      "path": "Cargo.lock",
+      "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+      "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+    },
+    "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+    "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+    "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+  }
+}

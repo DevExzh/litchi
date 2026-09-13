@@ -1,0 +1,5 @@
+{
+  "path": "Cargo.lock",
+  "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+  "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

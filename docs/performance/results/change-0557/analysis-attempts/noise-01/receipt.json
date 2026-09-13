@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0557/analyze.py",
+    "--noise-only",
+    "--output",
+    "docs/performance/results/change-0557/noise-analysis.json"
+  ],
+  "start_utc": "2026-09-13T15:04:42.573188+00:00",
+  "end_utc": "2026-09-13T15:04:43.079880+00:00",
+  "exit_code": 0,
+  "analyzer_sha256": "010f44e811d852ade5f5a62fcd3092961815ef0a3e81217697bc170b5e92bbb2"
+}

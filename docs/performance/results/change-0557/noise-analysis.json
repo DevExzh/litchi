@@ -1,0 +1,292 @@
+{
+  "expected_primary_sha256": "84f11d08100d03bf00cdec0484a18bb981dbaa35f3486be67b07d49b2ec6a97e",
+  "gate_lanes": {
+    "allocation_metrics": "allocator only; source-backed phase vectors when measured; eager is unavailable",
+    "allocator_timing": "allocator diagnostics only; no elapsed admission gate",
+    "native_timing": "native only; primary and control elapsed p50/mean admission gates",
+    "process_rss": "native and allocator per-case-shape child sidecars"
+  },
+  "limits": [
+    "Noise is descriptive and cannot be substituted by a prior repeat.",
+    "N above 5 percentage points stops candidate admission; no rescue rerun is allowed."
+  ],
+  "noise": {
+    "N_determining_row": {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "change_percent": -9.787197844389572,
+      "shape": "noncompact"
+    },
+    "N_percent": 9.787197844389572,
+    "absolute_floor_ns": 50000,
+    "candidate_gate_preregistered": false,
+    "floor_basis": "noise pilot p50; provisional diagnostic only",
+    "formula": "max(1.0, 3 * N, 100 * 50000 / matched_baseline_p50_ns)",
+    "instability_limit_percent": 5.0,
+    "no_noise_rescue": true,
+    "noise_reference_floors": [
+      {
+        "absolute_50000_ns_term_percent": 0.9325807530999917,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 5361466,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "medium"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.9348738808391054,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 5348315,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "medium"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.142576239150768,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 35068957,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.14148135391770075,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 35340346,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "dense-sparse"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.7663575180438877,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 6524370,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "noncompact"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.8494997380992307,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 5885817,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "noncompact"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.9338700471268181,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 5354064,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "vendor-extension"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.9275302096589286,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "matched_baseline_p50_ns": 5390660,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "vendor-extension"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.24715811421324752,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 20229965,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "medium"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.24745637121464753,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 20205582,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "medium"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.12784127554501995,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 39110999,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.1279073173346008,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 39090805,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "dense-sparse"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.22445698580394857,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 22275983,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "noncompact"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.2241867256618519,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 22302837,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "noncompact"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.2463467151660941,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 20296597,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 1,
+        "shape": "vendor-extension"
+      },
+      {
+        "absolute_50000_ns_term_percent": 0.246569235655095,
+        "baseline_reference": "noise_pilot",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "matched_baseline_p50_ns": 20278280,
+        "noise_term_percent": 29.361593533168715,
+        "primary_floor_percent": 29.361593533168715,
+        "repeat": 2,
+        "shape": "vendor-extension"
+      }
+    ],
+    "rows": [
+      {
+        "absolute_change_percent": 0.24528738968035982,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -0.24528738968035982,
+        "p50_r1_ns": 5361466,
+        "p50_r2_ns": 5348315,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.7738724593377556,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 0.7738724593377556,
+        "p50_r1_ns": 35068957,
+        "p50_r2_ns": 35340346,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 9.787197844389572,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -9.787197844389572,
+        "p50_r1_ns": 6524370,
+        "p50_r2_ns": 5885817,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.6835181648930607,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 0.6835181648930607,
+        "p50_r1_ns": 5354064,
+        "p50_r2_ns": 5390660,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "vendor-extension",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.12052912597723228,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -0.12052912597723228,
+        "p50_r1_ns": 20229965,
+        "p50_r2_ns": 20205582,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.05163253436712266,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -0.05163253436712266,
+        "p50_r1_ns": 39110999,
+        "p50_r2_ns": 39090805,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.1205513579355847,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 0.1205513579355847,
+        "p50_r1_ns": 22275983,
+        "p50_r2_ns": 22302837,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "zero_denominator": false
+      },
+      {
+        "absolute_change_percent": 0.09024665563394692,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -0.09024665563394692,
+        "p50_r1_ns": 20296597,
+        "p50_r2_ns": 20278280,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "vendor-extension",
+        "zero_denominator": false
+      }
+    ],
+    "too_unstable": true
+  },
+  "performance_claim": "none: baseline noise pilot only",
+  "plan_sha256": "d8111317e6d6d44219c844aaf740ea50fc149c361601bb6483a47d33843f88d8",
+  "run_sha256": "c9c0db8ac91da2d8604c3a7d70b77f5927f0b6ac9c6fb8066e4b7c350b8b8999",
+  "schema": "xlsx_linear_merge_0557_metrics_v1",
+  "scope": "Source-backed XLSX cell-value edit/save with one private provenance merge candidate; complete validation, preservation, fallback, and publication behavior remain authoritative",
+  "source_manifests": {
+    "baseline": {
+      "entries": 8595,
+      "sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5"
+    }
+  },
+  "status": "too_unstable"
+}

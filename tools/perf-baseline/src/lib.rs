@@ -5894,9 +5894,13 @@ struct XlsxCellValuesSourceSummary {
     plan_ns: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     plan_allocation_metrics: Vec<allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    staging_allocation_metrics: Vec<allocation_metrics::Sample>,
     commit_ns: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     commit_allocation_metrics: Vec<allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    commit_core_allocation_metrics: Vec<allocation_metrics::Sample>,
     publication_ns: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     publication_allocation_metrics: Vec<allocation_metrics::Sample>,
@@ -6109,8 +6113,10 @@ struct XlsxCellValuesIterationEvidence {
     open_ns: u64,
     plan_ns: u64,
     plan_allocation_metrics: Option<allocation_metrics::Sample>,
+    staging_allocation_metrics: Option<allocation_metrics::Sample>,
     commit_ns: u64,
     commit_allocation_metrics: Option<allocation_metrics::Sample>,
+    commit_core_allocation_metrics: Option<allocation_metrics::Sample>,
     publication_ns: u64,
     publication_allocation_metrics: Option<allocation_metrics::Sample>,
     reopen_ns: u64,
@@ -7960,6 +7966,29 @@ impl Drop for InFlightReadGuard<'_> {
     }
 }
 
+/// Append one optional allocator observation while preserving a one-for-one
+/// relationship with the phase vectors.  A field may be absent for every
+/// iteration of an evidence kind, but it cannot silently become present or
+/// absent part-way through that vector.
+fn record_xlsx_optional_allocation_metric(
+    metrics: &mut Vec<allocation_metrics::Sample>,
+    metric: Option<allocation_metrics::Sample>,
+    prior_sample_count: usize,
+    name: &str,
+) -> Result<(), Box<dyn Error>> {
+    match metric {
+        Some(metric) if metrics.len() == prior_sample_count => {
+            metrics.push(metric);
+            Ok(())
+        },
+        Some(_) => {
+            Err(format!("XLSX {name} allocation evidence cardinality is already misaligned").into())
+        },
+        None if metrics.is_empty() => Ok(()),
+        None => Err(format!("XLSX {name} allocation evidence is missing an iteration").into()),
+    }
+}
+
 impl SourceSummary {
     fn record(&mut self, snapshot: SourceSnapshot) {
         self.read_calls.push(snapshot.read_calls);
@@ -8126,25 +8155,41 @@ impl SourceSummary {
             return Err("XLSX cell-values source evidence mixed incompatible controls".into());
         }
         let source = evidence.source;
+        let prior_sample_count = summary.open_ns.len();
+        record_xlsx_optional_allocation_metric(
+            &mut summary.plan_allocation_metrics,
+            evidence.plan_allocation_metrics,
+            prior_sample_count,
+            "plan",
+        )?;
+        record_xlsx_optional_allocation_metric(
+            &mut summary.staging_allocation_metrics,
+            evidence.staging_allocation_metrics,
+            prior_sample_count,
+            "staging",
+        )?;
+        record_xlsx_optional_allocation_metric(
+            &mut summary.commit_allocation_metrics,
+            evidence.commit_allocation_metrics,
+            prior_sample_count,
+            "commit",
+        )?;
+        record_xlsx_optional_allocation_metric(
+            &mut summary.commit_core_allocation_metrics,
+            evidence.commit_core_allocation_metrics,
+            prior_sample_count,
+            "commit_core",
+        )?;
+        record_xlsx_optional_allocation_metric(
+            &mut summary.publication_allocation_metrics,
+            evidence.publication_allocation_metrics,
+            prior_sample_count,
+            "publication",
+        )?;
         summary.open_ns.push(evidence.open_ns);
         summary.plan_ns.push(evidence.plan_ns);
-        if let Some(plan_allocation_metrics) = evidence.plan_allocation_metrics {
-            summary
-                .plan_allocation_metrics
-                .push(plan_allocation_metrics);
-        }
         summary.commit_ns.push(evidence.commit_ns);
-        if let Some(commit_allocation_metrics) = evidence.commit_allocation_metrics {
-            summary
-                .commit_allocation_metrics
-                .push(commit_allocation_metrics);
-        }
         summary.publication_ns.push(evidence.publication_ns);
-        if let Some(publication_allocation_metrics) = evidence.publication_allocation_metrics {
-            summary
-                .publication_allocation_metrics
-                .push(publication_allocation_metrics);
-        }
         summary.reopen_ns.push(evidence.reopen_ns);
         summary.source_read_calls.push(source.read_calls);
         summary.source_read_bytes.push(source.read_bytes);
@@ -41337,8 +41382,10 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 open_ns,
                 plan_ns,
                 plan_allocation_metrics: None,
+                staging_allocation_metrics: None,
                 commit_ns,
                 commit_allocation_metrics: None,
+                commit_core_allocation_metrics: None,
                 publication_ns,
                 publication_allocation_metrics: None,
                 reopen_ns: 0,
@@ -41398,8 +41445,10 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 open_ns,
                 plan_ns,
                 plan_allocation_metrics: None,
+                staging_allocation_metrics: None,
                 commit_ns,
                 commit_allocation_metrics: None,
+                commit_core_allocation_metrics: None,
                 publication_ns,
                 publication_allocation_metrics: None,
                 reopen_ns: 0,
@@ -41917,11 +41966,13 @@ fn run_xlsx_cell_values_edit_save(
                 post_publication_budget,
                 commit_ns,
                 commit_allocation_metrics,
+                staging_allocation_metrics,
+                commit_core_allocation_metrics,
                 publication_ns,
                 publication_allocation_metrics,
                 budget_used_after_package_drop,
             ) = {
-                let allocation_region = allocation_metrics::begin();
+                let mut allocation_region = allocation_metrics::begin();
                 let commit_started = Instant::now();
                 for coordinate in &updates {
                     edit.set(
@@ -41933,12 +41984,18 @@ fn run_xlsx_cell_values_edit_save(
                         xlsx_value(*coordinate) + 1,
                     )?;
                 }
-                let commit = edit.commit()?;
-                let commit_duration = commit_started.elapsed();
-                let commit_allocation_metrics = match allocation_region.finish() {
+                let staging_allocation_metrics = match allocation_region.split() {
                     Some(sample) => sample,
                     None => allocation_metrics::unavailable_sample(),
                 };
+                let commit = edit.commit()?;
+                let commit_duration = commit_started.elapsed();
+                let (commit_core_allocation_metrics, commit_allocation_metrics) =
+                    allocation_region.finish_split();
+                let commit_core_allocation_metrics = commit_core_allocation_metrics
+                    .unwrap_or_else(allocation_metrics::unavailable_sample);
+                let commit_allocation_metrics = commit_allocation_metrics
+                    .unwrap_or_else(allocation_metrics::unavailable_sample);
                 let commit_ns = elapsed_ns(commit_duration)?;
                 duration += commit_duration;
                 if commit.diagnostics().touched_worksheets() != expected_touched {
@@ -41992,6 +42049,8 @@ fn run_xlsx_cell_values_edit_save(
                     post_publication_budget,
                     commit_ns,
                     commit_allocation_metrics,
+                    staging_allocation_metrics,
+                    commit_core_allocation_metrics,
                     publication_ns,
                     publication_allocation_metrics,
                     budget_used_after_package_drop,
@@ -42047,8 +42106,10 @@ fn run_xlsx_cell_values_edit_save(
                 open_ns,
                 plan_ns,
                 plan_allocation_metrics: Some(plan_allocation_metrics),
+                staging_allocation_metrics: Some(staging_allocation_metrics),
                 commit_ns,
                 commit_allocation_metrics: Some(commit_allocation_metrics),
+                commit_core_allocation_metrics: Some(commit_core_allocation_metrics),
                 publication_ns,
                 publication_allocation_metrics: Some(publication_allocation_metrics),
                 reopen_ns: 0,
@@ -66656,8 +66717,26 @@ mod tests {
                 );
             }
             assert_eq!(evidence.plan_ns.len(), sample_count);
+            assert_eq!(evidence.staging_allocation_metrics.len(), sample_count);
             assert_eq!(evidence.commit_allocation_metrics.len(), sample_count);
+            assert_eq!(evidence.commit_core_allocation_metrics.len(), sample_count);
             assert_eq!(evidence.publication_allocation_metrics.len(), sample_count);
+            for name in [
+                "staging_allocation_metrics",
+                "commit_allocation_metrics",
+                "commit_core_allocation_metrics",
+                "publication_allocation_metrics",
+            ] {
+                for sample in serialized[name].as_array().unwrap() {
+                    assert_eq!(
+                        sample,
+                        &serde_json::json!({
+                            "status": "unavailable",
+                            "scope": "operation_global_system_allocator",
+                        })
+                    );
+                }
+            }
             for (sorted_index, &acquisition_index) in
                 measured.elapsed_ns.sample_order.iter().enumerate()
             {
@@ -66670,6 +66749,66 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn xlsx_optional_allocation_metrics_reject_partial_cardinality() {
+        let sample = super::allocation_metrics::unavailable_sample();
+
+        let mut absent_then_present = Vec::new();
+        assert!(
+            super::record_xlsx_optional_allocation_metric(
+                &mut absent_then_present,
+                None,
+                0,
+                "staging"
+            )
+            .is_ok()
+        );
+        assert!(
+            super::record_xlsx_optional_allocation_metric(
+                &mut absent_then_present,
+                Some(sample.clone()),
+                1,
+                "staging"
+            )
+            .is_err()
+        );
+
+        let mut present_then_absent = vec![sample.clone()];
+        assert!(
+            super::record_xlsx_optional_allocation_metric(
+                &mut present_then_absent,
+                None,
+                1,
+                "staging"
+            )
+            .is_err()
+        );
+        let mut already_misaligned = vec![sample.clone(), sample.clone()];
+        assert!(
+            super::record_xlsx_optional_allocation_metric(
+                &mut already_misaligned,
+                Some(sample),
+                1,
+                "staging"
+            )
+            .is_err()
+        );
+
+        let mut always_absent = Vec::new();
+        for prior_sample_count in 0..3 {
+            assert!(
+                super::record_xlsx_optional_allocation_metric(
+                    &mut always_absent,
+                    None,
+                    prior_sample_count,
+                    "staging"
+                )
+                .is_ok()
+            );
+        }
+        assert!(always_absent.is_empty());
     }
 
     #[test]
@@ -66692,13 +66831,25 @@ mod tests {
             .and_then(|source| source.xlsx_cell_values.as_ref())
             .expect("source-backed cell-values evidence");
 
+        assert_eq!(evidence.staging_allocation_metrics.len(), sample_count);
         assert_eq!(evidence.commit_allocation_metrics.len(), sample_count);
+        assert_eq!(evidence.commit_core_allocation_metrics.len(), sample_count);
         assert!(
             evidence
                 .commit_allocation_metrics
                 .iter()
                 .all(|sample| sample.status == super::allocation_metrics::Status::Unavailable)
         );
+        for samples in [
+            &evidence.staging_allocation_metrics,
+            &evidence.commit_core_allocation_metrics,
+        ] {
+            assert!(
+                samples
+                    .iter()
+                    .all(|sample| sample.status == super::allocation_metrics::Status::Unavailable)
+            );
+        }
         let serialized_metrics = serde_json::to_value(&evidence.commit_allocation_metrics).unwrap();
         let serialized_samples = serialized_metrics
             .as_array()
@@ -66708,6 +66859,19 @@ mod tests {
             assert_eq!(sample.as_object().map(|object| object.len()), Some(2));
             assert_eq!(sample["status"], "unavailable");
             assert_eq!(sample["scope"], "operation_global_system_allocator");
+        }
+        let serialized_evidence = serde_json::to_value(evidence).unwrap();
+        for name in [
+            "staging_allocation_metrics",
+            "commit_core_allocation_metrics",
+        ] {
+            let serialized_samples = serialized_evidence[name].as_array().unwrap().to_vec();
+            assert_eq!(serialized_samples.len(), sample_count);
+            for sample in serialized_samples {
+                assert_eq!(sample.as_object().map(|object| object.len()), Some(2));
+                assert_eq!(sample["status"], "unavailable");
+                assert_eq!(sample["scope"], "operation_global_system_allocator");
+            }
         }
         assert_eq!(evidence.open_ns.len(), sample_count);
         assert_eq!(evidence.plan_ns.len(), sample_count);

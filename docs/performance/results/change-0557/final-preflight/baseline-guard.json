@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0557/run.py",
+    "guard-test",
+    "--stage",
+    "baseline",
+    "--execution-stage",
+    "baseline"
+  ],
+  "exit_code": 0
+}

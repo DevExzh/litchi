@@ -1,0 +1,145 @@
+{
+  "artifacts": {
+    "claims.host.json": "c40dba550aafc12be3394c211c87bb8a3e8bc03ab88135bc8831362ec9a63281",
+    "claims.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "claims.stdout": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+  },
+  "binary_after_sha256": null,
+  "binary_before_sha256": null,
+  "binary_descriptor_after_sha256": null,
+  "binary_descriptor_before_sha256": null,
+  "binary_descriptor_error": null,
+  "binary_descriptor_path": null,
+  "binary_descriptor_unchanged": null,
+  "binary_error": null,
+  "binary_path": null,
+  "binary_sha256": null,
+  "binary_unchanged": null,
+  "child_started": true,
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "end_utc": "2026-09-13T15:12:22.336529+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0557-target",
+    "GLIBC_TUNABLES": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "RUSTDOCFLAGS": null,
+    "RUSTFLAGS": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0557-target/tmp"
+  },
+  "execution_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "execution_manifest_unchanged": true,
+  "execution_stage": "baseline",
+  "execution_stage_after": {
+    "identity": {
+      "guard_scope": "live-source",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "execution_stage_before": {
+    "identity": {
+      "guard_scope": "live-source",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "execution_stage_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "exit_code": 0,
+  "name": "claims",
+  "output_manifest_unchanged": true,
+  "output_stage_after": {
+    "identity": {
+      "guard_scope": "manifest-only",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "output_stage_before": {
+    "identity": {
+      "guard_scope": "manifest-only",
+      "locks": {
+        "workspace_lock_binding": {
+          "path": "Cargo.lock",
+          "scope": "Ignored workspace lock additionally bound before and after every 0557 child; the harness lock is in the source manifest",
+          "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+        },
+        "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+        "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+        "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+      },
+      "manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0557/baseline/source-manifest.json",
+      "manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+      "source_file_count": 8595,
+      "stage": "baseline"
+    },
+    "ok": true
+  },
+  "output_stage_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "plan_sha256": "d8111317e6d6d44219c844aaf740ea50fc149c361601bb6483a47d33843f88d8",
+  "schema": "xlsx_linear_merge_0557_run_receipt_v1",
+  "script_sha256": "c9c0db8ac91da2d8604c3a7d70b77f5927f0b6ac9c6fb8066e4b7c350b8b8999",
+  "seconds": 70.1042177240015,
+  "source_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "spawn_error": null,
+  "stage": "baseline",
+  "start_utc": "2026-09-13T15:11:12.232323+00:00",
+  "success": true,
+  "workspace_lock_binding_sha256": "e3a8151a81efac7ba3eba708467ea4d420c5a218830c829274ba591bc3fd2000",
+  "workspace_lock_copy_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

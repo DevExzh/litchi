@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0557: same-binary variability stops merge admission
+
+The [fresh XLSX pilot](0557-xlsx-allocation-noise.md) stopped before candidate measurement: noncompact one-cell p50 drifted −9.7872%, with publication median changing −24.70% and commit median −0.97%. The cause is unestablished. Tested phase allocation instrumentation is retained for OLE2/OOXML work; the 0556 merge remains an unmeasured preparation artifact. No rescue repeat or candidate result is inferred. ODF remains deferred.
+
 ## Change 0556: XLSX sorted merge candidate prepared
 
 The [checked linear merge candidate](0556-xlsx-sorted-merge-preparation.md) passed differential and public XLSX tests, with private constructor invariants independently reviewed. Production source is restored pending measurement. The parsed iterator is released before index rebuilding, but merge-time buffer overlap still requires allocation/peak evidence. Fresh four-shape workflow measurements and target attribution are next; the retained 4.64–6.03% merge instruction share is not a removable fraction. ODF remains deferred.

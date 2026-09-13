@@ -1,0 +1,144 @@
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/allocation_metrics.rs:1287:
+         assert_eq!(commit_core.allocation_calls, Some(0));
+         assert_eq!(commit_core.live_bytes_before, Some(baseline.live_bytes));
+         assert_eq!(commit_core.live_bytes_after, Some(baseline.live_bytes));
+[31m-        assert_eq!(commit_core.region_peak_live_bytes, Some(baseline.live_bytes));
+[m[32m+        assert_eq!(
+[m[32m+            commit_core.region_peak_live_bytes,
+[m[32m+            Some(baseline.live_bytes)
+[m[32m+        );
+[m         assert_eq!(combined.status, Status::Measured);
+         assert_eq!(combined.allocation_calls, Some(0));
+         assert_eq!(combined.live_bytes_before, Some(baseline.live_bytes));
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/allocation_metrics.rs:1452:
+         assert_eq!(core.unwrap().status, Status::Overflow);
+         assert_eq!(combined.unwrap().status, Status::Overflow);
+ 
+[31m-        super::COUNTERS.overflowed.store(false, std::sync::atomic::Ordering::SeqCst);
+[m[32m+        super::COUNTERS
+[m[32m+            .overflowed
+[m[32m+            .store(false, std::sync::atomic::Ordering::SeqCst);
+[m         let mut ordinary_finish = super::begin();
+         {
+             let mut observer = super::COUNTERS.lock_observer();
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/allocation_metrics.rs:1461:
+         assert_eq!(ordinary_finish.split().unwrap().status, Status::Overflow);
+         assert_eq!(ordinary_finish.finish().unwrap().status, Status::Overflow);
+ 
+[31m-        super::COUNTERS.overflowed.store(false, std::sync::atomic::Ordering::SeqCst);
+[m[32m+        super::COUNTERS
+[m[32m+            .overflowed
+[m[32m+            .store(false, std::sync::atomic::Ordering::SeqCst);
+[m         let mut missing_final = super::begin();
+         assert_eq!(missing_final.split().unwrap().status, Status::Measured);
+         {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:7980:
+         Some(metric) if metrics.len() == prior_sample_count => {
+             metrics.push(metric);
+             Ok(())
+[31m-        }
+[m[31m-        Some(_) => Err(format!(
+[m[31m-            "XLSX {name} allocation evidence cardinality is already misaligned"
+[m[31m-        )
+[m[31m-        .into()),
+[m[32m+        },
+[m[32m+        Some(_) => {
+[m[32m+            Err(format!("XLSX {name} allocation evidence cardinality is already misaligned").into())
+[m[32m+        },
+[m         None if metrics.is_empty() => Ok(()),
+         None => Err(format!("XLSX {name} allocation evidence is missing an iteration").into()),
+     }
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:66757:
+         let sample = super::allocation_metrics::unavailable_sample();
+ 
+         let mut absent_then_present = Vec::new();
+[31m-        assert!(super::record_xlsx_optional_allocation_metric(
+[m[31m-            &mut absent_then_present,
+[m[31m-            None,
+[m[31m-            0,
+[m[31m-            "staging"
+[m[31m-        )
+[m[31m-        .is_ok());
+[m[31m-        assert!(super::record_xlsx_optional_allocation_metric(
+[m[31m-            &mut absent_then_present,
+[m[31m-            Some(sample.clone()),
+[m[31m-            1,
+[m[31m-            "staging"
+[m[31m-        )
+[m[31m-        .is_err());
+[m[32m+        assert!(
+[m[32m+            super::record_xlsx_optional_allocation_metric(
+[m[32m+                &mut absent_then_present,
+[m[32m+                None,
+[m[32m+                0,
+[m[32m+                "staging"
+[m[32m+            )
+[m[32m+            .is_ok()
+[m[32m+        );
+[m[32m+        assert!(
+[m[32m+            super::record_xlsx_optional_allocation_metric(
+[m[32m+                &mut absent_then_present,
+[m[32m+                Some(sample.clone()),
+[m[32m+                1,
+[m[32m+                "staging"
+[m[32m+            )
+[m[32m+            .is_err()
+[m[32m+        );
+[m 
+         let mut present_then_absent = vec![sample.clone()];
+[31m-        assert!(super::record_xlsx_optional_allocation_metric(
+[m[31m-            &mut present_then_absent,
+[m[31m-            None,
+[m[31m-            1,
+[m[31m-            "staging"
+[m[31m-        )
+[m[31m-        .is_err());
+[m[32m+        assert!(
+[m[32m+            super::record_xlsx_optional_allocation_metric(
+[m[32m+                &mut present_then_absent,
+[m[32m+                None,
+[m[32m+                1,
+[m[32m+                "staging"
+[m[32m+            )
+[m[32m+            .is_err()
+[m[32m+        );
+[m         let mut already_misaligned = vec![sample.clone(), sample.clone()];
+[31m-        assert!(super::record_xlsx_optional_allocation_metric(
+[m[31m-            &mut already_misaligned,
+[m[31m-            Some(sample),
+[m[31m-            1,
+[m[31m-            "staging"
+[m[31m-        )
+[m[31m-        .is_err());
+[m[32m+        assert!(
+[m[32m+            super::record_xlsx_optional_allocation_metric(
+[m[32m+                &mut already_misaligned,
+[m[32m+                Some(sample),
+[m[32m+                1,
+[m[32m+                "staging"
+[m[32m+            )
+[m[32m+            .is_err()
+[m[32m+        );
+[m 
+         let mut always_absent = Vec::new();
+         for prior_sample_count in 0..3 {
+Diff in /home/zhuhe/code/litchi/tools/perf-baseline/src/lib.rs:66794:
+[31m-            assert!(super::record_xlsx_optional_allocation_metric(
+[m[31m-                &mut always_absent,
+[m[31m-                None,
+[m[31m-                prior_sample_count,
+[m[31m-                "staging"
+[m[31m-            )
+[m[31m-            .is_ok());
+[m[32m+            assert!(
+[m[32m+                super::record_xlsx_optional_allocation_metric(
+[m[32m+                    &mut always_absent,
+[m[32m+                    None,
+[m[32m+                    prior_sample_count,
+[m[32m+                    "staging"
+[m[32m+                )
+[m[32m+                .is_ok()
+[m[32m+            );
+[m         }
+         assert!(always_absent.is_empty());
+     }

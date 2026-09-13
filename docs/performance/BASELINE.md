@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0557: XLSX instrumentation retained; noise gate stopped
+
+The [0557 record](0557-xlsx-allocation-noise.md) adds tested staging/commit allocation boundaries and a fresh 16-child, 16,000-sample baseline pilot. Maximum paired p50 drift was 9.7872%, above the preregistered 5% limit. The candidate was never applied or measured; no production speedup is claimed. The combined allocation interval remains intact. OLE2/OOXML remain first priority; ODF is deferred.
+
 ## Change 0556: XLSX candidate correctness preparation
 
 The [0556 packet](0556-xlsx-sorted-merge-preparation.md) retains a tested linear provenance merge candidate and a prospective measurement plan. Baseline and candidate passed 1,313 and 1,316 XLSX tests respectively, plus feature/lint/documentation checks. This packet adds no performance measurements and does not replace the retained baseline. Production source is restored; matched native, allocation, and profile evidence remains pending.

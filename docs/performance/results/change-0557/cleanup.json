@@ -1,0 +1,18 @@
+{
+  "utc": "2026-09-13T15:16:18.215847+00:00",
+  "removed_target": "/home/zhuhe/litchi-goal-0557-target",
+  "removed": true,
+  "regular_file_count": 9599,
+  "logical_regular_file_bytes": 18960844447,
+  "binary_sha256_by_kind": {
+    "baseline-normal": "fa69fc4675d67a1f3c73d056f77ccccf7d795befcfa6458b2a014fa86d0778c4"
+  },
+  "binary_bytes_by_kind": {
+    "baseline-normal": 59892784
+  },
+  "binary_descriptor_sha256": "e433f0710f54f803865543825b0a802b2a669effb42e51d3ec00b294ed551641",
+  "accessible_process_references": [],
+  "unreadable_or_raced_process_observations": 586,
+  "reference_scope": "Accessible /proc cwd, executable, file descriptors and maps; not host-wide visibility.",
+  "cleanup_script_sha256": "281b0571c5a8d4452beb56e5a59cad36c6c11c15408621878d1baaba583eac1e"
+}

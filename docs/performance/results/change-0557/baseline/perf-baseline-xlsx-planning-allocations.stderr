@@ -1,0 +1,3 @@
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.44s
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/litchi-goal-0557-target/debug/deps/xlsx_planning_allocations-c736483f7b9b1eed)

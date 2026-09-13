@@ -1,0 +1,16 @@
+{
+  "compiler_processes": [
+    {
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-roman-worktree",
+      "pid": 192224
+    },
+    {
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-roman-worktree/crates/litchi-ods",
+      "pid": 192235
+    }
+  ],
+  "observed_utc": "2026-09-13T14:56:45.920319+00:00",
+  "scope": "Accessible compiler processes only; no host quiescence guarantee"
+}

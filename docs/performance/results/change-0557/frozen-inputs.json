@@ -1,0 +1,16 @@
+{
+  "frozen_utc": "2026-09-13T14:30:32.924698+00:00",
+  "scope": "Final prospective measurement inputs; frozen after source review and pure preflights, during harness unit validation, before first release measurement build/capture. Earlier plan/analyzer amendments retained.",
+  "sha256": {
+    "plan.json": "d8111317e6d6d44219c844aaf740ea50fc149c361601bb6483a47d33843f88d8",
+    "run.py": "c9c0db8ac91da2d8604c3a7d70b77f5927f0b6ac9c6fb8066e4b7c350b8b8999",
+    "analyze.py": "010f44e811d852ade5f5a62fcd3092961815ef0a3e81217697bc170b5e92bbb2",
+    "expected-primary.json": "84f11d08100d03bf00cdec0484a18bb981dbaa35f3486be67b07d49b2ec6a97e",
+    "alloc-design.md": "d0117f36b425fce6f637d4256bc134b7657c556b4c102de7d390a5cc870ed80c",
+    "final-review.md": "6079b90bc7f76767f06e2d2735232ba0dbe2366aa5ecfb1a8cf7b167f9c7cef9",
+    "metrics-final-review.md": "ca6c69da93c3ff20636a1ef370b749a1d867641107dee2f4f533bbf0c19b8030",
+    "analyzer-notes.md": "1cd479751a7348aeb05d3de5661a2f45dadde21e2d7f45ea60773cba32d99481",
+    "driver-notes.md": "a5975d097fc17707b39ca5033ee321f26ebf36af9de39f6332977079894cb73f",
+    "baseline/source-manifest.json": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5"
+  }
+}

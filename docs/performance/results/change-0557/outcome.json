@@ -1,0 +1,55 @@
+{
+  "schema": "xlsx_0557_outcome_v1",
+  "base_revision": "0d812aca92b608f9de8f9398fad1c379077ce708",
+  "priority": "OLE2 and OOXML first; ODF deferred until that optimization goal completes; iWork excluded",
+  "disposition": "baseline pilot too unstable; candidate admission stopped; harness instrumentation retained",
+  "production_candidate_applied": false,
+  "candidate_performance_measured": false,
+  "production_speedup_claim": false,
+  "noise_N_percent": 9.787197844389572,
+  "noise_limit_percent": 5.0,
+  "noise_children": 16,
+  "samples_per_child": 1000,
+  "measured_noise_samples": 16000,
+  "warmups_per_child": 20,
+  "noise_rescue_runs": 0,
+  "successful_receipts": 26,
+  "quality": {
+    "harness_library": {
+      "passed": 498,
+      "ignored": 1,
+      "failed": 0
+    },
+    "allocator_binary": {
+      "passed": 5,
+      "failed": 0
+    },
+    "allocation_integration": {
+      "passed": 1,
+      "failed": 0
+    },
+    "harness_clippy": "pass; all targets and all features, warnings denied",
+    "harness_rustdoc": "pass; warnings denied",
+    "format": "pass",
+    "workspace_check": "pass; all features",
+    "crate_boundaries": "pass",
+    "strict_claim_registry": {
+      "passed": 10
+    }
+  },
+  "diagnostic_comparisons": 464,
+  "diagnostic_absolute_drifts_over_five_percent": 135,
+  "noise_analysis_sha256": "949e1210163396a54fe4e7ea98f5a4c2324a2ef47b31c534b11ad7fe6d87bb3e",
+  "results_review_sha256": "859190c9311b19e602c8014c196acc5a7ef89ab9a84d55da77eb0d188bbb67ae",
+  "source_manifest_sha256": "68fdc09a68bf779e17c5852e5f7a0c0a8b15253e35ed6762e42018a37c5011c5",
+  "owned_target_removed": true,
+  "logical_regular_file_bytes_removed": 18960844447,
+  "limits": [
+    "Same-binary variability cause unestablished",
+    "No candidate or allocator performance matrix, profile, cold-cache or scaling capture",
+    "Existing opt-in real-producer security test ignored; no fresh native Office, fuzz or sanitizer claim",
+    "Process visibility limited to accessible /proc entries"
+  ],
+  "archival_whitespace_findings": 36,
+  "unexpected_whitespace_findings": 0
+}

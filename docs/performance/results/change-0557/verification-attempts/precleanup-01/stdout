@@ -1,0 +1,2 @@
+Noise diagnostics: 464 comparisons; 135 individually retained/reviewed flags.
+{"adr_files": 30, "candidate_measured": false, "cleaned": false, "measured_samples": 16000, "noise_N_percent": 9.787197844389572, "noise_children": 16, "sealed": false, "source_files": 8595, "status": "pass", "successful_receipts": 26}

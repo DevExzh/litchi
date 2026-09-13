@@ -1,0 +1,200 @@
+{
+  "git_diff_check_exit_code": 2,
+  "classification": "Verbatim raw patch/format output and exact frozen review/test-log EOF preservation; no source whitespace finding.",
+  "finding_count": 36,
+  "findings": [
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-alloc-tests.stdout",
+      "line": 10,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-lib-tests.stdout",
+      "line": 504,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/perf-baseline-xlsx-planning-allocations.stdout",
+      "line": 6,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 19,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 65,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 69,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 200,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 225,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 259,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 263,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 677,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 870,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 937,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 987,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 1045,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/baseline/source.patch",
+      "line": 1081,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 19,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 65,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 69,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 196,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 221,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 255,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 259,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 605,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 799,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 856,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 906,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 964,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/before.patch",
+      "line": 1000,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 16,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 27,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 53,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 87,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/format-preflight/check.stdout",
+      "line": 122,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/performance/results/change-0557/metrics-final-review.md",
+      "line": 74,
+      "message": "new blank line at EOF."
+    },
+    {
+      "path": "docs/performance/results/change-0557/results-review.md",
+      "line": 94,
+      "message": "new blank line at EOF."
+    }
+  ],
+  "unexpected_findings": [],
+  "stdout": {
+    "encoding": "base64",
+    "sha256": "2ee4e04dc043cb7462f7b77b55936b8094bbb759dacde0d358fc2dbd3a15f9bf",
+    "bytes": 3373,
+    "data": "ZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3BlcmYtYmFzZWxpbmUtYWxsb2MtdGVzdHMuc3Rkb3V0OjEwOiBuZXcgYmxhbmsgbGluZSBhdCBFT0YuCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9wZXJmLWJhc2VsaW5lLWxpYi10ZXN0cy5zdGRvdXQ6NTA0OiBuZXcgYmxhbmsgbGluZSBhdCBFT0YuCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9wZXJmLWJhc2VsaW5lLXhsc3gtcGxhbm5pbmctYWxsb2NhdGlvbnMuc3Rkb3V0OjY6IG5ldyBibGFuayBsaW5lIGF0IEVPRi4KZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDoxOTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDo2NTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDo2OTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDoyMDA6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9zb3VyY2UucGF0Y2g6MjI1OiB0cmFpbGluZyB3aGl0ZXNwYWNlLgorIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvYmFzZWxpbmUvc291cmNlLnBhdGNoOjI1OTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDoyNjM6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9zb3VyY2UucGF0Y2g6Njc3OiB0cmFpbGluZyB3aGl0ZXNwYWNlLgorIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvYmFzZWxpbmUvc291cmNlLnBhdGNoOjg3MDogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Jhc2VsaW5lL3NvdXJjZS5wYXRjaDo5Mzc6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9zb3VyY2UucGF0Y2g6OTg3OiB0cmFpbGluZyB3aGl0ZXNwYWNlLgorIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvYmFzZWxpbmUvc291cmNlLnBhdGNoOjEwNDU6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9iYXNlbGluZS9zb3VyY2UucGF0Y2g6MTA4MTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjE5OiB0cmFpbGluZyB3aGl0ZXNwYWNlLgorIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvZm9ybWF0LXByZWZsaWdodC9iZWZvcmUucGF0Y2g6NjU6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9mb3JtYXQtcHJlZmxpZ2h0L2JlZm9yZS5wYXRjaDo2OTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjE5NjogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjIyMTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjI1NTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjI1OTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjYwNTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjc5OTogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjg1NjogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjkwNjogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjk2NDogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvYmVmb3JlLnBhdGNoOjEwMDA6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9mb3JtYXQtcHJlZmxpZ2h0L2NoZWNrLnN0ZG91dDoxNjogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKyAKZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L2Zvcm1hdC1wcmVmbGlnaHQvY2hlY2suc3Rkb3V0OjI3OiB0cmFpbGluZyB3aGl0ZXNwYWNlLgorIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvZm9ybWF0LXByZWZsaWdodC9jaGVjay5zdGRvdXQ6NTM6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisgCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9mb3JtYXQtcHJlZmxpZ2h0L2NoZWNrLnN0ZG91dDo4NzogdHJhaWxpbmcgd2hpdGVzcGFjZS4KKxtbbQ8gCmRvY3MvcGVyZm9ybWFuY2UvcmVzdWx0cy9jaGFuZ2UtMDU1Ny9mb3JtYXQtcHJlZmxpZ2h0L2NoZWNrLnN0ZG91dDoxMjI6IHRyYWlsaW5nIHdoaXRlc3BhY2UuCisbW20PIApkb2NzL3BlcmZvcm1hbmNlL3Jlc3VsdHMvY2hhbmdlLTA1NTcvbWV0cmljcy1maW5hbC1yZXZpZXcubWQ6NzQ6IG5ldyBibGFuayBsaW5lIGF0IEVPRi4KZG9jcy9wZXJmb3JtYW5jZS9yZXN1bHRzL2NoYW5nZS0wNTU3L3Jlc3VsdHMtcmV2aWV3Lm1kOjk0OiBuZXcgYmxhbmsgbGluZSBhdCBFT0YuCg=="
+  },
+  "stderr": {
+    "encoding": "base64",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "data": ""
+  }
+}

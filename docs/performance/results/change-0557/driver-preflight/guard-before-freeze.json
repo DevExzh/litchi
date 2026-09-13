@@ -1,0 +1,14 @@
+{
+  "utc": "2026-09-13T13:53:09.289736+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0557/run.py",
+    "guard-test"
+  ],
+  "exit_code": 1,
+  "classification": "expected missing prerequisite: stage manifest not yet frozen; not a workload run",
+  "driver_sha256": "c9c0db8ac91da2d8604c3a7d70b77f5927f0b6ac9c6fb8066e4b7c350b8b8999",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "76bf72be6f6dd6f6563e9167cceab4d963a8345ee4dbcd523953029033d58133"
+}

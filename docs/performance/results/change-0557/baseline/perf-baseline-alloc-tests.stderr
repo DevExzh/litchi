@@ -1,0 +1,4 @@
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.02s
+     Running unittests src/bin/litchi-perf-baseline-alloc.rs (/home/zhuhe/litchi-goal-0557-target/debug/deps/litchi_perf_baseline_alloc-05638068261fc877)
