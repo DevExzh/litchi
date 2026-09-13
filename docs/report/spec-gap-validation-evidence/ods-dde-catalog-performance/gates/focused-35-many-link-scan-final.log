@@ -1,0 +1,22 @@
+ODS DDE catalog preallocation focused gate
+UTC: 2026-09-13T05:28:10Z
+Working tree: /home/zhuhe/code/litchi-spec-gaps
+Command: cargo test --locked --offline -p litchi-ods --test ods_dde_transactions -- --test-threads=1
+Result: PASS; 35 passed, 0 failed, 0 ignored, 0 measured; elapsed 0.58s
+Source hashes were identical before and after the run.
+
+New coverage in this receipt:
+- a 1,024-link DDE catalog commits a reorder successfully under a finite 64 MiB Memory budget and its exact inverse restores the original XML;
+- the same many-link catalog is readable and stageable under a finite 2 MiB Memory budget, while commit scan scratch admission is refused with a Memory error, leaves the staged edit and source unchanged, and releases temporary scan reservations back to the staged baseline.
+
+The tests assert successful behavior, exact inverse/source preservation, and failure atomicity. They do not assert scanner vector capacities or implementation-specific byte estimates.
+
+Source hashes before the focused run:
+d8be57303a27c65d68312b18477a9356c5d4df8fa054910dace9b2318f009706  crates/litchi-ods/src/model/dde/transaction.rs
+98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8  crates/litchi-ods/src/model/dde.rs
+c691220b1c25a989cd68edfa7bcd52bd673153a1413f78a63a32dde3c3751f0c  crates/litchi-ods/tests/ods_dde_transactions.rs
+
+Source hashes after the focused run (identical):
+d8be57303a27c65d68312b18477a9356c5d4df8fa054910dace9b2318f009706  crates/litchi-ods/src/model/dde/transaction.rs
+98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8  crates/litchi-ods/src/model/dde.rs
+c691220b1c25a989cd68edfa7bcd52bd673153a1413f78a63a32dde3c3751f0c  crates/litchi-ods/tests/ods_dde_transactions.rs

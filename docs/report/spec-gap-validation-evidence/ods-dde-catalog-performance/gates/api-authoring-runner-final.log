@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running `/var/tmp/litchi-ods-catalog-root-target/debug/ods-dde-authoring-capture /var/tmp/litchi-ods-catalog-root-tmp/api-content.xml`
+wrote 1978 bytes to /var/tmp/litchi-ods-catalog-root-tmp/api-content.xml (changed=true, links=2)

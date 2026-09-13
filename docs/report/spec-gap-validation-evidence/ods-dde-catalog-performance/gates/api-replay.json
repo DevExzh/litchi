@@ -1,0 +1,6 @@
+{
+  "sha256": "c325938c04decebaf32eb0296ade4189a9da3a5d7d8df50c50e8db3659d631b8",
+  "exactly_matches_preoptimization_artifact": true,
+  "whole_odf_14_rng_valid": true,
+  "cache_prose_checks_pass": true
+}

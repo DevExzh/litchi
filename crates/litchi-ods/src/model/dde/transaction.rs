@@ -1509,17 +1509,44 @@ struct Scan {
 }
 
 impl Scan {
-    fn new(context: &ExecutionContext) -> CoreResult<Self> {
+    fn new(
+        context: &ExecutionContext,
+        table_capacity: usize,
+        link_capacity: usize,
+    ) -> CoreResult<Self> {
+        context.check().map_err(map_execution_core)?;
+        let table_bytes = table_capacity
+            .checked_mul(size_of::<TableSite>())
+            .ok_or_else(|| invalid_core("DDE table catalog memory size overflows"))?;
+        let link_bytes = link_capacity
+            .checked_mul(size_of::<LinkSite>())
+            .ok_or_else(|| invalid_core("DDE link catalog memory size overflows"))?;
+        let amount = 1usize
+            .checked_add(table_bytes)
+            .and_then(|value| value.checked_add(link_bytes))
+            .ok_or_else(|| invalid_core("DDE catalog memory size overflows"))?;
         let reservation = context
-            .reserve(Resource::Memory, 1)
+            .reserve(
+                Resource::Memory,
+                u64::try_from(amount)
+                    .map_err(|_| invalid_core("DDE catalog memory size exceeds u64"))?,
+            )
             .map_err(map_execution_core)?;
+        let mut tables = Vec::new();
+        tables.try_reserve_exact(table_capacity).map_err(|_| {
+            CoreError::Unsupported("DDE table catalog allocation failed".to_string())
+        })?;
+        let mut links = Vec::new();
+        links.try_reserve_exact(link_capacity).map_err(|_| {
+            CoreError::Unsupported("DDE link catalog allocation failed".to_string())
+        })?;
         Ok(Self {
             spreadsheet: None,
             spreadsheet_close_start: None,
-            tables: Vec::new(),
+            tables,
             links_container: None,
             links_container_opaque: false,
-            links: Vec::new(),
+            links,
             _memory_reservation: reservation,
             mce_present: false,
             mce_depth: 0,
@@ -1797,7 +1824,13 @@ fn render_source(
     context: &ExecutionContext,
 ) -> CoreResult<RenderedCandidate> {
     context.check().map_err(map_execution_core)?;
-    let scan = scan_source(before.content.as_ref(), before.limits(), context)?;
+    let scan = scan_source(
+        before.content.as_ref(),
+        before.limits(),
+        before.inventory().table_names.len(),
+        before.links().len(),
+        context,
+    )?;
     if scan.mce_present {
         return Err(invalid_core(
             "DDE mutation is refused when markup-compatibility choices are present",
@@ -2806,7 +2839,13 @@ fn verify_readback(
     Ok(())
 }
 
-fn scan_source(content: &str, limits: Limits, context: &ExecutionContext) -> CoreResult<Scan> {
+fn scan_source(
+    content: &str,
+    limits: Limits,
+    table_capacity: usize,
+    link_capacity: usize,
+    context: &ExecutionContext,
+) -> CoreResult<Scan> {
     // `quick_xml` reports positions relative to the input handed to the
     // reader.  It does not retain a UTF-8 BOM in that stream, so parse the
     // post-BOM slice and translate every range back to the original source
@@ -2823,7 +2862,7 @@ fn scan_source(content: &str, limits: Limits, context: &ExecutionContext) -> Cor
     // Admit scanner-owned projections before constructing their containers.
     // The source snapshot's retained bytes cover the input itself, not these
     // tables, link sites, frame stack, or decoded source/name strings.
-    let mut scan = Scan::new(context)?;
+    let mut scan = Scan::new(context, table_capacity, link_capacity)?;
     let mut stack = Vec::<Frame>::new();
     let mut depth = 0usize;
     loop {

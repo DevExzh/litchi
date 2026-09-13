@@ -1,0 +1,6 @@
+utc=2026-09-13T05:24:27.891061+00:00
+baseline=ae9bf7bfa11eed50e6560be166eaa18987cda2b5
+binary=/var/tmp/ods-dde-catalog-baseline-target/release/ods-dde-transaction-profile
+cpu_affinity=2
+warmups=3
+iterations=15
