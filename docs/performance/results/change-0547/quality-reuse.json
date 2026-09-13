@@ -1,0 +1,19 @@
+{
+  "scope": "Exact full source manifest equals sealed0546 final candidate; no production/harness edits. Prior nine quality commands and1306 tests reused, not rerun or counted as0547 executions.",
+  "prior_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "current_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "quality_summary_sha256": "6951388ff6fe87eca26ea9fcef636957cdbf7564bb9ff3e03f726b943f80890a",
+  "prior_seal_sha256": "4e2be2147eb83b77a01d7d4eb4a5b587e9e5ac125705b7389e2c9f9d579341eb",
+  "receipts": {
+    "final-quality-boundaries.receipt.json": "75c87b487562cc06e48ad8d97763e6aeb1aecb1836968620569beb912b14a1ad",
+    "final-quality-cap-clippy.receipt.json": "5d7b20337ced827df8efdc3a4f08cc3b84dfcb708c169f7275f19ce66d68e459",
+    "final-quality-check.receipt.json": "f66f8a59afcd52aabefd3f19ff7b8291329eaebf37d37d6f5403ba5a632ef922",
+    "final-quality-clippy.receipt.json": "d337fe535cec9cb636a0b9b32e289c2b21410addb8a3b006c9504a2938fb0aba",
+    "final-quality-fmt.receipt.json": "8285d5ef77e91b52b93eb2daa898ede1811f303dcf248b822251c92861517104",
+    "final-quality-guard-clippy.receipt.json": "7b2b3d03c30ff16b574c9b1cc42acc255f077ea00e68d5855e2906148807c701",
+    "final-quality-guard-fmt.receipt.json": "2eab6b6ce4a42df6d915943c4e7314bdbe64776bdc054fb57498957f4c227ef6",
+    "final-quality-rustdoc.receipt.json": "db790b2a70742f31a5318ac47fe12527c589ab6463eadf6a7684b5d7f58dfed6",
+    "final-quality-tests.receipt.json": "43c2f8c46501c94ca7861bba9cd4e390c9ff70c5a60e071045ddaa3e7962b8a5"
+  },
+  "tests_previously_passed": 1306
+}

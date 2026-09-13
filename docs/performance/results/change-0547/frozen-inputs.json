@@ -1,0 +1,11 @@
+{
+  "utc": "2026-09-13T02:14:29.059304+00:00",
+  "files": {
+    "run.py": "bdb71867fe345b04dd7893ed9cc0d19cdc10dab4964338e9f7ea312ddbfd1cf9",
+    "inspect_assembly.py": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+    "capture.py": "c242fdd3e57bd5ec4c03dd51c49eaad97d566236807414003a7e58185f877a6a",
+    "plan.json": "277710c59c98e614483ad94ac6c2130f58ea8e36ed3d2235341ac7c4139fc343",
+    "adr-manifest.json": "e815a51327a39956a3e5e3adfd3fc76b7942b1c65124c66189ab7b98f8bf6893"
+  },
+  "scope": "Capture inputs frozen; analysis consumes immutable raw output and cannot alter measured sources or captures."
+}

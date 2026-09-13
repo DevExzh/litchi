@@ -1,0 +1,9 @@
+{
+  "utc": "2026-09-13T02:36:56.773966+00:00",
+  "issue": "First strict post-cleanup replay rejected absent executable despite verified completed cleanup. Profile analyzer only supported live precleanup binaries.",
+  "resolution": "Retain live binary hash/size checks; after removal require exact planned path, matching completed cleanup binary+plan hashes, absent owned target, empty process references, and cleanup after build. Strict verifier separately validates all capture receipts and cleanup. No raw measurements or result rows changed.",
+  "original_analyzer_sha256": "f57827156072d2ab28dfa2e1f6806ed97c9bf6dbeca174b088c6f20737d6b0b3",
+  "final_analyzer_sha256": "c24bd2570caca3d995c934519e919a458338317112dd59a18a8b634caa6bdd8e",
+  "preserved_original": "precleanup-analyze_profiles.py",
+  "initial_strict_exit_code": 2
+}

@@ -1,0 +1,78 @@
+{
+  "revision": "2118c6fb1d023005e224aaa938e84d6ed0588b70",
+  "created_utc": "2026-09-13T02:14:29.056631+00:00",
+  "previous_turn": "progress:0546 retained measured XLSX optimization and sealed/committed/cleaned",
+  "scope": "Fresh baseline-only OLE2 collector sub-operation attribution",
+  "priority": "OLE2/OOXML active; ODF deferred until that goal completes; iWork excluded",
+  "hypothesis": "Locate the measured valid-loop visited test/update cost before a separately proved work-elimination candidate",
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "profile": {
+    "repeats": 1,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "zero-before/dump-after/toggle exact constructor; retain setup CFB open dump and use only positive incoming benchmark-runner dumps for operation attribution",
+    "instruction_flags": [
+      "--dump-instr=yes",
+      "--dump-line=no",
+      "--compress-pos=no",
+      "--collect-jumps=yes"
+    ]
+  },
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0547-target"
+  ],
+  "status": "frozen-before-build-and-capture",
+  "temporary_storage": "Use owned target/tmp from first child; prior0532 confirmed /tmp EDQUOT; vgdb=no from first profile",
+  "assembly": {
+    "owners": [
+      "SectorChainScratch",
+      "CheckedBitSet",
+      "chain_error"
+    ],
+    "required": [
+      "collect_exact",
+      "insert"
+    ],
+    "scope": "Same measured binary; all matching symbols captured; instruction mapping, not static latency"
+  },
+  "performance_claim": "none: single-repeat baseline instruction attribution, not candidate comparison or native latency",
+  "quality_reuse": {
+    "bundle": "change-0546/integration",
+    "stage": "candidate",
+    "condition": "Exact complete source-manifest equality plus prior final nine quality receipts and seal custody; no runtime or harness changes in0547"
+  }
+}

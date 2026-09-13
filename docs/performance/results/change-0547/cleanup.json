@@ -1,0 +1,19 @@
+{
+  "accessible_process_references": [],
+  "binary_sha256": "2d1e12c0d1e156ba8dde848d72f4f3c684a73887d5c5fc87ae0f4c57538b9875",
+  "input_sha256": {
+    "adr-manifest.json": "e815a51327a39956a3e5e3adfd3fc76b7942b1c65124c66189ab7b98f8bf6893",
+    "capture.py": "c242fdd3e57bd5ec4c03dd51c49eaad97d566236807414003a7e58185f877a6a",
+    "inspect_assembly.py": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+    "plan.json": "277710c59c98e614483ad94ac6c2130f58ea8e36ed3d2235341ac7c4139fc343",
+    "run.py": "bdb71867fe345b04dd7893ed9cc0d19cdc10dab4964338e9f7ea312ddbfd1cf9"
+  },
+  "owned_paths_absent": true,
+  "plan_sha256": "277710c59c98e614483ad94ac6c2130f58ea8e36ed3d2235341ac7c4139fc343",
+  "removed": [
+    "/home/zhuhe/litchi-goal-0547-target"
+  ],
+  "scope": "After all measured and analysis processes terminal; final precleanup passes including model, suboperations and documentation bindings.",
+  "target": "/home/zhuhe/litchi-goal-0547-target",
+  "utc": "2026-09-13T02:35:52.215783+00:00"
+}

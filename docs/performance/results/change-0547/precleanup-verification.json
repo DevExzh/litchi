@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0547/verify.py",
+    "--precleanup"
+  ],
+  "exit_code": 0,
+  "recorded_utc": "2026-09-13T02:34:25.838187+00:00",
+  "verifier_sha256": "4efdef2fba5b32307d2d461409a21674baf87e0642b57b33afeb02afab82cc89",
+  "stdout_sha256": "00c06de1a04f295e58c55311883164a40d3c4bb329d7801e9128f57f20d3fb10",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

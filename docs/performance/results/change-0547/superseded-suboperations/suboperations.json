@@ -1,0 +1,4637 @@
+{
+  "assembly_index_sha256": "91f0bf36bd5ad9e680af13a60d7036f265b6dbd8eff3f1b0065e92e0f3fa6531",
+  "instruction_analysis_sha256": "0254b841c6320c7f3c25ebcd0a366909cf14d3b1d77168375679d34bb07b1a74",
+  "mapping_script_sha256": "cb18ab483f338b28eef048620dba3f56a072c0692cd000238142fb04417fa8ff",
+  "rows": [
+    {
+      "categories": {
+        "cold_error_construction_reset": 0,
+        "entry_reservation_visited_preparation": 3130,
+        "fat_lookup_marker_checks_loop_state": 2140020,
+        "sector_vector_append_capacity": 1152480,
+        "success_status_and_shared_return": 550,
+        "visited_bounds_address_test_update": 2304960
+      },
+      "category_percent_of_collector": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.05588148126988435,
+        "fat_lookup_marker_checks_loop_state": 38.20686503104725,
+        "sector_vector_append_capacity": 20.575811352688916,
+        "success_status_and_shared_return": 0.009819429616113862,
+        "visited_bounds_address_test_update": 41.15162270537783
+      },
+      "category_percent_of_constructor": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.02765910724708375,
+        "fat_lookup_marker_checks_loop_state": 18.910876259074815,
+        "sector_vector_append_capacity": 10.184207003232935,
+        "success_status_and_shared_return": 0.004860226513065835,
+        "visited_bounds_address_test_update": 20.36841400646587
+      },
+      "collector_direct_ir": 215246,
+      "collector_inclusive_ir": 5816386,
+      "collector_self_ir": 5601140,
+      "constructor_inclusive_ir": 11316345,
+      "direct_children": {
+        "__memset_avx2_unaligned_erms": 209030,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 6216
+      },
+      "instructions": [
+        {
+          "address_hex": "0x2f223c0",
+          "assembly": "push %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x0"
+        },
+        {
+          "address_hex": "0x2f223c1",
+          "assembly": "push %r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1"
+        },
+        {
+          "address_hex": "0x2f223c3",
+          "assembly": "push %r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x3"
+        },
+        {
+          "address_hex": "0x2f223c5",
+          "assembly": "push %r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x5"
+        },
+        {
+          "address_hex": "0x2f223c7",
+          "assembly": "push %r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x7"
+        },
+        {
+          "address_hex": "0x2f223c9",
+          "assembly": "push %rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x9"
+        },
+        {
+          "address_hex": "0x2f223ca",
+          "assembly": "sub $0xb8,%rsp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xa"
+        },
+        {
+          "address_hex": "0x2f223d1",
+          "assembly": "mov %rsi,%r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x11"
+        },
+        {
+          "address_hex": "0x2f223d4",
+          "assembly": "mov %rdi,%rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x14"
+        },
+        {
+          "address_hex": "0x2f223d7",
+          "assembly": "movaps 0xf0(%rsp),%xmm0",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x17"
+        },
+        {
+          "address_hex": "0x2f223df",
+          "assembly": "movups %xmm0,0x40(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1f"
+        },
+        {
+          "address_hex": "0x2f223e4",
+          "assembly": "movq $0x0,0x10(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x24"
+        },
+        {
+          "address_hex": "0x2f223ec",
+          "assembly": "movq $0x0,0x30(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x2c"
+        },
+        {
+          "address_hex": "0x2f223f4",
+          "assembly": "test %r9,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x34"
+        },
+        {
+          "address_hex": "0x2f223f7",
+          "assembly": "je 2f22424 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x64>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x37"
+        },
+        {
+          "address_hex": "0x2f223f9",
+          "assembly": "cmp $0xfffffff9,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x39"
+        },
+        {
+          "address_hex": "0x2f223fd",
+          "assembly": "jbe 2f22436 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x76>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x3d"
+        },
+        {
+          "address_hex": "0x2f2242a",
+          "assembly": "movq $0xb,(%rbx)",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x6a"
+        },
+        {
+          "address_hex": "0x2f22431",
+          "assembly": "jmp 2f22685 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2c5>",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x71"
+        },
+        {
+          "address_hex": "0x2f22436",
+          "assembly": "mov %rcx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x76"
+        },
+        {
+          "address_hex": "0x2f22439",
+          "assembly": "cmp %rcx,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x79"
+        },
+        {
+          "address_hex": "0x2f2243c",
+          "assembly": "jbe 2f22488 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xc8>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x7c"
+        },
+        {
+          "address_hex": "0x2f22488",
+          "assembly": "mov (%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xc8"
+        },
+        {
+          "address_hex": "0x2f2248b",
+          "assembly": "cmp %r9,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xcb"
+        },
+        {
+          "address_hex": "0x2f2248e",
+          "assembly": "mov %rdx,0x60(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xce"
+        },
+        {
+          "address_hex": "0x2f22493",
+          "assembly": "jb 2f22859 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x499>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xd3"
+        },
+        {
+          "address_hex": "0x2f22499",
+          "assembly": "lea 0x3f(%r15),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xd9"
+        },
+        {
+          "address_hex": "0x2f2249d",
+          "assembly": "shr $0x6,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xdd"
+        },
+        {
+          "address_hex": "0x2f224a1",
+          "assembly": "mov 0x28(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xe1"
+        },
+        {
+          "address_hex": "0x2f224a5",
+          "assembly": "mov %r13,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xe5"
+        },
+        {
+          "address_hex": "0x2f224a8",
+          "assembly": "sub %rdx,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xe8"
+        },
+        {
+          "address_hex": "0x2f224ab",
+          "assembly": "mov %r15,0x58(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xeb"
+        },
+        {
+          "address_hex": "0x2f224b0",
+          "assembly": "mov %r9,0x78(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xf0"
+        },
+        {
+          "address_hex": "0x2f224b5",
+          "assembly": "mov %r8,0x70(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xf5"
+        },
+        {
+          "address_hex": "0x2f224ba",
+          "assembly": "jbe 2f22543 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x183>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0xfa"
+        },
+        {
+          "address_hex": "0x2f224c0",
+          "assembly": "mov 0x18(%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x100"
+        },
+        {
+          "address_hex": "0x2f224c4",
+          "assembly": "mov %rsi,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x104"
+        },
+        {
+          "address_hex": "0x2f224c7",
+          "assembly": "sub %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x107"
+        },
+        {
+          "address_hex": "0x2f224ca",
+          "assembly": "cmp %rax,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x10a"
+        },
+        {
+          "address_hex": "0x2f224cd",
+          "assembly": "ja 2f228aa <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4ea>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x10d"
+        },
+        {
+          "address_hex": "0x2f224e2",
+          "assembly": "mov 0x20(%r14),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x122"
+        },
+        {
+          "address_hex": "0x2f224e6",
+          "assembly": "lea (%rax,%rbp,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x126"
+        },
+        {
+          "address_hex": "0x2f224ea",
+          "assembly": "cmp $0x2,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x12a"
+        },
+        {
+          "address_hex": "0x2f224ee",
+          "assembly": "jb 2f22532 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x172>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x12e"
+        },
+        {
+          "address_hex": "0x2f224f0",
+          "assembly": "mov %rax,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x130"
+        },
+        {
+          "address_hex": "0x2f224f5",
+          "assembly": "mov %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x135"
+        },
+        {
+          "address_hex": "0x2f224f8",
+          "assembly": "not %rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x138"
+        },
+        {
+          "address_hex": "0x2f224fb",
+          "assembly": "add %r13,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x13b"
+        },
+        {
+          "address_hex": "0x2f224fe",
+          "assembly": "shl $0x3,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x13e"
+        },
+        {
+          "address_hex": "0x2f22502",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x142"
+        },
+        {
+          "address_hex": "0x2f22504",
+          "assembly": "mov %rdx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x144"
+        },
+        {
+          "address_hex": "0x2f22507",
+          "assembly": "mov %rax,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x147"
+        },
+        {
+          "address_hex": "0x2f2250a",
+          "assembly": "call *0x19bc80(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x14a"
+        },
+        {
+          "address_hex": "0x2f22510",
+          "assembly": "add %rbp,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x150"
+        },
+        {
+          "address_hex": "0x2f22513",
+          "assembly": "shl $0x3,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x153"
+        },
+        {
+          "address_hex": "0x2f22517",
+          "assembly": "mov 0x30(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x157"
+        },
+        {
+          "address_hex": "0x2f2251c",
+          "assembly": "lea (%rax,%r13,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x15c"
+        },
+        {
+          "address_hex": "0x2f22520",
+          "assembly": "sub %r15,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x160"
+        },
+        {
+          "address_hex": "0x2f22523",
+          "assembly": "mov 0x58(%rsp),%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x163"
+        },
+        {
+          "address_hex": "0x2f22528",
+          "assembly": "add $0xfffffffffffffff8,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x168"
+        },
+        {
+          "address_hex": "0x2f2252c",
+          "assembly": "add %r12,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x16c"
+        },
+        {
+          "address_hex": "0x2f2252f",
+          "assembly": "dec %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x16f"
+        },
+        {
+          "address_hex": "0x2f22532",
+          "assembly": "movq $0x0,(%rdi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x172"
+        },
+        {
+          "address_hex": "0x2f22539",
+          "assembly": "inc %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x179"
+        },
+        {
+          "address_hex": "0x2f2253c",
+          "assembly": "mov %rbp,0x28(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x17c"
+        },
+        {
+          "address_hex": "0x2f22540",
+          "assembly": "mov %rbp,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x180"
+        },
+        {
+          "address_hex": "0x2f22543",
+          "assembly": "mov %r15,0x30(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x183"
+        },
+        {
+          "address_hex": "0x2f22547",
+          "assembly": "mov 0x20(%r14),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x187"
+        },
+        {
+          "address_hex": "0x2f2254b",
+          "assembly": "shl $0x3,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x18b"
+        },
+        {
+          "address_hex": "0x2f2254f",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x18f"
+        },
+        {
+          "address_hex": "0x2f22551",
+          "assembly": "call *0x19bc39(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x191"
+        },
+        {
+          "address_hex": "0x2f22557",
+          "assembly": "mov 0x70(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x197"
+        },
+        {
+          "address_hex": "0x2f2255c",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x19c"
+        },
+        {
+          "address_hex": "0x2f22560",
+          "assembly": "mov %eax,%r12d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1a0"
+        },
+        {
+          "address_hex": "0x2f22563",
+          "assembly": "cmp %r12,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1a3"
+        },
+        {
+          "address_hex": "0x2f22566",
+          "assembly": "mov 0x78(%rsp),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1a6"
+        },
+        {
+          "address_hex": "0x2f2256b",
+          "assembly": "mov 0x60(%rsp),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1ab"
+        },
+        {
+          "address_hex": "0x2f22570",
+          "assembly": "jbe 2f2262f <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x26f>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1b0"
+        },
+        {
+          "address_hex": "0x2f22576",
+          "assembly": "lea 0x30(%r14),%r10",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1b6"
+        },
+        {
+          "address_hex": "0x2f2257a",
+          "assembly": "mov %rbx,0x68(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1ba"
+        },
+        {
+          "address_hex": "0x2f2257f",
+          "assembly": "nop",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 50,
+          "offset_hex": "0x1bf"
+        },
+        {
+          "address_hex": "0x2f22580",
+          "assembly": "cmp %r12,(%r10)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1c0"
+        },
+        {
+          "address_hex": "0x2f22583",
+          "assembly": "jbe 2f2269a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2da>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1c3"
+        },
+        {
+          "address_hex": "0x2f22589",
+          "assembly": "mov %r12,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1c9"
+        },
+        {
+          "address_hex": "0x2f2258c",
+          "assembly": "shr $0x6,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1cc"
+        },
+        {
+          "address_hex": "0x2f22590",
+          "assembly": "cmp 0x28(%r14),%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1d0"
+        },
+        {
+          "address_hex": "0x2f22594",
+          "assembly": "jae 2f226e4 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x324>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1d4"
+        },
+        {
+          "address_hex": "0x2f2259a",
+          "assembly": "mov $0x1,%r8d",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1da"
+        },
+        {
+          "address_hex": "0x2f225a0",
+          "assembly": "mov %r12d,%ecx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1e0"
+        },
+        {
+          "address_hex": "0x2f225a3",
+          "assembly": "shl %cl,%r8",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1e3"
+        },
+        {
+          "address_hex": "0x2f225a6",
+          "assembly": "mov 0x20(%r14),%rcx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1e6"
+        },
+        {
+          "address_hex": "0x2f225aa",
+          "assembly": "mov (%rcx,%rdi,8),%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1ea"
+        },
+        {
+          "address_hex": "0x2f225ae",
+          "assembly": "bt %r12,%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1ee"
+        },
+        {
+          "address_hex": "0x2f225b2",
+          "assembly": "jb 2f22790 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x3d0>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1f2"
+        },
+        {
+          "address_hex": "0x2f225b8",
+          "assembly": "mov %r12,0x38(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164640,
+          "offset_hex": "0x1f8"
+        },
+        {
+          "address_hex": "0x2f225bd",
+          "assembly": "or %r8,(%rcx,%rdi,8)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 164640,
+          "offset_hex": "0x1fd"
+        },
+        {
+          "address_hex": "0x2f225c1",
+          "assembly": "mov 0x10(%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x201"
+        },
+        {
+          "address_hex": "0x2f225c5",
+          "assembly": "cmp (%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x205"
+        },
+        {
+          "address_hex": "0x2f225c8",
+          "assembly": "jne 2f225ee <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x22e>",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x208"
+        },
+        {
+          "address_hex": "0x2f225ee",
+          "assembly": "mov 0x8(%r14),%rcx",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x22e"
+        },
+        {
+          "address_hex": "0x2f225f2",
+          "assembly": "mov %eax,(%rcx,%rbp,4)",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x232"
+        },
+        {
+          "address_hex": "0x2f225f5",
+          "assembly": "inc %rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x235"
+        },
+        {
+          "address_hex": "0x2f225f8",
+          "assembly": "mov %rbp,0x10(%r14)",
+          "category": "sector_vector_append_capacity",
+          "ir": 164640,
+          "offset_hex": "0x238"
+        },
+        {
+          "address_hex": "0x2f225fc",
+          "assembly": "mov (%rsi,%r12,4),%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164640,
+          "offset_hex": "0x23c"
+        },
+        {
+          "address_hex": "0x2f22600",
+          "assembly": "mov %eax,0x54(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164640,
+          "offset_hex": "0x240"
+        },
+        {
+          "address_hex": "0x2f22604",
+          "assembly": "dec %r13",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164640,
+          "offset_hex": "0x244"
+        },
+        {
+          "address_hex": "0x2f22607",
+          "assembly": "je 2f227cb <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x40b>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164640,
+          "offset_hex": "0x247"
+        },
+        {
+          "address_hex": "0x2f2260d",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x24d"
+        },
+        {
+          "address_hex": "0x2f22610",
+          "assembly": "je 2f227f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x439>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x250"
+        },
+        {
+          "address_hex": "0x2f22616",
+          "assembly": "cmp $0xfffffffa,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x256"
+        },
+        {
+          "address_hex": "0x2f22619",
+          "assembly": "jae 2f2281e <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x45e>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x259"
+        },
+        {
+          "address_hex": "0x2f2261f",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x25f"
+        },
+        {
+          "address_hex": "0x2f22623",
+          "assembly": "mov %rax,%r12",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x263"
+        },
+        {
+          "address_hex": "0x2f22626",
+          "assembly": "cmp %rax,%r15",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x266"
+        },
+        {
+          "address_hex": "0x2f22629",
+          "assembly": "ja 2f22580 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x1c0>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 164590,
+          "offset_hex": "0x269"
+        },
+        {
+          "address_hex": "0x2f22685",
+          "assembly": "mov %rbx,%rax",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2c5"
+        },
+        {
+          "address_hex": "0x2f22688",
+          "assembly": "add $0xb8,%rsp",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2c8"
+        },
+        {
+          "address_hex": "0x2f2268f",
+          "assembly": "pop %rbx",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2cf"
+        },
+        {
+          "address_hex": "0x2f22690",
+          "assembly": "pop %r12",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d0"
+        },
+        {
+          "address_hex": "0x2f22692",
+          "assembly": "pop %r13",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d2"
+        },
+        {
+          "address_hex": "0x2f22694",
+          "assembly": "pop %r14",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d4"
+        },
+        {
+          "address_hex": "0x2f22696",
+          "assembly": "pop %r15",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d6"
+        },
+        {
+          "address_hex": "0x2f22698",
+          "assembly": "pop %rbp",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d8"
+        },
+        {
+          "address_hex": "0x2f22699",
+          "assembly": "ret",
+          "category": "success_status_and_shared_return",
+          "ir": 50,
+          "offset_hex": "0x2d9"
+        },
+        {
+          "address_hex": "0x2f227cb",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 50,
+          "offset_hex": "0x40b"
+        },
+        {
+          "address_hex": "0x2f227ce",
+          "assembly": "je 2f2242a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x6a>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 50,
+          "offset_hex": "0x40e"
+        },
+        {
+          "address_hex": "0x2f22859",
+          "assembly": "mov %r8,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x499"
+        },
+        {
+          "address_hex": "0x2f2285c",
+          "assembly": "mov 0x8(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x49c"
+        },
+        {
+          "address_hex": "0x2f22860",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4a0"
+        },
+        {
+          "address_hex": "0x2f22863",
+          "assembly": "mov $0x4,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4a3"
+        },
+        {
+          "address_hex": "0x2f22869",
+          "assembly": "mov %r9,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4a9"
+        },
+        {
+          "address_hex": "0x2f2286c",
+          "assembly": "mov $0x4,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4ac"
+        },
+        {
+          "address_hex": "0x2f22872",
+          "assembly": "mov %rcx,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4b2"
+        },
+        {
+          "address_hex": "0x2f22875",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4b5"
+        },
+        {
+          "address_hex": "0x2f2287a",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4ba"
+        },
+        {
+          "address_hex": "0x2f2287e",
+          "assembly": "je 2f22893 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4d3>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4be"
+        },
+        {
+          "address_hex": "0x2f22893",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4d3"
+        },
+        {
+          "address_hex": "0x2f22898",
+          "assembly": "mov %rax,0x8(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4d8"
+        },
+        {
+          "address_hex": "0x2f2289c",
+          "assembly": "mov %r13,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4dc"
+        },
+        {
+          "address_hex": "0x2f2289f",
+          "assembly": "mov %r13,(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4df"
+        },
+        {
+          "address_hex": "0x2f228a2",
+          "assembly": "mov %r12,%r8",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4e2"
+        },
+        {
+          "address_hex": "0x2f228a5",
+          "assembly": "jmp 2f22499 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xd9>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x4e5"
+        },
+        {
+          "address_hex": "0x2f228aa",
+          "assembly": "mov %rdx,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x4ea"
+        },
+        {
+          "address_hex": "0x2f228af",
+          "assembly": "mov 0x20(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x4ef"
+        },
+        {
+          "address_hex": "0x2f228b3",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x4f3"
+        },
+        {
+          "address_hex": "0x2f228b6",
+          "assembly": "mov $0x8,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x4f6"
+        },
+        {
+          "address_hex": "0x2f228bc",
+          "assembly": "mov $0x8,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x4fc"
+        },
+        {
+          "address_hex": "0x2f228c2",
+          "assembly": "mov %r13,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x502"
+        },
+        {
+          "address_hex": "0x2f228c5",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x505"
+        },
+        {
+          "address_hex": "0x2f228ca",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x50a"
+        },
+        {
+          "address_hex": "0x2f228ce",
+          "assembly": "je 2f228f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x539>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x50e"
+        },
+        {
+          "address_hex": "0x2f228f9",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x539"
+        },
+        {
+          "address_hex": "0x2f228fe",
+          "assembly": "mov %rax,0x20(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x53e"
+        },
+        {
+          "address_hex": "0x2f22902",
+          "assembly": "mov %r13,0x18(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x542"
+        },
+        {
+          "address_hex": "0x2f22906",
+          "assembly": "mov %r13,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x546"
+        },
+        {
+          "address_hex": "0x2f22909",
+          "assembly": "mov 0x30(%rsp),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x549"
+        },
+        {
+          "address_hex": "0x2f2290e",
+          "assembly": "sub %rdx,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x54e"
+        },
+        {
+          "address_hex": "0x2f22911",
+          "assembly": "mov %rdx,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x551"
+        },
+        {
+          "address_hex": "0x2f22914",
+          "assembly": "cmp %rsi,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x554"
+        },
+        {
+          "address_hex": "0x2f22917",
+          "assembly": "jbe 2f224e2 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x122>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 10,
+          "offset_hex": "0x557"
+        }
+      ],
+      "job": "profile-r1-xls-owned"
+    },
+    {
+      "categories": {
+        "cold_error_construction_reset": 0,
+        "entry_reservation_visited_preparation": 1045,
+        "fat_lookup_marker_checks_loop_state": 1470,
+        "sector_vector_append_capacity": 840,
+        "success_status_and_shared_return": 165,
+        "visited_bounds_address_test_update": 1680
+      },
+      "category_percent_of_collector": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 20.096153846153847,
+        "fat_lookup_marker_checks_loop_state": 28.26923076923077,
+        "sector_vector_append_capacity": 16.153846153846153,
+        "success_status_and_shared_return": 3.173076923076923,
+        "visited_bounds_address_test_update": 32.30769230769231
+      },
+      "category_percent_of_constructor": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.42710240648705206,
+        "fat_lookup_marker_checks_loop_state": 0.6008043421396809,
+        "sector_vector_append_capacity": 0.3433167669369605,
+        "success_status_and_shared_return": 0.06743722207690296,
+        "visited_bounds_address_test_update": 0.686633533873921
+      },
+      "collector_direct_ir": 1040,
+      "collector_inclusive_ir": 6240,
+      "collector_self_ir": 5200,
+      "constructor_inclusive_ir": 244672,
+      "direct_children": {
+        "__memset_avx2_unaligned_erms": 230,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 810
+      },
+      "instructions": [
+        {
+          "address_hex": "0x2f223c0",
+          "assembly": "push %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x0"
+        },
+        {
+          "address_hex": "0x2f223c1",
+          "assembly": "push %r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1"
+        },
+        {
+          "address_hex": "0x2f223c3",
+          "assembly": "push %r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x3"
+        },
+        {
+          "address_hex": "0x2f223c5",
+          "assembly": "push %r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x5"
+        },
+        {
+          "address_hex": "0x2f223c7",
+          "assembly": "push %r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x7"
+        },
+        {
+          "address_hex": "0x2f223c9",
+          "assembly": "push %rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x9"
+        },
+        {
+          "address_hex": "0x2f223ca",
+          "assembly": "sub $0xb8,%rsp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xa"
+        },
+        {
+          "address_hex": "0x2f223d1",
+          "assembly": "mov %rsi,%r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x11"
+        },
+        {
+          "address_hex": "0x2f223d4",
+          "assembly": "mov %rdi,%rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x14"
+        },
+        {
+          "address_hex": "0x2f223d7",
+          "assembly": "movaps 0xf0(%rsp),%xmm0",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x17"
+        },
+        {
+          "address_hex": "0x2f223df",
+          "assembly": "movups %xmm0,0x40(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1f"
+        },
+        {
+          "address_hex": "0x2f223e4",
+          "assembly": "movq $0x0,0x10(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x24"
+        },
+        {
+          "address_hex": "0x2f223ec",
+          "assembly": "movq $0x0,0x30(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x2c"
+        },
+        {
+          "address_hex": "0x2f223f4",
+          "assembly": "test %r9,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x34"
+        },
+        {
+          "address_hex": "0x2f223f7",
+          "assembly": "je 2f22424 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x64>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x37"
+        },
+        {
+          "address_hex": "0x2f223f9",
+          "assembly": "cmp $0xfffffff9,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x39"
+        },
+        {
+          "address_hex": "0x2f223fd",
+          "assembly": "jbe 2f22436 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x76>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x3d"
+        },
+        {
+          "address_hex": "0x2f2242a",
+          "assembly": "movq $0xb,(%rbx)",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x6a"
+        },
+        {
+          "address_hex": "0x2f22431",
+          "assembly": "jmp 2f22685 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2c5>",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x71"
+        },
+        {
+          "address_hex": "0x2f22436",
+          "assembly": "mov %rcx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x76"
+        },
+        {
+          "address_hex": "0x2f22439",
+          "assembly": "cmp %rcx,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x79"
+        },
+        {
+          "address_hex": "0x2f2243c",
+          "assembly": "jbe 2f22488 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xc8>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x7c"
+        },
+        {
+          "address_hex": "0x2f22488",
+          "assembly": "mov (%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xc8"
+        },
+        {
+          "address_hex": "0x2f2248b",
+          "assembly": "cmp %r9,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xcb"
+        },
+        {
+          "address_hex": "0x2f2248e",
+          "assembly": "mov %rdx,0x60(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xce"
+        },
+        {
+          "address_hex": "0x2f22493",
+          "assembly": "jb 2f22859 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x499>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xd3"
+        },
+        {
+          "address_hex": "0x2f22499",
+          "assembly": "lea 0x3f(%r15),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xd9"
+        },
+        {
+          "address_hex": "0x2f2249d",
+          "assembly": "shr $0x6,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xdd"
+        },
+        {
+          "address_hex": "0x2f224a1",
+          "assembly": "mov 0x28(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xe1"
+        },
+        {
+          "address_hex": "0x2f224a5",
+          "assembly": "mov %r13,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xe5"
+        },
+        {
+          "address_hex": "0x2f224a8",
+          "assembly": "sub %rdx,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xe8"
+        },
+        {
+          "address_hex": "0x2f224ab",
+          "assembly": "mov %r15,0x58(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xeb"
+        },
+        {
+          "address_hex": "0x2f224b0",
+          "assembly": "mov %r9,0x78(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xf0"
+        },
+        {
+          "address_hex": "0x2f224b5",
+          "assembly": "mov %r8,0x70(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xf5"
+        },
+        {
+          "address_hex": "0x2f224ba",
+          "assembly": "jbe 2f22543 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x183>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0xfa"
+        },
+        {
+          "address_hex": "0x2f224c0",
+          "assembly": "mov 0x18(%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x100"
+        },
+        {
+          "address_hex": "0x2f224c4",
+          "assembly": "mov %rsi,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x104"
+        },
+        {
+          "address_hex": "0x2f224c7",
+          "assembly": "sub %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x107"
+        },
+        {
+          "address_hex": "0x2f224ca",
+          "assembly": "cmp %rax,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10a"
+        },
+        {
+          "address_hex": "0x2f224cd",
+          "assembly": "ja 2f228aa <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4ea>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10d"
+        },
+        {
+          "address_hex": "0x2f224e2",
+          "assembly": "mov 0x20(%r14),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x122"
+        },
+        {
+          "address_hex": "0x2f224e6",
+          "assembly": "lea (%rax,%rbp,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x126"
+        },
+        {
+          "address_hex": "0x2f224ea",
+          "assembly": "cmp $0x2,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12a"
+        },
+        {
+          "address_hex": "0x2f224ee",
+          "assembly": "jb 2f22532 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x172>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12e"
+        },
+        {
+          "address_hex": "0x2f224f0",
+          "assembly": "mov %rax,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x130"
+        },
+        {
+          "address_hex": "0x2f224f5",
+          "assembly": "mov %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x135"
+        },
+        {
+          "address_hex": "0x2f224f8",
+          "assembly": "not %rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x138"
+        },
+        {
+          "address_hex": "0x2f224fb",
+          "assembly": "add %r13,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13b"
+        },
+        {
+          "address_hex": "0x2f224fe",
+          "assembly": "shl $0x3,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13e"
+        },
+        {
+          "address_hex": "0x2f22502",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x142"
+        },
+        {
+          "address_hex": "0x2f22504",
+          "assembly": "mov %rdx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x144"
+        },
+        {
+          "address_hex": "0x2f22507",
+          "assembly": "mov %rax,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x147"
+        },
+        {
+          "address_hex": "0x2f2250a",
+          "assembly": "call *0x19bc80(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x14a"
+        },
+        {
+          "address_hex": "0x2f22510",
+          "assembly": "add %rbp,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x150"
+        },
+        {
+          "address_hex": "0x2f22513",
+          "assembly": "shl $0x3,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x153"
+        },
+        {
+          "address_hex": "0x2f22517",
+          "assembly": "mov 0x30(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x157"
+        },
+        {
+          "address_hex": "0x2f2251c",
+          "assembly": "lea (%rax,%r13,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x15c"
+        },
+        {
+          "address_hex": "0x2f22520",
+          "assembly": "sub %r15,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x160"
+        },
+        {
+          "address_hex": "0x2f22523",
+          "assembly": "mov 0x58(%rsp),%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x163"
+        },
+        {
+          "address_hex": "0x2f22528",
+          "assembly": "add $0xfffffffffffffff8,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x168"
+        },
+        {
+          "address_hex": "0x2f2252c",
+          "assembly": "add %r12,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16c"
+        },
+        {
+          "address_hex": "0x2f2252f",
+          "assembly": "dec %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16f"
+        },
+        {
+          "address_hex": "0x2f22532",
+          "assembly": "movq $0x0,(%rdi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x172"
+        },
+        {
+          "address_hex": "0x2f22539",
+          "assembly": "inc %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x179"
+        },
+        {
+          "address_hex": "0x2f2253c",
+          "assembly": "mov %rbp,0x28(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x17c"
+        },
+        {
+          "address_hex": "0x2f22540",
+          "assembly": "mov %rbp,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x180"
+        },
+        {
+          "address_hex": "0x2f22543",
+          "assembly": "mov %r15,0x30(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x183"
+        },
+        {
+          "address_hex": "0x2f22547",
+          "assembly": "mov 0x20(%r14),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x187"
+        },
+        {
+          "address_hex": "0x2f2254b",
+          "assembly": "shl $0x3,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x18b"
+        },
+        {
+          "address_hex": "0x2f2254f",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x18f"
+        },
+        {
+          "address_hex": "0x2f22551",
+          "assembly": "call *0x19bc39(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x191"
+        },
+        {
+          "address_hex": "0x2f22557",
+          "assembly": "mov 0x70(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x197"
+        },
+        {
+          "address_hex": "0x2f2255c",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x19c"
+        },
+        {
+          "address_hex": "0x2f22560",
+          "assembly": "mov %eax,%r12d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1a0"
+        },
+        {
+          "address_hex": "0x2f22563",
+          "assembly": "cmp %r12,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1a3"
+        },
+        {
+          "address_hex": "0x2f22566",
+          "assembly": "mov 0x78(%rsp),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1a6"
+        },
+        {
+          "address_hex": "0x2f2256b",
+          "assembly": "mov 0x60(%rsp),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1ab"
+        },
+        {
+          "address_hex": "0x2f22570",
+          "assembly": "jbe 2f2262f <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x26f>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1b0"
+        },
+        {
+          "address_hex": "0x2f22576",
+          "assembly": "lea 0x30(%r14),%r10",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1b6"
+        },
+        {
+          "address_hex": "0x2f2257a",
+          "assembly": "mov %rbx,0x68(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1ba"
+        },
+        {
+          "address_hex": "0x2f2257f",
+          "assembly": "nop",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 15,
+          "offset_hex": "0x1bf"
+        },
+        {
+          "address_hex": "0x2f22580",
+          "assembly": "cmp %r12,(%r10)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1c0"
+        },
+        {
+          "address_hex": "0x2f22583",
+          "assembly": "jbe 2f2269a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2da>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1c3"
+        },
+        {
+          "address_hex": "0x2f22589",
+          "assembly": "mov %r12,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1c9"
+        },
+        {
+          "address_hex": "0x2f2258c",
+          "assembly": "shr $0x6,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1cc"
+        },
+        {
+          "address_hex": "0x2f22590",
+          "assembly": "cmp 0x28(%r14),%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1d0"
+        },
+        {
+          "address_hex": "0x2f22594",
+          "assembly": "jae 2f226e4 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x324>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1d4"
+        },
+        {
+          "address_hex": "0x2f2259a",
+          "assembly": "mov $0x1,%r8d",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1da"
+        },
+        {
+          "address_hex": "0x2f225a0",
+          "assembly": "mov %r12d,%ecx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1e0"
+        },
+        {
+          "address_hex": "0x2f225a3",
+          "assembly": "shl %cl,%r8",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1e3"
+        },
+        {
+          "address_hex": "0x2f225a6",
+          "assembly": "mov 0x20(%r14),%rcx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1e6"
+        },
+        {
+          "address_hex": "0x2f225aa",
+          "assembly": "mov (%rcx,%rdi,8),%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1ea"
+        },
+        {
+          "address_hex": "0x2f225ae",
+          "assembly": "bt %r12,%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1ee"
+        },
+        {
+          "address_hex": "0x2f225b2",
+          "assembly": "jb 2f22790 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x3d0>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1f2"
+        },
+        {
+          "address_hex": "0x2f225b8",
+          "assembly": "mov %r12,0x38(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 120,
+          "offset_hex": "0x1f8"
+        },
+        {
+          "address_hex": "0x2f225bd",
+          "assembly": "or %r8,(%rcx,%rdi,8)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 120,
+          "offset_hex": "0x1fd"
+        },
+        {
+          "address_hex": "0x2f225c1",
+          "assembly": "mov 0x10(%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x201"
+        },
+        {
+          "address_hex": "0x2f225c5",
+          "assembly": "cmp (%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x205"
+        },
+        {
+          "address_hex": "0x2f225c8",
+          "assembly": "jne 2f225ee <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x22e>",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x208"
+        },
+        {
+          "address_hex": "0x2f225ee",
+          "assembly": "mov 0x8(%r14),%rcx",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x22e"
+        },
+        {
+          "address_hex": "0x2f225f2",
+          "assembly": "mov %eax,(%rcx,%rbp,4)",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x232"
+        },
+        {
+          "address_hex": "0x2f225f5",
+          "assembly": "inc %rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x235"
+        },
+        {
+          "address_hex": "0x2f225f8",
+          "assembly": "mov %rbp,0x10(%r14)",
+          "category": "sector_vector_append_capacity",
+          "ir": 120,
+          "offset_hex": "0x238"
+        },
+        {
+          "address_hex": "0x2f225fc",
+          "assembly": "mov (%rsi,%r12,4),%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 120,
+          "offset_hex": "0x23c"
+        },
+        {
+          "address_hex": "0x2f22600",
+          "assembly": "mov %eax,0x54(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 120,
+          "offset_hex": "0x240"
+        },
+        {
+          "address_hex": "0x2f22604",
+          "assembly": "dec %r13",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 120,
+          "offset_hex": "0x244"
+        },
+        {
+          "address_hex": "0x2f22607",
+          "assembly": "je 2f227cb <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x40b>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 120,
+          "offset_hex": "0x247"
+        },
+        {
+          "address_hex": "0x2f2260d",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x24d"
+        },
+        {
+          "address_hex": "0x2f22610",
+          "assembly": "je 2f227f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x439>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x250"
+        },
+        {
+          "address_hex": "0x2f22616",
+          "assembly": "cmp $0xfffffffa,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x256"
+        },
+        {
+          "address_hex": "0x2f22619",
+          "assembly": "jae 2f2281e <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x45e>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x259"
+        },
+        {
+          "address_hex": "0x2f2261f",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x25f"
+        },
+        {
+          "address_hex": "0x2f22623",
+          "assembly": "mov %rax,%r12",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x263"
+        },
+        {
+          "address_hex": "0x2f22626",
+          "assembly": "cmp %rax,%r15",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x266"
+        },
+        {
+          "address_hex": "0x2f22629",
+          "assembly": "ja 2f22580 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x1c0>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 105,
+          "offset_hex": "0x269"
+        },
+        {
+          "address_hex": "0x2f22685",
+          "assembly": "mov %rbx,%rax",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2c5"
+        },
+        {
+          "address_hex": "0x2f22688",
+          "assembly": "add $0xb8,%rsp",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2c8"
+        },
+        {
+          "address_hex": "0x2f2268f",
+          "assembly": "pop %rbx",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2cf"
+        },
+        {
+          "address_hex": "0x2f22690",
+          "assembly": "pop %r12",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d0"
+        },
+        {
+          "address_hex": "0x2f22692",
+          "assembly": "pop %r13",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d2"
+        },
+        {
+          "address_hex": "0x2f22694",
+          "assembly": "pop %r14",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d4"
+        },
+        {
+          "address_hex": "0x2f22696",
+          "assembly": "pop %r15",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d6"
+        },
+        {
+          "address_hex": "0x2f22698",
+          "assembly": "pop %rbp",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d8"
+        },
+        {
+          "address_hex": "0x2f22699",
+          "assembly": "ret",
+          "category": "success_status_and_shared_return",
+          "ir": 15,
+          "offset_hex": "0x2d9"
+        },
+        {
+          "address_hex": "0x2f227cb",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 15,
+          "offset_hex": "0x40b"
+        },
+        {
+          "address_hex": "0x2f227ce",
+          "assembly": "je 2f2242a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x6a>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 15,
+          "offset_hex": "0x40e"
+        },
+        {
+          "address_hex": "0x2f22859",
+          "assembly": "mov %r8,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x499"
+        },
+        {
+          "address_hex": "0x2f2285c",
+          "assembly": "mov 0x8(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x49c"
+        },
+        {
+          "address_hex": "0x2f22860",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a0"
+        },
+        {
+          "address_hex": "0x2f22863",
+          "assembly": "mov $0x4,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a3"
+        },
+        {
+          "address_hex": "0x2f22869",
+          "assembly": "mov %r9,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a9"
+        },
+        {
+          "address_hex": "0x2f2286c",
+          "assembly": "mov $0x4,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ac"
+        },
+        {
+          "address_hex": "0x2f22872",
+          "assembly": "mov %rcx,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b2"
+        },
+        {
+          "address_hex": "0x2f22875",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b5"
+        },
+        {
+          "address_hex": "0x2f2287a",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ba"
+        },
+        {
+          "address_hex": "0x2f2287e",
+          "assembly": "je 2f22893 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4d3>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4be"
+        },
+        {
+          "address_hex": "0x2f22893",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d3"
+        },
+        {
+          "address_hex": "0x2f22898",
+          "assembly": "mov %rax,0x8(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d8"
+        },
+        {
+          "address_hex": "0x2f2289c",
+          "assembly": "mov %r13,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4dc"
+        },
+        {
+          "address_hex": "0x2f2289f",
+          "assembly": "mov %r13,(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4df"
+        },
+        {
+          "address_hex": "0x2f228a2",
+          "assembly": "mov %r12,%r8",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e2"
+        },
+        {
+          "address_hex": "0x2f228a5",
+          "assembly": "jmp 2f22499 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xd9>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e5"
+        },
+        {
+          "address_hex": "0x2f228aa",
+          "assembly": "mov %rdx,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ea"
+        },
+        {
+          "address_hex": "0x2f228af",
+          "assembly": "mov 0x20(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ef"
+        },
+        {
+          "address_hex": "0x2f228b3",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f3"
+        },
+        {
+          "address_hex": "0x2f228b6",
+          "assembly": "mov $0x8,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f6"
+        },
+        {
+          "address_hex": "0x2f228bc",
+          "assembly": "mov $0x8,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4fc"
+        },
+        {
+          "address_hex": "0x2f228c2",
+          "assembly": "mov %r13,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x502"
+        },
+        {
+          "address_hex": "0x2f228c5",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x505"
+        },
+        {
+          "address_hex": "0x2f228ca",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50a"
+        },
+        {
+          "address_hex": "0x2f228ce",
+          "assembly": "je 2f228f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x539>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50e"
+        },
+        {
+          "address_hex": "0x2f228f9",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x539"
+        },
+        {
+          "address_hex": "0x2f228fe",
+          "assembly": "mov %rax,0x20(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x53e"
+        },
+        {
+          "address_hex": "0x2f22902",
+          "assembly": "mov %r13,0x18(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x542"
+        },
+        {
+          "address_hex": "0x2f22906",
+          "assembly": "mov %r13,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x546"
+        },
+        {
+          "address_hex": "0x2f22909",
+          "assembly": "mov 0x30(%rsp),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x549"
+        },
+        {
+          "address_hex": "0x2f2290e",
+          "assembly": "sub %rdx,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x54e"
+        },
+        {
+          "address_hex": "0x2f22911",
+          "assembly": "mov %rdx,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x551"
+        },
+        {
+          "address_hex": "0x2f22914",
+          "assembly": "cmp %rsi,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x554"
+        },
+        {
+          "address_hex": "0x2f22917",
+          "assembly": "jbe 2f224e2 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x122>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x557"
+        }
+      ],
+      "job": "profile-r1-cfb-tiny"
+    },
+    {
+      "categories": {
+        "cold_error_construction_reset": 0,
+        "entry_reservation_visited_preparation": 61765,
+        "fat_lookup_marker_checks_loop_state": 258560,
+        "sector_vector_append_capacity": 143360,
+        "success_status_and_shared_return": 14080,
+        "visited_bounds_address_test_update": 286720
+      },
+      "category_percent_of_collector": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 8.079295211809258,
+        "fat_lookup_marker_checks_loop_state": 33.82146150676599,
+        "sector_vector_append_capacity": 18.752493508701935,
+        "success_status_and_shared_return": 1.8417627553189404,
+        "visited_bounds_address_test_update": 37.50498701740387
+      },
+      "category_percent_of_constructor": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.4419653644842172,
+        "fat_lookup_marker_checks_loop_state": 1.8501508077558355,
+        "sector_vector_append_capacity": 1.025826190438879,
+        "success_status_and_shared_return": 0.10075078656096134,
+        "visited_bounds_address_test_update": 2.051652380877758
+      },
+      "collector_direct_ir": 56426,
+      "collector_inclusive_ir": 820911,
+      "collector_self_ir": 764485,
+      "constructor_inclusive_ir": 13975077,
+      "direct_children": {
+        "__memset_avx2_unaligned_erms": 55255,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 1171
+      },
+      "instructions": [
+        {
+          "address_hex": "0x2f223c0",
+          "assembly": "push %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x0"
+        },
+        {
+          "address_hex": "0x2f223c1",
+          "assembly": "push %r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1"
+        },
+        {
+          "address_hex": "0x2f223c3",
+          "assembly": "push %r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x3"
+        },
+        {
+          "address_hex": "0x2f223c5",
+          "assembly": "push %r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x5"
+        },
+        {
+          "address_hex": "0x2f223c7",
+          "assembly": "push %r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x7"
+        },
+        {
+          "address_hex": "0x2f223c9",
+          "assembly": "push %rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x9"
+        },
+        {
+          "address_hex": "0x2f223ca",
+          "assembly": "sub $0xb8,%rsp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xa"
+        },
+        {
+          "address_hex": "0x2f223d1",
+          "assembly": "mov %rsi,%r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x11"
+        },
+        {
+          "address_hex": "0x2f223d4",
+          "assembly": "mov %rdi,%rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x14"
+        },
+        {
+          "address_hex": "0x2f223d7",
+          "assembly": "movaps 0xf0(%rsp),%xmm0",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x17"
+        },
+        {
+          "address_hex": "0x2f223df",
+          "assembly": "movups %xmm0,0x40(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1f"
+        },
+        {
+          "address_hex": "0x2f223e4",
+          "assembly": "movq $0x0,0x10(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x24"
+        },
+        {
+          "address_hex": "0x2f223ec",
+          "assembly": "movq $0x0,0x30(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x2c"
+        },
+        {
+          "address_hex": "0x2f223f4",
+          "assembly": "test %r9,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x34"
+        },
+        {
+          "address_hex": "0x2f223f7",
+          "assembly": "je 2f22424 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x64>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x37"
+        },
+        {
+          "address_hex": "0x2f223f9",
+          "assembly": "cmp $0xfffffff9,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x39"
+        },
+        {
+          "address_hex": "0x2f223fd",
+          "assembly": "jbe 2f22436 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x76>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x3d"
+        },
+        {
+          "address_hex": "0x2f2242a",
+          "assembly": "movq $0xb,(%rbx)",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x6a"
+        },
+        {
+          "address_hex": "0x2f22431",
+          "assembly": "jmp 2f22685 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2c5>",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x71"
+        },
+        {
+          "address_hex": "0x2f22436",
+          "assembly": "mov %rcx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x76"
+        },
+        {
+          "address_hex": "0x2f22439",
+          "assembly": "cmp %rcx,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x79"
+        },
+        {
+          "address_hex": "0x2f2243c",
+          "assembly": "jbe 2f22488 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xc8>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x7c"
+        },
+        {
+          "address_hex": "0x2f22488",
+          "assembly": "mov (%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xc8"
+        },
+        {
+          "address_hex": "0x2f2248b",
+          "assembly": "cmp %r9,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xcb"
+        },
+        {
+          "address_hex": "0x2f2248e",
+          "assembly": "mov %rdx,0x60(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xce"
+        },
+        {
+          "address_hex": "0x2f22493",
+          "assembly": "jb 2f22859 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x499>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xd3"
+        },
+        {
+          "address_hex": "0x2f22499",
+          "assembly": "lea 0x3f(%r15),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xd9"
+        },
+        {
+          "address_hex": "0x2f2249d",
+          "assembly": "shr $0x6,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xdd"
+        },
+        {
+          "address_hex": "0x2f224a1",
+          "assembly": "mov 0x28(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xe1"
+        },
+        {
+          "address_hex": "0x2f224a5",
+          "assembly": "mov %r13,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xe5"
+        },
+        {
+          "address_hex": "0x2f224a8",
+          "assembly": "sub %rdx,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xe8"
+        },
+        {
+          "address_hex": "0x2f224ab",
+          "assembly": "mov %r15,0x58(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xeb"
+        },
+        {
+          "address_hex": "0x2f224b0",
+          "assembly": "mov %r9,0x78(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xf0"
+        },
+        {
+          "address_hex": "0x2f224b5",
+          "assembly": "mov %r8,0x70(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xf5"
+        },
+        {
+          "address_hex": "0x2f224ba",
+          "assembly": "jbe 2f22543 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x183>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0xfa"
+        },
+        {
+          "address_hex": "0x2f224c0",
+          "assembly": "mov 0x18(%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x100"
+        },
+        {
+          "address_hex": "0x2f224c4",
+          "assembly": "mov %rsi,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x104"
+        },
+        {
+          "address_hex": "0x2f224c7",
+          "assembly": "sub %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x107"
+        },
+        {
+          "address_hex": "0x2f224ca",
+          "assembly": "cmp %rax,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10a"
+        },
+        {
+          "address_hex": "0x2f224cd",
+          "assembly": "ja 2f228aa <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4ea>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10d"
+        },
+        {
+          "address_hex": "0x2f224e2",
+          "assembly": "mov 0x20(%r14),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x122"
+        },
+        {
+          "address_hex": "0x2f224e6",
+          "assembly": "lea (%rax,%rbp,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x126"
+        },
+        {
+          "address_hex": "0x2f224ea",
+          "assembly": "cmp $0x2,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12a"
+        },
+        {
+          "address_hex": "0x2f224ee",
+          "assembly": "jb 2f22532 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x172>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12e"
+        },
+        {
+          "address_hex": "0x2f224f0",
+          "assembly": "mov %rax,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x130"
+        },
+        {
+          "address_hex": "0x2f224f5",
+          "assembly": "mov %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x135"
+        },
+        {
+          "address_hex": "0x2f224f8",
+          "assembly": "not %rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x138"
+        },
+        {
+          "address_hex": "0x2f224fb",
+          "assembly": "add %r13,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13b"
+        },
+        {
+          "address_hex": "0x2f224fe",
+          "assembly": "shl $0x3,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13e"
+        },
+        {
+          "address_hex": "0x2f22502",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x142"
+        },
+        {
+          "address_hex": "0x2f22504",
+          "assembly": "mov %rdx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x144"
+        },
+        {
+          "address_hex": "0x2f22507",
+          "assembly": "mov %rax,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x147"
+        },
+        {
+          "address_hex": "0x2f2250a",
+          "assembly": "call *0x19bc80(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x14a"
+        },
+        {
+          "address_hex": "0x2f22510",
+          "assembly": "add %rbp,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x150"
+        },
+        {
+          "address_hex": "0x2f22513",
+          "assembly": "shl $0x3,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x153"
+        },
+        {
+          "address_hex": "0x2f22517",
+          "assembly": "mov 0x30(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x157"
+        },
+        {
+          "address_hex": "0x2f2251c",
+          "assembly": "lea (%rax,%r13,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x15c"
+        },
+        {
+          "address_hex": "0x2f22520",
+          "assembly": "sub %r15,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x160"
+        },
+        {
+          "address_hex": "0x2f22523",
+          "assembly": "mov 0x58(%rsp),%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x163"
+        },
+        {
+          "address_hex": "0x2f22528",
+          "assembly": "add $0xfffffffffffffff8,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x168"
+        },
+        {
+          "address_hex": "0x2f2252c",
+          "assembly": "add %r12,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16c"
+        },
+        {
+          "address_hex": "0x2f2252f",
+          "assembly": "dec %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16f"
+        },
+        {
+          "address_hex": "0x2f22532",
+          "assembly": "movq $0x0,(%rdi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x172"
+        },
+        {
+          "address_hex": "0x2f22539",
+          "assembly": "inc %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x179"
+        },
+        {
+          "address_hex": "0x2f2253c",
+          "assembly": "mov %rbp,0x28(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x17c"
+        },
+        {
+          "address_hex": "0x2f22540",
+          "assembly": "mov %rbp,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x180"
+        },
+        {
+          "address_hex": "0x2f22543",
+          "assembly": "mov %r15,0x30(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x183"
+        },
+        {
+          "address_hex": "0x2f22547",
+          "assembly": "mov 0x20(%r14),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x187"
+        },
+        {
+          "address_hex": "0x2f2254b",
+          "assembly": "shl $0x3,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x18b"
+        },
+        {
+          "address_hex": "0x2f2254f",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x18f"
+        },
+        {
+          "address_hex": "0x2f22551",
+          "assembly": "call *0x19bc39(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x191"
+        },
+        {
+          "address_hex": "0x2f22557",
+          "assembly": "mov 0x70(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x197"
+        },
+        {
+          "address_hex": "0x2f2255c",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x19c"
+        },
+        {
+          "address_hex": "0x2f22560",
+          "assembly": "mov %eax,%r12d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1a0"
+        },
+        {
+          "address_hex": "0x2f22563",
+          "assembly": "cmp %r12,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1a3"
+        },
+        {
+          "address_hex": "0x2f22566",
+          "assembly": "mov 0x78(%rsp),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1a6"
+        },
+        {
+          "address_hex": "0x2f2256b",
+          "assembly": "mov 0x60(%rsp),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1ab"
+        },
+        {
+          "address_hex": "0x2f22570",
+          "assembly": "jbe 2f2262f <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x26f>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1b0"
+        },
+        {
+          "address_hex": "0x2f22576",
+          "assembly": "lea 0x30(%r14),%r10",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1b6"
+        },
+        {
+          "address_hex": "0x2f2257a",
+          "assembly": "mov %rbx,0x68(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1ba"
+        },
+        {
+          "address_hex": "0x2f2257f",
+          "assembly": "nop",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 1280,
+          "offset_hex": "0x1bf"
+        },
+        {
+          "address_hex": "0x2f22580",
+          "assembly": "cmp %r12,(%r10)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1c0"
+        },
+        {
+          "address_hex": "0x2f22583",
+          "assembly": "jbe 2f2269a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2da>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1c3"
+        },
+        {
+          "address_hex": "0x2f22589",
+          "assembly": "mov %r12,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1c9"
+        },
+        {
+          "address_hex": "0x2f2258c",
+          "assembly": "shr $0x6,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1cc"
+        },
+        {
+          "address_hex": "0x2f22590",
+          "assembly": "cmp 0x28(%r14),%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1d0"
+        },
+        {
+          "address_hex": "0x2f22594",
+          "assembly": "jae 2f226e4 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x324>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1d4"
+        },
+        {
+          "address_hex": "0x2f2259a",
+          "assembly": "mov $0x1,%r8d",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1da"
+        },
+        {
+          "address_hex": "0x2f225a0",
+          "assembly": "mov %r12d,%ecx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1e0"
+        },
+        {
+          "address_hex": "0x2f225a3",
+          "assembly": "shl %cl,%r8",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1e3"
+        },
+        {
+          "address_hex": "0x2f225a6",
+          "assembly": "mov 0x20(%r14),%rcx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1e6"
+        },
+        {
+          "address_hex": "0x2f225aa",
+          "assembly": "mov (%rcx,%rdi,8),%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1ea"
+        },
+        {
+          "address_hex": "0x2f225ae",
+          "assembly": "bt %r12,%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1ee"
+        },
+        {
+          "address_hex": "0x2f225b2",
+          "assembly": "jb 2f22790 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x3d0>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1f2"
+        },
+        {
+          "address_hex": "0x2f225b8",
+          "assembly": "mov %r12,0x38(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20480,
+          "offset_hex": "0x1f8"
+        },
+        {
+          "address_hex": "0x2f225bd",
+          "assembly": "or %r8,(%rcx,%rdi,8)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 20480,
+          "offset_hex": "0x1fd"
+        },
+        {
+          "address_hex": "0x2f225c1",
+          "assembly": "mov 0x10(%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x201"
+        },
+        {
+          "address_hex": "0x2f225c5",
+          "assembly": "cmp (%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x205"
+        },
+        {
+          "address_hex": "0x2f225c8",
+          "assembly": "jne 2f225ee <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x22e>",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x208"
+        },
+        {
+          "address_hex": "0x2f225ee",
+          "assembly": "mov 0x8(%r14),%rcx",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x22e"
+        },
+        {
+          "address_hex": "0x2f225f2",
+          "assembly": "mov %eax,(%rcx,%rbp,4)",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x232"
+        },
+        {
+          "address_hex": "0x2f225f5",
+          "assembly": "inc %rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x235"
+        },
+        {
+          "address_hex": "0x2f225f8",
+          "assembly": "mov %rbp,0x10(%r14)",
+          "category": "sector_vector_append_capacity",
+          "ir": 20480,
+          "offset_hex": "0x238"
+        },
+        {
+          "address_hex": "0x2f225fc",
+          "assembly": "mov (%rsi,%r12,4),%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20480,
+          "offset_hex": "0x23c"
+        },
+        {
+          "address_hex": "0x2f22600",
+          "assembly": "mov %eax,0x54(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20480,
+          "offset_hex": "0x240"
+        },
+        {
+          "address_hex": "0x2f22604",
+          "assembly": "dec %r13",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20480,
+          "offset_hex": "0x244"
+        },
+        {
+          "address_hex": "0x2f22607",
+          "assembly": "je 2f227cb <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x40b>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20480,
+          "offset_hex": "0x247"
+        },
+        {
+          "address_hex": "0x2f2260d",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x24d"
+        },
+        {
+          "address_hex": "0x2f22610",
+          "assembly": "je 2f227f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x439>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x250"
+        },
+        {
+          "address_hex": "0x2f22616",
+          "assembly": "cmp $0xfffffffa,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x256"
+        },
+        {
+          "address_hex": "0x2f22619",
+          "assembly": "jae 2f2281e <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x45e>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x259"
+        },
+        {
+          "address_hex": "0x2f2261f",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x25f"
+        },
+        {
+          "address_hex": "0x2f22623",
+          "assembly": "mov %rax,%r12",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x263"
+        },
+        {
+          "address_hex": "0x2f22626",
+          "assembly": "cmp %rax,%r15",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x266"
+        },
+        {
+          "address_hex": "0x2f22629",
+          "assembly": "ja 2f22580 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x1c0>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 19200,
+          "offset_hex": "0x269"
+        },
+        {
+          "address_hex": "0x2f22685",
+          "assembly": "mov %rbx,%rax",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2c5"
+        },
+        {
+          "address_hex": "0x2f22688",
+          "assembly": "add $0xb8,%rsp",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2c8"
+        },
+        {
+          "address_hex": "0x2f2268f",
+          "assembly": "pop %rbx",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2cf"
+        },
+        {
+          "address_hex": "0x2f22690",
+          "assembly": "pop %r12",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d0"
+        },
+        {
+          "address_hex": "0x2f22692",
+          "assembly": "pop %r13",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d2"
+        },
+        {
+          "address_hex": "0x2f22694",
+          "assembly": "pop %r14",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d4"
+        },
+        {
+          "address_hex": "0x2f22696",
+          "assembly": "pop %r15",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d6"
+        },
+        {
+          "address_hex": "0x2f22698",
+          "assembly": "pop %rbp",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d8"
+        },
+        {
+          "address_hex": "0x2f22699",
+          "assembly": "ret",
+          "category": "success_status_and_shared_return",
+          "ir": 1280,
+          "offset_hex": "0x2d9"
+        },
+        {
+          "address_hex": "0x2f227cb",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 1280,
+          "offset_hex": "0x40b"
+        },
+        {
+          "address_hex": "0x2f227ce",
+          "assembly": "je 2f2242a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x6a>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 1280,
+          "offset_hex": "0x40e"
+        },
+        {
+          "address_hex": "0x2f22859",
+          "assembly": "mov %r8,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x499"
+        },
+        {
+          "address_hex": "0x2f2285c",
+          "assembly": "mov 0x8(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x49c"
+        },
+        {
+          "address_hex": "0x2f22860",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a0"
+        },
+        {
+          "address_hex": "0x2f22863",
+          "assembly": "mov $0x4,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a3"
+        },
+        {
+          "address_hex": "0x2f22869",
+          "assembly": "mov %r9,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a9"
+        },
+        {
+          "address_hex": "0x2f2286c",
+          "assembly": "mov $0x4,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ac"
+        },
+        {
+          "address_hex": "0x2f22872",
+          "assembly": "mov %rcx,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b2"
+        },
+        {
+          "address_hex": "0x2f22875",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b5"
+        },
+        {
+          "address_hex": "0x2f2287a",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ba"
+        },
+        {
+          "address_hex": "0x2f2287e",
+          "assembly": "je 2f22893 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4d3>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4be"
+        },
+        {
+          "address_hex": "0x2f22893",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d3"
+        },
+        {
+          "address_hex": "0x2f22898",
+          "assembly": "mov %rax,0x8(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d8"
+        },
+        {
+          "address_hex": "0x2f2289c",
+          "assembly": "mov %r13,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4dc"
+        },
+        {
+          "address_hex": "0x2f2289f",
+          "assembly": "mov %r13,(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4df"
+        },
+        {
+          "address_hex": "0x2f228a2",
+          "assembly": "mov %r12,%r8",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e2"
+        },
+        {
+          "address_hex": "0x2f228a5",
+          "assembly": "jmp 2f22499 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xd9>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e5"
+        },
+        {
+          "address_hex": "0x2f228aa",
+          "assembly": "mov %rdx,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ea"
+        },
+        {
+          "address_hex": "0x2f228af",
+          "assembly": "mov 0x20(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ef"
+        },
+        {
+          "address_hex": "0x2f228b3",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f3"
+        },
+        {
+          "address_hex": "0x2f228b6",
+          "assembly": "mov $0x8,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f6"
+        },
+        {
+          "address_hex": "0x2f228bc",
+          "assembly": "mov $0x8,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4fc"
+        },
+        {
+          "address_hex": "0x2f228c2",
+          "assembly": "mov %r13,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x502"
+        },
+        {
+          "address_hex": "0x2f228c5",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x505"
+        },
+        {
+          "address_hex": "0x2f228ca",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50a"
+        },
+        {
+          "address_hex": "0x2f228ce",
+          "assembly": "je 2f228f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x539>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50e"
+        },
+        {
+          "address_hex": "0x2f228f9",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x539"
+        },
+        {
+          "address_hex": "0x2f228fe",
+          "assembly": "mov %rax,0x20(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x53e"
+        },
+        {
+          "address_hex": "0x2f22902",
+          "assembly": "mov %r13,0x18(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x542"
+        },
+        {
+          "address_hex": "0x2f22906",
+          "assembly": "mov %r13,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x546"
+        },
+        {
+          "address_hex": "0x2f22909",
+          "assembly": "mov 0x30(%rsp),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x549"
+        },
+        {
+          "address_hex": "0x2f2290e",
+          "assembly": "sub %rdx,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x54e"
+        },
+        {
+          "address_hex": "0x2f22911",
+          "assembly": "mov %rdx,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x551"
+        },
+        {
+          "address_hex": "0x2f22914",
+          "assembly": "cmp %rsi,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x554"
+        },
+        {
+          "address_hex": "0x2f22917",
+          "assembly": "jbe 2f224e2 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x122>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x557"
+        }
+      ],
+      "job": "profile-r1-cfb-many-small"
+    },
+    {
+      "categories": {
+        "cold_error_construction_reset": 0,
+        "entry_reservation_visited_preparation": 1285,
+        "fat_lookup_marker_checks_loop_state": 2129800,
+        "sector_vector_append_capacity": 1146880,
+        "success_status_and_shared_return": 220,
+        "visited_bounds_address_test_update": 2293760
+      },
+      "category_percent_of_collector": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.023061964897356308,
+        "fat_lookup_marker_checks_loop_state": 38.223636450108536,
+        "sector_vector_append_capacity": 20.583117744342417,
+        "success_status_and_shared_return": 0.003948351966862559,
+        "visited_bounds_address_test_update": 41.16623548868483
+      },
+      "category_percent_of_constructor": {
+        "cold_error_construction_reset": 0.0,
+        "entry_reservation_visited_preparation": 0.012519773447635779,
+        "fat_lookup_marker_checks_loop_state": 20.750671975700143,
+        "sector_vector_append_capacity": 11.174068304766166,
+        "success_status_and_shared_return": 0.0021434631583500943,
+        "visited_bounds_address_test_update": 22.348136609532332
+      },
+      "collector_direct_ir": 108190,
+      "collector_inclusive_ir": 5680135,
+      "collector_self_ir": 5571945,
+      "constructor_inclusive_ir": 10263764,
+      "direct_children": {
+        "__memset_avx2_unaligned_erms": 104035,
+        "alloc::raw_vec::RawVecInner<A>::finish_grow": 4155
+      },
+      "instructions": [
+        {
+          "address_hex": "0x2f223c0",
+          "assembly": "push %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x0"
+        },
+        {
+          "address_hex": "0x2f223c1",
+          "assembly": "push %r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1"
+        },
+        {
+          "address_hex": "0x2f223c3",
+          "assembly": "push %r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x3"
+        },
+        {
+          "address_hex": "0x2f223c5",
+          "assembly": "push %r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x5"
+        },
+        {
+          "address_hex": "0x2f223c7",
+          "assembly": "push %r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x7"
+        },
+        {
+          "address_hex": "0x2f223c9",
+          "assembly": "push %rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x9"
+        },
+        {
+          "address_hex": "0x2f223ca",
+          "assembly": "sub $0xb8,%rsp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xa"
+        },
+        {
+          "address_hex": "0x2f223d1",
+          "assembly": "mov %rsi,%r14",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x11"
+        },
+        {
+          "address_hex": "0x2f223d4",
+          "assembly": "mov %rdi,%rbx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x14"
+        },
+        {
+          "address_hex": "0x2f223d7",
+          "assembly": "movaps 0xf0(%rsp),%xmm0",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x17"
+        },
+        {
+          "address_hex": "0x2f223df",
+          "assembly": "movups %xmm0,0x40(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1f"
+        },
+        {
+          "address_hex": "0x2f223e4",
+          "assembly": "movq $0x0,0x10(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x24"
+        },
+        {
+          "address_hex": "0x2f223ec",
+          "assembly": "movq $0x0,0x30(%rsi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x2c"
+        },
+        {
+          "address_hex": "0x2f223f4",
+          "assembly": "test %r9,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x34"
+        },
+        {
+          "address_hex": "0x2f223f7",
+          "assembly": "je 2f22424 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x64>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x37"
+        },
+        {
+          "address_hex": "0x2f223f9",
+          "assembly": "cmp $0xfffffff9,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x39"
+        },
+        {
+          "address_hex": "0x2f223fd",
+          "assembly": "jbe 2f22436 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x76>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x3d"
+        },
+        {
+          "address_hex": "0x2f2242a",
+          "assembly": "movq $0xb,(%rbx)",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x6a"
+        },
+        {
+          "address_hex": "0x2f22431",
+          "assembly": "jmp 2f22685 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2c5>",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x71"
+        },
+        {
+          "address_hex": "0x2f22436",
+          "assembly": "mov %rcx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x76"
+        },
+        {
+          "address_hex": "0x2f22439",
+          "assembly": "cmp %rcx,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x79"
+        },
+        {
+          "address_hex": "0x2f2243c",
+          "assembly": "jbe 2f22488 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xc8>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x7c"
+        },
+        {
+          "address_hex": "0x2f22488",
+          "assembly": "mov (%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xc8"
+        },
+        {
+          "address_hex": "0x2f2248b",
+          "assembly": "cmp %r9,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xcb"
+        },
+        {
+          "address_hex": "0x2f2248e",
+          "assembly": "mov %rdx,0x60(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xce"
+        },
+        {
+          "address_hex": "0x2f22493",
+          "assembly": "jb 2f22859 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x499>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xd3"
+        },
+        {
+          "address_hex": "0x2f22499",
+          "assembly": "lea 0x3f(%r15),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xd9"
+        },
+        {
+          "address_hex": "0x2f2249d",
+          "assembly": "shr $0x6,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xdd"
+        },
+        {
+          "address_hex": "0x2f224a1",
+          "assembly": "mov 0x28(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xe1"
+        },
+        {
+          "address_hex": "0x2f224a5",
+          "assembly": "mov %r13,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xe5"
+        },
+        {
+          "address_hex": "0x2f224a8",
+          "assembly": "sub %rdx,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xe8"
+        },
+        {
+          "address_hex": "0x2f224ab",
+          "assembly": "mov %r15,0x58(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xeb"
+        },
+        {
+          "address_hex": "0x2f224b0",
+          "assembly": "mov %r9,0x78(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xf0"
+        },
+        {
+          "address_hex": "0x2f224b5",
+          "assembly": "mov %r8,0x70(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xf5"
+        },
+        {
+          "address_hex": "0x2f224ba",
+          "assembly": "jbe 2f22543 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x183>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0xfa"
+        },
+        {
+          "address_hex": "0x2f224c0",
+          "assembly": "mov 0x18(%r14),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x100"
+        },
+        {
+          "address_hex": "0x2f224c4",
+          "assembly": "mov %rsi,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x104"
+        },
+        {
+          "address_hex": "0x2f224c7",
+          "assembly": "sub %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x107"
+        },
+        {
+          "address_hex": "0x2f224ca",
+          "assembly": "cmp %rax,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10a"
+        },
+        {
+          "address_hex": "0x2f224cd",
+          "assembly": "ja 2f228aa <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4ea>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x10d"
+        },
+        {
+          "address_hex": "0x2f224e2",
+          "assembly": "mov 0x20(%r14),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x122"
+        },
+        {
+          "address_hex": "0x2f224e6",
+          "assembly": "lea (%rax,%rbp,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x126"
+        },
+        {
+          "address_hex": "0x2f224ea",
+          "assembly": "cmp $0x2,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12a"
+        },
+        {
+          "address_hex": "0x2f224ee",
+          "assembly": "jb 2f22532 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x172>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x12e"
+        },
+        {
+          "address_hex": "0x2f224f0",
+          "assembly": "mov %rax,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x130"
+        },
+        {
+          "address_hex": "0x2f224f5",
+          "assembly": "mov %rdx,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x135"
+        },
+        {
+          "address_hex": "0x2f224f8",
+          "assembly": "not %rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x138"
+        },
+        {
+          "address_hex": "0x2f224fb",
+          "assembly": "add %r13,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13b"
+        },
+        {
+          "address_hex": "0x2f224fe",
+          "assembly": "shl $0x3,%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x13e"
+        },
+        {
+          "address_hex": "0x2f22502",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x142"
+        },
+        {
+          "address_hex": "0x2f22504",
+          "assembly": "mov %rdx,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x144"
+        },
+        {
+          "address_hex": "0x2f22507",
+          "assembly": "mov %rax,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x147"
+        },
+        {
+          "address_hex": "0x2f2250a",
+          "assembly": "call *0x19bc80(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x14a"
+        },
+        {
+          "address_hex": "0x2f22510",
+          "assembly": "add %rbp,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x150"
+        },
+        {
+          "address_hex": "0x2f22513",
+          "assembly": "shl $0x3,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x153"
+        },
+        {
+          "address_hex": "0x2f22517",
+          "assembly": "mov 0x30(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x157"
+        },
+        {
+          "address_hex": "0x2f2251c",
+          "assembly": "lea (%rax,%r13,8),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x15c"
+        },
+        {
+          "address_hex": "0x2f22520",
+          "assembly": "sub %r15,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x160"
+        },
+        {
+          "address_hex": "0x2f22523",
+          "assembly": "mov 0x58(%rsp),%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x163"
+        },
+        {
+          "address_hex": "0x2f22528",
+          "assembly": "add $0xfffffffffffffff8,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x168"
+        },
+        {
+          "address_hex": "0x2f2252c",
+          "assembly": "add %r12,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16c"
+        },
+        {
+          "address_hex": "0x2f2252f",
+          "assembly": "dec %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x16f"
+        },
+        {
+          "address_hex": "0x2f22532",
+          "assembly": "movq $0x0,(%rdi)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x172"
+        },
+        {
+          "address_hex": "0x2f22539",
+          "assembly": "inc %rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x179"
+        },
+        {
+          "address_hex": "0x2f2253c",
+          "assembly": "mov %rbp,0x28(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x17c"
+        },
+        {
+          "address_hex": "0x2f22540",
+          "assembly": "mov %rbp,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x180"
+        },
+        {
+          "address_hex": "0x2f22543",
+          "assembly": "mov %r15,0x30(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x183"
+        },
+        {
+          "address_hex": "0x2f22547",
+          "assembly": "mov 0x20(%r14),%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x187"
+        },
+        {
+          "address_hex": "0x2f2254b",
+          "assembly": "shl $0x3,%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x18b"
+        },
+        {
+          "address_hex": "0x2f2254f",
+          "assembly": "xor %esi,%esi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x18f"
+        },
+        {
+          "address_hex": "0x2f22551",
+          "assembly": "call *0x19bc39(%rip) # 30be190 <memset@GLIBC_2.2.5>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x191"
+        },
+        {
+          "address_hex": "0x2f22557",
+          "assembly": "mov 0x70(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x197"
+        },
+        {
+          "address_hex": "0x2f2255c",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x19c"
+        },
+        {
+          "address_hex": "0x2f22560",
+          "assembly": "mov %eax,%r12d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1a0"
+        },
+        {
+          "address_hex": "0x2f22563",
+          "assembly": "cmp %r12,%r15",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1a3"
+        },
+        {
+          "address_hex": "0x2f22566",
+          "assembly": "mov 0x78(%rsp),%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1a6"
+        },
+        {
+          "address_hex": "0x2f2256b",
+          "assembly": "mov 0x60(%rsp),%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1ab"
+        },
+        {
+          "address_hex": "0x2f22570",
+          "assembly": "jbe 2f2262f <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x26f>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1b0"
+        },
+        {
+          "address_hex": "0x2f22576",
+          "assembly": "lea 0x30(%r14),%r10",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1b6"
+        },
+        {
+          "address_hex": "0x2f2257a",
+          "assembly": "mov %rbx,0x68(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1ba"
+        },
+        {
+          "address_hex": "0x2f2257f",
+          "assembly": "nop",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 20,
+          "offset_hex": "0x1bf"
+        },
+        {
+          "address_hex": "0x2f22580",
+          "assembly": "cmp %r12,(%r10)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1c0"
+        },
+        {
+          "address_hex": "0x2f22583",
+          "assembly": "jbe 2f2269a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x2da>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1c3"
+        },
+        {
+          "address_hex": "0x2f22589",
+          "assembly": "mov %r12,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1c9"
+        },
+        {
+          "address_hex": "0x2f2258c",
+          "assembly": "shr $0x6,%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1cc"
+        },
+        {
+          "address_hex": "0x2f22590",
+          "assembly": "cmp 0x28(%r14),%rdi",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1d0"
+        },
+        {
+          "address_hex": "0x2f22594",
+          "assembly": "jae 2f226e4 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x324>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1d4"
+        },
+        {
+          "address_hex": "0x2f2259a",
+          "assembly": "mov $0x1,%r8d",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1da"
+        },
+        {
+          "address_hex": "0x2f225a0",
+          "assembly": "mov %r12d,%ecx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1e0"
+        },
+        {
+          "address_hex": "0x2f225a3",
+          "assembly": "shl %cl,%r8",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1e3"
+        },
+        {
+          "address_hex": "0x2f225a6",
+          "assembly": "mov 0x20(%r14),%rcx",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1e6"
+        },
+        {
+          "address_hex": "0x2f225aa",
+          "assembly": "mov (%rcx,%rdi,8),%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1ea"
+        },
+        {
+          "address_hex": "0x2f225ae",
+          "assembly": "bt %r12,%r9",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1ee"
+        },
+        {
+          "address_hex": "0x2f225b2",
+          "assembly": "jb 2f22790 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x3d0>",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1f2"
+        },
+        {
+          "address_hex": "0x2f225b8",
+          "assembly": "mov %r12,0x38(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163840,
+          "offset_hex": "0x1f8"
+        },
+        {
+          "address_hex": "0x2f225bd",
+          "assembly": "or %r8,(%rcx,%rdi,8)",
+          "category": "visited_bounds_address_test_update",
+          "ir": 163840,
+          "offset_hex": "0x1fd"
+        },
+        {
+          "address_hex": "0x2f225c1",
+          "assembly": "mov 0x10(%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x201"
+        },
+        {
+          "address_hex": "0x2f225c5",
+          "assembly": "cmp (%r14),%rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x205"
+        },
+        {
+          "address_hex": "0x2f225c8",
+          "assembly": "jne 2f225ee <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x22e>",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x208"
+        },
+        {
+          "address_hex": "0x2f225ee",
+          "assembly": "mov 0x8(%r14),%rcx",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x22e"
+        },
+        {
+          "address_hex": "0x2f225f2",
+          "assembly": "mov %eax,(%rcx,%rbp,4)",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x232"
+        },
+        {
+          "address_hex": "0x2f225f5",
+          "assembly": "inc %rbp",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x235"
+        },
+        {
+          "address_hex": "0x2f225f8",
+          "assembly": "mov %rbp,0x10(%r14)",
+          "category": "sector_vector_append_capacity",
+          "ir": 163840,
+          "offset_hex": "0x238"
+        },
+        {
+          "address_hex": "0x2f225fc",
+          "assembly": "mov (%rsi,%r12,4),%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163840,
+          "offset_hex": "0x23c"
+        },
+        {
+          "address_hex": "0x2f22600",
+          "assembly": "mov %eax,0x54(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163840,
+          "offset_hex": "0x240"
+        },
+        {
+          "address_hex": "0x2f22604",
+          "assembly": "dec %r13",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163840,
+          "offset_hex": "0x244"
+        },
+        {
+          "address_hex": "0x2f22607",
+          "assembly": "je 2f227cb <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x40b>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163840,
+          "offset_hex": "0x247"
+        },
+        {
+          "address_hex": "0x2f2260d",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x24d"
+        },
+        {
+          "address_hex": "0x2f22610",
+          "assembly": "je 2f227f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x439>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x250"
+        },
+        {
+          "address_hex": "0x2f22616",
+          "assembly": "cmp $0xfffffffa,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x256"
+        },
+        {
+          "address_hex": "0x2f22619",
+          "assembly": "jae 2f2281e <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x45e>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x259"
+        },
+        {
+          "address_hex": "0x2f2261f",
+          "assembly": "mov %eax,0x2c(%rsp)",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x25f"
+        },
+        {
+          "address_hex": "0x2f22623",
+          "assembly": "mov %rax,%r12",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x263"
+        },
+        {
+          "address_hex": "0x2f22626",
+          "assembly": "cmp %rax,%r15",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x266"
+        },
+        {
+          "address_hex": "0x2f22629",
+          "assembly": "ja 2f22580 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x1c0>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 163820,
+          "offset_hex": "0x269"
+        },
+        {
+          "address_hex": "0x2f22685",
+          "assembly": "mov %rbx,%rax",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2c5"
+        },
+        {
+          "address_hex": "0x2f22688",
+          "assembly": "add $0xb8,%rsp",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2c8"
+        },
+        {
+          "address_hex": "0x2f2268f",
+          "assembly": "pop %rbx",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2cf"
+        },
+        {
+          "address_hex": "0x2f22690",
+          "assembly": "pop %r12",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d0"
+        },
+        {
+          "address_hex": "0x2f22692",
+          "assembly": "pop %r13",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d2"
+        },
+        {
+          "address_hex": "0x2f22694",
+          "assembly": "pop %r14",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d4"
+        },
+        {
+          "address_hex": "0x2f22696",
+          "assembly": "pop %r15",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d6"
+        },
+        {
+          "address_hex": "0x2f22698",
+          "assembly": "pop %rbp",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d8"
+        },
+        {
+          "address_hex": "0x2f22699",
+          "assembly": "ret",
+          "category": "success_status_and_shared_return",
+          "ir": 20,
+          "offset_hex": "0x2d9"
+        },
+        {
+          "address_hex": "0x2f227cb",
+          "assembly": "cmp $0xfffffffe,%eax",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20,
+          "offset_hex": "0x40b"
+        },
+        {
+          "address_hex": "0x2f227ce",
+          "assembly": "je 2f2242a <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x6a>",
+          "category": "fat_lookup_marker_checks_loop_state",
+          "ir": 20,
+          "offset_hex": "0x40e"
+        },
+        {
+          "address_hex": "0x2f22859",
+          "assembly": "mov %r8,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x499"
+        },
+        {
+          "address_hex": "0x2f2285c",
+          "assembly": "mov 0x8(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x49c"
+        },
+        {
+          "address_hex": "0x2f22860",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a0"
+        },
+        {
+          "address_hex": "0x2f22863",
+          "assembly": "mov $0x4,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a3"
+        },
+        {
+          "address_hex": "0x2f22869",
+          "assembly": "mov %r9,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4a9"
+        },
+        {
+          "address_hex": "0x2f2286c",
+          "assembly": "mov $0x4,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ac"
+        },
+        {
+          "address_hex": "0x2f22872",
+          "assembly": "mov %rcx,%r13",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b2"
+        },
+        {
+          "address_hex": "0x2f22875",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4b5"
+        },
+        {
+          "address_hex": "0x2f2287a",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ba"
+        },
+        {
+          "address_hex": "0x2f2287e",
+          "assembly": "je 2f22893 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x4d3>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4be"
+        },
+        {
+          "address_hex": "0x2f22893",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d3"
+        },
+        {
+          "address_hex": "0x2f22898",
+          "assembly": "mov %rax,0x8(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4d8"
+        },
+        {
+          "address_hex": "0x2f2289c",
+          "assembly": "mov %r13,%r9",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4dc"
+        },
+        {
+          "address_hex": "0x2f2289f",
+          "assembly": "mov %r13,(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4df"
+        },
+        {
+          "address_hex": "0x2f228a2",
+          "assembly": "mov %r12,%r8",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e2"
+        },
+        {
+          "address_hex": "0x2f228a5",
+          "assembly": "jmp 2f22499 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0xd9>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4e5"
+        },
+        {
+          "address_hex": "0x2f228aa",
+          "assembly": "mov %rdx,0x30(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ea"
+        },
+        {
+          "address_hex": "0x2f228af",
+          "assembly": "mov 0x20(%r14),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4ef"
+        },
+        {
+          "address_hex": "0x2f228b3",
+          "assembly": "mov %rsp,%rdi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f3"
+        },
+        {
+          "address_hex": "0x2f228b6",
+          "assembly": "mov $0x8,%r8d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4f6"
+        },
+        {
+          "address_hex": "0x2f228bc",
+          "assembly": "mov $0x8,%r9d",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x4fc"
+        },
+        {
+          "address_hex": "0x2f228c2",
+          "assembly": "mov %r13,%rcx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x502"
+        },
+        {
+          "address_hex": "0x2f228c5",
+          "assembly": "call 2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x505"
+        },
+        {
+          "address_hex": "0x2f228ca",
+          "assembly": "cmpb $0x0,(%rsp)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50a"
+        },
+        {
+          "address_hex": "0x2f228ce",
+          "assembly": "je 2f228f9 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x539>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x50e"
+        },
+        {
+          "address_hex": "0x2f228f9",
+          "assembly": "mov 0x8(%rsp),%rax",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x539"
+        },
+        {
+          "address_hex": "0x2f228fe",
+          "assembly": "mov %rax,0x20(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x53e"
+        },
+        {
+          "address_hex": "0x2f22902",
+          "assembly": "mov %r13,0x18(%r14)",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x542"
+        },
+        {
+          "address_hex": "0x2f22906",
+          "assembly": "mov %r13,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x546"
+        },
+        {
+          "address_hex": "0x2f22909",
+          "assembly": "mov 0x30(%rsp),%rdx",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x549"
+        },
+        {
+          "address_hex": "0x2f2290e",
+          "assembly": "sub %rdx,%rsi",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x54e"
+        },
+        {
+          "address_hex": "0x2f22911",
+          "assembly": "mov %rdx,%rbp",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x551"
+        },
+        {
+          "address_hex": "0x2f22914",
+          "assembly": "cmp %rsi,%r12",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x554"
+        },
+        {
+          "address_hex": "0x2f22917",
+          "assembly": "jbe 2f224e2 <_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E+0x122>",
+          "category": "entry_reservation_visited_preparation",
+          "ir": 5,
+          "offset_hex": "0x557"
+        }
+      ],
+      "job": "profile-r1-cfb-few-large"
+    }
+  ],
+  "scope": "Four separate five-timed-dump totals; disjoint self-Ir categories. Direct children are separate. Source attribution is not removable-cost or latency prediction.",
+  "status": "pass"
+}

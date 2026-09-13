@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0547/instruction_analysis.py",
+    "--stage",
+    "baseline",
+    "--output",
+    "docs/performance/results/change-0547/analysis-runs/instructions.json"
+  ],
+  "start_utc": "2026-09-13T02:32:12.733055+00:00",
+  "end_utc": "2026-09-13T02:32:13.101871+00:00",
+  "seconds": 0.36883187299827114,
+  "exit_code": 0,
+  "script_sha256": "66cf49b960d0a964fbc0970c30a13ec4a69493b2263288f1b62849316a388745",
+  "artifacts": {
+    "instructions.json": "f5bd56a45b825399bb51a880e7549d98caf8cb14eaeb0be99316a311f15457d5",
+    "instructions.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "instructions.stdout": "4df9d98927fe607937cdf655235a7cb3e0135986a72fb6216306b300c98a8101"
+  }
+}

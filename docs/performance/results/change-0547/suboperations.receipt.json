@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0547/suboperations.py"
+  ],
+  "start_utc": "2026-09-13T02:31:34.175026+00:00",
+  "end_utc": "2026-09-13T02:31:34.220453+00:00",
+  "seconds": 0.04542707101791166,
+  "exit_code": 0,
+  "script_sha256": "f350fea4c5c24dd3621843aea97985ae7155e40d03db74e82ec6532d71b94dca",
+  "stdout_sha256": "ebe7466d7decbdf94f5e15e64a6e7c5659932b0abf860dc457871c5a7178ecff",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
