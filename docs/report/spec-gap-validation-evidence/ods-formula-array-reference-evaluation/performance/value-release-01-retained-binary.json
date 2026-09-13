@@ -1,0 +1,7 @@
+{
+  "path": "/home/zhuhe/code/litchi-array-target/retained/value-release-01",
+  "sha256": "ddfaa1a9cf611abc9e7ae465351647a211b8b48c6072a3defc1201bf9e51a905",
+  "bytes": 1920160,
+  "source_provenance": "diagnostics/candidate-release-01.tar.gz, run.json",
+  "purpose": "Retained current value-path binary before further release builds for paired allocation/performance measurements; this is not the scalar baseline."
+}
