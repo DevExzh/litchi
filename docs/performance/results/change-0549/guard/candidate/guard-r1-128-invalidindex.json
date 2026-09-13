@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "invalidindex",
+  "declared_chain_sectors": 128,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 65536,
+  "fat_entry_count": 256,
+  "input_sha256": "7b81153aa8aa2ca7d316eddc558cdf867a596da8c5034cb70f05237fb153a7ed",
+  "expected_error": "Invalid sector index 256 in regular stream",
+  "observed_error": "Invalid sector index 256 in regular stream",
+  "warmup_iterations": 20,
+  "sample_count": 200,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [970, 940, 950, 970, 930, 930, 920, 1020, 1110, 950, 1020, 970, 960, 910, 970, 950, 930, 940, 980, 1040, 1020, 950, 950, 1000, 950, 970, 960, 930, 970, 930, 960, 970, 950, 1000, 970, 920, 950, 910, 950, 920, 940, 940, 940, 920, 960, 910, 970, 910, 1000, 910, 930, 930, 930, 920, 940, 940, 920, 930, 930, 910, 1010, 940, 960, 950, 950, 920, 960, 930, 940, 980, 960, 920, 950, 910, 930, 930, 950, 920, 960, 950, 930, 950, 950, 1030, 970, 960, 1030, 1060, 1030, 1000, 1010, 980, 1020, 1010, 1030, 970, 960, 920, 940, 950, 930, 1010, 970, 990, 970, 1010, 950, 950, 970, 950, 960, 950, 940, 910, 940, 930, 940, 930, 960, 930, 970, 980, 960, 900, 960, 910, 950, 920, 940, 910, 930, 900, 920, 910, 980, 930, 1010, 960, 940, 910, 960, 910, 920, 920, 940, 930, 990, 910, 1060, 930, 960, 930, 1120, 1020, 1020, 930, 960, 910, 1000, 920, 1010, 980, 1000, 1030, 1010, 1040, 1030, 980, 1020, 980, 1030, 1010, 1020, 990, 1020, 1040, 970, 910, 920, 970, 930, 910, 920, 920, 960, 910, 920, 910, 940, 900, 950, 910, 940, 910, 940, 930, 940, 920, 940, 930]
+}

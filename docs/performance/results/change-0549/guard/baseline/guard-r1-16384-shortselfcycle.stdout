@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "shortselfcycle",
+  "declared_chain_sectors": 16384,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 8388608,
+  "fat_entry_count": 16640,
+  "input_sha256": "573a4374b6e8096bd994f2ce9a4ffaebafbd33cee3ce394dd3d934534c1d5806",
+  "expected_error": "Cycle detected in regular stream chain at sector 0",
+  "observed_error": "Cycle detected in regular stream chain at sector 0",
+  "warmup_iterations": 20,
+  "sample_count": 200,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [3250, 3281, 3210, 3240, 3250, 3250, 3310, 3330, 3290, 3230, 3200, 3180, 3230, 3190, 3250, 3270, 3210, 3230, 3310, 3250, 3250, 3190, 3240, 3250, 3260, 3250, 3230, 3290, 3190, 3210, 3210, 3240, 3220, 3290, 3190, 3260, 3200, 3200, 3240, 3250, 3210, 3180, 3250, 3340, 3260, 3230, 3180, 3250, 3230, 3220, 3260, 3260, 3220, 3260, 3240, 3230, 3250, 3330, 3210, 3220, 3230, 3210, 3220, 3240, 3220, 3250, 3240, 3240, 3210, 3230, 3221, 3280, 3220, 3230, 3250, 3240, 3230, 3200, 3340, 3210, 3250, 3220, 3230, 3240, 3220, 3270, 3250, 3180, 3250, 3220, 3220, 3260, 3240, 3230, 3250, 3220, 3270, 3230, 3200, 3210, 3200, 3220, 3240, 3170, 3210, 3220, 3260, 3200, 3260, 3270, 3190, 3270, 3230, 3250, 3270, 3220, 3200, 3280, 3300, 3290, 3210, 3210, 3230, 3250, 3170, 3280, 3270, 3240, 3270, 3220, 3240, 11220, 3260, 3250, 3250, 3190, 3201, 3260, 3250, 3280, 3240, 3240, 3310, 3210, 3240, 3270, 3240, 3270, 3210, 3230, 3210, 3310, 3250, 3220, 3250, 3260, 3220, 3270, 3230, 3230, 3270, 3220, 3210, 3300, 3220, 3200, 3260, 3220, 3240, 3230, 3250, 3250, 3290, 3240, 3230, 3250, 3200, 3250, 3240, 3190, 3230, 3270, 3190, 3230, 3240, 3250, 3250, 3240, 3270, 3210, 3340, 3340, 3300, 3280, 3290, 3230, 3250, 3180, 3230, 3190]
+}

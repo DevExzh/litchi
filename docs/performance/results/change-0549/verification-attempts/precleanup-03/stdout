@@ -1,0 +1,12 @@
+{
+  "components": {
+    "precleanup": {
+      "error": "guard-analysis input envelope differs",
+      "status": "fail"
+    }
+  },
+  "performance_claim": "candidate admission only; no broad format claim",
+  "schema": "litchi-0549-matched-verification-v1",
+  "scope": "precleanup",
+  "status": "fail"
+}

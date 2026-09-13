@@ -1,0 +1,82 @@
+{
+  "status": "pass",
+  "stage": "candidate",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "200dcfbd2b41cad68debd699eb06829f619db533273462d714f952ccf1f79812",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-no-default-tests.receipt.json",
+      "receipt_sha256": "0a2f2ebb2031740539e71ccf9d38193e68ea66ee9cff3df27a10c08706220829",
+      "executed_tests": 313
+    },
+    {
+      "name": "check-cfb-tests.receipt.json",
+      "receipt_sha256": "164d7c4aa2972be5a6ae13fe27fc37f2b7595201f62cc375e4683381fb557d57",
+      "executed_tests": 313
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "b0507ca5a5bb148bf805be37c29e01c1c6c563a4f01b99aa7825280fe4e5d2f6",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-doc-tests.receipt.json",
+      "receipt_sha256": "dd5f1b71ffc1ba406e3e6a9733813ee7c8563cc66cdb74e7cbb1eaa0c32e4246",
+      "executed_tests": 1187
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "d51bcba13dcc01dd354ad3bd99f47da1a5bb3c6ed8163ccf5e97e261e4006c71",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-guard-clippy.receipt.json",
+      "receipt_sha256": "741130d313061a7b2bbfee1229cdb83e90c3b9c5787016b1d522cbf92a9afe13",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "e1053e730a777722a881fe7984d6e71be9b9e1d6d49d294dc3ebf419e3eb056b",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "2d547ee36c63fa959ccde218b0129e567f3fcdef8f7fd5d9106acadfdc96d17b",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-rustdoc.receipt.json",
+      "receipt_sha256": "dfc7912f05685560b045785c36d0f021da6cc3918ef34162823d9bdebfb3287c",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-clippy.receipt.json",
+      "receipt_sha256": "30201be9358b77d1ad1bda84ea0ca3db3ff06578e73c15eb12f06aed5a08cf57",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-rustdoc.receipt.json",
+      "receipt_sha256": "d3cb46bbb5d43656fbc87e5ba020ee947f8ac0b8845cc1873937e3ef58df33bc",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ppt-tests.receipt.json",
+      "receipt_sha256": "7f616656a66d293e38fd9c789647f8f4ea7c847b60eb87c7171eadf8f4dc400d",
+      "executed_tests": 1230
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "8ea5e457a324d370a3527a327d4959046759fe6bfb90c986e32bf6555ed93dd4",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xls-tests.receipt.json",
+      "receipt_sha256": "2e03e0e08bfd5161858eac0f50cbc3351df2826c69f34761ad99ca2f40308ad7",
+      "executed_tests": 1345
+    }
+  ],
+  "executed_tests": 4388
+}

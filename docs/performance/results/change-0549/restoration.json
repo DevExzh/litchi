@@ -1,0 +1,18 @@
+{
+  "observed_utc": "2026-09-13T04:25:11.942349+00:00",
+  "disposition": "rejected",
+  "final_source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "baseline_source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "candidate_quality_summary_sha256": "093fce936ef40de548ab5f0d77fc9c8d098e8249df4c5db02bd66315c58bfe51",
+  "retained_baseline_binaries": {
+    "normal": {
+      "descriptor_sha256": "5b0efad11890a4d66febfbe0e1b0142e25f86d7d1ae8b3407787d76ba7135eee",
+      "binary_sha256": "7ed5a86c3bee64734a174f1c1feaddcb4c777ec41cbddfeec331d99b8a7c0ca4"
+    },
+    "alloc": {
+      "descriptor_sha256": "003f64499a6e8c53486ab59288df06adbfac950a2ea2af0f0a3606b7cbb189bc",
+      "binary_sha256": "24093d64c301f5fad11fca6a0600e0b56845ba5a192446e71c25394abbd8172b"
+    }
+  },
+  "scope": "Exact final runtime-plus-test source equals the measured baseline, including the common guard. No changed final rebuild or new performance claim. Fresh final quality follows."
+}

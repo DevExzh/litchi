@@ -1,0 +1,6 @@
+{
+  "utc": "2026-09-13T03:54:05.565157+00:00",
+  "script_sha256": "28bd6fd44b607ce0e2d9d2c3cdbb040049045c8a6f6eb33424093f18b718b602",
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "scope": "Guard thresholds and deterministic analysis frozen before any guard measurement"
+}

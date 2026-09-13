@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "valid",
+  "declared_chain_sectors": 16384,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 8388608,
+  "fat_entry_count": 16640,
+  "input_sha256": "d7b3a4a84e09408d56be2b656386a88c1d1bcd5d0231508c53f1a439c073301d",
+  "expected_error": null,
+  "observed_error": null,
+  "warmup_iterations": 0,
+  "sample_count": 1,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": true,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [41570]
+}

@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0549: checked bitset candidate rejected
+
+[0549](changes/0549-cfb-checked-test-and-mark.md) Combining checked membership
+and marking yields register bts plus a separate bt and store, reducing Ir but
+increasing primary latency. The existing checks were already coalesced. Keep
+the measured CFB baseline and investigate larger avoidable OOXML work; fewer
+instructions alone do not justify adoption.
+
 ## 0548: checkpoint bookkeeping offsets visited-map instruction savings
 
 [0548](changes/0548-ole2-checkpoint-collector-rejected.md) tests the bounded

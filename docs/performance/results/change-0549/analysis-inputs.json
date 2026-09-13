@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-13T03:59:01.219335+00:00",
+  "files": {
+    "analyze.py": "4c29450a0558b0c64ddfba3628799afe5ba95ad57b90e7f548f5d2909af54405",
+    "analyze_profiles.py": "143a5c3346470427942190a644a27e1162c49807ad137e1a198479ab3b8d5b76",
+    "analyze_hardware.py": "e35651820aa2955e46ff40561600adb87673c5504c0efe7c755ea099b69f801f",
+    "instruction_analysis.py": "cd3a663284e08013b59216f529fc0b0eef27a6e1ad725801227302bf28bd9c2c",
+    "decide.py": "508da5893e029426c1fe7776552d518033e60b100fb4dd913b32ea7c1aa97695",
+    "analyze_phase.py": "99c581ed60361c06e5308e8e3035b6b87f0f84ba87c6674a8a0fbf49c154e100",
+    "guard_analysis.py": "28bd6fd44b607ce0e2d9d2c3cdbb040049045c8a6f6eb33424093f18b718b602",
+    "summarize_quality.py": "6bd415579542fa5b62825faa7ca6e81b40bde2df610a0d72ced7488a7220c039"
+  },
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "scope": "Deterministic analyzer versions recorded during baseline build before captures; frozen plan alone defines admission thresholds."
+}

@@ -1,5 +1,13 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0549: checked bitset candidate rejected
+
+[0549](changes/0549-cfb-checked-test-and-mark.md) Fresh matched evidence
+rejects another CFB loop replacement and preserves its exact semantic tests
+and raw measurements. This is diagnostic progress, not a production speedup.
+OLE2/OOXML remain active; ODF is deferred until that goal completes and iWork
+is excluded.
+
 ## 0548: measured rejection; OLE2/OOXML goal stays active
 
 [0548](changes/0548-ole2-checkpoint-collector-rejected.md) adds a public malformed

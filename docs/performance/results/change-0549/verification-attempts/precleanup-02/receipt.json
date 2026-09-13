@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0549/verify.py",
+    "--component",
+    "precleanup",
+    "--strict"
+  ],
+  "start_utc": "2026-09-13T04:35:48.861575+00:00",
+  "end_utc": "2026-09-13T04:36:01.523448+00:00",
+  "seconds": 12.661882318003336,
+  "exit_code": 2,
+  "script_sha256_before": "a819b6ad8681ec77bc9f4c1c1b72043c3b88996a6984b06fdf2e55494e392092",
+  "script_sha256_after": "a819b6ad8681ec77bc9f4c1c1b72043c3b88996a6984b06fdf2e55494e392092",
+  "artifacts": {
+    "verify.py": "a819b6ad8681ec77bc9f4c1c1b72043c3b88996a6984b06fdf2e55494e392092",
+    "stdout": "b40556407f8cdf660ac5d06bad5e04dc3d8fb841edd12b03e286311d1e04c944",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

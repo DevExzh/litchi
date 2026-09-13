@@ -1,0 +1,6 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.27s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0549-target/debug/deps/litchi_cfb-284646b4392da4ef)
+     Running tests/sequential_writer.rs (/home/zhuhe/litchi-goal-0549-target/debug/deps/sequential_writer-09fd3b29feb0bf35)
+     Running tests/writer_storage_move.rs (/home/zhuhe/litchi-goal-0549-target/debug/deps/writer_storage_move-a23d4c49be40f256)
+   Doc-tests litchi_cfb

@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-13T04:15:03.228462+00:00",
+  "compiler_processes": [
+    {
+      "pid": 2381539,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 2384250,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

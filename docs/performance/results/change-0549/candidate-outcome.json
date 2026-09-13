@@ -1,0 +1,19 @@
+{
+  "observed_utc": "2026-09-13T04:15:02.208976+00:00",
+  "disposition": "rejected",
+  "native_primary_gate": false,
+  "profile_gate": true,
+  "collector_profile_gate": true,
+  "memory_gate": true,
+  "guard_gate": true,
+  "reason": "All eight frozen primary latency comparisons regress instead of improving at least3%. Lower instruction count does not override native failure. No recapture to seek admission; restore exact measured baseline after running candidate quality terminates.",
+  "quality_status": "candidate quality still running; final restored source requires all15checks",
+  "inputs": {
+    "comparison.json": "d64357af42deea745a0074a16aa0683a6c98734152643dbaeda41bbc79f49efe",
+    "baseline/profile-analysis.json": "1c635a965efd95150d4642531d4c19de6f464fa69755f31bf05b6236c5bc65af",
+    "candidate/profile-analysis.json": "7022ee25abe9738ad84c11593415a3e43d7acae0f11f192a7e71fd4e0d206e80",
+    "guard-analysis.json": "a2a32d36148fe07798f4e6db0b5ac71a517a167ae90b69a60a0cd75d4987c765",
+    "candidate/source-manifest.json": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9",
+    "baseline/source-manifest.json": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163"
+  }
+}
