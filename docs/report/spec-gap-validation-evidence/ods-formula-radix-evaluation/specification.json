@@ -1,0 +1,9 @@
+{
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "base_commit": "e1976c59d5c4785e0c73a5d27e9349ba082cca2f",
+  "scope": "ODF1.4 Part4 section6.19 fourteen radix conversion functions; Roman/Arabic remain separate work.",
+  "performance_hypothesis": "Bounded fixed-capacity integer arithmetic supports full finite f64 conversion; exact output reservation, no new frame variants, and outlined dispatch preserve old workloads. Measure existing scalar/logical/bitwise controls and radix workloads separately.",
+  "source_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4"
+}
