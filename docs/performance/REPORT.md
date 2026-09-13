@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0550: current XLSX commit attribution
+
+[0550](changes/0550-xlsx-source-commit-attribution.md) The current XLSX
+baseline confirms layout reconstruction as the leading measured commit cost.
+Native, allocator and exact-owner scopes remain separate, with all repeat
+flags and output identities retained. This batch retains attribution only;
+production and harness source are unchanged.
+
 ## 0549: checked bitset candidate rejected
 
 [0549](changes/0549-cfb-checked-test-and-mark.md) All eight primary XLS

@@ -1,0 +1,39 @@
+{
+  "performance_claim": "none",
+  "result": {
+    "failed_attempt": {
+      "amendment_sha256": "672a57c7c1673666e834709d1f81712e3b44e3ec710ff620c548f8e114fb13f8",
+      "failed_profile": "profile-r1-medium-c0",
+      "manifest_sha256": "05b13313523a1f68d8de2e0602c6cf4538aaaa58f33099f1331f2c11b3c9c7c6",
+      "receipt_sha256": "35a76d0beb4346945686bec0b1091373bb033695c70270445276c694a210b38b",
+      "status": "pass"
+    },
+    "private_source_replay": {
+      "changed_files": [],
+      "index_replayed": true,
+      "status": "pass"
+    },
+    "quality_continuity": {
+      "prior_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+      "prior_quality_sha256": "aa8ca992855849dd9f5e85038106958cc37b0400747d8d9efd94f008abf17b81",
+      "sha256": "370fc9d78424f1d95d0a5553adfd92fd844c1dd00780f92ccfb84cf292a7537e",
+      "status": "pass"
+    },
+    "source": {
+      "current_matches": true,
+      "manifest_entries": 8593,
+      "manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+      "prior_0549_final_matches": true,
+      "status": "pass"
+    },
+    "tool_source_continuity": {
+      "entries": 3,
+      "revision": "090b15b64ae52da2f8bf765cbb745ef76122792e",
+      "sha256": "0b0cfafa2519fc944fe753e14ec10fb5e15bd61ea5438ec048bfb533a2446be6",
+      "status": "pass"
+    }
+  },
+  "schema": "litchi-0550-xlsx-attribution-verification-v1",
+  "scope": "source",
+  "status": "pass"
+}

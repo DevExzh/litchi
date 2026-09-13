@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/analyze_metrics.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/metrics-analysis.json"
+  ],
+  "start_utc": "2026-09-13T05:17:06.438114+00:00",
+  "end_utc": "2026-09-13T05:17:06.685329+00:00",
+  "exit_code": 0,
+  "script_sha256": "95cc7baadb0dcefff7c4e29bad84321d05ff71073b5f8522e26945622f359c0f",
+  "plan_sha256": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+  "output": "metrics-analysis.json",
+  "output_sha256": "49e7978f1dd41b21031abe45cc2394a51085ca701d17fca79eda4ab5a8de14e4",
+  "artifacts": {
+    "stdout": "96edc6ff8cbcf4b1e96a7f6068389619b0314120646e6a0b5f2eaf7605522919",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputs_sha256": "0878a2a8963c13d91fe1ff365f544eb5e3eb23350706fb5e6f21e9de3aaf8435"
+}

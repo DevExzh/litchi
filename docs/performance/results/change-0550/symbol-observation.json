@@ -1,0 +1,8 @@
+{
+  "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+  "rows": [
+    "0000000002426220 T litchi_xlsx::cell_values::source::MultiSourceEdit::commit"
+  ],
+  "plan_sha256": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+  "symbols_sha256": "2bfdd67fd87f25999e32c3f4d3f7f31a132005d180d8904b8e57155d3e3482e1"
+}

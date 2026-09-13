@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0550: current XLSX commit attribution
+
+[0550](changes/0550-xlsx-source-commit-attribution.md) The complete source
+inventory and all previously read accepted ADR hashes match the prior
+validated baseline. Existing validation, publication, resource and
+preservation behavior is unchanged. The next layout-proof proposal must
+preserve scanner facts, original offsets, fallback/error order and
+authoritative output readback.
+
 ## 0549: checked bitset candidate rejected
 
 [0549](changes/0549-cfb-checked-test-and-mark.md) The private checked

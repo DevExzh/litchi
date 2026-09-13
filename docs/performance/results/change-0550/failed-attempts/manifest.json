@@ -1,0 +1,22 @@
+{
+  "baseline/profile-r1-medium-c0.callgrind": {
+    "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.callgrind",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "baseline/profile-r1-medium-c0.host.json": {
+    "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.host.json",
+    "sha256": "79cf4f3c1c1b5cc6f0e8835f7c543e63fb63277b927ef83a87b8104f4d1c707e"
+  },
+  "baseline/profile-r1-medium-c0.receipt.json": {
+    "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.receipt.json",
+    "sha256": "35a76d0beb4346945686bec0b1091373bb033695c70270445276c694a210b38b"
+  },
+  "baseline/profile-r1-medium-c0.stderr": {
+    "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.stderr",
+    "sha256": "a0b53a6a61c0a23e14d89c822e6d4fd7a7e1e9ad9153270a8e23cde954fddf64"
+  },
+  "baseline/profile-r1-medium-c0.stdout": {
+    "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

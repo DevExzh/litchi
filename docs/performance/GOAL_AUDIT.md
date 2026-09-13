@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0550: current XLSX commit attribution
+
+[0550](changes/0550-xlsx-source-commit-attribution.md) Fresh source-backed
+XLSX profiles change the next action toward eliminating a second source layout
+scan. Four metadata checks and capture oracles pass; no new broad test suite
+or optimization is claimed. Single-sheet API profiling, managed/refusal
+performance, route/copy counters, physical providers and scaling remain gaps.
+OLE2/OOXML stay first; ODF is deferred and iWork excluded.
+
 ## 0549: checked bitset candidate rejected
 
 [0549](changes/0549-cfb-checked-test-and-mark.md) Fresh matched evidence

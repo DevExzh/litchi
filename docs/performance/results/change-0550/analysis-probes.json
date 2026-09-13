@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "script_sha256": "746eccae05bce7bd17ce2a032d1fddaf02bf81b8a69fb38b77b5158aff53ed94",
+  "analyzer_sha256": "95cc7baadb0dcefff7c4e29bad84321d05ff71073b5f8522e26945622f359c0f",
+  "source_report_sha256": "8384a37d54356ca4f3e454474368a909cf19a2c31e028c3fa375d24909e64fd7",
+  "source_report": "baseline/native-r1-medium-c0.json",
+  "valid_control_passed": true,
+  "negative_cases": [
+    {
+      "case": "short_elapsed_vector",
+      "rejected": true,
+      "error": "native-r1-medium-c0.elapsed_ns.samples has 29 values, expected 30"
+    },
+    {
+      "case": "wrong_binary_hash",
+      "rejected": true,
+      "error": "native-r1-medium-c0 binary hash differs"
+    },
+    {
+      "case": "short_commit_vector",
+      "rejected": true,
+      "error": "native-r1-medium-c0.source.xlsx_cell_values.commit_ns has 29 values, expected 30"
+    }
+  ],
+  "temporary_copies_removed": true
+}

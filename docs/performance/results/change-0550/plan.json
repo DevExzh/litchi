@@ -1,0 +1,62 @@
+{
+  "revision": "090b15b64ae52da2f8bf765cbb745ef76122792e",
+  "created_utc": "2026-09-13T04:41:45.863506+00:00",
+  "previous_turn": "progress: committed 0549 rejection with strict post-commit replay and cleanup",
+  "priority": "OLE2/OOXML first; ODF deferred until that optimization goal completes; iWork excluded",
+  "scope": "Current source-backed XLSX MultiSourceEdit commit attribution; no optimization or speedup claim",
+  "hypothesis": "Fresh attribution determines whether full rewritten validation and reduced readback are substantial repeated work relative to rewrite and semantic merge. Inclusive shares are not removable fractions.",
+  "cpu": 2,
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0550-target"
+  ],
+  "cases": [
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "xlsx_source_backed_cell_values_one_percent_edit_save"
+  ],
+  "shapes": [
+    "medium",
+    "dense-sparse",
+    "noncompact",
+    "vendor-extension"
+  ],
+  "native": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30
+  },
+  "alloc": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+    "lifecycle": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates"
+  },
+  "drift_review_percent": 5,
+  "order": [
+    "build normal",
+    "preflight",
+    "native r1",
+    "profiles r1",
+    "profiles r2",
+    "native r2",
+    "build allocator",
+    "alloc r1",
+    "alloc r2",
+    "metadata checks"
+  ],
+  "limitations": [
+    "30 native samples descriptive only; no registered latency claim",
+    "Native commit phase includes edit staging; exact owner profile excludes it",
+    "Profiles simulated Ir only; instrumented elapsed excluded",
+    "No new counters for copied/reduced bytes or fallback route; source/profile inference must be labeled",
+    "Single SourceEdit owner and managed execution not measured in this batch",
+    "No new hardware, physical-cold, provider, concurrency, native Office or fuzz claim"
+  ]
+}

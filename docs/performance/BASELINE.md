@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0550: current XLSX commit attribution
+
+[0550](changes/0550-xlsx-source-commit-attribution.md) Current source-backed
+XLSX evidence covers four shapes, one-cell/one-percent edits, 480 native
+samples and 480 allocator samples. Eight exact-owner profiles exclude
+lifecycle/setup. Allocation vectors match across repeats; 22 native drift
+flags remain individually reviewed. No runtime change or speedup claim.
+
 ## 0549: checked bitset candidate rejected
 
 [0549](changes/0549-cfb-checked-test-and-mark.md) The final runtime-plus-test

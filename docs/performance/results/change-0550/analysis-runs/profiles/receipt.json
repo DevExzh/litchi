@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/analyze_profiles.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/profile-analysis.json"
+  ],
+  "start_utc": "2026-09-13T05:17:06.686981+00:00",
+  "end_utc": "2026-09-13T05:17:07.663208+00:00",
+  "exit_code": 0,
+  "script_sha256": "ac23bbe997c8753557c141752ea2bb2c3e59d634a549d75b6ecd517aabcd0fbc",
+  "plan_sha256": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+  "output": "profile-analysis.json",
+  "output_sha256": "64ee681a71674696e65f3d36922a03dec950e8af5d2e49ecf00b1c65c5dfd0ae",
+  "artifacts": {
+    "stdout": "00746773e1bf017fc03c9861175327dc0a4aefdc13064ffd953eeb3a4d654b10",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputs_sha256": "0878a2a8963c13d91fe1ff365f544eb5e3eb23350706fb5e6f21e9de3aaf8435"
+}
