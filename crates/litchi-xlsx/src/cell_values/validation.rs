@@ -5,7 +5,8 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
-use crate::error::{Result, invalid};
+use crate::error::{Error, Result, allocation, invalid};
+use crate::raw;
 
 const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -13,6 +14,9 @@ const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 #[cfg(test)]
 #[path = "validation_borrow_tests.rs"]
 mod borrow_tests;
+#[cfg(test)]
+#[path = "shared_traversal_tests.rs"]
+mod shared_traversal_tests;
 
 pub(super) fn workbook_xml(content: &[u8]) -> Result<()> {
     validate_xml(content, XmlOwner::Workbook)
@@ -26,6 +30,195 @@ pub(super) fn worksheet_xml(content: &[u8]) -> Result<()> {
 enum XmlOwner {
     Workbook,
     Worksheet,
+}
+
+/// Validation state for the shared source traversal.
+///
+/// The state owns only the local element names required by the existing
+/// closure checks. Event payloads remain borrowed for the duration of the
+/// callback. On an observer failure the driver stops immediately and the
+/// retained error is discarded before authoritative fallback validation.
+struct Validator {
+    owner: XmlOwner,
+    depth: usize,
+    elements: Vec<Box<[u8]>>,
+    dialect: Option<Box<[u8]>>,
+    saw_root: bool,
+    first_error: Option<Error>,
+}
+
+impl Validator {
+    fn new(owner: XmlOwner) -> Self {
+        Self {
+            owner,
+            depth: 0,
+            elements: Vec::new(),
+            dialect: None,
+            saw_root: false,
+            first_error: None,
+        }
+    }
+
+    fn observe(&mut self, namespace: &ResolveResult<'_>, event: &Event<'_>) -> bool {
+        if self.first_error.is_some() {
+            return false;
+        }
+        if let Err(error) = self.observe_inner(namespace, event) {
+            self.first_error = Some(error);
+            return false;
+        }
+        if matches!(event, Event::Eof) && (!self.saw_root || self.depth != 0) {
+            self.first_error = Some(invalid("value-only XML has no complete root element"));
+            return false;
+        }
+        true
+    }
+
+    fn observe_inner(&mut self, namespace: &ResolveResult<'_>, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                bind_dialect(namespace, &mut self.dialect)?;
+                let local = element
+                    .name()
+                    .local_name()
+                    .as_ref()
+                    .to_vec()
+                    .into_boxed_slice();
+                validate_element(
+                    self.owner,
+                    namespace,
+                    element,
+                    &local,
+                    self.elements.last().map(AsRef::as_ref),
+                    self.depth,
+                )?;
+                self.saw_root = true;
+                self.depth = self
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("value-only XML depth overflow"))?;
+                self.elements
+                    .try_reserve(1)
+                    .map_err(|source| allocation("value-only XML element stack", source))?;
+                self.elements.push(local);
+            },
+            Event::Empty(element) => {
+                bind_dialect(namespace, &mut self.dialect)?;
+                let local = element.name().local_name().as_ref().to_vec();
+                validate_element(
+                    self.owner,
+                    namespace,
+                    element,
+                    &local,
+                    self.elements.last().map(AsRef::as_ref),
+                    self.depth,
+                )?;
+                self.saw_root = true;
+            },
+            Event::End(element) => {
+                self.depth = self
+                    .depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("value-only XML has an unmatched closing element"))?;
+                let expected = self
+                    .elements
+                    .pop()
+                    .ok_or_else(|| invalid("value-only XML has no open element to close"))?;
+                if element.local_name().as_ref() != expected.as_ref()
+                    || !matches!((namespace, self.dialect.as_deref()), (ResolveResult::Bound(Namespace(value)), Some(expected)) if *value == expected)
+                {
+                    return Err(invalid(
+                        "value-only XML has a mismatched or foreign closing element",
+                    ));
+                }
+            },
+            Event::DocType(_) => {
+                return Err(invalid(
+                    "value-only edits refuse XML document type declarations",
+                ));
+            },
+            Event::Eof => {},
+            Event::Text(value) => {
+                let decoded = value
+                    .decode()
+                    .map_err(|error| invalid(format!("invalid value-only XML text: {error}")))?;
+                if !text_allowed(
+                    self.owner,
+                    self.elements.last().map(AsRef::as_ref),
+                    &decoded,
+                ) {
+                    return Err(invalid(
+                        "value-only XML has text outside a scalar value element",
+                    ));
+                }
+            },
+            Event::CData(value) => {
+                let decoded = value
+                    .decode()
+                    .map_err(|error| invalid(format!("invalid value-only XML text: {error}")))?;
+                if !text_allowed(
+                    self.owner,
+                    self.elements.last().map(AsRef::as_ref),
+                    &decoded,
+                ) {
+                    return Err(invalid(
+                        "value-only XML has text outside a scalar value element",
+                    ));
+                }
+            },
+            Event::GeneralRef(_) => {
+                if !text_context_allowed(self.owner, self.elements.last().map(AsRef::as_ref)) {
+                    return Err(invalid(
+                        "value-only XML has a reference outside a scalar value element",
+                    ));
+                }
+            },
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<()> {
+        if let Some(error) = self.first_error {
+            return Err(error);
+        }
+        if !self.saw_root || self.depth != 0 {
+            return Err(invalid("value-only XML has no complete root element"));
+        }
+        Ok(())
+    }
+}
+
+/// Validate and parse an eligible source using one borrowed `NsReader`.
+///
+/// Early reader, parser-transition, or provisional-cap uncertainty is
+/// converted into a provisional failure. After the observer accepts the
+/// complete source, parser materialization is carried as a `Complete` result;
+/// the caller finishes validation before forwarding that result through the
+/// raw facade. No speculative diagnostic escapes the established error order.
+pub(super) fn worksheet_xml_and_parse_source(content: &[u8]) -> Result<crate::cell::Store> {
+    let mut validator = Validator::new(XmlOwner::Worksheet);
+    let attempt = raw::worksheet::parse_source_with_observer(
+        content,
+        || Ok(None),
+        |namespace, event| validator.observe(namespace, event),
+    );
+    match attempt {
+        raw::worksheet::SourceParseAttempt::Complete(parsed) => {
+            validator.finish()?;
+            raw::worksheet::complete_source_parse(content, parsed)
+        },
+        raw::worksheet::SourceParseAttempt::ProvisionalFailed => {
+            drop(validator);
+            worksheet_xml(content)?;
+            raw::worksheet::parse(content, || Ok(None))
+        },
+        raw::worksheet::SourceParseAttempt::ReaderFailed => {
+            drop(validator);
+            worksheet_xml(content)?;
+            raw::worksheet::parse(content, || Ok(None))
+        },
+    }
 }
 
 fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {

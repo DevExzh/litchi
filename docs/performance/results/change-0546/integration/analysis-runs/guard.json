@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze_guard.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/guard-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:45:53.624757+00:00",
+  "end_utc": "2026-09-13T01:45:53.764375+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "65d7e79929931c826ecd08c66ab2aaf43a2041f67a3d7f910a80b8112d4d1050",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

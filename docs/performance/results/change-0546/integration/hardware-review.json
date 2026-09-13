@@ -1,0 +1,954 @@
+{
+  "rows": [
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch-misses",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 67530425,
+        "baseline_running_percent": 100.0,
+        "candidate": 63485114,
+        "candidate_running_percent": 100.0,
+        "change_percent": -5.99035323707795,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branches",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 27017001900,
+        "baseline_running_percent": 100.0,
+        "candidate": 25186766554,
+        "candidate_running_percent": 100.0,
+        "change_percent": -6.7743836002765345,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "context-switches",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 177,
+        "baseline_running_percent": 100.0,
+        "candidate": 149,
+        "candidate_running_percent": 100.0,
+        "change_percent": -15.81920903954802,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cpu-migrations",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 0,
+        "baseline_running_percent": 100.0,
+        "candidate": 0,
+        "candidate_running_percent": 100.0,
+        "change_percent": 0.0,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cycles",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 45978484528,
+        "baseline_running_percent": 100.0,
+        "candidate": 40980787031,
+        "candidate_running_percent": 100.0,
+        "change_percent": -10.869643809065732,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "instructions",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 139789754713,
+        "baseline_running_percent": 100.0,
+        "candidate": 130352477487,
+        "candidate_running_percent": 100.0,
+        "change_percent": -6.751050708526895,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "page-faults",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 971804,
+        "baseline_running_percent": 100.0,
+        "candidate": 52902,
+        "candidate_running_percent": 100.0,
+        "change_percent": -94.55630970854205,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch_miss_percent",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 0.2499552883401174,
+        "candidate": 0.25205742016899624,
+        "change_percent": 0.841003142137331
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "ipc",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 3.040329757451461,
+        "candidate": 3.1808192797369803,
+        "change_percent": 4.62086462631881
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch-misses",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 52263756,
+        "baseline_running_percent": 100.0,
+        "candidate": 50536216,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.305426422088764,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branches",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 14744530193,
+        "baseline_running_percent": 100.0,
+        "candidate": 14209159059,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.6309812994527846,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "context-switches",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 121,
+        "baseline_running_percent": 100.0,
+        "candidate": 118,
+        "candidate_running_percent": 100.0,
+        "change_percent": -2.4793388429752095,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cpu-migrations",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 0,
+        "baseline_running_percent": 100.0,
+        "candidate": 0,
+        "candidate_running_percent": 100.0,
+        "change_percent": 0.0,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cycles",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 28685890405,
+        "baseline_running_percent": 100.0,
+        "candidate": 27477397400,
+        "candidate_running_percent": 100.0,
+        "change_percent": -4.212848156142146,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "instructions",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 80281333710,
+        "baseline_running_percent": 100.0,
+        "candidate": 77762302551,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.137754497327472,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "page-faults",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 977270,
+        "baseline_running_percent": 100.0,
+        "candidate": 952714,
+        "candidate_running_percent": 100.0,
+        "change_percent": -2.512713988969273,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch_miss_percent",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 0.3544619958444816,
+        "candidate": 0.35565944325178517,
+        "change_percent": 0.337821098267721
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "ipc",
+      "repeat": 1,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 2.7986348890187083,
+        "candidate": 2.830046143707919,
+        "change_percent": 1.1223777282439507
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch-misses",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 67121420,
+        "baseline_running_percent": 100.0,
+        "candidate": 65789621,
+        "candidate_running_percent": 100.0,
+        "change_percent": -1.9841639226345298,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branches",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 26971079585,
+        "baseline_running_percent": 100.0,
+        "candidate": 26035694760,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.468103017723534,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "context-switches",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 158,
+        "baseline_running_percent": 100.0,
+        "candidate": 147,
+        "candidate_running_percent": 100.0,
+        "change_percent": -6.9620253164556996,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cpu-migrations",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 0,
+        "baseline_running_percent": 100.0,
+        "candidate": 0,
+        "candidate_running_percent": 100.0,
+        "change_percent": 0.0,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cycles",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 45810609095,
+        "baseline_running_percent": 100.0,
+        "candidate": 44048123921,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.847329709904179,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "instructions",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 139533366346,
+        "baseline_running_percent": 100.0,
+        "candidate": 135254385929,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.0666359803786514,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": true,
+      "kind": "candidate comparison",
+      "metric": "page-faults",
+      "repeat": 2,
+      "review": "Whole-child diagnostic includes setup, publication and OS activity; not isolated planning. Dense repeat 2 page faults rise 6.23%; repeat 1 falls 94.56%, so no stable page-fault reduction or causality is claimed.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 925163,
+        "baseline_running_percent": 100.0,
+        "candidate": 982807,
+        "candidate_running_percent": 100.0,
+        "change_percent": 6.2306858359013395,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch_miss_percent",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 0.2488644171193268,
+        "candidate": 0.2526900918391317,
+        "change_percent": 1.537252598860106
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "ipc",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "dense-sparse",
+      "values": {
+        "baseline": 3.0458745059827064,
+        "candidate": 3.070604917739012,
+        "change_percent": 0.8119314078019357
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch-misses",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 52880592,
+        "baseline_running_percent": 100.0,
+        "candidate": 50706217,
+        "candidate_running_percent": 100.0,
+        "change_percent": -4.111858278742419,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branches",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 14815937074,
+        "baseline_running_percent": 100.0,
+        "candidate": 14204466824,
+        "candidate_running_percent": 100.0,
+        "change_percent": -4.127111548503059,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "context-switches",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 124,
+        "baseline_running_percent": 100.0,
+        "candidate": 120,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.2258064516129004,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cpu-migrations",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 0,
+        "baseline_running_percent": 100.0,
+        "candidate": 0,
+        "candidate_running_percent": 100.0,
+        "change_percent": 0.0,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "cycles",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 28845619157,
+        "baseline_running_percent": 100.0,
+        "candidate": 27543801134,
+        "candidate_running_percent": 100.0,
+        "change_percent": -4.513052799853268,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "instructions",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 80687239645,
+        "baseline_running_percent": 100.0,
+        "candidate": 77735609364,
+        "candidate_running_percent": 100.0,
+        "change_percent": -3.6581128490530856,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "page-faults",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 1047788,
+        "baseline_running_percent": 100.0,
+        "candidate": 944317,
+        "candidate_running_percent": 100.0,
+        "change_percent": -9.87518467476245,
+        "status": "measured"
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "branch_miss_percent",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 0.35691695864987444,
+        "candidate": 0.3569737437404289,
+        "change_percent": 0.015909888610865508
+      }
+    },
+    {
+      "adverse_over_5_percent": false,
+      "kind": "candidate comparison",
+      "metric": "ipc",
+      "repeat": 2,
+      "review": "Retained whole-child diagnostic; no adverse change above 5% in the declared direction.",
+      "shape": "medium",
+      "values": {
+        "baseline": 2.797209489795941,
+        "candidate": 2.8222542337500163,
+        "change_percent": 0.8953474541480322
+      }
+    },
+    {
+      "change_percent": -0.605660337544156,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch-misses",
+      "repeat1": 67530425,
+      "repeat2": 67121420,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -0.16997561450369236,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branches",
+      "repeat1": 27017001900,
+      "repeat2": 26971079585,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -10.73446327683616,
+      "flag_over_5_percent": true,
+      "kind": "same-build repeat drift",
+      "metric": "context-switches",
+      "repeat1": 177,
+      "repeat2": 158,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cpu-migrations",
+      "repeat1": 0,
+      "repeat2": 0,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -0.3651173689680154,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cycles",
+      "repeat1": 45978484528,
+      "repeat2": 45810609095,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -0.18340998417687437,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "instructions",
+      "repeat1": 139789754713,
+      "repeat2": 139533366346,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -4.799424575325883,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "page-faults",
+      "repeat1": 971804,
+      "repeat2": 925163,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -0.4364265417366342,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch_miss_percent",
+      "repeat1": 0.2499552883401174,
+      "repeat2": 0.2488644171193268,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.1823732612443063,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "ipc",
+      "repeat1": 3.040329757451461,
+      "repeat2": 3.0458745059827064,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 3.6299958443801517,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch-misses",
+      "repeat1": 63485114,
+      "repeat2": 65789621,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 3.370532712803409,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branches",
+      "repeat1": 25186766554,
+      "repeat2": 26035694760,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -1.342281879194629,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "context-switches",
+      "repeat1": 149,
+      "repeat2": 147,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 0,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cpu-migrations",
+      "repeat1": 0,
+      "repeat2": 0,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 7.484816940386496,
+      "flag_over_5_percent": true,
+      "kind": "same-build repeat drift",
+      "metric": "cycles",
+      "repeat1": 40980787031,
+      "repeat2": 44048123921,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 3.760502705051283,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "instructions",
+      "repeat1": 130352477487,
+      "repeat2": 135254385929,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 1757.7879853313675,
+      "flag_over_5_percent": true,
+      "kind": "same-build repeat drift",
+      "metric": "page-faults",
+      "repeat1": 52902,
+      "repeat2": 982807,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 0.2510029935684166,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch_miss_percent",
+      "repeat1": 0.25205742016899624,
+      "repeat2": 0.2526900918391317,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -3.4649677427471492,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "ipc",
+      "repeat1": 3.1808192797369803,
+      "repeat2": 3.070604917739012,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "dense-sparse",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 1.1802366443008694,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch-misses",
+      "repeat1": 52263756,
+      "repeat2": 52880592,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.4842940403343654,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branches",
+      "repeat1": 14744530193,
+      "repeat2": 14815937074,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 2.4793388429751984,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "context-switches",
+      "repeat1": 121,
+      "repeat2": 124,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cpu-migrations",
+      "repeat1": 0,
+      "repeat2": 0,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.5568199199846413,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cycles",
+      "repeat1": 28685890405,
+      "repeat2": 28845619157,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.5056043743197458,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "instructions",
+      "repeat1": 80281333710,
+      "repeat2": 80687239645,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 7.215815485996702,
+      "flag_over_5_percent": true,
+      "kind": "same-build repeat drift",
+      "metric": "page-faults",
+      "repeat1": 977270,
+      "repeat2": 1047788,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.6925884394302972,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch_miss_percent",
+      "repeat1": 0.3544619958444816,
+      "repeat2": 0.35691695864987444,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": -0.05093194644145704,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "ipc",
+      "repeat1": 2.7986348890187083,
+      "repeat2": 2.797209489795941,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "baseline"
+    },
+    {
+      "change_percent": 0.33639439882082733,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch-misses",
+      "repeat1": 50536216,
+      "repeat2": 50706217,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -0.033022608730870484,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branches",
+      "repeat1": 14209159059,
+      "repeat2": 14204466824,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 1.6949152542372836,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "context-switches",
+      "repeat1": 118,
+      "repeat2": 120,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 0,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cpu-migrations",
+      "repeat1": 0,
+      "repeat2": 0,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 0.2416667526160987,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "cycles",
+      "repeat1": 27477397400,
+      "repeat2": 27543801134,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -0.03432664173298461,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "instructions",
+      "repeat1": 77762302551,
+      "repeat2": 77735609364,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -0.881376782539145,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "page-faults",
+      "repeat1": 952714,
+      "repeat2": 944317,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": 0.36953903898266915,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "branch_miss_percent",
+      "repeat1": 0.35565944325178517,
+      "repeat2": 0.3569737437404289,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    },
+    {
+      "change_percent": -0.2753280180687767,
+      "flag_over_5_percent": false,
+      "kind": "same-build repeat drift",
+      "metric": "ipc",
+      "repeat1": 2.830046143707919,
+      "repeat2": 2.8222542337500163,
+      "review": "Whole-child repeat variability retained individually; OS counters and setup are included. Drift is not attributed to the candidate and does not establish isolated planning or cold-cache behavior.",
+      "shape": "medium",
+      "stage": "candidate"
+    }
+  ],
+  "source_sha256": "1f990bf757f675f1dbc2fbd309992d0a7951de0b37868ad1599c73d5b95414e8",
+  "status": "complete"
+}

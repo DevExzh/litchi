@@ -1,0 +1,5 @@
+{
+  "reason": "results-review.md lacks explicit individual decision review",
+  "scope": "0546 OOXML/XLSX shared worksheet traversal campaign; ODF deferred",
+  "status": "fail"
+}

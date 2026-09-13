@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/baseline/native-r1-guard4-noncompact.rss.json",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/baseline-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "noncompact",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/baseline/native-r1-guard4-noncompact.json"
+  ],
+  "start_utc": "2026-09-13T01:30:04.602151+00:00",
+  "end_utc": "2026-09-13T01:30:07.957281+00:00",
+  "seconds": 3.3551292050105985,
+  "exit_code": 0,
+  "binary_sha256": "9965d31ce127d11ed9efa0597798416072902bebbb6e99e6e9a4020eab60cf53",
+  "source_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "working_source_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "script_sha256": "95bbc9aacd032acbb7ef7fcda7c5151830f854e0c81c9b36ef6461bfbc0915b5",
+  "plan_sha256": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0546-target/test-tmp"
+  },
+  "artifacts": {
+    "native-r1-guard4-noncompact.json": "ac4b8f7f8a23c68a782cc7bfc3871378a2cd71ef7856bdd0b2acf81fdc698e87",
+    "native-r1-guard4-noncompact.rss.json": "3bfb06e1cfa5b680f4d68d3f9acd0531d9fe86dc6f995bac8b2d142e65f5cfd1",
+    "native-r1-guard4-noncompact.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r1-guard4-noncompact.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

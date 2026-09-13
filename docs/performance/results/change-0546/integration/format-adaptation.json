@@ -1,0 +1,16 @@
+{
+  "utc": "2026-09-13T01:34:13.966128+00:00",
+  "prepared_patch_sha256": "bd9a0e25a5ce1a7dde78d568e4c1c998dd4c7103318269da31f201a125a9d539",
+  "applied_patch_sha256": "57cb7434e1c0be7c5b6ec3470941c044b048d7d7afce3a6783794e94b43caf64",
+  "changes": {
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs": {
+      "prepared_sha256": "5c56a86bd67d014c28823c9c315d6abbed8c614faf6f458795e3015ecfde3b95",
+      "formatted_sha256": "cb6203005ecd752f285a55944b64e2133087b5640645ddc3b365dbe33ed02914"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": {
+      "prepared_sha256": "8aedf9ab085f5dc627e76d8e13841f211a1a53d4dd02f67cf389a6ffe70cd6e1",
+      "formatted_sha256": "6db3c616e0e639b578b9aea2493cf717083f4d06f072a201a787002a9daa2178"
+    }
+  },
+  "review": "Root inspected exact diff: two assert line wraps and one subtotal line wrap only. No token or semantic changes; original prepared files/patch/review retained. cargo fmt completed before candidate source freeze/build."
+}

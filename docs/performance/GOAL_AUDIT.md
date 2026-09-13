@@ -2395,3 +2395,7 @@ work, the 0501 PPTX comparison, and the 0502 ODG audit. The retained
 regressions, missing replay executable, incomplete CRUD metrics and provider
 intersections, and unmeasured scaling keep the full non-iWork performance goal
 open.
+
+## 0546 — retained XLSX shared traversal
+
+Retained exact-admission shared traversal: planning p50 improves 24.77–26.51%, workflow p50 7.09–10.80%, and planning Ir 21.81–22.36% on both primary shapes/repeats. All frozen gates and nine final quality commands pass (1,306 tests). Same-invalid refusal and clustered scanner regressions remain explicitly reviewed; no universal speedup, RSS, or cold-cache claim is made. Accepted ADR/index hashes remain unchanged. OLE2/OOXML optimization remains active; ODF is deferred until completion and iWork excluded. [Change and limitations](changes/0546-xlsx-shared-traversal-retained.md); [sealed evidence](results/change-0546/README.md).

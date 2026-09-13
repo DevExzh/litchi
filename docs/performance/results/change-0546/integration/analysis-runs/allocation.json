@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze_allocation.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/allocation-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:45:53.494384+00:00",
+  "end_utc": "2026-09-13T01:45:53.624618+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "d3de6d7c02d6c33b839b55c588a7b086235575aaf85ecb2b36c6cfd5a9277502",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

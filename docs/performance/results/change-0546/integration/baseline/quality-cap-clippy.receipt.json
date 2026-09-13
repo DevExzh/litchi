@@ -1,0 +1,41 @@
+{
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0546-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "clippy",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--all-features",
+    "--example",
+    "perf_cap_boundary",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "start_utc": "2026-09-13T01:18:28.163104+00:00",
+  "end_utc": "2026-09-13T01:18:56.476740+00:00",
+  "seconds": 28.31363301401143,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "working_source_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "script_sha256": "95bbc9aacd032acbb7ef7fcda7c5151830f854e0c81c9b36ef6461bfbc0915b5",
+  "plan_sha256": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0546-target/test-tmp"
+  },
+  "artifacts": {
+    "quality-cap-clippy.stderr": "cf2f01ae33145fb83a57341b82e15cada611ddb6f8146e530358527457afa186",
+    "quality-cap-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -15,8 +15,8 @@ use super::super::namespace::is_spreadsheetml_name;
 use super::super::strings::decode_spreadsheet_text;
 use super::model::{
     Context, MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_COLUMN_STYLE, MAX_ENCODED_CELL_BYTES,
-    MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, Parser, PendingCell, PendingRow,
-    RawCell, RawFormula, RawFormulaKind, TextTarget, merge_successor,
+    MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, MAX_XML_EVENTS, Parser, PendingCell,
+    PendingRow, RawCell, RawFormula, RawFormulaKind, TextTarget, merge_successor,
 };
 use super::semantic::{materialize, resolve_shared_formulas};
 use super::validation::{
@@ -283,123 +283,157 @@ impl Parser {
             let (namespace, event) = reader.resolver().resolve_event(event);
             let decoder = reader.decoder();
             let resolver = reader.resolver();
-            match event {
-                Event::Start(element) if stack.is_empty() => {
-                    if closed_root
-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
-                    {
-                        return Err(invalid(
-                            "worksheet XML must have one SpreadsheetML worksheet root",
-                        ));
-                    }
-                    stack.push(Context::Worksheet);
-                },
-                Event::Empty(element) if stack.is_empty() => {
-                    if closed_root
-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
-                    {
-                        return Err(invalid(
-                            "worksheet XML must have one SpreadsheetML worksheet root",
-                        ));
-                    }
-                    closed_root = true;
-                },
-                Event::Start(element) => {
-                    if stack.len() >= MAX_XML_DEPTH {
-                        return Err(invalid(format!(
-                            "worksheet XML exceeds {MAX_XML_DEPTH} levels"
-                        )));
-                    }
-                    let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
-                    stack.push(child);
-                },
-                Event::Empty(element) => {
-                    let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
-                    parser.finish(child)?;
-                },
-                Event::Text(value) => {
-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
-                        && !value
-                            .decode()
-                            .map_err(|error| invalid(error.to_string()))?
-                            .trim()
-                            .is_empty()
-                    {
-                        return Err(invalid("worksheet leaf property cannot contain text"));
-                    }
-                    if let Some(target) = text_target(&stack) {
-                        parser.push_text(
-                            target,
-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
-                        )?;
-                    }
-                },
-                Event::CData(value) => {
-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
-                        return Err(invalid("worksheet leaf property cannot contain CDATA"));
-                    }
-                    if let Some(target) = text_target(&stack) {
-                        parser.push_text(
-                            target,
-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
-                        )?;
-                    }
-                },
-                Event::GeneralRef(value) => {
-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
-                        return Err(invalid(
-                            "worksheet leaf property cannot contain character references",
-                        ));
-                    }
-                    if let Some(target) = text_target(&stack) {
-                        parser.push_text(target, &decode_xml_reference(&value)?)?;
-                    }
-                },
-                Event::End(element) => {
-                    let ended = stack.pop().ok_or_else(|| {
-                        invalid("worksheet XML has a closing element outside its root")
-                    })?;
-                    parser.finish(ended)?;
-                    if ended == Context::Worksheet {
-                        if !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
-                            return Err(invalid(
-                                "worksheet XML has an invalid root closing element",
-                            ));
-                        }
-                        closed_root = true;
-                    }
-                },
-                Event::Eof if !closed_root || !stack.is_empty() => {
-                    return Err(invalid(
-                        "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
-                    ));
-                },
-                Event::Eof => break,
-                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+            if parser.transition(
+                &mut stack,
+                &mut closed_root,
+                &namespace,
+                event,
+                decoder,
+                resolver,
+            )? {
+                break;
             }
         }
 
-        resolve_shared_formulas(&mut parser.cells)?;
-        let needs_strings = parser
+        parser.finish_parse(strings)
+    }
+
+    fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
+    where
+        F: FnOnce() -> Result<Option<&'a [Text]>>,
+    {
+        resolve_shared_formulas(&mut self.cells)?;
+        let needs_strings = self
             .cells
             .iter()
             .any(|cell| cell.cell_type.as_deref() == Some("s"));
         let strings = if needs_strings { strings()? } else { None };
         let mut cells = Vec::new();
         cells
-            .try_reserve(parser.cells.len())
+            .try_reserve(self.cells.len())
             .map_err(|source| allocation("sparse worksheet cells", source))?;
-        let declared_extent = parser.declared_extent;
-        let rows = parser.rows;
-        let columns = column::resolve(parser.columns)?;
-        let defaults = parser.defaults;
-        let merges = parser.merges;
-        for cell in parser.cells {
+        let declared_extent = self.declared_extent;
+        let rows = self.rows;
+        let columns = column::resolve(self.columns)?;
+        let defaults = self.defaults;
+        let merges = self.merges;
+        for cell in self.cells {
             cells.push(materialize(cell, strings)?);
         }
         Store::from_unsorted(cells, rows, columns, defaults, merges, declared_extent)
+    }
+
+    /// Advance the ordinary worksheet parser by one XML event.
+    ///
+    /// The source-backed shared reader uses this same transition function so
+    /// its speculative parser cannot drift from the established materialized
+    /// parser. `true` is returned only for a complete end-of-file event.
+    fn transition(
+        &mut self,
+        stack: &mut Vec<Context>,
+        closed_root: &mut bool,
+        namespace: &ResolveResult<'_>,
+        event: Event<'_>,
+        decoder: Decoder,
+        resolver: &NamespaceResolver,
+    ) -> Result<bool> {
+        match event {
+            Event::Start(element) if stack.is_empty() => {
+                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
+                    return Err(invalid(
+                        "worksheet XML must have one SpreadsheetML worksheet root",
+                    ));
+                }
+                stack
+                    .try_reserve(1)
+                    .map_err(|source| allocation("worksheet parser element stack", source))?;
+                stack.push(Context::Worksheet);
+            },
+            Event::Empty(element) if stack.is_empty() => {
+                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
+                    return Err(invalid(
+                        "worksheet XML must have one SpreadsheetML worksheet root",
+                    ));
+                }
+                *closed_root = true;
+            },
+            Event::Start(element) => {
+                if stack.len() >= MAX_XML_DEPTH {
+                    return Err(invalid(format!(
+                        "worksheet XML exceeds {MAX_XML_DEPTH} levels"
+                    )));
+                }
+                let parent = current(stack)?;
+                let child = self.start(parent, namespace, &element, decoder, resolver)?;
+                stack
+                    .try_reserve(1)
+                    .map_err(|source| allocation("worksheet parser element stack", source))?;
+                stack.push(child);
+            },
+            Event::Empty(element) => {
+                let parent = current(stack)?;
+                let child = self.start(parent, namespace, &element, decoder, resolver)?;
+                self.finish(child)?;
+            },
+            Event::Text(value) => {
+                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
+                    && !value
+                        .decode()
+                        .map_err(|error| invalid(error.to_string()))?
+                        .trim()
+                        .is_empty()
+                {
+                    return Err(invalid("worksheet leaf property cannot contain text"));
+                }
+                if let Some(target) = text_target(stack) {
+                    self.push_text(
+                        target,
+                        &value.decode().map_err(|error| invalid(error.to_string()))?,
+                    )?;
+                }
+            },
+            Event::CData(value) => {
+                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+                    return Err(invalid("worksheet leaf property cannot contain CDATA"));
+                }
+                if let Some(target) = text_target(stack) {
+                    self.push_text(
+                        target,
+                        &value.decode().map_err(|error| invalid(error.to_string()))?,
+                    )?;
+                }
+            },
+            Event::GeneralRef(value) => {
+                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+                    return Err(invalid(
+                        "worksheet leaf property cannot contain character references",
+                    ));
+                }
+                if let Some(target) = text_target(stack) {
+                    self.push_text(target, &decode_xml_reference(&value)?)?;
+                }
+            },
+            Event::End(element) => {
+                let ended = stack.pop().ok_or_else(|| {
+                    invalid("worksheet XML has a closing element outside its root")
+                })?;
+                self.finish(ended)?;
+                if ended == Context::Worksheet {
+                    if !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
+                        return Err(invalid("worksheet XML has an invalid root closing element"));
+                    }
+                    *closed_root = true;
+                }
+            },
+            Event::Eof if !*closed_root || !stack.is_empty() => {
+                return Err(invalid(
+                    "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
+                ));
+            },
+            Event::Eof => return Ok(true),
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+        }
+        Ok(false)
     }
 
     fn start(
@@ -568,6 +602,9 @@ impl Parser {
                 .filter(|value| *value <= ROWS)
                 .ok_or_else(|| invalid("inferred worksheet row exceeds the spreadsheet grid"))?,
         };
+        self.seen_rows
+            .try_reserve(1)
+            .map_err(|source| allocation("worksheet parser row index set", source))?;
         if !self.seen_rows.insert(number) {
             return Err(invalid(format!("duplicate worksheet row {number}")));
         }
@@ -1069,4 +1106,68 @@ impl Parser {
         ));
         Ok(())
     }
+}
+
+/// Traverse one eligible source with the ordinary parser while giving a
+/// caller-owned validator a borrowed view of each event first.
+///
+/// Early parser failures are deliberately not returned here. The source-backed
+/// caller repeats the established two-pass path so the historical error text
+/// and precedence remain authoritative. Returning immediately on any
+/// provisional failure drops the parser before fallback starts. Once the
+/// observer accepts EOF, the finalization result is carried to the raw facade
+/// so its historical extension-error retry can still run.
+pub(super) fn parse_source_with_observer<'a, F, O>(
+    content: &[u8],
+    strings: F,
+    mut observer: O,
+) -> super::SourceParseAttempt
+where
+    F: FnOnce() -> Result<Option<&'a [Text]>>,
+    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+{
+    let mut reader = NsReader::from_reader(content);
+    reader.config_mut().check_end_names = true;
+    let mut parser = Parser::new(x14ac::Values::default());
+    let mut stack = Vec::new();
+    let mut closed_root = false;
+    let mut event_count = 0usize;
+
+    loop {
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(_) => return super::SourceParseAttempt::ReaderFailed,
+        };
+        let event_limit_exceeded = match event_count.checked_add(1) {
+            Some(count) => {
+                event_count = count;
+                count > MAX_XML_EVENTS || count > super::MAX_SHARED_PROVISIONAL_EVENTS
+            },
+            None => true,
+        };
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let decoder = reader.decoder();
+        let resolver = reader.resolver();
+        let parser_allowed = observer(&namespace, &event);
+        if !parser_allowed || event_limit_exceeded {
+            return super::SourceParseAttempt::ProvisionalFailed;
+        }
+
+        let complete = match parser.transition(
+            &mut stack,
+            &mut closed_root,
+            &namespace,
+            event,
+            decoder,
+            resolver,
+        ) {
+            Ok(complete) => complete,
+            Err(_) => return super::SourceParseAttempt::ProvisionalFailed,
+        };
+        if complete {
+            break;
+        }
+    }
+
+    super::SourceParseAttempt::Complete(parser.finish_parse(strings))
 }

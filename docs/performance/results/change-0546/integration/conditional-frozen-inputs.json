@@ -1,0 +1,19 @@
+{
+  "created_utc": "2026-09-13T01:46:55.475548+00:00",
+  "stage": "before first conditional capture",
+  "files": {
+    "plan.json": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+    "run.py": "95bbc9aacd032acbb7ef7fcda7c5151830f854e0c81c9b36ef6461bfbc0915b5",
+    "eager-plan.json": "25680eb2bcafe8b725d12848b94b1f4ee77df731edf8594cabf88e908ae665b9",
+    "eager_run.py": "3b3b39ef1c9c819bf34821517e126c91199885dda85487c5ed06f57f8aed10b1",
+    "analyze_eager.py": "8f51daf363d117dd983070d74723bb1ca2a015eec629bcc404f868a6f7e6fb98",
+    "analyze_planning.py": "212b9e074277d6c1a8d305640aeae1471331f3e7b89e1dd8cee4a2dce2ba3203",
+    "analyze_hardware.py": "604272f652a4e70ee6513c92550c1294539cdcea175e7f6d922a03a9adcf59a9",
+    "conditional_phase.py": "62c752553d3c61dec88c8616366bb8c4f9cc8dd9fd7eeedadf3fef2f88dbda13",
+    "comparison.json": "84bd0af41d2e4a19f46c6c9bbd443d55c9460f06be3cde1a4d51b960022a6a61",
+    "allocation-analysis.json": "8d111c3ca9c471109247376afbde68d417354018b5d321a5d13a2a341d42919b",
+    "guard-analysis.json": "dbad189d76febbbe7ec6c36085fb94c796485ac74c308ac7a8155e82c9e82413",
+    "symbol-observation.json": "267881dcfcf7943352256d6d4b218073cc696c6868fa7246bd98c18b4ec957ca",
+    "cap-boundary/cap-analysis.json": "7b8da14e5355aec51f0762c8d1d9f2789ef83d3a7b6b118c3c80c3a6925e5f32"
+  }
+}

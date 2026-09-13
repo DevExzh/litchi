@@ -1,0 +1,23 @@
+{
+  "analyzer_script_sha256": "8f51daf363d117dd983070d74723bb1ca2a015eec629bcc404f868a6f7e6fb98",
+  "binary_sha256": "4ea70e66e4b38635f85a543c7a02dcb07da25bfdab215dfcce5354df0163670b",
+  "case": "xlsx_open_owned",
+  "command_sha256": "c0c086f6bafd1fb3ba13eef2a7ffeefba973e513f7f0ffebcd11571d9768e4fe",
+  "eager_plan_sha256": "25680eb2bcafe8b725d12848b94b1f4ee77df731edf8594cabf88e908ae665b9",
+  "eager_run_script_sha256": "3b3b39ef1c9c819bf34821517e126c91199885dda85487c5ed06f57f8aed10b1",
+  "group": "candidate-r1",
+  "name": "eager-r1-xlsx_open_owned-dense-wide",
+  "output": "candidate/eager-r1-xlsx_open_owned-dense-wide.json",
+  "primary_plan_sha256": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+  "receipt_sha256": "e88cf6696ced285c8f83376ece08e18327001dfd5fe0a4149d2b746a48caeccc",
+  "repeat": 1,
+  "retained_baseline": false,
+  "rss": "candidate/eager-r1-xlsx_open_owned-dense-wide.rss.json",
+  "run_script_sha256": "95bbc9aacd032acbb7ef7fcda7c5151830f854e0c81c9b36ef6461bfbc0915b5",
+  "schema": "litchi-0546-eager-guard-binding-v1",
+  "shape": "dense-wide",
+  "source_checkout": "candidate binary under candidate source checkout",
+  "source_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "stage": "candidate",
+  "working_source_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511"
+}

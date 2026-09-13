@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze_eager.py",
+    "--write",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/eager-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:54:32.291200+00:00",
+  "end_utc": "2026-09-13T01:54:33.955269+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "c003308faf15c552a5e1819806ea34a892abab389a51db3f40c7a4b911518b7b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

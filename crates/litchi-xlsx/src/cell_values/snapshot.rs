@@ -443,8 +443,12 @@ impl Snapshot {
         }
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
-        validation::worksheet_xml(worksheet_xml.as_bytes())?;
-        let cells = raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?;
+        let cells = if raw::worksheet::source_stream_eligible(worksheet_xml.as_bytes()) {
+            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes())?
+        } else {
+            validation::worksheet_xml(worksheet_xml.as_bytes())?;
+            raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?
+        };
         package.check_execution()?;
         validate_style_references(&cells, capture.style_count)?;
         validate_scalar_cells(&cells)?;

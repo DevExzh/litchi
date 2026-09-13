@@ -1,0 +1,20 @@
+{
+  "accessible_process_references": [],
+  "binary_sha256": "256477888b66515c4d3f7510f061b083edece1e53c05bcd137f4928e3546437b",
+  "initial_scan": "Conservatively stopped on own transient shell command containing literal target; no deletion occurred. Repeated scan derives target from plan and has no references.",
+  "input_sha256": {
+    "Cargo.lock": "58c2b810de06b6f92fbf00ed86635767babea1e8973b8fd9b399b94299996e30",
+    "Cargo.toml": "a6ae4940cc452c160affb506c4e212e6067fec64b63a5c42200c7da2472c5915",
+    "adr-manifest.json": "e815a51327a39956a3e5e3adfd3fc76b7942b1c65124c66189ab7b98f8bf6893",
+    "analyze.py": "67f4a12a2a52c9482ad023acdf16e2013316c063bc0c11e41fe1a13a5309573c",
+    "baseline.rs": "47f0cc99f5f5a9b4ea2773474bd868ba688677824c28370674619dc59c08fa5e",
+    "capture.py": "6e0c067d2ee9c071543def38def59b42c79de44d1d0600cd158e9175366b65b4",
+    "counted.rs": "64c95876734169f0e7612bbd26dee6e78162d2e52950b3db6bbf52a79b8bcdc5",
+    "fixtures.json": "917d8940909320b8e4c927f7cd797e9e2b3db208c62d7a3701a1cccfaa8f4d98",
+    "generate.py": "63834fade60a0c536e2f6dbde5be9f6b2c0929c3edec7bc4de727fdfaf3dbca4",
+    "main.rs": "61075e4a0c0ea59591062359a1df96eb0ba43b77fde7202737058b22bd26218f"
+  },
+  "removed": true,
+  "target": "/home/zhuhe/litchi-goal-0546-target",
+  "utc": "2026-09-13T02:11:39.026300+00:00"
+}

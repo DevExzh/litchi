@@ -1,0 +1,22 @@
+{
+  "allocation_analysis_sha256": "8d111c3ca9c471109247376afbde68d417354018b5d321a5d13a2a341d42919b",
+  "allocation_passed": true,
+  "baseline_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "candidate_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "cap_analysis_sha256": "7b8da14e5355aec51f0762c8d1d9f2789ef83d3a7b6b118c3c80c3a6925e5f32",
+  "cap_passed": true,
+  "comparison_sha256": "84bd0af41d2e4a19f46c6c9bbd443d55c9460f06be3cde1a4d51b960022a6a61",
+  "completed_utc": "2026-09-13T02:09:22.068299+00:00",
+  "decision": "retain",
+  "eager_analysis_sha256": "1a94435fc2ce99abf497f83e442fe6f3485fa58660bf816b58d29191f0838a03",
+  "final_source_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "final_stage": "candidate",
+  "full_test_count": 1306,
+  "guard_analysis_sha256": "dbad189d76febbbe7ec6c36085fb94c796485ac74c308ac7a8155e82c9e82413",
+  "guard_passed": true,
+  "hardware_analysis_sha256": "1f990bf757f675f1dbc2fbd309992d0a7951de0b37868ad1599c73d5b95414e8",
+  "native_passed": true,
+  "plan_sha256": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+  "profile_analysis_sha256": "929f920bcc12f6de7594a8909892a96a8ef1bbe05ffe9a7a0354a6f443750f08",
+  "runtime_restored": false
+}

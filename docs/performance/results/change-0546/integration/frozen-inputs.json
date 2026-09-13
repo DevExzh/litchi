@@ -1,0 +1,29 @@
+{
+  "utc": "2026-09-13T01:18:27.290543+00:00",
+  "parent": "6b866732489413366b40c94da7aa77bd37e719c3",
+  "sha256": {
+    "analyze_guard.py": "5e4d618dd809abc91fb2d905226fd281ec746e5742399f21b1fc637bc11110b0",
+    "plan.json": "6835a4122a16bf6ec8a5f3513e27be50749d3a8b3a471261976de6f3c4302574",
+    "run.py": "95bbc9aacd032acbb7ef7fcda7c5151830f854e0c81c9b36ef6461bfbc0915b5",
+    "eager_run.py": "3b3b39ef1c9c819bf34821517e126c91199885dda85487c5ed06f57f8aed10b1",
+    "analyze_planning.py": "8e05fcfff7c251ee415f39dbd43a24b494c02e655a02e6cf56033e8625942da9",
+    "analyze_hardware.py": "604272f652a4e70ee6513c92550c1294539cdcea175e7f6d922a03a9adcf59a9",
+    "guard_run.py": "7aa05029afaf41737578142207747ecbe49a383f340e48071c6f32d1b5cc6858",
+    "analyze_eager.py": "8f51daf363d117dd983070d74723bb1ca2a015eec629bcc404f868a6f7e6fb98",
+    "baseline_phase.py": "7fe81004ec3876c07758fa54b2bd82e728d324217f6bcb28d47ea6958243bad0",
+    "candidate_phase.py": "ed3cc66e040498a1cdf8a8371fc047b5ad82ad87f09b370004b2393958d35e98",
+    "analyze_allocation.py": "539ad98b81235671601689ea9d9e085d3a8fad887bb44a543e8bbc9b3e2f5da3",
+    "conditional_phase.py": "62c752553d3c61dec88c8616366bb8c4f9cc8dd9fd7eeedadf3fef2f88dbda13",
+    "final_quality.py": "00cc1b476a7b838b7efb20ad139cce96a0b3eece2f7257a49ba8e28fc126b7d1",
+    "quality-plan.json": "9435059466988de9db2bbb80b9f06cf028d479b71267e8bc40c408fb4593e9a2",
+    "environment.json": "f69d21dbb9a5b57fbd4e594fae1e5811b86cf1a5164b5e1cd57507ea8336775d",
+    "analyze.py": "f0a7895be44aa1986c629c84c96d136ccbd9bb22019c1ceccbbabb0ef012b1db",
+    "cap-boundary/plan.json": "c41066c1e0081c2aaf6385da4bf83b505de008f87f3fe4560a36be603c1ef421",
+    "cap-boundary/analyze.py": "11bffc182384db3e750b530f1a7102dd704ef80e6f57c33e0dedf6d20e9b33b0",
+    "cap-boundary/cap_run.py": "3b07cd22de6821d512752ca6c9c6bf092f66d3b9ff669df73bfc1dcbb3dc7937"
+  },
+  "enabler_sha256": "7a5030ef7b867338fd69d0ba5ed7d9f3222901e3c2121437e9c9b39efc6cec9f",
+  "diagnostic_freeze_sha256": "ef9f647c77f3012ec3d91547c468254c7373a16a8b10885f369311bd8a204ef0",
+  "diagnostic_screen": "All10numericrepeat p50/mean reductions exceed20%; everycontrol addedp50/mean<=100us. Clustered relative174% remainsreviewed and integratedsparse1/2 required under5% envelope.",
+  "scope": "Full original0544 campaign plusvalidsparse1/2capguard; productionretention requiresalloriginalgates. Candidate source freeze follows finalpatchreview afterbaseline captures."
+}

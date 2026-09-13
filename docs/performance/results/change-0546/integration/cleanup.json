@@ -1,0 +1,22 @@
+{
+  "accessible_process_references": [],
+  "completed_utc": "2026-09-13T02:11:39.026300+00:00",
+  "owned_paths_absent": true,
+  "patch_replay_temporary_directories_absent": true,
+  "removed": [
+    "/home/zhuhe/litchi-goal-0546-target"
+  ],
+  "retained_binary_sha256_before_removal": {
+    "/home/zhuhe/litchi-goal-0546-target/cap-boundary-binaries/baseline-cap-boundary": "10727180c57a6a2fea4bdf02b04a7490462fd66f41af5fcb78a12830c20e917f",
+    "/home/zhuhe/litchi-goal-0546-target/cap-boundary-binaries/candidate-cap-boundary": "787b6b2bbd58db567590f8ae4951e28f4730f77455d446fd316a3b20898489e8",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/baseline-alloc": "650803a77823c42cc98dd1e6fa3ac115e3bcfb90cb726145b0d62731ccb06201",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/baseline-guard-alloc": "2725da61c275fff9e45e2b897869e45dd0e446f8301284d841a1f50b5ba19b0f",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/baseline-guard-normal": "45d1d0e8a10abdd3f222c4621c1b2ceffd18504d62f3b54c496ee3b0a783698c",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/baseline-normal": "9965d31ce127d11ed9efa0597798416072902bebbb6e99e6e9a4020eab60cf53",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/candidate-alloc": "85dd0e8d388b7de2ddb67a68930019576cffb9921d5191f5d001f7380e5a00d6",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/candidate-guard-alloc": "0e5dbcf8c879d316750e0f0c7404c762591859c77f9ffce22f503b3fe1857ec6",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/candidate-guard-normal": "134c1277884a97063c40dcd7c93f5b699cf9ffe26f9bf471e1001e240e43bb9a",
+    "/home/zhuhe/litchi-goal-0546-target/retained-binaries/candidate-normal": "4ea70e66e4b38635f85a543c7a02dcb07da25bfdab215dfcce5354df0163670b"
+  },
+  "scope": "Sole owned 0546 build tree, after terminal capture/quality and precleanup validation"
+}
