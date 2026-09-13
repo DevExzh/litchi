@@ -830,6 +830,37 @@ fn finite_inner_condition_does_not_cache_out_of_shape_broadcast_positions() {
 }
 
 #[test]
+fn reference_operand_error_handlers_use_resolved_reference_errors() {
+    for operand in [
+        "IFERROR([Missing.A1];[.C1:.D1])",
+        "IFERROR(([Missing.A1]:[.A1]);[.C1:.D1])",
+    ] {
+        let source = format!("=IF({{TRUE()}};([.A1]:{operand});0)");
+        let mut resolver = FixtureResolver::new();
+        for (column, value) in [10.0, 11.0, 12.0, 13.0].into_iter().enumerate() {
+            resolver.set("Main", 0, column, FixtureCell::Number(value));
+        }
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-resolved-reference-error-operand");
+        let expression = parse(&source);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{source:?} should catch the reference error: {error:?}"));
+        let array = result.as_array().expect("selected reference range array");
+        assert_eq!((array.shape().rows(), array.shape().columns()), (1, 4));
+        assert_array_numbers(array, &[10.0, 11.0, 12.0, 13.0]);
+        assert_eq!(resolver.reads(), 4);
+    }
+}
+
+#[test]
 fn lazy_reference_operands_provide_full_range_shape_and_skip_missing_alternatives() {
     for source in [
         "=IF({TRUE()};([.A1]:IF(TRUE();[.C1:.D1];[Missing.A1:.Z100]));0)",
