@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/litchi-goal-0545-target/scanner/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started": "2026-09-13T01:02:11.766156+00:00",
+  "freeze_sha256": "770fea53337d068b804a2512dffb98524f4ee57c42f6fac5d72931f54d8357b9",
+  "ended": "2026-09-13T01:02:13.767737+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "cd9a04041fa1b760db7a27483c2a85132f8178ff1e7208b82f207c77bb526f7c",
+  "stderr_sha256": "cc9671648d38bce8c05a792a75893a6821ca9ec932353fcb9d911e18df77ef88"
+}

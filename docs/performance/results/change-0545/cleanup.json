@@ -1,0 +1,14 @@
+{
+  "target": "/home/zhuhe/litchi-goal-0545-target",
+  "binary_sha256": "43fc465cc298a18d045fd83cdcedf15b39bccbfb85653a112a536c81971c7b62",
+  "input_sha256": {
+    "main.rs": "bfc732129784ad94332836fcae4a505f89a9aa77a23d130e16206fb5b30cb5e5",
+    "baseline.rs": "47f0cc99f5f5a9b4ea2773474bd868ba688677824c28370674619dc59c08fa5e",
+    "chunked.rs": "5307ddf85619fc803ac3c6d00d65d2f55f4eec3db44a7d97d6dfee4e77298bd2",
+    "Cargo.toml": "a6ae4940cc452c160affb506c4e212e6067fec64b63a5c42200c7da2472c5915",
+    "Cargo.lock": "58c2b810de06b6f92fbf00ed86635767babea1e8973b8fd9b399b94299996e30"
+  },
+  "utc": "2026-09-13T01:06:54.605084+00:00",
+  "removed": true,
+  "process_check": "Root observed terminal capture completion; ps showed no target build/benchmark process before removal."
+}

@@ -1,0 +1,50 @@
+{
+  "96": {
+    "file": "grid-96.xml",
+    "bytes": 246397,
+    "sha256": "2b08e992e1544e4844fdae5fda433e6cda90b8e7e6f44ea516a0a421bfdfbea6",
+    "generator": "generate.py: synthetic numeric XML, distinct from primary workflow fixture"
+  },
+  "128": {
+    "file": "grid-128.xml",
+    "bytes": 449678,
+    "sha256": "0086eb346c49f2402cb2d444fc4b0bc7f2d77d6f45a6035f21afb908087195de",
+    "generator": "generate.py: synthetic numeric XML, distinct from primary workflow fixture"
+  },
+  "160": {
+    "file": "grid-160.xml",
+    "bytes": 712925,
+    "sha256": "1023f17bf4716ca589e71d92eb9fbb853329add39c04a2fe6129f819c8f4c692",
+    "archive": "docs/performance/results/change-0544/cap-boundary/baseline/cap-native-r1-160.fixture.bin",
+    "archive_sha256": "2105c4d8b5e6d0b225d9bb45bd74197954d2d5a4bd3a365f752fb3d00ad19160",
+    "member": "xl/worksheets/sheet1.xml"
+  },
+  "164": {
+    "file": "grid-164.xml",
+    "bytes": 750049,
+    "sha256": "0b907969174ffc1e276477d24f472cc928b9bfb49554d8fe3c3e43bc9b584356",
+    "archive": "docs/performance/results/change-0544/cap-boundary/baseline/cap-native-r1-164.fixture.bin",
+    "archive_sha256": "c8608d872c25ff5635226050ca6dbf04c0f6114d63b10243a123e57280216209",
+    "member": "xl/worksheets/sheet1.xml"
+  },
+  "256": {
+    "file": "grid-256.xml",
+    "bytes": 1860029,
+    "sha256": "a7630be905961a2affc471eb3f539a616744d3f020d9564b62ea6da6a40e0c1c",
+    "archive": "docs/performance/results/change-0544/cap-boundary/baseline/cap-native-r1-256.fixture.bin",
+    "archive_sha256": "c31ee57584523ec4f1b83073798af40e9fc4298e2c8839efa541ad10f5d491b9",
+    "member": "xl/worksheets/sheet1.xml"
+  },
+  "sparse": {
+    "file": "sparse.xml",
+    "bytes": 1048583,
+    "sha256": "db7b7a2f8d6d9602c1f9af00956a69f1fbc7829ac3685a5b2e53f575c77b50b1",
+    "generator": "generate.py: deterministic lexical stress, not Office workflow"
+  },
+  "early-reject": {
+    "file": "early-reject.xml",
+    "bytes": 2097167,
+    "sha256": "3aa304ae2a6a1e15be9212d18168a8e8469b1a4aa7b34fd797021cfa5297a273",
+    "generator": "generate.py: deterministic lexical stress, not Office workflow"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "objdump",
+    "-d",
+    "-C",
+    "/home/zhuhe/litchi-goal-0545-target/scanner/target/release/xlsx-scanner-diagnostic"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started": "2026-09-13T01:02:27.207577+00:00",
+  "freeze_sha256": "770fea53337d068b804a2512dffb98524f4ee57c42f6fac5d72931f54d8357b9",
+  "binary_sha256": "43fc465cc298a18d045fd83cdcedf15b39bccbfb85653a112a536c81971c7b62",
+  "ended": "2026-09-13T01:02:27.278141+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "52d80664db4837917de76ddffc7911bd2482c484620fc73320b4e14053a8eafa",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

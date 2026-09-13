@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "utc": "2026-09-13T01:08:32.378304+00:00",
+  "exit_code": 2,
+  "stdout_sha256": "fdd59cdb143dd31142960525958dca05504428543cf3083c7882d3bb92841d8f",
+  "stderr": "",
+  "resolution": "objdump emits trailing spaces in raw machine output. Preserve the complete original stdout losslessly compressed, with original receipt hash checked after decompression; do not normalize captured bytes. This repeat archives the same initial staged whitespace failure."
+}

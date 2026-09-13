@@ -1,0 +1,8 @@
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.149
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling quick-xml v0.41.0
+   Compiling xlsx-scanner-diagnostic v0.0.0 (/home/zhuhe/litchi-goal-0545-target/scanner)
+    Finished `release` profile [optimized] target(s) in 1.69s
