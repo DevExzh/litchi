@@ -1,0 +1,19 @@
+{
+  "tests": 926,
+  "targets": 56,
+  "subprocess_tests": 1,
+  "doctests": 2,
+  "required_integration_groups": [
+    "classic_roman_matches_an_independent_digit_oracle",
+    "simplified_roman_matches_independent_shortest_lengths_and_arabic",
+    "arabic_accepts_ascii_case_and_indirect_subtraction",
+    "roman_formats_follow_specified_subtractive_levels_and_logical_compatibility",
+    "roman_and_arabic_round_trip_every_value_in_each_format",
+    "roman_integer_bounds_fractional_conversion_and_arity_are_formula_values",
+    "roman_eagerly_propagates_children_and_preserves_leftmost_errors",
+    "conditional_handlers_skip_roman_work_but_do_not_catch_refusals",
+    "roman_limits_cancellation_and_owned_result_reservations_are_atomic",
+    "roman_source_spelling_and_force_marker_survive_evaluation",
+    "roman_concatenation_preserves_literals_across_scan_windows"
+  ]
+}

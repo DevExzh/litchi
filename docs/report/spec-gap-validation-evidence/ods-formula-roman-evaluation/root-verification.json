@@ -1,0 +1,20 @@
+{
+  "status": 0,
+  "verified_at": "2026-09-13T15:07:18.062460+00:00",
+  "tests": 926,
+  "targets": 56,
+  "doctests": 2,
+  "source_inputs": 216,
+  "profiles": {
+    "baseline/comparable": 159,
+    "candidate/comparable": 159,
+    "candidate/roman": 123
+  },
+  "review_source_hashes_checked": true,
+  "independent_python_algorithm_values": 4000,
+  "final_abab_rows": 272,
+  "counter_captures": 5,
+  "reclaimed_allocated_bytes": 1555263488,
+  "artifacts": 9415,
+  "investigation_counter_captures": 4
+}

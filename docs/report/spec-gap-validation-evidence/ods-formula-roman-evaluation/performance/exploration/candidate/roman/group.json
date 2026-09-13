@@ -1,0 +1,181 @@
+{
+  "group": "roman",
+  "revision": "candidate",
+  "candidate_only": true,
+  "phase_selection": "all",
+  "phases": [
+    "parse",
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "case_count": 41,
+  "cases": [
+    {
+      "case": "roman-3888-format-0",
+      "repeat": 128
+    },
+    {
+      "case": "roman-3888-format-1",
+      "repeat": 128
+    },
+    {
+      "case": "roman-3888-format-2",
+      "repeat": 128
+    },
+    {
+      "case": "roman-3888-format-3",
+      "repeat": 128
+    },
+    {
+      "case": "roman-3888-format-4",
+      "repeat": 128
+    },
+    {
+      "case": "roman-499-format-0",
+      "repeat": 128
+    },
+    {
+      "case": "roman-499-format-1",
+      "repeat": 128
+    },
+    {
+      "case": "roman-499-format-2",
+      "repeat": 128
+    },
+    {
+      "case": "roman-499-format-3",
+      "repeat": 128
+    },
+    {
+      "case": "roman-499-format-4",
+      "repeat": 128
+    },
+    {
+      "case": "roman-998-format-0",
+      "repeat": 128
+    },
+    {
+      "case": "roman-998-format-1",
+      "repeat": 128
+    },
+    {
+      "case": "roman-998-format-2",
+      "repeat": 128
+    },
+    {
+      "case": "roman-998-format-3",
+      "repeat": 128
+    },
+    {
+      "case": "roman-998-format-4",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-uppercase",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-lowercase",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-indirect",
+      "repeat": 128
+    },
+    {
+      "case": "roman-zero",
+      "repeat": 128
+    },
+    {
+      "case": "roman-truncate",
+      "repeat": 128
+    },
+    {
+      "case": "roman-format-logical-true",
+      "repeat": 128
+    },
+    {
+      "case": "roman-format-logical-false",
+      "repeat": 128
+    },
+    {
+      "case": "roman-error-text",
+      "repeat": 128
+    },
+    {
+      "case": "roman-error-arity",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-error-invalid",
+      "repeat": 128
+    },
+    {
+      "case": "roman-bound-max",
+      "repeat": 128
+    },
+    {
+      "case": "roman-error-low",
+      "repeat": 128
+    },
+    {
+      "case": "roman-error-high",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-empty",
+      "repeat": 128
+    },
+    {
+      "case": "roman-refusal-work",
+      "repeat": 128
+    },
+    {
+      "case": "roman-refusal-memory",
+      "repeat": 128
+    },
+    {
+      "case": "roman-refusal-stack",
+      "repeat": 128
+    },
+    {
+      "case": "roman-refusal-cancelled",
+      "repeat": 128
+    },
+    {
+      "case": "arabic-input-64",
+      "repeat": 64
+    },
+    {
+      "case": "arabic-input-256",
+      "repeat": 32
+    },
+    {
+      "case": "arabic-input-1024",
+      "repeat": 8
+    },
+    {
+      "case": "arabic-input-4096",
+      "repeat": 2
+    },
+    {
+      "case": "roman-concat-64",
+      "repeat": 64
+    },
+    {
+      "case": "roman-concat-256",
+      "repeat": 32
+    },
+    {
+      "case": "roman-concat-1024",
+      "repeat": 8
+    },
+    {
+      "case": "roman-concat-4096",
+      "repeat": 2
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/candidate/ods-formula-roman-evaluation-profile"
+}

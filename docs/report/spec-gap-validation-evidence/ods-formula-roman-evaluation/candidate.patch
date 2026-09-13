@@ -1,0 +1,1137 @@
+diff --git a/crates/litchi-ods/docs/FEATURE_MATRIX.md b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+--- a/crates/litchi-ods/docs/FEATURE_MATRIX.md
++++ b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+@@ -77,7 +77,7 @@
+ | Rich cell text, spans, whitespace, fields, and hyperlinks | 🟡 | 🟡 | 🟡 | `document::{RichText, RichRun}` authors bounded paragraphs, text spans, explicit spaces, tabs, line breaks, and inert safe hyperlinks in existing non-repeated cells through provenance splices. The ordinary worksheet projection remains collapsed plain text, and arbitrary fields/foreign inline markup are not structurally editable |
+ | Formula strings and references | ✅ | ✅ | ✅ | Public `codec::formula` recognizes all 393 ODF 1.4 Part 4 chapter-6 function names and tokenizes supported literals, A1 references, ranges, operators, and sheet references. Function calls take precedence over A1-shaped names; UTF-8 strings and doubled quotes retain their values; decoded literal storage is sized to its content and U+0000 is refused under Part 4 §5.4. The bounded `codec::formula::reference` reader represents ODF 1.4 Part 4 §5.8 source IRIs, whole-axis ranges, nested sheet locators, inheritance, absolute markers, and reference errors; external sources remain inert. Worksheet and unified transactions retain, set, or clear inert formula strings. Complete expression grammar, function arity, host-defined identifiers, and evaluation remain outside this tokenizer. [Catalog evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-functions/README.md), [reference evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-references/README.md), [literal validation](../../../docs/report/spec-gap-validation-evidence/ods-formula-string-performance/README.md) |
+ | OpenFormula expression syntax | ✅ | ✅ | N/A | `codec::formula::expression::Expression` parses ODF 1.4 Part 4 chapter 5 into a bounded immutable flat tree with source-preserving node views, precedence, arrays, missing parameters, names, labels, errors, and inert external references. Explicit byte/node/depth/array-cell/reference limits and fallible storage apply. It does not perform function arity/type validation, name/reference resolution, evaluation, or recalculation. [Grammar and measurement evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/README.md). |
+-| Formula evaluation and recalculation | 🟡 | 🟡 | N/A | `codec::formula::evaluation::evaluate_scalar` evaluates already-parsed constant scalar expressions (all scalar operators and all nine Part 4 §6.15 logical functions, including lazy `IF`/`IFERROR`/`IFNA`, plus all five §6.6 bitwise functions with checked 48-bit operands/results and documented Integer conversion, and the fourteen §6.19 radix converters) with explicit finite limits and caller cancellation/resource charging. It preserves Number/Logical/Text/Error values, uses no workbook/cache/I/O, and returns typed refusals for references, arrays, names, labels, and unimplemented functions. Formula caches remain inert; dependency-graph recalculation, reference/name resolution, external sources, arrays, remaining function families (including Roman numerals), and cache publication remain outside this bounded profile. This does not claim an ODF Small Group evaluator. [Scalar evaluation evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/README.md), [logical-family evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/README.md), [bitwise evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/README.md), [radix evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/README.md) |
++| Formula evaluation and recalculation | 🟡 | 🟡 | N/A | `codec::formula::evaluation::evaluate_scalar` evaluates already-parsed constant scalar expressions (all scalar operators and all nine Part 4 §6.15 logical functions, including lazy `IF`/`IFERROR`/`IFNA`, plus all five §6.6 bitwise functions with checked 48-bit operands/results and documented Integer conversion, and all sixteen §6.19 number-representation converters, including all five `ROMAN` formats and `ARABIC`) with explicit finite limits and caller cancellation/resource charging. It preserves Number/Logical/Text/Error values, uses no workbook/cache/I/O, and returns typed refusals for references, arrays, names, labels, and unimplemented functions. Formula caches remain inert; dependency-graph recalculation, reference/name resolution, external sources, arrays, remaining function families, and cache publication remain outside this bounded profile. This does not claim an ODF Small Group evaluator. [Scalar evaluation evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/README.md), [logical-family evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/README.md), [bitwise evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/README.md), [radix evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/README.md), [Roman-numeral evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/README.md) |
+ | Repeated rows/cells and merged/covered cells | ✅ | ✅ | ✅ | Physical repeated runs are retained, logical lookup/edit splits only the affected run, and merge/covered metadata is typed and validated |
+ | Named ranges and named expressions | ✅ | ✅ | ✅ | Global and sheet-scoped definitions are parsed and validated per ODF 1.4 Part 3 sections 9.4.11-9.4.13; `definitions::{Snapshot, Edit, Commit, Patch}` adds exact key/checked-position CRUD and reorder, compact authored XML, typed readback, exact no-op retention, and reversible exact-source patches alongside the minimal builder |
+ | Cell and sheet styles | 🟡 | 🟡 | 🟡 | Typed source structures cover alignment, borders, background, common number/date/time/currency/percentage/boolean data styles, text properties, and protection flags. Unified transactions add or same-family replace bounded automatic graphs, conservatively remove styles with no retained package references, apply cell/rich-run references, and resolve supported inherited properties across `styles.xml` plus content automatic styles. Full property vocabulary and effective layout remain unsupported |
+diff --git a/crates/litchi-ods/src/codec/formula/evaluation.rs b/crates/litchi-ods/src/codec/formula/evaluation.rs
+--- a/crates/litchi-ods/src/codec/formula/evaluation.rs
++++ b/crates/litchi-ods/src/codec/formula/evaluation.rs
+@@ -7,9 +7,9 @@
+ //! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
+ //! and `XOR`), the five bit-operation functions (`BITAND`, `BITLSHIFT`,
+ //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
+-//! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions).  References,
+-//! arrays, names, labels, and other functions are reported as typed
+-//! capability refusals.
++//! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
++//! `ARABIC` and `ROMAN` conversions.  References, arrays, names, labels, and
++//! other functions are reported as typed capability refusals.
+ //!
+ //! The profile makes the following deterministic choices for host-dependent
+ //! scalar behavior:
+@@ -41,6 +41,11 @@
+ //!   truncated toward zero, accepts values from zero through ten, pads
+ //!   positive results, and is ignored for negative results after any formula
+ //!   error in the argument has been propagated.
++//! * `ARABIC` accepts the ASCII Roman symbols case-insensitively and returns
++//!   zero for empty text.  `ROMAN` accepts integers from zero through 3999;
++//!   this profile returns an empty text for zero, maps `TRUE`/`FALSE` format
++//!   values to formats 0/4.  Formats 0 through 3 use their permitted
++//!   subtractive chunks; format 4 uses a bounded shortest-valid construction.
+ //!
+ //! A successful text result keeps its memory reservation in
+ //! [`EvaluatedScalar`](crate::codec::formula::evaluation::EvaluatedScalar) until that result is dropped. Borrowed source strings
+@@ -79,6 +84,7 @@
+ //! ```
+ 
+ mod radix;
++mod roman;
+ 
+ use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
+ use litchi_core::{Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit};
+@@ -770,6 +776,10 @@
+             return self.schedule_eager_function(node);
+         }
+ 
++        if roman::is_roman_function(name) {
++            return self.schedule_eager_function(node);
++        }
++
+         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
+     }
+ 
+@@ -849,6 +859,9 @@
+         }
+         if radix::is_radix_function(name) {
+             return radix::apply(self, node, name);
++        }
++        if roman::is_roman_function(name) {
++            return roman::apply(self, node, name);
+         }
+ 
+         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
+@@ -1159,43 +1172,42 @@
+         let mut decoded_len = body.len();
+         let mut escaped_quotes = 0usize;
+         let mut cursor = 0usize;
+-        let mut next_check = 0usize;
+         while cursor < bytes.len() {
+-            if cursor >= next_check {
+-                self.context
+-                    .execution
+-                    .check()
+-                    .map_err(map_execution_error)?;
+-                next_check = cursor.saturating_add(4096);
+-            }
+-            match bytes[cursor] {
+-                0 => {
+-                    return Err(EvaluationFailure::InvalidExpression(
+-                        "string literal contains NUL",
+-                    ));
+-                },
+-                b'"' => {
+-                    if bytes.get(cursor + 1) != Some(&b'"') {
++            self.context
++                .execution
++                .check()
++                .map_err(map_execution_error)?;
++            // Keep cancellation bounded without a threshold branch per byte.
++            // A doubled quote may straddle the window by one byte.
++            let window_end = cursor.saturating_add(4096).min(bytes.len());
++            while cursor < window_end {
++                match bytes[cursor] {
++                    0 => {
+                         return Err(EvaluationFailure::InvalidExpression(
+-                            "unpaired quote in string literal",
++                            "string literal contains NUL",
+                         ));
+-                    }
+-                    escaped_quotes = escaped_quotes.checked_add(1).ok_or(
+-                        EvaluationFailure::InvalidExpression("string escape count overflow"),
+-                    )?;
+-                    decoded_len =
+-                        decoded_len
+-                            .checked_sub(1)
+-                            .ok_or(EvaluationFailure::InvalidExpression(
+-                                "string escape length underflow",
+-                            ))?;
+-                    cursor = cursor
+-                        .checked_add(2)
+-                        .ok_or(EvaluationFailure::InvalidExpression(
+-                            "string escape offset overflow",
+-                        ))?;
+-                },
+-                _ => cursor += 1,
++                    },
++                    b'"' => {
++                        if bytes.get(cursor + 1) != Some(&b'"') {
++                            return Err(EvaluationFailure::InvalidExpression(
++                                "unpaired quote in string literal",
++                            ));
++                        }
++                        escaped_quotes = escaped_quotes.checked_add(1).ok_or(
++                            EvaluationFailure::InvalidExpression("string escape count overflow"),
++                        )?;
++                        decoded_len = decoded_len.checked_sub(1).ok_or(
++                            EvaluationFailure::InvalidExpression("string escape length underflow"),
++                        )?;
++                        cursor =
++                            cursor
++                                .checked_add(2)
++                                .ok_or(EvaluationFailure::InvalidExpression(
++                                    "string escape offset overflow",
++                                ))?;
++                    },
++                    _ => cursor += 1,
++                }
+             }
+         }
+         Ok(StringScan {
+diff --git a/crates/litchi-ods/src/codec/formula/evaluation/roman.rs b/crates/litchi-ods/src/codec/formula/evaluation/roman.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/evaluation/roman.rs
+@@ -0,0 +1,427 @@
++//! OpenFormula 1.4 section 6.19 Roman-number conversion functions.
++//!
++//! `ARABIC` is deliberately a small, exact scanner: its right-to-left fold
++//! is the rule used by the specification for both canonical and noncanonical
++//! Roman text.  `ROMAN` keeps the four format-specific subtraction policies
++//! separate from format 4.  The first four formats select the greatest
++//! admissible numeral chunk at each step; format 4 uses a bounded signed-coin
++//! search.  For each coin, only the two representatives of the required
++//! residue class need consideration.  Any coefficient whose magnitude is at
++//! least the adjacent radix can be replaced by one next-valued coin and a
++//! smaller coefficient, so this finite search contains a minimum-length
++//! representation rather than relying on an unproved greedy choice.
++
++use super::{
++    EvaluationFailure, EvaluationResult, Evaluator, Node, ScalarError, TextValue, WorkingValue,
++    local_limit, map_execution_error,
++};
++use litchi_core::Resource;
++
++const ROMAN_VALUES: [u32; 7] = [1, 5, 10, 50, 100, 500, 1000];
++const ROMAN_SYMBOLS: [u8; 7] = *b"IVXLCDM";
++const ROMAN_RATIOS: [u32; 6] = [5, 2, 5, 2, 5, 2];
++const MAX_ROMAN_TEXT_BYTES: usize = 64;
++const FORMAT_COUNT: usize = 5;
++
++#[derive(Clone, Copy)]
++enum Function {
++    Arabic,
++    Roman,
++}
++
++fn function(name: &str) -> Option<Function> {
++    if name.eq_ignore_ascii_case("ARABIC") {
++        Some(Function::Arabic)
++    } else if name.eq_ignore_ascii_case("ROMAN") {
++        Some(Function::Roman)
++    } else {
++        None
++    }
++}
++
++pub(super) fn is_roman_function(name: &str) -> bool {
++    function(name).is_some()
++}
++
++/// Apply a section 6.19 Roman conversion after eager argument evaluation.
++/// This family is outlined so its bounded text scans and format search do
++/// not enlarge the evaluator's scalar hot loop.
++#[inline(never)]
++pub(super) fn apply<'a>(
++    evaluator: &mut Evaluator<'a, '_, '_>,
++    node: Node<'a>,
++    name: &str,
++) -> EvaluationResult<()> {
++    match function(name) {
++        Some(Function::Arabic) => apply_arabic(evaluator, node),
++        Some(Function::Roman) => apply_roman(evaluator, node),
++        None => Err(EvaluationFailure::InvalidExpression(
++            "unknown Roman conversion reached evaluator",
++        )),
++    }
++}
++
++fn apply_arabic<'a>(evaluator: &mut Evaluator<'a, '_, '_>, node: Node<'a>) -> EvaluationResult<()> {
++    if node.child_count() != 1 {
++        return evaluator.finish_invalid_arity(node);
++    }
++
++    let value = evaluator.pop_value()?;
++    if let Some(error) = formula_error(&value) {
++        return evaluator.push_value(WorkingValue::Error(error));
++    }
++    let text = super::to_text(value, evaluator)?;
++    let result = arabic_value(evaluator, text.text.as_ref());
++    drop(text);
++    match result? {
++        Ok(value) => evaluator.push_value(WorkingValue::Number(value)),
++        Err(error) => evaluator.push_value(WorkingValue::Error(error)),
++    }
++}
++
++fn arabic_value(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    text: &str,
++) -> EvaluationResult<Result<f64, ScalarError>> {
++    evaluator.charge_bytes(text.len())?;
++
++    // The maximum possible input under a 64-bit slice is below 2^74 when
++    // every byte is a thousand-valued symbol, so i128 is exact without
++    // imposing a narrower numeric cap on accepted noncanonical text.
++    let mut total = 0_i128;
++    let mut maximum = 0_i128;
++    let mut processed = 0usize;
++    let mut next_check = 4096usize;
++    for byte in text.bytes().rev() {
++        if processed >= next_check {
++            evaluator
++                .context
++                .execution
++                .check()
++                .map_err(map_execution_error)?;
++            next_check = processed.saturating_add(4096);
++        }
++        processed = processed.saturating_add(1);
++        let value = match roman_value(byte) {
++            Some(value) => i128::from(value),
++            None => return Ok(Err(ScalarError::Value)),
++        };
++        if value < maximum {
++            total -= value;
++        } else {
++            total += value;
++            maximum = maximum.max(value);
++        }
++    }
++
++    let value = total as f64;
++    if value.is_finite() {
++        Ok(Ok(value))
++    } else {
++        Ok(Err(ScalarError::Number))
++    }
++}
++
++fn roman_value(byte: u8) -> Option<u32> {
++    match byte {
++        b'I' | b'i' => Some(1),
++        b'V' | b'v' => Some(5),
++        b'X' | b'x' => Some(10),
++        b'L' | b'l' => Some(50),
++        b'C' | b'c' => Some(100),
++        b'D' | b'd' => Some(500),
++        b'M' | b'm' => Some(1000),
++        _ => None,
++    }
++}
++
++fn apply_roman<'a>(evaluator: &mut Evaluator<'a, '_, '_>, node: Node<'a>) -> EvaluationResult<()> {
++    let count = node.child_count();
++    if !(1..=2).contains(&count) {
++        return evaluator.finish_invalid_arity(node);
++    }
++
++    let format = if count == 2 {
++        Some(evaluator.pop_value()?)
++    } else {
++        None
++    };
++    let number = evaluator.pop_value()?;
++
++    // Eager function evaluation retains the leftmost formula error.  Check
++    // it before converting either argument so errors stay formula values.
++    if let Some(error) = formula_error(&number) {
++        return evaluator.push_value(WorkingValue::Error(error));
++    }
++    if let Some(format) = &format {
++        if let Some(error) = formula_error(format) {
++            return evaluator.push_value(WorkingValue::Error(error));
++        }
++    }
++
++    let number = match super::to_integer(number, evaluator)? {
++        Ok(number) => number,
++        Err(error) => return evaluator.push_value(WorkingValue::Error(error)),
++    };
++    if !number.is_finite() || !(0.0..4000.0).contains(&number) {
++        return evaluator.push_value(WorkingValue::Error(ScalarError::Number));
++    }
++    let number = number as u32;
++
++    let format = match format {
++        None => 0,
++        Some(WorkingValue::Logical(value)) => {
++            if value {
++                0
++            } else {
++                4
++            }
++        },
++        Some(value) => match super::to_integer(value, evaluator)? {
++            Ok(value) if value.is_finite() && (0.0..=4.0).contains(&value) => value as usize,
++            Ok(_) => return evaluator.push_value(WorkingValue::Error(ScalarError::Number)),
++            Err(error) => return evaluator.push_value(WorkingValue::Error(error)),
++        },
++    };
++
++    if number == 0 {
++        // The normative body says zero has an empty representation.  This
++        // also makes ARABIC(ROMAN(0)) preserve the stated identity.
++        return evaluator.push_value(WorkingValue::Text(TextValue::borrowed("")));
++    }
++
++    let (bytes, length) = if format == 4 {
++        render_simplified(evaluator, number)?
++    } else {
++        render_format(evaluator, number, format)?
++    };
++    render_text(evaluator, &bytes[..length])
++}
++
++fn render_format(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    mut number: u32,
++    format: usize,
++) -> EvaluationResult<([u8; MAX_ROMAN_TEXT_BYTES], usize)> {
++    debug_assert!(format < FORMAT_COUNT - 1);
++    let mut output = [0_u8; MAX_ROMAN_TEXT_BYTES];
++    let mut length = 0usize;
++
++    while number != 0 {
++        let (value, first, second) = next_chunk(number, format, evaluator)?;
++        number -= value;
++        append_symbol(&mut output, &mut length, first)?;
++        if let Some(second) = second {
++            append_symbol(&mut output, &mut length, second)?;
++        }
++    }
++    Ok((output, length))
++}
++
++/// Select the greatest admissible single symbol or subtractive pair.  A
++/// pair whose value ties a single symbol is ignored, which keeps the output
++/// shortest and avoids needless forms such as `VX` for five.
++fn next_chunk(
++    number: u32,
++    format: usize,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<(u32, u8, Option<u8>)> {
++    let mut best_value = 0_u32;
++    let mut best_first = b'\0';
++    let mut best_second = None;
++
++    for index in (0..ROMAN_VALUES.len()).rev() {
++        evaluator.charge_work(1)?;
++        let value = ROMAN_VALUES[index];
++        if value <= number && value > best_value {
++            best_value = value;
++            best_first = ROMAN_SYMBOLS[index];
++            best_second = None;
++        }
++    }
++
++    for smaller in 0..ROMAN_VALUES.len() - 1 {
++        if !subtractor_allowed(smaller, format) {
++            continue;
++        }
++        for larger in (smaller + 1)..ROMAN_VALUES.len() {
++            evaluator.charge_work(1)?;
++            let small = ROMAN_VALUES[smaller];
++            let large = ROMAN_VALUES[larger];
++            if format <= 1 && large > small.saturating_mul(10) {
++                continue;
++            }
++            let value = large - small;
++            if value <= number && value > best_value {
++                best_value = value;
++                best_first = ROMAN_SYMBOLS[smaller];
++                best_second = Some(ROMAN_SYMBOLS[larger]);
++            }
++        }
++    }
++
++    if best_value == 0 {
++        return Err(EvaluationFailure::InvalidExpression(
++            "Roman chunk construction made no progress",
++        ));
++    }
++    Ok((best_value, best_first, best_second))
++}
++
++fn subtractor_allowed(index: usize, format: usize) -> bool {
++    match format {
++        0 => matches!(index, 0 | 2 | 4),
++        1 => matches!(index, 0..=4),
++        2 => matches!(index, 0 | 2 | 3 | 4),
++        3 => matches!(index, 0..=4),
++        _ => false,
++    }
++}
++
++fn render_simplified(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    number: u32,
++) -> EvaluationResult<([u8; MAX_ROMAN_TEXT_BYTES], usize)> {
++    // For each adjacent pair of denominations, the coefficient must have a
++    // fixed residue modulo the pair's ratio.  The positive residue and its
++    // negative carry are the only candidates needed for a minimum.  There
++    // are six binary choices, so this search is constant and allocation-free.
++    let mut best = [0_i32; ROMAN_VALUES.len()];
++    let mut best_length = usize::MAX;
++
++    for mask in 0_u32..(1_u32 << ROMAN_RATIOS.len()) {
++        evaluator.charge_work(1)?;
++        let mut units = number;
++        let mut coefficients = [0_i32; ROMAN_VALUES.len()];
++        let mut length = 0usize;
++
++        for index in 0..ROMAN_RATIOS.len() {
++            evaluator.charge_work(1)?;
++            let ratio = ROMAN_RATIOS[index];
++            let remainder = units % ratio;
++            let coefficient = if remainder != 0 && (mask & (1_u32 << index)) != 0 {
++                remainder as i32 - ratio as i32
++            } else {
++                remainder as i32
++            };
++            coefficients[index] = coefficient;
++            length = length
++                .checked_add(coefficient.unsigned_abs() as usize)
++                .ok_or(EvaluationFailure::InvalidExpression(
++                    "Roman length overflow",
++                ))?;
++            let numerator = i64::from(units) - i64::from(coefficient);
++            units = u32::try_from(numerator / i64::from(ratio))
++                .map_err(|_| EvaluationFailure::InvalidExpression("Roman carry overflow"))?;
++        }
++
++        coefficients[ROMAN_VALUES.len() - 1] = i32::try_from(units)
++            .map_err(|_| EvaluationFailure::InvalidExpression("Roman high coefficient overflow"))?;
++        length = length
++            .checked_add(units as usize)
++            .ok_or(EvaluationFailure::InvalidExpression(
++                "Roman length overflow",
++            ))?;
++        if length < best_length {
++            best_length = length;
++            best = coefficients;
++        }
++    }
++
++    if best_length == usize::MAX {
++        return Err(EvaluationFailure::InvalidExpression(
++            "Roman simplified search found no representation",
++        ));
++    }
++
++    let mut output = [0_u8; MAX_ROMAN_TEXT_BYTES];
++    let mut length = 0usize;
++    // Negative lower-valued coins precede the positive coins.  This order
++    // makes each negative symbol see its intended larger symbol to the right.
++    for index in 0..ROMAN_VALUES.len() {
++        let coefficient = best[index];
++        if coefficient < 0 {
++            append_repeated(
++                &mut output,
++                &mut length,
++                ROMAN_SYMBOLS[index],
++                coefficient.unsigned_abs() as usize,
++            )?;
++        }
++    }
++    for index in (0..ROMAN_VALUES.len()).rev() {
++        let coefficient = best[index];
++        if coefficient > 0 {
++            append_repeated(
++                &mut output,
++                &mut length,
++                ROMAN_SYMBOLS[index],
++                coefficient as usize,
++            )?;
++        }
++    }
++    Ok((output, length))
++}
++
++fn append_symbol(
++    output: &mut [u8; MAX_ROMAN_TEXT_BYTES],
++    length: &mut usize,
++    symbol: u8,
++) -> EvaluationResult<()> {
++    append_repeated(output, length, symbol, 1)
++}
++
++fn append_repeated(
++    output: &mut [u8; MAX_ROMAN_TEXT_BYTES],
++    length: &mut usize,
++    symbol: u8,
++    count: usize,
++) -> EvaluationResult<()> {
++    let end = length
++        .checked_add(count)
++        .ok_or(EvaluationFailure::InvalidExpression(
++            "Roman output length overflow",
++        ))?;
++    if end > output.len() {
++        return Err(EvaluationFailure::InvalidExpression(
++            "Roman output exceeded fixed construction bound",
++        ));
++    }
++    output[*length..end].fill(symbol);
++    *length = end;
++    Ok(())
++}
++
++fn render_text<'a>(evaluator: &mut Evaluator<'a, '_, '_>, bytes: &[u8]) -> EvaluationResult<()> {
++    if bytes.len() > evaluator.limits.max_text_bytes {
++        return Err(local_limit(
++            Resource::Memory,
++            u64::try_from(bytes.len()).unwrap_or(u64::MAX),
++            u64::try_from(evaluator.limits.max_text_bytes).unwrap_or(u64::MAX),
++        ));
++    }
++    evaluator.charge_bytes(bytes.len())?;
++    let reservation = evaluator.reserve_storage(bytes.len(), "formula roman text")?;
++    let mut output = String::new();
++    if !bytes.is_empty() {
++        output
++            .try_reserve_exact(bytes.len())
++            .map_err(|source| EvaluationFailure::Allocation {
++                resource: "formula roman text",
++                source,
++            })?;
++        // Every byte is an ASCII Roman symbol, so the fallible reservation
++        // above is the only allocation point for this result.
++        for &byte in bytes {
++            output.push(byte as char);
++        }
++    }
++    evaluator.push_value(WorkingValue::Text(TextValue::owned(output, reservation)))
++}
++
++fn formula_error(value: &WorkingValue<'_>) -> Option<ScalarError> {
++    match value {
++        WorkingValue::Error(error) => Some(*error),
++        _ => None,
++    }
++}
+diff --git a/crates/litchi-ods/tests/ods_formula_roman_evaluation.rs b/crates/litchi-ods/tests/ods_formula_roman_evaluation.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_roman_evaluation.rs
+@@ -0,0 +1,554 @@
++//! Independent integration coverage for the OpenFormula 1.4 ROMAN and ARABIC
++//! conversion functions in section 6.19.
++//!
++//! The classic representation and the Arabic decoder below are deliberately
++//! independent of the evaluator implementation.  Format 4 is checked with a
++//! breadth-first oracle over the Roman sign rule (a symbol is negative when a
++//! larger symbol occurs to its right), rather than by reproducing the
++//! evaluator's construction algorithm.
++
++use std::{
++    collections::HashSet,
++    num::{NonZeroU64, NonZeroUsize},
++};
++
++use litchi_core::{
++    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Profile,
++    Resource,
++};
++use litchi_ods::codec::formula::{
++    evaluation::{
++        EvaluatedScalar, EvaluationContext, EvaluationFailure, EvaluationLimits, ScalarError,
++        ScalarValue, UnsupportedKind, evaluate_scalar,
++    },
++    expression::Expression,
++};
++
++fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
++    execution_with_core_limits(scope, CoreLimits::for_profile(Profile::Server))
++}
++
++fn execution_with_core_limits(
++    scope: &str,
++    core_limits: CoreLimits,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    let budget = Budget::root(scope.to_owned(), core_limits);
++    let (cancellation, token) = CancellationSource::pair();
++    let execution_limits = ExecutionLimits::new(
++        NonZeroUsize::new(1).expect("one worker"),
++        NonZeroUsize::new(1).expect("one in-flight task"),
++        NonZeroU64::new(1024 * 1024).expect("one in-flight MiB"),
++        0,
++    )
++    .expect("valid execution limits");
++    (
++        budget.clone(),
++        cancellation,
++        ExecutionContext::new(budget, token, execution_limits),
++    )
++}
++
++fn execution_with_memory(
++    scope: &str,
++    memory_bytes: usize,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    execution_with_core_limits(
++        scope,
++        CoreLimits::new(
++            u64::try_from(memory_bytes).expect("test memory limit fits u64"),
++            1 << 30,
++            1 << 30,
++            10_000_000,
++            256,
++            1_000_000_000,
++        ),
++    )
++}
++
++fn parse(source: &str) -> Expression {
++    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
++}
++
++fn evaluate<'a>(
++    expression: &'a Expression,
++    context: &ExecutionContext,
++    limits: &EvaluationLimits,
++) -> Result<EvaluatedScalar<'a>, EvaluationFailure> {
++    evaluate_scalar(expression, &EvaluationContext::new(context), limits)
++}
++
++fn number(result: &EvaluatedScalar<'_>) -> f64 {
++    match result.value() {
++        ScalarValue::Number(value) => *value,
++        value => panic!("expected Number, got {value:?}"),
++    }
++}
++
++fn text<'r>(result: &'r EvaluatedScalar<'_>) -> &'r str {
++    match result.value() {
++        ScalarValue::Text(value) => value.as_ref(),
++        value => panic!("expected Text, got {value:?}"),
++    }
++}
++
++#[test]
++fn roman_concatenation_preserves_literals_across_scan_windows() {
++    for prefix_bytes in [4094, 4095, 4096, 8191] {
++        let literal = format!("{}\"λI", "L".repeat(prefix_bytes));
++        let source = format!("=ROMAN(1)&\"{}\"", literal.replace('"', "\"\""));
++        let expression = parse(&source);
++        let (budget, _, execution) = execution("roman scan window");
++        let result = evaluate(&expression, &execution, &EvaluationLimits::default())
++            .expect("quote pairs may straddle a scan window");
++        assert_eq!(text(&result), format!("I{literal}"));
++        drop(result);
++        assert_eq!(budget.used(Resource::Memory), 0);
++    }
++}
++
++fn formula_error(result: &EvaluatedScalar<'_>) -> ScalarError {
++    match result.value() {
++        ScalarValue::Error(error) => *error,
++        value => panic!("expected formula Error, got {value:?}"),
++    }
++}
++
++fn assert_formula_error(source: &str, expected: ScalarError) {
++    let expression = parse(source);
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-error");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .unwrap_or_else(|error| panic!("{source:?} should return a formula error: {error}"));
++    assert_eq!(formula_error(&result), expected, "{source:?}");
++}
++
++fn assert_unsupported(source: &str, expected: UnsupportedKind) {
++    let expression = parse(source);
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-unsupported");
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("capability-dependent Roman expression should be refused");
++    assert!(
++        matches!(&error, EvaluationFailure::Unsupported(kind) if *kind == expected),
++        "{source:?} returned the wrong capability error: {error}"
++    );
++}
++
++fn classical_roman(mut value: usize) -> String {
++    const DIGITS: &[(usize, &str)] = &[
++        (1_000, "M"),
++        (900, "CM"),
++        (500, "D"),
++        (400, "CD"),
++        (100, "C"),
++        (90, "XC"),
++        (50, "L"),
++        (40, "XL"),
++        (10, "X"),
++        (9, "IX"),
++        (5, "V"),
++        (4, "IV"),
++        (1, "I"),
++    ];
++    let mut result = String::new();
++    for &(digit, spelling) in DIGITS {
++        while value >= digit {
++            result.push_str(spelling);
++            value -= digit;
++        }
++    }
++    result
++}
++
++fn arabic_reference(value: &str) -> Option<i64> {
++    fn roman_value(character: char) -> Option<i64> {
++        Some(match character.to_ascii_uppercase() {
++            'I' => 1,
++            'V' => 5,
++            'X' => 10,
++            'L' => 50,
++            'C' => 100,
++            'D' => 500,
++            'M' => 1_000,
++            _ => return None,
++        })
++    }
++
++    let values = value.chars().map(roman_value).collect::<Option<Vec<_>>>()?;
++    let mut total = 0_i64;
++    for (index, &current) in values.iter().enumerate() {
++        let subtract = values[index + 1..].iter().any(|&right| right > current);
++        total += if subtract { -current } else { current };
++    }
++    Some(total)
++}
++
++/// Find the shortest string satisfying the direct/indirect Roman sign rule.
++///
++/// The search runs right-to-left.  Its state is the accumulated value and the
++/// largest symbol already placed to the right, so every string accepted by the
++/// Arabic semantics is represented.  Fifteen symbols cover the classic
++/// spelling of every value below 4000; states are intentionally allowed to
++/// leave the requested output interval so overshoot-and-subtract spellings are
++/// not accidentally omitted from the oracle.
++fn shortest_roman_lengths(max_value: usize) -> Vec<usize> {
++    const SYMBOLS: [i32; 7] = [1, 5, 10, 50, 100, 500, 1_000];
++    const MAX_DEPTH: usize = 15;
++    let max_value = i32::try_from(max_value).expect("test bound fits i32");
++    let mut shortest = vec![usize::MAX; usize::try_from(max_value).unwrap() + 1];
++    shortest[0] = 0;
++    let mut frontier = HashSet::from([(0_i32, 0_i32)]);
++
++    for depth in 1..=MAX_DEPTH {
++        let mut next = HashSet::new();
++        for &(value, rightmost) in &frontier {
++            for symbol in SYMBOLS {
++                let signed = if symbol < rightmost { -symbol } else { symbol };
++                let value = value + signed;
++                let rightmost = rightmost.max(symbol);
++                if (0..=max_value).contains(&value) {
++                    let index = usize::try_from(value).expect("non-negative value");
++                    if shortest[index] == usize::MAX {
++                        shortest[index] = depth;
++                    }
++                }
++                next.insert((value, rightmost));
++            }
++        }
++        frontier = next;
++        if shortest.iter().all(|length| *length != usize::MAX) {
++            break;
++        }
++    }
++    assert!(
++        shortest.iter().all(|length| *length != usize::MAX),
++        "the independent Roman search did not cover all values through {max_value}"
++    );
++    shortest
++}
++
++#[test]
++fn classic_roman_matches_an_independent_digit_oracle() {
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-classic");
++    for value in 0..4_000 {
++        let source = format!("=ROMAN({value})");
++        let expression = parse(&source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(text(&result), classical_roman(value), "{source:?}");
++    }
++}
++
++#[test]
++fn simplified_roman_matches_independent_shortest_lengths_and_arabic() {
++    let shortest = shortest_roman_lengths(3_999);
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-simplified");
++    for (value, &expected_length) in shortest.iter().enumerate() {
++        let source = format!("=ROMAN({value};4)");
++        let expression = parse(&source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        let spelling = text(&result);
++        assert_eq!(arabic_reference(spelling), Some(value as i64), "{source:?}");
++        assert_eq!(
++            spelling.len(),
++            expected_length,
++            "{source:?} produced {spelling:?}"
++        );
++        assert!(
++            spelling
++                .chars()
++                .all(|character| "IVXLCDM".contains(character)),
++            "{source:?} emitted a non-Roman character: {spelling:?}"
++        );
++    }
++    assert_eq!(shortest[8], 3);
++    assert_eq!(shortest[998], 3);
++    assert_eq!(shortest[3_999], 5);
++}
++
++#[test]
++fn arabic_accepts_ascii_case_and_indirect_subtraction() {
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-arabic");
++    for (source, expected) in [
++        ("=ARABIC(\"\")", 0.0),
++        ("=ARABIC(\"I\")", 1.0),
++        ("=ARABIC(\"iv\")", 4.0),
++        ("=ARABIC(\"mCmXcIx\")", 1_999.0),
++        ("=ARABIC(\"IIX\")", 8.0),
++        ("=ARABIC(\"IXX\")", 19.0),
++        ("=ARABIC(\"XLIX\")", 49.0),
++        ("=ARABIC(\"IC\")", 99.0),
++        ("=ARABIC(\"MIM\")", 1_999.0),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++
++    for source in [
++        "=ARABIC(\"A\")",
++        "=ARABIC(\"Ⅰ\")",
++        "=ARABIC(\"IV \")",
++        "=ARABIC(\"-I\")",
++        "=ARABIC(\"0\")",
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a formula error: {error}"));
++        assert_eq!(formula_error(&result), ScalarError::Value, "{source:?}");
++    }
++}
++
++#[test]
++fn roman_formats_follow_specified_subtractive_levels_and_logical_compatibility() {
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-formats");
++    for (source, expected) in [
++        ("=ROMAN(499;0)", "CDXCIX"),
++        ("=ROMAN(499;1)", "LDVLIV"),
++        ("=ROMAN(499;2)", "ID"),
++        ("=ROMAN(499;3)", "ID"),
++        ("=ROMAN(499;4)", "ID"),
++        ("=ROMAN(45;1)", "VL"),
++        ("=ROMAN(45;2)", "XLV"),
++        ("=ROMAN(9)", "IX"),
++        ("=ROMAN(9;TRUE())", "IX"),
++        ("=ROMAN(499;FALSE())", "ID"),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(text(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn roman_and_arabic_round_trip_every_value_in_each_format() {
++    for format in 0..=4 {
++        let (_budget, _cancellation, context) = execution("ods-formula-roman-round-trip");
++        for value in 0..4_000 {
++            let source = format!("=ARABIC(ROMAN({value};{format}))");
++            let expression = parse(&source);
++            let result = evaluate(&expression, &context, &EvaluationLimits::default())
++                .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++            assert_eq!(number(&result), value as f64, "{source:?}");
++        }
++    }
++}
++
++#[test]
++fn roman_integer_bounds_fractional_conversion_and_arity_are_formula_values() {
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-bounds");
++    for (source, expected) in [
++        ("=ROMAN(4.9)", "IV"),
++        ("=ROMAN(3999.9)", "MMMCMXCIX"),
++        ("=ROMAN(-0.9)", ""),
++        ("=ROMAN(499;1.9)", "LDVLIV"),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(text(&result), expected, "{source:?}");
++    }
++
++    for (source, expected) in [
++        ("=ROMAN(-1)", ScalarError::Number),
++        ("=ROMAN(4000)", ScalarError::Number),
++        ("=ROMAN(1;-1)", ScalarError::Number),
++        ("=ROMAN(1;5)", ScalarError::Number),
++        ("=ROMAN()", ScalarError::Value),
++        ("=ROMAN(1;0;2)", ScalarError::Value),
++        ("=ARABIC()", ScalarError::Value),
++        ("=ARABIC(\"I\";\"V\")", ScalarError::Value),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a formula error: {error}"));
++        assert_eq!(formula_error(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn roman_eagerly_propagates_children_and_preserves_leftmost_errors() {
++    for (source, expected) in [
++        ("=ROMAN(#N/A;#DIV/0!)", ScalarError::NotAvailable),
++        ("=ARABIC(#N/A)", ScalarError::NotAvailable),
++        ("=ROMAN(#REF!;#DIV/0!)", ScalarError::Reference),
++        ("=ARABIC(#NUM!;#VALUE!)", ScalarError::Number),
++    ] {
++        assert_formula_error(source, expected);
++    }
++
++    for source in ["=ROMAN(1;[.A1];3)", "=ARABIC([.A1];1)", "=ROMAN(1;[.A1])"] {
++        assert_unsupported(source, UnsupportedKind::Reference);
++    }
++}
++
++#[test]
++fn conditional_handlers_skip_roman_work_but_do_not_catch_refusals() {
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-lazy");
++    for (source, expected) in [
++        ("=IF(TRUE();ROMAN(4);ARABIC([.A1]))", "IV"),
++        ("=IF(FALSE();ARABIC([.A1]);ROMAN(9))", "IX"),
++        ("=IF(TRUE();ROMAN(4);ROMAN(4000))", "IV"),
++        ("=IFERROR(ROMAN(4000);\"fallback\")", "fallback"),
++        ("=IFNA(ARABIC(#N/A);\"fallback\")", "fallback"),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate lazily: {error}"));
++        assert_eq!(text(&result), expected, "{source:?}");
++    }
++
++    for source in [
++        "=IFERROR(ARABIC([.A1]);\"fallback\")",
++        "=IFNA(ROMAN([.A1]);\"fallback\")",
++    ] {
++        assert_unsupported(source, UnsupportedKind::Reference);
++    }
++
++    let expression = parse("=IF(TRUE();\"ok\";ROMAN(3999))");
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_steps(64)
++            .with_max_text_bytes(32_767),
++    )
++    .expect("the unused Roman branch should not consume Work");
++    assert_eq!(text(&result), "ok");
++}
++
++#[test]
++fn roman_limits_cancellation_and_owned_result_reservations_are_atomic() {
++    let expression = parse("=ROMAN(3999)");
++
++    let (budget, cancellation, context) = execution("ods-formula-roman-cancel");
++    cancellation.cancel();
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("cancelled Roman evaluation should refuse before work");
++    assert!(matches!(error, EvaluationFailure::Cancelled));
++    assert_eq!(budget.used(Resource::Work), 0);
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let (budget, _cancellation, context) = execution("ods-formula-roman-work-limit");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(0),
++    )
++    .expect_err("zero Work allowance should refuse atomically");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++        "wrong Work failure: {error}"
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let (budget, _cancellation, context) = execution("ods-formula-roman-memory-limit");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_storage_bytes(0),
++    )
++    .expect_err("zero storage allowance should refuse atomically");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory),
++        "wrong Memory failure: {error}"
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let (budget, _cancellation, context) = execution("ods-formula-roman-text-limit");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_text_bytes(8),
++    )
++    .expect_err("a nine-byte Roman result should exceed an eight-byte text limit");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory),
++        "wrong text limit failure: {error}"
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    // Format 4 performs a bounded search after the ordinary evaluator frames
++    // have been admitted.  Sweep the local Work limit through that search so
++    // a refusal after partial progress is tested separately from max_steps=0.
++    let search_expression = parse("=ROMAN(3888;4)");
++    let shortest = shortest_roman_lengths(3_888);
++    let mut saw_mid_search_refusal = false;
++    let mut saw_success = false;
++    for max_steps in 0..=600 {
++        let scope = format!("ods-formula-roman-mid-search-{max_steps}");
++        let (budget, _cancellation, context) = execution(&scope);
++        let result = evaluate(
++            &search_expression,
++            &context,
++            &EvaluationLimits::default().with_max_steps(max_steps),
++        );
++        match result {
++            Err(EvaluationFailure::ResourceLimit(limit)) => {
++                assert_eq!(limit.resource, Resource::Work);
++                assert_eq!(budget.used(Resource::Memory), 0);
++                if max_steps >= 32 {
++                    saw_mid_search_refusal = true;
++                }
++            },
++            Ok(result) => {
++                let spelling = text(&result).to_owned();
++                assert_eq!(arabic_reference(&spelling), Some(3_888));
++                assert_eq!(spelling.len(), shortest[3_888]);
++                drop(result);
++                assert_eq!(budget.used(Resource::Memory), 0);
++                saw_success = true;
++                break;
++            },
++            Err(error) => panic!("mid-search Roman evaluation returned {error}"),
++        }
++    }
++    assert!(
++        saw_mid_search_refusal,
++        "the Work sweep never reached a partial Roman search"
++    );
++    assert!(
++        saw_success,
++        "ROMAN(3888;4) did not fit within 600 Work units"
++    );
++
++    let (budget, _cancellation, context) = execution("ods-formula-roman-result-lifetime");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("ordinary Roman output should evaluate");
++    assert_eq!(text(&result), "MMMCMXCIX");
++    assert!(result.reserved_output_bytes() >= 9);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(context);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(result);
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let (budget, _cancellation, context) = execution_with_memory("ods-formula-roman-tight", 256);
++    let expression = parse("=IF(TRUE();\"ok\";ROMAN(3999))");
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_storage_bytes(256)
++            .with_max_text_bytes(32_767),
++    )
++    .expect("an unused output-heavy Roman branch should not consume storage");
++    assert_eq!(text(&result), "ok");
++    assert_eq!(result.reserved_output_bytes(), 0);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn roman_source_spelling_and_force_marker_survive_evaluation() {
++    let source = "of:== roman(499;0) ";
++    let expression = parse(source);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++    let (_budget, _cancellation, context) = execution("ods-formula-roman-source");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("function names are case-insensitive in the scalar profile");
++    assert_eq!(text(&result), "CDXCIX");
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++}

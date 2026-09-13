@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/roman-harness/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-roman-worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-roman-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-roman-tmp",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "started_at": "2026-09-13T14:39:49.760189+00:00",
+  "finished_at": "2026-09-13T14:40:09.098911+00:00",
+  "status": 0
+}

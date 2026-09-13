@@ -1,0 +1,14 @@
+{
+  "before": {
+    "Cargo.toml": "638c9176b895d60fada4f715e990880b8a4c0bc77491ede3555c8fc1bc229d81",
+    "Cargo.lock": "8f2aff51ed4df52cf1be91363494b82feca0cdcf75eb2e17bb3699f51c37efaa",
+    "run.py": "ad256b7938c91da3fad58d25206d3e85dddd10c5a3d0bbb809ae1952406e5c3b",
+    "src/main.rs": "72d2ccc147fc04db683b64d426adafe2bde7243c9d47707b0e68651e3a4806c5"
+  },
+  "after": {
+    "Cargo.toml": "638c9176b895d60fada4f715e990880b8a4c0bc77491ede3555c8fc1bc229d81",
+    "Cargo.lock": "8f2aff51ed4df52cf1be91363494b82feca0cdcf75eb2e17bb3699f51c37efaa",
+    "run.py": "ad256b7938c91da3fad58d25206d3e85dddd10c5a3d0bbb809ae1952406e5c3b",
+    "src/main.rs": "72d2ccc147fc04db683b64d426adafe2bde7243c9d47707b0e68651e3a4806c5"
+  }
+}

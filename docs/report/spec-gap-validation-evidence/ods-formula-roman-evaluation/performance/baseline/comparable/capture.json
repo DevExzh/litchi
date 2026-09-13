@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/roman-harness/run.py",
+    "--binary",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/baseline/ods-formula-roman-evaluation-profile",
+    "--output",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/baseline/comparable",
+    "--revision",
+    "baseline",
+    "--group",
+    "comparable",
+    "--phase",
+    "all",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15"
+  ],
+  "started_at": "2026-09-13T14:56:50.842672+00:00",
+  "finished_at": "2026-09-13T14:56:52.438597+00:00",
+  "status": 0,
+  "binary_sha256": "5d092ebb4d4d79236c5950c686955a86c8b1d39a309e23ccb1ae24d8192e94be",
+  "raw_sha256": "1f22967f15e7438c5085d4192c3add260582aefc161cd03ee978e6c5dc5fb257"
+}
