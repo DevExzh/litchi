@@ -1,0 +1,13 @@
+{
+  "canonical_instruction_analysis_sha256": "f5bd56a45b825399bb51a880e7549d98caf8cb14eaeb0be99316a311f15457d5",
+  "issue": "Analyzer agent deleted intermediate baseline report during final path/schema normalization; original bytes unavailable. Reconstructed baseline report equals final canonical root report. First suboperation output/script/receipt retained as superseded, not asserted to have complete input custody. Final suboperation analysis rerun against canonical report and verified independently from raw profiles.",
+  "original_intermediate_sha256": "0254b841c6320c7f3c25ebcd0a366909cf14d3b1d77168375679d34bb07b1a74",
+  "scope": "Analysis-only artifact-path finalization; no measured source, executable, raw profile, capture command or gate changed.",
+  "superseded": {
+    "superseded-suboperations/suboperations.json": "a9fde60709e984b0b15ef14c7cd491bd3edcf22bd8d56351900d467218e69351",
+    "superseded-suboperations/suboperations.py": "cb18ab483f338b28eef048620dba3f56a072c0692cd000238142fb04417fa8ff",
+    "superseded-suboperations/suboperations.receipt.json": "4f53b95fde54c611ec825268c484a39d73fb4f7980069e0ad7c4cfdd1b7d8d4e",
+    "superseded-suboperations/suboperations.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "utc": "2026-09-13T02:31:34.171770+00:00"
+}

@@ -1,0 +1,1 @@
+PASS: valid sealed cleanup accepted; missing, wrong-binary, live-reference and incomplete-removal custody refused

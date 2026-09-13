@@ -1,0 +1,165 @@
+{
+  "binary_sha256": "2d1e12c0d1e156ba8dde848d72f4f3c684a73887d5c5fc87ae0f4c57538b9875",
+  "limitations": [
+    "This report validates normal benchmark output only; it makes no native latency, RSS, hardware, allocation, or speedup claim.",
+    "Callgrind Ir and call metadata remain mechanism evidence; operation-local calls must not be inferred from collection-off metadata."
+  ],
+  "performance_claim": "diagnostic-only",
+  "plan": "plan.json",
+  "plan_sha256": "277710c59c98e614483ad94ac6c2130f58ea8e36ed3d2235341ac7c4139fc343",
+  "profile_count": 4,
+  "profiles": [
+    {
+      "group": "xls-owned",
+      "identity": {
+        "case": "xls_owned_source_open_one_cell",
+        "corpus": {
+          "archive_bytes": 16995840,
+          "archive_member_count": 10,
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "compression": "none",
+          "entry_bytes": 2097152,
+          "entry_count": 257,
+          "generator": "litchi-xls-comments-opaque-heavy-v1",
+          "name": "xls-comments-opaque-heavy",
+          "package_format": "XLS/CFB",
+          "payload_kind": "incompressible",
+          "shape": "256-comments-opaque-heavy",
+          "target_entry": "Workbook",
+          "target_payload_bytes": 80946,
+          "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+          "uncompressed_payload_bytes": 16858200,
+          "xlsx": null
+        },
+        "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+        "sink": null,
+        "source": null
+      },
+      "kind": "xls",
+      "name": "profile-r1-xls-owned",
+      "receipt": "baseline/profile-r1-xls-owned.receipt.json",
+      "receipt_sha256": "b4d628ef7c5896f83c2b47d7a1016e8b32a0bbccf65603d790972304b3586fa3",
+      "report": "baseline/profile-r1-xls-owned.json",
+      "report_sha256": "5ee0e6c43925a608f490139fd47765ca4d1e5feb90a91b549e20df9376498913",
+      "samples": 5,
+      "shape": null
+    },
+    {
+      "group": "cfb-tiny",
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "archive_bytes": 3584,
+          "archive_member_count": 3,
+          "archive_sha256": "186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+          "compression": "none",
+          "entry_bytes": 512,
+          "entry_count": 3,
+          "generator": "litchi-cfb-synthetic-v1",
+          "name": "cfb-tiny-incompressible",
+          "package_format": "CFB/OLE2",
+          "payload_kind": "incompressible",
+          "shape": "tiny",
+          "target_entry": "benchmark_stream_00002.bin",
+          "target_payload_bytes": 512,
+          "target_payload_sha256": "df355b60021f82a84ec1ca06edcf7aea64a5272388c4eed239562fd63d3fceb3",
+          "uncompressed_payload_bytes": 1536,
+          "xlsx": null
+        },
+        "output_sha256": null,
+        "sink": null,
+        "source": null
+      },
+      "kind": "cfb",
+      "name": "profile-r1-cfb-tiny",
+      "receipt": "baseline/profile-r1-cfb-tiny.receipt.json",
+      "receipt_sha256": "802f04f6db0b5dbf66cc9a2612cecd21fdc1a470f1e7c956f83bae45e35b457b",
+      "report": "baseline/profile-r1-cfb-tiny.json",
+      "report_sha256": "98c7d662b065920a8245df3bd6327a3c096d5a223a7c5fe95b7aad0f90222b90",
+      "samples": 5,
+      "shape": "tiny"
+    },
+    {
+      "group": "cfb-many-small",
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "archive_bytes": 314880,
+          "archive_member_count": 256,
+          "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+          "compression": "none",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "generator": "litchi-cfb-synthetic-v1",
+          "name": "cfb-many-small-incompressible",
+          "package_format": "CFB/OLE2",
+          "payload_kind": "incompressible",
+          "shape": "many-small",
+          "target_entry": "benchmark_stream_00255.bin",
+          "target_payload_bytes": 1024,
+          "target_payload_sha256": "d558142d0dea1760aa463990aeb05298248820d4b06e509eed32ae6dc19fbce4",
+          "uncompressed_payload_bytes": 262144,
+          "xlsx": null
+        },
+        "output_sha256": null,
+        "sink": null,
+        "source": null
+      },
+      "kind": "cfb",
+      "name": "profile-r1-cfb-many-small",
+      "receipt": "baseline/profile-r1-cfb-many-small.receipt.json",
+      "receipt_sha256": "f07b85ae4c7f8ac4d0499f464f01e81c9e2e73b1ad0fe89386de264ac27db4fa",
+      "report": "baseline/profile-r1-cfb-many-small.json",
+      "report_sha256": "7c4b820d553ee6f542f5953d418217a8eed35949885f9927e2311a1c2c773a63",
+      "samples": 5,
+      "shape": "many-small"
+    },
+    {
+      "group": "cfb-few-large",
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "archive_bytes": 16912384,
+          "archive_member_count": 4,
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "compression": "none",
+          "entry_bytes": 4194304,
+          "entry_count": 4,
+          "generator": "litchi-cfb-synthetic-v1",
+          "name": "cfb-few-large-incompressible",
+          "package_format": "CFB/OLE2",
+          "payload_kind": "incompressible",
+          "shape": "few-large",
+          "target_entry": "benchmark_stream_00003.bin",
+          "target_payload_bytes": 4194304,
+          "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+          "uncompressed_payload_bytes": 16777216,
+          "xlsx": null
+        },
+        "output_sha256": null,
+        "sink": null,
+        "source": null
+      },
+      "kind": "cfb",
+      "name": "profile-r1-cfb-few-large",
+      "receipt": "baseline/profile-r1-cfb-few-large.receipt.json",
+      "receipt_sha256": "0949b01879ca225f963e0776c4014001d0c0109abf6fda3198415d8af0a6dbd6",
+      "report": "baseline/profile-r1-cfb-few-large.json",
+      "report_sha256": "a6461ecfee3a1171085ca4eff9a9afe27a9bb9846d5758ab556ae20e0e2849c2",
+      "samples": 5,
+      "shape": "few-large"
+    }
+  ],
+  "schema": "litchi-ole2-change-0547-profile-report-analysis-v1",
+  "scope": "Fresh baseline-only OLE2 collector sub-operation attribution",
+  "source_manifest_sha256": "db197f5ea518082646669db5ba229cc2ea4081f5d2b6a51357e07f9cc4090511",
+  "stage": "baseline",
+  "status": "pass",
+  "validation": {
+    "corpus_bindings_valid": true,
+    "no_native_or_allocator_comparison": true,
+    "no_speedup_claim": true,
+    "normal_reports_valid": true,
+    "source_binary_plan_and_driver_receipts_bound": true
+  }
+}

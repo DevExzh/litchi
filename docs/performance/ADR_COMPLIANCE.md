@@ -2934,3 +2934,7 @@ latency, RSS, or OOM claim follows. See [Change 0362](changes/0362-xlsx-selected
 ## 0546 — retained XLSX shared traversal
 
 Retained exact-admission shared traversal: planning p50 improves 24.77–26.51%, workflow p50 7.09–10.80%, and planning Ir 21.81–22.36% on both primary shapes/repeats. All frozen gates and nine final quality commands pass (1,306 tests). Same-invalid refusal and clustered scanner regressions remain explicitly reviewed; no universal speedup, RSS, or cold-cache claim is made. Accepted ADR/index hashes remain unchanged. OLE2/OOXML optimization remains active; ODF is deferred until completion and iWork excluded. [Change and limitations](changes/0546-xlsx-shared-traversal-retained.md); [sealed evidence](results/change-0546/README.md).
+
+## 0547 — OLE2 collector sub-operation attribution
+
+Fresh baseline profiles attribute visited-map per-step checks/update to 20.37% of XLS-owned and 22.35% of few-large CFB constructor Ir (tiny 0.69%, many-small 2.05%). A 376,264-case semantic model validates terminal proof and exact-error replay, but exposes declared-length short-cycle amplification in the terminal-only design. A bounded checkpoint/replay candidate is the next measured hypothesis; no production change or speedup is claimed. Exact-source 0546 quality evidence is reused, not rerun. [Detailed boundaries and next gates](changes/0547-ole2-collector-attribution.md). OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0547/test_sealed_replay.py"
+  ],
+  "exit_code": 0,
+  "recorded_utc": "2026-09-13T02:37:58.155541+00:00",
+  "script_sha256": "48f6c7d2dadfb235eac4e1f04d68259a2eff144c571e0f5ee6843f00b9e876e2",
+  "analyzer_sha256": "c24bd2570caca3d995c934519e919a458338317112dd59a18a8b634caa6bdd8e",
+  "stdout_sha256": "80faf7dfe768eb45dcff56c72beb26211e8904f273717c04d3a211d00e297329",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "scope": "Accept completed custody; reject four missing or contradictory cleanup cases. No Rust test or benchmark execution."
+}

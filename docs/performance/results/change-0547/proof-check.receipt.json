@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0547/proof_check.py"
+  ],
+  "generated_utc": "2026-09-13T02:26:30Z",
+  "exit_code": 0,
+  "script_sha256": "a1b0cabffb8a3c5d02ce88f17898c8e95df2ab6c9b3e7557b49d87ea1186c1fe",
+  "stdout_sha256": "b3751e719efe5b4ba4b4cee7d8f4b2d7255624d0596b8c912da9dfc5616da73f",
+  "status": "pass",
+  "scope": "semantic ordered-error model; no Rust allocation, native latency, or aliasing equivalence claim",
+  "result": {
+    "cases": 376264,
+    "cycle_cases": 13778,
+    "short_cycle_table_len": 32,
+    "terminal_only_total_over_reference": 17.0,
+    "checkpointed_total_over_reference": 2.0
+  }
+}
