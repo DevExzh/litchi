@@ -1,0 +1,20 @@
+{
+  "corrections": [
+    "Validate exact preserved profile amendment and actual receipt schema.",
+    "Distinguish retained baseline R2 source identity from candidate execution identity.",
+    "Replay bound pure metrics, profile and instruction functions, compare full canonical JSON objects.",
+    "Require one-for-one adverse/drift rows and canonical review evidence digests.",
+    "Bind all four precleanup binary and descriptor hashes to cleanup record.",
+    "Verify admission supplement predates every capture."
+  ],
+  "initial_observations": [
+    "Frozen profile consumer differed due to explicit ABBA execution-identity amendment.",
+    "Initial stage report validator assumed baseline R2 executed under baseline checkout."
+  ],
+  "observed_utc": "2026-09-13T12:03:20.926480+00:00",
+  "preserved_initial": "verifier-attempts/initial/verify.py",
+  "preserved_initial_sha256": "707b9b611805315a0d1af75ce8de95e924a84020b3d3974f8564dae77ae093c8",
+  "schema": "ole2_0554_verifier_development_v1",
+  "scope": "Verifier integration only; no source, capture, analyzer or gate changes",
+  "validation": "All six component checks and complete precleanup check passed; actual outputs retained under verification-attempts."
+}

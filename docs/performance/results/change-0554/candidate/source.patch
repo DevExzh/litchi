@@ -1,0 +1,252 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 9441de203..41ecf3af0 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -121,7 +121,10 @@ impl TryFrom<u8> for DirectoryNodeColor {
+ #[derive(Debug)]
+ struct ValidatedDirectoryEntry {
+     sid: u32,
+-    name: String,
++    // `Some` owns the validated name until the graph builder moves it into
++    // the public entry.  `None` is the handoff proof consumed by the final
++    // SID-aligned cache check; it is not a second name representation.
++    name: Option<String>,
+     name_data: DirectoryNameData,
+     entry_type: u8,
+     node_color: DirectoryNodeColor,
+@@ -994,7 +997,7 @@ impl<R: Read + Seek> OleFile<R> {
+         let mut dir_data = try_filled_vec(data_len, 0u8, "directory data")?;
+         self.read_sectors_batched(&sectors, &mut dir_data)?;
+ 
+-        let validated_entries = Self::validated_directory_entries(&dir_data, self.sector_size)?;
++        let mut validated_entries = Self::validated_directory_entries(&dir_data, self.sector_size)?;
+ 
+         // Each directory entry is 128 bytes
+         let num_entries = dir_data.len() / DIRENTRY_SIZE;
+@@ -1008,12 +1011,20 @@ impl<R: Read + Seek> OleFile<R> {
+         // Parse root entry first (always at index 0)
+         let mut root_entry = None;
+         if num_entries > 0 {
+-            let root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
++            // Keep the public root parse separate: validation may canonicalize
++            // the supported classic-Mac root spelling while the historical
++            // public entry retains its decoded view.
++            let root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0, None)?;
+             let root_child_sid = root.sid_child;
+             dir_entries[0] = Some(root.clone());
+ 
+             // Build storage tree using iterative approach (avoids recursion overhead)
+-            self.build_storage_tree_iterative(root_child_sid, &dir_data, &mut dir_entries)?;
++            self.build_storage_tree_iterative(
++                root_child_sid,
++                &dir_data,
++                &mut dir_entries,
++                &mut validated_entries,
++            )?;
+             root_entry = Some(root);
+         }
+ 
+@@ -1028,10 +1039,10 @@ impl<R: Read + Seek> OleFile<R> {
+                 (None, None) => {},
+                 (Some(entry), Some(validated_entry))
+                     if entry.sid == validated_entry.sid
+-                        // Validation canonicalizes the explicitly supported
+-                        // classic-Mac root encoding to `Root Entry`, while the
+-                        // public entry parser retains its historical decoding.
+-                        && (entry.sid == 0 || entry.name == validated_entry.name) =>
++                        // Every normal entry transfers its validated name to
++                        // the exact SID's public entry.  The root remains a
++                        // deliberate two-view exception for classic Mac.
++                        && (entry.sid == 0 || validated_entry.name.is_none()) =>
+                 {
+                     *name_data = Some(validated_entry.name_data);
+                 },
+@@ -1226,7 +1237,7 @@ impl<R: Read + Seek> OleFile<R> {
+             .and_then(Option::as_ref)
+             .ok_or_else(|| OleError::CorruptedFile("CFB root entry is missing".to_string()))?;
+         if root.entry_type != STGTY_ROOT
+-            || root.name != "Root Entry"
++            || root.name.as_deref() != Some("Root Entry")
+             || root.sid_left != NOSTREAM
+             || root.sid_right != NOSTREAM
+         {
+@@ -1424,7 +1435,7 @@ impl<R: Read + Seek> OleFile<R> {
+ 
+         Ok(Some(ValidatedDirectoryEntry {
+             sid,
+-            name,
++            name: Some(name),
+             name_data,
+             entry_type: raw.entry_type,
+             node_color,
+@@ -1457,7 +1468,12 @@ impl<R: Read + Seek> OleFile<R> {
+     }
+ 
+     /// Parse a single directory entry from 128 bytes
+-    fn parse_directory_entry(&self, data: &[u8], sid: u32) -> Result<DirectoryEntry, OleError> {
++    fn parse_directory_entry(
++        &self,
++        data: &[u8],
++        sid: u32,
++        validated_name: Option<&mut Option<String>>,
++    ) -> Result<DirectoryEntry, OleError> {
+         // Parse the raw directory entry
+         let raw = RawDirectoryEntry::read_from_bytes(data).map_err(|_err| {
+             OleError::InvalidFormat("Failed to parse directory entry".to_string())
+@@ -1470,7 +1486,14 @@ impl<R: Read + Seek> OleFile<R> {
+                 "invalid CFB directory name length {name_len} at SID {sid}"
+             )));
+         }
+-        let name = decode_utf16le(&raw.name[..name_len - 2])?;
++        let name = match validated_name {
++            Some(name) => name.take().ok_or_else(|| {
++                OleError::CorruptedFile(format!(
++                    "validated CFB directory SID {sid} name was already handed off"
++                ))
++            })?,
++            None => decode_utf16le(&raw.name[..name_len - 2])?,
++        };
+ 
+         // Format CLSID
+         let clsid = format_clsid(&raw.clsid);
+@@ -1507,6 +1530,7 @@ impl<R: Read + Seek> OleFile<R> {
+         root_sid: u32,
+         dir_data: &[u8],
+         dir_entries: &mut [Option<DirectoryEntry>],
++        validated_entries: &mut [Option<ValidatedDirectoryEntry>],
+     ) -> Result<(), OleError> {
+         if root_sid == NOSTREAM {
+             return Ok(());
+@@ -1554,7 +1578,25 @@ impl<R: Read + Seek> OleFile<R> {
+                 let end = offset.checked_add(DIRENTRY_SIZE).ok_or_else(|| {
+                     OleError::CorruptedFile("directory entry end offset overflow".to_string())
+                 })?;
+-                let entry = self.parse_directory_entry(&dir_data[offset..end], sid)?;
++                let mut validated_name = None;
++                if sid != 0 {
++                    let validated_entry = validated_entries
++                        .get_mut(sid_usize)
++                        .and_then(Option::as_mut)
++                        .ok_or_else(|| {
++                            OleError::CorruptedFile(format!(
++                                "invalid or empty CFB directory SID {sid}"
++                            ))
++                        })?;
++                    if validated_entry.sid != sid {
++                        return Err(OleError::CorruptedFile(format!(
++                            "invalid or empty CFB directory SID {sid}"
++                        )));
++                    }
++                    validated_name = Some(&mut validated_entry.name);
++                }
++                let entry =
++                    self.parse_directory_entry(&dir_data[offset..end], sid, validated_name)?;
+ 
+                 // Extract child SIDs before moving entry
+                 let left_sid = entry.sid_left;
+@@ -3069,6 +3111,105 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn normal_name_handoff_keeps_public_name_cache_and_scalar_fields() {
++        let file = file_with_streams(["Payload"]);
++        let sid = file.root.as_ref().unwrap().sid_child as usize;
++        let entry = file.dir_entries[sid].as_ref().unwrap();
++        let directory_sector =
++            u32::from_le_bytes(file.reader.get_ref()[0x30..0x34].try_into().unwrap());
++        let directory_offset = (directory_sector as usize + 1) * 512;
++        let raw = RawDirectoryEntry::read_from_bytes(
++            &file.reader.get_ref()[directory_offset + sid * DIRENTRY_SIZE
++                ..directory_offset + (sid + 1) * DIRENTRY_SIZE],
++        )
++        .unwrap();
++
++        assert_eq!(entry.name, "Payload");
++        assert_eq!(entry.sid, u32::try_from(sid).unwrap());
++        assert_eq!(entry.entry_type, raw.entry_type);
++        assert_eq!(entry.sid_left, raw.sid_left.get());
++        assert_eq!(entry.sid_right, raw.sid_right.get());
++        assert_eq!(entry.sid_child, raw.sid_child.get());
++        assert_eq!(entry.clsid, format_clsid(&raw.clsid));
++        assert_eq!(entry.start_sector, raw.start_sector.get());
++        assert_eq!(
++            entry.size,
++            mask_v3_stream_size(raw.stream_size.get(), file.sector_size)
++        );
++        assert_eq!(
++            entry.is_minifat,
++            entry.entry_type == STGTY_STREAM && entry.size < u64::from(file.mini_stream_cutoff)
++        );
++        assert!(entry.children.is_empty());
++        assert_eq!(
++            file.dir_name_data[sid].as_ref().unwrap(),
++            &directory_name_data("Payload").unwrap()
++        );
++    }
++
++    #[test]
++    fn classic_mac_root_keeps_public_and_validated_name_views() {
++        let mut data = sample_file();
++        let directory_sector = u32::from_le_bytes(data[0x30..0x34].try_into().unwrap());
++        let directory_offset = (directory_sector as usize + 1) * 512;
++        data[directory_offset..directory_offset + 64].fill(0);
++        data[directory_offset + 1] = b'R';
++        data[directory_offset + 64..directory_offset + 66].copy_from_slice(&2u16.to_le_bytes());
++
++        let file = OleFile::open(Cursor::new(data)).unwrap();
++        assert_eq!(file.root.as_ref().unwrap().name, "");
++        assert_eq!(
++            file.dir_name_data[0].as_ref().unwrap(),
++            &directory_name_data("Root Entry").unwrap()
++        );
++        assert_eq!(file.stream_len(&["Data"]).unwrap(), 7);
++    }
++
++    #[test]
++    fn name_handoff_does_not_bypass_validated_name_errors() {
++        let mut data = sample_file();
++        let directory_sector = u32::from_le_bytes(data[0x30..0x34].try_into().unwrap());
++        let directory_offset = (directory_sector as usize + 1) * 512;
++        let name_length_offset = directory_offset + DIRENTRY_SIZE + 64;
++        data[name_length_offset..name_length_offset + 2].copy_from_slice(&3u16.to_le_bytes());
++
++        assert!(matches!(
++            OleFile::open(Cursor::new(data)),
++            Err(OleError::CorruptedFile(message))
++                if message == "invalid CFB directory name length 3 at SID 1"
++        ));
++    }
++
++    #[test]
++    fn failed_directory_load_does_not_publish_a_partial_graph() {
++        let mut file = OleFile::open(Cursor::new(sample_file())).unwrap();
++        let before_root = format!("{:?}", file.root);
++        let before_entries = format!("{:?}", file.dir_entries);
++        let before_name_data = file.dir_name_data.clone();
++
++        let directory_sector =
++            u32::from_le_bytes(file.reader.get_ref()[0x30..0x34].try_into().unwrap());
++        let directory_offset = (directory_sector as usize + 1) * 512;
++        let name_length_offset = directory_offset + DIRENTRY_SIZE + 64;
++        file.reader.get_mut()[name_length_offset..name_length_offset + 2]
++            .copy_from_slice(&3u16.to_le_bytes());
++
++        // Reuse the parsed file as the receiver while clearing only the
++        // physical claim bookkeeping needed to exercise the staged loader.
++        file.sector_roles.fill(PhysicalSectorRole::Unclaimed);
++        let result = file.load_directory(None, OleFileLimits::default().max_directory_bytes());
++
++        assert!(matches!(
++            result,
++            Err(OleError::CorruptedFile(message))
++                if message == "invalid CFB directory name length 3 at SID 1"
++        ));
++        assert_eq!(format!("{:?}", file.root), before_root);
++        assert_eq!(format!("{:?}", file.dir_entries), before_entries);
++        assert_eq!(file.dir_name_data, before_name_data);
++    }
++
+     #[test]
+     fn lookup_refuses_a_missing_validated_name_cache_entry() {
+         let mut file = file_with_streams(["Alpha"]);

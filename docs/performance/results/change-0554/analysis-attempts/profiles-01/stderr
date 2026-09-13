@@ -1,0 +1,4 @@
+usage: analyze_profiles.py [-h] [--output OUTPUT_OPTION]
+                           [--stage {baseline,candidate}] [--compare]
+                           [output]
+analyze_profiles.py: error: argument --stage: invalid choice: 'matched' (choose from baseline, candidate)

@@ -1,0 +1,8 @@
+{
+  "observed_utc": "2026-09-13T12:05:22.775476+00:00",
+  "status": "failed terminal replay",
+  "error": "analyze_metrics.py deterministic replay differs",
+  "verified_difference": "Only binaries/{baseline,candidate}/{normal,alloc}/present changes from true to false after the verified deletion. All measurement and gate fields remain identical.",
+  "verifier_sha256": "6d2d70b4cdb74dd1ef5787110172a1fb84395a1e923aa0e385e7efa5d8690e49",
+  "correction": "Require strict cleanup custody first, then account for these four physical-presence booleans only during pure replay comparison."
+}

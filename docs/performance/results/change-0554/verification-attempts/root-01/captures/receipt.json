@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0554/verify.py",
+    "--component",
+    "captures",
+    "--strict"
+  ],
+  "exit_code": 0,
+  "observed_utc": "2026-09-13T12:01:20.151732+00:00"
+}

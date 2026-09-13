@@ -1,0 +1,1029 @@
+
+/home/zhuhe/litchi-goal-0554-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000170d6f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE>:
+ 170d6f0:	55                   	push   %rbp
+ 170d6f1:	41 57                	push   %r15
+ 170d6f3:	41 56                	push   %r14
+ 170d6f5:	41 55                	push   %r13
+ 170d6f7:	41 54                	push   %r12
+ 170d6f9:	53                   	push   %rbx
+ 170d6fa:	48 81 ec a8 03 00 00 	sub    $0x3a8,%rsp
+ 170d701:	49 89 f6             	mov    %rsi,%r14
+ 170d704:	49 89 fd             	mov    %rdi,%r13
+ 170d707:	83 fa 01             	cmp    $0x1,%edx
+ 170d70a:	75 6f                	jne    170d77b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x8b>
+ 170d70c:	89 cb                	mov    %ecx,%ebx
+ 170d70e:	4d 8b a6 30 01 00 00 	mov    0x130(%r14),%r12
+ 170d715:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170d71c:	00 
+ 170d71d:	48 89 de             	mov    %rbx,%rsi
+ 170d720:	4c 89 e2             	mov    %r12,%rdx
+ 170d723:	ff 15 d7 52 9b 01    	call   *0x19b52d7(%rip)        # 30c2a00 <_DYNAMIC+0x5a08>
+ 170d729:	48 8b 8c 24 f8 00 00 	mov    0xf8(%rsp),%rcx
+ 170d730:	00 
+ 170d731:	48 8b 84 24 00 01 00 	mov    0x100(%rsp),%rax
+ 170d738:	00 
+ 170d739:	48 83 f9 0b          	cmp    $0xb,%rcx
+ 170d73d:	0f 85 18 01 00 00    	jne    170d85b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x16b>
+ 170d743:	48 3d 01 00 00 04    	cmp    $0x4000001,%rax
+ 170d749:	0f 82 58 01 00 00    	jb     170d8a7 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1b7>
+ 170d74f:	49 c7 45 00 03 00 00 	movq   $0x3,0x0(%r13)
+ 170d756:	00 
+ 170d757:	49 89 45 08          	mov    %rax,0x8(%r13)
+ 170d75b:	49 c7 45 10 00 00 00 	movq   $0x4000000,0x10(%r13)
+ 170d762:	04 
+ 170d763:	48 8d 05 46 cb ab fe 	lea    -0x15434ba(%rip),%rax        # 1ca2b0 <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0x88f>
+ 170d76a:	49 89 45 18          	mov    %rax,0x18(%r13)
+ 170d76e:	49 c7 45 20 0f 00 00 	movq   $0xf,0x20(%r13)
+ 170d775:	00 
+ 170d776:	e9 e4 0b 00 00       	jmp    170e35f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc6f>
+ 170d77b:	49 8b 76 08          	mov    0x8(%r14),%rsi
+ 170d77f:	49 8b 56 10          	mov    0x10(%r14),%rdx
+ 170d783:	41 8b 8e 44 01 00 00 	mov    0x144(%r14),%ecx
+ 170d78a:	4c 89 74 24 38       	mov    %r14,0x38(%rsp)
+ 170d78f:	4d 8b a6 30 01 00 00 	mov    0x130(%r14),%r12
+ 170d796:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170d79d:	00 
+ 170d79e:	41 b9 00 00 00 04    	mov    $0x4000000,%r9d
+ 170d7a4:	4d 89 e0             	mov    %r12,%r8
+ 170d7a7:	ff 15 5b 52 9b 01    	call   *0x19b525b(%rip)        # 30c2a08 <_DYNAMIC+0x5a10>
+ 170d7ad:	48 8b 84 24 f8 00 00 	mov    0xf8(%rsp),%rax
+ 170d7b4:	00 
+ 170d7b5:	4c 8b b4 24 00 01 00 	mov    0x100(%rsp),%r14
+ 170d7bc:	00 
+ 170d7bd:	48 8b ac 24 08 01 00 	mov    0x108(%rsp),%rbp
+ 170d7c4:	00 
+ 170d7c5:	4c 8b bc 24 10 01 00 	mov    0x110(%rsp),%r15
+ 170d7cc:	00 
+ 170d7cd:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170d7d1:	75 67                	jne    170d83a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x14a>
+ 170d7d3:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170d7da:	00 
+ 170d7db:	4c 89 fe             	mov    %r15,%rsi
+ 170d7de:	4c 89 e2             	mov    %r12,%rdx
+ 170d7e1:	ff 15 19 52 9b 01    	call   *0x19b5219(%rip)        # 30c2a00 <_DYNAMIC+0x5a08>
+ 170d7e7:	48 8b 84 24 f8 00 00 	mov    0xf8(%rsp),%rax
+ 170d7ee:	00 
+ 170d7ef:	48 8b 94 24 00 01 00 	mov    0x100(%rsp),%rdx
+ 170d7f6:	00 
+ 170d7f7:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170d7fb:	0f 85 80 00 00 00    	jne    170d881 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x191>
+ 170d801:	48 81 fa 01 00 00 04 	cmp    $0x4000001,%rdx
+ 170d808:	0f 82 d4 00 00 00    	jb     170d8e2 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1f2>
+ 170d80e:	49 c7 45 00 03 00 00 	movq   $0x3,0x0(%r13)
+ 170d815:	00 
+ 170d816:	49 89 55 08          	mov    %rdx,0x8(%r13)
+ 170d81a:	49 c7 45 10 00 00 00 	movq   $0x4000000,0x10(%r13)
+ 170d821:	04 
+ 170d822:	48 8d 05 87 ca ab fe 	lea    -0x1543579(%rip),%rax        # 1ca2b0 <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0x88f>
+ 170d829:	49 89 45 18          	mov    %rax,0x18(%r13)
+ 170d82d:	49 c7 45 20 0f 00 00 	movq   $0xf,0x20(%r13)
+ 170d834:	00 
+ 170d835:	e9 0b 0b 00 00       	jmp    170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170d83a:	48 8b 8c 24 18 01 00 	mov    0x118(%rsp),%rcx
+ 170d841:	00 
+ 170d842:	4d 89 75 08          	mov    %r14,0x8(%r13)
+ 170d846:	49 89 6d 10          	mov    %rbp,0x10(%r13)
+ 170d84a:	4d 89 7d 18          	mov    %r15,0x18(%r13)
+ 170d84e:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170d852:	49 89 4d 20          	mov    %rcx,0x20(%r13)
+ 170d856:	e9 04 0b 00 00       	jmp    170e35f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc6f>
+ 170d85b:	48 8b 94 24 18 01 00 	mov    0x118(%rsp),%rdx
+ 170d862:	00 
+ 170d863:	49 89 55 20          	mov    %rdx,0x20(%r13)
+ 170d867:	0f 10 84 24 08 01 00 	movups 0x108(%rsp),%xmm0
+ 170d86e:	00 
+ 170d86f:	41 0f 11 45 10       	movups %xmm0,0x10(%r13)
+ 170d874:	49 89 4d 00          	mov    %rcx,0x0(%r13)
+ 170d878:	49 89 45 08          	mov    %rax,0x8(%r13)
+ 170d87c:	e9 de 0a 00 00       	jmp    170e35f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc6f>
+ 170d881:	48 8b 8c 24 18 01 00 	mov    0x118(%rsp),%rcx
+ 170d888:	00 
+ 170d889:	49 89 4d 20          	mov    %rcx,0x20(%r13)
+ 170d88d:	0f 10 84 24 08 01 00 	movups 0x108(%rsp),%xmm0
+ 170d894:	00 
+ 170d895:	41 0f 11 45 10       	movups %xmm0,0x10(%r13)
+ 170d89a:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170d89e:	49 89 55 08          	mov    %rdx,0x8(%r13)
+ 170d8a2:	e9 9e 0a 00 00       	jmp    170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170d8a7:	49 8b 76 08          	mov    0x8(%r14),%rsi
+ 170d8ab:	49 8b 56 10          	mov    0x10(%r14),%rdx
+ 170d8af:	4c 89 74 24 38       	mov    %r14,0x38(%rsp)
+ 170d8b4:	41 8b 8e 44 01 00 00 	mov    0x144(%r14),%ecx
+ 170d8bb:	48 83 ec 08          	sub    $0x8,%rsp
+ 170d8bf:	4c 8d 0d b0 c1 ab fe 	lea    -0x1543e50(%rip),%r9        # 1c9a76 <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0x55>
+ 170d8c6:	48 8d bc 24 00 01 00 	lea    0x100(%rsp),%rdi
+ 170d8cd:	00 
+ 170d8ce:	49 89 d8             	mov    %rbx,%r8
+ 170d8d1:	6a 09                	push   $0x9
+ 170d8d3:	ff 15 07 51 9b 01    	call   *0x19b5107(%rip)        # 30c29e0 <_DYNAMIC+0x59e8>
+ 170d8d9:	48 83 c4 10          	add    $0x10,%rsp
+ 170d8dd:	e9 cb fe ff ff       	jmp    170d7ad <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xbd>
+ 170d8e2:	48 89 54 24 18       	mov    %rdx,0x18(%rsp)
+ 170d8e7:	48 89 6c 24 20       	mov    %rbp,0x20(%rsp)
+ 170d8ec:	4c 89 74 24 28       	mov    %r14,0x28(%rsp)
+ 170d8f1:	4d 85 ff             	test   %r15,%r15
+ 170d8f4:	0f 84 e1 00 00 00    	je     170d9db <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x2eb>
+ 170d8fa:	48 8b 44 24 38       	mov    0x38(%rsp),%rax
+ 170d8ff:	4c 8b a0 80 00 00 00 	mov    0x80(%rax),%r12
+ 170d906:	48 8b 98 88 00 00 00 	mov    0x88(%rax),%rbx
+ 170d90d:	4e 8d 34 bd 00 00 00 	lea    0x0(,%r15,4),%r14
+ 170d914:	00 
+ 170d915:	31 ed                	xor    %ebp,%ebp
+ 170d917:	66 0f 1f 84 00 00 00 	nopw   0x0(%rax,%rax,1)
+ 170d91e:	00 00 
+ 170d920:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+ 170d925:	8b 34 28             	mov    (%rax,%rbp,1),%esi
+ 170d928:	48 39 f3             	cmp    %rsi,%rbx
+ 170d92b:	76 1c                	jbe    170d949 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x259>
+ 170d92d:	41 0f b6 04 34       	movzbl (%r12,%rsi,1),%eax
+ 170d932:	84 c0                	test   %al,%al
+ 170d934:	75 5d                	jne    170d993 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x2a3>
+ 170d936:	41 c6 04 34 03       	movb   $0x3,(%r12,%rsi,1)
+ 170d93b:	48 83 c5 04          	add    $0x4,%rbp
+ 170d93f:	49 39 ee             	cmp    %rbp,%r14
+ 170d942:	75 dc                	jne    170d920 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x230>
+ 170d944:	e9 92 00 00 00       	jmp    170d9db <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x2eb>
+ 170d949:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170d950:	00 
+ 170d951:	ba 03 00 00 00       	mov    $0x3,%edx
+ 170d956:	ff 15 8c 50 9b 01    	call   *0x19b508c(%rip)        # 30c29e8 <_DYNAMIC+0x59f0>
+ 170d95c:	48 8b 84 24 f8 00 00 	mov    0xf8(%rsp),%rax
+ 170d963:	00 
+ 170d964:	48 8b 8c 24 00 01 00 	mov    0x100(%rsp),%rcx
+ 170d96b:	00 
+ 170d96c:	48 8d bc 24 08 01 00 	lea    0x108(%rsp),%rdi
+ 170d973:	00 
+ 170d974:	48 8b 57 10          	mov    0x10(%rdi),%rdx
+ 170d978:	48 8d 74 24 50       	lea    0x50(%rsp),%rsi
+ 170d97d:	48 89 56 10          	mov    %rdx,0x10(%rsi)
+ 170d981:	0f 10 07             	movups (%rdi),%xmm0
+ 170d984:	0f 11 06             	movups %xmm0,(%rsi)
+ 170d987:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+ 170d98c:	48 89 4c 24 48       	mov    %rcx,0x48(%rsp)
+ 170d991:	eb 18                	jmp    170d9ab <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x2bb>
+ 170d993:	0f b6 d0             	movzbl %al,%edx
+ 170d996:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+ 170d99b:	b9 03 00 00 00       	mov    $0x3,%ecx
+ 170d9a0:	ff 15 4a 50 9b 01    	call   *0x19b504a(%rip)        # 30c29f0 <_DYNAMIC+0x59f8>
+ 170d9a6:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+ 170d9ab:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170d9af:	74 8a                	je     170d93b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x24b>
+ 170d9b1:	48 8d 4c 24 50       	lea    0x50(%rsp),%rcx
+ 170d9b6:	0f 10 41 f8          	movups -0x8(%rcx),%xmm0
+ 170d9ba:	0f 10 49 08          	movups 0x8(%rcx),%xmm1
+ 170d9be:	41 0f 11 4d 18       	movups %xmm1,0x18(%r13)
+ 170d9c3:	41 0f 11 45 08       	movups %xmm0,0x8(%r13)
+ 170d9c8:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170d9cc:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+ 170d9d1:	48 8b 6c 24 20       	mov    0x20(%rsp),%rbp
+ 170d9d6:	e9 6a 09 00 00       	jmp    170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170d9db:	48 83 7c 24 18 00    	cmpq   $0x0,0x18(%rsp)
+ 170d9e1:	0f 85 d9 02 00 00    	jne    170dcc0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x5d0>
+ 170d9e7:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+ 170d9ed:	45 31 e4             	xor    %r12d,%r12d
+ 170d9f0:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+ 170d9f5:	48 8b 6c 24 20       	mov    0x20(%rsp),%rbp
+ 170d9fa:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170da01:	00 
+ 170da02:	48 8b 74 24 38       	mov    0x38(%rsp),%rsi
+ 170da07:	48 89 ea             	mov    %rbp,%rdx
+ 170da0a:	4c 89 f9             	mov    %r15,%rcx
+ 170da0d:	4c 89 44 24 30       	mov    %r8,0x30(%rsp)
+ 170da12:	4d 89 e1             	mov    %r12,%r9
+ 170da15:	e8 f6 21 00 00       	call   170fc10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$20read_sectors_batched17he0fe2af04c05e626E>
+ 170da1a:	83 bc 24 f8 00 00 00 	cmpl   $0xb,0xf8(%rsp)
+ 170da21:	0b 
+ 170da22:	0f 85 ad 01 00 00    	jne    170dbd5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x4e5>
+ 170da28:	48 8b 44 24 38       	mov    0x38(%rsp),%rax
+ 170da2d:	4c 8b b8 30 01 00 00 	mov    0x130(%rax),%r15
+ 170da34:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170da3b:	00 
+ 170da3c:	48 8b 74 24 30       	mov    0x30(%rsp),%rsi
+ 170da41:	4c 89 e2             	mov    %r12,%rdx
+ 170da44:	4c 89 f9             	mov    %r15,%rcx
+ 170da47:	e8 e4 66 00 00       	call   1714130 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validated_directory_entries17h37ad1d35f365c1f7E>
+ 170da4c:	48 8b 84 24 f8 00 00 	mov    0xf8(%rsp),%rax
+ 170da53:	00 
+ 170da54:	0f 10 84 24 00 01 00 	movups 0x100(%rsp),%xmm0
+ 170da5b:	00 
+ 170da5c:	0f 29 44 24 40       	movaps %xmm0,0x40(%rsp)
+ 170da61:	48 8b 8c 24 10 01 00 	mov    0x110(%rsp),%rcx
+ 170da68:	00 
+ 170da69:	48 89 4c 24 50       	mov    %rcx,0x50(%rsp)
+ 170da6e:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170da72:	0f 85 88 01 00 00    	jne    170dc00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x510>
+ 170da78:	48 b9 00 00 00 00 00 	movabs $0x8000000000000000,%rcx
+ 170da7f:	00 00 80 
+ 170da82:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170da87:	0f 29 84 24 d0 01 00 	movaps %xmm0,0x1d0(%rsp)
+ 170da8e:	00 
+ 170da8f:	48 8b 44 24 50       	mov    0x50(%rsp),%rax
+ 170da94:	48 89 84 24 e0 01 00 	mov    %rax,0x1e0(%rsp)
+ 170da9b:	00 
+ 170da9c:	4c 89 e6             	mov    %r12,%rsi
+ 170da9f:	48 c1 ee 07          	shr    $0x7,%rsi
+ 170daa3:	48 89 8c 24 f8 00 00 	mov    %rcx,0xf8(%rsp)
+ 170daaa:	00 
+ 170daab:	b0 01                	mov    $0x1,%al
+ 170daad:	89 04 24             	mov    %eax,(%rsp)
+ 170dab0:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+ 170dab5:	48 8d 94 24 f8 00 00 	lea    0xf8(%rsp),%rdx
+ 170dabc:	00 
+ 170dabd:	48 89 74 24 10       	mov    %rsi,0x10(%rsp)
+ 170dac2:	e8 d9 43 ff ff       	call   1701ea0 <_ZN10litchi_cfb4file14try_filled_vec17h0992f5eb8a152d7dE>
+ 170dac7:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+ 170dacc:	0f 10 44 24 48       	movups 0x48(%rsp),%xmm0
+ 170dad1:	0f 29 84 24 f0 01 00 	movaps %xmm0,0x1f0(%rsp)
+ 170dad8:	00 
+ 170dad9:	48 8b 4c 24 58       	mov    0x58(%rsp),%rcx
+ 170dade:	48 89 8c 24 00 02 00 	mov    %rcx,0x200(%rsp)
+ 170dae5:	00 
+ 170dae6:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170daea:	0f 85 38 01 00 00    	jne    170dc28 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x538>
+ 170daf0:	0f 28 84 24 f0 01 00 	movaps 0x1f0(%rsp),%xmm0
+ 170daf7:	00 
+ 170daf8:	0f 29 84 24 b0 00 00 	movaps %xmm0,0xb0(%rsp)
+ 170daff:	00 
+ 170db00:	48 8b 84 24 00 02 00 	mov    0x200(%rsp),%rax
+ 170db07:	00 
+ 170db08:	48 89 84 24 c0 00 00 	mov    %rax,0xc0(%rsp)
+ 170db0f:	00 
+ 170db10:	48 8b 74 24 10       	mov    0x10(%rsp),%rsi
+ 170db15:	48 39 b4 24 e0 01 00 	cmp    %rsi,0x1e0(%rsp)
+ 170db1c:	00 
+ 170db1d:	0f 85 30 01 00 00    	jne    170dc53 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x563>
+ 170db23:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170db2a:	00 00 80 
+ 170db2d:	48 89 84 24 60 02 00 	mov    %rax,0x260(%rsp)
+ 170db34:	00 
+ 170db35:	48 85 f6             	test   %rsi,%rsi
+ 170db38:	0f 84 6a 04 00 00    	je     170dfa8 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x8b8>
+ 170db3e:	49 83 fc 7f          	cmp    $0x7f,%r12
+ 170db42:	0f 86 13 0a 00 00    	jbe    170e55b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xe6b>
+ 170db48:	48 8b 44 24 38       	mov    0x38(%rsp),%rax
+ 170db4d:	8b 90 40 01 00 00    	mov    0x140(%rax),%edx
+ 170db53:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170db5a:	00 
+ 170db5b:	4c 89 fe             	mov    %r15,%rsi
+ 170db5e:	89 14 24             	mov    %edx,(%rsp)
+ 170db61:	48 8b 4c 24 30       	mov    0x30(%rsp),%rcx
+ 170db66:	45 31 c0             	xor    %r8d,%r8d
+ 170db69:	45 31 c9             	xor    %r9d,%r9d
+ 170db6c:	e8 0f 37 00 00       	call   1711280 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$21parse_directory_entry17h39223f78051e6d12E>
+ 170db71:	48 8b 84 24 f8 00 00 	mov    0xf8(%rsp),%rax
+ 170db78:	00 
+ 170db79:	0f 10 84 24 00 01 00 	movups 0x100(%rsp),%xmm0
+ 170db80:	00 
+ 170db81:	0f 29 44 24 40       	movaps %xmm0,0x40(%rsp)
+ 170db86:	0f 10 84 24 10 01 00 	movups 0x110(%rsp),%xmm0
+ 170db8d:	00 
+ 170db8e:	0f 29 44 24 50       	movaps %xmm0,0x50(%rsp)
+ 170db93:	48 8b 8c 24 20 01 00 	mov    0x120(%rsp),%rcx
+ 170db9a:	00 
+ 170db9b:	48 89 4c 24 60       	mov    %rcx,0x60(%rsp)
+ 170dba0:	48 b9 00 00 00 00 00 	movabs $0x8000000000000000,%rcx
+ 170dba7:	00 00 80 
+ 170dbaa:	48 39 c8             	cmp    %rcx,%rax
+ 170dbad:	0f 85 b1 01 00 00    	jne    170dd64 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x674>
+ 170dbb3:	48 8b 44 24 60       	mov    0x60(%rsp),%rax
+ 170dbb8:	49 89 45 20          	mov    %rax,0x20(%r13)
+ 170dbbc:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170dbc1:	0f 28 4c 24 50       	movaps 0x50(%rsp),%xmm1
+ 170dbc6:	41 0f 11 4d 10       	movups %xmm1,0x10(%r13)
+ 170dbcb:	41 0f 11 45 00       	movups %xmm0,0x0(%r13)
+ 170dbd0:	e9 31 07 00 00       	jmp    170e306 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc16>
+ 170dbd5:	48 8b 84 24 18 01 00 	mov    0x118(%rsp),%rax
+ 170dbdc:	00 
+ 170dbdd:	49 89 45 20          	mov    %rax,0x20(%r13)
+ 170dbe1:	0f 10 84 24 f8 00 00 	movups 0xf8(%rsp),%xmm0
+ 170dbe8:	00 
+ 170dbe9:	0f 10 8c 24 08 01 00 	movups 0x108(%rsp),%xmm1
+ 170dbf0:	00 
+ 170dbf1:	41 0f 11 4d 10       	movups %xmm1,0x10(%r13)
+ 170dbf6:	41 0f 11 45 00       	movups %xmm0,0x0(%r13)
+ 170dbfb:	e9 2b 07 00 00       	jmp    170e32b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc3b>
+ 170dc00:	48 8b 8c 24 18 01 00 	mov    0x118(%rsp),%rcx
+ 170dc07:	00 
+ 170dc08:	48 8b 54 24 50       	mov    0x50(%rsp),%rdx
+ 170dc0d:	49 89 55 18          	mov    %rdx,0x18(%r13)
+ 170dc11:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170dc16:	41 0f 11 45 08       	movups %xmm0,0x8(%r13)
+ 170dc1b:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170dc1f:	49 89 4d 20          	mov    %rcx,0x20(%r13)
+ 170dc23:	e9 03 07 00 00       	jmp    170e32b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc3b>
+ 170dc28:	48 8b 4c 24 60       	mov    0x60(%rsp),%rcx
+ 170dc2d:	48 8b 94 24 00 02 00 	mov    0x200(%rsp),%rdx
+ 170dc34:	00 
+ 170dc35:	49 89 55 18          	mov    %rdx,0x18(%r13)
+ 170dc39:	0f 28 84 24 f0 01 00 	movaps 0x1f0(%rsp),%xmm0
+ 170dc40:	00 
+ 170dc41:	41 0f 11 45 08       	movups %xmm0,0x8(%r13)
+ 170dc46:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170dc4a:	49 89 4d 20          	mov    %rcx,0x20(%r13)
+ 170dc4e:	e9 cb 06 00 00       	jmp    170e31e <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc2e>
+ 170dc53:	ff 15 37 f6 9a 01    	call   *0x19af637(%rip)        # 30bd290 <_DYNAMIC+0x298>
+ 170dc59:	bf 2e 00 00 00       	mov    $0x2e,%edi
+ 170dc5e:	be 01 00 00 00       	mov    $0x1,%esi
+ 170dc63:	ff 15 2f f6 9a 01    	call   *0x19af62f(%rip)        # 30bd298 <_DYNAMIC+0x2a0>
+ 170dc69:	48 85 c0             	test   %rax,%rax
+ 170dc6c:	0f 84 02 09 00 00    	je     170e574 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xe84>
+ 170dc72:	0f 10 05 94 be ab fe 	movups -0x154416c(%rip),%xmm0        # 1c9b0d <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0xec>
+ 170dc79:	0f 11 40 1e          	movups %xmm0,0x1e(%rax)
+ 170dc7d:	0f 10 05 7b be ab fe 	movups -0x1544185(%rip),%xmm0        # 1c9aff <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0xde>
+ 170dc84:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+ 170dc88:	0f 10 05 60 be ab fe 	movups -0x15441a0(%rip),%xmm0        # 1c9aef <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0xce>
+ 170dc8f:	0f 11 00             	movups %xmm0,(%rax)
+ 170dc92:	49 c7 45 00 08 00 00 	movq   $0x8,0x0(%r13)
+ 170dc99:	00 
+ 170dc9a:	49 c7 45 08 2e 00 00 	movq   $0x2e,0x8(%r13)
+ 170dca1:	00 
+ 170dca2:	49 89 45 10          	mov    %rax,0x10(%r13)
+ 170dca6:	49 c7 45 18 2e 00 00 	movq   $0x2e,0x18(%r13)
+ 170dcad:	00 
+ 170dcae:	48 8d bc 24 b0 00 00 	lea    0xb0(%rsp),%rdi
+ 170dcb5:	00 
+ 170dcb6:	e8 a5 53 06 00       	call   1773060 <_ZN4core3ptr104drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..DirectoryEntry$GT$$GT$$GT$17h476cba350d180281E>
+ 170dcbb:	e9 5e 06 00 00       	jmp    170e31e <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc2e>
+ 170dcc0:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170dcc7:	00 
+ 170dcc8:	ba 01 00 00 00       	mov    $0x1,%edx
+ 170dccd:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+ 170dcd3:	41 b9 01 00 00 00    	mov    $0x1,%r9d
+ 170dcd9:	31 f6                	xor    %esi,%esi
+ 170dcdb:	4c 8b 64 24 18       	mov    0x18(%rsp),%r12
+ 170dce0:	4c 89 e1             	mov    %r12,%rcx
+ 170dce3:	e8 08 95 d1 ff       	call   14271f0 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hcb0dfd499e5da501E.llvm.14955387735043693257>
+ 170dce8:	80 bc 24 f8 00 00 00 	cmpb   $0x0,0xf8(%rsp)
+ 170dcef:	00 
+ 170dcf0:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+ 170dcf5:	74 32                	je     170dd29 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x639>
+ 170dcf7:	0f 10 84 24 00 01 00 	movups 0x100(%rsp),%xmm0
+ 170dcfe:	00 
+ 170dcff:	48 8d 05 79 bd ab fe 	lea    -0x1544287(%rip),%rax        # 1c9a7f <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0x5e>
+ 170dd06:	49 89 45 08          	mov    %rax,0x8(%r13)
+ 170dd0a:	49 c7 45 10 0e 00 00 	movq   $0xe,0x10(%r13)
+ 170dd11:	00 
+ 170dd12:	49 c7 45 00 01 00 00 	movq   $0x1,0x0(%r13)
+ 170dd19:	00 
+ 170dd1a:	41 0f 11 45 18       	movups %xmm0,0x18(%r13)
+ 170dd1f:	48 8b 6c 24 20       	mov    0x20(%rsp),%rbp
+ 170dd24:	e9 1c 06 00 00       	jmp    170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170dd29:	48 8b bc 24 00 01 00 	mov    0x100(%rsp),%rdi
+ 170dd30:	00 
+ 170dd31:	48 89 f8             	mov    %rdi,%rax
+ 170dd34:	49 83 fc 01          	cmp    $0x1,%r12
+ 170dd38:	48 8b 6c 24 20       	mov    0x20(%rsp),%rbp
+ 170dd3d:	74 1a                	je     170dd59 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x669>
+ 170dd3f:	49 8d 54 24 ff       	lea    -0x1(%r12),%rdx
+ 170dd44:	48 89 fb             	mov    %rdi,%rbx
+ 170dd47:	31 f6                	xor    %esi,%esi
+ 170dd49:	ff 15 81 02 9b 01    	call   *0x19b0281(%rip)        # 30bdfd0 <memset@GLIBC_2.2.5>
+ 170dd4f:	48 89 df             	mov    %rbx,%rdi
+ 170dd52:	4a 8d 04 23          	lea    (%rbx,%r12,1),%rax
+ 170dd56:	48 ff c8             	dec    %rax
+ 170dd59:	c6 00 00             	movb   $0x0,(%rax)
+ 170dd5c:	49 89 f8             	mov    %rdi,%r8
+ 170dd5f:	e9 96 fc ff ff       	jmp    170d9fa <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x30a>
+ 170dd64:	48 8b 8c 24 58 01 00 	mov    0x158(%rsp),%rcx
+ 170dd6b:	00 
+ 170dd6c:	48 89 8c 24 50 02 00 	mov    %rcx,0x250(%rsp)
+ 170dd73:	00 
+ 170dd74:	0f 10 84 24 28 01 00 	movups 0x128(%rsp),%xmm0
+ 170dd7b:	00 
+ 170dd7c:	0f 10 8c 24 38 01 00 	movups 0x138(%rsp),%xmm1
+ 170dd83:	00 
+ 170dd84:	0f 10 94 24 48 01 00 	movups 0x148(%rsp),%xmm2
+ 170dd8b:	00 
+ 170dd8c:	0f 11 94 24 40 02 00 	movups %xmm2,0x240(%rsp)
+ 170dd93:	00 
+ 170dd94:	0f 11 8c 24 30 02 00 	movups %xmm1,0x230(%rsp)
+ 170dd9b:	00 
+ 170dd9c:	0f 11 84 24 20 02 00 	movups %xmm0,0x220(%rsp)
+ 170dda3:	00 
+ 170dda4:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170dda9:	0f 28 4c 24 50       	movaps 0x50(%rsp),%xmm1
+ 170ddae:	0f 11 84 24 f8 01 00 	movups %xmm0,0x1f8(%rsp)
+ 170ddb5:	00 
+ 170ddb6:	0f 11 8c 24 08 02 00 	movups %xmm1,0x208(%rsp)
+ 170ddbd:	00 
+ 170ddbe:	48 8b 4c 24 60       	mov    0x60(%rsp),%rcx
+ 170ddc3:	48 89 8c 24 18 02 00 	mov    %rcx,0x218(%rsp)
+ 170ddca:	00 
+ 170ddcb:	48 89 84 24 f0 01 00 	mov    %rax,0x1f0(%rsp)
+ 170ddd2:	00 
+ 170ddd3:	8b 84 24 4c 02 00 00 	mov    0x24c(%rsp),%eax
+ 170ddda:	89 84 24 c8 00 00 00 	mov    %eax,0xc8(%rsp)
+ 170dde1:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170dde8:	00 
+ 170dde9:	48 8d b4 24 f0 01 00 	lea    0x1f0(%rsp),%rsi
+ 170ddf0:	00 
+ 170ddf1:	e8 3a f2 07 00       	call   178d030 <_ZN71_$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$5clone17h1aedb16f45e073fdE>
+ 170ddf6:	48 8b 84 24 58 01 00 	mov    0x158(%rsp),%rax
+ 170ddfd:	00 
+ 170ddfe:	48 89 84 24 a0 00 00 	mov    %rax,0xa0(%rsp)
+ 170de05:	00 
+ 170de06:	0f 10 84 24 48 01 00 	movups 0x148(%rsp),%xmm0
+ 170de0d:	00 
+ 170de0e:	0f 29 84 24 90 00 00 	movaps %xmm0,0x90(%rsp)
+ 170de15:	00 
+ 170de16:	0f 10 84 24 38 01 00 	movups 0x138(%rsp),%xmm0
+ 170de1d:	00 
+ 170de1e:	0f 29 84 24 80 00 00 	movaps %xmm0,0x80(%rsp)
+ 170de25:	00 
+ 170de26:	0f 10 84 24 f8 00 00 	movups 0xf8(%rsp),%xmm0
+ 170de2d:	00 
+ 170de2e:	0f 10 8c 24 08 01 00 	movups 0x108(%rsp),%xmm1
+ 170de35:	00 
+ 170de36:	0f 10 94 24 18 01 00 	movups 0x118(%rsp),%xmm2
+ 170de3d:	00 
+ 170de3e:	0f 10 9c 24 28 01 00 	movups 0x128(%rsp),%xmm3
+ 170de45:	00 
+ 170de46:	0f 29 5c 24 70       	movaps %xmm3,0x70(%rsp)
+ 170de4b:	0f 29 54 24 60       	movaps %xmm2,0x60(%rsp)
+ 170de50:	0f 29 4c 24 50       	movaps %xmm1,0x50(%rsp)
+ 170de55:	0f 29 44 24 40       	movaps %xmm0,0x40(%rsp)
+ 170de5a:	48 8b 84 24 c0 00 00 	mov    0xc0(%rsp),%rax
+ 170de61:	00 
+ 170de62:	48 85 c0             	test   %rax,%rax
+ 170de65:	0f 84 20 07 00 00    	je     170e58b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xe9b>
+ 170de6b:	48 89 84 24 a8 00 00 	mov    %rax,0xa8(%rsp)
+ 170de72:	00 
+ 170de73:	48 8b 8c 24 b8 00 00 	mov    0xb8(%rsp),%rcx
+ 170de7a:	00 
+ 170de7b:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170de82:	00 00 80 
+ 170de85:	48 89 4c 24 08       	mov    %rcx,0x8(%rsp)
+ 170de8a:	48 39 01             	cmp    %rax,(%rcx)
+ 170de8d:	74 0a                	je     170de99 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x7a9>
+ 170de8f:	48 8b 7c 24 08       	mov    0x8(%rsp),%rdi
+ 170de94:	e8 e7 a6 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170de99:	48 8b 84 24 a0 00 00 	mov    0xa0(%rsp),%rax
+ 170dea0:	00 
+ 170dea1:	4c 8b 54 24 08       	mov    0x8(%rsp),%r10
+ 170dea6:	49 89 42 60          	mov    %rax,0x60(%r10)
+ 170deaa:	0f 28 84 24 90 00 00 	movaps 0x90(%rsp),%xmm0
+ 170deb1:	00 
+ 170deb2:	41 0f 11 42 50       	movups %xmm0,0x50(%r10)
+ 170deb7:	0f 28 84 24 80 00 00 	movaps 0x80(%rsp),%xmm0
+ 170debe:	00 
+ 170debf:	41 0f 11 42 40       	movups %xmm0,0x40(%r10)
+ 170dec4:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170dec9:	0f 28 4c 24 50       	movaps 0x50(%rsp),%xmm1
+ 170dece:	0f 28 54 24 60       	movaps 0x60(%rsp),%xmm2
+ 170ded3:	0f 28 5c 24 70       	movaps 0x70(%rsp),%xmm3
+ 170ded8:	41 0f 11 5a 30       	movups %xmm3,0x30(%r10)
+ 170dedd:	41 0f 11 52 20       	movups %xmm2,0x20(%r10)
+ 170dee2:	41 0f 11 4a 10       	movups %xmm1,0x10(%r10)
+ 170dee7:	41 0f 11 02          	movups %xmm0,(%r10)
+ 170deeb:	48 8d bc 24 f8 00 00 	lea    0xf8(%rsp),%rdi
+ 170def2:	00 
+ 170def3:	4c 89 fe             	mov    %r15,%rsi
+ 170def6:	8b 14 24             	mov    (%rsp),%edx
+ 170def9:	8b 8c 24 c8 00 00 00 	mov    0xc8(%rsp),%ecx
+ 170df00:	4c 8b 44 24 30       	mov    0x30(%rsp),%r8
+ 170df05:	4d 89 e1             	mov    %r12,%r9
+ 170df08:	ff 74 24 10          	push   0x10(%rsp)
+ 170df0c:	ff b4 24 e0 01 00 00 	push   0x1e0(%rsp)
+ 170df13:	ff b4 24 b8 00 00 00 	push   0xb8(%rsp)
+ 170df1a:	41 52                	push   %r10
+ 170df1c:	e8 7f 7d 00 00       	call   1715ca0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$28build_storage_tree_iterative17h3bfe597f7e5a0a47E>
+ 170df21:	48 83 c4 20          	add    $0x20,%rsp
+ 170df25:	83 bc 24 f8 00 00 00 	cmpl   $0xb,0xf8(%rsp)
+ 170df2c:	0b 
+ 170df2d:	0f 85 a0 03 00 00    	jne    170e2d3 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xbe3>
+ 170df33:	0f 10 84 24 f0 01 00 	movups 0x1f0(%rsp),%xmm0
+ 170df3a:	00 
+ 170df3b:	0f 10 8c 24 00 02 00 	movups 0x200(%rsp),%xmm1
+ 170df42:	00 
+ 170df43:	0f 10 94 24 10 02 00 	movups 0x210(%rsp),%xmm2
+ 170df4a:	00 
+ 170df4b:	0f 10 9c 24 20 02 00 	movups 0x220(%rsp),%xmm3
+ 170df52:	00 
+ 170df53:	0f 29 84 24 60 02 00 	movaps %xmm0,0x260(%rsp)
+ 170df5a:	00 
+ 170df5b:	0f 29 8c 24 70 02 00 	movaps %xmm1,0x270(%rsp)
+ 170df62:	00 
+ 170df63:	0f 29 94 24 80 02 00 	movaps %xmm2,0x280(%rsp)
+ 170df6a:	00 
+ 170df6b:	0f 29 9c 24 90 02 00 	movaps %xmm3,0x290(%rsp)
+ 170df72:	00 
+ 170df73:	0f 10 84 24 30 02 00 	movups 0x230(%rsp),%xmm0
+ 170df7a:	00 
+ 170df7b:	0f 29 84 24 a0 02 00 	movaps %xmm0,0x2a0(%rsp)
+ 170df82:	00 
+ 170df83:	0f 10 84 24 40 02 00 	movups 0x240(%rsp),%xmm0
+ 170df8a:	00 
+ 170df8b:	0f 29 84 24 b0 02 00 	movaps %xmm0,0x2b0(%rsp)
+ 170df92:	00 
+ 170df93:	48 8b 84 24 50 02 00 	mov    0x250(%rsp),%rax
+ 170df9a:	00 
+ 170df9b:	48 89 84 24 c0 02 00 	mov    %rax,0x2c0(%rsp)
+ 170dfa2:	00 
+ 170dfa3:	48 8b 74 24 10       	mov    0x10(%rsp),%rsi
+ 170dfa8:	66 c7 84 24 f8 00 00 	movw   $0x2,0xf8(%rsp)
+ 170dfaf:	00 02 00 
+ 170dfb2:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+ 170dfb7:	48 8d 94 24 f8 00 00 	lea    0xf8(%rsp),%rdx
+ 170dfbe:	00 
+ 170dfbf:	e8 dc 40 ff ff       	call   17020a0 <_ZN10litchi_cfb4file14try_filled_vec17h521e32921113255bE>
+ 170dfc4:	48 8b 44 24 40       	mov    0x40(%rsp),%rax
+ 170dfc9:	0f 10 44 24 48       	movups 0x48(%rsp),%xmm0
+ 170dfce:	0f 29 84 24 f0 01 00 	movaps %xmm0,0x1f0(%rsp)
+ 170dfd5:	00 
+ 170dfd6:	48 8b 4c 24 58       	mov    0x58(%rsp),%rcx
+ 170dfdb:	48 89 8c 24 00 02 00 	mov    %rcx,0x200(%rsp)
+ 170dfe2:	00 
+ 170dfe3:	48 83 f8 0b          	cmp    $0xb,%rax
+ 170dfe7:	0f 85 98 02 00 00    	jne    170e285 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xb95>
+ 170dfed:	0f 28 84 24 f0 01 00 	movaps 0x1f0(%rsp),%xmm0
+ 170dff4:	00 
+ 170dff5:	0f 29 84 24 d0 00 00 	movaps %xmm0,0xd0(%rsp)
+ 170dffc:	00 
+ 170dffd:	4c 8b 84 24 00 02 00 	mov    0x200(%rsp),%r8
+ 170e004:	00 
+ 170e005:	4c 89 84 24 e0 00 00 	mov    %r8,0xe0(%rsp)
+ 170e00c:	00 
+ 170e00d:	48 8b bc 24 d8 00 00 	mov    0xd8(%rsp),%rdi
+ 170e014:	00 
+ 170e015:	4b 8d 04 80          	lea    (%r8,%r8,4),%rax
+ 170e019:	48 c1 e0 05          	shl    $0x5,%rax
+ 170e01d:	48 01 f8             	add    %rdi,%rax
+ 170e020:	48 8b 9c 24 b8 00 00 	mov    0xb8(%rsp),%rbx
+ 170e027:	00 
+ 170e028:	48 8b 8c 24 c0 00 00 	mov    0xc0(%rsp),%rcx
+ 170e02f:	00 
+ 170e030:	48 6b d1 68          	imul   $0x68,%rcx,%rdx
+ 170e034:	48 01 da             	add    %rbx,%rdx
+ 170e037:	4c 39 c1             	cmp    %r8,%rcx
+ 170e03a:	4c 0f 42 c1          	cmovb  %rcx,%r8
+ 170e03e:	48 8b 8c 24 d0 01 00 	mov    0x1d0(%rsp),%rcx
+ 170e045:	00 
+ 170e046:	4c 8b 8c 24 d8 01 00 	mov    0x1d8(%rsp),%r9
+ 170e04d:	00 
+ 170e04e:	48 8b 74 24 10       	mov    0x10(%rsp),%rsi
+ 170e053:	4c 69 d6 d0 00 00 00 	imul   $0xd0,%rsi,%r10
+ 170e05a:	4d 01 ca             	add    %r9,%r10
+ 170e05d:	48 89 bc 24 a8 00 00 	mov    %rdi,0xa8(%rsp)
+ 170e064:	00 
+ 170e065:	48 89 7c 24 40       	mov    %rdi,0x40(%rsp)
+ 170e06a:	48 89 44 24 48       	mov    %rax,0x48(%rsp)
+ 170e06f:	48 89 5c 24 50       	mov    %rbx,0x50(%rsp)
+ 170e074:	48 89 54 24 58       	mov    %rdx,0x58(%rsp)
+ 170e079:	48 c7 44 24 60 00 00 	movq   $0x0,0x60(%rsp)
+ 170e080:	00 00 
+ 170e082:	4c 89 44 24 68       	mov    %r8,0x68(%rsp)
+ 170e087:	0f 57 c0             	xorps  %xmm0,%xmm0
+ 170e08a:	0f 11 84 24 90 00 00 	movups %xmm0,0x90(%rsp)
+ 170e091:	00 
+ 170e092:	48 8d 7c 24 70       	lea    0x70(%rsp),%rdi
+ 170e097:	4c 89 4c 24 70       	mov    %r9,0x70(%rsp)
+ 170e09c:	4c 89 4c 24 78       	mov    %r9,0x78(%rsp)
+ 170e0a1:	48 89 8c 24 80 00 00 	mov    %rcx,0x80(%rsp)
+ 170e0a8:	00 
+ 170e0a9:	4c 89 94 24 f0 00 00 	mov    %r10,0xf0(%rsp)
+ 170e0b0:	00 
+ 170e0b1:	4c 89 94 24 88 00 00 	mov    %r10,0x88(%rsp)
+ 170e0b8:	00 
+ 170e0b9:	4d 85 c0             	test   %r8,%r8
+ 170e0bc:	0f 84 e6 02 00 00    	je     170e3a8 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xcb8>
+ 170e0c2:	48 85 f6             	test   %rsi,%rsi
+ 170e0c5:	0f 84 a6 02 00 00    	je     170e371 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc81>
+ 170e0cb:	4c 89 84 24 d0 02 00 	mov    %r8,0x2d0(%rsp)
+ 170e0d2:	00 
+ 170e0d3:	49 8d 91 d0 00 00 00 	lea    0xd0(%r9),%rdx
+ 170e0da:	b9 01 00 00 00       	mov    $0x1,%ecx
+ 170e0df:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e0e6:	00 00 80 
+ 170e0e9:	48 8d 70 02          	lea    0x2(%rax),%rsi
+ 170e0ed:	48 89 b4 24 d8 02 00 	mov    %rsi,0x2d8(%rsp)
+ 170e0f4:	00 
+ 170e0f5:	48 ff c0             	inc    %rax
+ 170e0f8:	48 89 84 24 e8 00 00 	mov    %rax,0xe8(%rsp)
+ 170e0ff:	00 
+ 170e100:	48 89 4c 24 10       	mov    %rcx,0x10(%rsp)
+ 170e105:	4c 89 8c 24 c8 02 00 	mov    %r9,0x2c8(%rsp)
+ 170e10c:	00 
+ 170e10d:	4c 8b ba 30 ff ff ff 	mov    -0xd0(%rdx),%r15
+ 170e114:	4c 3b bc 24 d8 02 00 	cmp    0x2d8(%rsp),%r15
+ 170e11b:	00 
+ 170e11c:	0f 84 5e 02 00 00    	je     170e380 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc90>
+ 170e122:	48 89 54 24 08       	mov    %rdx,0x8(%rsp)
+ 170e127:	48 8d 82 30 ff ff ff 	lea    -0xd0(%rdx),%rax
+ 170e12e:	48 89 84 24 c8 00 00 	mov    %rax,0xc8(%rsp)
+ 170e135:	00 
+ 170e136:	48 8d 70 08          	lea    0x8(%rax),%rsi
+ 170e13a:	48 89 34 24          	mov    %rsi,(%rsp)
+ 170e13e:	ba c8 00 00 00       	mov    $0xc8,%edx
+ 170e143:	48 8d bc 24 e0 02 00 	lea    0x2e0(%rsp),%rdi
+ 170e14a:	00 
+ 170e14b:	4c 8b 25 0e f1 9a 01 	mov    0x19af10e(%rip),%r12        # 30bd260 <memcpy@GLIBC_2.14>
+ 170e152:	41 ff d4             	call   *%r12
+ 170e155:	48 89 9c 24 f8 00 00 	mov    %rbx,0xf8(%rsp)
+ 170e15c:	00 
+ 170e15d:	4c 89 bc 24 00 01 00 	mov    %r15,0x100(%rsp)
+ 170e164:	00 
+ 170e165:	ba c8 00 00 00       	mov    $0xc8,%edx
+ 170e16a:	48 8d bc 24 08 01 00 	lea    0x108(%rsp),%rdi
+ 170e171:	00 
+ 170e172:	48 8b 34 24          	mov    (%rsp),%rsi
+ 170e176:	41 ff d4             	call   *%r12
+ 170e179:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e180:	00 00 80 
+ 170e183:	48 39 03             	cmp    %rax,(%rbx)
+ 170e186:	75 13                	jne    170e19b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xaab>
+ 170e188:	4c 3b bc 24 e8 00 00 	cmp    0xe8(%rsp),%r15
+ 170e18f:	00 
+ 170e190:	0f 84 8b 00 00 00    	je     170e221 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xb31>
+ 170e196:	e9 dd 01 00 00       	jmp    170e378 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc88>
+ 170e19b:	4c 3b bc 24 e8 00 00 	cmp    0xe8(%rsp),%r15
+ 170e1a2:	00 
+ 170e1a3:	0f 84 ec 02 00 00    	je     170e495 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xda5>
+ 170e1a9:	8b 43 50             	mov    0x50(%rbx),%eax
+ 170e1ac:	3b 84 24 b8 01 00 00 	cmp    0x1b8(%rsp),%eax
+ 170e1b3:	0f 85 bf 01 00 00    	jne    170e378 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc88>
+ 170e1b9:	48 b9 00 00 00 00 00 	movabs $0x8000000000000000,%rcx
+ 170e1c0:	00 00 80 
+ 170e1c3:	49 39 cf             	cmp    %rcx,%r15
+ 170e1c6:	74 08                	je     170e1d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xae0>
+ 170e1c8:	85 c0                	test   %eax,%eax
+ 170e1ca:	0f 85 a8 01 00 00    	jne    170e378 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc88>
+ 170e1d0:	48 8b 84 24 08 01 00 	mov    0x108(%rsp),%rax
+ 170e1d7:	00 
+ 170e1d8:	48 89 04 24          	mov    %rax,(%rsp)
+ 170e1dc:	4c 8b a4 24 a8 00 00 	mov    0xa8(%rsp),%r12
+ 170e1e3:	00 
+ 170e1e4:	4c 89 e7             	mov    %r12,%rdi
+ 170e1e7:	e8 e4 87 07 00       	call   17869d0 <_ZN4core3ptr94drop_in_place$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$17hce0f343fdf047e45E>
+ 170e1ec:	ba a0 00 00 00       	mov    $0xa0,%edx
+ 170e1f1:	4c 89 e7             	mov    %r12,%rdi
+ 170e1f4:	48 8d b4 24 f0 02 00 	lea    0x2f0(%rsp),%rsi
+ 170e1fb:	00 
+ 170e1fc:	ff 15 5e f0 9a 01    	call   *0x19af05e(%rip)        # 30bd260 <memcpy@GLIBC_2.14>
+ 170e202:	4a 8d 04 7d 00 00 00 	lea    0x0(,%r15,2),%rax
+ 170e209:	00 
+ 170e20a:	48 85 c0             	test   %rax,%rax
+ 170e20d:	74 12                	je     170e221 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xb31>
+ 170e20f:	ba 01 00 00 00       	mov    $0x1,%edx
+ 170e214:	48 8b 3c 24          	mov    (%rsp),%rdi
+ 170e218:	4c 89 fe             	mov    %r15,%rsi
+ 170e21b:	ff 15 1f f0 9a 01    	call   *0x19af01f(%rip)        # 30bd240 <_DYNAMIC+0x248>
+ 170e221:	48 8b 84 24 d0 02 00 	mov    0x2d0(%rsp),%rax
+ 170e228:	00 
+ 170e229:	48 8b 4c 24 10       	mov    0x10(%rsp),%rcx
+ 170e22e:	48 39 c8             	cmp    %rcx,%rax
+ 170e231:	0f 84 53 01 00 00    	je     170e38a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc9a>
+ 170e237:	48 ff c1             	inc    %rcx
+ 170e23a:	48 83 c3 68          	add    $0x68,%rbx
+ 170e23e:	48 81 84 24 a8 00 00 	addq   $0xa0,0xa8(%rsp)
+ 170e245:	00 a0 00 00 00 
+ 170e24a:	48 8b 54 24 08       	mov    0x8(%rsp),%rdx
+ 170e24f:	48 81 c2 d0 00 00 00 	add    $0xd0,%rdx
+ 170e256:	48 8b 84 24 c8 00 00 	mov    0xc8(%rsp),%rax
+ 170e25d:	00 
+ 170e25e:	48 05 d0 00 00 00    	add    $0xd0,%rax
+ 170e264:	49 89 c1             	mov    %rax,%r9
+ 170e267:	48 3b 84 24 f0 00 00 	cmp    0xf0(%rsp),%rax
+ 170e26e:	00 
+ 170e26f:	0f 85 8b fe ff ff    	jne    170e100 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xa10>
+ 170e275:	4c 8b 8c 24 f0 00 00 	mov    0xf0(%rsp),%r9
+ 170e27c:	00 
+ 170e27d:	48 89 c8             	mov    %rcx,%rax
+ 170e280:	e9 14 01 00 00       	jmp    170e399 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xca9>
+ 170e285:	48 8b 4c 24 60       	mov    0x60(%rsp),%rcx
+ 170e28a:	48 8b 94 24 00 02 00 	mov    0x200(%rsp),%rdx
+ 170e291:	00 
+ 170e292:	49 89 55 18          	mov    %rdx,0x18(%r13)
+ 170e296:	0f 28 84 24 f0 01 00 	movaps 0x1f0(%rsp),%xmm0
+ 170e29d:	00 
+ 170e29e:	41 0f 11 45 08       	movups %xmm0,0x8(%r13)
+ 170e2a3:	49 89 45 00          	mov    %rax,0x0(%r13)
+ 170e2a7:	49 89 4d 20          	mov    %rcx,0x20(%r13)
+ 170e2ab:	b0 01                	mov    $0x1,%al
+ 170e2ad:	89 04 24             	mov    %eax,(%rsp)
+ 170e2b0:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e2b7:	00 00 80 
+ 170e2ba:	48 39 84 24 60 02 00 	cmp    %rax,0x260(%rsp)
+ 170e2c1:	00 
+ 170e2c2:	74 47                	je     170e30b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc1b>
+ 170e2c4:	48 8d bc 24 60 02 00 	lea    0x260(%rsp),%rdi
+ 170e2cb:	00 
+ 170e2cc:	e8 af a2 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e2d1:	eb 38                	jmp    170e30b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc1b>
+ 170e2d3:	48 8b 84 24 18 01 00 	mov    0x118(%rsp),%rax
+ 170e2da:	00 
+ 170e2db:	49 89 45 20          	mov    %rax,0x20(%r13)
+ 170e2df:	0f 10 84 24 f8 00 00 	movups 0xf8(%rsp),%xmm0
+ 170e2e6:	00 
+ 170e2e7:	0f 10 8c 24 08 01 00 	movups 0x108(%rsp),%xmm1
+ 170e2ee:	00 
+ 170e2ef:	41 0f 11 4d 10       	movups %xmm1,0x10(%r13)
+ 170e2f4:	41 0f 11 45 00       	movups %xmm0,0x0(%r13)
+ 170e2f9:	48 8d bc 24 f0 01 00 	lea    0x1f0(%rsp),%rdi
+ 170e300:	00 
+ 170e301:	e8 7a a2 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e306:	b0 01                	mov    $0x1,%al
+ 170e308:	89 04 24             	mov    %eax,(%rsp)
+ 170e30b:	48 8d bc 24 b0 00 00 	lea    0xb0(%rsp),%rdi
+ 170e312:	00 
+ 170e313:	e8 48 4d 06 00       	call   1773060 <_ZN4core3ptr104drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..DirectoryEntry$GT$$GT$$GT$17h476cba350d180281E>
+ 170e318:	80 3c 24 00          	cmpb   $0x0,(%rsp)
+ 170e31c:	74 0d                	je     170e32b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc3b>
+ 170e31e:	48 8d bc 24 d0 01 00 	lea    0x1d0(%rsp),%rdi
+ 170e325:	00 
+ 170e326:	e8 05 59 06 00       	call   1773c30 <_ZN4core3ptr113drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..ValidatedDirectoryEntry$GT$$GT$$GT$17hc0e38ece74699639E>
+ 170e32b:	48 8b 74 24 18       	mov    0x18(%rsp),%rsi
+ 170e330:	48 85 f6             	test   %rsi,%rsi
+ 170e333:	74 10                	je     170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170e335:	ba 01 00 00 00       	mov    $0x1,%edx
+ 170e33a:	48 8b 7c 24 30       	mov    0x30(%rsp),%rdi
+ 170e33f:	ff 15 fb ee 9a 01    	call   *0x19aeefb(%rip)        # 30bd240 <_DYNAMIC+0x248>
+ 170e345:	4d 85 f6             	test   %r14,%r14
+ 170e348:	74 15                	je     170e35f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc6f>
+ 170e34a:	49 c1 e6 02          	shl    $0x2,%r14
+ 170e34e:	ba 04 00 00 00       	mov    $0x4,%edx
+ 170e353:	48 89 ef             	mov    %rbp,%rdi
+ 170e356:	4c 89 f6             	mov    %r14,%rsi
+ 170e359:	ff 15 e1 ee 9a 01    	call   *0x19aeee1(%rip)        # 30bd240 <_DYNAMIC+0x248>
+ 170e35f:	48 81 c4 a8 03 00 00 	add    $0x3a8,%rsp
+ 170e366:	5b                   	pop    %rbx
+ 170e367:	41 5c                	pop    %r12
+ 170e369:	41 5d                	pop    %r13
+ 170e36b:	41 5e                	pop    %r14
+ 170e36d:	41 5f                	pop    %r15
+ 170e36f:	5d                   	pop    %rbp
+ 170e370:	c3                   	ret
+ 170e371:	b8 01 00 00 00       	mov    $0x1,%eax
+ 170e376:	eb 26                	jmp    170e39e <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xcae>
+ 170e378:	45 31 ff             	xor    %r15d,%r15d
+ 170e37b:	e9 18 01 00 00       	jmp    170e498 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xda8>
+ 170e380:	49 89 d1             	mov    %rdx,%r9
+ 170e383:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 170e388:	eb 0f                	jmp    170e399 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xca9>
+ 170e38a:	4c 8b 8c 24 c8 02 00 	mov    0x2c8(%rsp),%r9
+ 170e391:	00 
+ 170e392:	49 81 c1 d0 00 00 00 	add    $0xd0,%r9
+ 170e399:	48 8d 7c 24 70       	lea    0x70(%rsp),%rdi
+ 170e39e:	48 89 44 24 60       	mov    %rax,0x60(%rsp)
+ 170e3a3:	4c 89 4c 24 78       	mov    %r9,0x78(%rsp)
+ 170e3a8:	e8 c3 ed fe ff       	call   16fd170 <_ZN86_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..ops..drop..Drop$GT$4drop17h03da7ee0a696c659E>
+ 170e3ad:	48 8b 44 24 38       	mov    0x38(%rsp),%rax
+ 170e3b2:	4c 8d b8 90 00 00 00 	lea    0x90(%rax),%r15
+ 170e3b9:	49 89 c4             	mov    %rax,%r12
+ 170e3bc:	48 b9 00 00 00 00 00 	movabs $0x8000000000000000,%rcx
+ 170e3c3:	00 00 80 
+ 170e3c6:	48 39 88 90 00 00 00 	cmp    %rcx,0x90(%rax)
+ 170e3cd:	74 08                	je     170e3d7 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xce7>
+ 170e3cf:	4c 89 ff             	mov    %r15,%rdi
+ 170e3d2:	e8 a9 a1 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e3d7:	48 8b 84 24 c0 02 00 	mov    0x2c0(%rsp),%rax
+ 170e3de:	00 
+ 170e3df:	49 89 47 60          	mov    %rax,0x60(%r15)
+ 170e3e3:	0f 28 84 24 b0 02 00 	movaps 0x2b0(%rsp),%xmm0
+ 170e3ea:	00 
+ 170e3eb:	41 0f 11 47 50       	movups %xmm0,0x50(%r15)
+ 170e3f0:	0f 28 84 24 a0 02 00 	movaps 0x2a0(%rsp),%xmm0
+ 170e3f7:	00 
+ 170e3f8:	41 0f 11 47 40       	movups %xmm0,0x40(%r15)
+ 170e3fd:	0f 28 84 24 60 02 00 	movaps 0x260(%rsp),%xmm0
+ 170e404:	00 
+ 170e405:	0f 28 8c 24 70 02 00 	movaps 0x270(%rsp),%xmm1
+ 170e40c:	00 
+ 170e40d:	0f 28 94 24 80 02 00 	movaps 0x280(%rsp),%xmm2
+ 170e414:	00 
+ 170e415:	0f 28 9c 24 90 02 00 	movaps 0x290(%rsp),%xmm3
+ 170e41c:	00 
+ 170e41d:	41 0f 11 5f 30       	movups %xmm3,0x30(%r15)
+ 170e422:	41 0f 11 57 20       	movups %xmm2,0x20(%r15)
+ 170e427:	41 0f 11 4f 10       	movups %xmm1,0x10(%r15)
+ 170e42c:	41 0f 11 07          	movups %xmm0,(%r15)
+ 170e430:	4d 8d 7c 24 48       	lea    0x48(%r12),%r15
+ 170e435:	4c 89 ff             	mov    %r15,%rdi
+ 170e438:	e8 23 4c 06 00       	call   1773060 <_ZN4core3ptr104drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..DirectoryEntry$GT$$GT$$GT$17h476cba350d180281E>
+ 170e43d:	48 8b 84 24 c0 00 00 	mov    0xc0(%rsp),%rax
+ 170e444:	00 
+ 170e445:	49 89 47 10          	mov    %rax,0x10(%r15)
+ 170e449:	0f 28 84 24 b0 00 00 	movaps 0xb0(%rsp),%xmm0
+ 170e450:	00 
+ 170e451:	41 0f 11 07          	movups %xmm0,(%r15)
+ 170e455:	49 8d 7c 24 60       	lea    0x60(%r12),%rdi
+ 170e45a:	e8 b1 6e 06 00       	call   1775310 <_ZN4core3ptr117drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$$GT$17hfd0ebb00d9339167E>
+ 170e45f:	48 8b 84 24 e0 00 00 	mov    0xe0(%rsp),%rax
+ 170e466:	00 
+ 170e467:	49 89 44 24 70       	mov    %rax,0x70(%r12)
+ 170e46c:	0f 28 84 24 d0 00 00 	movaps 0xd0(%rsp),%xmm0
+ 170e473:	00 
+ 170e474:	41 0f 11 44 24 60    	movups %xmm0,0x60(%r12)
+ 170e47a:	49 c7 45 00 0b 00 00 	movq   $0xb,0x0(%r13)
+ 170e481:	00 
+ 170e482:	48 8b 74 24 18       	mov    0x18(%rsp),%rsi
+ 170e487:	48 85 f6             	test   %rsi,%rsi
+ 170e48a:	0f 84 b5 fe ff ff    	je     170e345 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc55>
+ 170e490:	e9 a0 fe ff ff       	jmp    170e335 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc45>
+ 170e495:	41 b7 01             	mov    $0x1,%r15b
+ 170e498:	48 8b 4c 24 08       	mov    0x8(%rsp),%rcx
+ 170e49d:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 170e4a2:	48 89 44 24 60       	mov    %rax,0x60(%rsp)
+ 170e4a7:	48 89 4c 24 78       	mov    %rcx,0x78(%rsp)
+ 170e4ac:	ff 15 de ed 9a 01    	call   *0x19aedde(%rip)        # 30bd290 <_DYNAMIC+0x298>
+ 170e4b2:	bf 33 00 00 00       	mov    $0x33,%edi
+ 170e4b7:	be 01 00 00 00       	mov    $0x1,%esi
+ 170e4bc:	ff 15 d6 ed 9a 01    	call   *0x19aedd6(%rip)        # 30bd298 <_DYNAMIC+0x2a0>
+ 170e4c2:	48 85 c0             	test   %rax,%rax
+ 170e4c5:	0f 84 d3 00 00 00    	je     170e59e <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xeae>
+ 170e4cb:	0f 10 05 0a b6 ab fe 	movups -0x15449f6(%rip),%xmm0        # 1c9adc <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0xbb>
+ 170e4d2:	0f 11 40 20          	movups %xmm0,0x20(%rax)
+ 170e4d6:	0f 10 05 ef b5 ab fe 	movups -0x1544a11(%rip),%xmm0        # 1c9acc <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0xab>
+ 170e4dd:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+ 170e4e1:	0f 10 05 d4 b5 ab fe 	movups -0x1544a2c(%rip),%xmm0        # 1c9abc <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.8.llvm.2686730325894774174+0x9b>
+ 170e4e8:	0f 11 00             	movups %xmm0,(%rax)
+ 170e4eb:	c7 40 2f 67 72 65 65 	movl   $0x65657267,0x2f(%rax)
+ 170e4f2:	49 c7 45 00 08 00 00 	movq   $0x8,0x0(%r13)
+ 170e4f9:	00 
+ 170e4fa:	49 c7 45 08 33 00 00 	movq   $0x33,0x8(%r13)
+ 170e501:	00 
+ 170e502:	49 89 45 10          	mov    %rax,0x10(%r13)
+ 170e506:	49 c7 45 18 33 00 00 	movq   $0x33,0x18(%r13)
+ 170e50d:	00 
+ 170e50e:	45 84 ff             	test   %r15b,%r15b
+ 170e511:	75 0d                	jne    170e520 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xe30>
+ 170e513:	48 8d bc 24 00 01 00 	lea    0x100(%rsp),%rdi
+ 170e51a:	00 
+ 170e51b:	e8 c0 e6 06 00       	call   177cbe0 <_ZN4core3ptr62drop_in_place$LT$litchi_cfb..file..ValidatedDirectoryEntry$GT$17h58f17e9b34c70741E>
+ 170e520:	48 8d 7c 24 70       	lea    0x70(%rsp),%rdi
+ 170e525:	e8 46 ec fe ff       	call   16fd170 <_ZN86_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..ops..drop..Drop$GT$4drop17h03da7ee0a696c659E>
+ 170e52a:	48 8d bc 24 d0 00 00 	lea    0xd0(%rsp),%rdi
+ 170e531:	00 
+ 170e532:	e8 d9 6d 06 00       	call   1775310 <_ZN4core3ptr117drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$$GT$17hfd0ebb00d9339167E>
+ 170e537:	c7 04 24 00 00 00 00 	movl   $0x0,(%rsp)
+ 170e53e:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e545:	00 00 80 
+ 170e548:	48 39 84 24 60 02 00 	cmp    %rax,0x260(%rsp)
+ 170e54f:	00 
+ 170e550:	0f 85 6e fd ff ff    	jne    170e2c4 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xbd4>
+ 170e556:	e9 b0 fd ff ff       	jmp    170e30b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xc1b>
+ 170e55b:	48 8d 0d a6 14 96 01 	lea    0x19614a6(%rip),%rcx        # 306fa08 <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.7.llvm.2686730325894774174+0x70>
+ 170e562:	be 80 00 00 00       	mov    $0x80,%esi
+ 170e567:	31 ff                	xor    %edi,%edi
+ 170e569:	4c 89 e2             	mov    %r12,%rdx
+ 170e56c:	ff 15 d6 ec 9a 01    	call   *0x19aecd6(%rip)        # 30bd248 <_DYNAMIC+0x250>
+ 170e572:	eb 3a                	jmp    170e5ae <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xebe>
+ 170e574:	b0 01                	mov    $0x1,%al
+ 170e576:	89 04 24             	mov    %eax,(%rsp)
+ 170e579:	bf 01 00 00 00       	mov    $0x1,%edi
+ 170e57e:	be 2e 00 00 00       	mov    $0x2e,%esi
+ 170e583:	ff 15 3f ed 9a 01    	call   *0x19aed3f(%rip)        # 30bd2c8 <_DYNAMIC+0x2d0>
+ 170e589:	eb 23                	jmp    170e5ae <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xebe>
+ 170e58b:	48 8d 15 8e 14 96 01 	lea    0x196148e(%rip),%rdx        # 306fa20 <anon.7f2573d2d837d18ea8bb34d1ff1b03ef.7.llvm.2686730325894774174+0x88>
+ 170e592:	31 ff                	xor    %edi,%edi
+ 170e594:	31 f6                	xor    %esi,%esi
+ 170e596:	ff 15 d4 ec 9a 01    	call   *0x19aecd4(%rip)        # 30bd270 <_DYNAMIC+0x278>
+ 170e59c:	eb 10                	jmp    170e5ae <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xebe>
+ 170e59e:	bf 01 00 00 00       	mov    $0x1,%edi
+ 170e5a3:	be 33 00 00 00       	mov    $0x33,%esi
+ 170e5a8:	ff 15 1a ed 9a 01    	call   *0x19aed1a(%rip)        # 30bd2c8 <_DYNAMIC+0x2d0>
+ 170e5ae:	0f 0b                	ud2
+ 170e5b0:	49 89 c4             	mov    %rax,%r12
+ 170e5b3:	45 84 ff             	test   %r15b,%r15b
+ 170e5b6:	75 0d                	jne    170e5c5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xed5>
+ 170e5b8:	48 8d bc 24 00 01 00 	lea    0x100(%rsp),%rdi
+ 170e5bf:	00 
+ 170e5c0:	e8 1b e6 06 00       	call   177cbe0 <_ZN4core3ptr62drop_in_place$LT$litchi_cfb..file..ValidatedDirectoryEntry$GT$17h58f17e9b34c70741E>
+ 170e5c5:	48 8d 7c 24 70       	lea    0x70(%rsp),%rdi
+ 170e5ca:	e8 a1 eb fe ff       	call   16fd170 <_ZN86_$LT$alloc..vec..into_iter..IntoIter$LT$T$C$A$GT$$u20$as$u20$core..ops..drop..Drop$GT$4drop17h03da7ee0a696c659E>
+ 170e5cf:	e9 f6 00 00 00       	jmp    170e6ca <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0xfda>
+ 170e5d4:	49 89 c4             	mov    %rax,%r12
+ 170e5d7:	48 8b 84 24 c0 02 00 	mov    0x2c0(%rsp),%rax
+ 170e5de:	00 
+ 170e5df:	49 89 47 60          	mov    %rax,0x60(%r15)
+ 170e5e3:	0f 28 84 24 b0 02 00 	movaps 0x2b0(%rsp),%xmm0
+ 170e5ea:	00 
+ 170e5eb:	41 0f 11 47 50       	movups %xmm0,0x50(%r15)
+ 170e5f0:	0f 28 84 24 a0 02 00 	movaps 0x2a0(%rsp),%xmm0
+ 170e5f7:	00 
+ 170e5f8:	41 0f 11 47 40       	movups %xmm0,0x40(%r15)
+ 170e5fd:	0f 28 84 24 60 02 00 	movaps 0x260(%rsp),%xmm0
+ 170e604:	00 
+ 170e605:	0f 28 8c 24 70 02 00 	movaps 0x270(%rsp),%xmm1
+ 170e60c:	00 
+ 170e60d:	0f 28 94 24 80 02 00 	movaps 0x280(%rsp),%xmm2
+ 170e614:	00 
+ 170e615:	0f 28 9c 24 90 02 00 	movaps 0x290(%rsp),%xmm3
+ 170e61c:	00 
+ 170e61d:	41 0f 11 5f 30       	movups %xmm3,0x30(%r15)
+ 170e622:	41 0f 11 57 20       	movups %xmm2,0x20(%r15)
+ 170e627:	41 0f 11 4f 10       	movups %xmm1,0x10(%r15)
+ 170e62c:	41 0f 11 07          	movups %xmm0,(%r15)
+ 170e630:	48 8d bc 24 d0 00 00 	lea    0xd0(%rsp),%rdi
+ 170e637:	00 
+ 170e638:	e8 d3 6c 06 00       	call   1775310 <_ZN4core3ptr117drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$$GT$17hfd0ebb00d9339167E>
+ 170e63d:	c7 04 24 00 00 00 00 	movl   $0x0,(%rsp)
+ 170e644:	e9 17 01 00 00       	jmp    170e760 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1070>
+ 170e649:	49 89 c4             	mov    %rax,%r12
+ 170e64c:	48 8b 84 24 a0 00 00 	mov    0xa0(%rsp),%rax
+ 170e653:	00 
+ 170e654:	48 8b 4c 24 08       	mov    0x8(%rsp),%rcx
+ 170e659:	48 89 41 60          	mov    %rax,0x60(%rcx)
+ 170e65d:	0f 28 84 24 90 00 00 	movaps 0x90(%rsp),%xmm0
+ 170e664:	00 
+ 170e665:	0f 11 41 50          	movups %xmm0,0x50(%rcx)
+ 170e669:	0f 28 84 24 80 00 00 	movaps 0x80(%rsp),%xmm0
+ 170e670:	00 
+ 170e671:	0f 11 41 40          	movups %xmm0,0x40(%rcx)
+ 170e675:	0f 28 44 24 40       	movaps 0x40(%rsp),%xmm0
+ 170e67a:	0f 28 4c 24 50       	movaps 0x50(%rsp),%xmm1
+ 170e67f:	0f 28 54 24 60       	movaps 0x60(%rsp),%xmm2
+ 170e684:	0f 28 5c 24 70       	movaps 0x70(%rsp),%xmm3
+ 170e689:	0f 11 59 30          	movups %xmm3,0x30(%rcx)
+ 170e68d:	0f 11 51 20          	movups %xmm2,0x20(%rcx)
+ 170e691:	0f 11 49 10          	movups %xmm1,0x10(%rcx)
+ 170e695:	0f 11 01             	movups %xmm0,(%rcx)
+ 170e698:	eb 6b                	jmp    170e705 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1015>
+ 170e69a:	49 89 c4             	mov    %rax,%r12
+ 170e69d:	48 8b 84 24 c0 00 00 	mov    0xc0(%rsp),%rax
+ 170e6a4:	00 
+ 170e6a5:	49 89 47 10          	mov    %rax,0x10(%r15)
+ 170e6a9:	0f 28 84 24 b0 00 00 	movaps 0xb0(%rsp),%xmm0
+ 170e6b0:	00 
+ 170e6b1:	41 0f 11 07          	movups %xmm0,(%r15)
+ 170e6b5:	48 8d bc 24 d0 00 00 	lea    0xd0(%rsp),%rdi
+ 170e6bc:	00 
+ 170e6bd:	e8 4e 6c 06 00       	call   1775310 <_ZN4core3ptr117drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$$GT$17hfd0ebb00d9339167E>
+ 170e6c2:	e9 b9 00 00 00       	jmp    170e780 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1090>
+ 170e6c7:	49 89 c4             	mov    %rax,%r12
+ 170e6ca:	48 8d bc 24 d0 00 00 	lea    0xd0(%rsp),%rdi
+ 170e6d1:	00 
+ 170e6d2:	e8 39 6c 06 00       	call   1775310 <_ZN4core3ptr117drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..directory_name..DirectoryNameData$GT$$GT$$GT$17hfd0ebb00d9339167E>
+ 170e6d7:	c7 04 24 00 00 00 00 	movl   $0x0,(%rsp)
+ 170e6de:	eb 5f                	jmp    170e73f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x104f>
+ 170e6e0:	49 89 c4             	mov    %rax,%r12
+ 170e6e3:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e6ea:	00 00 80 
+ 170e6ed:	48 39 44 24 40       	cmp    %rax,0x40(%rsp)
+ 170e6f2:	74 11                	je     170e705 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1015>
+ 170e6f4:	48 8d 7c 24 40       	lea    0x40(%rsp),%rdi
+ 170e6f9:	e8 82 9e 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e6fe:	eb 05                	jmp    170e705 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1015>
+ 170e700:	eb 30                	jmp    170e732 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1042>
+ 170e702:	49 89 c4             	mov    %rax,%r12
+ 170e705:	b0 01                	mov    $0x1,%al
+ 170e707:	89 04 24             	mov    %eax,(%rsp)
+ 170e70a:	48 8d bc 24 f0 01 00 	lea    0x1f0(%rsp),%rdi
+ 170e711:	00 
+ 170e712:	e8 69 9e 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e717:	eb 26                	jmp    170e73f <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x104f>
+ 170e719:	49 89 c4             	mov    %rax,%r12
+ 170e71c:	eb 42                	jmp    170e760 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1070>
+ 170e71e:	49 89 c4             	mov    %rax,%r12
+ 170e721:	eb 4a                	jmp    170e76d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x107d>
+ 170e723:	49 89 c4             	mov    %rax,%r12
+ 170e726:	eb 58                	jmp    170e780 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1090>
+ 170e728:	48 89 6c 24 20       	mov    %rbp,0x20(%rsp)
+ 170e72d:	4c 89 74 24 28       	mov    %r14,0x28(%rsp)
+ 170e732:	49 89 c4             	mov    %rax,%r12
+ 170e735:	eb 66                	jmp    170e79d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x10ad>
+ 170e737:	49 89 c4             	mov    %rax,%r12
+ 170e73a:	b0 01                	mov    $0x1,%al
+ 170e73c:	89 04 24             	mov    %eax,(%rsp)
+ 170e73f:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 170e746:	00 00 80 
+ 170e749:	48 39 84 24 60 02 00 	cmp    %rax,0x260(%rsp)
+ 170e750:	00 
+ 170e751:	74 0d                	je     170e760 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1070>
+ 170e753:	48 8d bc 24 60 02 00 	lea    0x260(%rsp),%rdi
+ 170e75a:	00 
+ 170e75b:	e8 20 9e 06 00       	call   1778580 <_ZN4core3ptr53drop_in_place$LT$litchi_cfb..file..DirectoryEntry$GT$17h0b8e52c6f9a8e1cfE>
+ 170e760:	48 8d bc 24 b0 00 00 	lea    0xb0(%rsp),%rdi
+ 170e767:	00 
+ 170e768:	e8 f3 48 06 00       	call   1773060 <_ZN4core3ptr104drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..DirectoryEntry$GT$$GT$$GT$17h476cba350d180281E>
+ 170e76d:	80 3c 24 00          	cmpb   $0x0,(%rsp)
+ 170e771:	74 0d                	je     170e780 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x1090>
+ 170e773:	48 8d bc 24 d0 01 00 	lea    0x1d0(%rsp),%rdi
+ 170e77a:	00 
+ 170e77b:	e8 b0 54 06 00       	call   1773c30 <_ZN4core3ptr113drop_in_place$LT$alloc..vec..Vec$LT$core..option..Option$LT$litchi_cfb..file..ValidatedDirectoryEntry$GT$$GT$$GT$17hc0e38ece74699639E>
+ 170e780:	48 83 7c 24 18 00    	cmpq   $0x0,0x18(%rsp)
+ 170e786:	74 15                	je     170e79d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x10ad>
+ 170e788:	ba 01 00 00 00       	mov    $0x1,%edx
+ 170e78d:	48 8b 7c 24 30       	mov    0x30(%rsp),%rdi
+ 170e792:	48 8b 74 24 18       	mov    0x18(%rsp),%rsi
+ 170e797:	ff 15 a3 ea 9a 01    	call   *0x19aeaa3(%rip)        # 30bd240 <_DYNAMIC+0x248>
+ 170e79d:	48 83 7c 24 28 00    	cmpq   $0x0,0x28(%rsp)
+ 170e7a3:	74 19                	je     170e7be <_ZN10litchi_cfb4file16OleFile$LT$R$GT$14load_directory17he325b08538564a1cE+0x10ce>
+ 170e7a5:	48 8b 74 24 28       	mov    0x28(%rsp),%rsi
+ 170e7aa:	48 c1 e6 02          	shl    $0x2,%rsi
+ 170e7ae:	ba 04 00 00 00       	mov    $0x4,%edx
+ 170e7b3:	48 8b 7c 24 20       	mov    0x20(%rsp),%rdi
+ 170e7b8:	ff 15 82 ea 9a 01    	call   *0x19aea82(%rip)        # 30bd240 <_DYNAMIC+0x248>
+ 170e7be:	4c 89 e7             	mov    %r12,%rdi
+ 170e7c1:	e8 4a 5a 94 01       	call   3054210 <_Unwind_Resume@plt>
+ 170e7c6:	ff 15 6c eb 9a 01    	call   *0x19aeb6c(%rip)        # 30bd338 <_DYNAMIC+0x340>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

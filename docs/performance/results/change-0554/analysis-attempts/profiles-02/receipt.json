@@ -1,0 +1,19 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0554/analyze_profiles.py",
+    "--compare",
+    "--output",
+    "docs/performance/results/change-0554/profile-analysis.json"
+  ],
+  "start_utc": "2026-09-13T11:37:46.873451+00:00",
+  "end_utc": "2026-09-13T11:37:47.271384+00:00",
+  "seconds": 0.3979310439899564,
+  "exit_code": 2,
+  "script_sha256": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+  "artifacts": {
+    "stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "5f30e5761493ff0ec8abfa37054f096228d61d6f4ec6c1a833d9fc6cb979d99b"
+  }
+}

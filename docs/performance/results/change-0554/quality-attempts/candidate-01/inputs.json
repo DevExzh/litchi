@@ -1,0 +1,40 @@
+{
+  "schema": "ole2_0554_quality_inputs_v1",
+  "created_utc": "2026-09-13T11:25:18.160412+00:00",
+  "stage": "candidate",
+  "mode": "targeted",
+  "source_manifest_sha256": "7c7a3aca6cec23a740c2e45de6290ba641c53c204bf678e0f9d3cc5eef9ac859",
+  "plan_sha256": "daec0ba4b393bfddb4bb101d23249512fbeffb898e43487dcd03e3cf170bc4dd",
+  "script_sha256": "3019546a719ffccc416a508949acf00aaff7861fece16d22caea16ae0c03c1af",
+  "commands": {
+    "cfb-tests": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "cfb-clippy": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "fmt": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ]
+  },
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

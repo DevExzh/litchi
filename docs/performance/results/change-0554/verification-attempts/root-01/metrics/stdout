@@ -1,0 +1,11 @@
+{
+  "result": {
+    "gate_passed": false,
+    "path": "metrics-analysis.json",
+    "schema": "ole2_name_handoff_metrics_0554_v1",
+    "sha256": "30f4bc0923d5207129d690acf9c2ed59cf216531dc7545470ec08367f4f7d39c"
+  },
+  "schema": "litchi.ole2.verification.0554.v1",
+  "scope": "metrics",
+  "status": "pass"
+}

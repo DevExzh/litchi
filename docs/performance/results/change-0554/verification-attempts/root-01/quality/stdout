@@ -1,0 +1,11 @@
+{
+  "result": {
+    "attempt": "quality-attempts/final-baseline-01/result.json",
+    "path": "quality.json",
+    "rows": 8,
+    "sha256": "09cfa267680b490c9bbaa72bafd37b9c57ec085659a2536f5da570a787ee2668"
+  },
+  "schema": "litchi.ole2.verification.0554.v1",
+  "scope": "quality",
+  "status": "pass"
+}

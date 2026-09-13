@@ -1,0 +1,9 @@
+{
+  "files": {
+    "docs/performance/0554-ole2-name-handoff.md": "f01310e3c60fec10374373514e5732c11e157e35699673b463988ad98aafebb7",
+    "docs/performance/BASELINE.md": "bb2e8d94d564d955460e71b9e5c6f07a98eecfd864e2fc28078e5ea012025375",
+    "docs/performance/HOTSPOTS.md": "12e7a588ca432d019c4e3ec3f1deb07f959c02cc58120a12c2badb55494c2a55"
+  },
+  "schema": "ole2_0554_documentation_manifest_v1",
+  "scope": "Files outside the evidence bundle included in completed change0554"
+}

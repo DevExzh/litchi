@@ -1,0 +1,29 @@
+{
+  "schema": "ole2_0554_quality_v1",
+  "status": "pass",
+  "stage": "candidate",
+  "mode": "targeted",
+  "source_manifest_sha256": "7c7a3aca6cec23a740c2e45de6290ba641c53c204bf678e0f9d3cc5eef9ac859",
+  "inputs_sha256": "f3722eaacc01c40806c59861865b989b1d969f0f5b69bd35043b127aab8a2e78",
+  "completed_utc": "2026-09-13T11:25:53.326114+00:00",
+  "rows": [
+    {
+      "name": "cfb-tests",
+      "path": "quality-attempts/candidate-01/cfb-tests",
+      "receipt_sha256": "97ea2facf5c5a3f01a13a99d83cf022c80b2f47a49fd64754f80db765415154c",
+      "exit_code": 0
+    },
+    {
+      "name": "cfb-clippy",
+      "path": "quality-attempts/candidate-01/cfb-clippy",
+      "receipt_sha256": "b0b93a7bdfc34e14f4b1058489fd8cd963fe5bf58ce8e298d327d341cfce11ad",
+      "exit_code": 0
+    },
+    {
+      "name": "fmt",
+      "path": "quality-attempts/candidate-01/fmt",
+      "receipt_sha256": "0508d4246e4609661ab905995d21c4e54e201adb7cc60ee2b74d1226c2604df0",
+      "exit_code": 0
+    }
+  ]
+}

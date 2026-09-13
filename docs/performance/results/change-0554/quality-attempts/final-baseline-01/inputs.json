@@ -1,0 +1,108 @@
+{
+  "schema": "ole2_0554_quality_inputs_v1",
+  "created_utc": "2026-09-13T11:38:28.090892+00:00",
+  "stage": "final",
+  "mode": "commands",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "plan_sha256": "daec0ba4b393bfddb4bb101d23249512fbeffb898e43487dcd03e3cf170bc4dd",
+  "script_sha256": "3019546a719ffccc416a508949acf00aaff7861fece16d22caea16ae0c03c1af",
+  "commands": {
+    "tests": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "workspace": [
+      "cargo",
+      "check",
+      "--locked",
+      "--workspace",
+      "--all-features"
+    ],
+    "clippy": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "rustdoc": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--no-deps"
+    ],
+    "fmt": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "boundaries": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "no-default": [
+      "cargo",
+      "check",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-xls",
+      "--no-default-features"
+    ],
+    "claims": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ]
+  },
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

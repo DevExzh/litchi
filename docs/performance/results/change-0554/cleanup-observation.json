@@ -1,0 +1,9 @@
+{
+  "detail": "Initial cleanup verified all four binary hashes and descriptors, found no accessible process references, and removed the target. A subsequent Python-cache assertion failed before writing cleanup.json. Removed only the owned bundle cache and repeated the post-removal checks.",
+  "observed_utc": "2026-09-13T12:04:02.314887+00:00",
+  "removed_cache_files": {
+    "__pycache__/verify.cpython-314.pyc": "c76d03b6b4fffac4ba9e72f1725b168de3b0dbe765286bf0abda52d489797d63"
+  },
+  "status": "post-removal cache check failed",
+  "target_absent": true
+}

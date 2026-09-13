@@ -1,0 +1,19 @@
+{
+  "schema": "ole2_0554_analysis_inputs_v1",
+  "frozen_utc": "2026-09-13T11:35:57.920333+00:00",
+  "scope": "Numerical/profile consumers and transitive helpers frozen after baselineR1 validation and before any candidate captures; source, plan, all gates and driver already frozen",
+  "files": {
+    "docs/performance/results/change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+    "docs/performance/results/change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74",
+    "docs/performance/results/change-0536/analyze_profiles.py": "5ce0d3a0c9f9246f207b9be063791cf6ccf014f6582da47562de42c7e0d364a5",
+    "docs/performance/results/change-0554/admission-supplement.json": "832057a756fc45922ebd91e836c54a7ba9b832e364c0d145cc15171c07c51c1f",
+    "docs/performance/results/change-0554/analyze_metrics.py": "3aeff5aba7b6b212bf0b263bf5d43e614ed41d62bfb83b2c53ff3584f8652c82",
+    "docs/performance/results/change-0554/analyze_profiles.py": "af789e447d0093d1e2ad6f2f01a44109ea6701735517c5d1cf2ed9754705f315",
+    "docs/performance/results/change-0554/inspect_assembly.py": "8ea269afde9a167bb56ec2d224dc0eb0e8e0c93c97e5f3b2522e9f395df3e665",
+    "docs/performance/results/change-0554/quality-plan.json": "daec0ba4b393bfddb4bb101d23249512fbeffb898e43487dcd03e3cf170bc4dd",
+    "docs/performance/results/change-0554/quality.py": "3019546a719ffccc416a508949acf00aaff7861fece16d22caea16ae0c03c1af",
+    "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+    "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  }
+}

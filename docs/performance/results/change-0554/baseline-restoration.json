@@ -1,0 +1,14 @@
+{
+  "schema": "ole2_0554_restoration_v1",
+  "restored_utc": "2026-09-13T11:38:28.063863+00:00",
+  "reason": "Canonical main metrics failed mandatory native controls and every primaryXLSgate; no timingrerun orgaterelaxation",
+  "metrics_sha256": "30f4bc0923d5207129d690acf9c2ed59cf216531dc7545470ec08367f4f7d39c",
+  "paths": [
+    "crates/litchi-cfb/src/file.rs"
+  ],
+  "candidate_source_sha256": "a96667162dbd8c3d7ebe88cad3bb0f07670296ebf2fd16279b7971cc375bbdd9",
+  "restored_source_sha256": "72fb5295dfbba5f3ed2192a9c24ecbf7d8aa2759f418b77563a4e2ff1042d03b",
+  "final_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "baseline_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "exact_baseline_restored": true
+}

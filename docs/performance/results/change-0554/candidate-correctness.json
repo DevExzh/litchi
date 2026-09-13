@@ -1,0 +1,27 @@
+{
+  "schema": "ole2_0554_candidate_correctness_v1",
+  "recorded_utc": "2026-09-13T11:32:19.592654+00:00",
+  "status": "pass",
+  "source_manifest_sha256": "7c7a3aca6cec23a740c2e45de6290ba641c53c204bf678e0f9d3cc5eef9ac859",
+  "binding_sha256": "c1b47fae1fbd04b9db6848313da68e229d1349eb474517338ea46d2f5d8291c0",
+  "review": {
+    "path": "candidate-review.md",
+    "sha256": "1266dbedb15a2da487c9c5125b9b97c5f8e06964798d035244aab992c1184ff6"
+  },
+  "resource_boundary": {
+    "path": "resource-boundary-review.md",
+    "sha256": "e229abdf96a52cfde3a05ffb7b29e568aa5ee4f926dee18b08e3ba72d77cc8e4"
+  },
+  "quality_attempt": {
+    "path": "quality-attempts/candidate-01/result.json",
+    "sha256": "6e7d32489cce2dcdff1a987823676c6e725c87d91b86ba80c98990c7449d3ee5"
+  },
+  "test_summary": {
+    "groups": 4,
+    "passed": 314,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_scope": "Existing DirectoryEntryBuilder::set_clsid doc example"
+  },
+  "scope": "Source review and targeted CFB tests/Clippy/format pass; full final-source quality and measured admission remain separate requirements."
+}

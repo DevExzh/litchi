@@ -1,0 +1,15 @@
+{
+  "schema": "ole2_0554_admission_supplement_v1",
+  "recorded_utc": "2026-09-13T11:15:43.532968+00:00",
+  "plan_sha256": "d901c87af4e8d2585af997dbc850832db21db0ce0e359d3dcf7d90c7b415e98c",
+  "scope": "Additional mandatory admission requirement from 0553 OLE2 attribution plan, frozen before any capture; does not relax or replace any0554plan gate",
+  "primary_xls_cases": [
+    "xls_source_backed_open",
+    "xls_source_backed_open_one_cell",
+    "xls_owned_source_open",
+    "xls_owned_source_open_one_cell"
+  ],
+  "requirement": "Every primary XLS native p50 must improve at least3% in both paired repeats, in addition to many-small and all control gates. The candidate is rejected if either gate set fails.",
+  "capture_receipts_present": false,
+  "reason": "0553 attribution plan carries the previous primary XLS retention requirement; keep it authoritative for adoption rather than silently broadening admissibility to the many-small substrate alone."
+}

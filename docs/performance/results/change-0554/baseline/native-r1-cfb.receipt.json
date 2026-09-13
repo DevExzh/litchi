@@ -1,0 +1,52 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0554/baseline/native-r1-cfb.rss.json",
+    "/home/zhuhe/litchi-goal-0554-target/retained/baseline/normal",
+    "--case",
+    "cfb_open",
+    "--warmup",
+    "20",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0554/baseline/native-r1-cfb.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0554/baseline/native-r1-cfb.catalog.json",
+    "--shape",
+    "tiny,many-small,few-large",
+    "--payload",
+    "incompressible"
+  ],
+  "start_utc": "2026-09-13T11:23:49.693474+00:00",
+  "end_utc": "2026-09-13T11:23:50.410057+00:00",
+  "seconds": 0.7166057679860387,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "binary_sha256": "075a61ea31d9441e12dcdfd03fb0d4e0b1f7d264f460eac465d65864cc4ae459",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "script_sha256": "f90f8285be651b1115086194e1c3660e88d2b8880bb71f6d4e9fc839075f06d3",
+  "plan_sha256": "d901c87af4e8d2585af997dbc850832db21db0ce0e359d3dcf7d90c7b415e98c",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r1-cfb.catalog.json": "9775fb6e1b98453fe104d5b546f82134957ade9874c2a19779b32be16c692ce7",
+    "native-r1-cfb.host.json": "68a45da25b6ebbab046e1445c7e5337745cfbf2cb5fadf52f6895a512179bc9d",
+    "native-r1-cfb.json": "b3f8c0e25fe98f75f604a01f6c5bcbef005b6a0bb08caab8f2b537ce1f37f6e8",
+    "native-r1-cfb.rss.json": "c69c3c0568f7b37d9449cdcd18a1e2ed96946bd183919189c8d9cee6f2407c3a",
+    "native-r1-cfb.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r1-cfb.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
