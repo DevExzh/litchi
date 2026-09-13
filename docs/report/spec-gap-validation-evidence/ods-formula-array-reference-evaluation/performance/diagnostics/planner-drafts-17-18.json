@@ -1,0 +1,15 @@
+{
+  "scope": "Draft17 compile errors; draft18 corrects only namespace and moved-mask errors and passes394library+51value tests. Direct-operand infix shaping still incomplete for composed endpoints; no acceptance claim. Draft18 changed source files retained; remaining closure based on committed union+mask snapshot.",
+  "command": "cargo test --locked --offline -p litchi-ods --all-features --no-fail-fast --lib --test ods_formula_array_reference_evaluation",
+  "workspace": "/home/zhuhe/code/litchi-array-worktree",
+  "archive": "planner-drafts-17-18.tar.gz",
+  "sha256": "df2a3a5368818bcb3521ce714013ded5a05a61e839c4015b4d513bd3e3916d31",
+  "members": {
+    "planner-draft-17-source.json": "2e1017c23d3405542cb39448a4b7d3d49af8fac44c4bbd400aea46ea91f2fc13",
+    "planner-draft-17-tests.log": "49e52a9d2505905d02e0642dc66d76bdfd6ee9361978e9bd9fdb3855d540f631",
+    "planner-draft-18-source.json": "363a41616141700727a41573c123fe693bf52fab52dfc6ba68e7948761f02f16",
+    "planner-draft-18-tests.log": "23d47148df4286e058d5039dc3f9bf1ef6566d553ea767ac1cdf11ae56a2f7a2",
+    "draft18/crates/litchi-ods/src/codec/formula/evaluation/value.rs": "dc464aad3cad35e3d8fa15f577272d7c20d05e8022b0ebaa43e0d391930b1bd5",
+    "draft18/crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "4816d843a2cd4182c4aac2f885dbf94d04e1b56016de0176ac4ae4a3ae77e6d8"
+  }
+}
