@@ -12,12 +12,18 @@ positional reads by 24.84% on the PPTX captures and 15.79-16.31% on the DOCX
 ones without changing which ranges are read.
 
 The goal's target for this path — work proportional to mandatory metadata plus
-accessed content — is not yet met. About 88% of reads still repeat a range.
-The named, unmeasured follow-ups are: memoize the resolved descriptor and the
-local-header framing per entry (a further ~50% and ~25% of the reads by the
-0561 model), coalesce the header/payload/descriptor span for small members, and
-give structural members such as `[Content_Types].xml` and the relationship parts
-a retention policy so they are not re-read on every package open.
+accessed content — is not yet met. About 88% of reads still repeat a range, but
+a later segmentation of the same traces **retracted** this record's first
+projection: those repeats are across the ten archive constructions each traced
+child performs, not within one archive instance, where every member's header and
+descriptor is already read exactly once. A per-entry memo would therefore remove
+zero reads on this corpus. The correction and its evidence are in change 0561.
+
+The follow-ups the measurement actually supports are: coalesce the local header,
+payload and descriptor into one bounded read per member read, which is the only
+candidate that reduces first-read cost and which the payload size distribution
+supports; and stop reconstructing the package on every open, which ADR 0011
+makes `litchi-opc`'s to own. Neither is implemented or measured.
 
 Still required by the goal and unchanged by this batch: cold-cache and physical
 device distributions, remote/range-source behaviour for OPC consumers, peak RSS

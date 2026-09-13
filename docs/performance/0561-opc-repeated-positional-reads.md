@@ -102,27 +102,59 @@ here.
 ## Follow-up
 
 Change [0562](0562-zip-descriptor-read-once.md) removes the duplicate descriptor
-read. Memoizing the resolved descriptor and the local-header framing per entry,
-coalescing the header/payload/descriptor span for small members, and giving
-structural members a retention policy remain open and unmeasured.
+read that occurs *within* one verified entry read.
 
-After 0562, the `docx_file_source_open` capture's 224 remaining calls cover 23
-distinct ranges. Counting repeats names the next targets precisely: one
-840-byte span at offset 64 read 24 times, a 4-byte probe at offset 0 read 20
-times alongside the first local header at the same offset read 20 times, an
-8-byte probe at offset 30 read 10 times, and the end-of-central-directory and
-central-directory spans read 10 times each. The child performs about ten
-independent package opens, so most of that is per-open re-work that no
-within-open cache can remove; the within-open residual is the roughly 2.4 reads
-of the structural member and 2 reads of the first local header per open.
+### Correction: where the remaining repeats actually are
 
-The PPTX capture shows the same structure at scale. After 0562 its 10,216 calls
-group as 3,386 reads of 30 bytes, 3,376 of 16 bytes and 3,414 payload reads —
-one header, one descriptor and one payload per member read. Memoizing the
-resolved descriptor and the header framing per entry would therefore remove
-about two thirds of what remains. That is a count model derived from the
-retained trace, not a measured result, and neither change has been implemented
-or measured.
+This record originally projected that memoizing the resolved descriptor and the
+local-header framing per entry would remove about two thirds of the remaining
+reads. **That projection was wrong**, and it is retracted here.
+
+It assumed the 6x-to-20x range multiplicity happens inside one archive instance.
+It does not. Segmenting each traced `(pid, fd)` read stream at its own 22-byte
+end-of-central-directory read — the unambiguous marker for one archive
+construction — separates the two cases:
+
+| Capture | `pread64` | archive constructions | local-header reads | repeats *within* one archive | descriptor reads | repeats within one archive |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `docx_file_source_open` | 224 | 10 | 52 | 9 | 42 | **0** |
+| `docx_file_source_full_text` | 236 | 10 | 56 | 9 | 46 | **0** |
+| `pptx_file_source_open` | 10,216 | 10 | 3,386 | 9 | 3,376 | **0** |
+| `pptx_file_source_selected_slide` | 10,228 | 10 | 3,390 | 9 | 3,380 | **0** |
+
+Inside one `IndexedArchive`, every member's local header and descriptor is
+already read exactly once. The nine header repeats are all `(offset 0, length
+30)` — a prologue probe taken before any archive exists, not a `get_entry`
+repeat. So a per-entry memo of either value would remove **zero** reads on this
+corpus. It would still be correct, and would pay off whenever the OPC part cache
+evicts or bypasses and a member is read twice from one archive, but it is not
+what this measurement calls for.
+
+Reproduce with
+[`segment_reads.py`](results/change-0561/segment_reads.py); the result is in
+[`read-segmentation.json`](results/change-0561/read-segmentation.json).
+
+### What the measurement does call for
+
+Every member read costs three positional reads after 0562 — a 30-byte local
+header, the payload, and a 16-byte descriptor — and each is a separate `pread64`
+on the **first** read of that member, which is what this corpus does. Two
+targets follow:
+
+1. **Coalesce the three into one bounded read per member.** The span is
+   `local_header_offset` to `body_end + descriptor`, bounded by the central
+   record's `compressed_size` plus a fixed metadata allowance. The payload size
+   distribution supports it: 2,136 of the roughly 3,414 PPTX payload reads are
+   256 bytes or fewer and about 3,394 are 2 KiB or fewer, so a small window
+   covers nearly every member. This is the only change measured here that would
+   reduce first-read cost.
+2. **Stop reconstructing the package per open** — ten archive constructions per
+   traced child, each re-reading the end-of-central-directory record, the
+   central directory, the detection probes and the structural members. ADR 0011
+   makes this `litchi-opc`'s to own, not `soapberry-zip`'s.
+
+Neither is implemented or measured. The counts above are properties of the
+retained traces; the coalescing figure is a span model, not a result.
 
 ## Limitations
 

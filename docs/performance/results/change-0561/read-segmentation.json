@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "summary_kind": "litchi-opc-read-segmentation",
+  "rows": [
+    {
+      "capture": "docx_file_source_full_text.pread.txt",
+      "pread64_calls": 236,
+      "archive_constructions": 10,
+      "local_header_reads": 56,
+      "local_header_repeats_within_one_archive": 9,
+      "descriptor_reads": 46,
+      "descriptor_repeats_within_one_archive": 0
+    },
+    {
+      "capture": "docx_file_source_open.pread.txt",
+      "pread64_calls": 224,
+      "archive_constructions": 10,
+      "local_header_reads": 52,
+      "local_header_repeats_within_one_archive": 9,
+      "descriptor_reads": 42,
+      "descriptor_repeats_within_one_archive": 0
+    },
+    {
+      "capture": "pptx_file_source_open.pread.txt.gz",
+      "pread64_calls": 10216,
+      "archive_constructions": 10,
+      "local_header_reads": 3386,
+      "local_header_repeats_within_one_archive": 9,
+      "descriptor_reads": 3376,
+      "descriptor_repeats_within_one_archive": 0
+    },
+    {
+      "capture": "pptx_file_source_selected_slide.pread.txt.gz",
+      "pread64_calls": 10228,
+      "archive_constructions": 10,
+      "local_header_reads": 3390,
+      "local_header_repeats_within_one_archive": 9,
+      "descriptor_reads": 3380,
+      "descriptor_repeats_within_one_archive": 0
+    }
+  ]
+}

@@ -125,7 +125,10 @@ with it, so they are a real regression guard rather than a restatement.
 No cold-cache, physical-device, remote/range-source, peak-RSS or allocation
 result is claimed. The captures are warm-cache and single-sample; they count
 syscalls, not physical device I/O. The remaining ~88% of reads that re-read a
-range are untouched by this change — memoizing the resolved descriptor and the
-local-header framing per entry, coalescing small members' spans, and giving
-structural members a retention policy all remain open, and change 0561 records
-what each would remove.
+range are untouched by this change. Change 0561 segments the same traces and
+retracts its own earlier projection about them: within one archive instance
+every member's header and descriptor is already read exactly once, so a
+per-entry memo of either value would remove none of them. The follow-ups that
+measurement does support are coalescing the header, payload and descriptor into
+one bounded read per member read, and not reconstructing the package on every
+open.
