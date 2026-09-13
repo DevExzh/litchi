@@ -1,0 +1,6 @@
+{
+  "scope": "60 tests:58pass. Direct array operand cases fixed; computed nested-array, arithmetic-array and singleton-reference IF cases wrongly succeed. Finite condition-cache entry limit still fails. Scalar nested IF with unselected array alternative passes.",
+  "archive": "planner-handler-27.tar.gz",
+  "sha256": "281e4b53d4803bff63e251f63c2d953f53f8e4ae46508870a9d26547b68101ad",
+  "status": 101
+}

@@ -734,6 +734,7 @@ fn if_without_a_branch_keeps_reference_operand_refusal_typed() {
 
 #[test]
 fn matrix_reference_operator_operands_keep_their_typed_refusal() {
+    let mut failures = Vec::new();
     for operand in [
         "IF({TRUE();FALSE()};[.C1:.D1];[.E1:.F1])",
         "IFERROR({#DIV/0!;1};[.C1:.D1])",
@@ -741,6 +742,11 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
         "IF({TRUE()};[.C1:.D1];0)",
         "IFERROR([.C1:.D1];0)",
         "IFNA([.C1:.D1];0)",
+        "IF(IF(TRUE();{TRUE()};FALSE());[.C1:.D1];0)",
+        "IF(({TRUE()}+0);[.C1:.D1];0)",
+        "IF([.C1];[.C1:.D1];[.C1:.D1])",
+        "IFERROR(IF(TRUE();{#DIV/0!};1);[.C1:.D1])",
+        "IFNA(IF(TRUE();{#N/A};1);[.C1:.D1])",
     ] {
         for source in [
             format!("=([.A1]:{operand})"),
@@ -751,7 +757,7 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
             let (_budget, _cancellation, execution) =
                 make_execution("ods-formula-value-matrix-reference-operand");
             let expression = parse(&source);
-            let error = evaluate_at(
+            let result = evaluate_at(
                 &expression,
                 &resolver,
                 &execution,
@@ -759,15 +765,15 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
                 0,
                 Mode::Matrix,
                 &Limits::default(),
-            )
-            .expect_err("matrix results must not be coerced into reference operands");
-            assert!(
-                matches!(
-                    error,
-                    EvaluationFailure::Unsupported(UnsupportedKind::ReferenceOperator)
-                ),
-                "{source:?} returned {error:?}"
             );
+            match result {
+                Err(EvaluationFailure::Unsupported(UnsupportedKind::ReferenceOperator)) => {},
+                Err(error) => failures.push(format!("{source:?} returned {error:?}")),
+                Ok(result) => failures.push(format!(
+                    "{source:?} unexpectedly succeeded with {:?}",
+                    result.value()
+                )),
+            }
             assert_eq!(
                 resolver.missing_metadata_calls(),
                 0,
@@ -775,6 +781,7 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
             );
         }
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
@@ -828,6 +835,7 @@ fn lazy_reference_operands_provide_full_range_shape_and_skip_missing_alternative
         "=IF({TRUE()};([.A1]:IF(TRUE();[.C1:.D1];[Missing.A1:.Z100]));0)",
         "=IF({TRUE()};([.A1]:IFERROR(1/0;[.C1:.D1]));0)",
         "=IF({TRUE()};([.A1]:IFNA(#N/A;[.C1:.D1]));0)",
+        "=IF({TRUE()};([.A1]:IF(IF(TRUE();TRUE();{TRUE();FALSE()});[.C1:.D1];[Missing.A1]));0)",
     ] {
         let mut resolver = FixtureResolver::new();
         for (column, value) in [10.0, 11.0, 12.0, 13.0].into_iter().enumerate() {
