@@ -779,6 +779,7 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
         "IF([.C1];[.C1:.D1];[.C1:.D1])",
         "IFERROR(IF(TRUE();{#DIV/0!};1);[.C1:.D1])",
         "IFNA(IF(TRUE();{#N/A};1);[.C1:.D1])",
+        "IFERROR((([.A1]![.B1]):[.C1]);[.C1:.D1])",
     ] {
         for source in [
             format!("=([.A1]:{operand})"),
