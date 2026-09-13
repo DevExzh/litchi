@@ -1,0 +1,75 @@
+{
+  "schema": "xlsx_merge_0556_preparation_decision_v1",
+  "created_utc": "2026-09-13T13:28:42.588417+00:00",
+  "status": "prepared-awaiting-performance-measurement",
+  "adoption_allowed": false,
+  "production_restored": true,
+  "performance_captures": 0,
+  "quality_attempts": [
+    "baseline-01",
+    "baseline-02",
+    "candidate-01",
+    "candidate-03",
+    "candidate-04"
+  ],
+  "successful_candidate_attempts": [
+    "candidate-03",
+    "candidate-04"
+  ],
+  "inadmissible_attempts": [
+    "candidate-02"
+  ],
+  "test_counts": {
+    "baseline-01": {
+      "groups": 59,
+      "passed": 1313,
+      "failed": 0,
+      "ignored": 0
+    },
+    "candidate-01": {
+      "groups": 59,
+      "passed": 1316,
+      "failed": 0,
+      "ignored": 0
+    },
+    "candidate-03": {
+      "groups": 59,
+      "passed": 1316,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "evidence": {
+    "README.md": "9c7f092d9911a7b52331669160c721e525e33f16024b910dce64eee98f13f438",
+    "preparation.json": "152f962f94f91a5ac5b465ef970981b92410bef6fecf86058de2678f02f69539",
+    "baseline-source.json": "cceee48350176b00813b2211df0bb027911e39c284acd717129d22152ed3712e",
+    "candidate-source.json": "bd27facf728d65356eb4ab6c1a97c5ba354fe8df4fa2b07e206c62311f07bca9",
+    "candidate/candidate.json": "97c8d538eb478b5bde2507561347c25603cddfce2a5f176e17d5e6e7a162e959",
+    "candidate/cell.rs": "f7fa882fcf4ccd4909950660f0b614760c7b96eaccf44341129506db3f00e68c",
+    "candidate/candidate.patch": "d8f509ecbeaac1b2346f490fe22c0e73a5c3074c7ed82418bc88c198642eba8c",
+    "source-proof.md": "ccf77475d133b2833b823e93c4e162a122a3e9fcb208c6d1ca17660817d39dbe",
+    "candidate-review.md": "eb441d2a3c3db1e5876e4461f3acb553d6d5ca3af1c13e0d43ee4318003da2eb",
+    "format-review.md": "d9ed76b158b7dfb8594aea9e7cf3cc88def92f9ba7d4f6abb567bf0cf13dc22b",
+    "format-correction.json": "461dd8e762fe813c5bb01da784719ddff3ff205c71bb5ebc8bcd05fc07b3f36e",
+    "measurement-plan.md": "cf3614a930b0e9460b55f92fc783dca5d928f860959066948f7f0384143cd77e",
+    "adr-compliance.md": "5e7c67a28dafa62d2bdd9f428cd89467b85a15a2069c74c98de722212f058ffa",
+    "environment.json": "62f9f6e530a005fea8c7d7a00f448e0d113f8558514b89e566ad3a5f399c0f18",
+    "restoration.json": "8fe7815d2cfb9b33a3d72e2dcdad0b6d1f141016cd80dcde32e9c9b8861d5652",
+    "documentation.json": "edbfbc1c022c10602916314384eb35af6007df680111d7a7dbddaeb2d6603979",
+    "final-checks/result.json": "1a4ef5dcdc0540e4df27d8b9158d14ed0125cd3586bfb32960fa117244f5689c",
+    "quality-attempts/candidate-02/aborted.json": "98b4a35982a0d011d4eb8b1e36aa07bf9d40012ddab90fd2e00d8e077e1cb526",
+    "quality-attempts/baseline-01/result.json": "5afa9b6b7bc23302d34b5411eb59d30ee15d8bcd4ee44effe39b81b50c921fb2",
+    "quality-attempts/baseline-02/result.json": "0ca827d78f3743a83b3305ebeccb7e2321491213343b41ddb71c7d5f8b41215b",
+    "quality-attempts/candidate-01/result.json": "1f2bd47860af75baee82d55fdd90ee5073d2eb933be1c825474bb17cd8e9e242",
+    "quality-attempts/candidate-03/result.json": "b04688082fd8d656c4cb2a7eb4f9f4374b558675c11fc589b21cfb1a0132c780",
+    "quality-attempts/candidate-04/result.json": "941457ef21907d7d5d86264433ca340cd599cfc7c10cc14a7d054d57296b4199"
+  },
+  "remaining": [
+    "Freeze fresh measurement plan, corpus/source/binary bindings, and noise threshold before candidate captures",
+    "Implement and validate harness-only allocation-scope instrumentation without changing native workflow scope",
+    "Run matched native/allocation ABBA controls across all four XLSX shapes",
+    "Obtain positive merge/owner instruction and allocation attribution; review all adverse and drift rows",
+    "Adopt only after measured benefit and applicable correctness/preservation/resource gates pass"
+  ],
+  "scope": "OLE2/OOXML priority; ODF deferred; iWork excluded"
+}

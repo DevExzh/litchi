@@ -1,0 +1,52 @@
+{
+  "targeted": {
+    "xlsx-tests": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-xlsx",
+      "--all-features"
+    ],
+    "xlsx-clippy": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "format": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ]
+  },
+  "commands": {
+    "workspace-check": [
+      "cargo",
+      "check",
+      "--workspace",
+      "--all-features"
+    ],
+    "xlsx-doc": [
+      "cargo",
+      "doc",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "xlsx-minimal": [
+      "cargo",
+      "check",
+      "-p",
+      "litchi-xlsx",
+      "--no-default-features"
+    ]
+  }
+}

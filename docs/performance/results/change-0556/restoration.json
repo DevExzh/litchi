@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-13T13:22:20.628200+00:00",
+  "before_sha256": "f7fa882fcf4ccd4909950660f0b614760c7b96eaccf44341129506db3f00e68c",
+  "after_sha256": "7e807528568ebdd4a717382a3b1b249e178504b03e04d38147cb0159c5b567c7",
+  "baseline_manifest_sha256": "cceee48350176b00813b2211df0bb027911e39c284acd717129d22152ed3712e",
+  "all_manifest_files_match": true,
+  "reason": "Candidate remains isolated pending fresh performance measurements",
+  "candidate_quality": {
+    "candidate-03": "b04688082fd8d656c4cb2a7eb4f9f4374b558675c11fc589b21cfb1a0132c780",
+    "candidate-04": "941457ef21907d7d5d86264433ca340cd599cfc7c10cc14a7d054d57296b4199"
+  }
+}

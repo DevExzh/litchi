@@ -1,0 +1,37 @@
+{
+  "schema": "ole2_0556_quality_inputs_v1",
+  "created_utc": "2026-09-13T13:19:01.206080+00:00",
+  "stage": "candidate",
+  "mode": "targeted",
+  "source_manifest_sha256": "bd27facf728d65356eb4ab6c1a97c5ba354fe8df4fa2b07e206c62311f07bca9",
+  "plan_sha256": "fa1ec96241f133d35463a76665b3754eb150b882ebdf5d38779b785234406754",
+  "script_sha256": "efc978bee84c6c8a15223f44b8f59f91c7355df50ebc450dd7c2460c7b778635",
+  "commands": {
+    "xlsx-tests": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-xlsx",
+      "--all-features"
+    ],
+    "xlsx-clippy": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-xlsx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "format": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ]
+  },
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}

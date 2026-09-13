@@ -1,0 +1,31 @@
+{
+  "commands": {
+    "boundaries": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "claims": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "format": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ]
+  },
+  "driver_sha256": "04ef80b65261bc4922af88ae4afb74275557581b515b092d5ed4b41e712f4325",
+  "source_manifest_sha256": "cceee48350176b00813b2211df0bb027911e39c284acd717129d22152ed3712e"
+}

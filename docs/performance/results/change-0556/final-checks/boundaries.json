@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "exit_code": 0,
+  "start_utc": "2026-09-13T13:22:20.940451+00:00",
+  "end_utc": "2026-09-13T13:26:36.050840+00:00",
+  "seconds": 255.11038801301038,
+  "source_stable": true,
+  "inputs_sha256": "2b271ef2f42b42b6f7bdb64e860ec0e500a9a9cd8e8acb451a00ffb1fe11ea83",
+  "stdout_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

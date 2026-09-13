@@ -1,0 +1,14 @@
+{
+  "status": "inadmissible-source-changed",
+  "recorded_utc": "2026-09-13T13:19:01.047060+00:00",
+  "reason": "Root started candidate-02 after the formatting command yielded a live session, before it terminated. The driver captured the pre-format manifest; its post-command source check rejected the run. No result or quality command receipt was published.",
+  "driver_session": 22648,
+  "observed_exit_code": 1,
+  "observed_error": "AssertionError: crates/litchi-xlsx/src/cell.rs at quality.py:33, called by main line67 verify_source(manifest)",
+  "admissible_quality_evidence": false,
+  "artifacts": {
+    "inputs.json": "f890487e689650f3e6699d96e0f2f78590f5135238cc268a0210dcbcee5382cc",
+    "xlsx-tests/stderr": "b7a4289b4e1826ec1a32e84dd8b1d6a6ef5dd2cac4950d5c045db874c2a49d0a",
+    "xlsx-tests/stdout": "1a70278cf32ed2b1d1e97d39b670e665a1f23b5e72940a5b13e84d62ef7b69b3"
+  }
+}

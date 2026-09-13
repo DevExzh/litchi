@@ -1,0 +1,10 @@
+{
+  "utc": "2026-09-13T13:29:37.962771+00:00",
+  "target": "/home/zhuhe/litchi-goal-0556-target",
+  "removed": true,
+  "regular_file_bytes_before": 14568545122,
+  "accessible_proc_entries_inspected": 646,
+  "target_references_before": [],
+  "precleanup_sha256": "4b3c0ab42676d0206bc25846ccdd59915957011b43539000fe7d0c36c7645fbd",
+  "python_cache_present": false
+}

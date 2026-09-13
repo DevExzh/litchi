@@ -1,0 +1,19 @@
+{
+  "schema": "xlsx_merge_0556_candidate_v1",
+  "base_revision": "3210f07ac7a9daa2686e781645f6539a156a26ce",
+  "production_source": "crates/litchi-xlsx/src/cell.rs",
+  "production_sha256": "7e807528568ebdd4a717382a3b1b249e178504b03e04d38147cb0159c5b567c7",
+  "candidate_source": "docs/performance/results/change-0556/candidate/cell.rs",
+  "candidate_source_sha256": "f7fa882fcf4ccd4909950660f0b614760c7b96eaccf44341129506db3f00e68c",
+  "candidate_patch": "docs/performance/results/change-0556/candidate/candidate.patch",
+  "candidate_patch_sha256": "d8f509ecbeaac1b2346f490fe22c0e73a5c3074c7ed82418bc88c198642eba8c",
+  "source_review": "docs/performance/results/change-0556/candidate/source-review.md",
+  "source_review_sha256": "aab1914a68f3671bbcb72483e72857d8f3c2a608cb44fa020ac20dc7562e6e8f",
+  "adr_manifest": "docs/performance/results/change-0555/adr-manifest.json",
+  "adr_continuity_verified": true,
+  "production_edited": true,
+  "build_or_test_run": true,
+  "performance_claim": null,
+  "adoption_allowed": false,
+  "preparation_phase": "root rustfmt correction after preserved candidate-01 format failure"
+}

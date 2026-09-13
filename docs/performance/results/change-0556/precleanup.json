@@ -1,0 +1,13 @@
+{
+  "utc": "2026-09-13T13:29:36.673019+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0556/verify.py"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"status\": \"pass\", \"quality_attempts\": [\"baseline-01\", \"baseline-02\", \"candidate-01\", \"candidate-03\", \"candidate-04\"], \"adoption_allowed\": false, \"production_restored\": true}\n",
+  "stderr": "",
+  "verifier_sha256": "b3cd6f331b5372a2d1186cd32a329310b80bb1e47b859fdc889c04cdc55bf597",
+  "decision_sha256": "890b82e7b8f946566562667d8599640bdf771c3d838c6237b7eb6753c9c8ee4b"
+}
