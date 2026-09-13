@@ -1,0 +1,6 @@
+{
+  "error": "canonical report field is missing: comparisons.adverse",
+  "schema": "litchi.xlsx.verification.0553.v1",
+  "scope": "precleanup",
+  "status": "fail"
+}

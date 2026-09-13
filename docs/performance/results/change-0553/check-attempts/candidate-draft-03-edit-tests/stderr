@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized] target(s) in 0.09s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0553-target/release/deps/litchi_xlsx-5869fb098817a2ab)
+error: test failed, to rerun pass `-p litchi-xlsx --lib`

@@ -1,0 +1,39 @@
+{
+  "schema": "xlsx_0553_cleanup_v1",
+  "observed_utc": "2026-09-13T11:09:54.928818+00:00",
+  "plan_sha256": "17d810a24912065fde8c71de6109be983f7c5b3bdcea5fd6584f4725c6499ea4",
+  "target": "/home/zhuhe/litchi-goal-0553-target",
+  "removed": [
+    "/home/zhuhe/litchi-goal-0553-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "process_reference_scope": "Accessible /proc cwd, executable and open file descriptors; cleanup process ancestors excluded.",
+  "python_cache_absent": true,
+  "binary_sha256_by_kind": {
+    "baseline/alloc": "03157156ce50f64a2fb4460fd5631830b9209ecf21be63b1cdc7328066fad870",
+    "baseline/cap": "d3bdd1d51de213c96e4ed37b912fe59cea2836ba943379f9f14d37a4f3de8eff",
+    "baseline/guard-alloc": "a3106e2ba491f12c2c066b52f7f54fa73e054ef20e7d5a6687f7a614cae91dec",
+    "baseline/guard-normal": "619fc3d7c8fdb7598d3cb9802751de0b1e330cfd018ed77b31843b7693308346",
+    "baseline/normal": "75d45263c46364b20129b5919e05f896891ca72c4c7da57869f92bc8d57ab05f",
+    "candidate/alloc": "09ca3ed8f5750a4ae0c5001ecb3b9e245cbc5bfc6f10ec9a9944e37c94375b0c",
+    "candidate/cap": "210468b5ac6039ada28368551fba3208bc6583620743f5dcedde014c919c1d9a",
+    "candidate/guard-alloc": "2cd60839d83d8dd11465f43aaae0e156a5508916535aba4edc79268f738ed20c",
+    "candidate/guard-normal": "2cd3319faa7e98d9c760e48d39c6f8b8692d6a7fdfba2af37925d9ac6c1ac3a0",
+    "candidate/normal": "dd3bf36c74da74f32f1a07216fb4ad3104f80b7d43a986264bfc32c9c83200d6"
+  },
+  "binary_descriptor_sha256_by_kind": {
+    "baseline/alloc": "62d4686e16da3da46aca7caebd985f8d41bcd3ebf6c7d33849e18c4acd658f61",
+    "baseline/cap": "139dbb32308749b3345d0c4680dfd50dbc7c5d515fec6f074dca6f97a8198d7b",
+    "baseline/guard-alloc": "ea732a9f7eb22dc38498b74d9e159c7c03f73f284913562656def532ce762d06",
+    "baseline/guard-normal": "0825d808754928abb76e5e77fff78cb986c857d8ebfa085fc5a3e7790cf39e24",
+    "baseline/normal": "e20dda660939adbbbc12abd748c8b5a823dcf19771760537858e71e2fe2fec0c",
+    "candidate/alloc": "3f37d222755fe513b62c01e929e4aaf703dbbae2317cdad3cd0bc7f313cf9df1",
+    "candidate/cap": "ff133d774beba7003de89b85643002c38631331220cbd72f941f0a1de8f52e41",
+    "candidate/guard-alloc": "6b99467967453f909b35d7455b83b7bfd8a38ebb350978e0c58a550c5692997c",
+    "candidate/guard-normal": "2da4ffce888ebbf559e6fa629a0ab274d579cd16385b8a267dc6ec84564b9a64",
+    "candidate/normal": "f0d83fe1e7ff627d5ca1db5d4545998cf1c846753fbd00eec78c865ced1ec9ef"
+  },
+  "precleanup_verification_sha256": "b6f666a04041ebce1d2219a7e7b0944db678ea54085c043831c727f73051365a",
+  "scope": "Remove only owned change0553 build/retained-binary target after passing precleanup and exact binary hash checks."
+}

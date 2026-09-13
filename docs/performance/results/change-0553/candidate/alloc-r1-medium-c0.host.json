@@ -1,0 +1,26 @@
+{
+  "observed_utc": "2026-09-13T10:43:57.396253+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3813669,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-scalar-worktree"
+    },
+    {
+      "pid": 3815660,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-scalar-worktree/crates/soapberry-zip"
+    },
+    {
+      "pid": 3816008,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/x509-cert-0.2.5"
+    },
+    {
+      "pid": 3816126,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-scalar-worktree/crates/litchi-core"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

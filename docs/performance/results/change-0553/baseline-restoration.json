@@ -1,0 +1,30 @@
+{
+  "schema": "xlsx_0553_baseline_restoration_v1",
+  "start_utc": "2026-09-13T10:54:08.760514+00:00",
+  "end_utc": "2026-09-13T10:54:09.192502+00:00",
+  "reason": "Mandatory frozen main gates failed; restore exact baseline before final quality.",
+  "candidate_manifest_sha256": "c17a88f6ddaec2ade4d053e07cacc40e9e263b80c43689d900ebded80f614bf7",
+  "baseline_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "final_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "profile_decision_sha256": "71bdc6c947a99389c3cb5e9c314cf179134ffd92c0753189e03170e018ca5328",
+  "restored_paths": [
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+    "crates/litchi-xlsx/src/cell_values/source.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs"
+  ],
+  "removed_candidate_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/noop_collector_guard.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/resource_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_action_domain.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs"
+  ],
+  "exact_baseline_source": true
+}

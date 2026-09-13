@@ -1,0 +1,6 @@
+{
+  "error": "Object of type datetime is not JSON serializable",
+  "schema": "litchi.xlsx.verification.0553.v1",
+  "scope": "candidate-custody",
+  "status": "fail"
+}

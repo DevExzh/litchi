@@ -1,0 +1,8 @@
+{
+  "frozen_utc": "2026-09-13T09:13:11.408310+00:00",
+  "path": "Cargo.lock",
+  "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "retained": "workspace-Cargo.lock",
+  "reason": "Ignored workspace lock frozen before every0553 build. guarded_capture.py checks it per child, starting with baseline.",
+  "baseline_cap_not_started": true
+}

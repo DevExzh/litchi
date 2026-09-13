@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0553: matched XLSX commit-local proof experiment
+
+[0553](0553-xlsx-commit-local-compact-proof.md) retains 119 baseline and 119
+candidate build/capture receipts covering four worksheet shapes, unmanaged
+and managed one-cell/one-percent workflows, planning/refusal and cap controls,
+and separate allocator runs in frozen ABBA order. Both analyzers validate the
+complete matrices. Main latency and RSS admission failed; exact baseline
+source is restored. No production speedup or fresh instruction-profile claim.
+
 ## 0551: retained XLSX scanner attribution refined
 
 [0551](changes/0551-xlsx-layout-handoff-feasibility.md) replays the eight

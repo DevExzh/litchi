@@ -1,0 +1,9 @@
+{
+  "schema": "xlsx_0553_verifier_attempt_v1",
+  "created_utc": "docs/performance/results/change-0553/verify.py",
+  "source_path": "docs/performance/results/change-0553/verify.py",
+  "copy_path": "docs/performance/results/change-0553/verifier-attempts/initial/verify.py",
+  "source_sha256": "752c2735888904490a94d4797fbf75136826eab6e25fdbf6eb881a8576107ec2",
+  "copy_sha256": "752c2735888904490a94d4797fbf75136826eab6e25fdbf6eb881a8576107ec2",
+  "reason": "Exact pre-edit verifier retained before bounded terminal-closure custody corrections."
+}

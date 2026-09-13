@@ -1,0 +1,260 @@
+//! Differential coverage for the compact writer's accepted action domain.
+//!
+//! Candidate inclusion target: copy this file to
+//! `crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_action_domain.rs`
+//! in the isolated candidate (and, when validating the candidate in the live
+//! crate, use the same repo-relative destination), then add this ordinary
+//! child declaration to `raw/worksheet/edit/package.rs`:
+//!
+//! ```ignore
+//! #[cfg(test)]
+//! mod compact_action_domain;
+//! ```
+//!
+//! Every action map is rebuilt at its consuming seam because `Action` is
+//! intentionally not `Clone`.
+
+use std::collections::BTreeMap;
+
+use litchi_sheet::Cell as Address;
+
+use super::{
+    ValueOnlyRewrite, reduced_readback, rewrite_value_only_with_compact_proof,
+    rewrite_value_only_with_provenance, try_compact_value_rewrite,
+};
+use crate::cell::{Content, Number, Store, Text, Value};
+use crate::formula::Formula;
+use crate::raw::worksheet;
+use crate::raw::worksheet::edit::{Action, Payload, StyleEffect, collect_compact_layout};
+
+const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+fn address(reference: &str) -> Address {
+    Address::from_a1(reference).expect("valid worksheet address")
+}
+
+fn worksheet(body: &str) -> Vec<u8> {
+    format!(r#"<worksheet xmlns="{SML}">{body}</worksheet>"#).into_bytes()
+}
+
+fn number_content(value: &str) -> Content {
+    Content::from(Value::Number(
+        Number::new(value).expect("valid worksheet number"),
+    ))
+}
+
+fn parse_store(content: &[u8], shared_strings: Option<&[Text]>) -> Store {
+    match shared_strings {
+        Some(shared_strings) => worksheet::parse(content, || Ok(Some(shared_strings)))
+            .expect("worksheet parse with shared strings"),
+        None => worksheet::parse(content, || Ok(None)).expect("worksheet parse"),
+    }
+}
+
+fn assert_stores_equal(actual: &Store, expected: &Store, label: &str) {
+    assert_eq!(
+        actual.entries().len(),
+        expected.entries().len(),
+        "{label}: entry count"
+    );
+    for (index, (actual, expected)) in actual.entries().iter().zip(expected.entries()).enumerate() {
+        assert_eq!(actual.address, expected.address, "{label}: address {index}");
+        assert_eq!(actual.cell, expected.cell, "{label}: cell {index}");
+        assert_eq!(actual.style, expected.style, "{label}: style {index}");
+    }
+}
+
+fn assert_rewrites_equal(
+    compact: ValueOnlyRewrite<'_>,
+    complete: ValueOnlyRewrite<'_>,
+    expected: &[u8],
+    shared_strings: Option<&[Text]>,
+    label: &str,
+) {
+    assert_eq!(complete.bytes, expected, "{label}: complete bytes");
+    assert_eq!(compact.bytes, expected, "{label}: compact bytes");
+    assert_eq!(compact.bytes, complete.bytes, "{label}: route bytes");
+    assert_eq!(compact.omitted, complete.omitted, "{label}: provenance");
+
+    let compact_reduced =
+        reduced_readback(&compact.bytes, &compact.omitted).expect("compact reduced readback");
+    let complete_reduced =
+        reduced_readback(&complete.bytes, &complete.omitted).expect("complete reduced readback");
+    assert_eq!(compact_reduced, complete_reduced, "{label}: reduced bytes");
+
+    let compact_store = parse_store(&compact.bytes, shared_strings);
+    let complete_store = parse_store(&complete.bytes, shared_strings);
+    assert_stores_equal(&compact_store, &complete_store, label);
+
+    let compact_reduced_store = parse_store(&compact_reduced, shared_strings);
+    let complete_reduced_store = parse_store(&complete_reduced, shared_strings);
+    assert_stores_equal(&compact_reduced_store, &complete_reduced_store, label);
+}
+
+fn assert_fast_case(
+    source: &[u8],
+    make_actions: impl Fn() -> BTreeMap<Address, Action>,
+    expected: &[u8],
+    label: &str,
+) {
+    let store = parse_store(source, None);
+    let actions = make_actions();
+    let proof = collect_compact_layout(source, store.entries(), &actions)
+        .expect("eligible source should admit compact proof");
+    let compact = try_compact_value_rewrite(source, &proof, store.entries(), &actions)
+        .expect("eligible action map should use compact writer");
+    let complete = rewrite_value_only_with_provenance(source, "Sheet1", make_actions())
+        .expect("complete rewrite");
+    assert_rewrites_equal(compact, complete, expected, None, label);
+}
+
+fn assert_fallback_case(
+    source: &[u8],
+    make_actions: impl Fn() -> BTreeMap<Address, Action>,
+    expected: &[u8],
+    shared_strings: Option<&[Text]>,
+    label: &str,
+) {
+    let store = parse_store(source, None);
+    let actions = make_actions();
+    let proof = collect_compact_layout(source, store.entries(), &actions);
+    assert!(proof.is_none(), "{label}: compact collector must refuse");
+
+    let complete = rewrite_value_only_with_provenance(source, "Sheet1", make_actions())
+        .expect("complete fallback rewrite");
+    let fallback = rewrite_value_only_with_compact_proof(
+        source,
+        "Sheet1",
+        make_actions(),
+        proof,
+        store.entries(),
+    )
+    .expect("complete fallback through compact wrapper");
+    assert_rewrites_equal(fallback, complete, expected, shared_strings, label);
+}
+
+#[test]
+fn compact_plain_formula_and_discontiguous_scalars_match_complete() {
+    let source = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="C1"><v>3</v></c></row><row r="3"><c r="B3"><v>5</v></c><c r="D3"><v>7</v></c></row></sheetData>"#,
+    );
+    let expected = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><v>10</v></c><c r="C1"><f>A1+2</f></c></row><row r="3"><c r="B3"><v>5</v></c><c r="D3"><v>70</v></c></row></sheetData>"#,
+    );
+
+    assert_fast_case(
+        &source,
+        || {
+            BTreeMap::from([
+                (address("A1"), Action::set(number_content("10"))),
+                (
+                    address("C1"),
+                    Action::set(Content::from(
+                        Formula::new("A1+2").expect("valid worksheet formula"),
+                    )),
+                ),
+                (address("D3"), Action::set(number_content("70"))),
+            ])
+        },
+        &expected,
+        "plain formula and discontiguous scalar updates",
+    );
+}
+
+#[test]
+fn compact_clear_clear_if_present_and_style_payload_match_complete() {
+    let source = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c></row></sheetData>"#,
+    );
+    let expected = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"></c><c r="B1"></c><c r="C1" s="8"><v>30</v></c></row></sheetData>"#,
+    );
+
+    assert_fast_case(
+        &source,
+        || {
+            BTreeMap::from([
+                (address("A1"), Action::clear(true)),
+                (address("B1"), Action::clear(false)),
+                (
+                    address("C1"),
+                    Action::Update {
+                        payload: Some(Payload::Set(number_content("30"))),
+                        style: Some(StyleEffect::Set(8)),
+                    },
+                ),
+            ])
+        },
+        &expected,
+        "clear, clear-if-present, and combined payload/style",
+    );
+}
+
+#[test]
+fn formula_source_and_shared_string_payload_use_complete_fallback() {
+    let formula_source = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><f>A1+1</f><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
+    );
+    let formula_expected = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><f>A1+1</f><v>1</v></c><c r="B1"><v>9</v></c></row></sheetData>"#,
+    );
+    assert_fallback_case(
+        &formula_source,
+        || BTreeMap::from([(address("B1"), Action::set(number_content("9")))]),
+        &formula_expected,
+        None,
+        "source formula",
+    );
+
+    let shared_string_source = worksheet(
+        r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
+    );
+    let shared_string_expected = worksheet(
+        r#"<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>2</v></c></row></sheetData>"#,
+    );
+    let shared_strings = [Text::from("shared")];
+    let store = parse_store(&shared_string_source, None);
+    let actions = || {
+        BTreeMap::from([(
+            address("A1"),
+            Action::Update {
+                payload: Some(Payload::SharedString {
+                    index: 0,
+                    text: Text::from("shared"),
+                }),
+                style: None,
+            },
+        )])
+    };
+    let proof_actions = BTreeMap::from([(address("A1"), Action::set(number_content("9")))]);
+    let proof = collect_compact_layout(&shared_string_source, store.entries(), &proof_actions)
+        .expect("formula-free source proof");
+    let shared_string_actions = actions();
+    assert!(
+        try_compact_value_rewrite(
+            &shared_string_source,
+            &proof,
+            store.entries(),
+            &shared_string_actions,
+        )
+        .is_none(),
+        "shared-string payload must refuse compact writer"
+    );
+    let complete = rewrite_value_only_with_provenance(&shared_string_source, "Sheet1", actions())
+        .expect("complete shared-string rewrite");
+    let fallback = rewrite_value_only_with_compact_proof(
+        &shared_string_source,
+        "Sheet1",
+        actions(),
+        Some(proof),
+        store.entries(),
+    )
+    .expect("shared-string fallback through compact wrapper");
+    assert_rewrites_equal(
+        fallback,
+        complete,
+        &shared_string_expected,
+        Some(&shared_strings),
+        "shared-string payload",
+    );
+}

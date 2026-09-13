@@ -1,0 +1,37 @@
+{
+  "schema": "xlsx_0553_progress_checkpoint_v1",
+  "recorded_utc": "2026-09-13T10:18:19.565494+00:00",
+  "status": "nonterminal; candidate performance capture not started",
+  "selected_draft": "candidate-attempts/draft-06",
+  "binding_sha256": "77de336bcc7a7de8fff846777cf57f66320655262a792d19041f35e53885cd7b",
+  "checks": [
+    {
+      "name": "clippy",
+      "receipt": "check-attempts/candidate-draft-06-clippy/receipt.json",
+      "sha256": "9c126b540e10057d0fcc4a8599d9f6da472d9affce19ba67247b47f25c0ef3b2"
+    },
+    {
+      "name": "edit-tests",
+      "receipt": "check-attempts/candidate-draft-06-edit-tests/receipt.json",
+      "sha256": "1cd4d06c51a138b5fa9a5c3aaa59cdaacbe974272d99e52fb725d15e0d6f8940"
+    },
+    {
+      "name": "public-tests",
+      "receipt": "check-attempts/candidate-draft-06-public-tests/receipt.json",
+      "sha256": "6227c1e2da382f76fadd74eae401a2e242d3b488b6b9a7c9181b1d089037c38d"
+    }
+  ],
+  "draft_replay": {
+    "count": 6,
+    "status": "pass",
+    "verifier_sha256": "05aa7d61fcd2e8822442659e8e1fc79f815b2a2a9ed9d807293f250a9954c8d4"
+  },
+  "pending": [
+    "no-op invocation and populated metadata-cap fallback evidence",
+    "final source review binding",
+    "candidate and retained-baseline-repeat-two captures",
+    "frozen performance gates and conditional profiles",
+    "full final quality, disposition, cleanup, seal and commit"
+  ],
+  "priority": "OLE2/OOXML performance first; ODF deferred"
+}

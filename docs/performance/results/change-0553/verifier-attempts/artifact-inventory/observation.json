@@ -1,0 +1,9 @@
+{
+  "observed_utc": "2026-09-13T11:05:54.027435+00:00",
+  "prior_verifier_sha256": "9502e260d85f0a81794eb39780ced6ca635353386aea7502f6606d0934542877",
+  "failed_command": "decide.py --output docs/performance/results/change-0553/decision.json",
+  "exit_code": 2,
+  "error": "baseline/build-normal.receipt.json artifact inventory differs",
+  "cause": "Per-job artifact validator compared every file in the shared stage directory against one job inventory. Scope actual inventory to the exact stem-dot prefix; complete stage inventory remains checked independently.",
+  "frozen_analyzers_unchanged": true
+}

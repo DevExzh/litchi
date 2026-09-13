@@ -1,0 +1,9 @@
+{
+  "frozen_utc": "2026-09-13T09:13:11.408412+00:00",
+  "files": {
+    "docs/performance/results/change-0553/plan.json": "17d810a24912065fde8c71de6109be983f7c5b3bdcea5fd6584f4725c6499ea4",
+    "docs/performance/results/change-0553/run.py": "f1398fcc87dc7bccfc05930276e26a4a8a21106480613238eab49310ae1c23f0",
+    "docs/performance/results/change-0553/capture.py": "21b0153923e87a331906552457a5f77bb444686d4ce9c9c99e3efcb2dbe5d2c1",
+    "docs/performance/results/change-0553/adr-manifest.json": "c4e7331b91816d3752917c3cb4b320ed56c35efede61baa9170d215546e10ad2"
+  }
+}

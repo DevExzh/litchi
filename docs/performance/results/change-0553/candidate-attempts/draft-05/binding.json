@@ -1,0 +1,52 @@
+{
+  "schema": "xlsx_0553_candidate_draft_binding_v1",
+  "frozen_utc": "2026-09-13T10:06:02.121079+00:00",
+  "scope": "Reconcile completed coder handoff: exact worksheet namespace dialect and defaults CDATA refusal; provisional candidate.",
+  "base_revision": "8aa0c5baf0616d16c79eba0c6c28dc1716338ad6",
+  "plan_sha256": "17d810a24912065fde8c71de6109be983f7c5b3bdcea5fd6584f4725c6499ea4",
+  "baseline_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "original_isolated_source_hashes": {
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": "ea0b2c5769dec4e321e90619915d8dad5edeac9c122d174da954c045f1bbbe32",
+    "crates/litchi-xlsx/src/cell_values/source.rs": "4999faf8d974218a2cbbc837021124d7c3c13f5ccce5c9b35f3323796256ef18",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": "66bfac6d44a991af6888af5175d07403d53aeca7f7a809038867fcfc38796a6d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": "ade699763cb5c50bf3766cb1aa2e603bbbb2a46f4d0cbf40d6a52db0a096ddf0",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": "3ca156cf37ef824d49c0cc9472767144ce57806be9741d31d86e2404c0e76187",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": "faf67cbde138a7c47e3642f595efe6100e216b3d69509039b6c98465723dc31d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": "da6738979620e7717de44d3164e4b7206cbbacdd84a5bc218a6d0ac31e5891f0",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/resource_tests.rs": "682b81ec497bb0f95b8c0c5863052c11b1d9476a79bcd843cf4b4d0fa283b9e5",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs": "854008afd366d92bc56d66d26a4caca6180b223bcd90bfada23b974545871760",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": "e9645fef68915deef9120f338ff3a6b6a41668fb76054bec331d5b78d91e1e34",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_action_domain.rs": "63ecb62de0d66581cb648f39792aad7a497134bf9790dc87dd049b8e4cc93b7d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs": "e8e630d6c4d33f65bbee6527dbbca6dd5332b5482791661f2a1b1a4daf1189b3",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs": "1e59c2e722cbcad9b3674350f361e8185c0f1a1be2b0b3d6ad7efa94baf658c8",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": "305e20504153c9b3147c60f92a6f3653dbd0d181712c335876e91c147ddf9c2a"
+  },
+  "source_hashes": {
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": "ea0b2c5769dec4e321e90619915d8dad5edeac9c122d174da954c045f1bbbe32",
+    "crates/litchi-xlsx/src/cell_values/source.rs": "4999faf8d974218a2cbbc837021124d7c3c13f5ccce5c9b35f3323796256ef18",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": "66bfac6d44a991af6888af5175d07403d53aeca7f7a809038867fcfc38796a6d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": "ade699763cb5c50bf3766cb1aa2e603bbbb2a46f4d0cbf40d6a52db0a096ddf0",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": "3ca156cf37ef824d49c0cc9472767144ce57806be9741d31d86e2404c0e76187",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": "faf67cbde138a7c47e3642f595efe6100e216b3d69509039b6c98465723dc31d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": "da6738979620e7717de44d3164e4b7206cbbacdd84a5bc218a6d0ac31e5891f0",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact/resource_tests.rs": "682b81ec497bb0f95b8c0c5863052c11b1d9476a79bcd843cf4b4d0fa283b9e5",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs": "ef0ee955ab9f1e4d245a244aaea9030ec9cb9d6c2f0a6cf80327032da3a5ee4c",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": "e9645fef68915deef9120f338ff3a6b6a41668fb76054bec331d5b78d91e1e34",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_action_domain.rs": "63ecb62de0d66581cb648f39792aad7a497134bf9790dc87dd049b8e4cc93b7d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs": "e8e630d6c4d33f65bbee6527dbbca6dd5332b5482791661f2a1b1a4daf1189b3",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs": "1e59c2e722cbcad9b3674350f361e8185c0f1a1be2b0b3d6ad7efa94baf658c8",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": "305e20504153c9b3147c60f92a6f3653dbd0d181712c335876e91c147ddf9c2a"
+  },
+  "patch_sha256": "f27b5efc2e60cc467c1e7500d68d898ae2918712e71123289c3b0060037d30cd",
+  "limits": {
+    "source_bytes": 8388608,
+    "events": 131072,
+    "logical_proof_bytes": 2097152
+  },
+  "root_changes": "Apply canonical namespace/defaults-CDATA proof changes and three tests; avoid redundant slice expressions and label PI test as source admission only.",
+  "lifetime": "Proof consumed and dropped before complete fallback or candidate readback; no planning/Snapshot retention.",
+  "parent_binding_sha256": "6b461ad4d0af2c1a57d5aa17744acb1afa8980da310ab729838db41a5869769a",
+  "transition_sha256": "e1d2cc84ed03ecb05fdacdc1f477fd873b6ad04a308dc0faffabc0cdc1e36731",
+  "previous_check_receipt_sha256": "9fc76e9d03400945c09e8d691bebb011372b47a8b82eb58cd6e5f2e9b4738042"
+}

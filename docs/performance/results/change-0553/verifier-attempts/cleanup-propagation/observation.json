@@ -1,0 +1,6 @@
+{
+  "observed_utc": "2026-09-13T11:10:52.259570+00:00",
+  "failure": "strict all: baseline/binary-normal.json retained binary is missing without cleanup custody",
+  "cause": "Terminal checker passed cleanup summary instead of the validated cleanup record to capture consumers. Pass the digest-checked record after complete cleanup validation; no unconditional missing-binary allowance.",
+  "precleanup_record_and_measurements_unchanged": true
+}

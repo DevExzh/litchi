@@ -1,0 +1,16 @@
+{
+  "schema": "xlsx_0553_profile_decision_v1",
+  "status": "skipped",
+  "scope": "Complete main, planning/refusal, and cap pilot; no partial-pilot profile claim.",
+  "pilot_passed": false,
+  "profile_required": false,
+  "profile_gate_passed": true,
+  "main_analysis_sha256": "147abc506cde809dfe7f20368a5cfc567629b5f58feffeeba09d23ad1c9fb02a",
+  "pilot_gates": {
+    "main": false,
+    "guard": true,
+    "cap": true
+  },
+  "profile_rows": [],
+  "reason": "The complete pilot failed: unmanaged vendor-extension one-percent latency misses three required 3% improvement checks, and dense-sparse unmanaged one-percent repeat-two peak RSS exceeds the 5% ceiling. Frozen policy skips instruction profiles; no adoption claim."
+}

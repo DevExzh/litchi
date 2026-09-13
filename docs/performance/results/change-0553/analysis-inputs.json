@@ -1,0 +1,15 @@
+{
+  "schema": "xlsx_0553_analysis_inputs_v1",
+  "frozen_utc": "2026-09-13T09:13:11.408605+00:00",
+  "scope": "Corrected inherited main and guard/cap analyzers frozen before the first baseline capture. All0552 gates retained.",
+  "files": {
+    "docs/performance/results/change-0553/analyze_metrics.py": "69042472302568c42241fbfcbdad8a8c683f3134e7e7c0ebf9c8ed5ec8f42426",
+    "docs/performance/results/change-0553/analyze_guards.py": "89c9ed81e66ff3ea35505cfa9aaf0c9ffefdfa4292ccff3757f88c2b64edb2d0",
+    "docs/performance/results/change-0553/run.py": "f1398fcc87dc7bccfc05930276e26a4a8a21106480613238eab49310ae1c23f0",
+    "docs/performance/results/change-0553/capture.py": "21b0153923e87a331906552457a5f77bb444686d4ce9c9c99e3efcb2dbe5d2c1",
+    "docs/performance/results/change-0553/plan.json": "17d810a24912065fde8c71de6109be983f7c5b3bdcea5fd6584f4725c6499ea4",
+    "docs/performance/results/change-0546/integration/analyze.py": "c380298762c64f104c4aaaf1bf53fae7e613bc7aa9148fe1d6f1da19b2eb9614",
+    "docs/performance/results/change-0521/analyze.py": "322357892b496ef09ca01aa69bb5a8708182a9a771a4541e3b21a6885a7616ad",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  }
+}

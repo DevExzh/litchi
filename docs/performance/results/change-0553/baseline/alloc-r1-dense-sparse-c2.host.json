@@ -1,0 +1,46 @@
+{
+  "observed_utc": "2026-09-13T09:33:21.402915+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3391952,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3394615,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-expression-worktree/crates/soapberry-zip"
+    },
+    {
+      "pid": 3395056,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-bigint-dig-0.8.6"
+    },
+    {
+      "pid": 3395065,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/chrono-0.4.45"
+    },
+    {
+      "pid": 3395227,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/x509-cert-0.2.5"
+    },
+    {
+      "pid": 3395380,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rsa-0.9.10"
+    },
+    {
+      "pid": 3395523,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-expression-worktree/crates/litchi-core"
+    },
+    {
+      "pid": 3395558,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ecdsa-0.16.9"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

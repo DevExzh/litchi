@@ -1,0 +1,372 @@
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -838,7 +838,7 @@
+ 
+     /// Borrow the authoritative sorted cell owners for one commit-local
+     /// source/layout pairing. The slice never escapes the immutable snapshot.
+-    pub(crate) fn stored_entries(&self) -> &[crate::cell::Stored] {
++    pub(crate) fn stored_entries(&self) -> &[Stored] {
+         self.cells.entries()
+     }
+ 
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
+@@ -225,7 +225,7 @@
+             // direct walker cannot retain their error precedence without
+             // retaining value state, so it conservatively declines them.
+             Event::GeneralRef(_) | Event::DocType(_) => false,
+-            Event::Comment(_) | Event::Decl(_) => true,
++            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => true,
+             Event::Eof => self.closed_root && self.stack.is_empty(),
+         }
+     }
+@@ -974,9 +974,3 @@
+ 
+ #[cfg(test)]
+ mod resource_tests;
+-
+-#[cfg(test)]
+-mod dimension_expansion;
+-
+-#[cfg(test)]
+-mod layout_order_fallback;
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/compact/dimension_expansion.rs
++++ /dev/null
+@@ -1,73 +0,0 @@
+-//! Differential coverage for a non-empty explicit dimension element.
+-//!
+-//! Candidate inclusion target: copy this file to
+-//! `crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs`
+-//! in the isolated candidate (and, when validating the candidate in the live
+-//! crate, use the same repo-relative destination), then add this ordinary
+-//! child declaration to `raw/worksheet/edit/package.rs`:
+-//!
+-//! ```ignore
+-//! #[cfg(test)]
+-//! mod compact_dimension_expansion;
+-//! ```
+-//!
+-//! The test intentionally calls the private compact seam so a fallback cannot
+-//! make a broken compact dimension writer look correct.
+-
+-use std::collections::BTreeMap;
+-
+-use litchi_sheet::Cell as Address;
+-
+-use super::super::package::{rewrite_value_only_with_provenance, try_compact_value_rewrite};
+-use crate::cell::{Content, Number, Value};
+-use crate::raw::worksheet;
+-use crate::raw::worksheet::edit::{Action, collect_compact_layout};
+-
+-const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+-
+-fn address(reference: &str) -> Address {
+-    Address::from_a1(reference).expect("valid worksheet address")
+-}
+-
+-#[test]
+-fn compact_dimension_expansion_preserves_explicit_dimension_close() {
+-    // The source cell is outside the declared one-cell extent.  The edit must
+-    // expand the opening tag while retaining the explicit closing tag byte for
+-    // byte.  A compact proof that accidentally spans the whole element loses
+-    // that close when its writer emits only the replacement opening tag.
+-    let source = format!(
+-        r#"<worksheet xmlns="{SML}"><dimension ref="A1"></dimension><sheetData><row r="1"><c r="C1"><v>1</v></c></row></sheetData></worksheet>"#,
+-    )
+-    .into_bytes();
+-    let store = worksheet::parse(&source, || Ok(None)).expect("source worksheet parse");
+-    assert_eq!(store.entries().len(), 1);
+-    assert_eq!(store.entries()[0].address, address("C1"));
+-
+-    let actions = BTreeMap::from([(
+-        address("C1"),
+-        Action::set(Content::from(Value::Number(
+-            Number::new("9").expect("valid worksheet number"),
+-        ))),
+-    )]);
+-
+-    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+-        .expect("complete worksheet rewrite");
+-    let proof = collect_compact_layout(&source, store.entries(), &actions)
+-        .expect("explicit dimension source should admit compact proof");
+-    let compact = try_compact_value_rewrite(&source, &proof, store.entries(), &actions)
+-        .expect("eligible scalar edit should use compact writer");
+-
+-    let expected = format!(
+-        r#"<worksheet xmlns="{SML}"><dimension ref="A1:C1"></dimension><sheetData><row r="1"><c r="C1"><v>9</v></c></row></sheetData></worksheet>"#,
+-    )
+-    .into_bytes();
+-    assert_eq!(complete.bytes, expected);
+-    assert_eq!(compact.bytes, expected);
+-    assert_eq!(compact.bytes, complete.bytes);
+-    assert_eq!(compact.omitted, complete.omitted);
+-
+-    let rewritten =
+-        worksheet::parse(&compact.bytes, || Ok(None)).expect("compact output worksheet parse");
+-    assert_eq!(rewritten.entries().len(), 1);
+-    assert_eq!(rewritten.entries()[0].address, address("C1"));
+-}
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/compact/layout_order_fallback.rs
++++ /dev/null
+@@ -1,160 +0,0 @@
+-//! Differential coverage for worksheet-child ordering and column envelopes.
+-//!
+-//! Candidate inclusion target: copy this file to
+-//! `crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs`
+-//! in the isolated candidate (and, when validating the candidate in the live
+-//! crate, use the same repo-relative destination), then add this ordinary
+-//! child declaration to `raw/worksheet/edit/package.rs`:
+-//!
+-//! ```ignore
+-//! #[cfg(test)]
+-//! mod compact_layout_order_fallback;
+-//! ```
+-//!
+-//! The complete scanner remains the diagnostic authority for every refusal.
+-
+-use std::collections::BTreeMap;
+-
+-use litchi_sheet::Cell as Address;
+-
+-use super::super::package::{
+-    rewrite_value_only_with_compact_proof, rewrite_value_only_with_provenance,
+-    try_compact_value_rewrite,
+-};
+-use crate::cell::{Content, Number, Store, Value};
+-use crate::error::Error;
+-use crate::raw::worksheet;
+-use crate::raw::worksheet::edit::{Action, collect_compact_layout};
+-
+-const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+-const CELL_DATA: &str = r#"<sheetData><row r="1"><c r="C1"><v>1</v></c></row></sheetData>"#;
+-
+-fn address(reference: &str) -> Address {
+-    Address::from_a1(reference).expect("valid worksheet address")
+-}
+-
+-fn worksheet(body: &str) -> Vec<u8> {
+-    format!(r#"<worksheet xmlns="{SML}">{body}</worksheet>"#).into_bytes()
+-}
+-
+-fn number_action(value: &str) -> Action {
+-    Action::set(Content::from(Value::Number(
+-        Number::new(value).expect("valid worksheet number"),
+-    )))
+-}
+-
+-fn assert_invalid<T>(result: crate::error::Result<T>, expected: &str, label: &str) {
+-    match result {
+-        Err(Error::Invalid(actual)) => assert_eq!(actual, expected, "{label}"),
+-        Err(_) => panic!("{label}: expected Invalid error"),
+-        Ok(_) => panic!("{label}: expected complete scanner refusal"),
+-    }
+-}
+-
+-fn authoritative_store(source: &[u8]) -> Store {
+-    worksheet::parse(source, || Ok(None)).expect("authoritative worksheet Store")
+-}
+-
+-#[test]
+-fn compact_accepts_dimension_defaults_cols_sheet_data_order() {
+-    // The complete scanner's order is dimension, sheetFormatPr, non-empty
+-    // cols, then sheetData.  The columns are deliberately retained even
+-    // though this scalar edit changes only C1.
+-    let source = worksheet(&format!(
+-        r#"<dimension ref="A1"/><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1"/></cols>{CELL_DATA}"#,
+-    ));
+-    let store = authoritative_store(&source);
+-    assert_eq!(store.entries().len(), 1);
+-    assert_eq!(store.entries()[0].address, address("C1"));
+-    let actions = BTreeMap::from([(address("C1"), number_action("9"))]);
+-
+-    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
+-        .expect("complete ordered worksheet rewrite");
+-    let proof = collect_compact_layout(&source, store.entries(), &actions)
+-        .expect("ordered worksheet should admit compact proof");
+-    let compact = try_compact_value_rewrite(&source, &proof, store.entries(), &actions)
+-        .expect("ordered worksheet should use compact writer");
+-    assert_eq!(compact.bytes, complete.bytes);
+-    assert_eq!(compact.omitted, complete.omitted);
+-
+-    let wrapped = rewrite_value_only_with_compact_proof(
+-        &source,
+-        "Sheet1",
+-        actions,
+-        Some(proof),
+-        store.entries(),
+-    )
+-    .expect("compact proof wrapper");
+-    assert_eq!(wrapped.bytes, complete.bytes);
+-    assert_eq!(wrapped.omitted, complete.omitted);
+-
+-    let rewritten = authoritative_store(&compact.bytes);
+-    assert_eq!(rewritten.entries().len(), 1);
+-    assert_eq!(rewritten.entries()[0].address, address("C1"));
+-}
+-
+-#[test]
+-fn compact_layout_order_refusals_preserve_complete_errors() {
+-    // Keep one authoritative Store from a known-good source.  The refusal
+-    // fixtures contain the same C1 source record, so this isolates child
+-    // ordering from semantic materialization while still exercising the real
+-    // parser Store/address sequence.
+-    let base = worksheet(CELL_DATA);
+-    let store = authoritative_store(&base);
+-    let actions = BTreeMap::from([(address("C1"), number_action("9"))]);
+-
+-    let cases = [
+-        (
+-            "dimension after defaults",
+-            format!(r#"<sheetFormatPr defaultRowHeight="15"/><dimension ref="A1"/>{CELL_DATA}"#,),
+-            "worksheet dimension must precede sheetFormatPr during edit",
+-        ),
+-        (
+-            "defaults after cols",
+-            format!(
+-                r#"<dimension ref="A1"/><cols><col min="1" max="1"/></cols><sheetFormatPr defaultRowHeight="15"/>{CELL_DATA}"#,
+-            ),
+-            "worksheet sheetFormatPr appears after column or cell data during edit",
+-        ),
+-        (
+-            "dimension after sheetData",
+-            format!(r#"{CELL_DATA}<dimension ref="A1"/>"#,),
+-            "worksheet dimension must precede sheetData during cell edits",
+-        ),
+-        (
+-            "defaults after sheetData",
+-            format!(r#"{CELL_DATA}<sheetFormatPr defaultRowHeight="15"/>"#,),
+-            "worksheet sheetFormatPr appears after column or cell data during edit",
+-        ),
+-        (
+-            "cols after sheetData",
+-            format!(r#"{CELL_DATA}<cols><col min="1" max="1"/></cols>"#,),
+-            "worksheet cols appears after sheetData during edit",
+-        ),
+-        (
+-            "empty cols",
+-            format!(r#"<dimension ref="A1"/><cols></cols>{CELL_DATA}"#,),
+-            "worksheet cols contains no col during edit",
+-        ),
+-    ];
+-
+-    for (label, body, expected) in cases {
+-        let source = worksheet(&body);
+-        let proof = collect_compact_layout(&source, store.entries(), &actions);
+-        assert!(
+-            proof.is_none(),
+-            "{label}: malformed order must refuse compact route"
+-        );
+-
+-        let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone());
+-        assert_invalid(complete, expected, label);
+-        let fallback = rewrite_value_only_with_compact_proof(
+-            &source,
+-            "Sheet1",
+-            actions.clone(),
+-            proof,
+-            store.entries(),
+-        );
+-        assert_invalid(fallback, expected, label);
+-    }
+-}
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_dimension_expansion.rs
+@@ -29,6 +29,16 @@
+     Address::from_a1(reference).expect("valid worksheet address")
+ }
+ 
++fn number_action(value: &str) -> Action {
++    Action::set(Content::from(Value::Number(
++        Number::new(value).expect("valid worksheet number"),
++    )))
++}
++
++fn scalar_actions() -> BTreeMap<Address, Action> {
++    BTreeMap::from([(address("C1"), number_action("9"))])
++}
++
+ #[test]
+ fn compact_dimension_expansion_preserves_explicit_dimension_close() {
+     // The source cell is outside the declared one-cell extent.  The edit must
+@@ -43,14 +53,9 @@
+     assert_eq!(store.entries().len(), 1);
+     assert_eq!(store.entries()[0].address, address("C1"));
+ 
+-    let actions = BTreeMap::from([(
+-        address("C1"),
+-        Action::set(Content::from(Value::Number(
+-            Number::new("9").expect("valid worksheet number"),
+-        ))),
+-    )]);
++    let actions = scalar_actions();
+ 
+-    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
++    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", scalar_actions())
+         .expect("complete worksheet rewrite");
+     let proof = collect_compact_layout(&source, store.entries(), &actions)
+         .expect("explicit dimension source should admit compact proof");
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package/compact_layout_order_fallback.rs
+@@ -43,6 +43,10 @@
+     )))
+ }
+ 
++fn scalar_actions() -> BTreeMap<Address, Action> {
++    BTreeMap::from([(address("C1"), number_action("9"))])
++}
++
+ fn assert_invalid<T>(result: crate::error::Result<T>, expected: &str, label: &str) {
+     match result {
+         Err(Error::Invalid(actual)) => assert_eq!(actual, expected, "{label}"),
+@@ -66,9 +70,9 @@
+     let store = authoritative_store(&source);
+     assert_eq!(store.entries().len(), 1);
+     assert_eq!(store.entries()[0].address, address("C1"));
+-    let actions = BTreeMap::from([(address("C1"), number_action("9"))]);
++    let actions = scalar_actions();
+ 
+-    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone())
++    let complete = rewrite_value_only_with_provenance(&source, "Sheet1", scalar_actions())
+         .expect("complete ordered worksheet rewrite");
+     let proof = collect_compact_layout(&source, store.entries(), &actions)
+         .expect("ordered worksheet should admit compact proof");
+@@ -80,7 +84,7 @@
+     let wrapped = rewrite_value_only_with_compact_proof(
+         &source,
+         "Sheet1",
+-        actions,
++        scalar_actions(),
+         Some(proof),
+         store.entries(),
+     )
+@@ -101,7 +105,6 @@
+     // parser Store/address sequence.
+     let base = worksheet(CELL_DATA);
+     let store = authoritative_store(&base);
+-    let actions = BTreeMap::from([(address("C1"), number_action("9"))]);
+ 
+     let cases = [
+         (
+@@ -140,18 +143,19 @@
+ 
+     for (label, body, expected) in cases {
+         let source = worksheet(&body);
+-        let proof = collect_compact_layout(&source, store.entries(), &actions);
++        let proof_actions = scalar_actions();
++        let proof = collect_compact_layout(&source, store.entries(), &proof_actions);
+         assert!(
+             proof.is_none(),
+             "{label}: malformed order must refuse compact route"
+         );
+ 
+-        let complete = rewrite_value_only_with_provenance(&source, "Sheet1", actions.clone());
++        let complete = rewrite_value_only_with_provenance(&source, "Sheet1", scalar_actions());
+         assert_invalid(complete, expected, label);
+         let fallback = rewrite_value_only_with_compact_proof(
+             &source,
+             "Sheet1",
+-            actions.clone(),
++            scalar_actions(),
+             proof,
+             store.entries(),
+         );

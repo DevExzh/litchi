@@ -1,0 +1,31 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -314,13 +314,13 @@
+     Ok(())
+ }
+ 
+-fn write_compact_replacement_row<'a>(
++fn write_compact_replacement_row(
+     output: &mut Vec<u8>,
+     source: &[u8],
+     row: &CompactRowSlot,
+     entries: &[Stored],
+     entry_index: &mut usize,
+-    edits: BTreeMap<Address, &'a Action>,
++    edits: BTreeMap<Address, &Action>,
+     omitted: &mut Vec<OmittedCells>,
+     recording: &mut bool,
+ ) -> Result<()> {
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/compact.rs
+@@ -907,9 +907,7 @@
+         }
+         column
+     } else {
+-        previous_column
+-            .checked_add(1)
+-            .or_else(|| if *previous_column == 0 { Some(1) } else { None })?
++        previous_column.checked_add(1)?
+     };
+     if !(1..=COLUMNS).contains(&column) || column <= *previous_column {
+         return None;

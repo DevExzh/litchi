@@ -1,0 +1,19 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0553/analyze_guards.py",
+    "--output",
+    "docs/performance/results/change-0553/guard-cap-analysis.json"
+  ],
+  "start_utc": "2026-09-13T10:51:40.615392+00:00",
+  "end_utc": "2026-09-13T10:51:40.858218+00:00",
+  "exit_code": 0,
+  "script_sha256": "89c9ed81e66ff3ea35505cfa9aaf0c9ffefdfa4292ccff3757f88c2b64edb2d0",
+  "script_stable": true,
+  "artifacts": {
+    "stdout": "659ecea60dbcf984a0f77e52c991a73b6efbee8b2ac330054fc45bdd1b36c38d",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "output_sha256": "3dfc8654c49ef8aa2bd8cd000471b961337fc9b34c201d148c24e2cdc35fc85b"
+}
