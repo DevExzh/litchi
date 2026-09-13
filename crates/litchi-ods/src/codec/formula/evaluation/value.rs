@@ -951,6 +951,10 @@ struct RuntimeArea<'a> {
 struct RuntimeAreaSet<'a> {
     areas: Vec<RuntimeArea<'a>>,
     records: Vec<RuntimeReference<'a>>,
+    /// Checked logical cells represented by the retained physical areas.
+    /// Keeping this alongside the area vector lets reference union admission
+    /// remain linear when a list is built left-associatively.
+    cell_count: usize,
     area_reservation: Option<Reservation>,
     record_reservation: Option<Reservation>,
     is_list: bool,
@@ -972,6 +976,7 @@ impl<'a> RuntimeAreaSet<'a> {
         Self {
             areas: Vec::new(),
             records: Vec::new(),
+            cell_count: 0,
             area_reservation: None,
             record_reservation: None,
             is_list: false,
@@ -1106,6 +1111,14 @@ impl<'a> RuntimeAreaSet<'a> {
         area: RuntimeArea<'a>,
         evaluator: &mut ValueEvaluator<'a, '_, '_, '_, R>,
     ) -> EvaluationResult<()> {
+        let area_cells = area.rect.count()?;
+        let cell_count = self.cell_count.checked_add(area_cells).ok_or_else(|| {
+            EvaluationFailure::ResourceLimit(evaluator.local_limit(
+                Resource::Objects,
+                u64::MAX,
+                evaluator.limits.max_reference_cells,
+            ))
+        })?;
         ensure_capacity(
             &mut self.areas,
             &mut self.area_reservation,
@@ -1116,6 +1129,7 @@ impl<'a> RuntimeAreaSet<'a> {
             "formula reference areas",
         )?;
         self.areas.push(area);
+        self.cell_count = cell_count;
         Ok(())
     }
 

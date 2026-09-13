@@ -306,6 +306,140 @@ fn column_label(mut index: usize) -> String {
     label.into_iter().rev().collect()
 }
 
+fn repeated_union_source(pattern: &[&str], count: usize) -> String {
+    assert!(!pattern.is_empty());
+    let mut source = String::from("=(");
+    for index in 0..count {
+        if index != 0 {
+            source.push('~');
+        }
+        source.push_str(pattern[index % pattern.len()]);
+    }
+    source.push(')');
+    source
+}
+
+fn assert_large_duplicate_union(pattern: &[(&str, [usize; 3], [usize; 3])], scope: &str) {
+    const COUNT: usize = 4_096;
+    const LINEAR_WORK_PER_ENTRY: u64 = 256;
+    const LINEAR_WORK_FIXED_COST: u64 = 16_384;
+
+    let reference_sources: Vec<_> = pattern.iter().map(|(source, _, _)| *source).collect();
+    let source = repeated_union_source(&reference_sources, COUNT);
+    let expected: Vec<_> = pattern
+        .iter()
+        .map(|(source, _, _)| Reference::parse(source).expect("valid expected reference"))
+        .collect();
+    let resolver = FixtureResolver::new();
+    let (budget, _cancellation, execution) = make_execution(scope);
+    let expression = parse(&source);
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .unwrap_or_else(|error| panic!("4096-entry union should evaluate: {error}"));
+    let list = result
+        .as_reference_list()
+        .expect("a union chain should remain a reference list");
+    assert_eq!(list.len(), COUNT);
+    for index in 0..COUNT {
+        let (source, starts, ends) = pattern[index % pattern.len()];
+        let reference = list
+            .get(index)
+            .unwrap_or_else(|| panic!("missing duplicate union record {index}"));
+        assert_eq!(
+            reference.reference(),
+            Some(&expected[index % expected.len()])
+        );
+        assert_eq!(reference.areas().len(), 1, "{source} at index {index}");
+        assert_eq!(
+            reference.areas()[0].starts(),
+            starts,
+            "{source} at index {index}"
+        );
+        assert_eq!(
+            reference.areas()[0].ends(),
+            ends,
+            "{source} at index {index}"
+        );
+    }
+    assert_eq!(
+        resolver.reads(),
+        0,
+        "reference union construction must not read provider cells"
+    );
+
+    let work = budget.used(Resource::Work);
+    let linear_bound = (COUNT as u64)
+        .saturating_mul(LINEAR_WORK_PER_ENTRY)
+        .saturating_add(LINEAR_WORK_FIXED_COST);
+    assert!(
+        work <= linear_bound,
+        "4096-entry union used {work} work units, above linear bound {linear_bound}"
+    );
+}
+
+#[test]
+fn left_associated_duplicate_unions_keep_order_and_use_linear_work() {
+    // Repeated coordinates make duplicate retention observable while the
+    // interspersed B/C records make an accidental sort or deduplication
+    // visible in the public list order.
+    let local_pattern = [
+        ("[.A1]", [0, 0, 0], [1, 1, 1]),
+        ("[.B1]", [0, 0, 1], [1, 1, 2]),
+        ("[.A1]", [0, 0, 0], [1, 1, 1]),
+        ("[.C1]", [0, 0, 2], [1, 1, 3]),
+    ];
+    assert_large_duplicate_union(&local_pattern, "ods-formula-value-large-local-union");
+
+    // The same left-associated chain is exercised across the ordered Main,
+    // Data, Archive sheets. Each reference is one retained 3-D cuboid and
+    // duplicates must remain separate records in source order.
+    let three_dimensional_pattern = [
+        ("[Main.A1:Archive.A1]", [0, 0, 0], [3, 1, 1]),
+        ("[Main.B1:Archive.B1]", [0, 0, 1], [3, 1, 2]),
+        ("[Main.A1:Archive.A1]", [0, 0, 0], [3, 1, 1]),
+        ("[Main.C1:Archive.C1]", [0, 0, 2], [3, 1, 3]),
+    ];
+    assert_large_duplicate_union(
+        &three_dimensional_pattern,
+        "ods-formula-value-large-3d-union",
+    );
+}
+
+#[test]
+fn union_cell_limit_includes_intersection_left_operand_before_provider_reads() {
+    let resolver = FixtureResolver::new();
+    let (budget, _cancellation, execution) =
+        make_execution("ods-formula-value-union-intersection-cell-limit");
+    let expression = parse("=(([.A1:.B2]![.B1:.C3])~[.D1:.E2])");
+
+    // The intersection contributes B1:B2 (two logical cells) and the right
+    // range contributes D1:E2 (four). A limit of five must therefore reject
+    // the union while it is still a reference-only operation.
+    let error = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default().with_max_reference_cells(5),
+    )
+    .expect_err("the union must include its intersection operand in the cell budget");
+    assert!(matches!(
+        error,
+        EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Objects
+    ));
+    assert_eq!(resolver.reads(), 0);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
 #[test]
 fn local_reference_values_keep_empty_text_logical_and_formula_errors_distinct() {
     let mut resolver = FixtureResolver::new();
