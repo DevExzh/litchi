@@ -34,9 +34,10 @@ and index path rather than in the slide query.
 ## Per-operation syscall isolation
 
 `isolation/` holds `strace -f -c` summaries for the same binary at 5 and at 25
-samples. Differencing the two and dividing by 20 isolates the per-operation
-syscall count from process start-up and the harness's in-process corpus
-generation:
+samples. These filesystem selectors use a fresh child per sample, so
+differencing the two and dividing by 20 isolates one complete child — its
+untimed open, the timed operation and the post-timer oracle — not the timed
+operation alone:
 
 | Case | `statx` per operation | `pread64` per operation |
 | --- | ---: | ---: |
@@ -45,7 +46,8 @@ generation:
 
 The owned-source selectors `xlsx_source_first_cell` and
 `opc_source_open_main_read` isolate to zero of both, which confirms the counts
-come from the file adapter rather than from the harness.
+come from the file adapter rather than from the harness, and that process
+start-up contributes no `statx` or `pread64`.
 
 ## Reproduce
 

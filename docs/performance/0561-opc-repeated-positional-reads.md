@@ -24,12 +24,21 @@ read 6, 10, 12, 20 and in one case 24 times. Reads are small: for
 `pptx_file_source_selected_slide`, 6,760 calls are 16 bytes or fewer and 3,400
 are 32 or fewer.
 
-Differencing 5-sample and 25-sample `strace -f -c` children isolates the
-per-operation cost from process start-up and the harness's in-process corpus
-generation: `docx_file_source_full_text` issues 598 `statx` and 262 `pread64`
-per operation; `pptx_file_source_selected_slide` issues 9,696 and 13,588. The
-owned-source selectors `xlsx_source_first_cell` and `opc_source_open_main_read`
-isolate to zero of both, confirming the counts come from the file adapter.
+These filesystem selectors use a fresh child per sample, so differencing
+`strace -f -c` runs at 5 and at 25 samples and dividing by 20 isolates one
+complete child: its untimed open, the timed operation, and the post-timer
+oracle. It does **not** isolate the timed operation alone. On that basis
+`docx_file_source_full_text` costs 598 `statx` and 262 `pread64` per child and
+`pptx_file_source_selected_slide` costs 9,696 and 13,588. The owned-source
+selectors `xlsx_source_first_cell` and `opc_source_open_main_read` isolate to
+zero of both, which confirms two things: the counts come from the file adapter
+rather than from the harness, and process start-up contributes no `statx` or
+`pread64` of its own.
+
+`pptx_file_source_open` accounts for almost all of the calls that
+`pptx_file_source_selected_slide` makes — 13,592 against 13,608 — so the
+repetition is in the open and index path, not in the slide query that the
+selected-slide selector actually times.
 
 ## Where the reads come from
 
