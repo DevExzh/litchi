@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0558: one fence per shared CFB read
+
+[0558](0558-ole2-single-read-fence.md) removes the leading source-version
+observation from `SharedOleFile::read_stream_range` and
+`SharedOleStreamCursor::read_exact`, keeping one fence per read. `version()`
+calls and whole-child `statx` both fall about 49% with read calls and bytes
+byte-identical; all 48 paired ABBA cells improve, file-source p50 by 26.88-28.98%
+and the owned control by 14.35-16.41%. The record states the two behavioral
+costs — halved sampling of the reverted-mutation window and one error-identity
+change when the fence itself cannot observe the source — and the added tests
+that pin them.
+
 ## 0551: source-layout reuse direction refined
 
 [0551](changes/0551-xlsx-layout-handoff-feasibility.md) completes the next

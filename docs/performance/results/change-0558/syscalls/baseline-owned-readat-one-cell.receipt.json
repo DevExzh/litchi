@@ -1,0 +1,32 @@
+{
+  "name": "baseline-owned-readat-one-cell",
+  "command": [
+    "/usr/bin/strace",
+    "-f",
+    "-c",
+    "-e",
+    "trace=statx,fstat,newfstatat,pread64,read,write,openat,close,lseek,fsync,fdatasync",
+    "-o",
+    "docs/performance/results/change-0558/syscalls/baseline-owned-readat-one-cell.strace.txt",
+    "--",
+    "/usr/bin/taskset",
+    "-c",
+    "17",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/0db5c175-cade-4685-8f04-7ebb02a30b4a/scratchpad/baseline/xls_source_attribution",
+    "--input",
+    "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "--mode",
+    "owned-readat",
+    "--operation",
+    "one-cell",
+    "--warmups",
+    "1",
+    "--samples",
+    "5"
+  ],
+  "returncode": 0,
+  "started_unix": 1789313958.7294269,
+  "finished_unix": 1789313958.7473202,
+  "stdout": "baseline-owned-readat-one-cell.stdout",
+  "stderr": "baseline-owned-readat-one-cell.stderr"
+}

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0558: the shared CFB reader fenced every read twice
+
+The [0558 record](0558-ole2-single-read-fence.md) confirms the largest open OLE2 file-source hotspot and removes half of it. `SharedOleFile::read_stream_range` and `SharedOleStreamCursor::read_exact` observed `ReadAt::version()` before and after each payload read, so every positional read on a `FileSource` cost two `statx` syscalls: 1,266 observations and 655 reads for one selective XLS open, with probe time measured at roughly half of elapsed. Removing only the leading observation halves `version()` calls (-48.98% to -49.13%) and whole-child `statx` (-48.83% to -48.91%) with `read_at` calls and bytes byte-identical, and improves all 48 paired ABBA cells (-26.88% to -28.98% file-source p50). The remaining file-source gap over an owned source is now dominated by the surviving one probe per read plus positional read cost; bounded span batching, which reduces reads rather than probes, is the next hypothesis for that gap. `performance_claim: none`.
+
 ## Change 0557: same-binary variability stops merge admission
 
 The [fresh XLSX pilot](0557-xlsx-allocation-noise.md) stopped before candidate measurement: noncompact one-cell p50 drifted −9.7872%, with publication median changing −24.70% and commit median −0.97%. The cause is unestablished. Tested phase allocation instrumentation is retained for OLE2/OOXML work; the 0556 merge remains an unmeasured preparation artifact. No rescue repeat or candidate result is inferred. ODF remains deferred.

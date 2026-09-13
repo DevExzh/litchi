@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0558-ole2-single-read-fence",
+  "revision": "5dc90f31a97e16c386d923b7b79932c3d5cd9ad2",
+  "created_utc": "2026-09-13T15:37:42Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred until that goal completes; iWork excluded.",
+    "production_crates": [
+      "litchi-cfb"
+    ],
+    "harness_changed": false
+  },
+  "hypothesis": {
+    "statement": "SharedOleFile::read_stream_range and SharedOleStreamCursor::read_exact each observe ReadAt::version() twice per call - once before the payload read and once after. The pre-read observation is redundant because expected_version is captured and fenced at open and every checked operation ends with a post-read fence, so each read is already bracketed by the previous operation's successful fence and its own post-read fence. On a FileSource each observation is one statx syscall.",
+    "mechanism": "Deleting the two pre-read fences halves the number of ReadAt::version() calls issued by the shared CFB reader per physical read.",
+    "predicted_primary_effect": "version_calls per measured XLS operation falls by approximately one half; whole-child statx syscall count falls by approximately one half; file-source elapsed p50 falls because version probes were measured at roughly half of file-source elapsed time in the frozen baseline.",
+    "predicted_null_effect": "owned-readat mode elapsed changes little because its version() observation performs no syscall."
+  },
+  "frozen_baseline_observations": {
+    "note": "captured before the candidate edit, same host, binary sha256 a510ef172ecf2d61327b74382ad9c0a1bee36fcebff4661edf6d780cc1552fd8",
+    "file_source_one_cell": {
+      "elapsed_p50_us": 693.3,
+      "version_calls": 1813,
+      "read_calls": 921,
+      "version_us": 351.0,
+      "read_us": 141.4
+    },
+    "file_source_open": {
+      "elapsed_p50_us": 509.1,
+      "version_calls": 1266,
+      "read_calls": 655,
+      "version_us": 243.4,
+      "read_us": 133.1
+    },
+    "owned_readat_one_cell": {
+      "elapsed_p50_us": 268.3,
+      "version_calls": 1813,
+      "read_calls": 921
+    }
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "convention_cpu": 2,
+    "deviation_reason": "mpstat -P ALL sampled CPU 2 at 93.97% busy and CPU 17 at 97.50% idle during planning; the CPU-2 convention was not usable on this shared host in this session.",
+    "quiescence_limitation": "the host runs unrelated concurrent workloads; no host-wide quiescence is claimed."
+  },
+  "input": {
+    "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "groups": [
+    {
+      "name": "latency-abba",
+      "binary": "xls_source_attribution",
+      "legs": [
+        "A1",
+        "B1",
+        "B2",
+        "A2"
+      ],
+      "repeats": [
+        "R1",
+        "R2"
+      ],
+      "modes": [
+        "file-source",
+        "owned-readat"
+      ],
+      "operations": [
+        "open",
+        "list",
+        "one-cell"
+      ],
+      "warmups": 20,
+      "samples": 100,
+      "children": 48,
+      "child_scope": "one child per (repeat, leg, mode, operation); samples share that child's process"
+    },
+    {
+      "name": "syscall-counts",
+      "tool": "strace -f -c",
+      "binaries": [
+        "baseline xls_source_attribution",
+        "candidate xls_source_attribution"
+      ],
+      "modes": [
+        "file-source",
+        "owned-readat"
+      ],
+      "operations": [
+        "open",
+        "list",
+        "one-cell"
+      ],
+      "warmups": 1,
+      "samples": 5,
+      "children": 12,
+      "metric": "whole-child statx and pread64 call counts; deterministic, not a timing measurement"
+    }
+  ],
+  "acceptance": {
+    "primary_gate": "deterministic: candidate version_calls must be strictly lower than baseline for every measured cell, and whole-child statx counts must fall, with read_calls and read_bytes unchanged and every semantic oracle projection identical.",
+    "secondary_gate": "paired file-source elapsed p50 must improve in BOTH ABBA directions for the accepted cells; any cell that does not improve in both directions is reported and not accepted.",
+    "regression_trigger": "any cell with more than 5% adverse p50/mean movement is reported explicitly and not hidden in an aggregate.",
+    "stability_precondition": "same-binary drift between R1 and R2 on the A legs is reported; cells whose same-binary drift exceeds 5% are reported as unstable and excluded from acceptance."
+  },
+  "owned_paths": [
+    "docs/performance/results/change-0558"
+  ],
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured"
+}

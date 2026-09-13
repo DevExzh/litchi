@@ -1,0 +1,50 @@
+{
+  "change_id": "0558-ole2-single-read-fence",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "deterministic_counter_reduction_with_identical_read_work",
+    "all_paired_latency_cells_improve_in_both_directions",
+    "documented_behavioural_costs_accepted_and_tested",
+    "layout_regression_reported_and_resolved_by_0559"
+  ],
+  "accepted_evidence": {
+    "version_calls_change_percent": [
+      -49.13,
+      -48.98
+    ],
+    "statx_change_percent": [
+      -48.91,
+      -48.83
+    ],
+    "read_calls_unchanged": true,
+    "read_bytes_unchanged": true,
+    "paired_latency_cells_improving_both_directions": "48/48",
+    "file_source_p50_change_percent_range": [
+      -28.98,
+      -26.88
+    ],
+    "owned_control_p50_change_percent_range": [
+      -16.41,
+      -14.35
+    ]
+  },
+  "reported_regressions": {
+    "ole_common_one_edit_save": "adverse in both directions; +26.22%/+27.04% p50 many-small and +41.01%/+40.77% wide-root; identical instruction count; resolved by change 0559",
+    "doc_semantic_full_text": "doc-tiny p99 only, +75.52%/+34.49%"
+  },
+  "withheld": [
+    "cold cache",
+    "physical device",
+    "remote or range source",
+    "peak RSS",
+    "allocation",
+    "concurrency scaling",
+    "real-producer breadth",
+    "cross platform"
+  ],
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision"
+}

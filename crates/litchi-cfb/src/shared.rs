@@ -585,7 +585,8 @@ impl SharedOleFile {
     /// Construction resolves only the immutable validated catalog and chain;
     /// it publishes no source bytes and performs no source-version fence.
     /// The first and every subsequent [`SharedOleStreamCursor::read_exact`]
-    /// call fences the retained source before payload publication.
+    /// call fences the retained source after its payload read and before
+    /// publishing those bytes to the caller.
     ///
     /// # Errors
     ///
@@ -767,10 +768,14 @@ impl SharedOleFile {
     /// leaves [`Self::open_stream`]'s lazy mini-stream cache untouched.
     ///
     /// An empty destination performs stream lookup, bounds validation, and a
-    /// source-version check but performs no payload read. The source version is
-    /// checked both before and after a non-empty read. If a later range read or
-    /// source check fails, callers must discard the destination; bytes written
-    /// before the failure are not rolled back.
+    /// source-version check but performs no payload read. A non-empty read is
+    /// bracketed by two successful source-version observations: the most
+    /// recent earlier one taken by this reader, which for the first read is
+    /// the capture taken while opening it, and one taken after this read
+    /// completes. Concurrent callers share one reader, so the earlier
+    /// observation is not necessarily one this thread took. If a later range
+    /// read or source check fails, callers must discard the destination;
+    /// bytes written before the failure are not rolled back.
     ///
     /// # Errors
     ///
@@ -805,7 +810,6 @@ impl SharedOleFile {
             return self.check_source_version();
         }
 
-        self.check_source_version()?;
         let result = (|| -> Result<(), OleError> {
             if is_minifat {
                 self.read_minifat_range(start_sector, offset, output, false, false)?;
@@ -2454,8 +2458,10 @@ impl SharedOleStreamCursor<'_> {
     ///
     /// Movement is strictly forward. A failed movement leaves the logical
     /// position unchanged. Skipping traverses only the immutable, validated
-    /// allocation tables and publishes no source bytes; the next read fences
-    /// the retained source before using the moved position.
+    /// allocation tables and publishes no source bytes, so it takes no
+    /// source-version observation of its own. The next read uses the moved
+    /// position and then fences the retained source before publishing the
+    /// bytes it read.
     ///
     /// # Errors
     ///
@@ -2492,13 +2498,24 @@ impl SharedOleStreamCursor<'_> {
 
     /// Reads exactly `output.len()` logical bytes and advances the cursor.
     ///
-    /// Every read fences the retained source before payload I/O and again
-    /// after the read. Reads are grouped into physically contiguous FAT or
+    /// Every read fences the retained source after payload I/O. Together with
+    /// the most recent earlier observation taken by the shared reader, which
+    /// for the first read is the capture taken while opening it, that later
+    /// fence brackets the bytes this call publishes: both observations must
+    /// equal the opened source version. A concurrent caller may have taken
+    /// that earlier observation. Because no fence runs before the payload
+    /// read, a source mutation that is reverted before this read's own fence
+    /// is not observed, exactly as
+    /// `litchi_core::FileVersionPolicy` already documents for reverted
+    /// transitions. Reads are grouped into physically contiguous FAT or
     /// MiniFAT runs when doing so is safe. The destination may contain a
     /// prefix when a later source, chain, or version check fails; callers must
     /// discard it on any error. A failed read does not commit the cursor
     /// position, so a stable source may be retried. If a read/chain error and a
-    /// source mutation race, the post-read `SourceChanged` error wins.
+    /// source mutation race, the post-read `SourceChanged` error wins. If the
+    /// fence itself cannot observe the source while the payload read also
+    /// failed, the payload error is reported; a fence failure after a
+    /// successful read is reported instead of the bytes.
     ///
     /// # Errors
     ///
@@ -2506,7 +2523,6 @@ impl SharedOleStreamCursor<'_> {
     /// remaining logical stream, a corruption error when allocation traversal
     /// fails, or a source I/O/source-version error.
     pub fn read_exact(&mut self, output: &mut [u8]) -> Result<(), OleError> {
-        self.file.check_source_version()?;
         let state = self.state;
         let position = self.position;
         let result = (|| {
@@ -2929,6 +2945,8 @@ mod tests {
         bytes: Vec<u8>,
         revision: AtomicU64,
         reads: AtomicUsize,
+        versions: AtomicUsize,
+        fail_version: AtomicBool,
         read_ranges: Mutex<Vec<(u64, usize)>>,
         active_reads: AtomicUsize,
         max_active_reads: AtomicUsize,
@@ -2952,6 +2970,8 @@ mod tests {
                 bytes,
                 revision: AtomicU64::new(0),
                 reads: AtomicUsize::new(0),
+                versions: AtomicUsize::new(0),
+                fail_version: AtomicBool::new(false),
                 read_ranges: Mutex::new(Vec::new()),
                 active_reads: AtomicUsize::new(0),
                 max_active_reads: AtomicUsize::new(0),
@@ -2973,6 +2993,18 @@ mod tests {
         fn reset_read_count(&self) {
             self.reads.store(0, AtomicOrdering::SeqCst);
             self.read_ranges.lock().unwrap().clear();
+        }
+
+        fn reset_observation_counts(&self) {
+            self.reset_read_count();
+            self.versions.store(0, AtomicOrdering::SeqCst);
+        }
+
+        fn observation_counts(&self) -> (usize, usize) {
+            (
+                self.reads.load(AtomicOrdering::SeqCst),
+                self.versions.load(AtomicOrdering::SeqCst),
+            )
         }
 
         fn read_ranges(&self) -> Vec<(u64, usize)> {
@@ -3087,6 +3119,10 @@ mod tests {
         }
 
         fn version(&self) -> io::Result<SourceVersion> {
+            self.versions.fetch_add(1, AtomicOrdering::SeqCst);
+            if self.fail_version.load(AtomicOrdering::SeqCst) {
+                return Err(io::Error::other("injected source-version failure"));
+            }
             Ok(SourceVersion::new(
                 7,
                 self.revision.load(AtomicOrdering::SeqCst),
@@ -5592,7 +5628,104 @@ mod tests {
     }
 
     #[test]
-    fn stream_cursor_fences_before_during_and_after_hostile_reads() {
+    fn read_exact_reports_a_fence_failure_after_a_successful_read() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_version.store(true, AtomicOrdering::SeqCst);
+        let mut output = [0u8; 4];
+        // The bytes were read, but they are never published when the
+        // trailing fence cannot observe the source.
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::Io(_))
+        ));
+        assert_eq!(cursor.position(), 0, "a failed read does not commit");
+    }
+
+    #[test]
+    fn read_exact_reports_the_payload_error_when_the_fence_also_fails() {
+        // When the payload read and the fence fail together the payload error
+        // is reported: the fence can only override an earlier error with
+        // `SourceChanged`, and an unobservable source is not a proven change.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.fail_version.store(true, AtomicOrdering::SeqCst);
+        let mut output = [0u8; 4];
+        let error = cursor.read_exact(&mut output).unwrap_err();
+        assert!(
+            matches!(error, OleError::Io(_)),
+            "unexpected error: {error:?}"
+        );
+        assert!(
+            format!("{error}").contains("injected positional read failure"),
+            "expected the payload failure, found: {error}"
+        );
+    }
+
+    #[test]
+    fn checked_reads_observe_the_source_version_exactly_once() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+
+        // One cursor read publishes bytes and takes one trailing observation.
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.reset_observation_counts();
+        let mut output = [0u8; 4];
+        cursor.read_exact(&mut output).unwrap();
+        assert_eq!(output, [0xA5; 4]);
+        assert_eq!(source.observation_counts(), (1, 1));
+
+        // Skipping publishes no bytes and takes no observation, so the
+        // preceding read's trailing observation still opens the next bracket.
+        source.reset_observation_counts();
+        cursor.skip_forward(4).unwrap();
+        assert_eq!(source.observation_counts(), (0, 0));
+
+        source.reset_observation_counts();
+        cursor.read_exact(&mut output).unwrap();
+        assert_eq!(source.observation_counts(), (1, 1));
+
+        // One bounded range read behaves the same way.
+        source.reset_observation_counts();
+        let mut range = [0u8; 16];
+        file.read_stream_range(&["Large"], 0, &mut range).unwrap();
+        assert_eq!(range, [0xA5; 16]);
+        assert_eq!(source.observation_counts(), (1, 1));
+
+        // An empty range read still observes the version once, and reads
+        // nothing.
+        source.reset_observation_counts();
+        file.read_stream_range(&["Large"], 0, &mut []).unwrap();
+        assert_eq!(source.observation_counts(), (0, 1));
+    }
+
+    #[test]
+    fn first_cursor_read_after_open_reports_a_change_from_its_trailing_fence() {
+        // The opening observation of the first read's bracket is the one taken
+        // while opening the reader. A mutation that lands after that point is
+        // reported by the read's own trailing fence, and the destination is
+        // not authoritative on that error.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        source.reset_observation_counts();
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(reads, 1, "the payload read is attempted before the fence");
+        assert_eq!(versions, 1, "one trailing observation reports the change");
+        assert_eq!(cursor.position(), 0, "a failed read does not commit");
+    }
+
+    #[test]
+    fn stream_cursor_reports_source_changes_around_hostile_reads() {
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
         source.revision.store(1, AtomicOrdering::SeqCst);
