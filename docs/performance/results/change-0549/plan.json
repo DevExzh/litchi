@@ -1,0 +1,149 @@
+{
+  "revision": "6d9fbb7401729aacf2afc5d6b6c681a9e7384056",
+  "created_utc": "2026-09-13T03:54:05.477627+00:00",
+  "previous_turn": "progress:0548 rejected checkpoint collector on native and instruction gates, retained corruption guard, committed and cleaned",
+  "scope": "Matched CFB checked bitset test-and-mark experiment",
+  "priority": "OLE2/OOXML active; ODF deferred until that goal completes; iWork excluded",
+  "hypothesis": "Combine checked bitset membership and marking in the existing exact collector; keep exact first-cycle detection, reservations, zero-fill, error ordering and scratch reuse; remove only emitted redundant bit-operation work",
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "order": [
+      "baseline r1 xls/cfb",
+      "candidate r1 xls/cfb",
+      "candidate r2 cfb/xls",
+      "baseline r2 cfb/xls"
+    ]
+  },
+  "allocation": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Existing constructor/operation clock with canonical operation-global System allocator region; excludes construction of input fixtures, correctness oracles, report construction and object drop"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "zero-before/dump-after/toggle exact constructor; retain setup CFB open dump and use only positive incoming benchmark-runner dumps for operation attribution",
+    "instruction_flags": [
+      "--dump-instr=yes",
+      "--dump-line=no",
+      "--compress-pos=no",
+      "--collect-jumps=yes"
+    ]
+  },
+  "hardware": {
+    "repeats": 2,
+    "case": "xls_owned_source_open_one_cell",
+    "warmup": 0,
+    "samples": 1000,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims"
+  },
+  "review": {
+    "same_build_adverse_percent": 5,
+    "matched_adverse_percent": 5,
+    "primary_cases": [
+      "xls_source_backed_open",
+      "xls_source_backed_open_one_cell",
+      "xls_owned_source_open",
+      "xls_owned_source_open_one_cell"
+    ],
+    "policy": "Adopt only if all four primary workflow p50 values improve by at least 3% in both paired repeats; XLS-owned constructor Ir and collector exclusive Ir in XLS-owned and CFB-few-large decrease in both repeats; allocation calls/bytes/incremental peak do not grow materially; and correctness/quality pass. Review every >5% matched latency/RSS regression and every absolute >5% same-build variation. No stable-tail or broad provider/scaling claim. Revert production if admission fails, retain independent contract tests after restored quality. The exact final runtime-plus-test source and binary must be measured; any changed rebuild requires fresh full ABBA."
+  },
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0549-target"
+  ],
+  "status": "frozen-before-build-capture-and-candidate",
+  "temporary_storage": "Use sole owned target/tmp and retained binary copies; vgdb=no from first profile",
+  "assembly": {
+    "owners": [
+      "SectorChainScratch",
+      "CheckedBitSet"
+    ],
+    "required": [
+      "collect_exact",
+      "insert"
+    ],
+    "scope": "Same measured binary; all matching symbols captured; instruction mapping, not static latency"
+  },
+  "candidate_files": [
+    "crates/litchi-cfb/src/file.rs"
+  ],
+  "retained_enabler": "crates/litchi-cfb/examples/perf_chain_guard.rs",
+  "guard": {
+    "sizes": [
+      128,
+      16384
+    ],
+    "samples": 200,
+    "warmup": 20,
+    "repeats": 2,
+    "native_order": [
+      "baseline1",
+      "candidate1",
+      "candidate2",
+      "baseline2"
+    ],
+    "gates": {
+      "invalid_p50_and_mean_max_same_invalid_ratio": 4.0,
+      "invalid_p50_and_mean_max_baseline_valid_ratio": 2.0
+    },
+    "review": "Every>5%matchedadverse/two-repeatdrift reviewed individually; no allocation/RSS claim from guardtimings",
+    "cases": [
+      "valid",
+      "shortselfcycle",
+      "prefixcycle",
+      "latercycle",
+      "earlyend",
+      "invalidmarker",
+      "invalidindex",
+      "lateexcess"
+    ],
+    "preflight": {
+      "guard_clippy": true,
+      "warmup": 0,
+      "samples": 1,
+      "cases": "allcasesandsizesbeforemainbuild",
+      "scope": "oracle smoke only; noadmission orlatencyclaimfrompreflight"
+    }
+  },
+  "failed_attempts": []
+}

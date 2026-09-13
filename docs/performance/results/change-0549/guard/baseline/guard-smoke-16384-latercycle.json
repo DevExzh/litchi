@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "latercycle",
+  "declared_chain_sectors": 16384,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 8388608,
+  "fat_entry_count": 16640,
+  "input_sha256": "fbe396a107b20e5bc8ab1ca503a397be2cb8d91fcb5571f6dbb9171d2de5804c",
+  "expected_error": "Cycle detected in regular stream chain at sector 8192",
+  "observed_error": "Cycle detected in regular stream chain at sector 8192",
+  "warmup_iterations": 0,
+  "sample_count": 1,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [25700]
+}

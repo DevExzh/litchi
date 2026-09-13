@@ -1,5 +1,12 @@
 # Performance program phase report
 
+## 0549: checked bitset candidate rejected
+
+[0549](changes/0549-cfb-checked-test-and-mark.md) All eight primary XLS
+latency comparisons regress 2.080–10.876%, while collector Ir falls about
+2.94%. Allocation and malformed-input gates pass. The candidate is rejected
+and exact baseline production restored; no runtime improvement is retained.
+
 ## 0548: OLE2 checkpoint candidate rejected
 
 [0548](changes/0548-ole2-checkpoint-collector-rejected.md) rejects the bounded

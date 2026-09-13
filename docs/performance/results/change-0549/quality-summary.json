@@ -1,0 +1,82 @@
+{
+  "status": "pass",
+  "stage": "final",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "876802614425a368c2fd02a5bf3848f58d2e7ca5e08331d1d3c90a16cd3136bc",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-no-default-tests.receipt.json",
+      "receipt_sha256": "cd524c9bf85ca2440f7b3758f5a1b766328f6df7a63c10db286858e5fc131166",
+      "executed_tests": 310
+    },
+    {
+      "name": "check-cfb-tests.receipt.json",
+      "receipt_sha256": "4198297bea4c28553ed66d1ca36d7dced16a47a44890576e30557f1fbf8a88bd",
+      "executed_tests": 310
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "f6322eb9bf16cc16bcf587c00e2b63a95aafbde4592fdd56bd264c77f327b46e",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-doc-tests.receipt.json",
+      "receipt_sha256": "3438fdaf1a506072556e9acbb83cc35a4dd4d393bceb0e9e313138ffdeee585b",
+      "executed_tests": 1187
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "403401aefeccee8f66e71cd5a19bd2f7b2150ad56fabf928e27c92e165b379ab",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-guard-clippy.receipt.json",
+      "receipt_sha256": "460b1ce15e1f219f3b9545e14858fdfc5f0fd0c33113301d1137f76b4da5f223",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "a0ce89fa068ff8782ffbd2945a2f374533bc3957117b27a86d1b412d5b913af4",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "0152225daf172bce9758ca1c7f442c461114ac49c683532762b3b13ef69228fc",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-rustdoc.receipt.json",
+      "receipt_sha256": "0ed4adb88554659b39280833b29505ed76d89a5e9567f17a4e2095c69ce980d0",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-clippy.receipt.json",
+      "receipt_sha256": "bc3c0ceef5caf1b45b8df4a999334a1f76cc75190698b995dda9bf1d23323715",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-rustdoc.receipt.json",
+      "receipt_sha256": "8512dc73da8e7a1de4e7a551e67f6e5c903097360b1bcf581ce26a3e2e586bdb",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ppt-tests.receipt.json",
+      "receipt_sha256": "794357e040397bfb050ce2e886c2f61a6cf2f3f0f768bc38cdae913d95f88aa5",
+      "executed_tests": 1230
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "6e2e89ae9faec712b96b133609ec4e2d59261affe8b5006af0bd45468425bd21",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xls-tests.receipt.json",
+      "receipt_sha256": "b2243fd0caf6aefbab53ef4195f4260808704b9d509db5a688959524aa56e43b",
+      "executed_tests": 1345
+    }
+  ],
+  "executed_tests": 4382
+}

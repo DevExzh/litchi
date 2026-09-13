@@ -1,0 +1,30 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "--disassemble=_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h9a5958d9c8d265faE",
+    "/home/zhuhe/litchi-goal-0549-target/retained/candidate/normal"
+  ],
+  "start_utc": "2026-09-13T04:12:04.123203+00:00",
+  "end_utc": "2026-09-13T04:12:04.320442+00:00",
+  "seconds": 0.19724994600983337,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9",
+  "binary_sha256": "d711d01908d7c2709cb30341cb9d9c2947ad31d01968f78b3f614e8d9b519d22",
+  "source_manifest_sha256": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9",
+  "script_sha256": "c987ce1dc79993db93e42263bc6c5a3a550feb4785d2476c095d85e5818cfbd9",
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "assembly-5.host.json": "c2e3f0ae0e39cac8862647139cc5b8b85837c8ed4c7bd91918f9fa656cb0da4b",
+    "assembly-5.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assembly-5.stdout": "c68864a9c5b4e528762a4f3a1d8c41349e21385cd022ffdbed9d3356ec8c16c9"
+  }
+}

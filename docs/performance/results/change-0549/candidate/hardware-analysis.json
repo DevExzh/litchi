@@ -1,0 +1,125 @@
+{
+  "binary_sha256": "d711d01908d7c2709cb30341cb9d9c2947ad31d01968f78b3f614e8d9b519d22",
+  "captures": [
+    {
+      "branch_miss_percent": 0.2738750599459992,
+      "events": {
+        "branch-misses": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 2746980
+        },
+        "branches": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 1003004801
+        },
+        "context-switches": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 71
+        },
+        "cpu-migrations": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 0
+        },
+        "cycles": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 3448714440
+        },
+        "instructions": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 5404926851
+        },
+        "page-faults": {
+          "event_runtime_ns": 809874859,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 66773
+        }
+      },
+      "exit_code": 0,
+      "group_valid": true,
+      "identity_equal": true,
+      "ipc": 1.5672294546370154,
+      "name": "hardware-r1-xls-owned",
+      "receipt_sha256": "2d0521fcb1b795c485b7e207bee71e079edac0b4140a9b70467542974de28801",
+      "repeat": 1,
+      "status": "measured"
+    },
+    {
+      "branch_miss_percent": 0.26705863280065173,
+      "events": {
+        "branch-misses": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 2677267
+        },
+        "branches": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 1002501575
+        },
+        "context-switches": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 71
+        },
+        "cpu-migrations": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 0
+        },
+        "cycles": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 3486222124
+        },
+        "instructions": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 5402576238
+        },
+        "page-faults": {
+          "event_runtime_ns": 782332178,
+          "running_percent": 100.0,
+          "status": "measured",
+          "value": 66787
+        }
+      },
+      "exit_code": 0,
+      "group_valid": true,
+      "identity_equal": true,
+      "ipc": 1.5496936356428217,
+      "name": "hardware-r2-xls-owned",
+      "receipt_sha256": "2ea4596e19773f9c3df02ecdc2d8182ebe49479d0a27c4384bfbcf89c9f274db",
+      "repeat": 2,
+      "status": "measured"
+    }
+  ],
+  "latency_samples_excluded_from_native": 2000,
+  "limitations": [
+    "Whole-child counters include setup, copies, queries, oracles, drop, and report construction."
+  ],
+  "no_operation_local_hardware_or_speedup_claim": true,
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "schema": "cfb_ole2_hardware_analysis_v1",
+  "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims",
+  "stage": "candidate",
+  "status": "pass"
+}

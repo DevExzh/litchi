@@ -1,0 +1,186 @@
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -45,6 +45,31 @@
+         self.words.get(word).is_some_and(|value| value & mask != 0)
+     }
+ 
++    /// Test and set one bit while preserving fallible bounds diagnostics.
++    ///
++    /// The combined operation keeps the old word available for the result and
++    /// performs one checked word lookup for the hot exact-chain walk. Writing
++    /// the same word when a bit was already set is unobservable for this set;
++    /// it also leaves the operation open to lowering as a bit-test-and-set.
++    #[inline]
++    fn test_and_mark(&mut self, bit: usize) -> Result<bool, OleError> {
++        if bit >= self.bit_len {
++            return Err(OleError::CorruptedFile(format!(
++                "bit index {bit} exceeds checked bit-set capacity {}",
++                self.bit_len
++            )));
++        }
++        let word = bit / BITSET_WORD_BITS;
++        let mask = 1u64 << (bit % BITSET_WORD_BITS);
++        let value = self.words.get_mut(word).ok_or_else(|| {
++            OleError::CorruptedFile(format!("bit index {bit} has no backing word"))
++        })?;
++        let old_word = *value;
++        let new_word = old_word | mask;
++        *value = new_word;
++        Ok(old_word & mask != 0)
++    }
++
+     fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+         if bit >= self.bit_len {
+             return Err(OleError::CorruptedFile(format!(
+@@ -2845,12 +2870,11 @@
+                         "Invalid sector index {sector} in {table_name}"
+                     )));
+                 }
+-                if self.visited.contains(slot) {
++                if self.visited.test_and_mark(slot)? {
+                     return Err(OleError::CorruptedFile(format!(
+                         "Cycle detected in {table_name} chain at sector {sector}"
+                     )));
+                 }
+-                self.visited.insert(slot)?;
+                 // The fallible exact reservation above covers this loop's
+                 // exactly `expected_count` pushes; keep allocation failure at
+                 // that established boundary.
+@@ -3144,6 +3168,62 @@
+     }
+ 
+     #[test]
++    fn checked_bit_set_test_and_mark_reports_presence_at_word_boundaries() {
++        let mut bits = CheckedBitSet::try_with_capacity(BITSET_WORD_BITS + 1, "test").unwrap();
++        let words_ptr = bits.words.as_ptr();
++        let words_capacity = bits.words.capacity();
++
++        assert!(!bits.test_and_mark(0).unwrap());
++        assert!(bits.test_and_mark(0).unwrap());
++        assert!(!bits.test_and_mark(BITSET_WORD_BITS - 1).unwrap());
++        assert!(bits.test_and_mark(BITSET_WORD_BITS - 1).unwrap());
++        assert!(!bits.test_and_mark(BITSET_WORD_BITS).unwrap());
++        assert!(bits.test_and_mark(BITSET_WORD_BITS).unwrap());
++        assert_eq!(bits.words[0], 1 | (1u64 << (BITSET_WORD_BITS - 1)));
++        assert_eq!(bits.words[1], 1);
++        assert_eq!(bits.words.as_ptr(), words_ptr);
++        assert_eq!(bits.words.capacity(), words_capacity);
++
++        let out_of_bounds = bits.test_and_mark(bits.bit_len);
++        assert!(matches!(
++            out_of_bounds,
++            Err(OleError::CorruptedFile(message))
++                if message == "bit index 65 exceeds checked bit-set capacity 65"
++        ));
++        assert_eq!(bits.words.as_ptr(), words_ptr);
++        assert_eq!(bits.words.capacity(), words_capacity);
++    }
++
++    #[test]
++    fn checked_bit_set_test_and_mark_preserves_missing_backing_word_without_growth() {
++        let mut bits = CheckedBitSet {
++            words: vec![0],
++            bit_len: BITSET_WORD_BITS + 1,
++        };
++        let words_ptr = bits.words.as_ptr();
++        let words_capacity = bits.words.capacity();
++
++        let missing_word = bits.test_and_mark(BITSET_WORD_BITS);
++        assert!(matches!(
++            missing_word,
++            Err(OleError::CorruptedFile(message))
++                if message == "bit index 64 has no backing word"
++        ));
++        assert_eq!(bits.words, vec![0]);
++        assert_eq!(bits.words.as_ptr(), words_ptr);
++        assert_eq!(bits.words.capacity(), words_capacity);
++
++        let out_of_bounds = bits.test_and_mark(bits.bit_len);
++        assert!(matches!(
++            out_of_bounds,
++            Err(OleError::CorruptedFile(message))
++                if message == "bit index 65 exceeds checked bit-set capacity 65"
++        ));
++        assert_eq!(bits.words.as_ptr(), words_ptr);
++        assert_eq!(bits.words.capacity(), words_capacity);
++    }
++
++    #[test]
+     fn rejects_chain_lengths_before_reserving_chain_storage() {
+         let result = collect_sector_chain_exact(&[ENDOFCHAIN], 0, 2, "FAT");
+         assert!(matches!(
+@@ -3328,6 +3408,74 @@
+         }
+     }
+ 
++    fn enumerate_exhaustive_chain_tables(
++        table: &mut [u32],
++        values: &[u32],
++        depth: usize,
++        scratch: &mut SectorChainScratch,
++    ) {
++        if depth < table.len() {
++            for &value in values {
++                table[depth] = value;
++                enumerate_exhaustive_chain_tables(table, values, depth + 1, scratch);
++            }
++            return;
++        }
++
++        for &start_sector in values {
++            for expected_count in 0..=table.len() + 1 {
++                let expected =
++                    collect_sector_chain_exact(table, start_sector, expected_count, "exhaustive")
++                        .map_err(|error| error.to_string());
++                let actual_result =
++                    scratch.collect_exact(table, start_sector, expected_count, "exhaustive");
++                let actual = actual_result
++                    .map(|()| scratch.sectors().to_vec())
++                    .map_err(|error| error.to_string());
++
++                assert_eq!(
++                    actual, expected,
++                    "table {table:?}, start {start_sector}, count {expected_count}"
++                );
++                match expected {
++                    Ok(sectors) => {
++                        assert_eq!(scratch.sectors(), sectors.as_slice());
++                        if expected_count == 0 {
++                            assert_eq!(scratch.visited.bit_len, 0);
++                        } else {
++                            assert_eq!(scratch.visited.bit_len, table.len());
++                            for &sector in &sectors {
++                                let slot = usize::try_from(sector).unwrap();
++                                assert!(scratch.visited.contains(slot));
++                            }
++                        }
++                    },
++                    Err(_) => {
++                        assert!(scratch.sectors.is_empty());
++                        assert_eq!(scratch.visited.bit_len, 0);
++                    },
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn scratch_exhaustively_matches_owned_helper_for_small_tables() {
++        for length in 0..=4 {
++            let mut values: Vec<u32> = (0..length).map(|value| value as u32).collect();
++            values.extend([
++                length as u32,
++                ENDOFCHAIN,
++                MAXREGSECT,
++                MAXREGSECT + 2,
++                u32::MAX,
++            ]);
++            let mut table = vec![ENDOFCHAIN; length];
++            let mut scratch = SectorChainScratch::default();
++            enumerate_exhaustive_chain_tables(&mut table, &values, 0, &mut scratch);
++        }
++    }
++
+     #[test]
+     fn malformed_large_declarations_do_not_unwind() {
+         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

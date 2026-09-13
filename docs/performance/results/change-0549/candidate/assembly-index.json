@@ -1,0 +1,71 @@
+{
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "binary_sha256": "d711d01908d7c2709cb30341cb9d9c2947ad31d01968f78b3f614e8d9b519d22",
+  "source_manifest_sha256": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9",
+  "script_sha256": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+  "rows": [
+    {
+      "name": "assembly-0",
+      "symbol": "_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE",
+      "address_hex": "0000000002f141d0",
+      "size_bytes": 236,
+      "receipt_sha256": "d79bc6aa307f2cb96fb71a2696d0b29c13068f3766cbfa9c294d31f11d479d9f"
+    },
+    {
+      "name": "assembly-1",
+      "symbol": "_ZN10litchi_cfb4file13CheckedBitSet6insert17hd0819a41161dc860E",
+      "address_hex": "0000000002f142c0",
+      "size_bytes": 223,
+      "receipt_sha256": "45fb8e1723e3fd985fc835c35d7fbdb35280454d2e866818b298dd1a68f96436"
+    },
+    {
+      "name": "assembly-2",
+      "symbol": "_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E",
+      "address_hex": "0000000002f223c0",
+      "size_bytes": 1434,
+      "receipt_sha256": "e175c9208960db8b59690ecff1ada84410637f70f73a1fb50331db8fec1b356d"
+    },
+    {
+      "name": "assembly-3",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h707769b8d68086e6E",
+      "address_hex": "0000000002837d10",
+      "size_bytes": 62,
+      "receipt_sha256": "5189465a17a713a4d4eea070cfb10532989597efb1f6fc677fc46469bf97063f"
+    },
+    {
+      "name": "assembly-4",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h91681fb3f502007dE",
+      "address_hex": "0000000002f24760",
+      "size_bytes": 62,
+      "receipt_sha256": "8271068f5ab8c89399127d24a61f8cfe0cb8c1364aba945995cf000d0b25ef4b"
+    },
+    {
+      "name": "assembly-5",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h9a5958d9c8d265faE",
+      "address_hex": "0000000001753840",
+      "size_bytes": 62,
+      "receipt_sha256": "82e611afaf2b817420ef537c18da9cc9d3cdcabf452a76957def5e35ccb775cf"
+    },
+    {
+      "name": "assembly-6",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17hc097149cd6a0f807E",
+      "address_hex": "00000000028642c0",
+      "size_bytes": 62,
+      "receipt_sha256": "b1409144da7d3529154a1d344b24b298a152b22d61c8350205abf867bf7bd592"
+    },
+    {
+      "name": "assembly-7",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17he4f944a9e0b0e1acE",
+      "address_hex": "00000000027ab4a0",
+      "size_bytes": 62,
+      "receipt_sha256": "e43629614646ae221e2e5d6d4226953897155c8e641a4a901eb91627fd61b6f5"
+    },
+    {
+      "name": "assembly-8",
+      "symbol": "_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17hf57b5842bcd2d7fdE",
+      "address_hex": "0000000001fd7950",
+      "size_bytes": 62,
+      "receipt_sha256": "9a5b5ff2a1258f1caf07215676aed56a9f65856e6afbb633563786d9d0f8de0b"
+    }
+  ]
+}

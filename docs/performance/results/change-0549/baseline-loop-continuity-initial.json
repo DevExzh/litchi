@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "scope": "Fresh0549 baseline collector disassembly instruction lines exactly equal sealed0548 baseline, including addresses/bytes/operands; prior source-level loop review applies. No timing reuse.",
+  "assembly": {
+    "docs/performance/results/change-0548/baseline/assembly-2.stdout": "c8f23242ee89bfbadde2c96e4f1750be3df3dfd668b487678a32db9f33c520ab",
+    "docs/performance/results/change-0549/baseline/assembly-2.stdout": "f2d7e837a8d2a3e0135b99a1522dc67d5f279dfe171ba94cef1e8fbff3b78e28"
+  },
+  "binary_hashes": [
+    "960ef0f2557ae1d81c958c06d17496a380ef51f75902c85ed5e76aa2ef8ebec5",
+    "7ed5a86c3bee64734a174f1c1feaddcb4c777ec41cbddfeec331d99b8a7c0ca4"
+  ],
+  "instruction_lines": 331,
+  "review_sha256": "ba34663a21258beb9c007430d8bcbe4c8a408509071549880d22f1435049a8a1"
+}

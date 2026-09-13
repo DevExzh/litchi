@@ -1,0 +1,71 @@
+{
+  "adoption_allowed": false,
+  "adverse_review_complete": true,
+  "adverse_review_sha256": "e81a0ed9549367b337aa41ba8ba9d902b71fdfdccc4030535118d60cd9833421",
+  "collector_ir": [
+    {
+      "baseline": 5601140,
+      "candidate": 5436525,
+      "change_percent": -2.9389552841028843,
+      "group": "xls-owned",
+      "repeat": 1,
+      "shape": null
+    },
+    {
+      "baseline": 5571945,
+      "candidate": 5408115,
+      "change_percent": -2.94026592150497,
+      "group": "cfb-few-large",
+      "repeat": 1,
+      "shape": "few-large"
+    },
+    {
+      "baseline": 5601140,
+      "candidate": 5436525,
+      "change_percent": -2.9389552841028843,
+      "group": "xls-owned",
+      "repeat": 2,
+      "shape": null
+    },
+    {
+      "baseline": 5571945,
+      "candidate": 5408115,
+      "change_percent": -2.94026592150497,
+      "group": "cfb-few-large",
+      "repeat": 2,
+      "shape": "few-large"
+    }
+  ],
+  "collector_profile_gate": true,
+  "comparison_sha256": "d64357af42deea745a0074a16aa0683a6c98734152643dbaeda41bbc79f49efe",
+  "constructor_ir": [
+    {
+      "baseline": 11317748,
+      "candidate": 11152433,
+      "change_percent": -1.4606704443322127,
+      "repeat": 1
+    },
+    {
+      "baseline": 11315393,
+      "candidate": 11155279,
+      "change_percent": -1.4150105082519016,
+      "repeat": 2
+    }
+  ],
+  "disposition": "rejected",
+  "final_source": "final",
+  "final_source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "guard_analysis_sha256": "a2a32d36148fe07798f4e6db0b5ac71a517a167ae90b69a60a0cd75d4987c765",
+  "guard_gate": true,
+  "memory_gate": true,
+  "native_primary_gate": false,
+  "other_rejection_reason": "Reject candidate adoption: all eight paired primary native p50 values regress, from +2.079931% to +10.876280%, while admission requires at least a 3% improvement for all four workflows in both repeats. Allocation and public guard gates pass and the required profile Ir rows decrease, but those diagnostic or resource-contract passes cannot offset the primary latency failure. Retain the candidate as measurement-only and restore the exact baseline after the terminal quality phase.",
+  "profile_gate": true,
+  "profiles_sha256": {
+    "baseline": "1c635a965efd95150d4642531d4c19de6f464fa69755f31bf05b6236c5bc65af",
+    "candidate": "7022ee25abe9738ad84c11593415a3e43d7acae0f11f192a7e71fd4e0d206e80"
+  },
+  "quality_gates": 15,
+  "quality_summary_sha256": "aa8ca992855849dd9f5e85038106958cc37b0400747d8d9efd94f008abf17b81",
+  "scope": "Matched CFB checked bitset test-and-mark experiment; OLE2/OOXML active, ODF deferred, iWork excluded"
+}

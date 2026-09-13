@@ -1,0 +1,50 @@
+{
+  "components": {
+    "source": {
+      "result": {
+        "adr": {
+          "entries": 30,
+          "sha256": "c5a27220e14b71e3fc23621ae58b10dca79ac21fa134981a448d2d65ff34fcfd",
+          "status": "pass"
+        },
+        "baseline": {
+          "changed_files": [],
+          "manifest_entries": 8593,
+          "manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+          "new_files": [],
+          "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stage": "baseline"
+        },
+        "candidate": {
+          "changed_files": [
+            "crates/litchi-cfb/src/file.rs"
+          ],
+          "manifest_entries": 8593,
+          "manifest_sha256": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9",
+          "new_files": [],
+          "patch_sha256": "4f9b9046d706700f8249310eb538c977409107ae62da92670fadfc03b3638fee",
+          "stage": "candidate"
+        },
+        "candidate_inputs": {
+          "candidate_admission_inputs_sha256": "7cab28a9fe269ebc39b6d016c0fbd71d6118f8a09702301a6e2bdb3d7734d629",
+          "candidate_patch_sha256": "0602a50efe65c800ea36163d22af19d4f44dac9a77f4d87861230956a23fb40d",
+          "snapshot_sha256": "711572fd5779aff9efdfd3e452040daa378e23aad22bb6ecb83841dbbe903377",
+          "source_note_sha256": "135628353a35fd53cbb72b91914530454bac279796bdda0ee152727489929660",
+          "status": "pass"
+        },
+        "final": null,
+        "manifests": {
+          "baseline": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+          "candidate": "a84e664a7924ea4b1cce33e1fc49124eb7667ddd48c9722d9b0b9a9dd5d88ba9"
+        },
+        "selected": null,
+        "status": "pass"
+      },
+      "status": "pass"
+    }
+  },
+  "performance_claim": "candidate admission only; no broad format claim",
+  "schema": "litchi-0549-matched-verification-v1",
+  "scope": "source",
+  "status": "pass"
+}

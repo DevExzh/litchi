@@ -1,0 +1,25 @@
+{
+  "artifacts": {
+    "inputs.json": "fc77a9a1197eb83689755b87dfd266a979c59955a1584c6f5defb5fe7abc970c",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout": "c41629b37da7a26e8b16c37183776965d90c0a4f2c669696dbece8e39fc234a5"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0549/analyze_hardware.py",
+    "--stage",
+    "candidate",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0549/candidate/hardware-analysis.json"
+  ],
+  "end_utc": "2026-09-13T04:13:06.291558+00:00",
+  "exit_code": 0,
+  "inputs_sha256": "fc77a9a1197eb83689755b87dfd266a979c59955a1584c6f5defb5fe7abc970c",
+  "output": "candidate/hardware-analysis.json",
+  "output_sha256": "edae4701302032f675afd57aa9509aa6a15a24e7c3fc53693dfcc4a99da6ae60",
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "script_sha256": "e35651820aa2955e46ff40561600adb87673c5504c0efe7c755ea099b69f801f",
+  "seconds": 0.10822247999021783,
+  "start_utc": "2026-09-13T04:13:06.183335+00:00"
+}

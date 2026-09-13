@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0549: checked bitset candidate rejected
+
+[0549](changes/0549-cfb-checked-test-and-mark.md) The private checked
+operation preserves logical/backing bounds, exact first-cycle errors,
+allocation order, zero-fill and scratch/ownership behavior. Frozen native
+gates reject adoption, so exact baseline production is restored. Accepted
+ADR/index hashes remain unchanged; no exception is needed.
+
 ## 0548: bounded CFB experiment preserves owner and refusal contracts
 
 [0548](changes/0548-ole2-checkpoint-collector-rejected.md) keeps validation in

@@ -1,0 +1,12 @@
+{
+  "docs/performance/ADR_COMPLIANCE.md": "623c0effcffd2a8e172c4d154f2f88fc573ffcf04a672c789ff5cb4e8f4e5c30",
+  "docs/performance/BASELINE.md": "b0d81d83bc8d01e713fa03c725413a007242d953c0428bdee5b82527b85d7ff1",
+  "docs/performance/GOAL_AUDIT.md": "00290e642f539c48079b049e048d14f8f1f6a6021e3938e43d1143c352faae61",
+  "docs/performance/HOTSPOTS.md": "e905a6330b1a4f9b2d779f1cc2f837a9061d204cb6178fa2265a63c8c769a9fe",
+  "docs/performance/REPORT.md": "249e3da1dd8d1866ef407a0f8f3efa8d32a173745757bc813ecd3416a2b66554",
+  "docs/performance/changes/0549-cfb-checked-test-and-mark.md": "ea9f3b14d13c9bad3d61a8170195ce3c81e239249c8d9ae356247151c96163e2",
+  "docs/performance/results/change-0549/README.md": "bcc7f1709ed114686c8c8059d12367b4d179187d7809621545907a29ea13aac6",
+  "docs/performance/results/change-0549/adr-compliance.md": "1d881aa0e5c184c81785ecb33bd620828726e4c4d36ec5172a30d0a2720067a7",
+  "docs/performance/results/change-0549/protocol.md": "4aba48843f1d7de143e2ee27aa4127e5aedb3222830414a8bf52dd2747f9e1a5",
+  "docs/performance/results/change-0549/results-review.md": "de781abcd2355049ce9bda406bfcd08a07699aa9ab134b8a948e412d34bdf9ef"
+}

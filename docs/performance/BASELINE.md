@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0549: checked bitset candidate rejected
+
+[0549](changes/0549-cfb-checked-test-and-mark.md) The final runtime-plus-test
+source exactly equals the freshly measured baseline. The common 0548 guard
+remains unchanged. Eight primary latency failures prevent the reduced-Ir
+candidate from replacing that baseline; no candidate timing gain is carried
+into production claims.
+
 ## 0548: fresh paired OLE2 baseline and rejected checkpoint candidate
 
 [0548](changes/0548-ole2-checkpoint-collector-rejected.md) retains two-repeat

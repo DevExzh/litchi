@@ -1,0 +1,21 @@
+{
+  "artifacts": {
+    "inputs.json": "b5e3395b664c6103dc5ae5952f9d7119a8cf90690b9baaefe861aecc6bd35382",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout": "a2a32d36148fe07798f4e6db0b5ac71a517a167ae90b69a60a0cd75d4987c765"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0549/guard_analysis.py"
+  ],
+  "end_utc": "2026-09-13T04:13:09.578616+00:00",
+  "exit_code": 0,
+  "inputs_sha256": "b5e3395b664c6103dc5ae5952f9d7119a8cf90690b9baaefe861aecc6bd35382",
+  "output": "guard-analysis.json",
+  "output_sha256": "a2a32d36148fe07798f4e6db0b5ac71a517a167ae90b69a60a0cd75d4987c765",
+  "plan_sha256": "026807b726b28a34de2f466e5156af762bd49fdb8962ee4b1900114ce4e63d40",
+  "script_sha256": "28bd6fd44b607ce0e2d9d2c3cdbb040049045c8a6f6eb33424093f18b718b602",
+  "seconds": 0.06520873898989521,
+  "start_utc": "2026-09-13T04:13:09.513402+00:00"
+}
