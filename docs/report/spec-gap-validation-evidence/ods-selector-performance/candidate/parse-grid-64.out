@@ -1,0 +1,2 @@
+config workload=Parse sheets=1 rows=64 columns=64 source_bytes=338634 warmups=3 iterations=15
+result mean_ns=6067694 p50_ns=5956225 p95_ns=6262647 p99_ns=6262647 memory_delta_p50=7909580 memory_delta_max=7909580 memory_final_p50=7909580 memory_final_max=7909580 work_delta_p50=1197402 work_delta_max=1197402 work_final_p50=1197402 work_final_max=1197402 probes=0

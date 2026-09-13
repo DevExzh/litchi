@@ -245,100 +245,145 @@ impl Catalog {
         let table = self.tables.get(table_index).ok_or_else(|| {
             Error::InvalidFormat("ODS metadata worksheet index disappeared".to_string())
         })?;
-        for row_index in &table.rows {
-            let row = self.rows.get(*row_index).ok_or_else(|| {
+        // Rows are appended in document order and each interval is strictly
+        // after the preceding one (`append_row` advances `logical_row` by the
+        // positive repeat count).  Search those disjoint intervals by index so
+        // a sparse sheet does not charge every preceding row.  Each midpoint
+        // remains one logical candidate comparison, including its cancellation
+        // check and fixed work charge.
+        let mut row_lower = 0usize;
+        let mut row_upper = table.rows.len();
+        let mut matching_row = None;
+        while row_lower < row_upper {
+            let middle = row_lower + (row_upper - row_lower) / 2;
+            let row_index = *table.rows.get(middle).ok_or_else(|| {
+                Error::InvalidFormat("ODS metadata table row index disappeared".to_string())
+            })?;
+            let row = self.rows.get(row_index).ok_or_else(|| {
                 Error::InvalidFormat("ODS metadata row index disappeared".to_string())
             })?;
             let row_end = row.logical_start.checked_add(row.repeat).ok_or_else(|| {
                 Error::InvalidFormat("ODS metadata logical row address overflows".to_string())
             })?;
             budget.comparison()?;
-            if selector.row() < row_end && selector.row() >= row.logical_start {
-                for cell_index in &row.cells {
-                    budget.comparison()?;
-                    let cell = self.cells.get(*cell_index).ok_or_else(|| {
-                        Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+            if selector.row() < row.logical_start {
+                row_upper = middle;
+            } else if selector.row() >= row_end {
+                row_lower = middle + 1;
+            } else {
+                matching_row = Some(row_index);
+                break;
+            }
+        }
+
+        if let Some(row_index) = matching_row {
+            let row = self.rows.get(row_index).ok_or_else(|| {
+                Error::InvalidFormat("ODS metadata row index disappeared".to_string())
+            })?;
+            // Cells within a row follow the same invariant: their positive
+            // column intervals are emitted in document order.  Repeated cells
+            // therefore need no expansion or auxiliary index for binary lookup.
+            let mut cell_lower = 0usize;
+            let mut cell_upper = row.cells.len();
+            let mut matching_cell = None;
+            while cell_lower < cell_upper {
+                let middle = cell_lower + (cell_upper - cell_lower) / 2;
+                let cell_index = *row.cells.get(middle).ok_or_else(|| {
+                    Error::InvalidFormat("ODS metadata row cell index disappeared".to_string())
+                })?;
+                let cell = self.cells.get(cell_index).ok_or_else(|| {
+                    Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+                })?;
+                let end = cell
+                    .column_start
+                    .checked_add(cell.column_repeat)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS metadata logical column address overflows".to_string(),
+                        )
                     })?;
-                    let end = cell
-                        .column_start
-                        .checked_add(cell.column_repeat)
-                        .ok_or_else(|| {
-                            Error::InvalidFormat(
-                                "ODS metadata logical column address overflows".to_string(),
-                            )
-                        })?;
-                    if selector.column() < end && selector.column() >= cell.column_start {
-                        let physical_row = selector.row();
-                        let physical_column = selector.column();
-                        if cell.merge != Merge::None
-                            && physical_row == cell.row_start
-                            && physical_column == cell.column_start
-                        {
-                            return Ok(PhysicalCell::Stored(*cell_index));
-                        }
-                        if cell.merge == Merge::None {
-                            return Ok(PhysicalCell::Stored(*cell_index));
-                        }
-                        if let Merge::Span { rows, columns } = cell.merge {
-                            let row_end =
-                                cell.row_start.checked_add(rows.get()).ok_or_else(|| {
-                                    Error::InvalidFormat("ODS merge row span overflows".to_string())
-                                })?;
-                            let col_end =
-                                cell.column_start
-                                    .checked_add(columns.get())
-                                    .ok_or_else(|| {
-                                        Error::InvalidFormat(
-                                            "ODS merge column span overflows".to_string(),
-                                        )
-                                    })?;
-                            if physical_row < row_end && physical_column < col_end {
-                                return Ok(PhysicalCell::ImplicitCovered {
-                                    anchor: (cell.row_start, cell.column_start),
-                                    rows: rows.get(),
-                                    columns: columns.get(),
-                                });
-                            }
-                        }
-                        return Ok(PhysicalCell::Stored(*cell_index));
-                    }
+                budget.comparison()?;
+                if selector.column() < cell.column_start {
+                    cell_upper = middle;
+                } else if selector.column() >= end {
+                    cell_lower = middle + 1;
+                } else {
+                    matching_cell = Some(cell_index);
+                    break;
                 }
-                // A merge anchor may cover later rows that have no physical
-                // row/cell object.  Keep this lookup sparse and bounded.
-                for cell_index in &self.cells {
-                    budget.comparison()?;
-                    if cell_index.table != table_index {
-                        continue;
-                    }
-                    if let Merge::Span { rows, columns } = cell_index.merge {
-                        let row_end =
-                            cell_index
-                                .row_start
-                                .checked_add(rows.get())
-                                .ok_or_else(|| {
-                                    Error::InvalidFormat("ODS merge row span overflows".to_string())
-                                })?;
-                        let col_end = cell_index
-                            .column_start
+            }
+
+            if let Some(cell_index) = matching_cell {
+                let cell = self.cells.get(cell_index).ok_or_else(|| {
+                    Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+                })?;
+                let physical_row = selector.row();
+                let physical_column = selector.column();
+                if cell.merge != Merge::None
+                    && physical_row == cell.row_start
+                    && physical_column == cell.column_start
+                {
+                    return Ok(PhysicalCell::Stored(cell_index));
+                }
+                if cell.merge == Merge::None {
+                    return Ok(PhysicalCell::Stored(cell_index));
+                }
+                if let Merge::Span { rows, columns } = cell.merge {
+                    let row_end = cell.row_start.checked_add(rows.get()).ok_or_else(|| {
+                        Error::InvalidFormat("ODS merge row span overflows".to_string())
+                    })?;
+                    let col_end =
+                        cell.column_start
                             .checked_add(columns.get())
                             .ok_or_else(|| {
                                 Error::InvalidFormat("ODS merge column span overflows".to_string())
                             })?;
-                        if selector.row() >= cell_index.row_start
-                            && selector.row() < row_end
-                            && selector.column() >= cell_index.column_start
-                            && selector.column() < col_end
-                        {
-                            return Ok(PhysicalCell::ImplicitCovered {
-                                anchor: (cell_index.row_start, cell_index.column_start),
-                                rows: rows.get(),
-                                columns: columns.get(),
-                            });
-                        }
+                    if physical_row < row_end && physical_column < col_end {
+                        return Ok(PhysicalCell::ImplicitCovered {
+                            anchor: (cell.row_start, cell.column_start),
+                            rows: rows.get(),
+                            columns: columns.get(),
+                        });
                     }
                 }
-                return Ok(PhysicalCell::Missing);
+                return Ok(PhysicalCell::Stored(cell_index));
             }
+
+            // A merge anchor may cover later rows that have no physical
+            // row/cell object.  Keep this lookup sparse and bounded.
+            for cell_index in &self.cells {
+                budget.comparison()?;
+                if cell_index.table != table_index {
+                    continue;
+                }
+                if let Merge::Span { rows, columns } = cell_index.merge {
+                    let row_end =
+                        cell_index
+                            .row_start
+                            .checked_add(rows.get())
+                            .ok_or_else(|| {
+                                Error::InvalidFormat("ODS merge row span overflows".to_string())
+                            })?;
+                    let col_end = cell_index
+                        .column_start
+                        .checked_add(columns.get())
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODS merge column span overflows".to_string())
+                        })?;
+                    if selector.row() >= cell_index.row_start
+                        && selector.row() < row_end
+                        && selector.column() >= cell_index.column_start
+                        && selector.column() < col_end
+                    {
+                        return Ok(PhysicalCell::ImplicitCovered {
+                            anchor: (cell_index.row_start, cell_index.column_start),
+                            rows: rows.get(),
+                            columns: columns.get(),
+                        });
+                    }
+                }
+            }
+            return Ok(PhysicalCell::Missing);
         }
         for cell in &self.cells {
             budget.comparison()?;
@@ -2328,6 +2373,45 @@ mod tests {
             Ok(PhysicalCell::Stored(_))
         ));
         assert_eq!(above.budget().used(Resource::Work), 24);
+    }
+
+    #[test]
+    fn ordered_selector_lookup_charges_only_interval_candidates() {
+        let row = concat!(
+            "<table:table-row>",
+            "<table:table-cell/><table:table-cell/><table:table-cell/><table:table-cell/>",
+            "<table:table-cell/><table:table-cell/><table:table-cell/><table:table-cell/>",
+            "</table:table-row>"
+        );
+        let source = format!(
+            "<office:document-content xmlns:office=\"{OFFICE_NS}\" xmlns:table=\"{TABLE_NS}\"><office:body><office:spreadsheet><table:table table:name=\"Data\">{}</table:table></office:spreadsheet></office:body></office:document-content>",
+            row.repeat(8)
+        );
+        let catalog = scan_fixture(&source).expect("ordered selector fixture");
+        let selector =
+            crate::sheet_metadata::CellSelector::by_position(litchi_core::Position::new(0), 7, 7);
+
+        let below = context();
+        assert!(
+            catalog
+                .cell_for_selector(&selector, &below, selector_limits(55))
+                .is_err()
+        );
+        assert_eq!(below.budget().used(Resource::Work), 48);
+
+        let exact = context();
+        assert!(matches!(
+            catalog.cell_for_selector(&selector, &exact, selector_limits(56)),
+            Ok(PhysicalCell::Stored(_))
+        ));
+        assert_eq!(exact.budget().used(Resource::Work), 56);
+
+        let above = context();
+        assert!(matches!(
+            catalog.cell_for_selector(&selector, &above, selector_limits(57)),
+            Ok(PhysicalCell::Stored(_))
+        ));
+        assert_eq!(above.budget().used(Resource::Work), 56);
     }
 
     #[test]

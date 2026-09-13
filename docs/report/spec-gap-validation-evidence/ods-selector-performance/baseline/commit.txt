@@ -1,0 +1,4 @@
+commit=d5b5afdb4032b718c0f94c113a3b1b09f17ae6ba
+commit_subject=feat(ods): add bounded sheet metadata transactions
+worktree=/var/tmp/ods-selector-baseline-d5b5
+2026-09-13T02:22:51Z
