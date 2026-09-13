@@ -1,0 +1,12 @@
+{
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/ods-formula-array-reference-evaluation-scalar-profile",
+  "build_status": 0,
+  "capture_status": 0,
+  "captured_at": "2026-09-13T15:33:43.343Z",
+  "commit": "67360b209c5b428161b27f1f08650169d4997739",
+  "raw_csv": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/raw.csv",
+  "raw_csv_sha256": "22ed898910a76723d81d5e93fe5f40a8d9f8f20b5a2e37166ebfd01c562f54e0",
+  "row_count": 282,
+  "sha256": "b68d801f62a1ec6e4accdd090940dda46e58d97c7818b91e4dbcc38ca8cdf682",
+  "size_bytes": 1317096
+}
