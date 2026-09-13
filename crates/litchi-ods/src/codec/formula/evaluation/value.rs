@@ -1169,12 +1169,12 @@ enum RuntimeValue<'a> {
     Empty,
     Missing,
     Scalar(WorkingValue<'a>),
+    Array(RuntimeArrayValue<'a>),
+    Areas(RuntimeAreaSet<'a>),
     /// A scalar-demand reference token.  The cell geometry is retained until
     /// its consuming operation projects it, which preserves sibling resolver
     /// ordering without allocating first-class reference metadata vectors.
     ScalarCell(RuntimeArea<'a>),
-    Array(RuntimeArrayValue<'a>),
-    Areas(RuntimeAreaSet<'a>),
 }
 
 impl RuntimeValue<'_> {
