@@ -1,0 +1,212 @@
+[
+  {
+    "phase": "parse",
+    "case": "control-utf8-left-1024",
+    "repeat": "8",
+    "p50_ns": 0.54,
+    "max_rss_kib": 9.57
+  },
+  {
+    "phase": "parse",
+    "case": "control-escaped-256",
+    "repeat": "32",
+    "p50_ns": -0.79,
+    "max_rss_kib": 8.29
+  },
+  {
+    "phase": "parse",
+    "case": "control-escaped-4096",
+    "repeat": "2",
+    "p50_ns": 0.0,
+    "max_rss_kib": 6.09
+  },
+  {
+    "phase": "parse",
+    "case": "control-true",
+    "repeat": "128",
+    "p50_ns": 5.97,
+    "max_rss_kib": -2.15
+  },
+  {
+    "phase": "parse",
+    "case": "failure-work",
+    "repeat": "128",
+    "p50_ns": 0.43,
+    "max_rss_kib": 5.11
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-flat-64",
+    "repeat": "64",
+    "p50_ns": 5.56,
+    "max_rss_kib": 9.52
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-flat-256",
+    "repeat": "32",
+    "p50_ns": 3.92,
+    "max_rss_kib": 5.12
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-64",
+    "repeat": "64",
+    "p50_ns": -0.65,
+    "max_rss_kib": 7.93
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-256",
+    "repeat": "32",
+    "p50_ns": 3.97,
+    "max_rss_kib": 5.78
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-1024",
+    "repeat": "8",
+    "p50_ns": 5.62,
+    "max_rss_kib": 5.24
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-4096",
+    "repeat": "2",
+    "p50_ns": 7.94,
+    "max_rss_kib": 4.34
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-utf8-left-1024",
+    "repeat": "8",
+    "p50_ns": -0.38,
+    "max_rss_kib": 6.14
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-utf8-left-4096",
+    "repeat": "2",
+    "p50_ns": -3.19,
+    "max_rss_kib": 5.11
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-escaped-256",
+    "repeat": "32",
+    "p50_ns": 0.89,
+    "max_rss_kib": 6.83
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-escaped-1024",
+    "repeat": "8",
+    "p50_ns": 0.79,
+    "max_rss_kib": 5.6
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-true",
+    "repeat": "128",
+    "p50_ns": -0.02,
+    "max_rss_kib": 5.46
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-array",
+    "repeat": "128",
+    "p50_ns": -0.91,
+    "max_rss_kib": 6.14
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-work",
+    "repeat": "128",
+    "p50_ns": 1.29,
+    "max_rss_kib": 5.44
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-memory",
+    "repeat": "128",
+    "p50_ns": 2.21,
+    "max_rss_kib": 8.09
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-stack",
+    "repeat": "128",
+    "p50_ns": -0.05,
+    "max_rss_kib": 10.54
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-cancelled",
+    "repeat": "128",
+    "p50_ns": -4.65,
+    "max_rss_kib": 9.59
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-flat-256",
+    "repeat": "32",
+    "p50_ns": 0.9,
+    "max_rss_kib": 5.78
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-flat-1024",
+    "repeat": "8",
+    "p50_ns": 5.13,
+    "max_rss_kib": 4.01
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-flat-4096",
+    "repeat": "2",
+    "p50_ns": 4.86,
+    "max_rss_kib": 5.47
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-64",
+    "repeat": "64",
+    "p50_ns": -0.83,
+    "max_rss_kib": 11.84
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-256",
+    "repeat": "32",
+    "p50_ns": 0.29,
+    "max_rss_kib": 11.0
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-4096",
+    "repeat": "2",
+    "p50_ns": -2.03,
+    "max_rss_kib": 6.77
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-false",
+    "repeat": "128",
+    "p50_ns": 1.24,
+    "max_rss_kib": 10.27
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "failure-reference",
+    "repeat": "128",
+    "p50_ns": 0.73,
+    "max_rss_kib": 6.75
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "failure-work",
+    "repeat": "128",
+    "p50_ns": -0.34,
+    "max_rss_kib": 7.77
+  }
+]

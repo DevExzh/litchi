@@ -1,0 +1,12 @@
+{
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/candidate/ods-formula-logical-evaluation-profile",
+  "target_binary": "/var/tmp/ods-logical-target/release/ods-formula-logical-evaluation-profile",
+  "sha256": "636de431ef448e97cc5f8e97c44ce4a6edb994919191008da05d603aad32446c",
+  "size_bytes": 1244800,
+  "base_commit": "3f907e9e1abcde99b2ce94e88c1122bb79f77a8d",
+  "source_manifest": "source-sha256.json",
+  "harness_manifest": "harness-sha256.txt",
+  "build_command": "build-command.json",
+  "build_status": 0,
+  "captured_at": "2026-09-13T12:31:25.045274+00:00"
+}

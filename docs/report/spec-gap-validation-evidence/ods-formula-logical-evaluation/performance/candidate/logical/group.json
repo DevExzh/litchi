@@ -1,0 +1,197 @@
+{
+  "group": "logical",
+  "revision": "candidate",
+  "candidate_only": true,
+  "phase_selection": "all",
+  "phases": [
+    "parse",
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "case_count": 45,
+  "cases": [
+    {
+      "case": "logical-true",
+      "repeat": 128
+    },
+    {
+      "case": "logical-false",
+      "repeat": 128
+    },
+    {
+      "case": "logical-and-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-and-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-and-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-and-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-or-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-or-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-or-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-or-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-xor-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-xor-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-xor-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-xor-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-not-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-not-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-not-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-not-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-if-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-if-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-if-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-if-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-iferror-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-iferror-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-iferror-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-iferror-4096",
+      "repeat": 2
+    },
+    {
+      "case": "logical-ifna-64",
+      "repeat": 64
+    },
+    {
+      "case": "logical-ifna-256",
+      "repeat": 32
+    },
+    {
+      "case": "logical-ifna-1024",
+      "repeat": 8
+    },
+    {
+      "case": "logical-ifna-4096",
+      "repeat": 2
+    },
+    {
+      "case": "lazy-if-true-heavy-64",
+      "repeat": 64
+    },
+    {
+      "case": "lazy-if-true-heavy-256",
+      "repeat": 32
+    },
+    {
+      "case": "lazy-if-true-heavy-1024",
+      "repeat": 8
+    },
+    {
+      "case": "lazy-if-true-heavy-4096",
+      "repeat": 2
+    },
+    {
+      "case": "lazy-if-false-reference",
+      "repeat": 128
+    },
+    {
+      "case": "lazy-iferror-success-reference",
+      "repeat": 128
+    },
+    {
+      "case": "lazy-ifna-success-reference",
+      "repeat": 128
+    },
+    {
+      "case": "lazy-iferror-error",
+      "repeat": 128
+    },
+    {
+      "case": "lazy-ifna-non-na",
+      "repeat": 128
+    },
+    {
+      "case": "text-if-true",
+      "repeat": 128
+    },
+    {
+      "case": "text-if-false",
+      "repeat": 128
+    },
+    {
+      "case": "text-if-escaped",
+      "repeat": 128
+    },
+    {
+      "case": "text-if-concat",
+      "repeat": 128
+    },
+    {
+      "case": "text-iferror",
+      "repeat": 128
+    },
+    {
+      "case": "text-ifna",
+      "repeat": 128
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/candidate/ods-formula-logical-evaluation-profile"
+}

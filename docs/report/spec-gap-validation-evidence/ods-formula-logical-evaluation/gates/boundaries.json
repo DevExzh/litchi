@@ -1,0 +1,13 @@
+{
+  "status": 0,
+  "command": [
+    "python3",
+    "tools/check_crate_boundaries.py"
+  ],
+  "finished_at": "2026-09-13T12:07:28.861539+00:00",
+  "seconds": 226.94167971611023,
+  "files": {
+    "tools/check_crate_boundaries.py": "75ca53760f5506dad053ef575ae50b44d9609ab1841456306be0e45965e6e12a",
+    "tools/crate_boundaries.json": "83cd3e394b95d81a1596f4452426ddad10182dd89437e1111d41d044efae4b95"
+  }
+}
