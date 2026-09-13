@@ -7,6 +7,12 @@ resource refusals, and lazy branch costs. Semantic preflight checks run before
 timing; the lazy aggregate cases require one range scan across selected output
 cells.
 
+The VAPI-3 migration gives every `value::Resolver` operation the final
+`&ExecutionContext` argument, including `source_version`. The fixture and
+instrumented worksheet adapter forward that context. Historical v1 captures
+used the previous API plumbing; rerun this candidate harness with fresh source
+provenance. This API migration alone provides no runtime comparability claim.
+
 Build from the isolated candidate workspace after synchronizing its sources,
 including this harness. Use the existing shared target only when no other
 build owns it:

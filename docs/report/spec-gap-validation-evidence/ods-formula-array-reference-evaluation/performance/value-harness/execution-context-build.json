@@ -1,0 +1,30 @@
+{
+  "scope": "Debug build verification of execution-context API migration only; no runtime or performance capture",
+  "production_checkpoint": "5997b0c5f",
+  "source_manifest": "diagnostics/integration-checkpoint-14.tar.gz:source-manifest.json",
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi-array-worktree/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/value-harness/Cargo.toml"
+  ],
+  "exit_code": 0,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-array-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-array-tmp",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0"
+  },
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "harness_files": {
+    "Cargo.toml": "44b731de34b54ee723e9611b1c32cfc2ee91a802b674494dc02a20fafa89819a",
+    "Cargo.lock": "25e9c37f67ec26b73e760d8eb00a581cfa4ac7e1e425b8c42d7d1ce450878d0a",
+    "src/main.rs": "6a02a57d210550e143469dabb0e16295cc64e4af6f17ff7e1cee06ee244fc583",
+    "run.py": "f2b8ef3e06fccd3988fe87b866577405709bde264b3807244ed5c8c760b7d6e4",
+    "README.md": "60520863ddf7d3a5962d0ace949772aebc982fc6794b7e44ece1535951d2a9d5"
+  },
+  "binary_sha256": "a184c1eedc84661915afbc5e92f6b5992d3d6ddfbe493e8e3b71fdd6169aea3c",
+  "build_log": "   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)\n   Compiling ods-formula-array-reference-evaluation-value-profile v0.0.0 (/home/zhuhe/code/litchi-array-worktree/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/value-harness)\n    Finished `dev` profile [unoptimized] target(s) in 6.89s\n"
+}

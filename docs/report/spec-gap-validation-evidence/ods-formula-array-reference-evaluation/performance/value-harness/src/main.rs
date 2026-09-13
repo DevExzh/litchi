@@ -47,7 +47,7 @@ use std::{
 
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Profile,
-    Resource,
+    Resource, SourceVersion,
 };
 use litchi_ods::codec::formula::{
     evaluation::value::{
@@ -430,7 +430,12 @@ impl FixtureResolver {
 }
 
 impl Resolver for FixtureResolver {
-    fn sheet_extent(&self, sheet: &str) -> Result<Option<SheetExtent>, EvaluationFailure> {
+    fn sheet_extent(
+        &self,
+        sheet: &str,
+        execution: &ExecutionContext,
+    ) -> Result<Option<SheetExtent>, EvaluationFailure> {
+        execution.check()?;
         self.stats.extent_calls.fetch_add(1, Ordering::Relaxed);
         Ok(sheet_id(sheet).map(|_| self.extent))
     }
@@ -440,7 +445,9 @@ impl Resolver for FixtureResolver {
         sheet: &str,
         row: usize,
         column: usize,
+        execution: &ExecutionContext,
     ) -> Result<CellRead<'a>, EvaluationFailure> {
+        execution.check()?;
         self.stats.reads.fetch_add(1, Ordering::Relaxed);
         let sheet_id = sheet_id(sheet).unwrap_or(255);
         self.stats
@@ -483,12 +490,22 @@ impl Resolver for FixtureResolver {
         })
     }
 
-    fn sheet_index(&self, sheet: &str) -> Result<Option<usize>, EvaluationFailure> {
+    fn sheet_index(
+        &self,
+        sheet: &str,
+        execution: &ExecutionContext,
+    ) -> Result<Option<usize>, EvaluationFailure> {
+        execution.check()?;
         self.stats.sheet_index_calls.fetch_add(1, Ordering::Relaxed);
         Ok(sheet_id(sheet).map(usize::from))
     }
 
-    fn sheet_name_at<'a>(&'a self, index: usize) -> Result<Option<&'a str>, EvaluationFailure> {
+    fn sheet_name_at<'a>(
+        &'a self,
+        index: usize,
+        execution: &ExecutionContext,
+    ) -> Result<Option<&'a str>, EvaluationFailure> {
+        execution.check()?;
         self.stats.sheet_name_calls.fetch_add(1, Ordering::Relaxed);
         Ok(match index {
             0 => Some("Main"),
@@ -498,9 +515,18 @@ impl Resolver for FixtureResolver {
         })
     }
 
-    fn sheet_count(&self) -> Result<usize, EvaluationFailure> {
+    fn sheet_count(&self, execution: &ExecutionContext) -> Result<usize, EvaluationFailure> {
+        execution.check()?;
         self.stats.sheet_count_calls.fetch_add(1, Ordering::Relaxed);
         Ok(3)
+    }
+
+    fn source_version(
+        &self,
+        execution: &ExecutionContext,
+    ) -> Result<Option<SourceVersion>, EvaluationFailure> {
+        execution.check()?;
+        Ok(None)
     }
 }
 
@@ -545,9 +571,13 @@ impl<'source> CountingWorksheetResolver<'source> {
 }
 
 impl<'source> Resolver for CountingWorksheetResolver<'source> {
-    fn sheet_extent(&self, sheet: &str) -> Result<Option<SheetExtent>, EvaluationFailure> {
+    fn sheet_extent(
+        &self,
+        sheet: &str,
+        execution: &ExecutionContext,
+    ) -> Result<Option<SheetExtent>, EvaluationFailure> {
         self.stats.extent_calls.fetch_add(1, Ordering::Relaxed);
-        <WorksheetFormulaResolver<'source> as Resolver>::sheet_extent(&self.inner, sheet)
+        <WorksheetFormulaResolver<'source> as Resolver>::sheet_extent(&self.inner, sheet, execution)
     }
 
     fn read_cell<'a>(
@@ -555,6 +585,7 @@ impl<'source> Resolver for CountingWorksheetResolver<'source> {
         sheet: &str,
         row: usize,
         column: usize,
+        execution: &ExecutionContext,
     ) -> Result<CellRead<'a>, EvaluationFailure> {
         self.stats.reads.fetch_add(1, Ordering::Relaxed);
         self.stats
@@ -567,6 +598,7 @@ impl<'source> Resolver for CountingWorksheetResolver<'source> {
             sheet,
             row,
             column,
+            execution,
         )?;
         if let CellRead::Text(text) = value {
             self.stats
@@ -580,19 +612,38 @@ impl<'source> Resolver for CountingWorksheetResolver<'source> {
         Ok(value)
     }
 
-    fn sheet_index(&self, sheet: &str) -> Result<Option<usize>, EvaluationFailure> {
+    fn sheet_index(
+        &self,
+        sheet: &str,
+        execution: &ExecutionContext,
+    ) -> Result<Option<usize>, EvaluationFailure> {
         self.stats.sheet_index_calls.fetch_add(1, Ordering::Relaxed);
-        <WorksheetFormulaResolver<'source> as Resolver>::sheet_index(&self.inner, sheet)
+        <WorksheetFormulaResolver<'source> as Resolver>::sheet_index(&self.inner, sheet, execution)
     }
 
-    fn sheet_name_at<'a>(&'a self, index: usize) -> Result<Option<&'a str>, EvaluationFailure> {
+    fn sheet_name_at<'a>(
+        &'a self,
+        index: usize,
+        execution: &ExecutionContext,
+    ) -> Result<Option<&'a str>, EvaluationFailure> {
         self.stats.sheet_name_calls.fetch_add(1, Ordering::Relaxed);
-        <WorksheetFormulaResolver<'source> as Resolver>::sheet_name_at(&self.inner, index)
+        <WorksheetFormulaResolver<'source> as Resolver>::sheet_name_at(
+            &self.inner,
+            index,
+            execution,
+        )
     }
 
-    fn sheet_count(&self) -> Result<usize, EvaluationFailure> {
+    fn sheet_count(&self, execution: &ExecutionContext) -> Result<usize, EvaluationFailure> {
         self.stats.sheet_count_calls.fetch_add(1, Ordering::Relaxed);
-        <WorksheetFormulaResolver<'source> as Resolver>::sheet_count(&self.inner)
+        <WorksheetFormulaResolver<'source> as Resolver>::sheet_count(&self.inner, execution)
+    }
+
+    fn source_version(
+        &self,
+        execution: &ExecutionContext,
+    ) -> Result<Option<SourceVersion>, EvaluationFailure> {
+        <WorksheetFormulaResolver<'source> as Resolver>::source_version(&self.inner, execution)
     }
 }
 
