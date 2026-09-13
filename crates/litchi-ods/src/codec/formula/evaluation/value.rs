@@ -1350,6 +1350,11 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     shape_mask_reservation: Option<Reservation>,
     demand_cache: Vec<DemandCacheEntry>,
     demand_cache_reservation: Option<Reservation>,
+    /// One source shape per condition node.  Entries are keyed by source
+    /// coordinates in this shape; callers with a later broadcast shape are
+    /// projected back to it instead of creating one alias per output cell.
+    condition_cache_shapes: Vec<ConditionCacheShape>,
+    condition_cache_shape_reservation: Option<Reservation>,
     condition_cache: Vec<ConditionCacheEntry<'expr>>,
     condition_cache_reservation: Option<Reservation>,
     reference_cells_read: usize,
@@ -1432,6 +1437,11 @@ struct ConditionCacheEntry<'a> {
     value: ConditionCacheValue<'a>,
 }
 
+struct ConditionCacheShape {
+    node: usize,
+    shape: Shape,
+}
+
 #[derive(Clone, Copy)]
 enum ConditionCacheValue<'a> {
     Empty,
@@ -1469,6 +1479,12 @@ enum ShapeFrame<'a> {
         children: usize,
         base: Option<Shape>,
     },
+}
+
+#[derive(Clone, Copy)]
+enum ReferenceShapeFrame<'a> {
+    Visit(super::Node<'a>),
+    Apply(super::InfixOperator),
 }
 
 #[derive(Clone, Copy)]
@@ -1528,6 +1544,8 @@ where
             shape_mask_reservation: None,
             demand_cache: Vec::new(),
             demand_cache_reservation: None,
+            condition_cache_shapes: Vec::new(),
+            condition_cache_shape_reservation: None,
             condition_cache: Vec::new(),
             condition_cache_reservation: None,
             reference_cells_read: 0,
@@ -2210,62 +2228,61 @@ where
         first_mask: Option<ShapeMask>,
         second_mask: Option<ShapeMask>,
     ) -> EvaluationResult<Shape> {
+        // Keep both selected branches available while shape planning runs.
+        // A later sibling can widen the common result, so every non-empty
+        // branch is replanned at that widened demand before the shape is
+        // published.  This is also what makes condition-cache source shapes
+        // canonical across sibling growth rather than leaving an earlier
+        // singleton result as the apparent value for new coordinates.
+        let mut branches = [(first, first_mask), (second, second_mask)];
+        let max_iterations = self
+            .expression
+            .node_count()
+            .saturating_add(1)
+            .min(self.limits.scalar.max_stack_entries.max(1));
         let mut shape = initial;
-        for (branch, mask) in [(first, first_mask), (second, second_mask)] {
-            let Some(mut mask) = mask else {
-                continue;
-            };
-            if mask.indexes.is_empty() {
-                continue;
-            }
-            let Some(branch) = branch else {
-                continue;
-            };
-            // A selected branch can itself widen a singleton condition axis.
-            // Replan that branch at the widened demand so a nested lazy
-            // condition is evaluated at every eventual output coordinate.
-            // Each iteration is monotonic under the bounded max-shape profile;
-            // the node-count cap prevents malformed cyclic growth from
-            // turning planning into an unbounded loop.
-            let max_iterations = self
-                .expression
-                .node_count()
-                .saturating_add(1)
-                .min(self.limits.scalar.max_stack_entries.max(1));
-            let mut demand = initial;
-            let mut converged = false;
-            let mut unknown = false;
-            for _ in 0..max_iterations {
-                let Some(branch_shape) = self.shape_hint_demand(branch, demand, Some(&mask))?
-                else {
-                    unknown = true;
-                    break;
+        for _ in 0..max_iterations {
+            let mut grew = false;
+            for (branch, mask_slot) in &mut branches {
+                let Some(branch) = *branch else {
+                    continue;
                 };
-                let next = broadcast_shape(demand, branch_shape).ok_or(
-                    EvaluationFailure::InvalidExpression("incompatible matrix branch shapes"),
-                )?;
-                if next == demand {
-                    shape = broadcast_shape(shape, next).ok_or(
+                let Some(mut mask) = mask_slot.take() else {
+                    continue;
+                };
+                if mask.indexes.is_empty() {
+                    *mask_slot = Some(mask);
+                    continue;
+                }
+                if mask.shape != shape {
+                    let mask_shape = mask.shape;
+                    mask = self.expand_shape_mask(mask, mask_shape, shape)?;
+                }
+                if mask.indexes.is_empty() {
+                    *mask_slot = Some(mask);
+                    continue;
+                }
+                let branch_shape = self.shape_hint_demand(branch, shape, Some(&mask))?;
+                if let Some(branch_shape) = branch_shape {
+                    let next = broadcast_shape(shape, branch_shape).ok_or(
                         EvaluationFailure::InvalidExpression("incompatible matrix branch shapes"),
                     )?;
-                    converged = true;
-                    break;
+                    if next != shape {
+                        shape = next;
+                        grew = true;
+                    }
                 }
-                mask = self.expand_shape_mask(mask, demand, next)?;
-                if mask.indexes.is_empty() {
-                    break;
-                }
-                demand = next;
+                *mask_slot = Some(mask);
             }
-            if !converged && !unknown && !mask.indexes.is_empty() {
-                return Err(EvaluationFailure::ResourceLimit(self.local_limit(
-                    Resource::Objects,
-                    u64::try_from(max_iterations.saturating_add(1)).unwrap_or(u64::MAX),
-                    max_iterations,
-                )));
+            if !grew {
+                return Ok(shape);
             }
         }
-        Ok(shape)
+        Err(EvaluationFailure::ResourceLimit(self.local_limit(
+            Resource::Objects,
+            u64::try_from(max_iterations.saturating_add(1)).unwrap_or(u64::MAX),
+            max_iterations,
+        )))
     }
 
     fn expand_shape_mask(
@@ -2584,6 +2601,87 @@ where
         Ok((first, false))
     }
 
+    fn condition_cache_shape_position(&mut self, node: usize) -> EvaluationResult<(usize, bool)> {
+        let mut first = 0;
+        let mut last = self.condition_cache_shapes.len();
+        while first < last {
+            let middle = first + (last - first) / 2;
+            self.scalar.charge_work(1)?;
+            match self.condition_cache_shapes[middle].node.cmp(&node) {
+                std::cmp::Ordering::Less => first = middle + 1,
+                std::cmp::Ordering::Equal => return Ok((middle, true)),
+                std::cmp::Ordering::Greater => last = middle,
+            }
+        }
+        Ok((first, false))
+    }
+
+    /// Record the source shape used for a condition's cached coordinates.
+    ///
+    /// A lazy branch can be replanned at a larger shape after a sibling has
+    /// widened the result.  Preserve entries whose coordinates remain valid
+    /// under that broadcast expansion, and discard entries only when an axis
+    /// shrinks or becomes incompatible.  The retained vector reservation
+    /// remains owned by the cache and therefore stays charged.
+    fn condition_cache_set_shape(
+        &mut self,
+        node: super::Node<'expr>,
+        shape: Shape,
+    ) -> EvaluationResult<()> {
+        let node = node.arena_index();
+        let (position, present) = self.condition_cache_shape_position(node)?;
+        if present {
+            if self.condition_cache_shapes[position].shape == shape {
+                return Ok(());
+            }
+            let old_shape = self.condition_cache_shapes[position].shape;
+            // `retain` examines every entry and may shift every surviving
+            // entry.  Charge that full bounded pass before mutating the
+            // cache; charging only the removed subset would make shape
+            // growth an unaccounted quadratic scan.
+            let scanned = self.condition_cache.len();
+            self.scalar
+                .charge_work(u64::try_from(scanned).unwrap_or(u64::MAX))?;
+            let preserve =
+                old_shape.rows() <= shape.rows() && old_shape.columns() <= shape.columns();
+            self.condition_cache.retain_mut(|entry| {
+                if entry.node != node {
+                    return true;
+                }
+                if !preserve {
+                    return false;
+                }
+                // Treat the old source shape as the destination and the new
+                // canonical shape as the source.  This maps each previously
+                // evaluated coordinate into the widened shape while keeping
+                // singleton axes broadcastable.
+                let Some(index) = projected_array_index(shape, old_shape, entry.index) else {
+                    return false;
+                };
+                entry.demand = shape;
+                entry.index = index;
+                true
+            });
+            self.condition_cache_shapes[position].shape = shape;
+            return Ok(());
+        }
+        ensure_capacity(
+            &mut self.condition_cache_shapes,
+            &mut self.condition_cache_shape_reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value condition cache shapes",
+        )?;
+        let moved = self.condition_cache_shapes.len().saturating_sub(position);
+        self.scalar
+            .charge_work(u64::try_from(moved).unwrap_or(u64::MAX))?;
+        self.condition_cache_shapes
+            .insert(position, ConditionCacheShape { node, shape });
+        Ok(())
+    }
+
     fn condition_cache_get(
         &mut self,
         node: super::Node<'expr>,
@@ -2593,6 +2691,18 @@ where
         if self.condition_cache.is_empty() {
             return Ok(None);
         }
+        let (shape_position, shape_present) =
+            self.condition_cache_shape_position(node.arena_index())?;
+        let source_shape = if shape_present {
+            Some(self.condition_cache_shapes[shape_position].shape)
+        } else {
+            None
+        };
+        let (demand, index) = source_shape
+            .and_then(|shape| {
+                projected_array_index(shape, demand, index).map(|index| (shape, index))
+            })
+            .unwrap_or((demand, index));
         let (position, present) = self.condition_cache_position(node, demand, index)?;
         if !present {
             return Ok(None);
@@ -2637,6 +2747,7 @@ where
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ConditionCacheValue::Error(*error),
             RuntimeValue::Array(_) | RuntimeValue::Areas(_) => return Ok(()),
         };
+        self.condition_cache_set_shape(node, demand)?;
         let (position, present) = self.condition_cache_position(node, demand, index)?;
         if present {
             self.condition_cache[position].value = cache_value;
@@ -3040,6 +3151,180 @@ where
         Ok(())
     }
 
+    /// Resolve geometry for a reference expression without reading cells.  The
+    /// small frame machine accepts parenthesized references and arbitrary
+    /// nesting of `:`, `!`, and `~`; the runtime reference module remains the
+    /// authority for their area/list semantics.  Its temporary area result is
+    /// dropped after extracting a bounded two-dimensional shape. A list or a
+    /// multi-plane result has no unambiguous broadcast shape and is deliberately
+    /// left unknown for the normal reference path.
+    fn reference_shape_value(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
+        let mut frames = Vec::new();
+        let mut frame_reservation = None;
+        let mut values = Vec::new();
+        let mut value_reservation = None;
+        ensure_capacity(
+            &mut frames,
+            &mut frame_reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value reference shape frames",
+        )?;
+        frames.push(ReferenceShapeFrame::Visit(root));
+
+        while let Some(frame) = frames.pop() {
+            self.scalar.step()?;
+            match frame {
+                ReferenceShapeFrame::Visit(node) => match node.kind() {
+                    super::Kind::Parenthesized => {
+                        let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference shape parentheses are empty",
+                        ))?;
+                        ensure_capacity(
+                            &mut frames,
+                            &mut frame_reservation,
+                            1,
+                            self.limits.scalar.max_stack_entries,
+                            self.execution,
+                            &self.storage_budget,
+                            "formula value reference shape frames",
+                        )?;
+                        frames.push(ReferenceShapeFrame::Visit(child));
+                    },
+                    super::Kind::Reference(reference) => {
+                        let value = match self.reference_value(reference) {
+                            Ok(value) => value,
+                            Err(EvaluationFailure::Unsupported(
+                                super::UnsupportedKind::Reference
+                                | super::UnsupportedKind::ReferenceOperator,
+                            )) => return Ok(None),
+                            Err(error) => return Err(error),
+                        };
+                        ensure_capacity(
+                            &mut values,
+                            &mut value_reservation,
+                            1,
+                            self.limits.scalar.max_stack_entries,
+                            self.execution,
+                            &self.storage_budget,
+                            "formula value reference shape values",
+                        )?;
+                        values.push(value);
+                    },
+                    super::Kind::Infix(operator)
+                        if matches!(
+                            operator,
+                            super::InfixOperator::Range
+                                | super::InfixOperator::Intersection
+                                | super::InfixOperator::Union
+                        ) =>
+                    {
+                        let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference shape left operand is missing",
+                        ))?;
+                        let right = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference shape right operand is missing",
+                        ))?;
+                        ensure_capacity(
+                            &mut frames,
+                            &mut frame_reservation,
+                            3,
+                            self.limits.scalar.max_stack_entries,
+                            self.execution,
+                            &self.storage_budget,
+                            "formula value reference shape frames",
+                        )?;
+                        frames.push(ReferenceShapeFrame::Apply(operator));
+                        frames.push(ReferenceShapeFrame::Visit(right));
+                        frames.push(ReferenceShapeFrame::Visit(left));
+                    },
+                    _ => return Ok(None),
+                },
+                ReferenceShapeFrame::Apply(operator) => {
+                    let right = values.pop().ok_or(EvaluationFailure::InvalidExpression(
+                        "reference shape right value is missing",
+                    ))?;
+                    let left = values.pop().ok_or(EvaluationFailure::InvalidExpression(
+                        "reference shape left value is missing",
+                    ))?;
+                    let value = match operator {
+                        super::InfixOperator::Range => self.combine_range(left, right),
+                        super::InfixOperator::Intersection => self.intersect_ranges(left, right),
+                        super::InfixOperator::Union => self.union_ranges(left, right),
+                        _ => {
+                            return Err(EvaluationFailure::InvalidExpression(
+                                "non-reference operator reached shape evaluator",
+                            ));
+                        },
+                    };
+                    let value = match value {
+                        Ok(value) => value,
+                        Err(EvaluationFailure::Unsupported(
+                            super::UnsupportedKind::Reference
+                            | super::UnsupportedKind::ReferenceOperator,
+                        )) => return Ok(None),
+                        Err(error) => return Err(error),
+                    };
+                    ensure_capacity(
+                        &mut values,
+                        &mut value_reservation,
+                        1,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value reference shape values",
+                    )?;
+                    values.push(value);
+                },
+            }
+        }
+        if values.len() != 1 {
+            return Err(EvaluationFailure::InvalidExpression(
+                "reference shape evaluator did not produce one value",
+            ));
+        }
+        Ok(values.pop())
+    }
+
+    fn reference_operator_shape(
+        &mut self,
+        node: super::Node<'expr>,
+        operator: super::InfixOperator,
+    ) -> EvaluationResult<Option<Shape>> {
+        if !matches!(
+            operator,
+            super::InfixOperator::Range
+                | super::InfixOperator::Intersection
+                | super::InfixOperator::Union
+        ) {
+            return Ok(None);
+        }
+        let Some(value) = self.reference_shape_value(node)? else {
+            return Ok(None);
+        };
+        match &value {
+            RuntimeValue::Areas(areas) if !areas.is_list && areas.areas.len() == 1 => {
+                let area = areas
+                    .areas
+                    .first()
+                    .ok_or(EvaluationFailure::InvalidExpression(
+                        "reference operator area disappeared",
+                    ))?;
+                Ok(Some(Shape::new(area.rect.rows(), area.rect.columns())?))
+            },
+            RuntimeValue::Areas(_) => Ok(None),
+            RuntimeValue::Empty
+            | RuntimeValue::Missing
+            | RuntimeValue::Scalar(_)
+            | RuntimeValue::Array(_) => Ok(Some(Shape::new(1, 1)?)),
+        }
+    }
+
     fn combine_planned_children(
         &mut self,
         node: super::Node<'expr>,
@@ -3079,7 +3364,7 @@ where
                         | super::InfixOperator::Intersection
                         | super::InfixOperator::Union
                 ) {
-                    return Ok(None);
+                    return self.reference_operator_shape(node, operator);
                 }
                 Ok(match (shapes[0], shapes[1]) {
                     (Some(left), Some(right)) => broadcast_shape(left, right),
@@ -3289,7 +3574,6 @@ where
                 self.charge_cell_work(index)?;
                 let value =
                     self.condition_value_at(condition, condition_shape, effective_shape, index)?;
-                self.condition_cache_put(condition, effective_shape, index, &value)?;
                 match self.scalar_logical(value)? {
                     Ok(true) => {
                         first_selected = true;
@@ -3346,7 +3630,6 @@ where
                 self.charge_cell_work(index)?;
                 let evaluated =
                     self.condition_value_at(condition, condition_shape, effective_shape, index)?;
-                self.condition_cache_put(condition, effective_shape, index, &evaluated)?;
                 let caught = matches!(
                     evaluated,
                     RuntimeValue::Scalar(WorkingValue::Error(error))
@@ -3398,9 +3681,9 @@ where
             ))?;
             let array_shape = Shape::new(dimensions.rows(), columns)?;
             let Some(source_index) = projected_array_index(array_shape, demand, index) else {
-                let value = RuntimeValue::Scalar(WorkingValue::Error(ScalarError::NotAvailable));
-                self.condition_cache_put(root, demand, index, &value)?;
-                return Ok(value);
+                return Ok(RuntimeValue::Scalar(WorkingValue::Error(
+                    ScalarError::NotAvailable,
+                )));
             };
             let row = source_index / columns;
             let column = source_index % columns;
@@ -3475,9 +3758,9 @@ where
         index: usize,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
         let Some(condition_index) = projected_array_index(condition_shape, demand, index) else {
-            let value = RuntimeValue::Scalar(WorkingValue::Error(ScalarError::NotAvailable));
-            self.condition_cache_put(root, demand, index, &value)?;
-            return Ok(value);
+            return Ok(RuntimeValue::Scalar(WorkingValue::Error(
+                ScalarError::NotAvailable,
+            )));
         };
         self.evaluate_scalar_at(root, condition_shape, condition_index)
     }
