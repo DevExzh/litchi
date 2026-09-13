@@ -103,3 +103,11 @@ Historical captures retain their exact sources and logs. The current source
 archive and gate receipt, rather than earlier counts, establish current
 validation. Temporary capture directories and loose gate logs were removed
 only after archived contents were verified.
+
+## Existing-workload comparison
+
+The [common-value comparison](performance/common-01-analysis.md) against the
+pre-matrix evaluator passes 162 processes with no deterministic or memory-counter
+changes. Ten cases cross a latency or RSS review threshold, including text
+arithmetic p50 +6.57%. These findings remain open; current matrix support does
+not establish a blanket performance pass for existing workloads.
