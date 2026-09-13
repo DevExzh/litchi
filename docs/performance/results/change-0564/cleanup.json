@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-13T19:39:21Z",
+  "batch": [
+    "0564-xls-open-read-attribution"
+  ],
+  "removed": [
+    "the session scratchpad in full: the staged release binaries, build logs, and the raw strace working directory after the two traces this record cites were copied into the packet",
+    "tools/perf-baseline/target, the gitignored build directory for the harness workspace"
+  ],
+  "retained_in_the_repository": [
+    "the full pread64 trace and the strace -f -c isolation pair cited by the record, plus the summarizer that recomputes the result from them"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commit",
+  "background_tasks": "no measurement process remains",
+  "revision": "ac80c2a3a9ad2d707b36ea26b81158cd8e096f2d"
+}
