@@ -1,0 +1,13 @@
+{
+  "label": "candidate-coverage",
+  "group": "coverage",
+  "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate-coverage",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T09:04:51Z",
+  "status": 0,
+  "raw_sha256": "e5b7efa99d227966e5877ffa8ac14f60bb4139f64df3b5b939475fe6d8a17994",
+  "row_count": 16
+}

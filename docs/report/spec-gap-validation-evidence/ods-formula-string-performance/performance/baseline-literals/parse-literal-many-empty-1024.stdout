@@ -1,0 +1,2 @@
+config workload=parse case=literal-many-empty-1024 input_bytes=3075 repeat=8 warmups=3 iterations=15 expected_success=true
+result mean_ns=628033 p50_ns=626913 p95_ns=653503 p99_ns=653503 alloc_calls_p50=8280 alloc_calls_max=8280 dealloc_calls_p50=8208 dealloc_calls_max=8208 requested_bytes_p50=16269848 requested_bytes_max=16269848 released_bytes_p50=16269848 released_bytes_max=16269848 live_before_p50=5967 live_after_p50=5967 live_after_max=5967 peak_live_delta_p50=1804803 peak_live_delta_max=1804803 successes_p50=8 successes_max=8 checksum_p50=40976 checksum_max=40976

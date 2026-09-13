@@ -1,0 +1,5 @@
+{
+  "verified": true,
+  "report_rows_checked": 37,
+  "checks": "input lengths, repeats, outcomes, normalized p50, latency deltas, allocation counts, requested bytes, raw peak deltas, RSS against all final paired CSV rows"
+}

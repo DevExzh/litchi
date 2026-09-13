@@ -1,0 +1,12 @@
+{
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "section": "ODF 1.4 Part 4 §5.4 Constant Strings",
+  "grammar": "String ::= '\"' ([^\"#x00] | '\"\"')* '\"' ",
+  "requirements": [
+    "Quotes delimit strings; doubled quotes decode to one quote.",
+    "U+0000 is excluded; do not broaden this exclusion to every control character.",
+    "Decoded token content is Text; formula storage remains inert."
+  ]
+}

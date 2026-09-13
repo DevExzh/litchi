@@ -1,0 +1,13 @@
+{
+  "label": "baseline-comparable",
+  "group": "comparable",
+  "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T08:57:38Z",
+  "status": 0,
+  "raw_sha256": "17739109b2bad1e5e14fc8bce4b00cb3b4a8d1b20b22f4acf78360ef7809929c",
+  "row_count": 12
+}

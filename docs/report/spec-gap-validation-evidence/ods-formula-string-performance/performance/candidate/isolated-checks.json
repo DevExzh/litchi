@@ -1,0 +1,48 @@
+{
+  "source_manifest": "candidate/source-sha256.json",
+  "total_tests": 82,
+  "checks": [
+    {
+      "name": "formula-unit",
+      "command_log": "candidate/isolated-formula-unit.log",
+      "status": 0,
+      "expected_passes": 49,
+      "observed_passes": 49
+    },
+    {
+      "name": "string-regression",
+      "command_log": "candidate/isolated-string-regression.log",
+      "status": 0,
+      "expected_passes": 6,
+      "observed_passes": 6
+    },
+    {
+      "name": "scan-regression",
+      "command_log": "candidate/isolated-scan-regression.log",
+      "status": 0,
+      "expected_passes": 6,
+      "observed_passes": 6
+    },
+    {
+      "name": "tokenizer-regression",
+      "command_log": "candidate/isolated-tokenizer-regression.log",
+      "status": 0,
+      "expected_passes": 4,
+      "observed_passes": 4
+    },
+    {
+      "name": "function-catalog",
+      "command_log": "candidate/isolated-function-catalog.log",
+      "status": 0,
+      "expected_passes": 7,
+      "observed_passes": 7
+    },
+    {
+      "name": "reference-integration",
+      "command_log": "candidate/isolated-reference-integration.log",
+      "status": 0,
+      "expected_passes": 10,
+      "observed_passes": 10
+    }
+  ]
+}

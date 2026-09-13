@@ -1,0 +1,72 @@
+{
+  "group": "coverage",
+  "case_count": 16,
+  "cases": [
+    {
+      "case": "coverage-source-cell",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-source-range",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-empty-source",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-unicode-escaped-source",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-whole-columns",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-whole-rows",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-cross-sheet-range",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-nested-inherited",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-ref-error",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-colon-sheet-1k",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-colon-sheet-4k",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-colon-sheet-16k",
+      "repeat": 128
+    },
+    {
+      "case": "coverage-source-iri-1k",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-source-iri-4k",
+      "repeat": 1000
+    },
+    {
+      "case": "coverage-source-iri-16k",
+      "repeat": 128
+    },
+    {
+      "case": "coverage-source-iri-over-16k",
+      "repeat": 128
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15
+}

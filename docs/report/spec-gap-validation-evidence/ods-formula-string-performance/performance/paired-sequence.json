@@ -1,0 +1,77 @@
+{
+  "batch": "ods-formula-string-performance-final-revised-paired",
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "harness_sha256": "6a92e819429e6eaf359d6186aa67d17f2f546980bb5a3e6633cb2259de433790",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "baseline-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "6f22313b866a48f7d354b78290262cab1933f7b14bd13605a95bb5ec9ff1d70a",
+      "row_count": 12,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T09:04:30Z",
+      "finished_at": "2026-09-13T09:04:30Z"
+    },
+    {
+      "label": "baseline-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "8cc2e90c549e090247480e4f86da9b5bf2b2ada549f8d9e0c40f75225e22720c",
+      "row_count": 16,
+      "elapsed_seconds": 0.76,
+      "started_at": "2026-09-13T09:04:35Z",
+      "finished_at": "2026-09-13T09:04:35Z"
+    },
+    {
+      "label": "baseline-literals",
+      "group": "literals",
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "raw_sha256": "979fcf90312abd13adfa2d3e140936f8678f0d969af506f941e5b8ad295954d6",
+      "row_count": 9,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T09:04:41Z",
+      "finished_at": "2026-09-13T09:04:41Z"
+    },
+    {
+      "label": "candidate-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "raw_sha256": "dc823066556f557cf3341b7a3de1f4971372b7f6e21765d32a4a13f3c5428627",
+      "row_count": 12,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T09:04:46Z",
+      "finished_at": "2026-09-13T09:04:46Z"
+    },
+    {
+      "label": "candidate-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "raw_sha256": "e5b7efa99d227966e5877ffa8ac14f60bb4139f64df3b5b939475fe6d8a17994",
+      "row_count": 16,
+      "elapsed_seconds": 0.76,
+      "started_at": "2026-09-13T09:04:51Z",
+      "finished_at": "2026-09-13T09:04:51Z"
+    },
+    {
+      "label": "candidate-literals",
+      "group": "literals",
+      "status": 0,
+      "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "raw_sha256": "46efada5ae823288c30aeb3deb82e1df7dec7cde6d1f339fd0aaff048de5f17f",
+      "row_count": 9,
+      "elapsed_seconds": 0.2,
+      "started_at": "2026-09-13T09:04:56Z",
+      "finished_at": "2026-09-13T09:04:56Z"
+    }
+  ],
+  "order": "baseline-comparable, baseline-coverage, baseline-literals, candidate-comparable, candidate-coverage, candidate-literals",
+  "measurement_note": "Final revised candidate after the NUL-scan fastpath. Outputs ran in the recorded order; raw rows and per-lane /usr/bin/time files are authoritative."
+}

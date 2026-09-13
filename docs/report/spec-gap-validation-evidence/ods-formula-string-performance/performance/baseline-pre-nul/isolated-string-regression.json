@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "--test",
+    "ods_formula_string_regression",
+    "--",
+    "--nocapture"
+  ],
+  "cwd": "/var/tmp/ods-string-worktree",
+  "CARGO_TARGET_DIR": "/var/tmp/ods-string-target",
+  "TMPDIR": "/var/tmp/ods-string-tmp",
+  "status": 101,
+  "expected_baseline_status": 101,
+  "expected_passes": 4,
+  "expected_failures": [
+    "many_short_and_empty_utf8_literals_retain_bounded_capacity",
+    "nul_is_rejected_while_non_nul_controls_remain_valid"
+  ],
+  "log": "baseline/isolated-string-regression.log",
+  "source_manifest": "baseline/isolated-string-regression-source-sha256.json",
+  "source_manifest_sha256": "5b56d5071c67211a0f00935aa7387160c9f5ce22f9dcbec29da1b7e08b0c5b6b"
+}
