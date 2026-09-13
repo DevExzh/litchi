@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0551: source proof must retain the complete edit contract
+
+[0551](changes/0551-xlsx-layout-handoff-feasibility.md) preserves the current
+runtime and verifies all 30 prior ADR/index hashes. The proposed private proof
+must bind original bytes, preserve scanner-only errors and exact no-op sharing,
+bound retained metadata, and keep full output validation plus independent
+readback. A completed source allowlist does not prove attribute-value decoding.
+No ADR exception or production optimization is admitted.
+
 ## 0550: current XLSX commit attribution
 
 [0550](changes/0550-xlsx-source-commit-attribution.md) The complete source

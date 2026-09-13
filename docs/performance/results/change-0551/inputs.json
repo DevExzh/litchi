@@ -1,0 +1,30 @@
+{
+  "files": {
+    "docs/performance/results/change-0550/SHA256SUMS": "d9462eee943301b08e6c7ea032a09fd3a1b2d07ecf8ed895a828ee6d64124fa7",
+    "docs/performance/results/change-0550/adr-manifest.json": "fefccee2e05a78afce65ac8562658a3654fd60895cdcf5701e874e42146ac692",
+    "docs/performance/results/change-0550/analyze_profiles.py": "ac23bbe997c8753557c141752ea2bb2c3e59d634a549d75b6ecd517aabcd0fbc",
+    "docs/performance/results/change-0550/baseline/native-r1-dense-sparse-c1.json": "c8c1fb80869758589b2a2ae77b1436fe33f87dde8fa7dac838d2b88bf48e7547",
+    "docs/performance/results/change-0550/baseline/native-r1-medium-c1.json": "fb26e270a7d6eecb9c08962e6289ea4a8041fb98471e3b49ba5a4f5475b97c2f",
+    "docs/performance/results/change-0550/baseline/native-r1-noncompact-c1.json": "deac67ddc163608d883389a6a4b9bf4e2e0277563cb59d580e5a329d3dec1a2b",
+    "docs/performance/results/change-0550/baseline/native-r1-vendor-extension-c1.json": "0a5e0075f8d84f2d6db76e83bc02a116b4d9fd0d76aaf2e4d89251d3fe02498e",
+    "docs/performance/results/change-0550/baseline/native-r2-dense-sparse-c1.json": "618d980d72f8c79b4faa4ff91bec8d82108d1061ea4225b84c17bf8087db204a",
+    "docs/performance/results/change-0550/baseline/native-r2-medium-c1.json": "6c0278fff0c9b30552f0c3ccdb819ae1af035712234fb7ce08b93d92e5e4149a",
+    "docs/performance/results/change-0550/baseline/native-r2-noncompact-c1.json": "3808ada50b34045ba1592e989c86405e5d60256fcc6279c45967d0a87823b01b",
+    "docs/performance/results/change-0550/baseline/native-r2-vendor-extension-c1.json": "e5fe08b589ee471c883619a2c60cfc15a041cc6ef6a46567d8e022b1a0b736d3",
+    "docs/performance/results/change-0550/baseline/profile-r1-dense-sparse-c0.callgrind.4": "3bfad4962266d4a345b0bba1c3ef83888129f5908218a2db344fd463d84c9787",
+    "docs/performance/results/change-0550/baseline/profile-r1-medium-c0.callgrind.4": "969bf7f08a1f6d1a179e978408144d84822bde036560c42234db95be42da068b",
+    "docs/performance/results/change-0550/baseline/profile-r1-noncompact-c0.callgrind.4": "713f7dfe8de3f007d25fc282b7d6738439329edf1e669e9d4c9a4d17c12ea431",
+    "docs/performance/results/change-0550/baseline/profile-r1-vendor-extension-c0.callgrind.5": "9224bbb071b1ac0b003415a371dfe8fd7c0181568a3afb6bb0ad20ca9ae8aaca",
+    "docs/performance/results/change-0550/baseline/profile-r2-dense-sparse-c0.callgrind.4": "ad12980733aceecf6f16867f019446edebd0f3410ece4e44e523a46a3cce56ba",
+    "docs/performance/results/change-0550/baseline/profile-r2-medium-c0.callgrind.4": "c65c98852ab47bf7cdb78cede58315e548ae1b4d32ff92abd3b4b1064b500f2e",
+    "docs/performance/results/change-0550/baseline/profile-r2-noncompact-c0.callgrind.4": "916597a7bff31eb4bcb8471fcb9d02769a7d51a43f0b0ecc646db93aeb76b85e",
+    "docs/performance/results/change-0550/baseline/profile-r2-vendor-extension-c0.callgrind.5": "8ea754b9bb31d2580e6a70107e2f87bdbce4f9a59a886fdb48056ebf68780bd3",
+    "docs/performance/results/change-0550/baseline/source-manifest.json": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+    "docs/performance/results/change-0550/plan.json": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+    "docs/performance/results/change-0550/profile-analysis.json": "64ee681a71674696e65f3d36922a03dec950e8af5d2e49ecf00b1c65c5dfd0ae",
+    "docs/performance/results/change-0551/analyze.py": "8d6658539b1c95ffd9e01938ccf2bd27a9874d80b63e331a269118a49d4d566a"
+  },
+  "previous_turn": "no progress: priorities acknowledged, clean state checked; no implementation or new attribution",
+  "scope": "read-only retained-profile reanalysis and source-bound layout handoff design; no production change",
+  "source_revision": "41b55e8e87838eb30b5147547ad6f171fecbc38e"
+}

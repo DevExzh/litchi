@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0551: source-layout reuse direction refined
+
+[0551](changes/0551-xlsx-layout-handoff-feasibility.md) completes the next
+source/profile feasibility audit. Eight retained scanner partitions balance,
+and corpus calculations expose the dense workload's row-reparse limitation.
+Compact per-cell facts are the next candidate direction, subject to exact
+scanner equivalence, ownership/memory limits and fresh workflow measurements.
+Production and harness remain unchanged; no runtime gain is claimed.
+
 ## 0550: current XLSX commit attribution
 
 [0550](changes/0550-xlsx-source-commit-attribution.md) The current XLSX

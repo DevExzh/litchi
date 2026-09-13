@@ -1,0 +1,1584 @@
+{
+  "adr_hashes_checked": 30,
+  "edit_row_coverage": [
+    {
+      "case": "one-cell",
+      "cells_in_edited_rows": 48,
+      "cells_in_edited_rows_percent_of_planned_cells": 2.0833333333333335,
+      "edited_cells": 1,
+      "edited_rows": 1,
+      "planned_sheet_cells": 2304,
+      "shape": "medium",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 48,
+          "edited_cells": 1,
+          "edited_rows": 1,
+          "sheet": 0
+        }
+      ],
+      "total_corpus_cells": 9216
+    },
+    {
+      "case": "one-percent",
+      "cells_in_edited_rows": 4464,
+      "cells_in_edited_rows_percent_of_planned_cells": 48.4375,
+      "edited_cells": 93,
+      "edited_rows": 93,
+      "planned_sheet_cells": 9216,
+      "shape": "medium",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1152,
+          "edited_cells": 24,
+          "edited_rows": 24,
+          "sheet": 0
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 1
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 2
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 3
+        }
+      ],
+      "total_corpus_cells": 9216
+    },
+    {
+      "case": "one-cell",
+      "cells_in_edited_rows": 128,
+      "cells_in_edited_rows_percent_of_planned_cells": 0.78125,
+      "edited_cells": 1,
+      "edited_rows": 1,
+      "planned_sheet_cells": 16384,
+      "shape": "dense-sparse",
+      "sheets": [
+        {
+          "cells": 16384,
+          "cells_in_edited_rows": 128,
+          "edited_cells": 1,
+          "edited_rows": 1,
+          "sheet": 0
+        }
+      ],
+      "total_corpus_cells": 17792
+    },
+    {
+      "case": "one-percent",
+      "cells_in_edited_rows": 16769,
+      "cells_in_edited_rows_percent_of_planned_cells": 94.25022482014388,
+      "edited_cells": 178,
+      "edited_rows": 142,
+      "planned_sheet_cells": 17792,
+      "shape": "dense-sparse",
+      "sheets": [
+        {
+          "cells": 16384,
+          "cells_in_edited_rows": 16384,
+          "edited_cells": 164,
+          "edited_rows": 128,
+          "sheet": 0
+        },
+        {
+          "cells": 1024,
+          "cells_in_edited_rows": 352,
+          "edited_cells": 11,
+          "edited_rows": 11,
+          "sheet": 1
+        },
+        {
+          "cells": 256,
+          "cells_in_edited_rows": 32,
+          "edited_cells": 2,
+          "edited_rows": 2,
+          "sheet": 2
+        },
+        {
+          "cells": 128,
+          "cells_in_edited_rows": 1,
+          "edited_cells": 1,
+          "edited_rows": 1,
+          "sheet": 3
+        }
+      ],
+      "total_corpus_cells": 17792
+    },
+    {
+      "case": "one-cell",
+      "cells_in_edited_rows": 48,
+      "cells_in_edited_rows_percent_of_planned_cells": 2.0833333333333335,
+      "edited_cells": 1,
+      "edited_rows": 1,
+      "planned_sheet_cells": 2304,
+      "shape": "noncompact",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 48,
+          "edited_cells": 1,
+          "edited_rows": 1,
+          "sheet": 0
+        }
+      ],
+      "total_corpus_cells": 9216
+    },
+    {
+      "case": "one-percent",
+      "cells_in_edited_rows": 4464,
+      "cells_in_edited_rows_percent_of_planned_cells": 48.4375,
+      "edited_cells": 93,
+      "edited_rows": 93,
+      "planned_sheet_cells": 9216,
+      "shape": "noncompact",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1152,
+          "edited_cells": 24,
+          "edited_rows": 24,
+          "sheet": 0
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 1
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 2
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 3
+        }
+      ],
+      "total_corpus_cells": 9216
+    },
+    {
+      "case": "one-cell",
+      "cells_in_edited_rows": 48,
+      "cells_in_edited_rows_percent_of_planned_cells": 2.0833333333333335,
+      "edited_cells": 1,
+      "edited_rows": 1,
+      "planned_sheet_cells": 2304,
+      "shape": "vendor-extension",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 48,
+          "edited_cells": 1,
+          "edited_rows": 1,
+          "sheet": 0
+        }
+      ],
+      "total_corpus_cells": 9216
+    },
+    {
+      "case": "one-percent",
+      "cells_in_edited_rows": 4464,
+      "cells_in_edited_rows_percent_of_planned_cells": 48.4375,
+      "edited_cells": 93,
+      "edited_rows": 93,
+      "planned_sheet_cells": 9216,
+      "shape": "vendor-extension",
+      "sheets": [
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1152,
+          "edited_cells": 24,
+          "edited_rows": 24,
+          "sheet": 0
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 1
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 2
+        },
+        {
+          "cells": 2304,
+          "cells_in_edited_rows": 1104,
+          "edited_cells": 23,
+          "edited_rows": 23,
+          "sheet": 3
+        }
+      ],
+      "total_corpus_cells": 9216
+    }
+  ],
+  "inputs_sha256": "a0815a87272cfe6adfde8270712a7cace465a32f732854c8105dbcead46c8fdc",
+  "limitations": [
+    "Reanalysis of retained 0550 captures; no fresh timing, allocation or hardware run.",
+    "Direct scanner partitions are disjoint; names do not separate inlined work.",
+    "Named reader/namespace costs are not proven removable costs or latency fractions.",
+    "Scanner semantics would still need to execute in a shared full-Layout observer.",
+    "Row coverage is a source-bound corpus calculation, not executed candidate work.",
+    "No proof representation, memory estimate or runtime candidate is admitted."
+  ],
+  "performance_claim": "none",
+  "profile_rows": [
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 20976367,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 13722647,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5386720,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 5297156,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4852664,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4051212,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2667178,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2371789,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1563249,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1107794,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 772396,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391408,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 61395,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 15156,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 11492,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 4884,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1826,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 133269922,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 10683876,
+        "named_reader": 13722647,
+        "named_scanner_semantics": 26135411,
+        "other_direct_children": 13034479,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.052537756433784,
+        "named_reader": 19.333869289171158,
+        "named_scanner_semantics": 36.82224137170956,
+        "other_direct_children": 18.364307792690898,
+        "scanner_self": 10.427043789994599
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r1-medium-c0.callgrind.4",
+      "raw_sha256": "969bf7f08a1f6d1a179e978408144d84822bde036560c42234db95be42da068b",
+      "repeat": 1,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 70977241,
+      "shape": "medium"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2606,
+          "inclusive_ir": 42199101,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 26422295,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 10376352,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 10268984,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 9352184,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1370,
+          "inclusive_ir": 7800860,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 5130883,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 4566820,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 2517502,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1476,
+          "inclusive_ir": 1957892,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2600,
+          "inclusive_ir": 1211614,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 753952,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1374,
+          "inclusive_ir": 610256,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 42797,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 15464,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1372,
+          "inclusive_ir": 11602,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 5003,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1380,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1711,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1390,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 258256329,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 20645336,
+        "named_reader": 26422295,
+        "named_scanner_semantics": 51840807,
+        "other_direct_children": 24341146,
+        "scanner_self": 14257978
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.01396410475229,
+        "named_reader": 19.215157781649857,
+        "named_scanner_semantics": 37.70033170975717,
+        "other_direct_children": 17.70167810843741,
+        "scanner_self": 10.368868295403274
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r1-dense-sparse-c0.callgrind.4",
+      "raw_sha256": "3bfad4962266d4a345b0bba1c3ef83888129f5908218a2db344fd463d84c9787",
+      "repeat": 1,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 137507562,
+      "shape": "dense-sparse"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 38892525,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 14619509,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 6103492,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5746144,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4963256,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4161804,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2492086,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2408660,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1659314,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1094829,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 784796,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391436,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 57684,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 18051,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 14996,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 5038,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1596,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 165898276,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 11849636,
+        "named_reader": 14619509,
+        "named_scanner_semantics": 44174401,
+        "other_direct_children": 13092750,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 13.00198588667336,
+        "named_reader": 16.041222674527233,
+        "named_scanner_semantics": 48.470260044633406,
+        "other_direct_children": 14.365989868190267,
+        "scanner_self": 8.120541525975737
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r1-noncompact-c0.callgrind.4",
+      "raw_sha256": "713f7dfe8de3f007d25fc282b7d6738439329edf1e669e9d4c9a4d17c12ea431",
+      "repeat": 1,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 91137124,
+      "shape": "noncompact"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 20991658,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 13722389,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5386720,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 5297604,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4852664,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4051212,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2666552,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2371743,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1579173,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1107794,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 767005,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391408,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 61796,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 15186,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 11496,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 4884,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1826,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 133297977,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 10684324,
+        "named_reader": 13722389,
+        "named_scanner_semantics": 26145341,
+        "other_direct_children": 13050136,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.047704028580869,
+        "named_reader": 19.3264869389073,
+        "named_scanner_semantics": 36.82285871285077,
+        "other_direct_children": 18.379691973093312,
+        "scanner_self": 10.423258346567748
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r1-vendor-extension-c0.callgrind.5",
+      "raw_sha256": "9224bbb071b1ac0b003415a371dfe8fd7c0181568a3afb6bb0ad20ca9ae8aaca",
+      "repeat": 1,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 71003018,
+      "shape": "vendor-extension"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 20984980,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 13722507,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5386720,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 5297149,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4852664,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4051212,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2667225,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2371804,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1569858,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1107794,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 769702,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391408,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 61508,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 15336,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 11626,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 5297,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1711,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 133280376,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 10683869,
+        "named_reader": 13722507,
+        "named_scanner_semantics": 26141510,
+        "other_direct_children": 13041695,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.049735803043479,
+        "named_reader": 19.33008584300451,
+        "named_scanner_semantics": 36.82400252124199,
+        "other_direct_children": 18.371066153457434,
+        "scanner_self": 10.425109679252587
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r2-medium-c0.callgrind.4",
+      "raw_sha256": "c65c98852ab47bf7cdb78cede58315e548ae1b4d32ff92abd3b4b1064b500f2e",
+      "repeat": 2,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 70990409,
+      "shape": "medium"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2606,
+          "inclusive_ir": 42215736,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 26421760,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 10376352,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 10269133,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 9352184,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1370,
+          "inclusive_ir": 7800860,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 5130340,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 4566793,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 2513896,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1476,
+          "inclusive_ir": 1957892,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2600,
+          "inclusive_ir": 1228296,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 753952,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1374,
+          "inclusive_ir": 610256,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 42830,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 15446,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1372,
+          "inclusive_ir": 11559,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 5170,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1380,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1596,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1390,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 258284803,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 20645485,
+        "named_reader": 26421760,
+        "named_scanner_semantics": 51874106,
+        "other_direct_children": 24337012,
+        "scanner_self": 14257978
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.010930820095032,
+        "named_reader": 19.21074808875423,
+        "named_scanner_semantics": 37.71665410235103,
+        "other_direct_children": 17.69496834294872,
+        "scanner_self": 10.36669864585099
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r2-dense-sparse-c0.callgrind.4",
+      "raw_sha256": "ad12980733aceecf6f16867f019446edebd0f3410ece4e44e523a46a3cce56ba",
+      "repeat": 2,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 137536341,
+      "shape": "dense-sparse"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 38892935,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 14616391,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 6103993,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5746144,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4963256,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4161804,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2491863,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2408669,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1664955,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1094829,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 782253,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391436,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 57548,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 18051,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 14900,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 4869,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 1596,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 165902662,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 11850137,
+        "named_reader": 14616391,
+        "named_scanner_semantics": 44172172,
+        "other_direct_children": 13097872,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 13.002496230965553,
+        "named_reader": 16.037752887398586,
+        "named_scanner_semantics": 48.4676674998409,
+        "other_direct_children": 14.371566448022437,
+        "scanner_self": 8.120516933772524
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r2-noncompact-c0.callgrind.4",
+      "raw_sha256": "916597a7bff31eb4bcb8471fcb9d02769a7d51a43f0b0ecc646db93aeb76b85e",
+      "repeat": 2,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 91137400,
+      "shape": "noncompact"
+    },
+    {
+      "children": [
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2608,
+          "inclusive_ir": 20992603,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell"
+        },
+        {
+          "category": "named_reader",
+          "function_id": 1096,
+          "inclusive_ir": 13722741,
+          "name": "quick_xml::reader::Reader<R>::read_event_impl"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1126,
+          "inclusive_ir": 5386720,
+          "name": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        {
+          "category": "named_namespace_dispatch",
+          "function_id": 1120,
+          "inclusive_ir": 5297357,
+          "name": "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1148,
+          "inclusive_ir": 4852664,
+          "name": "quick_xml::name::QName::local_name"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1372,
+          "inclusive_ir": 4051212,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 880,
+          "inclusive_ir": 2667805,
+          "name": "__rustc::__rust_realloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1314,
+          "inclusive_ir": 2371797,
+          "name": "litchi_xlsx::raw::namespace::is_spreadsheetml_name"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 962,
+          "inclusive_ir": 1549842,
+          "name": "alloc::raw_vec::RawVec<T,A>::grow_one"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1478,
+          "inclusive_ir": 1107794,
+          "name": "quick_xml::events::BytesRef::decode"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 2602,
+          "inclusive_ir": 768316,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1190,
+          "inclusive_ir": 391408,
+          "name": "quick_xml::name::NamespaceResolver::set_level"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1376,
+          "inclusive_ir": 316768,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1212,
+          "inclusive_ir": 61314,
+          "name": "alloc::vec::Vec<T,A>::into_boxed_slice"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1378,
+          "inclusive_ir": 15143,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1374,
+          "inclusive_ir": 11492,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::tag"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1094,
+          "inclusive_ir": 5117,
+          "name": "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+        },
+        {
+          "category": "named_scanner_semantics",
+          "function_id": 1382,
+          "inclusive_ir": 3512,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1200,
+          "inclusive_ir": 2056,
+          "name": "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 724,
+          "inclusive_ir": 548,
+          "name": "__memcpy_avx_unaligned_erms"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 844,
+          "inclusive_ir": 140,
+          "name": "__rustc::__rust_dealloc"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 900,
+          "inclusive_ir": 68,
+          "name": "__memcmp_avx2_movbe"
+        },
+        {
+          "category": "other_direct_children",
+          "function_id": 1392,
+          "inclusive_ir": 44,
+          "name": "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>"
+        }
+      ],
+      "commit_ir": 133269518,
+      "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+      "partition_ir": {
+        "named_namespace_dispatch": 10684077,
+        "named_reader": 13722741,
+        "named_scanner_semantics": 26147554,
+        "other_direct_children": 13022089,
+        "scanner_self": 7400828
+      },
+      "partition_percent_of_scanner": {
+        "named_namespace_dispatch": 15.05281076599023,
+        "named_reader": 19.33398865093312,
+        "named_scanner_semantics": 36.839324759219814,
+        "other_direct_children": 18.346839085386875,
+        "scanner_self": 10.427036738469964
+      },
+      "positive_owner_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+      "raw_file": "docs/performance/results/change-0550/baseline/profile-r2-vendor-extension-c0.callgrind.5",
+      "raw_sha256": "8ea754b9bb31d2580e6a70107e2f87bdbce4f9a59a886fdb48056ebf68780bd3",
+      "repeat": 2,
+      "rewrite": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+      "scanner": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+      "scanner_ir": 70977289,
+      "shape": "vendor-extension"
+    }
+  ],
+  "schema": "xlsx_layout_handoff_feasibility_0551_v1",
+  "source_inventory_checked": 8593,
+  "source_revision": "41b55e8e87838eb30b5147547ad6f171fecbc38e"
+}

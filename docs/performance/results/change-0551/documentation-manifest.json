@@ -1,0 +1,12 @@
+{
+  "docs/performance/ADR_COMPLIANCE.md": "8fff130b3d3acf6130cd74f246d6f1baf29190edb123e0703bf9e391f942c46e",
+  "docs/performance/BASELINE.md": "659b5b6d3d62a713caf476fae01a0abacdd76b1f573ca7e74dcc662a65c2cdc0",
+  "docs/performance/GOAL_AUDIT.md": "ad3720d6f50fb42781fe062b7306fc8c888aa064476423774431caa878697670",
+  "docs/performance/HOTSPOTS.md": "e8825f0d5fee7e15015190a05ff46c0648180ddba28ac1db1c63f50f42befd82",
+  "docs/performance/REPORT.md": "934478ee95aa8a3d65eca4db06ec78d4dad5a9ec705b5e9ac5e35eb12f131d54",
+  "docs/performance/changes/0551-xlsx-layout-handoff-feasibility.md": "ae97eb3da45fb285166fc90dfb739d8acd0f97d9ace1fcbe81a8a55d1798787e",
+  "docs/performance/results/change-0551/README.md": "32f57948d19e5323361e9a1e6eadd0db6ede89b57ceedb92e8e64be2933eb4c6",
+  "docs/performance/results/change-0551/design-review.md": "2b15a065d0fcacd6d984fb9c8e752de681560a4c93bc16b8e48b3c0ac18c1ec9",
+  "docs/performance/results/change-0551/next-target.md": "dbeb633cb465f3e170ae7553b89c8bc89bb89406f5cdb504f51398888c09b20c",
+  "docs/performance/results/change-0551/profile-review.md": "3229f1b89e313a4c86d1575783c13aff78a19bc855dd03c8b1d91c0de31b0195"
+}

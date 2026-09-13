@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0551: layout handoff design prerequisites narrowed
+
+[0551](changes/0551-xlsx-layout-handoff-feasibility.md) adds reproducible
+scanner partitions, source-bound edit-row coverage and a field/refusal audit.
+This is diagnostic progress toward eliminating repeated OOXML work, not a
+runtime improvement or a completed equivalence proof. Compact cell metadata,
+error-order differential tests, managed/no-op retention and fresh matched
+workflow admission remain required. OLE2/OOXML stay first, ODF deferred and
+iWork excluded; the broad goal remains active.
+
 ## 0550: current XLSX commit attribution
 
 [0550](changes/0550-xlsx-source-commit-attribution.md) Fresh source-backed
