@@ -1,0 +1,6 @@
+{
+  "scope": "Dynamic direct-reference errors and reference-error infix propagation:61integrationtests pass; geometry-dependent empty-intersection case not yet covered.",
+  "archive": "planner-draft-32.tar.gz",
+  "sha256": "e4a1959d86e42a1e704a2f1a1485f17d7b7ecf131398f67255ea6961ccaa632f",
+  "status": 0
+}
