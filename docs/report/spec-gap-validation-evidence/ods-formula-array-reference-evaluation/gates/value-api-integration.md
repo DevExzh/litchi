@@ -52,3 +52,26 @@ snapshot. Coordinate these API changes across the evaluator, worksheet index,
 tests, and candidate profiling harness afterward. Preserve historical baseline
 sources and captures; changed harness bytes require new provenance and an
 explicit comparability review.
+
+
+## Revision 16 implementation evidence
+
+The contracts above are implemented in revision 16; the earlier checklist remains
+as the rationale. [The full gate receipt](integration-revision-16.json) binds the
+source and passing runtime/documentation checks.
+
+| Contract | Current evidence |
+| --- | --- |
+| Typed unsupported cell values | `UnsupportedKind::CellValue`; worksheet resolver integration covers inert formula caches and unsupported cell types. |
+| Caller execution context | Resolver methods accept the evaluation context; worksheet tests cover independent preparation cancellation and constrained/cancelled lookup. |
+| Geometry admission and actual reads | Limit documentation distinguishes both bounds; value tests cover bare Matrix admission and Scalar projection without excess provider reads. |
+| Resolver coherence | Public resolver documentation requires coherent sheet ordering, extents and values, including when identity fencing is unavailable. |
+| Structural borrowed equality | Independent array/list equality tests cover shape, contents, ordering and duplicates. |
+| Persistent ownership | `Evaluated::to_owned` and opaque `OwnedEvaluated`; seven integration tests cover source lifetime independence, exact text/reference metadata, limits, cancellation and reservation release. |
+
+The [owned source review](value-owned-review.md) clears the allocation and
+cancellation boundaries. Release profiling is still under review. In particular,
+the ownership harness exposed quadratic admission work in a 4,096-entry union
+expression during preparation; the copy boundary itself has not yet received a
+complete successful large-list capture. These API implementation checks do not
+constitute complete performance or specification acceptance.
