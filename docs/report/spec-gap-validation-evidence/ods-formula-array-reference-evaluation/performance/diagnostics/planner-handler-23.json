@@ -1,0 +1,6 @@
+{
+  "scope": "Corrected one-argument IF typed-refusal regression fails on draft; failure assertion lacked actual-error diagnostic, improved in subsequent test",
+  "archive": "planner-handler-23.tar.gz",
+  "sha256": "5900959a15054853fc91a0de8aa3955603031a5872fca7761a6c48425615b7c4",
+  "status": 101
+}
