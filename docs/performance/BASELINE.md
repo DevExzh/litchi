@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0544: residual preflight cost fails valid cap gates
+
+[0544](changes/0544-xlsx-event-preflight-rejected.md) records fresh main/cap ABBA evidence. Planning p50 falls 18.2–20.4%,
+but medium repeat2 workflow p50/mean gains 2.857/2.917% miss 3%. Cap164repeat1
+and 256 repeat 2 p50/mean regress 5.36–6.94%, above 5%. Allocation/refusal gates
+pass. Production is restored; the deterministic cap benchmark is retained.
+
 ## 0543: pilot gains do not survive the valid cap boundary
 
 [0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) records candidate planning p50 reductions of 28.5–31.6% and workflow

@@ -1,0 +1,22 @@
+{
+  "removed": [
+    "/home/zhuhe/litchi-goal-0544-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "patch_replay_temporary_directories_absent": true,
+  "retained_binary_sha256_before_removal": {
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/baseline-guard-alloc": "22d38bd9ea7a37fad72efa1c9db102f23bac0fc92a9c81128377aeb52542531e",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/baseline-alloc": "8d6ee563415a52d521912dcb7422bea8daa850024c957fce4b55e220ee256d0b",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/baseline-normal": "d60e7eac59828a60efdb5f8f5ac88b24168d443f9328af63093a03f489359705",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/baseline-guard-normal": "27904362509679ba85621c96c5a52d3664b248f3cc9146a92072b0af32220c0c",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/candidate-guard-alloc": "727298590426b1a5e55a2174ca960a0e4ea86b5541e0d727ec459a64f8c0e465",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/candidate-alloc": "4ebd1b9c414c0051263be780e879cedb257faa1cac7777cff1eca6428c4264be",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/candidate-normal": "b4be44ea39fce408d84c342802eee37525ebba838ca4fa5076406c77e7f94ba5",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/candidate-guard-normal": "025c818d75be0091869d0b075fc69c202fab8aa3daa6856c5a7e62bdde6c6231",
+    "/home/zhuhe/litchi-goal-0544-target/cap-boundary-binaries/baseline-cap-boundary": "5747937d506a0e826b0b94385a210686c6f437527a8dfdea9a039262925bd6de",
+    "/home/zhuhe/litchi-goal-0544-target/cap-boundary-binaries/candidate-cap-boundary": "7427909b668ccba162c3af3cbd57ff03ad0b4cd92cb4f5871fd27224de58d150"
+  },
+  "completed_utc": "2026-09-13T00:52:03.363602+00:00",
+  "scope": "Checked accessible /proc cmdline/cwd/exe/fds before deleting sole owned target; all ten measured binary hashes checked; no unrelated files removed."
+}

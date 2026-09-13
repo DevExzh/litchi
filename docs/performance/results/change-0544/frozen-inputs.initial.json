@@ -1,0 +1,32 @@
+{
+  "created_utc": "2026-09-13T00:03:48.045009+00:00",
+  "status": "frozen-before-baseline-build-and-capture",
+  "files": {
+    "plan.json": "66fcb7321c637963b20e43e2fd91e87cd9749e928f24a5c94206ef4cccfd2a65",
+    "allocation-gates.json": "ee56937a4cb49f89b306073ea4a1ac7137320acfd4f774015390e527b5fe221c",
+    "quality-plan.json": "3449da62f1a5c264b3fc8b815ef624f9bbd051fd68b1a546dcdd4b22b9d0b05d",
+    "run.py": "30b8e81f4eb93b874839e0c6f1f6f86a135910d93e36785b072b23b243d563ab",
+    "guard_run.py": "7aa05029afaf41737578142207747ecbe49a383f340e48071c6f32d1b5cc6858",
+    "analyze.py": "7fd652f29f39e6c3878c56f426f2b5b178bd4455ea17aeb9b3480c4398224826",
+    "analyze_allocation.py": "5f386641e4d93aeaeda114f1bca5f7c0d3cd9da8e591a11d37d1cb0b010a12bf",
+    "analyze_guard.py": "55ac52c9508d5f3bd295f08e0148928ae2a8d0272c05e351bc632e77fc4445d7",
+    "analyze_planning.py": "fcf751f70747b0399139af0cf105f47718cbafcf7f1d60d314673699681df353",
+    "analyze_hardware.py": "862d4848272e4d9a50534e431db02500cc2f032a1ea29a161290316882840165",
+    "eager_run.py": "dc3bde5c5d480a1b6175c9729e4b2c986282eac7fd9779a65bc239ac8f6659c1",
+    "analyze_eager.py": "b60d82677f8793ace5d2f4351346be01b3b40acb39e65c17867a30c73032b15b",
+    "final_quality.py": "00cc1b476a7b838b7efb20ad139cce96a0b3eece2f7257a49ba8e28fc126b7d1",
+    "conditional_phase.py": "62c752553d3c61dec88c8616366bb8c4f9cc8dd9fd7eeedadf3fef2f88dbda13",
+    "baseline_phase.py": "7fe81004ec3876c07758fa54b2bd82e728d324217f6bcb28d47ea6958243bad0",
+    "candidate_phase.py": "ed3cc66e040498a1cdf8a8371fc047b5ad82ad87f09b370004b2393958d35e98",
+    "adr-manifest.json": "0e0f61eb42bd48e36b1ab41cefa64ffa328d8731284021ad3d80c5430321fb42",
+    "cap-boundary/plan.json": "04c034b1b362bbccc1d502dbdc5d79631eb78ae38d7b9d01fe154c24fb60368f",
+    "cap-boundary/cap_run.py": "0f43942f4139df110caaee663c94c5c2bd00d4ef2b0de3f832971fefd26c7efa",
+    "cap-boundary/analyze.py": "7cd4544847a580d4c80d21c24a8f4fcb88bb69a03a659900f7cbb69ac20d097b",
+    "cap-boundary/guard.rs": "0fb2b5c3c2ee5f19e6d553296723203db64c9969179e6861cd2f38846c2d4bd7"
+  },
+  "shared_enabler": {
+    "path": "crates/litchi-xlsx/examples/perf_cap_boundary.rs",
+    "sha256": "0fb2b5c3c2ee5f19e6d553296723203db64c9969179e6861cd2f38846c2d4bd7"
+  },
+  "candidate_freeze": "Reviewed candidate patch and oracle tests will freeze before application/candidate build; no candidate runtime measurements reused."
+}

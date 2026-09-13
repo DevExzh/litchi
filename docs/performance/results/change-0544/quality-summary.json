@@ -1,0 +1,77 @@
+{
+  "status": "pass",
+  "final_source": "baseline",
+  "final_checks": [
+    {
+      "command": "quality-tests",
+      "receipt": "baseline/final-quality-tests.receipt.json",
+      "sha256": "95a8d8791575509fbede683c4a3a6e6e733393415741fa0ecb33a03310640511",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-check",
+      "receipt": "baseline/final-quality-check.receipt.json",
+      "sha256": "708437ca76c2ac09b2a62a24daef5a8a99ecbf71997c6560c4c4f038b6a92145",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-clippy",
+      "receipt": "baseline/final-quality-clippy.receipt.json",
+      "sha256": "8ee5fab63d92cd6f5b226be727146edb2d1fd76e98714bbb984fa162c3d58ed9",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-rustdoc",
+      "receipt": "baseline/final-quality-rustdoc.receipt.json",
+      "sha256": "985b28d47247458c60768078b93b3e22a0561fcc99e0dd2cbc91585792bd2507",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-fmt",
+      "receipt": "baseline/final-quality-fmt.receipt.json",
+      "sha256": "ce6fd12e7b6ad6d75cb6c944a19d13e1aa96f473ad6af88f9e8296be1fddb00b",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-boundaries",
+      "receipt": "baseline/final-quality-boundaries.receipt.json",
+      "sha256": "dce6e23954b3e02589b322ed74a2aebad04171b849fc888ceea439cf37f29c8d",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-clippy",
+      "receipt": "baseline/final-quality-guard-clippy.receipt.json",
+      "sha256": "3f8490977f9f8375b3feea273e1bf521bfeef9d0d70ad3ff5749e5d49ed32ed4",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-fmt",
+      "receipt": "baseline/final-quality-guard-fmt.receipt.json",
+      "sha256": "311ba3fdfa1688e418d1cfd93d98da5a3fd09ab87486cac4a253f1a365c36f09",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-cap-clippy",
+      "receipt": "baseline/final-quality-cap-clippy.receipt.json",
+      "sha256": "6c05c490bc5f9a94cb8db00c07530d4c7c708cc313651f2668aa725a8f519c7f",
+      "exit_code": 0
+    }
+  ],
+  "test_counts": {
+    "baseline/final-quality-tests": 1299,
+    "baseline/quality-tests": 1299,
+    "candidate/quality-tests": 1305
+  },
+  "total_passed_test_executions": 3903,
+  "failed_command_receipts": [
+    {
+      "receipt": "failed-baseline-1/quality-cap-clippy.receipt.json",
+      "sha256": "b88dc6147dd00bc459912906419d8aea5d971e0782f5da8fa6d2a9ab1d9463e1",
+      "exit_code": 101
+    }
+  ],
+  "interrupted_attempts": [
+    "interrupted-baseline-build-1/interruption.json"
+  ],
+  "scope": "All nine frozen final checks pass on restored baseline plus retained cap example. Candidate1305 tests andClippy passed before captures. InitialcapClippyfailure and interrupted baseline release attempt retained."
+}

@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0544: conservative two-scan admission adds measurable work
+
+[0544](changes/0544-xlsx-event-preflight-rejected.md) avoids the discarded parser prefix with a lexical bound, but its
+scan overhead still exceeds two cap envelopes and one workflow gain gate.
+Next is a reviewed coarser single-scan bound with fresh correctness/performance
+evidence, trading earlier conservative fallback for less scan work. After
+admission, prioritize fresh commit attribution. ODF remains deferred.
+
 ## 0543: above-cap fallback repeats valid worksheet work
 
 [0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) shows that forwarding validated EOF errors fixes the measured late-raw

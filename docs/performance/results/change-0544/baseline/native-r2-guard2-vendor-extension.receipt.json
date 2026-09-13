@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0544/baseline/native-r2-guard2-vendor-extension.rss.json",
+    "/home/zhuhe/litchi-goal-0544-target/retained-binaries/baseline-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0544/baseline/native-r2-guard2-vendor-extension.json"
+  ],
+  "start_utc": "2026-09-13T00:35:04.985189+00:00",
+  "end_utc": "2026-09-13T00:35:08.198440+00:00",
+  "seconds": 3.21324996300973,
+  "exit_code": 0,
+  "binary_sha256": "d60e7eac59828a60efdb5f8f5ac88b24168d443f9328af63093a03f489359705",
+  "source_manifest_sha256": "139d784ae44d173f4aa1d2d573139ed6eeee63902f491df46eab64a66b64ff90",
+  "working_source_manifest_sha256": "fada10910fbb27b802baeac9404afd47af31bab4d0a182fffddb2eb1d8def1dc",
+  "script_sha256": "30b8e81f4eb93b874839e0c6f1f6f86a135910d93e36785b072b23b243d563ab",
+  "plan_sha256": "66fcb7321c637963b20e43e2fd91e87cd9749e928f24a5c94206ef4cccfd2a65",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0544-target/test-tmp"
+  },
+  "artifacts": {
+    "native-r2-guard2-vendor-extension.json": "b4a5b9de111325c38a7bad4f991e6e4f2dc2588f1aad9ff9f9e8915fe0d89dc7",
+    "native-r2-guard2-vendor-extension.rss.json": "0f2d43361ae51d6ecd933637ceb66aac1be9f3d3d82a11d6217622e1bc2ef516",
+    "native-r2-guard2-vendor-extension.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-guard2-vendor-extension.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
