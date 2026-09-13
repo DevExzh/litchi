@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0560-xls-single-observation-freshness",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "strictly_equivalent_zero_read_observation_collapse",
+    "counted_observation_invariant_test_added",
+    "paired_latency_improves_in_both_directions_on_every_source_backed_selector"
+  ],
+  "accepted_evidence": {
+    "observations_per_retained_metadata_query": [
+      6,
+      1
+    ],
+    "version_calls_change_percent": [
+      -2.02,
+      -2.49
+    ],
+    "read_calls_unchanged": true,
+    "read_bytes_unchanged": true,
+    "latency_rows": 14,
+    "latency_comparisons": 56,
+    "improve_both_directions": 34
+  },
+  "reported_regressions": {
+    "xls_semantic_full_cell_scan xls-tiny": "p50/mean/p95 adverse in both directions; 190 ns -> 200 ns, one clock tick",
+    "xls_semantic_list_worksheets xls-tiny": "p99 adverse in both directions; 30 ns -> 63 ns, below useful clock resolution"
+  },
+  "withheld": [
+    "cold cache",
+    "physical device",
+    "remote or range source",
+    "peak RSS",
+    "allocation",
+    "concurrency scaling",
+    "real-producer breadth",
+    "cross platform"
+  ],
+  "revision": "01e25364c8d762a9e1b9f359ca507f664643c936"
+}

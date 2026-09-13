@@ -436,6 +436,7 @@ struct CountingSource {
     ranges: Arc<Mutex<Vec<(u64, usize)>>>,
     cancel_on_read: Arc<Mutex<Option<CancellationSource>>>,
     revision: Arc<AtomicU64>,
+    versions: Arc<AtomicU64>,
 }
 
 impl CountingSource {
@@ -445,7 +446,16 @@ impl CountingSource {
             ranges: Arc::new(Mutex::new(Vec::new())),
             cancel_on_read: Arc::new(Mutex::new(None)),
             revision: Arc::new(AtomicU64::new(0)),
+            versions: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    fn version_calls(&self) -> u64 {
+        self.versions.load(Ordering::Relaxed)
+    }
+
+    fn clear_version_calls(&self) {
+        self.versions.store(0, Ordering::Relaxed);
     }
 
     fn bytes_read(&self) -> usize {
@@ -495,11 +505,91 @@ impl ReadAt for CountingSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        self.versions.fetch_add(1, Ordering::Relaxed);
         Ok(SourceVersion::new(
             0x584c_535f_5445_5354,
             self.revision.load(Ordering::Relaxed),
         ))
     }
+}
+
+#[test]
+fn retained_metadata_queries_observe_the_source_once() {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    // Acquiring the handle is itself one metadata query; hold it so the
+    // counted region covers exactly one query each.
+    let worksheet = owner.worksheet(0).unwrap().unwrap();
+
+    let mut queries: Vec<(&str, Box<dyn Fn()>)> = Vec::new();
+    queries.push((
+        "worksheet_count",
+        Box::new(|| {
+            owner.worksheet_count().unwrap();
+        }),
+    ));
+    queries.push((
+        "worksheet_names",
+        Box::new(|| {
+            owner.worksheet_names().unwrap();
+        }),
+    ));
+    queries.push((
+        "worksheet_handle",
+        Box::new(|| {
+            owner.worksheet(0).unwrap().unwrap();
+        }),
+    ));
+    queries.push((
+        "worksheet_name",
+        Box::new(|| {
+            worksheet.name().unwrap();
+        }),
+    ));
+    queries.push((
+        "worksheet_visibility",
+        Box::new(|| {
+            worksheet.visibility().unwrap();
+        }),
+    ));
+
+    for (query, run) in &queries {
+        source.clear_ranges();
+        source.clear_version_calls();
+        run();
+        assert_eq!(
+            source.version_calls(),
+            1,
+            "{query} must fence the retained source exactly once"
+        );
+        assert_eq!(source.bytes_read(), 0, "{query} must read no source bytes");
+    }
+}
+
+#[test]
+fn retained_metadata_queries_still_refuse_a_changed_source() {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    owner.worksheet_count().unwrap();
+    let worksheet = owner.worksheet(0).unwrap().unwrap();
+    worksheet.name().unwrap();
+
+    source.bump();
+
+    assert!(
+        matches!(
+            owner.worksheet_count(),
+            Err(SourceBackedError::SourceChanged { .. })
+        ),
+        "a changed source must still be refused by workbook metadata"
+    );
+    assert!(
+        matches!(
+            worksheet.name(),
+            Err(SourceBackedError::SourceChanged { .. })
+        ),
+        "a changed source must still be refused by worksheet metadata"
+    );
 }
 
 fn ranges_overlap(left: (u64, usize), right: (u64, usize)) -> bool {

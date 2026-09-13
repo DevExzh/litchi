@@ -1267,8 +1267,13 @@ impl SourceBackedWorkbook {
         self.inner.ensure_current()
     }
 
+    /// Reads retained in-memory workbook metadata behind one trailing fence.
+    ///
+    /// `operation` reads only values this snapshot already owns; it consumes no
+    /// source bytes. One observation after it therefore proves everything two
+    /// observations around it proved, and it is the trailing one that bounds
+    /// what the caller receives.
     fn metadata<T>(&self, operation: impl FnOnce(&SourceInner) -> T) -> Result<T> {
-        self.ensure_current()?;
         let value = operation(&self.inner);
         self.ensure_current()?;
         Ok(value)
@@ -1310,21 +1315,27 @@ impl SourceInner {
     }
 }
 
+/// Fences the retained source once for both the workbook snapshot and the CFB
+/// view it was opened over.
+///
+/// `SourceInner` takes its source from `SharedOleFile::source_arc` and its
+/// expected version from the same view, so the two expectations are the same
+/// value observed against the same object. One observation therefore discharges
+/// both, and `SharedOleFile::source_version` would only repeat it: nothing
+/// between the observations reads a source byte. The debug assertion records
+/// the identity this relies on.
 fn ensure_current_parts(
     source: &Arc<dyn ReadAt>,
     cfb: &SharedOleFile,
     expected_version: SourceVersion,
 ) -> Result<()> {
+    debug_assert_eq!(
+        cfb.captured_source_version(),
+        expected_version,
+        "the workbook snapshot and its CFB view must share one captured source version"
+    );
     let observed = source.version().map_err(SourceBackedError::Io)?;
-    if observed != expected_version {
-        return Err(SourceBackedError::SourceChanged {
-            expected: expected_version,
-            observed,
-        });
-    }
-    cfb.source_version().map_err(SourceBackedError::from)?;
-    let observed = source.version().map_err(SourceBackedError::Io)?;
-    if observed != expected_version {
+    if observed != expected_version || cfb.captured_source_version() != expected_version {
         return Err(SourceBackedError::SourceChanged {
             expected: expected_version,
             observed,
@@ -1402,12 +1413,20 @@ impl SourceBackedWorksheet {
             .map(SourceBackedCell::into_value))
     }
 
+    /// Reads one retained worksheet descriptor behind one trailing fence.
+    ///
+    /// The lookup and `operation` read only retained in-memory state, so they
+    /// consume no source bytes and the trailing observation proves what the
+    /// leading and trailing pair proved. The missing-worksheet branch fences
+    /// before reporting so a changed source still takes precedence over
+    /// `WorksheetNotFound`, which is the order the leading fence produced.
     fn metadata<T>(&self, operation: impl FnOnce(&SheetEntry) -> T) -> Result<T> {
-        self.owner.ensure_current()?;
-        let sheet =
-            self.owner.sheets.get(self.sheet_index).ok_or_else(|| {
-                SourceBackedError::WorksheetNotFound(self.sheet_index.to_string())
-            })?;
+        let Some(sheet) = self.owner.sheets.get(self.sheet_index) else {
+            self.owner.ensure_current()?;
+            return Err(SourceBackedError::WorksheetNotFound(
+                self.sheet_index.to_string(),
+            ));
+        };
         let value = operation(sheet);
         self.owner.ensure_current()?;
         Ok(value)

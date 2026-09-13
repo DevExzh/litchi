@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0560: one observation, unchanged proof and error identity
+
+[0560](0560-xls-single-observation-freshness.md) collapses observations that had
+no `read_at` between them, so the proof obligation is unchanged: two observations
+separated by no consumed bytes prove what one proves. `SourceInner.source` is
+`SharedOleFile::source_arc()` and its expected version is that view's, so one
+observation discharges both expectations; the new `captured_source_version`
+accessor is documented as observing nothing. The error variant and payload round
+trip unchanged through `From<OleError> for SourceBackedError`. Ownership,
+dependency direction and public CRUD surfaces are unchanged. No ADR exception is
+needed.
+
 ## 0559: exhaustive equivalence, no contract movement
 
 [0559](0559-cfb-ascii-simple-uppercase.md) changes only how the `[MS-CFB]` 2.6.4

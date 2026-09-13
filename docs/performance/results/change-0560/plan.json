@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0560-xls-single-observation-freshness",
+  "revision": "01e25364c8d762a9e1b9f359ca507f664643c936",
+  "created_utc": "2026-09-13T16:56:37Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred; iWork excluded.",
+    "production_crates": [
+      "litchi-cfb",
+      "litchi-xls"
+    ],
+    "baseline_stage": "changes 0558 and 0559 applied"
+  },
+  "hypothesis": {
+    "statement": "litchi-xls `ensure_current_parts` takes three source observations - `source.version()`, `SharedOleFile::source_version()` and `source.version()` again - with no `read_at` between them, and the two retained-metadata helpers call it twice around a closure that reads only in-memory state.",
+    "equivalence": "`SourceInner.source` is defined as `cfb.source_arc()` and `SourceInner.expected_version` as `cfb.source_version()`, so the two expectations are the same value against the same object; one observation discharges both. The metadata closures consume no source bytes, so the trailing observation proves what the pair proved.",
+    "predicted_effect": "three observations become one per freshness check, and six become one per retained metadata query; read calls and read bytes unchanged."
+  },
+  "acceptance": {
+    "primary_gate": "counted-observation tests must show exactly one observation per retained metadata query and zero source bytes read; a changed source must still be refused.",
+    "secondary_gate": "paired A/E/E/A p50 must improve in both directions for the source-backed and owned-source XLS selectors.",
+    "regression_trigger": "any cell adverse in both directions by more than 5% is reported explicitly."
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "aslr": "disabled with setarch -R for the selector matrix"
+  },
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured"
+}
