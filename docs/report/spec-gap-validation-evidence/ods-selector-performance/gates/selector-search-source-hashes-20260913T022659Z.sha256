@@ -1,0 +1,4 @@
+COMMIT d5b5afdb4032b718c0f94c113a3b1b09f17ae6ba
+SOURCE_ROOT /home/zhuhe/code/litchi-spec-gaps
+6f08a6488414c1eb357fa6c877ffe41d3d7c27eed9682ee4f62b3e815b10aa2b  crates/litchi-ods/src/sheet_metadata/index.rs
+691045cfea0894ccf20073e07053bb07b82b77c521be6465c6474893b88e498d  crates/litchi-ods/tests/sheet_metadata_selector_search.rs

@@ -1,0 +1,11 @@
+Cargo.toml: OK
+crates/litchi-core/Cargo.toml: OK
+crates/litchi-core/src/lib.rs: OK
+crates/litchi-ods/Cargo.toml: OK
+crates/litchi-ods/src/lib.rs: OK
+crates/litchi-ods/src/sheet_metadata/detective.rs: OK
+crates/litchi-ods/src/sheet_metadata/index.rs: OK
+crates/litchi-ods/src/sheet_metadata/mod.rs: OK
+docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/Cargo.lock: OK
+docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/Cargo.toml: OK
+docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/src/main.rs: OK
