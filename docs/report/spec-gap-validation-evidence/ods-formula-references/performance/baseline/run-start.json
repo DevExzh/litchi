@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-13T07:25:02.589486+00:00",
+  "group": "comparable",
+  "paired_sequence": "baseline-then-candidate-final-reserve-guard",
+  "sequence_index": 0,
+  "sequence_start_utc": "2026-09-13T07:25:02.589470+00:00",
+  "binary": "/var/tmp/litchi-ods-formula-references-target-20260913/release/ods-formula-reference-profile",
+  "binary_sha256": "fc61266859129715710064d74bdc3e56f5eaab945f6f8988b16d113da7722355",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-references/performance/baseline",
+  "warmups": 3,
+  "iterations": 15
+}

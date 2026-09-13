@@ -1,0 +1,12 @@
+{
+  "base": "b7a66574a541ac0efc443056c4d11f6b829fffa9",
+  "status": 0,
+  "patch_sha256": "13b1d18f34d00c33337b7d0045d5082bedf1ac3e6b696e015ec3468ab36b20c7",
+  "replayed_sha256": {
+    "crates/litchi-ods/src/codec/formula.rs": "d276e8e9190751ab949ce902deae7bfd90cc00f4f4029d24330329d066209005",
+    "crates/litchi-ods/src/codec/formula/reference.rs": "f72ffeb06d5ab2354c747a96e6e13961d4325da81c5004529bf6df02bb4430d6",
+    "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961",
+    "crates/litchi-ods/src/model/cell.rs": "85d71d6e4c7986cc9450ded6d26eb41656adcaa1104ac4284b5338b2cf8cdc15",
+    "crates/litchi-ods/tests/ods_formula_references.rs": "b9d9fbd654e00e0dc4919451fc9b46aeedad8669dca0be541f757c1e779680db"
+  }
+}

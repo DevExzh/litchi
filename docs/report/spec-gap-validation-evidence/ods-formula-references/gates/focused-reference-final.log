@@ -1,0 +1,19 @@
+command=['cargo', 'test', '--locked', '--offline', '-p', 'litchi-ods', '--test', 'ods_formula_references']
+status=0
+source_sha256={"crates/litchi-ods/src/codec/formula.rs": "d276e8e9190751ab949ce902deae7bfd90cc00f4f4029d24330329d066209005", "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1", "crates/litchi-ods/src/codec/formula/reference.rs": "f72ffeb06d5ab2354c747a96e6e13961d4325da81c5004529bf6df02bb4430d6", "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961", "crates/litchi-ods/src/model/cell.rs": "85d71d6e4c7986cc9450ded6d26eb41656adcaa1104ac4284b5338b2cf8cdc15", "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947", "crates/litchi-ods/tests/ods_formula_references.rs": "b9d9fbd654e00e0dc4919451fc9b46aeedad8669dca0be541f757c1e779680db"}
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/ods_formula_references.rs (/var/tmp/ods-reference-root-gates-target/debug/deps/ods_formula_references-a4da129fbd395bb6)
+
+running 10 tests
+test all_six_range_alternatives_preserve_coordinate_kind_and_locator_state ... ok
+test malformed_mixed_and_overflow_references_are_refused ... ok
+test bracketed_references_are_tokens_and_original_formula_text_is_retained ... ok
+test reference_error_is_distinct_and_cannot_be_made_source_qualified ... ok
+test representative_functions_and_bare_cell_controls_remain_unchanged ... ok
+test public_reference_parser_requires_the_normative_bracket_wrapper ... ok
+test formula_limits_are_exact_and_forward_into_nested_references ... ok
+test source_iris_are_decoded_and_remain_external_inert_metadata ... ok
+test quoted_unicode_delimited_and_nested_locators_keep_full_metadata ... ok
+test source_and_locator_boundaries_are_bounded_without_losing_atomicity ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

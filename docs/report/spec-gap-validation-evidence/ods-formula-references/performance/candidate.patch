@@ -1,0 +1,2935 @@
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 0a66e1060..8b03fd9f4 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -21 +21 @@
+-use litchi_core::{Error, Result};
++use litchi_core::{Error, Resource, ResourceLimit, Result};
+@@ -22,0 +23 @@ use smallvec::SmallVec;
++use std::{borrow::Cow, convert::TryFrom, sync::Arc};
+@@ -24,0 +26 @@ mod functions;
++pub mod reference;
+@@ -31,0 +34,65 @@ use functions::{MAX_STANDARD_FUNCTION_NAME_BYTES, STANDARD_FORMULA_FUNCTIONS};
++/// Default maximum UTF-8 byte length of one parsed formula.
++pub const DEFAULT_MAX_FORMULA_BYTES: usize = 1024 * 1024;
++/// Default maximum number of tokens emitted for one parsed formula.
++pub const DEFAULT_MAX_FORMULA_TOKENS: usize = 65_536;
++
++/// Finite parser limits for formulas and their token vectors.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct FormulaLimits {
++    max_bytes: usize,
++    max_tokens: usize,
++    reference: reference::Limits,
++}
++
++impl Default for FormulaLimits {
++    fn default() -> Self {
++        Self {
++            max_bytes: DEFAULT_MAX_FORMULA_BYTES,
++            max_tokens: DEFAULT_MAX_FORMULA_TOKENS,
++            reference: reference::Limits::default(),
++        }
++    }
++}
++
++impl FormulaLimits {
++    /// Set the maximum UTF-8 byte length of a formula.
++    #[must_use]
++    pub const fn with_max_bytes(mut self, value: usize) -> Self {
++        self.max_bytes = value;
++        self
++    }
++
++    /// Set the maximum number of emitted tokens.
++    #[must_use]
++    pub const fn with_max_tokens(mut self, value: usize) -> Self {
++        self.max_tokens = value;
++        self
++    }
++
++    /// Set the finite limits used for every bracketed reference in this
++    /// formula.
++    #[must_use]
++    pub const fn with_reference_limits(mut self, value: reference::Limits) -> Self {
++        self.reference = value;
++        self
++    }
++
++    /// Return the maximum formula byte length.
++    #[must_use]
++    pub const fn max_bytes(self) -> usize {
++        self.max_bytes
++    }
++
++    /// Return the maximum token count.
++    #[must_use]
++    pub const fn max_tokens(self) -> usize {
++        self.max_tokens
++    }
++
++    /// Return the finite limits used for bracketed references.
++    #[must_use]
++    pub const fn reference_limits(self) -> reference::Limits {
++        self.reference
++    }
++}
++
+@@ -62,0 +130,5 @@ pub enum Token {
++    /// Complete OpenFormula 1.4 bracketed reference metadata.
++    ///
++    /// The box keeps adding source, subtable, and whole-axis state from
++    /// inflating every token in an otherwise ordinary formula.
++    Reference(Box<reference::Reference>),
+@@ -99,0 +172 @@ pub struct FormulaParser<'a> {
++    limits: FormulaLimits,
+@@ -108,0 +182 @@ impl<'a> FormulaParser<'a> {
++            limits: FormulaLimits::default(),
+@@ -116,3 +190,3 @@ impl<'a> FormulaParser<'a> {
+-    pub fn parse(mut self) -> Result<Formula> {
+-        let original = String::from_utf8_lossy(self.input).to_string();
+-        let mut tokens = Vec::new();
++    pub fn parse(self) -> Result<Formula> {
++        self.parse_with_limits(&FormulaLimits::default())
++    }
+@@ -119,0 +194,2 @@ impl<'a> FormulaParser<'a> {
++    /// Parse the formula with explicit finite byte and token limits.
++    pub fn parse_with_limits(mut self, limits: &FormulaLimits) -> Result<Formula> {
+@@ -125,0 +202,16 @@ impl<'a> FormulaParser<'a> {
++        if input.len() > limits.max_bytes {
++            return Err(formula_limit_error(
++                Resource::InputBytes,
++                input.len(),
++                limits.max_bytes,
++            ));
++        }
++        self.limits = *limits;
++        let mut original = String::new();
++        original
++            .try_reserve_exact(input.len())
++            .map_err(|source| Error::Allocation {
++                resource: "formula text",
++                source,
++            })?;
++        original.push_str(input);
+@@ -131,0 +224 @@ impl<'a> FormulaParser<'a> {
++        let mut tokens = Vec::new();
+@@ -138,0 +232,7 @@ impl<'a> FormulaParser<'a> {
++            if tokens.len() >= self.limits.max_tokens {
++                return Err(formula_limit_error(
++                    Resource::Objects,
++                    tokens.len().saturating_add(1),
++                    self.limits.max_tokens,
++                ));
++            }
+@@ -139,0 +240,3 @@ impl<'a> FormulaParser<'a> {
++            if tokens.len() == tokens.capacity() {
++                reserve_token_slot(&mut tokens, self.limits.max_tokens)?;
++            }
+@@ -193,0 +297,6 @@ impl<'a> FormulaParser<'a> {
++        result
++            .try_reserve_exact(self.input.len().saturating_sub(self.position))
++            .map_err(|source| Error::Allocation {
++                resource: "formula string literal",
++                source,
++            })?;
+@@ -287 +396 @@ impl<'a> FormulaParser<'a> {
+-        if let Some(function) = self.try_parse_function_call() {
++        if let Some(function) = self.try_parse_function_call()? {
+@@ -330 +439,4 @@ impl<'a> FormulaParser<'a> {
+-            Ok(Token::Function(function.to_owned()))
++            Ok(Token::Function(copy_formula_component(
++                function,
++                "formula function name",
++            )?))
+@@ -345 +457 @@ impl<'a> FormulaParser<'a> {
+-    fn try_parse_function_call(&mut self) -> Option<Token> {
++    fn try_parse_function_call(&mut self) -> Result<Option<Token>> {
+@@ -347 +459 @@ impl<'a> FormulaParser<'a> {
+-            return None;
++            return Ok(None);
+@@ -362 +474 @@ impl<'a> FormulaParser<'a> {
+-                return None;
++                return Ok(None);
+@@ -367 +479 @@ impl<'a> FormulaParser<'a> {
+-            return None;
++            return Ok(None);
+@@ -380 +492 @@ impl<'a> FormulaParser<'a> {
+-            return None;
++            return Ok(None);
+@@ -387 +499 @@ impl<'a> FormulaParser<'a> {
+-                return None;
++                return Ok(None);
+@@ -392 +504 @@ impl<'a> FormulaParser<'a> {
+-            return None;
++            return Ok(None);
+@@ -395 +507,4 @@ impl<'a> FormulaParser<'a> {
+-        Some(Token::Function(function.to_owned()))
++        Ok(Some(Token::Function(copy_formula_component(
++            function,
++            "formula function name",
++        )?)))
+@@ -408,2 +523,9 @@ impl<'a> FormulaParser<'a> {
+-                    quoted = !quoted;
+-                    self.advance();
++                    if quoted && self.input.get(self.position + 1) == Some(&b'\'') {
++                        // Apostrophes are escaped by doubling them in ODF
++                        // source and sheet names.  Keep a closing bracket in
++                        // those quoted spans from ending the reference body.
++                        self.position += 2;
++                    } else {
++                        quoted = !quoted;
++                        self.advance();
++                    }
+@@ -427 +549 @@ impl<'a> FormulaParser<'a> {
+-        parse_open_formula_reference(reference)
++        parse_open_formula_reference(reference, &self.limits.reference)
+@@ -454 +576 @@ impl<'a> FormulaParser<'a> {
+-                sheet = Some(sheet_name.to_string());
++                sheet = Some(copy_formula_component(sheet_name, "formula sheet name")?);
+@@ -486,2 +608,2 @@ impl<'a> FormulaParser<'a> {
+-            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?
+-            .to_uppercase();
++            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
++        let column = copy_upper_ascii(column, "formula column")?;
+@@ -616,18 +738,7 @@ fn strip_open_formula_prefix(value: &str) -> Option<&str> {
+-fn parse_open_formula_reference(value: &str) -> Result<Token> {
+-    let value = value.trim();
+-    let (start, end) = split_open_formula_range(value)
+-        .ok_or_else(|| Error::InvalidFormat("Invalid ODF bracketed reference range".to_string()))?;
+-    let start = parse_open_formula_cell_ref(start)?;
+-    let Some(end) = end else {
+-        return Ok(Token::CellRef(start));
+-    };
+-
+-    Ok(Token::RangeRef(RangeRef {
+-        start,
+-        end: parse_open_formula_cell_ref(end)?,
+-    }))
+-}
+-
+-fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
+-    if value.is_empty() {
+-        return None;
++fn reserve_token_slot(tokens: &mut Vec<Token>, maximum: usize) -> Result<()> {
++    if tokens.len() >= maximum {
++        return Err(formula_limit_error(
++            Resource::Objects,
++            tokens.len().saturating_add(1),
++            maximum,
++        ));
+@@ -635,8 +746,19 @@ fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
+-
+-    let mut quoted = false;
+-    for (index, character) in value.char_indices() {
+-        match character {
+-            '\'' => quoted = !quoted,
+-            ':' if !quoted => return Some((&value[..index], Some(&value[index + 1..]))),
+-            _ => {},
+-        }
++    if tokens.len() == tokens.capacity() {
++        let next_capacity = if tokens.capacity() == 0 {
++            4.min(maximum)
++        } else {
++            tokens
++                .capacity()
++                .checked_mul(2)
++                .ok_or_else(|| Error::InvalidFormat("formula token capacity overflow".to_string()))?
++                .min(maximum)
++        };
++        let additional = next_capacity
++            .checked_sub(tokens.len())
++            .ok_or_else(|| Error::InvalidFormat("formula token capacity overflow".to_string()))?;
++        tokens
++            .try_reserve_exact(additional)
++            .map_err(|source| Error::Allocation {
++                resource: "formula tokens",
++                source,
++            })?;
+@@ -644 +766 @@ fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
+-    (!quoted).then_some((value, None))
++    Ok(())
+@@ -647,14 +769,3 @@ fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
+-fn parse_open_formula_cell_ref(value: &str) -> Result<CellRef> {
+-    let value = value.trim();
+-    let (sheet, cell) = if let Some(cell) = value.strip_prefix('.') {
+-        (None, cell)
+-    } else {
+-        let separator = value
+-            .char_indices()
+-            .rev()
+-            .find_map(|(index, character)| (character == '.').then_some(index))
+-            .ok_or_else(|| {
+-                Error::InvalidFormat("ODF reference is missing its sheet separator".to_string())
+-            })?;
+-        let sheet = parse_open_formula_sheet_name(&value[..separator])?;
+-        (Some(sheet), &value[separator + 1..])
++fn formula_limit_error(resource: Resource, actual: usize, maximum: usize) -> Error {
++    let Some(observed) = u64::try_from(actual).ok() else {
++        return Error::InvalidFormat("formula limit exceeds u64".to_string());
+@@ -662,8 +773,8 @@ fn parse_open_formula_cell_ref(value: &str) -> Result<CellRef> {
+-
+-    let (column, row, column_absolute, row_absolute) = parse_a1_cell_ref(cell)?;
+-    Ok(CellRef {
+-        sheet,
+-        column,
+-        row,
+-        column_absolute,
+-        row_absolute,
++    let Some(limit) = u64::try_from(maximum).ok() else {
++        return Error::InvalidFormat("formula limit exceeds u64".to_string());
++    };
++    Error::ResourceLimit(ResourceLimit {
++        resource,
++        observed,
++        limit,
++        scope: Arc::from("ods-formula"),
+@@ -673,38 +784,7 @@ fn parse_open_formula_cell_ref(value: &str) -> Result<CellRef> {
+-fn parse_open_formula_sheet_name(value: &str) -> Result<String> {
+-    let value = value.trim().strip_prefix('$').unwrap_or(value.trim());
+-    if value.is_empty() {
+-        return Err(Error::InvalidFormat(
+-            "ODF reference has an empty sheet name".to_string(),
+-        ));
+-    }
+-
+-    if value.starts_with('\'') || value.ends_with('\'') {
+-        let value = value
+-            .strip_prefix('\'')
+-            .and_then(|value| value.strip_suffix('\''))
+-            .ok_or_else(|| {
+-                Error::InvalidFormat("ODF reference has an unterminated sheet name".to_string())
+-            })?;
+-        let mut sheet = String::with_capacity(value.len());
+-        let mut characters = value.chars().peekable();
+-        while let Some(character) = characters.next() {
+-            if character == '\'' && characters.next() != Some('\'') {
+-                return Err(Error::InvalidFormat(
+-                    "ODF reference has an invalid escaped sheet name".to_string(),
+-                ));
+-            }
+-            sheet.push(character);
+-        }
+-        if sheet.is_empty() {
+-            return Err(Error::InvalidFormat(
+-                "ODF reference has an empty sheet name".to_string(),
+-            ));
+-        }
+-        Ok(sheet)
+-    } else if value.contains('\'') {
+-        Err(Error::InvalidFormat(
+-            "ODF reference has an invalid sheet name".to_string(),
+-        ))
+-    } else {
+-        Ok(value.to_string())
+-    }
++fn copy_formula_component(value: &str, resource: &'static str) -> Result<String> {
++    let mut result = String::new();
++    result
++        .try_reserve_exact(value.len())
++        .map_err(|source| Error::Allocation { resource, source })?;
++    result.push_str(value);
++    Ok(result)
+@@ -713,47 +793,5 @@ fn parse_open_formula_sheet_name(value: &str) -> Result<String> {
+-fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
+-    let value = value.trim();
+-    let bytes = value.as_bytes();
+-    let mut position = 0;
+-    let column_absolute = if bytes.get(position) == Some(&b'$') {
+-        position += 1;
+-        true
+-    } else {
+-        false
+-    };
+-    let column_start = position;
+-    while bytes.get(position).is_some_and(u8::is_ascii_alphabetic) {
+-        position += 1;
+-    }
+-    if column_start == position {
+-        return Err(Error::InvalidFormat(
+-            "ODF reference is missing its column".to_string(),
+-        ));
+-    }
+-    let column = std::str::from_utf8(&bytes[column_start..position])
+-        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF column".to_string()))?
+-        .to_ascii_uppercase();
+-
+-    let row_absolute = if bytes.get(position) == Some(&b'$') {
+-        position += 1;
+-        true
+-    } else {
+-        false
+-    };
+-    let row_start = position;
+-    while bytes.get(position).is_some_and(u8::is_ascii_digit) {
+-        position += 1;
+-    }
+-    if row_start == position || position != bytes.len() {
+-        return Err(Error::InvalidFormat(
+-            "ODF reference has an invalid row".to_string(),
+-        ));
+-    }
+-    let row = std::str::from_utf8(&bytes[row_start..position])
+-        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF row".to_string()))?
+-        .parse::<u32>()
+-        .map_err(|_error| Error::InvalidFormat("Invalid ODF row number".to_string()))?;
+-    if row == 0 {
+-        return Err(Error::InvalidFormat(
+-            "ODF references must use 1-based rows".to_string(),
+-        ));
+-    }
++fn copy_upper_ascii(value: &str, resource: &'static str) -> Result<String> {
++    let mut result = copy_formula_component(value, resource)?;
++    result.make_ascii_uppercase();
++    Ok(result)
++}
+@@ -761 +799,3 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
+-    Ok((column, row, column_absolute, row_absolute))
++fn parse_open_formula_reference(value: &str, limits: &reference::Limits) -> Result<Token> {
++    let reference = reference::parse_body(value, limits)?;
++    Ok(reference.into_token())
+@@ -782 +822,9 @@ pub fn is_valid_function(name: &str) -> bool {
+-/// Extract all cell references from a formula
++/// Extract legacy cell references from a formula.
++///
++/// References already represented by legacy tokens are borrowed.  A rich
++/// local cell or cell-range reference contributes an owned legacy projection
++/// when it has no subtable selector; this keeps quoted and absolute sheet
++/// cells visible to existing callers while making the unavoidable loss of
++/// those lexical markers explicit in the returned `CellRef`.  External,
++/// whole-axis, subtable, inherited, and invalidated references are skipped.
++/// Use [`extract_references`] for the complete reference family.
+@@ -784 +832 @@ pub fn is_valid_function(name: &str) -> bool {
+-pub fn extract_cell_refs(formula: &Formula) -> SmallVec<[&CellRef; 8]> {
++pub fn extract_cell_refs<'a>(formula: &'a Formula) -> SmallVec<[Cow<'a, CellRef>; 8]> {
+@@ -789,2 +837,42 @@ pub fn extract_cell_refs(formula: &Formula) -> SmallVec<[&CellRef; 8]> {
+-            Token::CellRef(cell_ref) => Some(cell_ref),
+-            Token::RangeRef(range_ref) => Some(&range_ref.start), // Just start for simplicity
++            Token::CellRef(cell_ref) => Some(Cow::Borrowed(cell_ref)),
++            Token::RangeRef(range_ref) => Some(Cow::Borrowed(&range_ref.start)),
++            Token::Reference(reference) => reference.legacy_cell_ref().map(Cow::Owned),
++            Token::Function(_)
++            | Token::Number(_)
++            | Token::String(_)
++            | Token::Boolean(_)
++            | Token::Operator(_)
++            | Token::LParen
++            | Token::RParen
++            | Token::Comma
++            | Token::Semicolon => None,
++        })
++        .collect()
++}
++
++/// A borrowed reference occurrence in a parsed formula.
++///
++/// Legacy tokens remain available for compatible cell and range syntax. Rich
++/// bracketed references borrow their boxed [`reference::Reference`] without
++/// maintaining a second sidecar allocation.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum ReferenceView<'a> {
++    /// A legacy-compatible cell reference, whether bracketed or unbracketed.
++    Cell(&'a CellRef),
++    /// A legacy-compatible cell range, whether bracketed or unbracketed.
++    Range(&'a RangeRef),
++    /// A complete bracketed OpenFormula reference.
++    Rich(&'a reference::Reference),
++}
++
++/// Extract all reference occurrences without discarding rich OpenFormula
++/// metadata.
++#[must_use]
++pub fn extract_references<'a>(formula: &'a Formula) -> SmallVec<[ReferenceView<'a>; 8]> {
++    formula
++        .tokens
++        .iter()
++        .filter_map(|token| match token {
++            Token::CellRef(reference) => Some(ReferenceView::Cell(reference)),
++            Token::RangeRef(reference) => Some(ReferenceView::Range(reference)),
++            Token::Reference(reference) => Some(ReferenceView::Rich(reference)),
+@@ -821 +909,2 @@ pub fn extract_functions(formula: &Formula) -> SmallVec<[&str; 4]> {
+-            | Token::Semicolon => None,
++            | Token::Semicolon
++            | Token::Reference(_) => None,
+@@ -886,11 +975,27 @@ mod tests {
+-            Token::RangeRef(RangeRef { start, end })
+-                if start.sheet.as_deref() == Some("Inputs")
+-                    && start.column == "A"
+-                    && start.row == 1
+-                    && start.column_absolute
+-                    && start.row_absolute
+-                    && end.sheet.is_none()
+-                    && end.column == "B"
+-                    && end.row == 2
+-                    && end.column_absolute
+-                    && end.row_absolute
++            Token::Reference(reference)
++                if matches!(
++                    reference.as_ref(),
++                    reference::Reference::Local(reference::Address::Cells(start, end))
++                        if matches!(
++                            &start.sheet,
++                            reference::SheetSelector::Explicit(locator)
++                                if locator.sheet.name == "Inputs" && locator.sheet.absolute
++                        )
++                            && matches!(
++                                &start.value,
++                                reference::EndpointValue::Cell(cell)
++                                    if cell.column.label == "A"
++                                        && cell.row.number == 1
++                                        && cell.column.absolute
++                                        && cell.row.absolute
++                            )
++                            && matches!(end.sheet, reference::SheetSelector::Inherited)
++                            && matches!(
++                                &end.value,
++                                reference::EndpointValue::Cell(cell)
++                                    if cell.column.label == "B"
++                                        && cell.row.number == 2
++                                        && cell.column.absolute
++                                        && cell.row.absolute
++                            )
++                )
+@@ -908,2 +1013,15 @@ mod tests {
+-            Token::CellRef(CellRef { sheet: Some(sheet), column, row, .. })
+-                if sheet == "Bob's" && column == "A" && *row == 1
++            Token::Reference(reference)
++                if matches!(
++                    reference.as_ref(),
++                    reference::Reference::Local(reference::Address::Cell(endpoint))
++                        if matches!(
++                            &endpoint.sheet,
++                            reference::SheetSelector::Explicit(locator)
++                                if locator.sheet.name == "Bob's" && locator.sheet.quoted
++                        )
++                            && matches!(
++                                &endpoint.value,
++                                reference::EndpointValue::Cell(cell)
++                                    if cell.column.label == "A" && cell.row.number == 1
++                            )
++                )
+@@ -933 +1051,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected cell reference"),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected cell reference"),
+@@ -982,0 +1102,33 @@ mod tests {
++    #[test]
++    fn test_extract_cell_refs_projects_legacy_compatible_rich_cells() {
++        let formula = FormulaParser::new("=SUM(['Bob''s'.$A$1:.B2])")
++            .parse()
++            .expect("quoted rich cell range should parse");
++        let refs = extract_cell_refs(&formula);
++        assert!(matches!(
++            refs.as_slice(),
++            [Cow::Owned(CellRef {
++                sheet: Some(sheet),
++                column,
++                row: 1,
++                column_absolute: true,
++                row_absolute: true,
++            })] if sheet == "Bob's" && column == "A"
++        ));
++
++        let external = FormulaParser::new("=['file:///book.ods'#.A1]")
++            .parse()
++            .expect("external rich cell should parse");
++        assert!(extract_cell_refs(&external).is_empty());
++    }
++
++    #[test]
++    fn test_formula_limits_forward_reference_limits() {
++        let limits = FormulaLimits::default()
++            .with_reference_limits(reference::Limits::default().with_max_name_bytes(3));
++        let error = FormulaParser::new("of:=[Sheet.A1]")
++            .parse_with_limits(&limits)
++            .expect_err("formula reference name limit should be enforced");
++        assert!(matches!(error, Error::ResourceLimit(_)));
++    }
++
+@@ -1013 +1165,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected cell reference"),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected cell reference"),
+@@ -1039 +1192,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected range reference"),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected range reference"),
+@@ -1062 +1216,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected number token"),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected number token"),
+@@ -1085 +1240,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected string token: {:?}", formula.tokens),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected string token: {:?}", formula.tokens),
+@@ -1168 +1324,2 @@ mod tests {
+-                | Token::Semicolon => None,
++                | Token::Semicolon
++                | Token::Reference(_) => None,
+@@ -1197 +1354,2 @@ mod tests {
+-            | Token::Semicolon => panic!("Expected cell reference"),
++            | Token::Semicolon
++            | Token::Reference(_) => panic!("Expected cell reference"),
+@@ -1384 +1542,2 @@ mod tests {
+-                | Token::Semicolon => None,
++                | Token::Semicolon
++                | Token::Reference(_) => None,
+diff --git a/crates/litchi-ods/src/model/cell.rs b/crates/litchi-ods/src/model/cell.rs
+index 77b346d57..98b0f4b54 100644
+--- a/crates/litchi-ods/src/model/cell.rs
++++ b/crates/litchi-ods/src/model/cell.rs
+@@ -252,5 +252 @@ impl Cell {
+-    pub fn add_hyperlink(
+-        &mut self,
+-        range: Range<usize>,
+-        mut hyperlink: Link,
+-    ) -> Result<()> {
++    pub fn add_hyperlink(&mut self, range: Range<usize>, mut hyperlink: Link) -> Result<()> {
+@@ -560 +556 @@ impl Cell {
+-                .cloned()
++                .map(std::borrow::Cow::into_owned)
+@@ -1028,4 +1024 @@ mod tests {
+-                .add_hyperlink(
+-                    1..2,
+-                    Link::with_text("https://example.test/", "").unwrap(),
+-                )
++                .add_hyperlink(1..2, Link::with_text("https://example.test/", "").unwrap(),)
+
+diff --git a/crates/litchi-ods/src/codec/formula/reference.rs b/crates/litchi-ods/src/codec/formula/reference.rs
+new file mode 100644
+index 000000000..e57b60b6c
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/reference.rs
+@@ -0,0 +1,1130 @@
++//! OpenFormula 1.4 reference syntax.
++//!
++//! Bracketed references are deliberately kept separate from the older
++//! [`super::CellRef`] and [`super::RangeRef`] projection.  The grammar in
++//! OpenFormula 1.4 can carry a source IRI, a subtable locator, whole rows or
++//! columns, and an omitted second locator which inherits the first one.  None
++//! of those states can be represented by the legacy structures without losing
++//! information, so this module owns the complete, inert representation.
++
++use litchi_core::{Error, Resource, ResourceLimit, Result};
++use std::{convert::TryFrom, sync::Arc};
++
++mod iri;
++
++use self::iri::is_valid_iri_reference;
++
++/// Default maximum number of bytes in one bracketed reference body.
++pub const DEFAULT_MAX_REFERENCE_BYTES: usize = 64 * 1024;
++/// Default maximum number of locator and endpoint components.
++pub const DEFAULT_MAX_REFERENCE_COMPONENTS: usize = 256;
++/// Default maximum size of one source, sheet, or column lexical value.
++pub const DEFAULT_MAX_REFERENCE_NAME_BYTES: usize = 16 * 1024;
++
++/// Finite limits applied while parsing one OpenFormula reference.
++///
++/// The limits cover the complete bracket body and every owned component.  A
++/// parser never grows a component vector past `max_components`, and all
++/// vectors reserve before they are mutated.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct Limits {
++    max_bytes: usize,
++    max_components: usize,
++    max_name_bytes: usize,
++}
++
++impl Default for Limits {
++    fn default() -> Self {
++        Self {
++            max_bytes: DEFAULT_MAX_REFERENCE_BYTES,
++            max_components: DEFAULT_MAX_REFERENCE_COMPONENTS,
++            max_name_bytes: DEFAULT_MAX_REFERENCE_NAME_BYTES,
++        }
++    }
++}
++
++impl Limits {
++    /// Set the maximum UTF-8 byte length of the bracketed reference body.
++    #[must_use]
++    pub const fn with_max_bytes(mut self, value: usize) -> Self {
++        self.max_bytes = value;
++        self
++    }
++
++    /// Set the maximum number of address, locator, and subtable components.
++    #[must_use]
++    pub const fn with_max_components(mut self, value: usize) -> Self {
++        self.max_components = value;
++        self
++    }
++
++    /// Set the maximum UTF-8 byte length of one source, sheet, or column
++    /// component.
++    #[must_use]
++    pub const fn with_max_name_bytes(mut self, value: usize) -> Self {
++        self.max_name_bytes = value;
++        self
++    }
++
++    /// Return the maximum reference body length.
++    #[must_use]
++    pub const fn max_bytes(self) -> usize {
++        self.max_bytes
++    }
++
++    /// Return the maximum component count.
++    #[must_use]
++    pub const fn max_components(self) -> usize {
++        self.max_components
++    }
++
++    /// Return the maximum component string length.
++    #[must_use]
++    pub const fn max_name_bytes(self) -> usize {
++        self.max_name_bytes
++    }
++}
++
++/// A source IRI in the OpenFormula `'IRI'#` prefix.
++///
++/// The IRI is inert.  Parsing and inspecting it never opens, resolves, or
++/// otherwise contacts the referenced source.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Source {
++    /// The decoded IRI value.  Doubled apostrophes in formula syntax have
++    /// already been reduced to one apostrophe.
++    pub iri: String,
++}
++
++impl Source {
++    /// Validate and create an inert source IRI.
++    pub fn new(iri: &str) -> Result<Self> {
++        if iri.len() > DEFAULT_MAX_REFERENCE_NAME_BYTES {
++            return Err(limit_error(
++                "source IRI bytes",
++                iri.len(),
++                DEFAULT_MAX_REFERENCE_NAME_BYTES,
++            ));
++        }
++        if !is_valid_iri_reference(iri) {
++            return Err(Error::InvalidFormat(
++                "invalid OpenFormula source IRI".to_string(),
++            ));
++        }
++        Ok(Self {
++            iri: copy_component(iri, "formula reference source IRI")?,
++        })
++    }
++
++    /// Return the decoded IRI.
++    #[must_use]
++    pub fn as_str(&self) -> &str {
++        &self.iri
++    }
++}
++
++/// A sheet name in a sheet locator.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct SheetName {
++    /// Decoded sheet name, without the optional `$` marker or quote pair.
++    pub name: String,
++    /// Whether the sheet name carried the `$` absolute marker.
++    pub absolute: bool,
++    /// Whether the sheet name used the quoted lexical form.
++    pub quoted: bool,
++}
++
++impl SheetName {
++    /// Return the decoded sheet name.
++    #[must_use]
++    pub fn as_str(&self) -> &str {
++        &self.name
++    }
++}
++
++/// A subtable component in a sheet locator.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum Subtable {
++    /// A cell address selecting a subtable.
++    Cell(Cell),
++    /// A quoted sheet-name component selecting a subtable.
++    Name(SheetName),
++}
++
++/// A cell coordinate used by an endpoint or subtable selector.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Cell {
++    /// Column coordinate.
++    pub column: Column,
++    /// Row coordinate.
++    pub row: Row,
++}
++
++/// A column coordinate, including its absolute marker.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Column {
++    /// Uppercase A-Z column label.
++    pub label: String,
++    /// Whether the column carried the `$` absolute marker.
++    pub absolute: bool,
++}
++
++/// A one-based row coordinate, including its absolute marker.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Row {
++    /// One-based row number.
++    pub number: u32,
++    /// Whether the row carried the `$` absolute marker.
++    pub absolute: bool,
++}
++
++/// A locator for a sheet and its optional subtable chain.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct SheetLocator {
++    /// The first sheet-name component.
++    pub sheet: SheetName,
++    /// Ordered subtable components following the sheet name.
++    pub subtables: Vec<Subtable>,
++}
++
++impl SheetLocator {
++    /// Return the first sheet name.
++    #[must_use]
++    pub fn sheet_name(&self) -> &SheetName {
++        &self.sheet
++    }
++
++    /// Return the ordered subtable chain.
++    #[must_use]
++    pub fn subtables(&self) -> &[Subtable] {
++        &self.subtables
++    }
++}
++
++/// The sheet-selection state carried by one reference endpoint.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum SheetSelector {
++    /// No sheet locator was written; the evaluator's current sheet applies.
++    Current,
++    /// A sheet locator was written on this endpoint.
++    Explicit(SheetLocator),
++    /// The endpoint omitted its locator and inherits the first endpoint's
++    /// locator according to OpenFormula 1.4 section 5.8.
++    Inherited,
++}
++
++/// The coordinate kind carried by an endpoint.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum EndpointValue {
++    /// A single cell coordinate.
++    Cell(Cell),
++    /// A whole-column coordinate.
++    Column(Column),
++    /// A whole-row coordinate.
++    Row(Row),
++}
++
++/// One endpoint of a cell, row, or column address.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Endpoint {
++    /// Sheet selection for this endpoint.
++    pub sheet: SheetSelector,
++    /// Cell, column, or row coordinate.
++    pub value: EndpointValue,
++}
++
++impl Endpoint {
++    /// Construct a cell endpoint.
++    #[must_use]
++    pub fn cell(sheet: SheetSelector, cell: Cell) -> Self {
++        Self {
++            sheet,
++            value: EndpointValue::Cell(cell),
++        }
++    }
++
++    /// Construct a whole-column endpoint.
++    #[must_use]
++    pub fn column(sheet: SheetSelector, column: Column) -> Self {
++        Self {
++            sheet,
++            value: EndpointValue::Column(column),
++        }
++    }
++
++    /// Construct a whole-row endpoint.
++    #[must_use]
++    pub fn row(sheet: SheetSelector, row: Row) -> Self {
++        Self {
++            sheet,
++            value: EndpointValue::Row(row),
++        }
++    }
++}
++
++/// A parsed range address.
++///
++/// `Cells`, `Columns`, and `Rows` use endpoint sheet selectors directly, so
++/// two different explicit locators represent a cross-sheet cuboid without a
++/// second cross-sheet enum variant.  The invalidated `#REF!` state belongs to
++/// [`Reference::Error`], so it cannot be paired with a source IRI.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum Address {
++    /// One cell endpoint.
++    Cell(Endpoint),
++    /// A cell range.
++    Cells(Endpoint, Endpoint),
++    /// A whole-column range.
++    Columns(Endpoint, Endpoint),
++    /// A whole-row range.
++    Rows(Endpoint, Endpoint),
++}
++
++/// A complete OpenFormula 1.4 reference.
++///
++/// The invalidated `#REF!` state is a direct variant and therefore cannot be
++/// combined with the source-bearing variant.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum Reference {
++    /// A local, non-error range address.
++    Local(Address),
++    /// A source-qualified, non-error reference.
++    Source {
++        /// Inert source IRI.
++        source: Source,
++        /// Valid range address in that source.
++        address: Address,
++    },
++    /// An invalidated reference (`#REF!`).
++    Error,
++}
++
++impl Reference {
++    /// Parse one complete bracketed reference.
++    pub fn parse(value: &str) -> Result<Self> {
++        parse(value)
++    }
++
++    /// Parse one reference with explicit finite limits.
++    pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Self> {
++        parse_with_limits(value, limits)
++    }
++
++    /// Return the source IRI, if this is source-qualified.
++    #[must_use]
++    pub fn source(&self) -> Option<&Source> {
++        match self {
++            Self::Local(_) | Self::Error => None,
++            Self::Source { source, .. } => Some(source),
++        }
++    }
++
++    /// Return whether this reference is an explicit invalidated reference.
++    #[must_use]
++    pub fn is_error(&self) -> bool {
++        matches!(self, Self::Error)
++    }
++
++    /// Borrow the parsed address, if this is not `#REF!`.
++    #[must_use]
++    pub fn address(&self) -> Option<&Address> {
++        match self {
++            Self::Local(address) | Self::Source { address, .. } => Some(address),
++            Self::Error => None,
++        }
++    }
++
++    /// Build the legacy cell projection used by [`super::extract_cell_refs`].
++    ///
++    /// The projection is intentionally limited to a local cell endpoint with
++    /// no subtable selector.  Quoting and an absolute sheet marker are
++    /// representable as a legacy `CellRef` sheet name, although those lexical
++    /// markers are necessarily lost by that older shape.  Source-qualified,
++    /// whole-axis, subtable, and invalidated references return `None` instead
++    /// of being reported as a different local cell.
++    pub(crate) fn legacy_cell_ref(&self) -> Option<super::CellRef> {
++        let address = match self {
++            Self::Local(address) => address,
++            Self::Source { .. } | Self::Error => return None,
++        };
++        match address {
++            Address::Cell(endpoint) | Address::Cells(endpoint, _) => {
++                legacy_projection_cell(endpoint)
++            },
++            Address::Columns(_, _) | Address::Rows(_, _) => None,
++        }
++    }
++
++    /// Convert to a token, retaining a legacy token only when it can carry every meaningful state of this
++    /// reference.  Bracketed references with source IRIs, absolute sheet
++    /// locators, quoted names, subtables, whole axes, or inherited endpoints
++    /// deliberately stay in the rich representation.
++    pub(crate) fn into_token(self) -> super::Token {
++        match self {
++            Self::Local(address) => address.into_token(),
++            Self::Source { source, address } => {
++                super::Token::Reference(Box::new(Self::Source { source, address }))
++            },
++            Self::Error => super::Token::Reference(Box::new(Self::Error)),
++        }
++    }
++}
++
++impl Address {
++    fn into_token(self) -> super::Token {
++        let compatible = self.is_legacy_compatible();
++        match self {
++            Self::Cell(endpoint) if compatible => {
++                super::Token::CellRef(legacy_cell(endpoint).expect("validated legacy cell"))
++            },
++            Self::Cells(start, end) if compatible => super::Token::RangeRef(super::RangeRef {
++                start: legacy_cell(start).expect("validated legacy range start"),
++                end: legacy_cell(end).expect("validated legacy range end"),
++            }),
++            address => super::Token::Reference(Box::new(Reference::Local(address))),
++        }
++    }
++
++    fn is_legacy_compatible(&self) -> bool {
++        match self {
++            Self::Cell(endpoint) => legacy_cell_shape(endpoint),
++            Self::Cells(start, end) => legacy_cell_shape(start) && legacy_cell_shape(end),
++            Self::Columns(_, _) | Self::Rows(_, _) => false,
++        }
++    }
++}
++
++fn legacy_cell_shape(endpoint: &Endpoint) -> bool {
++    match &endpoint.sheet {
++        SheetSelector::Current => {},
++        SheetSelector::Explicit(locator)
++            if locator.subtables.is_empty() && !locator.sheet.absolute && !locator.sheet.quoted => {
++        },
++        SheetSelector::Explicit(_) | SheetSelector::Inherited => return false,
++    }
++    matches!(endpoint.value, EndpointValue::Cell(_))
++}
++
++fn legacy_cell(endpoint: Endpoint) -> Option<super::CellRef> {
++    let sheet = match endpoint.sheet {
++        SheetSelector::Current => None,
++        SheetSelector::Explicit(locator)
++            if locator.subtables.is_empty() && !locator.sheet.absolute && !locator.sheet.quoted =>
++        {
++            Some(locator.sheet.name)
++        },
++        SheetSelector::Explicit(_) | SheetSelector::Inherited => return None,
++    };
++    let EndpointValue::Cell(cell) = endpoint.value else {
++        return None;
++    };
++    Some(super::CellRef {
++        sheet,
++        column: cell.column.label,
++        row: cell.row.number,
++        column_absolute: cell.column.absolute,
++        row_absolute: cell.row.absolute,
++    })
++}
++
++fn legacy_projection_cell(endpoint: &Endpoint) -> Option<super::CellRef> {
++    let sheet = match &endpoint.sheet {
++        SheetSelector::Current => None,
++        SheetSelector::Explicit(locator) if locator.subtables.is_empty() => {
++            Some(locator.sheet.name.clone())
++        },
++        SheetSelector::Explicit(_) | SheetSelector::Inherited => return None,
++    };
++    let EndpointValue::Cell(cell) = &endpoint.value else {
++        return None;
++    };
++    Some(super::CellRef {
++        sheet,
++        column: cell.column.label.clone(),
++        row: cell.row.number,
++        column_absolute: cell.column.absolute,
++        row_absolute: cell.row.absolute,
++    })
++}
++
++/// Parse one OpenFormula reference with default limits.
++pub fn parse(value: &str) -> Result<Reference> {
++    parse_with_limits(value, &Limits::default())
++}
++
++/// Parse one OpenFormula reference with explicit finite limits.
++pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Reference> {
++    let value = value.trim();
++    if !value.starts_with('[') || !value.ends_with(']') || value.len() < 2 {
++        return Err(invalid("a reference must be enclosed in brackets"));
++    }
++    parse_body(&value[1..value.len() - 1], limits)
++}
++
++pub(crate) fn parse_body(value: &str, limits: &Limits) -> Result<Reference> {
++    if value.len() > limits.max_bytes {
++        return Err(limit_error(
++            "reference bytes",
++            value.len(),
++            limits.max_bytes,
++        ));
++    }
++    // The public wrapper may be surrounded by formula whitespace, but bytes
++    // inside the brackets belong to the reference grammar.  Keep them intact
++    // so whitespace cannot be silently accepted inside a sheet or coordinate.
++    let mut parser = Parser::new(value, *limits);
++    parser.parse()
++}
++
++struct Parser<'a> {
++    input: &'a str,
++    bytes: &'a [u8],
++    position: usize,
++    limits: Limits,
++    components: usize,
++}
++
++impl<'a> Parser<'a> {
++    fn new(input: &'a str, limits: Limits) -> Self {
++        Self {
++            input,
++            bytes: input.as_bytes(),
++            position: 0,
++            limits,
++            components: 0,
++        }
++    }
++
++    fn parse(&mut self) -> Result<Reference> {
++        if self.input.is_empty() {
++            return Err(invalid("empty OpenFormula reference"));
++        }
++
++        if self.input == "#REF!" {
++            return Ok(Reference::Error);
++        }
++
++        let source = self.parse_source_prefix()?;
++        let first = self.parse_first_endpoint()?;
++        let address = if self.at_end() {
++            match first.value {
++                EndpointValue::Cell(_) => Address::Cell(first),
++                EndpointValue::Column(_) | EndpointValue::Row(_) => {
++                    return Err(invalid("whole-row or whole-column reference needs a range"));
++                },
++            }
++        } else {
++            self.expect_byte(b':', "reference range separator")?;
++            let second = if self.consume_byte(b'.') {
++                Endpoint {
++                    sheet: SheetSelector::Inherited,
++                    value: self.parse_coordinate()?,
++                }
++            } else {
++                if !matches!(first.sheet, SheetSelector::Explicit(_)) {
++                    return Err(invalid(
++                        "a range endpoint may name its sheet only after an explicit first sheet",
++                    ));
++                }
++                self.parse_explicit_endpoint()?
++            };
++
++            if !self.at_end() {
++                return Err(invalid("trailing bytes in OpenFormula reference"));
++            }
++            self.combine_range(first, second)?
++        };
++
++        if !self.at_end() {
++            return Err(invalid("trailing bytes in OpenFormula reference"));
++        }
++
++        if let Some(source) = source {
++            Ok(Reference::Source { source, address })
++        } else {
++            Ok(Reference::Local(address))
++        }
++    }
++
++    fn parse_source_prefix(&mut self) -> Result<Option<Source>> {
++        if self.peek() != Some(b'\'') {
++            return Ok(None);
++        }
++
++        let checkpoint = self.position;
++        let close = self.scan_quoted(checkpoint)?;
++        if self.bytes.get(close + 1) != Some(&b'#') {
++            return Ok(None);
++        }
++
++        self.position = checkpoint;
++        self.bump_component()?;
++        let (iri, close) = self.parse_quoted_text(true)?;
++        debug_assert_eq!(self.bytes.get(close), Some(&b'\''));
++        self.position = close + 1;
++        self.expect_byte(b'#', "source IRI terminator")?;
++        if iri.len() > self.limits.max_name_bytes {
++            return Err(limit_error(
++                "source IRI bytes",
++                iri.len(),
++                self.limits.max_name_bytes,
++            ));
++        }
++        if !is_valid_iri_reference(&iri) {
++            return Err(invalid("invalid OpenFormula source IRI"));
++        }
++        Ok(Some(Source { iri }))
++    }
++
++    fn parse_first_endpoint(&mut self) -> Result<Endpoint> {
++        if self.consume_byte(b'.') {
++            return Ok(Endpoint {
++                sheet: SheetSelector::Current,
++                value: self.parse_coordinate()?,
++            });
++        }
++        self.parse_explicit_endpoint()
++    }
++
++    fn parse_explicit_endpoint(&mut self) -> Result<Endpoint> {
++        let sheet = self.parse_sheet_name()?;
++        let mut subtables = Vec::new();
++
++        loop {
++            self.expect_byte(b'.', "sheet and coordinate separator")?;
++            if self.peek() == Some(b'\'') || self.peek_dollar_quote() {
++                let name = self.parse_sheet_name()?;
++                self.push_subtable_into(&mut subtables, Subtable::Name(name))?;
++                continue;
++            }
++
++            let coordinate = self.parse_coordinate()?;
++            if matches!(coordinate, EndpointValue::Cell(_)) && self.peek() == Some(b'.') {
++                let EndpointValue::Cell(cell) = coordinate else {
++                    unreachable!("coordinate was checked as a cell")
++                };
++                self.push_subtable_into(&mut subtables, Subtable::Cell(cell))?;
++                continue;
++            }
++            if self.peek() == Some(b'.') {
++                return Err(invalid(
++                    "whole-row or whole-column cannot select a subtable",
++                ));
++            }
++            let locator = SheetLocator { sheet, subtables };
++            return Ok(Endpoint {
++                sheet: SheetSelector::Explicit(locator),
++                value: coordinate,
++            });
++        }
++    }
++
++    fn combine_range(&self, first: Endpoint, second: Endpoint) -> Result<Address> {
++        match (&first.value, &second.value) {
++            (EndpointValue::Cell(_), EndpointValue::Cell(_)) => Ok(Address::Cells(first, second)),
++            (EndpointValue::Column(_), EndpointValue::Column(_)) => {
++                Ok(Address::Columns(first, second))
++            },
++            (EndpointValue::Row(_), EndpointValue::Row(_)) => Ok(Address::Rows(first, second)),
++            _ => Err(invalid(
++                "range endpoints must both be cells, columns, or rows",
++            )),
++        }
++    }
++
++    fn parse_coordinate(&mut self) -> Result<EndpointValue> {
++        let start = self.position;
++        let column_absolute = self.consume_byte(b'$');
++        let column_start = self.position;
++        while self.peek().is_some_and(|byte| byte.is_ascii_uppercase()) {
++            self.advance();
++        }
++        if self.position != column_start {
++            let column_label = &self.input[column_start..self.position];
++            if column_label.len() > self.limits.max_name_bytes {
++                return Err(limit_error(
++                    "column bytes",
++                    column_label.len(),
++                    self.limits.max_name_bytes,
++                ));
++            }
++
++            let row_absolute = self.consume_byte(b'$');
++            let row_start = self.position;
++            if self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                if self.peek() == Some(b'0') {
++                    return Err(invalid("OpenFormula rows are one-based"));
++                }
++                while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                    self.advance();
++                }
++                let row_digits = &self.input[row_start..self.position];
++                if row_digits.len() > self.limits.max_name_bytes {
++                    return Err(limit_error(
++                        "row bytes",
++                        row_digits.len(),
++                        self.limits.max_name_bytes,
++                    ));
++                }
++                let row_number = row_digits
++                    .parse::<u32>()
++                    .map_err(|_error| invalid("row exceeds the representable range"))?;
++                self.bump_component()?;
++                self.bump_component()?;
++                let column = Column {
++                    label: copy_component(column_label, "formula reference column")?,
++                    absolute: column_absolute,
++                };
++                return Ok(EndpointValue::Cell(Cell {
++                    column,
++                    row: Row {
++                        number: row_number,
++                        absolute: row_absolute,
++                    },
++                }));
++            }
++            if row_absolute {
++                return Err(invalid("absolute column must be followed by a row"));
++            }
++            if self.peek() == Some(b':') || self.at_end() || self.peek() == Some(b'.') {
++                self.bump_component()?;
++                return Ok(EndpointValue::Column(Column {
++                    label: copy_component(column_label, "formula reference column")?,
++                    absolute: column_absolute,
++                }));
++            }
++            return Err(invalid("invalid OpenFormula column endpoint"));
++        }
++
++        self.position = start;
++        let row_absolute = self.consume_byte(b'$');
++        let row_start = self.position;
++        if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++            return Err(invalid("expected uppercase column or one-based row"));
++        }
++        if self.peek() == Some(b'0') {
++            return Err(invalid("OpenFormula rows are one-based"));
++        }
++        while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++            self.advance();
++        }
++        let row_digits = &self.input[row_start..self.position];
++        if row_digits.len() > self.limits.max_name_bytes {
++            return Err(limit_error(
++                "row bytes",
++                row_digits.len(),
++                self.limits.max_name_bytes,
++            ));
++        }
++        if !self.at_end() && self.peek() != Some(b':') && self.peek() != Some(b'.') {
++            return Err(invalid("invalid OpenFormula row endpoint"));
++        }
++        let number = row_digits
++            .parse::<u32>()
++            .map_err(|_error| invalid("row exceeds the representable range"))?;
++        self.bump_component()?;
++        Ok(EndpointValue::Row(Row {
++            number,
++            absolute: row_absolute,
++        }))
++    }
++
++    fn parse_sheet_name(&mut self) -> Result<SheetName> {
++        let absolute = self.consume_byte(b'$');
++        if self.peek() == Some(b'\'') {
++            self.bump_component()?;
++            let (name, close) = self.parse_quoted_text(false)?;
++            self.position = close + 1;
++            if name.is_empty() {
++                return Err(invalid("sheet names cannot be empty"));
++            }
++            return Ok(SheetName {
++                name,
++                absolute,
++                quoted: true,
++            });
++        }
++
++        let start = self.position;
++        while let Some(byte) = self.peek() {
++            if byte == b'.'
++                || byte == b']'
++                || byte == b'#'
++                || byte == b'$'
++                || byte == b'\''
++                || byte.is_ascii_whitespace()
++            {
++                break;
++            }
++            self.advance();
++        }
++        if start == self.position {
++            return Err(invalid("expected non-empty sheet name"));
++        }
++        let name = &self.input[start..self.position];
++        if name.len() > self.limits.max_name_bytes {
++            return Err(limit_error(
++                "sheet name bytes",
++                name.len(),
++                self.limits.max_name_bytes,
++            ));
++        }
++        self.bump_component()?;
++        Ok(SheetName {
++            name: copy_component(name, "formula reference sheet name")?,
++            absolute,
++            quoted: false,
++        })
++    }
++
++    fn parse_quoted_text(&mut self, source: bool) -> Result<(String, usize)> {
++        let opening = self.position;
++        let close = self.scan_quoted(opening)?;
++        let inner_start = opening + 1;
++        let inner = &self.input[inner_start..close];
++        let mut decoded_len = 0usize;
++        let mut position = 0usize;
++        while position < inner.len() {
++            let byte = inner.as_bytes()[position];
++            if byte == b'\'' {
++                if inner.as_bytes().get(position + 1) != Some(&b'\'') {
++                    return Err(invalid("invalid apostrophe escape"));
++                }
++                position += 2;
++                decoded_len = decoded_len
++                    .checked_add(1)
++                    .ok_or_else(|| invalid("quoted component length overflow"))?;
++            } else {
++                let character = inner[position..]
++                    .chars()
++                    .next()
++                    .ok_or_else(|| invalid("invalid UTF-8 in quoted component"))?;
++                let width = character.len_utf8();
++                position += width;
++                decoded_len = decoded_len
++                    .checked_add(width)
++                    .ok_or_else(|| invalid("quoted component length overflow"))?;
++            }
++        }
++        if decoded_len > self.limits.max_name_bytes {
++            return Err(limit_error(
++                if source {
++                    "source IRI bytes"
++                } else {
++                    "sheet name bytes"
++                },
++                decoded_len,
++                self.limits.max_name_bytes,
++            ));
++        }
++
++        let mut decoded = String::new();
++        decoded
++            .try_reserve_exact(decoded_len)
++            .map_err(|source| Error::Allocation {
++                resource: "formula reference component",
++                source,
++            })?;
++        position = 0;
++        while position < inner.len() {
++            if inner.as_bytes()[position] == b'\'' {
++                decoded.push('\'');
++                position += 2;
++            } else {
++                let character = inner[position..]
++                    .chars()
++                    .next()
++                    .ok_or_else(|| invalid("invalid UTF-8 in quoted component"))?;
++                position += character.len_utf8();
++                decoded.push(character);
++            }
++        }
++        Ok((decoded, close))
++    }
++
++    fn scan_quoted(&self, opening: usize) -> Result<usize> {
++        if self.bytes.get(opening) != Some(&b'\'') {
++            return Err(invalid("expected quoted component"));
++        }
++        let mut position = opening + 1;
++        while position < self.bytes.len() {
++            if self.bytes[position] != b'\'' {
++                let character = self.input[position..]
++                    .chars()
++                    .next()
++                    .ok_or_else(|| invalid("invalid UTF-8 in quoted component"))?;
++                position += character.len_utf8();
++                continue;
++            }
++            if self.bytes.get(position + 1) == Some(&b'\'') {
++                position += 2;
++                continue;
++            }
++            return Ok(position);
++        }
++        Err(invalid("unterminated quoted component"))
++    }
++
++    fn push_subtable_into(
++        &mut self,
++        subtables: &mut Vec<Subtable>,
++        subtable: Subtable,
++    ) -> Result<()> {
++        self.bump_component()?;
++        if subtables.len() == subtables.capacity() {
++            let next_capacity = if subtables.capacity() == 0 {
++                1
++            } else {
++                subtables
++                    .capacity()
++                    .checked_mul(2)
++                    .ok_or_else(|| invalid("subtable capacity overflow"))?
++                    .min(self.limits.max_components)
++            };
++            let additional = next_capacity
++                .checked_sub(subtables.len())
++                .ok_or_else(|| invalid("subtable capacity overflow"))?;
++            subtables
++                .try_reserve_exact(additional)
++                .map_err(|source| Error::Allocation {
++                    resource: "formula reference subtables",
++                    source,
++                })?;
++        }
++        subtables.push(subtable);
++        Ok(())
++    }
++
++    fn bump_component(&mut self) -> Result<()> {
++        self.components = self
++            .components
++            .checked_add(1)
++            .ok_or_else(|| invalid("reference component count overflow"))?;
++        if self.components > self.limits.max_components {
++            return Err(limit_error(
++                "reference components",
++                self.components,
++                self.limits.max_components,
++            ));
++        }
++        Ok(())
++    }
++
++    fn peek_dollar_quote(&self) -> bool {
++        self.peek() == Some(b'$') && self.bytes.get(self.position + 1) == Some(&b'\'')
++    }
++
++    fn expect_byte(&mut self, expected: u8, label: &str) -> Result<()> {
++        if self.consume_byte(expected) {
++            Ok(())
++        } else {
++            Err(invalid(format!("expected {label}")))
++        }
++    }
++
++    fn consume_byte(&mut self, expected: u8) -> bool {
++        if self.peek() == Some(expected) {
++            self.position += 1;
++            true
++        } else {
++            false
++        }
++    }
++
++    fn peek(&self) -> Option<u8> {
++        self.bytes.get(self.position).copied()
++    }
++
++    fn advance(&mut self) {
++        self.position += 1;
++    }
++
++    fn at_end(&self) -> bool {
++        self.position == self.bytes.len()
++    }
++}
++
++fn invalid(message: impl Into<String>) -> Error {
++    Error::InvalidFormat(message.into())
++}
++
++fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
++    let Some(observed) = u64::try_from(actual).ok() else {
++        return invalid("OpenFormula reference limit exceeds u64");
++    };
++    let Some(limit) = u64::try_from(maximum).ok() else {
++        return invalid("OpenFormula reference limit exceeds u64");
++    };
++    let resource = if resource == "reference components" {
++        Resource::Objects
++    } else {
++        Resource::InputBytes
++    };
++    Error::ResourceLimit(ResourceLimit {
++        resource,
++        observed,
++        limit,
++        scope: Arc::from("ods-formula-reference"),
++    })
++}
++
++fn copy_component(value: &str, resource: &'static str) -> Result<String> {
++    let mut result = String::new();
++    result
++        .try_reserve_exact(value.len())
++        .map_err(|source| Error::Allocation { resource, source })?;
++    result.push_str(value);
++    Ok(result)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn cell_endpoint(reference: &Reference) -> &Endpoint {
++        match reference.address().expect("non-error address") {
++            Address::Cell(endpoint) => endpoint,
++            other => panic!("expected cell address, got {other:?}"),
++        }
++    }
++
++    #[test]
++    fn parses_local_cell_and_preserves_absolute_metadata() {
++        let reference = parse("[. $A$1]");
++        assert!(reference.is_err(), "interior whitespace is not grammar");
++
++        let reference = parse("[.$A$1]").expect("relative cell reference");
++        let endpoint = cell_endpoint(&reference);
++        assert!(matches!(endpoint.sheet, SheetSelector::Current));
++        assert!(matches!(
++            &endpoint.value,
++            EndpointValue::Cell(cell)
++                if cell.column.label == "A"
++                    && cell.column.absolute
++                    && cell.row.number == 1
++                    && cell.row.absolute
++        ));
++    }
++
++    #[test]
++    fn parses_colon_rich_unquoted_sheet_name_without_range_split() {
++        let reference = parse("[Sheet:Two.A1]").expect("colon is legal in unquoted sheet names");
++        let endpoint = cell_endpoint(&reference);
++        assert!(matches!(
++            &endpoint.sheet,
++            SheetSelector::Explicit(locator)
++                if locator.sheet.name == "Sheet:Two" && locator.subtables.is_empty()
++        ));
++    }
++
++    #[test]
++    fn parses_inherited_and_cross_sheet_endpoints() {
++        let inherited = parse("[$Inputs.$A$1:.$B$2]").expect("inherited endpoint");
++        let Address::Cells(start, end) = inherited.address().expect("address") else {
++            panic!("expected cell range");
++        };
++        assert!(matches!(
++            start.sheet,
++            SheetSelector::Explicit(ref locator)
++                if locator.sheet.name == "Inputs" && locator.sheet.absolute
++        ));
++        assert!(matches!(end.sheet, SheetSelector::Inherited));
++
++        let cross_sheet = parse("[First.A1:Second.B2]").expect("cross-sheet range");
++        let Address::Cells(start, end) = cross_sheet.address().expect("address") else {
++            panic!("expected cell range");
++        };
++        assert!(matches!(
++            start.sheet,
++            SheetSelector::Explicit(ref locator) if locator.sheet.name == "First"
++        ));
++        assert!(matches!(
++            end.sheet,
++            SheetSelector::Explicit(ref locator) if locator.sheet.name == "Second"
++        ));
++    }
++
++    #[test]
++    fn parses_whole_axis_ranges() {
++        let columns = parse("[Sheet.A:.C]").expect("whole-column range");
++        assert!(matches!(
++            columns.address(),
++            Some(Address::Columns(start, end))
++                if matches!(start.value, EndpointValue::Column(ref column) if column.label == "A")
++                    && matches!(end.sheet, SheetSelector::Inherited)
++                    && matches!(end.value, EndpointValue::Column(ref column) if column.label == "C")
++        ));
++
++        let rows = parse("[Sheet.1:.4]").expect("whole-row range");
++        assert!(matches!(
++            rows.address(),
++            Some(Address::Rows(start, end))
++                if matches!(start.value, EndpointValue::Row(ref row) if row.number == 1)
++                    && matches!(end.sheet, SheetSelector::Inherited)
++                    && matches!(end.value, EndpointValue::Row(ref row) if row.number == 4)
++        ));
++    }
++
++    #[test]
++    fn parses_subtable_chain_and_quoted_names() {
++        let reference = parse("['Bob''s'.A1.'Sub.Table'.B2]").expect("subtable locator");
++        let endpoint = cell_endpoint(&reference);
++        let SheetSelector::Explicit(locator) = &endpoint.sheet else {
++            panic!("expected explicit locator");
++        };
++        assert_eq!(locator.sheet.name, "Bob's");
++        assert!(locator.sheet.quoted);
++        assert!(matches!(
++            locator.subtables.as_slice(),
++            [
++                Subtable::Cell(Cell { column, row }),
++                Subtable::Name(SheetName { name, quoted: true, .. })
++            ] if column.label == "A" && row.number == 1 && name == "Sub.Table"
++        ));
++        assert!(matches!(
++            &endpoint.value,
++            EndpointValue::Cell(Cell { column, row })
++                if column.label == "B" && row.number == 2
++        ));
++    }
++
++    #[test]
++    fn parses_source_and_keeps_reference_error_source_free() {
++        let reference = parse("['file:///tmp/a''b.ods'#Sheet.A1]").expect("source reference");
++        assert_eq!(
++            reference.source().map(Source::as_str),
++            Some("file:///tmp/a'b.ods")
++        );
++        assert!(matches!(reference.address(), Some(Address::Cell(_))));
++
++        let error = parse("[#REF!]").expect("reference error");
++        assert!(error.is_error());
++        assert!(error.address().is_none());
++        assert!(error.source().is_none());
++        assert!(parse("['file:///tmp/a.ods'# #REF!]").is_err());
++    }
++
++    #[test]
++    fn rejects_non_normative_columns_and_second_endpoint_without_dot() {
++        assert!(parse("[.a1]").is_err());
++        assert!(parse("[ .A1 ]").is_err());
++        assert!(parse("[Sheet.A1:B2]").is_err());
++        assert!(parse("[.A1:Sheet.B2]").is_err());
++        assert!(parse("[Sheet.A1:.B]").is_err());
++    }
++
++    #[test]
++    fn applies_byte_and_component_limits_before_component_allocation() {
++        let limits = Limits::default().with_max_bytes(4);
++        let error = parse_with_limits("[.A123]", &limits).expect_err("byte limit");
++        assert!(
++            matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes)
++        );
++
++        let limits = Limits::default().with_max_components(1);
++        let error = parse_with_limits("[.A1]", &limits).expect_err("component limit");
++        assert!(
++            matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Objects)
++        );
++    }
++}
+
+diff --git a/crates/litchi-ods/src/codec/formula/reference/iri.rs b/crates/litchi-ods/src/codec/formula/reference/iri.rs
+new file mode 100644
+index 000000000..f7e65f4f1
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/reference/iri.rs
+@@ -0,0 +1,515 @@
++//! Allocation-free lexical validation for RFC 3987 IRI references.
++//!
++//! This module deliberately stops at the generic IRI-reference grammar. It
++//! does not resolve a reference, normalize it, apply scheme-specific rules, or
++//! access any external resource. The caller supplies an already-decoded IRI;
++//! format-specific escaping such as doubled ODF apostrophes is handled before
++//! this validator is called.
++
++use std::net::Ipv6Addr;
++
++/// Validate an IRI reference using RFC 3987 section 2.2's generic grammar.
++///
++/// The implementation only borrows `value`: all scans use indices into the
++/// input, a fixed-size scalar state, or the standard library's lexical IPv6
++/// parser. In particular, it never allocates while checking a caller-owned
++/// reference.
++pub(super) fn is_valid_iri_reference(value: &str) -> bool {
++    let (without_fragment, fragment) = split_first(value, b'#');
++    if let Some(fragment) = fragment {
++        if !validate_component(fragment, Component::Fragment) {
++            return false;
++        }
++    }
++
++    let (hier_part, query) = split_first(without_fragment, b'?');
++    if let Some(query) = query {
++        if !validate_component(query, Component::Query) {
++            return false;
++        }
++    }
++
++    validate_reference_hier_part(hier_part)
++}
++
++#[derive(Clone, Copy)]
++enum Component {
++    UserInfo,
++    RegName,
++    Path,
++    Query,
++    Fragment,
++    SegmentNoColon,
++    IpvFutureTail,
++}
++
++fn split_first(value: &str, delimiter: u8) -> (&str, Option<&str>) {
++    if let Some(index) = find_byte(value, delimiter) {
++        (&value[..index], Some(&value[index + 1..]))
++    } else {
++        (value, None)
++    }
++}
++
++fn find_byte(value: &str, needle: u8) -> Option<usize> {
++    value.as_bytes().iter().position(|byte| *byte == needle)
++}
++
++fn validate_reference_hier_part(value: &str) -> bool {
++    if let Some(colon) = find_byte(value, b':') {
++        let slash = find_byte(value, b'/');
++        if slash.is_none_or(|slash| colon < slash) {
++            if !is_valid_scheme(&value[..colon]) {
++                // A colon in the first relative path segment is forbidden by
++                // `ipath-noscheme`; it cannot be reinterpreted as a relative
++                // reference when its prospective scheme is invalid.
++                return false;
++            }
++            return validate_hier_part(&value[colon + 1..]);
++        }
++    }
++
++    validate_relative_part(value)
++}
++
++fn is_valid_scheme(value: &str) -> bool {
++    let mut bytes = value.bytes();
++    let Some(first) = bytes.next() else {
++        return false;
++    };
++    if !first.is_ascii_alphabetic() {
++        return false;
++    }
++
++    bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
++}
++
++fn validate_hier_part(value: &str) -> bool {
++    if let Some(network_path) = value.strip_prefix("//") {
++        return validate_network_path(network_path);
++    }
++    if value.starts_with('/') {
++        // The authority alternative was already selected above for `//`.
++        return validate_component(value, Component::Path);
++    }
++    if value.is_empty() {
++        return true;
++    }
++
++    // `ipath-rootless = isegment-nz *( "/" isegment )`.
++    validate_component(value, Component::Path)
++}
++
++fn validate_relative_part(value: &str) -> bool {
++    if let Some(network_path) = value.strip_prefix("//") {
++        return validate_network_path(network_path);
++    }
++    if value.starts_with('/') {
++        // `ipath-absolute` begins with one slash. A leading `//` was handled
++        // as the authority form above.
++        return validate_component(value, Component::Path);
++    }
++    if value.is_empty() {
++        return true;
++    }
++
++    // `ipath-noscheme = isegment-nz-nc *( "/" isegment )`.
++    let first_slash = find_byte(value, b'/').unwrap_or(value.len());
++    if first_slash == 0 || !validate_component(&value[..first_slash], Component::SegmentNoColon) {
++        return false;
++    }
++    validate_component(&value[first_slash..], Component::Path)
++}
++
++fn validate_network_path(value: &str) -> bool {
++    let slash = find_byte(value, b'/').unwrap_or(value.len());
++    let authority = &value[..slash];
++    let path = &value[slash..];
++    validate_authority(authority) && validate_component(path, Component::Path)
++}
++
++fn validate_authority(value: &str) -> bool {
++    let (userinfo, host_port) = if let Some(at) = find_byte(value, b'@') {
++        (Some(&value[..at]), &value[at + 1..])
++    } else {
++        (None, value)
++    };
++
++    if let Some(userinfo) = userinfo {
++        if !validate_component(userinfo, Component::UserInfo) {
++            return false;
++        }
++    }
++
++    if host_port.starts_with('[') {
++        let Some(close) = find_byte(host_port, b']') else {
++            return false;
++        };
++        if !is_valid_ip_literal(&host_port[1..close]) {
++            return false;
++        }
++        return validate_port_suffix(&host_port[close + 1..]);
++    }
++
++    let colon = find_byte(host_port, b':').unwrap_or(host_port.len());
++    let host = &host_port[..colon];
++    if !validate_host(host) {
++        return false;
++    }
++    if colon == host_port.len() {
++        return true;
++    }
++
++    validate_port(&host_port[colon + 1..])
++}
++
++fn validate_port_suffix(value: &str) -> bool {
++    if value.is_empty() {
++        return true;
++    }
++    let Some(port) = value.strip_prefix(':') else {
++        return false;
++    };
++    validate_port(port)
++}
++
++fn validate_port(value: &str) -> bool {
++    // RFC 3986/3987 define `port = *DIGIT`, so an empty port after the colon
++    // is syntactically valid and scheme policy is outside this validator.
++    value.bytes().all(|byte| byte.is_ascii_digit())
++}
++
++fn validate_host(value: &str) -> bool {
++    // The host alternatives are ordered IPv4address / ireg-name. If the
++    // dotted-decimal production does not match, the generic reg-name remains
++    // a legal fallback under RFC 3986's first-match-wins rule.
++    is_valid_ipv4(value) || validate_component(value, Component::RegName)
++}
++
++fn is_valid_ip_literal(value: &str) -> bool {
++    if value.starts_with('v') || value.starts_with('V') {
++        let Some(dot) = find_byte(value, b'.') else {
++            return false;
++        };
++        if dot <= 1
++            || !value.as_bytes()[1..dot]
++                .iter()
++                .all(|byte| byte.is_ascii_hexdigit())
++        {
++            return false;
++        }
++        let tail = &value[dot + 1..];
++        return !tail.is_empty() && validate_component(tail, Component::IpvFutureTail);
++    }
++
++    is_valid_ipv6(value)
++}
++
++fn is_valid_ipv6(value: &str) -> bool {
++    if value.is_empty() {
++        return false;
++    }
++
++    if !value
++        .bytes()
++        .all(|byte| byte.is_ascii_hexdigit() || matches!(byte, b':' | b'.'))
++    {
++        return false;
++    }
++
++    // `Ipv6Addr` performs the RFC 3986 IPv6 production check. Validate an
++    // embedded dotted-decimal ls32 ourselves as well, because the ABNF
++    // forbids leading-zero octets even if a platform parser accepts them.
++    if let Some(dot) = find_byte(value, b'.') {
++        let Some(colon) = value.as_bytes().iter().rposition(|byte| *byte == b':') else {
++            return false;
++        };
++        if dot < colon || !is_valid_ipv4(&value[colon + 1..]) {
++            return false;
++        }
++    }
++
++    value.parse::<Ipv6Addr>().is_ok()
++}
++
++fn is_valid_ipv4(value: &str) -> bool {
++    let mut octet_count = 0_u8;
++    let mut digit_count = 0_u8;
++    let mut number = 0_u16;
++    let mut leading_zero = false;
++
++    for byte in value.bytes() {
++        if byte.is_ascii_digit() {
++            if digit_count == 0 {
++                leading_zero = byte == b'0';
++            } else if leading_zero {
++                return false;
++            }
++            digit_count += 1;
++            if digit_count > 3 {
++                return false;
++            }
++            number = number * 10 + u16::from(byte - b'0');
++            if number > 255 {
++                return false;
++            }
++        } else if byte == b'.' {
++            if digit_count == 0 || octet_count == 3 {
++                return false;
++            }
++            octet_count += 1;
++            digit_count = 0;
++            number = 0;
++            leading_zero = false;
++        } else {
++            return false;
++        }
++    }
++
++    digit_count != 0 && octet_count == 3
++}
++
++fn validate_component(value: &str, component: Component) -> bool {
++    let bytes = value.as_bytes();
++    let mut index = 0;
++
++    while index < bytes.len() {
++        let byte = bytes[index];
++        if byte == b'%' {
++            if matches!(component, Component::IpvFutureTail)
++                || index + 2 >= bytes.len()
++                || !bytes[index + 1].is_ascii_hexdigit()
++                || !bytes[index + 2].is_ascii_hexdigit()
++            {
++                return false;
++            }
++            index += 3;
++            continue;
++        }
++
++        if byte.is_ascii() {
++            if !is_allowed_ascii(byte, component) {
++                return false;
++            }
++            index += 1;
++            continue;
++        }
++
++        let Some(character) = value[index..].chars().next() else {
++            return false;
++        };
++        if !is_allowed_unicode(character, component) {
++            return false;
++        }
++        index += character.len_utf8();
++    }
++
++    true
++}
++
++fn is_allowed_ascii(byte: u8, component: Component) -> bool {
++    let iunreserved = byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~');
++    let sub_delim = matches!(
++        byte,
++        b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'='
++    );
++
++    match component {
++        Component::UserInfo => iunreserved || sub_delim || byte == b':',
++        Component::RegName => iunreserved || sub_delim,
++        Component::Path => iunreserved || sub_delim || matches!(byte, b':' | b'@' | b'/'),
++        Component::Query | Component::Fragment => {
++            iunreserved || sub_delim || matches!(byte, b':' | b'@' | b'/' | b'?')
++        },
++        Component::SegmentNoColon => iunreserved || sub_delim || byte == b'@',
++        Component::IpvFutureTail => iunreserved || sub_delim || byte == b':',
++    }
++}
++
++fn is_allowed_unicode(character: char, component: Component) -> bool {
++    match component {
++        Component::Query => is_ucschar(character) || is_iprivate(character),
++        Component::IpvFutureTail => false,
++        Component::UserInfo
++        | Component::RegName
++        | Component::Path
++        | Component::Fragment
++        | Component::SegmentNoColon => is_ucschar(character),
++    }
++}
++
++fn is_ucschar(character: char) -> bool {
++    let value = character as u32;
++    (0x00A0..=0xD7FF).contains(&value)
++        || (0xF900..=0xFDCF).contains(&value)
++        || (0xFDF0..=0xFFEF).contains(&value)
++        || (0x10000..=0x1FFFD).contains(&value)
++        || (0x20000..=0x2FFFD).contains(&value)
++        || (0x30000..=0x3FFFD).contains(&value)
++        || (0x40000..=0x4FFFD).contains(&value)
++        || (0x50000..=0x5FFFD).contains(&value)
++        || (0x60000..=0x6FFFD).contains(&value)
++        || (0x70000..=0x7FFFD).contains(&value)
++        || (0x80000..=0x8FFFD).contains(&value)
++        || (0x90000..=0x9FFFD).contains(&value)
++        || (0xA0000..=0xAFFFD).contains(&value)
++        || (0xB0000..=0xBFFFD).contains(&value)
++        || (0xC0000..=0xCFFFD).contains(&value)
++        || (0xD0000..=0xDFFFD).contains(&value)
++        || (0xE1000..=0xEFFFD).contains(&value)
++}
++
++fn is_iprivate(character: char) -> bool {
++    let value = character as u32;
++    (0xE000..=0xF8FF).contains(&value)
++        || (0xF0000..=0xFFFFD).contains(&value)
++        || (0x100000..=0x10FFFD).contains(&value)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::is_valid_iri_reference;
++
++    #[test]
++    fn accepts_empty_relative_query_and_fragment_references() {
++        for value in [
++            "",
++            "?",
++            "#",
++            "?#",
++            "?query=yes",
++            "#fragment",
++            "path/to/resource",
++            "./relative",
++            "../parent",
++            "/absolute/path",
++            "//example.org/path",
++            "a/b:c",
++            "/a:b",
++        ] {
++            assert!(
++                is_valid_iri_reference(value),
++                "expected valid IRI reference: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn accepts_absolute_schemes_and_authority_forms() {
++        for value in [
++            "http:",
++            "http:path",
++            "http:/path",
++            "http://",
++            "http:///path",
++            "http://user:password@example.org:443/path",
++            "http://example.org:",
++            "http://:8080/path",
++            "urn:example:animal:ferret:nose",
++            "mailto:person@example.org?subject=hello",
++            "https://例え.テスト/こんにちは",
++        ] {
++            assert!(
++                is_valid_iri_reference(value),
++                "expected valid IRI reference: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn accepts_ipv6_and_ipvfuture_literals() {
++        for value in [
++            "http://[::1]/",
++            "http://[2001:db8::1]:443/",
++            "http://[::ffff:192.0.2.1]/",
++            "http://[v1.fe]/",
++            "http://[V1.fe:tail]/",
++        ] {
++            assert!(
++                is_valid_iri_reference(value),
++                "expected valid IP literal: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn accepts_ucschar_and_private_query_characters_only_in_their_grammar_slots() {
++        for value in [
++            "https://example.org/\u{00A0}\u{F900}",
++            "https://example.org/?\u{E000}\u{F0000}\u{100000}",
++            "?\u{10FFFD}",
++        ] {
++            assert!(
++                is_valid_iri_reference(value),
++                "expected valid Unicode IRI: {value:?}"
++            );
++        }
++
++        for value in [
++            "https://example.org/\u{E000}",
++            "https://example.org/#\u{E000}",
++            "https://\u{E000}/",
++            "https://example.org/?\u{10FFFE}",
++        ] {
++            assert!(
++                !is_valid_iri_reference(value),
++                "expected invalid Unicode IRI: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn rejects_malformed_ip_literals_and_ports() {
++        for value in [
++            "http://[::1",
++            "http://[::1]]/",
++            "http://[::1%25eth0]/",
++            "http://[2001:db8:0:0:0:0:0:0:1]/",
++            "http://[::ffff:192.00.2.1]/",
++            "http://[::ffff:999.0.2.1]/",
++            "http://[v]/",
++            "http://[v1]/",
++            "http://[v1.]/",
++            "http://[v1.^]/",
++            "http://[v1.fe%20]/",
++            "http://example.org:abc/",
++            "http://example.org:80:90/",
++        ] {
++            assert!(
++                !is_valid_iri_reference(value),
++                "expected invalid IP/port IRI: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn rejects_bad_percent_escapes_and_disallowed_delimiters() {
++        for value in [
++            "http://example.org/%",
++            "http://example.org/%G0",
++            "http://example.org/%0",
++            "http://example.org/a\\b",
++            "http://example.org/a[b",
++            "http://example.org/a b",
++            "http://example.org/#frag#again",
++            "http://example.org/?query#fragment#again",
++        ] {
++            assert!(
++                !is_valid_iri_reference(value),
++                "expected invalid syntax: {value:?}"
++            );
++        }
++    }
++
++    #[test]
++    fn rejects_invalid_first_segment_colons() {
++        for value in [":/path", "1scheme:value", "bad@name:value", "a%3Ab:c"] {
++            assert!(
++                !is_valid_iri_reference(value),
++                "expected invalid relative prefix: {value:?}"
++            );
++        }
++        assert!(is_valid_iri_reference("a:b"));
++        assert!(is_valid_iri_reference("a/b:c"));
++    }
++}
+
+diff --git a/crates/litchi-ods/tests/ods_formula_references.rs b/crates/litchi-ods/tests/ods_formula_references.rs
+new file mode 100644
+index 000000000..dab747f16
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_references.rs
+@@ -0,0 +1,673 @@
++//! Integration coverage for inert OpenFormula 1.4 references.
++//!
++//! The fixtures follow Part 4 section 5.8.  They inspect only the structured
++//! reference token and its decoded metadata: no workbook lookup, URI
++//! resolution, network access, or formula evaluation is involved.
++
++use litchi_core::{Error, Resource};
++use litchi_ods::codec::formula::reference::{
++    Address, Endpoint, EndpointValue, Limits, Reference, SheetSelector, Subtable,
++};
++use litchi_ods::codec::formula::{
++    FormulaLimits, FormulaParser, ReferenceView, Token, extract_cell_refs, extract_references,
++    is_valid_function,
++};
++
++fn parse_reference(value: &str) -> Reference {
++    Reference::parse(value)
++        .unwrap_or_else(|error| panic!("expected valid OpenFormula reference {value:?}: {error}"))
++}
++
++fn parse_formula_reference(value: &str) -> Reference {
++    let formula = FormulaParser::new(value)
++        .parse()
++        .unwrap_or_else(|error| panic!("expected valid formula {value:?}: {error}"));
++    assert_eq!(
++        formula.text, value,
++        "formula text must remain byte-for-byte intact"
++    );
++    formula
++        .tokens
++        .into_iter()
++        .find_map(|token| match token {
++            Token::Reference(reference) => Some(*reference),
++            _ => None,
++        })
++        .unwrap_or_else(|| panic!("formula did not produce a Reference token: {value:?}"))
++}
++
++fn assert_cell(
++    endpoint: &Endpoint,
++    column: &str,
++    row: u32,
++    column_absolute: bool,
++    row_absolute: bool,
++) {
++    let EndpointValue::Cell(cell) = &endpoint.value else {
++        panic!("expected a cell endpoint, got {:?}", endpoint.value);
++    };
++    assert_eq!(cell.column.label, column);
++    assert_eq!(cell.column.absolute, column_absolute);
++    assert_eq!(cell.row.number, row);
++    assert_eq!(cell.row.absolute, row_absolute);
++}
++
++fn assert_column(endpoint: &Endpoint, label: &str, absolute: bool) {
++    let EndpointValue::Column(column) = &endpoint.value else {
++        panic!("expected a column endpoint, got {:?}", endpoint.value);
++    };
++    assert_eq!(column.label, label);
++    assert_eq!(column.absolute, absolute);
++}
++
++fn assert_row(endpoint: &Endpoint, number: u32, absolute: bool) {
++    let EndpointValue::Row(row) = &endpoint.value else {
++        panic!("expected a row endpoint, got {:?}", endpoint.value);
++    };
++    assert_eq!(row.number, number);
++    assert_eq!(row.absolute, absolute);
++}
++
++fn assert_explicit_sheet(endpoint: &Endpoint, name: &str, absolute: bool, quoted: bool) {
++    let SheetSelector::Explicit(locator) = &endpoint.sheet else {
++        panic!(
++            "expected an explicit sheet selector, got {:?}",
++            endpoint.sheet
++        );
++    };
++    assert_eq!(locator.sheet.name, name);
++    assert_eq!(locator.sheet.absolute, absolute);
++    assert_eq!(locator.sheet.quoted, quoted);
++}
++
++fn reference_body_with_length(length: usize) -> String {
++    let name_limit = Limits::default().max_name_bytes();
++    let fixed_name_bytes = name_limit * 3;
++    // `'source'#'sheet'.'subtable'.'subtable'.A1` has fourteen bytes of
++    // syntax around its four decoded names and final cell coordinate.
++    assert!(length >= fixed_name_bytes + 14);
++    let last_name_bytes = length - fixed_name_bytes - 14;
++    assert!(last_name_bytes <= name_limit);
++    format!(
++        "'{}'#'{}'.'{}'.'{}'.A1",
++        "a".repeat(name_limit),
++        "b".repeat(name_limit),
++        "c".repeat(name_limit),
++        "d".repeat(last_name_bytes),
++    )
++}
++
++#[test]
++fn bracketed_references_are_tokens_and_original_formula_text_is_retained() {
++    let formula = FormulaParser::new("of:=[.A1]")
++        .parse()
++        .expect("legacy-compatible bracketed cell remains parseable");
++    assert_eq!(formula.text, "of:=[.A1]");
++    assert!(matches!(formula.tokens.first(), Some(Token::CellRef(_))));
++
++    let reference = parse_formula_reference("of:=[.A1:.B2]");
++    match &reference {
++        Reference::Local(Address::Cells(start, end)) => {
++            assert_eq!(start.sheet, SheetSelector::Current);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_cell(start, "A", 1, false, false);
++            assert_cell(end, "B", 2, false, false);
++        },
++        other => panic!("expected rich inherited cell range, got {other:?}"),
++    }
++
++    let formula = FormulaParser::new("=A1+Sheet1.$B$2")
++        .parse()
++        .expect("legacy bare cell references remain parseable");
++    assert_eq!(formula.text, "=A1+Sheet1.$B$2");
++    assert!(matches!(formula.tokens[0], Token::CellRef(_)));
++    assert!(matches!(formula.tokens[2], Token::CellRef(_)));
++
++    let nested = FormulaParser::new("of:=SUM([.A1:.B2])")
++        .parse()
++        .expect("a bracketed reference is inert inside a function call");
++    assert_eq!(nested.text, "of:=SUM([.A1:.B2])");
++    assert!(
++        nested
++            .tokens
++            .iter()
++            .any(|token| matches!(token, Token::Reference(_)))
++    );
++    assert!(
++        nested
++            .tokens
++            .iter()
++            .filter_map(|token| match token {
++                Token::Reference(reference) => Some(reference.as_ref()),
++                _ => None,
++            })
++            .any(|reference| matches!(reference, Reference::Local(Address::Cells(_, _))))
++    );
++    assert!(
++        extract_references(&nested)
++            .iter()
++            .any(|reference| matches!(reference, ReferenceView::Rich(_)))
++    );
++    assert!(matches!(
++        parse_formula_reference("of:=[.A1:.B2]").address(),
++        Some(Address::Cells(_, _))
++    ));
++    match parse_formula_reference("of:=[.A1:.B2]").address() {
++        Some(Address::Cells(start, end)) => {
++            assert_eq!(start.sheet, SheetSelector::Current);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++        },
++        other => panic!("rich address accessor lost inherited endpoint: {other:?}"),
++    }
++}
++
++#[test]
++fn all_six_range_alternatives_preserve_coordinate_kind_and_locator_state() {
++    match parse_reference("[.A1]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_eq!(endpoint.sheet, SheetSelector::Current);
++            assert_cell(&endpoint, "A", 1, false, false);
++        },
++        other => panic!("expected one current-sheet cell, got {other:?}"),
++    }
++
++    match parse_reference("[.A1:.B$2]") {
++        Reference::Local(Address::Cells(start, end)) => {
++            assert_eq!(start.sheet, SheetSelector::Current);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_cell(&start, "A", 1, false, false);
++            assert_cell(&end, "B", 2, false, true);
++        },
++        other => panic!("expected inherited cell range, got {other:?}"),
++    }
++
++    match parse_reference("[.$A:.$C]") {
++        Reference::Local(Address::Columns(start, end)) => {
++            assert_eq!(start.sheet, SheetSelector::Current);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_column(&start, "A", true);
++            assert_column(&end, "C", true);
++        },
++        other => panic!("expected inherited whole-column range, got {other:?}"),
++    }
++
++    match parse_reference("[.$1:.$3]") {
++        Reference::Local(Address::Rows(start, end)) => {
++            assert_eq!(start.sheet, SheetSelector::Current);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_row(&start, 1, true);
++            assert_row(&end, 3, true);
++        },
++        other => panic!("expected inherited whole-row range, got {other:?}"),
++    }
++
++    match parse_reference("[Sheet1.A1:Sheet2.$B$2]") {
++        Reference::Local(Address::Cells(start, end)) => {
++            assert_explicit_sheet(&start, "Sheet1", false, false);
++            assert_explicit_sheet(&end, "Sheet2", false, false);
++            assert_cell(&start, "A", 1, false, false);
++            assert_cell(&end, "B", 2, true, true);
++        },
++        other => panic!("expected cross-sheet cell cuboid, got {other:?}"),
++    }
++
++    match parse_reference("[$Sheet1.$A:$Sheet2.$C]") {
++        Reference::Local(Address::Columns(start, end)) => {
++            assert_explicit_sheet(&start, "Sheet1", true, false);
++            assert_explicit_sheet(&end, "Sheet2", true, false);
++            assert_column(&start, "A", true);
++            assert_column(&end, "C", true);
++        },
++        other => panic!("expected cross-sheet whole-column cuboid, got {other:?}"),
++    }
++
++    match parse_reference("[Sheet1.$1:Sheet2.$3]") {
++        Reference::Local(Address::Rows(start, end)) => {
++            assert_explicit_sheet(&start, "Sheet1", false, false);
++            assert_explicit_sheet(&end, "Sheet2", false, false);
++            assert_row(&start, 1, true);
++            assert_row(&end, 3, true);
++        },
++        other => panic!("expected cross-sheet whole-row cuboid, got {other:?}"),
++    }
++}
++
++#[test]
++fn quoted_unicode_delimited_and_nested_locators_keep_full_metadata() {
++    match parse_reference("['Q1 Sales'.$C$3]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "Q1 Sales", false, true);
++            assert_cell(&endpoint, "C", 3, true, true);
++        },
++        other => panic!("expected quoted sheet cell, got {other:?}"),
++    }
++
++    match parse_reference("['Bob''s'.A1]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "Bob's", false, true);
++            assert_cell(&endpoint, "A", 1, false, false);
++        },
++        other => panic!("expected doubled-apostrophe sheet cell, got {other:?}"),
++    }
++
++    match parse_reference("['日本語'.A1]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "日本語", false, true);
++            assert_cell(&endpoint, "A", 1, false, false);
++        },
++        other => panic!("expected Unicode sheet cell, got {other:?}"),
++    }
++
++    match parse_reference("['A] : B.C'.A1]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "A] : B.C", false, true);
++            assert_cell(&endpoint, "A", 1, false, false);
++        },
++        other => panic!("expected delimiters inside quoted sheet, got {other:?}"),
++    }
++
++    match parse_reference("[$'Q1 Sales'.$A$1]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "Q1 Sales", true, true);
++            assert_cell(&endpoint, "A", 1, true, true);
++        },
++        other => panic!("expected absolute quoted sheet cell, got {other:?}"),
++    }
++
++    for (spelling, expected_name) in [("[[.A1]", "["), ("[S[heet.A1]", "S[heet")] {
++        match parse_reference(spelling) {
++            Reference::Local(Address::Cell(endpoint)) => {
++                assert_explicit_sheet(&endpoint, expected_name, false, false);
++                assert_cell(&endpoint, "A", 1, false, false);
++            },
++            other => panic!("expected delimiter-bearing unquoted sheet, got {other:?}"),
++        }
++    }
++
++    match parse_reference("[Sheet:Name.A1:.B2]") {
++        Reference::Local(Address::Cells(start, end)) => {
++            assert_explicit_sheet(&start, "Sheet:Name", false, false);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_cell(&start, "A", 1, false, false);
++            assert_cell(&end, "B", 2, false, false);
++        },
++        other => panic!("expected colon-bearing sheet name, got {other:?}"),
++    }
++
++    match parse_reference("[Sheet.A1.'Sub]Table'.'Sub.Table'.B2]") {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert_explicit_sheet(&endpoint, "Sheet", false, false);
++            let SheetSelector::Explicit(locator) = &endpoint.sheet else {
++                unreachable!("checked above");
++            };
++            assert_eq!(locator.subtables.len(), 3);
++            match &locator.subtables[0] {
++                Subtable::Cell(cell) => {
++                    assert_eq!(cell.column.label, "A");
++                    assert_eq!(cell.row.number, 1);
++                },
++                other => panic!("expected cell subtable, got {other:?}"),
++            }
++            match &locator.subtables[1] {
++                Subtable::Name(name) => {
++                    assert_eq!(name.name, "Sub]Table");
++                    assert!(name.quoted);
++                },
++                other => panic!("expected quoted subtable, got {other:?}"),
++            }
++            match &locator.subtables[2] {
++                Subtable::Name(name) => {
++                    assert_eq!(name.name, "Sub.Table");
++                    assert!(name.quoted);
++                },
++                other => panic!("expected second quoted subtable, got {other:?}"),
++            }
++            assert_cell(&endpoint, "B", 2, false, false);
++        },
++        other => panic!("expected nested subtable cell, got {other:?}"),
++    }
++}
++
++#[test]
++fn source_iris_are_decoded_and_remain_external_inert_metadata() {
++    for (spelling, decoded) in [
++        ("[''#.A1]", ""),
++        ("['../book.ods'#.A1]", "../book.ods"),
++        ("['#fragment'#.A1]", "#fragment"),
++        (
++            "['https://例え.テスト/こんにちは?x=✓'#.A1]",
++            "https://例え.テスト/こんにちは?x=✓",
++        ),
++        (
++            "['https://example.org/a#fragment'#.A1]",
++            "https://example.org/a#fragment",
++        ),
++        ("['file:///O''Brien.ods'#.A1]", "file:///O'Brien.ods"),
++    ] {
++        let reference = parse_reference(spelling);
++        assert_eq!(
++            reference.source().map(|source| source.as_str()),
++            Some(decoded)
++        );
++        assert!(matches!(reference.address(), Some(Address::Cell(_))));
++        assert!(!reference.is_error());
++        match reference {
++            Reference::Source {
++                address: Address::Cell(endpoint),
++                ..
++            } => {
++                assert_eq!(endpoint.sheet, SheetSelector::Current);
++                assert_cell(&endpoint, "A", 1, false, false);
++            },
++            other => panic!("expected source-qualified cell, got {other:?}"),
++        }
++    }
++
++    let formula_reference = parse_formula_reference("of:=['file:///O''Brien.ods'#.A1]");
++    assert_eq!(
++        formula_reference.source().unwrap().as_str(),
++        "file:///O'Brien.ods"
++    );
++    assert!(matches!(formula_reference, Reference::Source { .. }));
++
++    let nested_formula = FormulaParser::new("of:=SUM(['file:///book.ods'#.A1])")
++        .parse()
++        .expect("external references remain inert inside a formula");
++    let rich_references = extract_references(&nested_formula);
++    assert!(matches!(
++        rich_references.as_slice(),
++        [ReferenceView::Rich(Reference::Source { .. })]
++    ));
++    assert!(extract_cell_refs(&nested_formula).is_empty());
++
++    match parse_reference("['../book.ods'#Sheet1.A1:.B2]") {
++        Reference::Source {
++            address: Address::Cells(start, end),
++            ..
++        } => {
++            assert_explicit_sheet(&start, "Sheet1", false, false);
++            assert_eq!(end.sheet, SheetSelector::Inherited);
++            assert_cell(&start, "A", 1, false, false);
++            assert_cell(&end, "B", 2, false, false);
++        },
++        other => panic!("expected source-qualified inherited range, got {other:?}"),
++    }
++}
++
++#[test]
++fn reference_error_is_distinct_and_cannot_be_made_source_qualified() {
++    let reference = parse_reference("[#REF!]");
++    assert!(reference.is_error());
++    assert_eq!(reference.source(), None);
++    assert_eq!(reference.address(), None);
++    assert!(matches!(reference, Reference::Error));
++
++    assert!(Reference::parse("[''#REF!]").is_err());
++    assert!(Reference::parse("['file:///book.ods'# #REF!]").is_err());
++}
++
++#[test]
++fn public_reference_parser_requires_the_normative_bracket_wrapper() {
++    for input in [".A1", "Sheet1.A1", "#REF!"] {
++        assert!(
++            Reference::parse(input).is_err(),
++            "unbracketed reference was accepted by the public parser: {input:?}"
++        );
++    }
++    assert!(Reference::parse("[.A1]").is_ok());
++}
++
++#[test]
++fn representative_functions_and_bare_cell_controls_remain_unchanged() {
++    for name in [
++        "SUM", "LOG10", "BIN2DEC", "BITAND", "COMPLEX", "DCOUNT", "DDE", "VLOOKUP",
++    ] {
++        assert!(
++            is_valid_function(name),
++            "representative function was lost: {name}"
++        );
++    }
++    for (spelling, canonical) in [("sum", "SUM"), ("LoG10", "LOG10"), ("bin2dec", "BIN2DEC")] {
++        assert!(
++            is_valid_function(spelling),
++            "case-insensitive function was rejected: {spelling}"
++        );
++        assert!(is_valid_function(canonical));
++    }
++
++    for input in ["=A1", "=AA10", "=Sheet1.A1", "=$A$1", "=.A1"] {
++        let formula = FormulaParser::new(input)
++            .parse()
++            .unwrap_or_else(|error| panic!("legacy cell reference rejected {input:?}: {error}"));
++        assert_eq!(formula.text, input);
++        assert!(
++            matches!(formula.tokens.first(), Some(Token::CellRef(_))),
++            "{input:?}"
++        );
++        assert!(
++            formula
++                .tokens
++                .iter()
++                .all(|token| !matches!(token, Token::Reference(_))),
++            "{input:?}"
++        );
++    }
++}
++
++#[test]
++fn formula_limits_are_exact_and_forward_into_nested_references() {
++    let input = "=A1";
++    let exact = FormulaLimits::default().with_max_bytes(input.len());
++    let formula = FormulaParser::new(input)
++        .parse_with_limits(&exact)
++        .expect("formula at the byte limit must be admitted");
++    assert_eq!(formula.text, input);
++    assert_eq!(formula.tokens.len(), 1);
++
++    let short = FormulaLimits::default().with_max_bytes(input.len() - 1);
++    let byte_error = FormulaParser::new(input)
++        .parse_with_limits(&short)
++        .expect_err("formula one byte over the limit must fail");
++    let Error::ResourceLimit(byte_limit) = byte_error else {
++        panic!("formula byte overflow lost its typed limit error: {byte_error}");
++    };
++    assert_eq!(byte_limit.resource, Resource::InputBytes);
++    assert_eq!(byte_limit.observed, input.len() as u64);
++    assert_eq!(byte_limit.limit, (input.len() - 1) as u64);
++
++    let one_token = FormulaLimits::default().with_max_tokens(1);
++    let one = FormulaParser::new("=1")
++        .parse_with_limits(&one_token)
++        .expect("one token at the token limit must be admitted");
++    assert_eq!(one.tokens.len(), 1);
++
++    let token_error = FormulaParser::new("=1+2")
++        .parse_with_limits(&one_token)
++        .expect_err("a second token over the limit must fail");
++    let Error::ResourceLimit(token_limit) = token_error else {
++        panic!("formula token overflow lost its typed limit error: {token_error}");
++    };
++    assert_eq!(token_limit.resource, Resource::Objects);
++    assert_eq!(token_limit.observed, 2);
++    assert_eq!(token_limit.limit, 1);
++
++    // Admission happens before `next_token`, so a malformed first token still
++    // reports the configured token budget instead of a syntax fallback.
++    let no_tokens = FormulaLimits::default().with_max_tokens(0);
++    let malformed_error = FormulaParser::new("=~")
++        .parse_with_limits(&no_tokens)
++        .expect_err("zero token budget must reject before parsing malformed input");
++    let Error::ResourceLimit(malformed_limit) = malformed_error else {
++        panic!(
++            "zero-token admission parsed malformed input instead of returning a limit: {malformed_error}"
++        );
++    };
++    assert_eq!(malformed_limit.resource, Resource::Objects);
++    assert_eq!(malformed_limit.observed, 1);
++    assert_eq!(malformed_limit.limit, 0);
++
++    let nested_exact =
++        FormulaLimits::default().with_reference_limits(Limits::default().with_max_bytes(3));
++    FormulaParser::new("of:=[.A1]")
++        .parse_with_limits(&nested_exact)
++        .expect("nested reference at its body byte limit must be admitted");
++
++    let nested_short =
++        FormulaLimits::default().with_reference_limits(Limits::default().with_max_bytes(2));
++    let nested_error = FormulaParser::new("of:=[.A1]")
++        .parse_with_limits(&nested_short)
++        .expect_err("nested reference byte overflow must be forwarded");
++    let Error::ResourceLimit(nested_limit) = nested_error else {
++        panic!("nested reference limit was converted to syntax error: {nested_error}");
++    };
++    assert_eq!(nested_limit.resource, Resource::InputBytes);
++    assert_eq!(nested_limit.observed, 3);
++    assert_eq!(nested_limit.limit, 2);
++
++    let nested_name =
++        FormulaLimits::default().with_reference_limits(Limits::default().with_max_name_bytes(3));
++    let name_error = FormulaParser::new("of:=[Sheet.A1]")
++        .parse_with_limits(&nested_name)
++        .expect_err("nested reference name overflow must be forwarded");
++    assert!(matches!(name_error, Error::ResourceLimit(_)));
++}
++
++#[test]
++fn malformed_mixed_and_overflow_references_are_refused() {
++    for input in [
++        "[]",
++        "[.a1]",
++        "[.A01]",
++        "[.A0]",
++        "[.A]",
++        "[.1]",
++        "[.A1:.B]",
++        "[.A1:.1]",
++        "[.A:.1]",
++        "[.A1:Sheet.B2]",
++        "[.A1:B2]",
++        "[.A1:.B2:.C3]",
++        "[Sheet.A1:Sheet.B2:Sheet.C3]",
++        "[Sheet..A1]",
++        "[Sheet.A1.]",
++        "[Sheet.A1.'Sub].B2]",
++        "[''.A1]",
++        "['Q1 Sales.A1]",
++        "['Bob's'.A1]",
++        "[.A4294967296]",
++        "[.A18446744073709551616]",
++        "['file:///bad%ZZ'#.A1]",
++        "['file:///bad path'#.A1]",
++        "['file:///bad'#A1]",
++        "['file:///bad'#.A1",
++        "[#ref!]",
++    ] {
++        assert!(
++            Reference::parse(input).is_err(),
++            "malformed reference was accepted: {input:?}"
++        );
++    }
++}
++
++#[test]
++fn source_and_locator_boundaries_are_bounded_without_losing_atomicity() {
++    // `max_bytes` is the body budget: the two outer brackets do not consume
++    // it.  Check both sides of the boundary through the public parser.
++    let exact_body = Limits::default().with_max_bytes(".A1".len());
++    assert!(Reference::parse_with_limits("[.A1]", &exact_body).is_ok());
++    let one_byte_short = Limits::default().with_max_bytes(".A1".len() - 1);
++    assert!(Reference::parse_with_limits("[.A1]", &one_byte_short).is_err());
++
++    // FormulaParser uses the same body budget after it has removed the
++    // bracket wrapper.  Keep the constructed names within the independent
++    // decoded-name budget while making the body exactly 64 KiB and then one
++    // byte larger.
++    let default_body_limit = Limits::default().max_bytes();
++    let exact_formula = format!("of:=[{}]", reference_body_with_length(default_body_limit));
++    let exact = FormulaParser::new(&exact_formula)
++        .parse()
++        .expect("formula reference at the body limit must be admitted");
++    assert_eq!(exact.text, exact_formula);
++    assert!(exact.tokens.iter().any(|token| matches!(
++        token,
++        Token::Reference(reference) if matches!(reference.as_ref(), Reference::Source { .. })
++    )));
++
++    let over_formula = format!(
++        "of:=[{}]",
++        reference_body_with_length(default_body_limit + 1)
++    );
++    let over_error = FormulaParser::new(&over_formula)
++        .parse()
++        .expect_err("formula reference one byte over the body limit must fail");
++    assert!(
++        matches!(&over_error, Error::ResourceLimit(_)),
++        "formula body overflow must retain its typed resource-limit cause: {over_error}"
++    );
++
++    // Name limits are measured after UTF-8 decoding and doubled-apostrophe
++    // unescaping, rather than by their lexical spelling.
++    let exact_unicode = Limits::default().with_max_name_bytes("界".len());
++    assert!(Reference::parse_with_limits("['界'.A1]", &exact_unicode).is_ok());
++    let unicode_short = Limits::default().with_max_name_bytes("界".len() - 1);
++    assert!(Reference::parse_with_limits("['界'.A1]", &unicode_short).is_err());
++
++    let exact_decoded = Limits::default().with_max_name_bytes(3);
++    assert!(Reference::parse_with_limits("['a''b'.A1]", &exact_decoded).is_ok());
++    let decoded_short = Limits::default().with_max_name_bytes(2);
++    assert!(Reference::parse_with_limits("['a''b'.A1]", &decoded_short).is_err());
++    assert!(Reference::parse_with_limits("['a''b'#.A1]", &exact_decoded).is_ok());
++    assert!(Reference::parse_with_limits("['a''b'#.A1]", &decoded_short).is_err());
++
++    let body_limit = Limits::default().with_max_bytes(2);
++    assert!(Reference::parse_with_limits("[.A1]", &body_limit).is_err());
++
++    let name_limit = Limits::default().with_max_name_bytes(3);
++    assert!(Reference::parse_with_limits("[Sheet.A1]", &name_limit).is_err());
++    assert!(Reference::parse_with_limits("['../book.ods'#.A1]", &name_limit).is_err());
++
++    let component_limit = Limits::default().with_max_components(1);
++    assert!(Reference::parse_with_limits("[.A1]", &component_limit).is_err());
++
++    let oversized_source = "a".repeat(Limits::default().max_name_bytes() + 1);
++    let oversized_reference = format!("['{oversized_source}'#.A1]");
++    let source_error = Reference::parse(&oversized_reference)
++        .expect_err("an oversized source must fail before it can be retained");
++    assert!(
++        matches!(&source_error, Error::ResourceLimit(_)),
++        "source refusal must retain its typed resource-limit cause: {source_error}"
++    );
++    assert!(
++        source_error
++            .to_string()
++            .to_ascii_lowercase()
++            .contains("limit"),
++        "source refusal lost its resource-limit cause: {source_error}"
++    );
++    let formula = format!("of:={oversized_reference}");
++    let formula_error = FormulaParser::new(&formula)
++        .parse()
++        .expect_err("the formula path must propagate source admission refusal");
++    assert!(
++        matches!(&formula_error, Error::ResourceLimit(_)),
++        "formula path must retain its typed resource-limit cause: {formula_error}"
++    );
++    assert!(
++        formula_error
++            .to_string()
++            .to_ascii_lowercase()
++            .contains("limit"),
++        "formula path converted source limit refusal into a generic fallback: {formula_error}"
++    );
++
++    let valid = Reference::parse_with_limits(
++        "[''#.A1:.B2]",
++        &Limits::default()
++            .with_max_bytes(64)
++            .with_max_components(8)
++            .with_max_name_bytes(8),
++    )
++    .expect("a bounded valid source reference remains readable");
++    assert_eq!(valid.source().unwrap().as_str(), "");
++    assert!(matches!(valid, Reference::Source { .. }));
++}

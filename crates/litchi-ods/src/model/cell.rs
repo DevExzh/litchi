@@ -249,11 +249,7 @@ impl Cell {
     /// ranges are kept in document order and may not overlap, so unrelated
     /// text cannot accidentally acquire a target. Hyperlink targets are inert
     /// metadata and are never followed by this crate.
-    pub fn add_hyperlink(
-        &mut self,
-        range: Range<usize>,
-        mut hyperlink: Link,
-    ) -> Result<()> {
+    pub fn add_hyperlink(&mut self, range: Range<usize>, mut hyperlink: Link) -> Result<()> {
         if self.merge == CellMerge::Covered {
             return Err(litchi_core::Error::InvalidFormat(
                 "cannot author a hyperlink in a covered cell".to_string(),
@@ -557,7 +553,7 @@ impl Cell {
         if let Some(formula) = self.parsed_formula()? {
             Ok(super::formula::extract_cell_refs(&formula)
                 .into_iter()
-                .cloned()
+                .map(std::borrow::Cow::into_owned)
                 .collect())
         } else {
             Ok(Vec::new())
@@ -1025,10 +1021,7 @@ mod tests {
         let mut unicode = Cell::new(CellValue::Text("é".to_string()), "é", 0, 0);
         assert!(
             unicode
-                .add_hyperlink(
-                    1..2,
-                    Link::with_text("https://example.test/", "").unwrap(),
-                )
+                .add_hyperlink(1..2, Link::with_text("https://example.test/", "").unwrap(),)
                 .is_err()
         );
     }
