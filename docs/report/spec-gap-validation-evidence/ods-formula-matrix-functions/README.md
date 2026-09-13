@@ -29,10 +29,11 @@ performance requirements.
 
 The [current release report](performance/release-06-analysis.md) retains 99
 successful processes over 33 cases, with zero deterministic result/counter
-changes between the two release windows. Ten cases trigger at least one
-positive latency/RSS review flag; those comparisons are not interleaved and
-remain open for follow-up. Exact per-case results are retained rather than
-reported as a blanket performance pass.
+changes between the two release windows. Ten cases trigger RSS review flags in those sequential windows. The
+[paired follow-up](performance/pairs-01-analysis.md) passes 198 processes with
+unchanged deterministic results and counters. Fourteen cases exceed the RSS
+review threshold, including five of the earlier ten; no median p50/p95 latency
+change exceeds 5%. RSS acceptance and existing-workload checks remain open.
 
 - [Contract](contract.md): local specification sections and context rules.
 - [Implementation profile](implementation-profile.md): explicit choices for

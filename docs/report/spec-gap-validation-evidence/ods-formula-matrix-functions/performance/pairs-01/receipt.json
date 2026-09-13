@@ -1,0 +1,16 @@
+{
+  "archive_sha256": "0e8c54e71ef5503ab9b54966b64ca8cd0846959ef577632a64be150c9e6cde3a",
+  "binaries": {
+    "before": "345d84f03adabcdece862e8a7285d100b1e31042c44607f67c5127de9d2784d8",
+    "after": "fe9d4e7350b25df8f56e90dcd42b6d9dc3b89cef87daea30463afd9edad018f5"
+  },
+  "source_basis": [
+    "../../candidate-05/source.tar.gz",
+    "../../candidate-06/source.tar.gz"
+  ],
+  "runs": 198,
+  "failed_runs": 0,
+  "deterministic_mismatches": [],
+  "rss_review_flags": 14,
+  "capture_runner_sha256": "803fb2ba81bb54401f195ed0575e79c17d3ce577ace22560439e4b48bcaed3ce"
+}

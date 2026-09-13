@@ -1,0 +1,1459 @@
+{
+  "runs": 198,
+  "failed_runs": 0,
+  "deterministic_mismatches": [],
+  "cases": [
+    {
+      "case": "mdeterm-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2704,
+          2628,
+          2688
+        ],
+        "elapsed_ns": [
+          31100,
+          30470,
+          31110
+        ],
+        "elapsed_ns_p95": [
+          31500,
+          30640,
+          31601
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2844,
+          2832,
+          2652
+        ],
+        "elapsed_ns": [
+          31360,
+          31450,
+          31310
+        ],
+        "elapsed_ns_p95": [
+          31660,
+          31761,
+          31710
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 5.35714285714286,
+        "elapsed_ns": 0.8360128617363349,
+        "elapsed_ns_p95": 0.6666666666666599
+      },
+      "review_flag": true
+    },
+    {
+      "case": "minverse-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2792,
+          2808,
+          2696
+        ],
+        "elapsed_ns": [
+          37470,
+          37190,
+          37600
+        ],
+        "elapsed_ns_p95": [
+          38030,
+          37910,
+          38200
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2928,
+          2868,
+          2684
+        ],
+        "elapsed_ns": [
+          37481,
+          37760,
+          37390
+        ],
+        "elapsed_ns_p95": [
+          38040,
+          38310,
+          37881
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 2.7220630372492893,
+        "elapsed_ns": 0.02935681878837304,
+        "elapsed_ns_p95": 0.02629503023927615
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mmult-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2696,
+          2908,
+          2648
+        ],
+        "elapsed_ns": [
+          44831,
+          44851,
+          45500
+        ],
+        "elapsed_ns_p95": [
+          48630,
+          45730,
+          46060
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2656,
+          2912,
+          2636
+        ],
+        "elapsed_ns": [
+          46690,
+          45590,
+          45101
+        ],
+        "elapsed_ns_p95": [
+          47300,
+          46141,
+          49700
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.4836795252225476,
+        "elapsed_ns": 1.6476778667142256,
+        "elapsed_ns_p95": 2.6921406860616504
+      },
+      "review_flag": false
+    },
+    {
+      "case": "munit-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2808,
+          2752,
+          2748
+        ],
+        "elapsed_ns": [
+          17940,
+          17580,
+          17950
+        ],
+        "elapsed_ns_p95": [
+          18400,
+          18060,
+          18030
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2836,
+          2604,
+          2780
+        ],
+        "elapsed_ns": [
+          17470,
+          17650,
+          17741
+        ],
+        "elapsed_ns_p95": [
+          17700,
+          17830,
+          18090
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 1.017441860465107,
+        "elapsed_ns": -1.6164994425863943,
+        "elapsed_ns_p95": -1.2735326688815052
+      },
+      "review_flag": false
+    },
+    {
+      "case": "transpose-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2788,
+          2796,
+          2808
+        ],
+        "elapsed_ns": [
+          30080,
+          29810,
+          30470
+        ],
+        "elapsed_ns_p95": [
+          30661,
+          30481,
+          30930
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2812,
+          2848,
+          2628
+        ],
+        "elapsed_ns": [
+          30620,
+          30061,
+          29910
+        ],
+        "elapsed_ns_p95": [
+          30960,
+          30630,
+          30211
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 0.5722460658083017,
+        "elapsed_ns": -0.06316489361701816,
+        "elapsed_ns_p95": -0.10110563908548587
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mdeterm-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2708,
+          2688,
+          2652
+        ],
+        "elapsed_ns": [
+          42370,
+          42460,
+          42110
+        ],
+        "elapsed_ns_p95": [
+          42540,
+          43290,
+          42380
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2912,
+          2864,
+          2656
+        ],
+        "elapsed_ns": [
+          42300,
+          41130,
+          42631
+        ],
+        "elapsed_ns_p95": [
+          42870,
+          41720,
+          46830
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 6.547619047619047,
+        "elapsed_ns": -0.1652112343639378,
+        "elapsed_ns_p95": 0.77574047954867
+      },
+      "review_flag": true
+    },
+    {
+      "case": "minverse-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2660,
+          2704,
+          2796
+        ],
+        "elapsed_ns": [
+          83321,
+          83041,
+          82371
+        ],
+        "elapsed_ns_p95": [
+          89960,
+          90361,
+          89170
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2664,
+          2656,
+          2876
+        ],
+        "elapsed_ns": [
+          84800,
+          83120,
+          83430
+        ],
+        "elapsed_ns_p95": [
+          89140,
+          87431,
+          87480
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.4792899408283988,
+        "elapsed_ns": 0.46844329909321303,
+        "elapsed_ns_p95": -2.756780791462876
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mmult-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2856,
+          2912,
+          2948
+        ],
+        "elapsed_ns": [
+          82570,
+          82470,
+          80700
+        ],
+        "elapsed_ns_p95": [
+          89740,
+          89341,
+          84770
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2964,
+          3164,
+          3156
+        ],
+        "elapsed_ns": [
+          86740,
+          82941,
+          82900
+        ],
+        "elapsed_ns_p95": [
+          90850,
+          86731,
+          87461
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 8.379120879120872,
+        "elapsed_ns": 0.5711167697344477,
+        "elapsed_ns_p95": -2.1042970192856614
+      },
+      "review_flag": true
+    },
+    {
+      "case": "munit-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2900,
+          2708,
+          2656
+        ],
+        "elapsed_ns": [
+          9050,
+          9000,
+          8900
+        ],
+        "elapsed_ns_p95": [
+          9200,
+          9180,
+          9040
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2848,
+          2636,
+          2656
+        ],
+        "elapsed_ns": [
+          9000,
+          8890,
+          8960
+        ],
+        "elapsed_ns_p95": [
+          9100,
+          8980,
+          9060
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.9202363367799125,
+        "elapsed_ns": -0.4444444444444473,
+        "elapsed_ns_p95": -1.3071895424836555
+      },
+      "review_flag": false
+    },
+    {
+      "case": "transpose-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2704,
+          2672,
+          2676
+        ],
+        "elapsed_ns": [
+          34471,
+          34440,
+          34410
+        ],
+        "elapsed_ns_p95": [
+          34641,
+          34760,
+          34720
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2908,
+          2844,
+          2804
+        ],
+        "elapsed_ns": [
+          33980,
+          37530,
+          34970
+        ],
+        "elapsed_ns_p95": [
+          34250,
+          41940,
+          35210
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 6.278026905829592,
+        "elapsed_ns": 1.5389082462253123,
+        "elapsed_ns_p95": 1.4112903225806495
+      },
+      "review_flag": true
+    },
+    {
+      "case": "mdeterm-16",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2880,
+          3000,
+          2944
+        ],
+        "elapsed_ns": [
+          83881,
+          82440,
+          82350
+        ],
+        "elapsed_ns_p95": [
+          90860,
+          86790,
+          88130
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3112,
+          2912,
+          3144
+        ],
+        "elapsed_ns": [
+          83821,
+          83970,
+          84060
+        ],
+        "elapsed_ns_p95": [
+          88210,
+          90541,
+          89480
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 5.7065217391304435,
+        "elapsed_ns": 1.8558951965065518,
+        "elapsed_ns_p95": 1.5318279813911317
+      },
+      "review_flag": true
+    },
+    {
+      "case": "minverse-16",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          3056,
+          2944,
+          3012
+        ],
+        "elapsed_ns": [
+          231191,
+          229391,
+          234401
+        ],
+        "elapsed_ns_p95": [
+          238251,
+          237661,
+          241892
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3164,
+          3104,
+          3076
+        ],
+        "elapsed_ns": [
+          229431,
+          231041,
+          231341
+        ],
+        "elapsed_ns_p95": [
+          237661,
+          239321,
+          242111
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 3.054448871181936,
+        "elapsed_ns": -0.0648814183943136,
+        "elapsed_ns_p95": 0.4491061947274
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mmult-16",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2940,
+          2960,
+          3096
+        ],
+        "elapsed_ns": [
+          211011,
+          215491,
+          207061
+        ],
+        "elapsed_ns_p95": [
+          218621,
+          223111,
+          218021
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3052,
+          3164,
+          3104
+        ],
+        "elapsed_ns": [
+          207951,
+          207051,
+          210501
+        ],
+        "elapsed_ns_p95": [
+          215751,
+          215811,
+          220851
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 4.86486486486486,
+        "elapsed_ns": -1.4501613659951396,
+        "elapsed_ns_p95": -1.2853294056838105
+      },
+      "review_flag": false
+    },
+    {
+      "case": "munit-16",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2600,
+          2856,
+          2676
+        ],
+        "elapsed_ns": [
+          11500,
+          11300,
+          11430
+        ],
+        "elapsed_ns_p95": [
+          11720,
+          11371,
+          11520
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2888,
+          2848,
+          2620
+        ],
+        "elapsed_ns": [
+          11420,
+          11510,
+          11480
+        ],
+        "elapsed_ns_p95": [
+          11500,
+          11690,
+          11700
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 6.427503736920781,
+        "elapsed_ns": 0.43744531933507247,
+        "elapsed_ns_p95": 1.475694444444442
+      },
+      "review_flag": true
+    },
+    {
+      "case": "transpose-16",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          3040,
+          2856,
+          2908
+        ],
+        "elapsed_ns": [
+          55130,
+          55110,
+          54840
+        ],
+        "elapsed_ns_p95": [
+          55360,
+          55251,
+          59520
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3180,
+          3184,
+          3164
+        ],
+        "elapsed_ns": [
+          54590,
+          52260,
+          54950
+        ],
+        "elapsed_ns_p95": [
+          54871,
+          56570,
+          59791
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 9.353507565336994,
+        "elapsed_ns": -0.9435674106332836,
+        "elapsed_ns_p95": 2.1856936416184913
+      },
+      "review_flag": true
+    },
+    {
+      "case": "transpose-64",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          4996,
+          5088,
+          5000
+        ],
+        "elapsed_ns": [
+          595182,
+          593903,
+          589423
+        ],
+        "elapsed_ns_p95": [
+          608342,
+          602952,
+          597003
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          5004,
+          4956,
+          4936
+        ],
+        "elapsed_ns": [
+          591982,
+          627103,
+          613422
+        ],
+        "elapsed_ns_p95": [
+          597923,
+          638353,
+          621163
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -0.880000000000003,
+        "elapsed_ns": 3.2865636307612522,
+        "elapsed_ns_p95": 3.0203067574201548
+      },
+      "review_flag": false
+    },
+    {
+      "case": "munit-64",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          3204,
+          3212,
+          3280
+        ],
+        "elapsed_ns": [
+          73131,
+          73181,
+          74570
+        ],
+        "elapsed_ns_p95": [
+          73831,
+          77680,
+          78271
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3292,
+          3376,
+          3304
+        ],
+        "elapsed_ns": [
+          75171,
+          73211,
+          73200
+        ],
+        "elapsed_ns_p95": [
+          81741,
+          78270,
+          80191
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 2.8642590286425795,
+        "elapsed_ns": 0.04099424714065769,
+        "elapsed_ns_p95": 3.2324922760041286
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mmult-rect-4x8x2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2700,
+          2692,
+          2896
+        ],
+        "elapsed_ns": [
+          32640,
+          30790,
+          30600
+        ],
+        "elapsed_ns_p95": [
+          32920,
+          30930,
+          30850
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2848,
+          2692,
+          2616
+        ],
+        "elapsed_ns": [
+          30460,
+          31020,
+          29550
+        ],
+        "elapsed_ns_p95": [
+          30800,
+          31300,
+          29800
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -0.2962962962962945,
+        "elapsed_ns": -1.0717765508281962,
+        "elapsed_ns_p95": -0.42030391205949424
+      },
+      "review_flag": false
+    },
+    {
+      "case": "transpose-rect-2x8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2680,
+          2628,
+          2696
+        ],
+        "elapsed_ns": [
+          13970,
+          14141,
+          13940
+        ],
+        "elapsed_ns_p95": [
+          14110,
+          14320,
+          14080
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2908,
+          2848,
+          2888
+        ],
+        "elapsed_ns": [
+          14110,
+          14100,
+          14120
+        ],
+        "elapsed_ns_p95": [
+          14330,
+          14310,
+          14330
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 7.761194029850738,
+        "elapsed_ns": 1.0021474588403745,
+        "elapsed_ns_p95": 1.5591778880226892
+      },
+      "review_flag": true
+    },
+    {
+      "case": "minverse-singular-2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2700,
+          2696,
+          2796
+        ],
+        "elapsed_ns": [
+          33400,
+          33060,
+          33560
+        ],
+        "elapsed_ns_p95": [
+          33940,
+          33610,
+          34090
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2656,
+          2648,
+          2656
+        ],
+        "elapsed_ns": [
+          33650,
+          32971,
+          33370
+        ],
+        "elapsed_ns_p95": [
+          34090,
+          33360,
+          33840
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.6296296296296253,
+        "elapsed_ns": -0.08982035928143395,
+        "elapsed_ns_p95": -0.29463759575721893
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mdeterm-nonsquare-2x1",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2704,
+          2684,
+          2708
+        ],
+        "elapsed_ns": [
+          23530,
+          22731,
+          22580
+        ],
+        "elapsed_ns_p95": [
+          28030,
+          22910,
+          22900
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2652,
+          2688,
+          2660
+        ],
+        "elapsed_ns": [
+          22500,
+          22210,
+          22290
+        ],
+        "elapsed_ns_p95": [
+          22640,
+          22520,
+          22600
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.6272189349112454,
+        "elapsed_ns": -1.940081826580442,
+        "elapsed_ns_p95": -1.3531209079004847
+      },
+      "review_flag": false
+    },
+    {
+      "case": "mmult-incompatible-2x3-2x2",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2700,
+          2648,
+          2796
+        ],
+        "elapsed_ns": [
+          2960,
+          2920,
+          2940
+        ],
+        "elapsed_ns_p95": [
+          3140,
+          3070,
+          3090
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2864,
+          2888,
+          2912
+        ],
+        "elapsed_ns": [
+          2870,
+          3000,
+          2980
+        ],
+        "elapsed_ns_p95": [
+          3050,
+          3120,
+          3110
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 6.962962962962971,
+        "elapsed_ns": 1.3605442176870763,
+        "elapsed_ns_p95": 0.6472491909385036
+      },
+      "review_flag": true
+    },
+    {
+      "case": "munit-zero",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2808,
+          2700,
+          2768
+        ],
+        "elapsed_ns": [
+          14820,
+          14400,
+          14280
+        ],
+        "elapsed_ns_p95": [
+          14920,
+          14530,
+          14740
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2912,
+          2656,
+          2848
+        ],
+        "elapsed_ns": [
+          14550,
+          14770,
+          14460
+        ],
+        "elapsed_ns_p95": [
+          14680,
+          14940,
+          14630
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 2.8901734104046284,
+        "elapsed_ns": 1.041666666666674,
+        "elapsed_ns_p95": -0.4070556309362261
+      },
+      "review_flag": false
+    },
+    {
+      "case": "if-selected-mdeterm-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2752,
+          2704,
+          2652
+        ],
+        "elapsed_ns": [
+          42740,
+          42920,
+          42900
+        ],
+        "elapsed_ns_p95": [
+          43410,
+          43130,
+          43721
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2656,
+          2852,
+          2848
+        ],
+        "elapsed_ns": [
+          43171,
+          42010,
+          42161
+        ],
+        "elapsed_ns_p95": [
+          47060,
+          42550,
+          42500
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 5.3254437869822535,
+        "elapsed_ns": -1.722610722610718,
+        "elapsed_ns_p95": -1.98111034323889
+      },
+      "review_flag": true
+    },
+    {
+      "case": "if-unselected-mdeterm-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2800,
+          2700,
+          2652
+        ],
+        "elapsed_ns": [
+          2340,
+          2350,
+          2381
+        ],
+        "elapsed_ns_p95": [
+          2400,
+          2390,
+          2490
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2604,
+          2848,
+          2888
+        ],
+        "elapsed_ns": [
+          2370,
+          2390,
+          2400
+        ],
+        "elapsed_ns_p95": [
+          2430,
+          2480,
+          2470
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 5.481481481481487,
+        "elapsed_ns": 1.7021276595744705,
+        "elapsed_ns_p95": 2.9166666666666563
+      },
+      "review_flag": true
+    },
+    {
+      "case": "if-selected-minverse-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2692,
+          2704,
+          2656
+        ],
+        "elapsed_ns": [
+          82961,
+          84050,
+          83861
+        ],
+        "elapsed_ns_p95": [
+          90080,
+          93650,
+          90770
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2656,
+          2628,
+          2908
+        ],
+        "elapsed_ns": [
+          83131,
+          83140,
+          83861
+        ],
+        "elapsed_ns_p95": [
+          87350,
+          90091,
+          84201
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -1.3372956909361022,
+        "elapsed_ns": -0.8597560248506442,
+        "elapsed_ns_p95": -3.7677646799603393
+      },
+      "review_flag": false
+    },
+    {
+      "case": "if-unselected-minverse-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2732,
+          2796,
+          2788
+        ],
+        "elapsed_ns": [
+          2360,
+          2440,
+          2350
+        ],
+        "elapsed_ns_p95": [
+          2470,
+          2530,
+          2450
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2900,
+          2652,
+          2876
+        ],
+        "elapsed_ns": [
+          2420,
+          2390,
+          2370
+        ],
+        "elapsed_ns_p95": [
+          2500,
+          2470,
+          2460
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 3.1563845050215145,
+        "elapsed_ns": 1.2711864406779627,
+        "elapsed_ns_p95": 0.0
+      },
+      "review_flag": false
+    },
+    {
+      "case": "if-selected-mmult-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2952,
+          3144,
+          2960
+        ],
+        "elapsed_ns": [
+          83051,
+          88280,
+          83641
+        ],
+        "elapsed_ns_p95": [
+          87520,
+          94651,
+          86000
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          3164,
+          2912,
+          3144
+        ],
+        "elapsed_ns": [
+          83150,
+          83870,
+          81440
+        ],
+        "elapsed_ns_p95": [
+          91850,
+          85700,
+          88071
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 6.216216216216219,
+        "elapsed_ns": -0.5870326753625643,
+        "elapsed_ns_p95": 0.629570383912248
+      },
+      "review_flag": true
+    },
+    {
+      "case": "if-unselected-mmult-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2784,
+          2776,
+          2864
+        ],
+        "elapsed_ns": [
+          2370,
+          2340,
+          2440
+        ],
+        "elapsed_ns_p95": [
+          2460,
+          2430,
+          2570
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2888,
+          2928,
+          2636
+        ],
+        "elapsed_ns": [
+          2410,
+          2410,
+          2390
+        ],
+        "elapsed_ns_p95": [
+          2470,
+          2500,
+          2470
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 3.735632183908044,
+        "elapsed_ns": 1.6877637130801704,
+        "elapsed_ns_p95": 0.40650406504065817
+      },
+      "review_flag": false
+    },
+    {
+      "case": "if-selected-munit-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2784,
+          2744,
+          2612
+        ],
+        "elapsed_ns": [
+          9890,
+          9880,
+          9900
+        ],
+        "elapsed_ns_p95": [
+          10090,
+          9981,
+          10020
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2784,
+          2656,
+          2620
+        ],
+        "elapsed_ns": [
+          9890,
+          9940,
+          9900
+        ],
+        "elapsed_ns_p95": [
+          10000,
+          10080,
+          10030
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": -3.206997084548102,
+        "elapsed_ns": 0.10111223458038054,
+        "elapsed_ns_p95": 0.09980039920158834
+      },
+      "review_flag": false
+    },
+    {
+      "case": "if-unselected-munit-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2692,
+          2808,
+          2672
+        ],
+        "elapsed_ns": [
+          2350,
+          2450,
+          2500
+        ],
+        "elapsed_ns_p95": [
+          2410,
+          2530,
+          2570
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2708,
+          2900,
+          2928
+        ],
+        "elapsed_ns": [
+          2510,
+          2510,
+          2440
+        ],
+        "elapsed_ns_p95": [
+          2560,
+          2600,
+          2500
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 7.726597325408613,
+        "elapsed_ns": 2.448979591836742,
+        "elapsed_ns_p95": 1.1857707509881354
+      },
+      "review_flag": true
+    },
+    {
+      "case": "if-selected-transpose-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2632,
+          2644,
+          2808
+        ],
+        "elapsed_ns": [
+          38000,
+          34760,
+          35140
+        ],
+        "elapsed_ns_p95": [
+          38430,
+          35181,
+          35560
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2664,
+          2908,
+          2852
+        ],
+        "elapsed_ns": [
+          34881,
+          34730,
+          34901
+        ],
+        "elapsed_ns_p95": [
+          35200,
+          34940,
+          35250
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 7.866868381240555,
+        "elapsed_ns": -0.7370517928286802,
+        "elapsed_ns_p95": -1.0123734533183382
+      },
+      "review_flag": true
+    },
+    {
+      "case": "if-unselected-transpose-8",
+      "deterministic_parity": true,
+      "before": {
+        "rss_kib": [
+          2756,
+          2784,
+          2744
+        ],
+        "elapsed_ns": [
+          2340,
+          2370,
+          2340
+        ],
+        "elapsed_ns_p95": [
+          2470,
+          2440,
+          2400
+        ]
+      },
+      "after": {
+        "rss_kib": [
+          2848,
+          2908,
+          2848
+        ],
+        "elapsed_ns": [
+          2430,
+          2390,
+          2370
+        ],
+        "elapsed_ns_p95": [
+          2530,
+          2460,
+          2430
+        ]
+      },
+      "delta_percent": {
+        "rss_kib": 3.338171262699574,
+        "elapsed_ns": 2.136752136752129,
+        "elapsed_ns_p95": 0.8196721311475308
+      },
+      "review_flag": false
+    }
+  ]
+}
