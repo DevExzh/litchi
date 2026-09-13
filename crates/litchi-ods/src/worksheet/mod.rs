@@ -6,6 +6,7 @@
 //! Repeated rows and cells stay as physical runs, so logical lookup never
 //! requires expanding a large ODF repetition into heap objects.
 
+pub mod formula;
 pub mod model;
 
 pub(crate) mod codec;

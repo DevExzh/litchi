@@ -104,7 +104,7 @@ where
                 } else {
                     (second_index, first_index)
                 };
-                let sheet_count = self.resolver.sheet_count()?;
+                let sheet_count = self.resolver.sheet_count(self.execution)?;
                 if end >= sheet_count {
                     return Ok(None);
                 }
@@ -132,7 +132,7 @@ where
                     } else if index == second_index {
                         second_sheet
                     } else {
-                        let name = self.resolver.sheet_name_at(index)?.ok_or(
+                        let name = self.resolver.sheet_name_at(index, self.execution)?.ok_or(
                             EvaluationFailure::InvalidExpression("sheet order index has no name"),
                         )?;
                         SheetRef::Named(name)
@@ -150,7 +150,7 @@ where
                     } else if index == second_index {
                         second_sheet
                     } else {
-                        let name = self.resolver.sheet_name_at(index)?.ok_or(
+                        let name = self.resolver.sheet_name_at(index, self.execution)?.ok_or(
                             EvaluationFailure::InvalidExpression("sheet order index has no name"),
                         )?;
                         SheetRef::Named(name)
@@ -228,7 +228,10 @@ where
     }
 
     fn rect_within_extent(&self, sheet: SheetRef<'expr>, rect: Rect) -> EvaluationResult<bool> {
-        let Some(extent) = self.resolver.sheet_extent(self.sheet_name(sheet))? else {
+        let Some(extent) = self
+            .resolver
+            .sheet_extent(self.sheet_name(sheet), self.execution)?
+        else {
             return Ok(false);
         };
         Ok(rect.row_end <= extent.rows() && rect.column_end <= extent.columns())
@@ -249,11 +252,12 @@ where
             },
             EndpointValue::Column(column) => {
                 let start = super::column_number(&column.label)?;
-                let extent = self.resolver.sheet_extent(self.sheet_name(sheet))?.ok_or(
-                    EvaluationFailure::InvalidExpression(
+                let extent = self
+                    .resolver
+                    .sheet_extent(self.sheet_name(sheet), self.execution)?
+                    .ok_or(EvaluationFailure::InvalidExpression(
                         "whole-column reference names a missing sheet",
-                    ),
-                )?;
+                    ))?;
                 let end = start
                     .checked_add(1)
                     .ok_or(EvaluationFailure::InvalidExpression(
@@ -270,11 +274,12 @@ where
                 let start = usize::try_from(row.number.saturating_sub(1)).map_err(|_| {
                     EvaluationFailure::InvalidExpression("reference row exceeds usize")
                 })?;
-                let extent = self.resolver.sheet_extent(self.sheet_name(sheet))?.ok_or(
-                    EvaluationFailure::InvalidExpression(
+                let extent = self
+                    .resolver
+                    .sheet_extent(self.sheet_name(sheet), self.execution)?
+                    .ok_or(EvaluationFailure::InvalidExpression(
                         "whole-row reference names a missing sheet",
-                    ),
-                )?;
+                    ))?;
                 let end = start
                     .checked_add(1)
                     .ok_or(EvaluationFailure::InvalidExpression(
@@ -327,7 +332,7 @@ where
             max_sheet = max_sheet.max(area.sheet_index);
             rect = rect.bounding(area.rect)?;
         }
-        let sheet_count = self.resolver.sheet_count()?;
+        let sheet_count = self.resolver.sheet_count(self.execution)?;
         if max_sheet >= sheet_count {
             return Ok(RuntimeValue::Scalar(WorkingValue::Error(
                 ScalarError::Reference,
@@ -351,12 +356,9 @@ where
         // sheet from leaving a partially-built reference behind.
         for index in min_sheet..=max_sheet {
             self.scalar.charge_work(1)?;
-            let name =
-                self.resolver
-                    .sheet_name_at(index)?
-                    .ok_or(EvaluationFailure::InvalidExpression(
-                        "range sheet order has no name",
-                    ))?;
+            let name = self.resolver.sheet_name_at(index, self.execution)?.ok_or(
+                EvaluationFailure::InvalidExpression("range sheet order has no name"),
+            )?;
             let sheet = SheetRef::Named(name);
             if !self.rect_within_extent(sheet, rect)? {
                 return Ok(RuntimeValue::Scalar(WorkingValue::Error(
@@ -369,12 +371,9 @@ where
         result.is_list = false;
         for index in min_sheet..=max_sheet {
             self.scalar.charge_work(1)?;
-            let name =
-                self.resolver
-                    .sheet_name_at(index)?
-                    .ok_or(EvaluationFailure::InvalidExpression(
-                        "range sheet order has no name",
-                    ))?;
+            let name = self.resolver.sheet_name_at(index, self.execution)?.ok_or(
+                EvaluationFailure::InvalidExpression("range sheet order has no name"),
+            )?;
             let sheet = SheetRef::Named(name);
             result.push(
                 RuntimeArea {

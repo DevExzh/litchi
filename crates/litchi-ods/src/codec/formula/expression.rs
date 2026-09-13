@@ -476,6 +476,10 @@ impl<'a> Node<'a> {
         self.record().children_len
     }
 
+    pub(super) fn arena_index(&self) -> usize {
+        self.id.0
+    }
+
     /// Return a function or named-expression name span, if this node has one.
     #[must_use]
     pub fn name(&self) -> Option<&'a str> {
