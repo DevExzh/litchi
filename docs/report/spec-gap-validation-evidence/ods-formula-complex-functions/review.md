@@ -36,3 +36,11 @@ candidate after the performance captures. All five ODS gates pass. Raw logs
 retain their exact original trailing blank lines; source/document diff checks
 pass without rewriting captured evidence. Temporary capture/build receipts
 were archived and byte-verified before loose scratch directories were removed.
+
+A final source-only cache review attributes the +16-byte sample difference to
+one widened `DemandCacheValue`/entry after adding the 24-byte Complex payload.
+The case caches one AND branch, and its allocation count is unchanged at 4,161.
+This matches the observed delta but remains a layout inference without a
+private-type size probe. No frame/reservation-ownership change was found on
+that path. The harness lockfile is retained directly as well as in the exact
+build archive, so the documented locked build can be replayed from Git.
