@@ -1,0 +1,343 @@
+[
+  {
+    "phase": "parse",
+    "case": "control-flat-1024",
+    "repeat": 8,
+    "delta_pct": {
+      "p50_ns": 7.6898100118000245,
+      "p95_ns": 5.9242586638085015,
+      "p99_ns": 5.9242586638085015,
+      "max_rss_kib": 4.674220963172804
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "control-coerce-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": 5.688898802884967,
+      "p95_ns": 5.063170050085075,
+      "p99_ns": 5.063170050085075,
+      "max_rss_kib": 2.9787234042553123
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "control-utf8-left-64",
+    "repeat": 64,
+    "delta_pct": {
+      "p50_ns": 0.5084745762711895,
+      "p95_ns": 114.0886699507389,
+      "p99_ns": 114.0886699507389,
+      "max_rss_kib": -9.009009009009006
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "control-utf8-left-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": 0.46403712296982924,
+      "p95_ns": 0.8083140877598094,
+      "p99_ns": 0.8083140877598094,
+      "max_rss_kib": 8.688524590163937
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "control-true",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": 1.5082956259426794,
+      "p95_ns": 90.86142322097379,
+      "p99_ns": 90.86142322097379,
+      "max_rss_kib": -0.3062787136294043
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "logical-or-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": -0.17388815124310675,
+      "p95_ns": -10.214080059440889,
+      "p99_ns": -10.214080059440889,
+      "max_rss_kib": 10.294117647058831
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "logical-iferror-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": 1.8594090118760898,
+      "p95_ns": 2.158095261993487,
+      "p99_ns": 2.158095261993487,
+      "max_rss_kib": 5.96638655462185
+    }
+  },
+  {
+    "phase": "parse",
+    "case": "lazy-if-false-reference",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.4064486830154368,
+      "p95_ns": -20.328255350018132,
+      "p99_ns": -20.328255350018132,
+      "max_rss_kib": 10.83743842364533
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-flat-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": -1.5801517974226686,
+      "p95_ns": -2.87543341262696,
+      "p99_ns": -2.87543341262696,
+      "max_rss_kib": 8.92561983471074
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-flat-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": -2.0995206214007744,
+      "p95_ns": -2.218506705480683,
+      "p99_ns": -2.218506705480683,
+      "max_rss_kib": 13.163972286374136
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": 0.4373769512843628,
+      "p95_ns": 0.4452767469385721,
+      "p99_ns": 0.4452767469385721,
+      "max_rss_kib": 7.21311475409836
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-coerce-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": -2.7193982525280713,
+      "p95_ns": -4.006458547372571,
+      "p99_ns": -4.006458547372571,
+      "max_rss_kib": 6.88172043010753
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-utf8-left-64",
+    "repeat": 64,
+    "delta_pct": {
+      "p50_ns": 1.298701298701288,
+      "p95_ns": 7.9814189189189255,
+      "p99_ns": 7.9814189189189255,
+      "max_rss_kib": 0.7788161993769416
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-utf8-left-1024",
+    "repeat": 8,
+    "delta_pct": {
+      "p50_ns": 8.646188850967018,
+      "p95_ns": -26.042202779207415,
+      "p99_ns": -26.042202779207415,
+      "max_rss_kib": -1.9345238095238138
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-utf8-left-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": 10.747663551401864,
+      "p95_ns": 35.27176118962401,
+      "p99_ns": 35.27176118962401,
+      "max_rss_kib": -0.14792899408283544
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-true",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.6974501581036519,
+      "p95_ns": 18.389151427984384,
+      "p99_ns": 18.389151427984384,
+      "max_rss_kib": -5.683563748079878
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "control-false",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.3607666290868061,
+      "p95_ns": 27.90765765765766,
+      "p99_ns": 27.90765765765766,
+      "max_rss_kib": 0.3039513677811634
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "failure-array",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.42120042120041834,
+      "p95_ns": 43.262163108155406,
+      "p99_ns": 43.262163108155406,
+      "max_rss_kib": 0.15600624024960652
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "logical-false",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": 0.09294944457038934,
+      "p95_ns": -22.923535876903756,
+      "p99_ns": -22.923535876903756,
+      "max_rss_kib": 9.618573797678277
+    }
+  },
+  {
+    "phase": "evaluate",
+    "case": "logical-not-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": 0.0732800831395819,
+      "p95_ns": -0.5877479493886173,
+      "p99_ns": -0.5877479493886173,
+      "max_rss_kib": 10.030395136778125
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-coerce-1024",
+    "repeat": 8,
+    "delta_pct": {
+      "p50_ns": -1.5806803905306976,
+      "p95_ns": 5.242031578819817,
+      "p99_ns": 5.242031578819817,
+      "max_rss_kib": -7.888040712468191
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": 3.893956366351947,
+      "p95_ns": 3.9260035949670424,
+      "p99_ns": 3.9260035949670424,
+      "max_rss_kib": 7.401315789473695
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-1024",
+    "repeat": 8,
+    "delta_pct": {
+      "p50_ns": 7.733083879014657,
+      "p95_ns": 6.669535283993122,
+      "p99_ns": 6.669535283993122,
+      "max_rss_kib": -6.9908814589665695
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-utf8-left-4096",
+    "repeat": 2,
+    "delta_pct": {
+      "p50_ns": 8.79204892966361,
+      "p95_ns": 0.3150157507875395,
+      "p99_ns": 0.3150157507875395,
+      "max_rss_kib": -7.750759878419455
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "control-escaped-64",
+    "repeat": 64,
+    "delta_pct": {
+      "p50_ns": 1.0476190476190528,
+      "p95_ns": 8.011841034791578,
+      "p99_ns": 8.011841034791578,
+      "max_rss_kib": -9.82142857142857
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "failure-memory",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.3907514950022617,
+      "p95_ns": 84.7009735744089,
+      "p99_ns": 84.7009735744089,
+      "max_rss_kib": -2.127659574468088
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "failure-stack",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": 0.14623446258834605,
+      "p95_ns": 0.4867090977162203,
+      "p99_ns": 0.4867090977162203,
+      "max_rss_kib": 6.942148760330569
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "failure-cancelled",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": -0.08797653958944052,
+      "p95_ns": 54.80673720578708,
+      "p99_ns": 54.80673720578708,
+      "max_rss_kib": -7.00152207001522
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "logical-false",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": 0.9892398472752584,
+      "p95_ns": 71.9556556383163,
+      "p99_ns": 71.9556556383163,
+      "max_rss_kib": -4.4510385756676545
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "logical-not-256",
+    "repeat": 32,
+    "delta_pct": {
+      "p50_ns": 0.40035515208014516,
+      "p95_ns": 0.6491349977314043,
+      "p99_ns": 0.6491349977314043,
+      "max_rss_kib": 7.270029673590495
+    }
+  },
+  {
+    "phase": "parse-evaluate",
+    "case": "text-if-escaped",
+    "repeat": 128,
+    "delta_pct": {
+      "p50_ns": 2.0135415335934104,
+      "p95_ns": 17.003748661192432,
+      "p99_ns": 17.003748661192432,
+      "max_rss_kib": 11.774461028192373
+    }
+  }
+]

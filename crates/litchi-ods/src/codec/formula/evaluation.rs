@@ -3,10 +3,11 @@
 //! This module evaluates the already-parsed ODS expression tree directly.  It
 //! does not stringify and reparse formulas, inspect a workbook, resolve an
 //! external source, refresh a cache, or publish a cell change.  The scalar
-//! profile covers constants, scalar operators, and the normative logical
+//! profile covers constants, scalar operators, the normative logical
 //! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
-//! and `XOR`).  References, arrays, names, labels, and other functions are
-//! reported as typed capability refusals.
+//! and `XOR`), and the five bit-operation functions (`BITAND`, `BITLSHIFT`,
+//! `BITOR`, `BITRSHIFT`, and `BITXOR`).  References, arrays, names, labels,
+//! and other functions are reported as typed capability refusals.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -23,6 +24,11 @@
 //!   syntax and reports a value error when conversion fails;
 //! * Text used where a Logical is required reports `#VALUE!`; AND/OR follow
 //!   their `NumberSequenceList` signature and convert scalar numeric Text;
+//! * bit-operation data operands and results use the exact unsigned 48-bit
+//!   range; signed finite shift counts have no arbitrary magnitude cap.  A
+//!   left shift that cannot fit returns `#NUM!`, while a sufficiently large
+//!   right shift returns zero.  Integer conversion truncates toward zero;
+//!   unrepresentable data operands/results return `#NUM!` in this profile;
 //! * `0^0` is accepted as `1`, as permitted by this bounded profile.
 //!
 //! A successful text result keeps its memory reservation in
@@ -738,6 +744,11 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             || name.eq_ignore_ascii_case("OR")
             || name.eq_ignore_ascii_case("XOR")
             || name.eq_ignore_ascii_case("NOT")
+            || name.eq_ignore_ascii_case("BITAND")
+            || name.eq_ignore_ascii_case("BITLSHIFT")
+            || name.eq_ignore_ascii_case("BITOR")
+            || name.eq_ignore_ascii_case("BITRSHIFT")
+            || name.eq_ignore_ascii_case("BITXOR")
         {
             return self.schedule_eager_function(node);
         }
@@ -811,10 +822,48 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         if name.eq_ignore_ascii_case("NOT") {
             return self.apply_not(node);
         }
+        if name.eq_ignore_ascii_case("BITAND")
+            || name.eq_ignore_ascii_case("BITLSHIFT")
+            || name.eq_ignore_ascii_case("BITOR")
+            || name.eq_ignore_ascii_case("BITRSHIFT")
+            || name.eq_ignore_ascii_case("BITXOR")
+        {
+            return self.apply_bitwise(node, name);
+        }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
         // scheduled arguments so the value stack remains balanced and retain
         // the leftmost formula error if one was produced.
+        self.finish_invalid_arity(node)
+    }
+
+    #[inline(never)]
+    fn apply_bitwise(&mut self, node: Node<'a>, name: &str) -> EvaluationResult<()> {
+        if node.child_count() != 2 {
+            return self.finish_invalid_arity(node);
+        }
+
+        let right = self.pop_value()?;
+        let left = self.pop_value()?;
+        let value = if name.eq_ignore_ascii_case("BITAND") {
+            bitwise_pair(self, left, right, |left, right| left & right)?
+        } else if name.eq_ignore_ascii_case("BITOR") {
+            bitwise_pair(self, left, right, |left, right| left | right)?
+        } else if name.eq_ignore_ascii_case("BITXOR") {
+            bitwise_pair(self, left, right, |left, right| left ^ right)?
+        } else if name.eq_ignore_ascii_case("BITLSHIFT") {
+            bitwise_shift(self, left, right, true)?
+        } else if name.eq_ignore_ascii_case("BITRSHIFT") {
+            bitwise_shift(self, left, right, false)?
+        } else {
+            return Err(EvaluationFailure::InvalidExpression(
+                "unknown bitwise function reached evaluator",
+            ));
+        };
+        self.push_value(value)
+    }
+
+    fn finish_invalid_arity(&mut self, node: Node<'a>) -> EvaluationResult<()> {
         let mut propagated = None;
         let mut next_check = 0usize;
         for index in 0..node.child_count() {
@@ -1386,6 +1435,128 @@ fn to_number<'a>(
         },
         WorkingValue::Error(error) => Ok(Err(error)),
     }
+}
+
+const BIT_WIDTH: u32 = 48;
+const BIT_MAX: u64 = (1_u64 << BIT_WIDTH) - 1;
+const BIT_LIMIT: f64 = 281_474_976_710_656.0;
+
+/// Apply the profile's Conversion to Integer rule: first use the existing
+/// Number conversion and then truncate toward zero.  The latter is an
+/// explicit profile choice because Part 4 leaves the generic conversion from
+/// non-integer Numbers implementation-defined.
+fn to_integer<'a>(
+    value: WorkingValue<'a>,
+    evaluator: &mut Evaluator<'_, '_, '_>,
+) -> EvaluationResult<Result<f64, ScalarError>> {
+    match to_number(value, evaluator)? {
+        Ok(value) => {
+            let value = value.trunc();
+            if value.is_finite() {
+                Ok(Ok(value))
+            } else {
+                Ok(Err(ScalarError::Number))
+            }
+        },
+        Err(error) => Ok(Err(error)),
+    }
+}
+
+/// Convert one integer operand to the supported unsigned 48-bit domain.
+fn to_bit_operand<'a>(
+    value: WorkingValue<'a>,
+    evaluator: &mut Evaluator<'_, '_, '_>,
+) -> EvaluationResult<Result<u64, ScalarError>> {
+    match to_integer(value, evaluator)? {
+        Ok(value) if (0.0..BIT_LIMIT).contains(&value) => Ok(Ok(value as u64)),
+        Ok(_) => Ok(Err(ScalarError::Number)),
+        Err(error) => Ok(Err(error)),
+    }
+}
+
+fn bitwise_pair<'a>(
+    evaluator: &mut Evaluator<'_, '_, '_>,
+    left: WorkingValue<'a>,
+    right: WorkingValue<'a>,
+    operation: impl FnOnce(u64, u64) -> u64,
+) -> EvaluationResult<WorkingValue<'a>> {
+    let left = to_bit_operand(left, evaluator)?;
+    let right = to_bit_operand(right, evaluator)?;
+    let result = match (left, right) {
+        (Err(error), _) => return Ok(WorkingValue::Error(error)),
+        (Ok(_), Err(error)) => return Ok(WorkingValue::Error(error)),
+        (Ok(left), Ok(right)) => operation(left, right),
+    };
+    Ok(bit_result(result))
+}
+
+fn bitwise_shift<'a>(
+    evaluator: &mut Evaluator<'_, '_, '_>,
+    left: WorkingValue<'a>,
+    right: WorkingValue<'a>,
+    leftward: bool,
+) -> EvaluationResult<WorkingValue<'a>> {
+    let left = to_bit_operand(left, evaluator)?;
+    let right = to_integer(right, evaluator)?;
+    let left = match left {
+        Ok(value) => value,
+        Err(error) => return Ok(WorkingValue::Error(error)),
+    };
+    let right = match right {
+        Ok(value) => value,
+        Err(error) => return Ok(WorkingValue::Error(error)),
+    };
+
+    if right < 0.0 {
+        return Ok(if leftward {
+            shift_right(left, -right)
+        } else {
+            shift_left(left, -right)
+        });
+    }
+    Ok(if leftward {
+        shift_left(left, right)
+    } else {
+        shift_right(left, right)
+    })
+}
+
+fn bit_result<'a>(value: u64) -> WorkingValue<'a> {
+    if value <= BIT_MAX {
+        WorkingValue::Number(value as f64)
+    } else {
+        WorkingValue::Error(ScalarError::Number)
+    }
+}
+
+fn shift_left<'a>(value: u64, amount: f64) -> WorkingValue<'a> {
+    if value == 0 || amount == 0.0 {
+        return WorkingValue::Number(value as f64);
+    }
+    if amount >= f64::from(BIT_WIDTH) {
+        return WorkingValue::Error(ScalarError::Number);
+    }
+    let amount = amount as u32;
+    // `checked_shl` only checks the shift count; it may still discard high
+    // bits when the shifted value exceeds the native integer width.  Check
+    // the profile's 48-bit result domain before performing the shift.
+    if value > (BIT_MAX >> amount) {
+        return WorkingValue::Error(ScalarError::Number);
+    }
+    match value.checked_shl(amount) {
+        Some(value) => bit_result(value),
+        None => WorkingValue::Error(ScalarError::Number),
+    }
+}
+
+fn shift_right<'a>(value: u64, amount: f64) -> WorkingValue<'a> {
+    if amount >= f64::from(BIT_WIDTH) {
+        return WorkingValue::Number(0.0);
+    }
+    if amount == 0.0 {
+        return WorkingValue::Number(value as f64);
+    }
+    WorkingValue::Number((value >> amount as u32) as f64)
 }
 
 /// Conversion used by the scalar Logical parameter family.  Text conversion
