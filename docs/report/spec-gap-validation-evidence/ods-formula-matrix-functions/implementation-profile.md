@@ -42,3 +42,10 @@ buffers. Unselected lazy branches do not evaluate matrix arguments or run
 their numerical kernels. Matrix support remains within the existing
 read-only, source-version-checked value API; it does not activate recursive
 worksheet recalculation or trust formula caches.
+
+Nested value probes used by shape discovery have a structural ceiling of 32
+active probes, further bounded by `max_stack_entries` and the caller's Depth
+budget. Exceeding it returns an operational `ResourceLimit(Depth)` and
+releases the suspended storage. Ordinary expression traversal remains
+iterative. This ceiling bounds the remaining probe call-stack use; it is
+distinct from the mathematical dimensions of a matrix.

@@ -1,0 +1,49 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0308]: mismatched types
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs:248:16
+    |
+247 |         match inverse {
+    |               ------- this expression has type `std::result::Result<std::result::Result<(), ScalarError>, EvaluationFailure>`
+248 |             Ok(()) => {},
+    |                ^^ expected `Result<(), ScalarError>`, found `()`
+    |
+    = note:   expected enum `std::result::Result<(), ScalarError>`
+            found unit type `()`
+
+error[E0308]: mismatched types
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs:251:41
+    |
+251 |                 return Ok(formula_error(error));
+    |                           ------------- ^^^^^ expected `ScalarError`, found `EvaluationFailure`
+    |                           |
+    |                           arguments to this function are incorrect
+    |
+note: function defined here
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs:64:4
+    |
+ 64 | fn formula_error<'a>(error: ScalarError) -> RuntimeValue<'a> {
+    |    ^^^^^^^^^^^^^     ------------------
+
+error[E0499]: cannot borrow `*self` as mutable more than once at a time
+    --> crates/litchi-ods/src/codec/formula/evaluation/value.rs:3498:59
+     |
+3498 | ...                   self.push_shape_value(self.matrix_unit_shape_hint(node)?)?;
+     |                       ---- ---------------- ^^^^ second mutable borrow occurs here
+     |                       |    |
+     |                       |    first borrow later used by call
+     |                       first mutable borrow occurs here
+     |
+help: try adding a local storing this argument...
+    --> crates/litchi-ods/src/codec/formula/evaluation/value.rs:3498:59
+     |
+3498 | ...                   self.push_shape_value(self.matrix_unit_shape_hint(node)?)?;
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: ...and then using that local as the argument to this call
+    --> crates/litchi-ods/src/codec/formula/evaluation/value.rs:3498:37
+     |
+3498 | ...                   self.push_shape_value(self.matrix_unit_shape_hint(node)?)?;
+     |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0308, E0499.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-ods` (lib) due to 3 previous errors
