@@ -1,0 +1,13 @@
+{
+  "baseline_commit": "21ad9118367a7f154083ec337069896d63fb3a92",
+  "patch_sha256": "d901ec22cdaa0df73eff112563ec0c9729977ee587a195aa94bf6dbfdb0d4680",
+  "patch_context": "zero; apply with --unidiff-zero",
+  "git_apply_check": true,
+  "git_apply": true,
+  "replayed_sources_match_final_gates": true,
+  "source_hashes": {
+    "crates/litchi-ods/src/codec/formula.rs": "0c3108e95e4b5fd92e616917171ebd840f26e103a2076e27592a9a330f2bd647",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947"
+  }
+}

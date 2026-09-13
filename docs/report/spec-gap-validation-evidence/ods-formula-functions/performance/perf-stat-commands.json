@@ -1,0 +1,58 @@
+[
+  {
+    "variant": "baseline",
+    "command": [
+      "perf",
+      "stat",
+      "-x",
+      ",",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+      "-o",
+      "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/baseline/perf-stat.csv",
+      "taskset",
+      "-c",
+      "2",
+      "/var/tmp/ods-formula-baseline-target/release/ods-formula-function-profile",
+      "--workload",
+      "parse",
+      "--case",
+      "parse-sum-upper",
+      "--repeat",
+      "100000",
+      "--warmups",
+      "3",
+      "--iterations",
+      "15"
+    ],
+    "exit_code": 0
+  },
+  {
+    "variant": "candidate",
+    "command": [
+      "perf",
+      "stat",
+      "-x",
+      ",",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+      "-o",
+      "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/candidate/perf-stat.csv",
+      "taskset",
+      "-c",
+      "2",
+      "/var/tmp/ods-formula-candidate-target/release/ods-formula-function-profile",
+      "--workload",
+      "parse",
+      "--case",
+      "parse-sum-upper",
+      "--repeat",
+      "100000",
+      "--warmups",
+      "3",
+      "--iterations",
+      "15"
+    ],
+    "exit_code": 0
+  }
+]

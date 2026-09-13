@@ -1,0 +1,36 @@
+{
+  "cwd": "/var/tmp/ods-formula-candidate-21ad",
+  "CARGO_TARGET_DIR": "/var/tmp/ods-formula-candidate-test-target",
+  "commands": [
+    {
+      "name": "formula-unit",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--lib",
+        "codec::formula::tests"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "formula-integration",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--test",
+        "ods_formula_functions"
+      ],
+      "exit_code": 0
+    }
+  ]
+}

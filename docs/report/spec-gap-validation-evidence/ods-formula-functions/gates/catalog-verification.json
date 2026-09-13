@@ -1,0 +1,15 @@
+{
+  "standard_names": 393,
+  "previous_names": 161,
+  "new_names": 232,
+  "all_previous_names_retained": true,
+  "independent_lxml_heading_set_matches": true,
+  "stdlib_extractor_replay_byte_identical": true,
+  "production_catalog_matches_normative_set": true,
+  "test_golden_catalog_matches_normative_set": true,
+  "maximum_canonical_name_bytes": 19,
+  "all_section_anchors_exist": true,
+  "spec_zip_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+  "part4_html_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "normative_tsv_sha256": "a4fa63d7b25db5e380f75097345d4d4132f796502937ef597973db44c43055b3"
+}

@@ -1,71 +1,29 @@
 //! ODF formula parsing and representation.
 //!
-//! This module provides support for `OpenFormula` (ODF 1.2) spreadsheet formulas.
-//! It handles parsing, validation, and representation of formulas in ODS files.
+//! This module tokenizes the supported subset of `OpenFormula` expressions and
+//! represents formulas stored in ODS files. Function-name recognition covers
+//! the complete normative Part 4, chapter 6 catalog; this remains a tokenizer,
+//! not a complete expression grammar or evaluator, and it does not validate
+//! function arity.
 //!
 //! # Formula Syntax
 //!
 //! ODF uses `OpenFormula` syntax (similar to Excel but with some differences):
-//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (external)
+//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (sheet-qualified)
 //! - Functions: `SUM(A1:A10)`, `IF(A1>0, "Positive", "Negative")`
 //! - Operators: `+`, `-`, `*`, `/`, `^`, `&` (concatenation)
-//! - References: `.A1` (relative to current sheet), `[file.ods]Sheet.A1` (external file)
+//! - References: `.A1` (relative to current sheet), `[$Inputs.$A$1]` (bracketed)
 //!
 //! # References
 //!
-//! - `OpenFormula` 1.2 Specification
+//! - ODF 1.4 Part 4, `OpenFormula` Format
 //! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
 use litchi_core::{Error, Result};
-use phf::{Set, phf_set};
 use smallvec::SmallVec;
 
-// ============================================================================
-// FORMULA FUNCTION CATALOG
-// ============================================================================
+mod functions;
 
-/// Standard `OpenFormula` functions
-///
-/// This is a compile-time set of valid `OpenFormula` function names.
-/// Using phf for O(1) lookup.
-static FORMULA_FUNCTIONS: Set<&'static str> = phf_set! {
-    // Mathematical functions
-    "ABS", "ACOS", "ACOSH", "ACOT", "ACOTH", "ASIN", "ASINH", "ATAN", "ATAN2", "ATANH",
-    "CEILING", "COS", "COSH", "COT", "COTH", "DEGREES", "EXP", "FACT", "FLOOR",
-    "INT", "LN", "LOG", "LOG10", "MOD", "PI", "POWER", "PRODUCT", "QUOTIENT",
-    "RADIANS", "RAND", "ROUND", "ROUNDDOWN", "ROUNDUP", "SIGN", "SIN", "SINH",
-    "SQRT", "SUM", "SUMIF", "SUMIFS", "SUMSQ", "TAN", "TANH", "TRUNC",
-
-    // Statistical functions
-    "AVERAGE", "AVERAGEA", "AVERAGEIF", "AVERAGEIFS", "COUNT", "COUNTA", "COUNTBLANK",
-    "COUNTIF", "COUNTIFS", "MAX", "MAXA", "MEDIAN", "MIN", "MINA", "MODE",
-    "PERCENTILE", "PERCENTRANK", "QUARTILE", "RANK", "STDEV", "STDEVA", "STDEVP",
-    "STDEVPA", "VAR", "VARA", "VARP", "VARPA",
-
-    // Logical functions
-    "AND", "FALSE", "IF", "IFERROR", "IFNA", "NOT", "OR", "TRUE", "XOR",
-
-    // Text functions
-    "CHAR", "CODE", "CONCATENATE", "EXACT", "FIND", "FIXED", "LEFT", "LEN",
-    "LOWER", "MID", "PROPER", "REPLACE", "REPT", "RIGHT", "SEARCH", "SUBSTITUTE",
-    "T", "TEXT", "TRIM", "UPPER", "VALUE",
-
-    // Date and time functions
-    "DATE", "DATEVALUE", "DAY", "DAYS", "DAYS360", "HOUR", "MINUTE", "MONTH",
-    "NOW", "SECOND", "TIME", "TIMEVALUE", "TODAY", "WEEKDAY", "YEAR",
-
-    // Lookup and reference functions
-    "ADDRESS", "CHOOSE", "COLUMN", "COLUMNS", "HLOOKUP", "INDEX", "INDIRECT",
-    "LOOKUP", "MATCH", "OFFSET", "ROW", "ROWS", "VLOOKUP",
-
-    // Information functions
-    "CELL", "ERROR.TYPE", "INFO", "ISBLANK", "ISERR", "ISERROR", "ISEVEN",
-    "ISLOGICAL", "ISNA", "ISNONTEXT", "ISNUMBER", "ISODD", "ISREF", "ISTEXT",
-    "N", "NA", "TYPE",
-
-    // Financial functions
-    "DB", "DDB", "FV", "IPMT", "IRR", "MIRR", "NPER", "NPV", "PMT", "PPMT",
-    "PV", "RATE", "SLN", "SYD", "VDB",
-};
+use functions::{MAX_STANDARD_FUNCTION_NAME_BYTES, STANDARD_FORMULA_FUNCTIONS};
 
 // ============================================================================
 // FORMULA COMPONENTS
@@ -233,24 +191,37 @@ impl<'a> FormulaParser<'a> {
     fn parse_string(&mut self) -> Result<Token> {
         self.advance(); // Skip opening quote
         let mut result = String::new();
+        let mut segment_start = self.position;
 
         while let Some(ch) = self.peek() {
             if ch == b'"' {
+                // Formula input has already been validated as UTF-8. Copy
+                // complete UTF-8 segments instead of treating each byte as a
+                // character; this preserves non-ASCII literals verbatim.
+                if segment_start < self.position {
+                    let segment = std::str::from_utf8(&self.input[segment_start..self.position])
+                        .map_err(|_error| {
+                            Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                        })?;
+                    result.push_str(segment);
+                }
                 self.advance();
                 // Check for escaped quote
                 if self.peek() == Some(b'"') {
                     result.push('"');
                     self.advance();
+                    segment_start = self.position;
                 } else {
-                    break;
+                    return Ok(Token::String(result));
                 }
             } else {
-                result.push(ch as char);
                 self.advance();
             }
         }
 
-        Ok(Token::String(result))
+        Err(Error::InvalidFormat(
+            "Unterminated string literal".to_string(),
+        ))
     }
 
     /// Parse a number literal
@@ -308,6 +279,15 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse identifier, cell reference, or function
     fn parse_identifier_or_ref(&mut self) -> Result<Token> {
+        // A function name may also be a valid column-plus-row spelling (for
+        // example, `BIN2DEC` is column BIN, row 2, followed by `DEC`).  When
+        // the complete identifier is followed by an opening parenthesis, the
+        // function grammar takes precedence over that speculative cell parse.
+        // Keep the whitespace unconsumed so the normal token loop handles it.
+        if let Some(function) = self.try_parse_function_call() {
+            return Ok(function);
+        }
+
         // Try to parse as cell reference first.
         // IMPORTANT: This parse is speculative; if it fails, we must rewind so that
         // the same input can be parsed as a function/name instead.
@@ -343,11 +323,11 @@ impl<'a> FormulaParser<'a> {
 
         let ident = std::str::from_utf8(&self.input[start..self.position])
             .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in identifier".to_string()))?
-            .to_uppercase();
+            .trim();
 
         // Check if it's a known function
-        if FORMULA_FUNCTIONS.contains(ident.as_str()) {
-            Ok(Token::Function(ident))
+        if let Some(function) = lookup_function(ident) {
+            Ok(Token::Function(function.to_owned()))
         } else if ident == "TRUE" {
             Ok(Token::Boolean(true))
         } else if ident == "FALSE" {
@@ -355,9 +335,64 @@ impl<'a> FormulaParser<'a> {
         } else {
             // Treat as cell reference or named range
             Err(Error::InvalidFormat(format!(
-                "Unknown identifier or invalid cell reference: {ident}"
+                "Unknown identifier or invalid cell reference: {}",
+                ident.to_uppercase()
             )))
         }
+    }
+
+    /// Recognize a known function invocation before trying a cell reference.
+    fn try_parse_function_call(&mut self) -> Option<Token> {
+        if !self.peek_is_letter() {
+            return None;
+        }
+
+        let start = self.position;
+        while self
+            .input
+            .get(self.position)
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || *ch == b'_' || *ch == b'.')
+        {
+            self.advance();
+            // This lexer accepts ASCII identifiers, so a longer spelling
+            // cannot match the standard catalog. Avoid scanning a large
+            // unknown identifier twice before its ordinary refusal path.
+            if self.position - start > MAX_STANDARD_FUNCTION_NAME_BYTES {
+                self.position = start;
+                return None;
+            }
+        }
+        let end = self.position;
+        if start == end {
+            return None;
+        }
+
+        let mut lookahead = end;
+        while self
+            .input
+            .get(lookahead)
+            .is_some_and(|ch| ch.is_ascii_whitespace())
+        {
+            lookahead += 1;
+        }
+        if self.input.get(lookahead) != Some(&b'(') {
+            self.position = start;
+            return None;
+        }
+
+        let identifier = match std::str::from_utf8(&self.input[start..end]) {
+            Ok(identifier) => identifier,
+            Err(_) => {
+                self.position = start;
+                return None;
+            },
+        };
+        let Some(function) = lookup_function(identifier) else {
+            self.position = start;
+            return None;
+        };
+        self.position = end;
+        Some(Token::Function(function.to_owned()))
     }
 
     /// Parse an ODF bracketed cell or range reference, such as `[.A1]` or
@@ -523,6 +558,55 @@ impl<'a> FormulaParser<'a> {
     }
 }
 
+// The catalog's longest canonical name is 19 ASCII bytes. Four bytes per
+// scalar is enough to bound the input that can be normalized without making
+// `is_valid_function` perform an unbounded Unicode uppercase allocation.
+const MAX_FUNCTION_INPUT_BYTES: usize = MAX_STANDARD_FUNCTION_NAME_BYTES * 4;
+
+fn lookup_function(name: &str) -> Option<&'static str> {
+    if name.is_empty() || name.len() > MAX_FUNCTION_INPUT_BYTES {
+        return None;
+    }
+
+    // Keep the common canonical spelling on the O(1) PHF path.
+    if let Some(function) = lookup_canonical_function(name) {
+        return Some(function);
+    }
+
+    let mut normalized = [0_u8; MAX_STANDARD_FUNCTION_NAME_BYTES];
+    let normalized_len = if name.is_ascii() {
+        if name.len() > MAX_STANDARD_FUNCTION_NAME_BYTES {
+            return None;
+        }
+        for (index, byte) in name.bytes().enumerate() {
+            normalized[index] = byte.to_ascii_uppercase();
+        }
+        name.len()
+    } else {
+        let mut normalized_len: usize = 0;
+        for character in name.chars() {
+            for uppercase in character.to_uppercase() {
+                let mut encoded = [0_u8; 4];
+                let encoded = uppercase.encode_utf8(&mut encoded).as_bytes();
+                let next_len = normalized_len.checked_add(encoded.len())?;
+                if next_len > normalized.len() {
+                    return None;
+                }
+                normalized[normalized_len..next_len].copy_from_slice(encoded);
+                normalized_len = next_len;
+            }
+        }
+        normalized_len
+    };
+
+    let normalized = std::str::from_utf8(&normalized[..normalized_len]).ok()?;
+    lookup_canonical_function(normalized)
+}
+
+fn lookup_canonical_function(name: &str) -> Option<&'static str> {
+    STANDARD_FORMULA_FUNCTIONS.get_key(name).copied()
+}
+
 fn strip_open_formula_prefix(value: &str) -> Option<&str> {
     let bytes = value.as_bytes();
     (bytes.len() >= 4 && bytes[..3].eq_ignore_ascii_case(b"of:") && bytes[3] == b'=')
@@ -681,12 +765,18 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
 // FORMULA UTILITIES
 // ============================================================================
 
-/// Check if a string is a valid `OpenFormula` function name
+/// Query whether a name matches the case-insensitive ODF 1.4 Part 4 chapter 6
+/// function catalog.
+///
+/// Function names are compared case-insensitively. The lookup uses a bounded
+/// stack buffer, so a caller-controlled name cannot trigger an unbounded
+/// Unicode-uppercase allocation. Names outside the bounded normalization
+/// envelope are rejected. This query does not validate invocation syntax or
+/// function arity.
 #[inline]
-#[allow(dead_code)] // Will be used for future enhancements
 #[must_use]
 pub fn is_valid_function(name: &str) -> bool {
-    FORMULA_FUNCTIONS.contains(name.to_uppercase().as_str())
+    lookup_function(name).is_some()
 }
 
 /// Extract all cell references from a formula
@@ -760,6 +850,30 @@ mod tests {
     }
 
     #[test]
+    fn test_function_calls_take_precedence_over_cell_reference_shape() {
+        let formula = FormulaParser::new("=BIN2DEC (\"101\")")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BIN2DEC"));
+        assert!(matches!(formula.tokens[1], Token::LParen));
+
+        let formula = FormulaParser::new("=BINOM.DIST.RANGE(A1;1;2)")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BINOM.DIST.RANGE"));
+
+        // Without an invocation parenthesis, the same spelling remains a
+        // valid cell reference (column LOG, row 10).
+        let formula = FormulaParser::new("=LOG10")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::CellRef(CellRef { column, row, .. }) if column == "LOG" && *row == 10
+        ));
+    }
+
+    #[test]
     fn test_parse_canonical_odf_formula_without_normalizing_the_input() {
         let formula = FormulaParser::new("of:=SUM([$Inputs.$A$1:.$B$2])")
             .parse()
@@ -825,6 +939,35 @@ mod tests {
         assert!(is_valid_function("SUM"));
         assert!(is_valid_function("AVERAGE"));
         assert!(!is_valid_function("INVALID_FUNCTION"));
+    }
+
+    #[test]
+    fn test_function_lookup_is_bounded_and_case_insensitive_without_ascii_only_regression() {
+        assert!(is_valid_function("sum"));
+        assert!(is_valid_function("ſUM"));
+        assert!(is_valid_function("ıF"));
+        assert!(!is_valid_function(
+            &"A".repeat(MAX_FUNCTION_INPUT_BYTES + 1)
+        ));
+        assert!(!is_valid_function("not-a-function"));
+    }
+
+    #[test]
+    fn test_string_literals_preserve_utf8_and_require_a_closing_quote() {
+        let formula = FormulaParser::new("=UNICODE(\"α🌟\")")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(
+            &formula.tokens[2],
+            Token::String(value) if value == "α🌟"
+        ));
+
+        let formula = FormulaParser::new("=\"a\"\"b\"")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::String(value) if value == "a\"b"));
+
+        assert!(FormulaParser::new("=\"unterminated").parse().is_err());
     }
 
     #[test]
@@ -1194,6 +1337,17 @@ mod tests {
         // Invalid functions
         assert!(!is_valid_function("NOTAFUNCTION"));
         assert!(!is_valid_function(""));
+    }
+
+    #[test]
+    fn test_every_part4_catalog_name_is_tokenized_as_a_function_call() {
+        assert_eq!(STANDARD_FORMULA_FUNCTIONS.len(), 393);
+        for name in STANDARD_FORMULA_FUNCTIONS.iter() {
+            let formula = FormulaParser::new(&format!("={name}()"))
+                .parse()
+                .expect("catalog function should parse as an invocation");
+            assert!(matches!(&formula.tokens[0], Token::Function(found) if found == *name));
+        }
     }
 
     #[test]

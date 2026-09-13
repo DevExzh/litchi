@@ -1,0 +1,1495 @@
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 1d4f22705..0a66e1060 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -3,2 +3,5 @@
+-//! This module provides support for `OpenFormula` (ODF 1.2) spreadsheet formulas.
+-//! It handles parsing, validation, and representation of formulas in ODS files.
++//! This module tokenizes the supported subset of `OpenFormula` expressions and
++//! represents formulas stored in ODS files. Function-name recognition covers
++//! the complete normative Part 4, chapter 6 catalog; this remains a tokenizer,
++//! not a complete expression grammar or evaluator, and it does not validate
++//! function arity.
+@@ -9 +12 @@
+-//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (external)
++//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (sheet-qualified)
+@@ -12 +15 @@
+-//! - References: `.A1` (relative to current sheet), `[file.ods]Sheet.A1` (external file)
++//! - References: `.A1` (relative to current sheet), `[$Inputs.$A$1]` (bracketed)
+@@ -16 +19 @@
+-//! - `OpenFormula` 1.2 Specification
++//! - ODF 1.4 Part 4, `OpenFormula` Format
+@@ -19 +21,0 @@ use litchi_core::{Error, Result};
+-use phf::{Set, phf_set};
+@@ -22,3 +24 @@ use smallvec::SmallVec;
+-// ============================================================================
+-// FORMULA FUNCTION CATALOG
+-// ============================================================================
++mod functions;
+@@ -26,43 +26 @@ use smallvec::SmallVec;
+-/// Standard `OpenFormula` functions
+-///
+-/// This is a compile-time set of valid `OpenFormula` function names.
+-/// Using phf for O(1) lookup.
+-static FORMULA_FUNCTIONS: Set<&'static str> = phf_set! {
+-    // Mathematical functions
+-    "ABS", "ACOS", "ACOSH", "ACOT", "ACOTH", "ASIN", "ASINH", "ATAN", "ATAN2", "ATANH",
+-    "CEILING", "COS", "COSH", "COT", "COTH", "DEGREES", "EXP", "FACT", "FLOOR",
+-    "INT", "LN", "LOG", "LOG10", "MOD", "PI", "POWER", "PRODUCT", "QUOTIENT",
+-    "RADIANS", "RAND", "ROUND", "ROUNDDOWN", "ROUNDUP", "SIGN", "SIN", "SINH",
+-    "SQRT", "SUM", "SUMIF", "SUMIFS", "SUMSQ", "TAN", "TANH", "TRUNC",
+-
+-    // Statistical functions
+-    "AVERAGE", "AVERAGEA", "AVERAGEIF", "AVERAGEIFS", "COUNT", "COUNTA", "COUNTBLANK",
+-    "COUNTIF", "COUNTIFS", "MAX", "MAXA", "MEDIAN", "MIN", "MINA", "MODE",
+-    "PERCENTILE", "PERCENTRANK", "QUARTILE", "RANK", "STDEV", "STDEVA", "STDEVP",
+-    "STDEVPA", "VAR", "VARA", "VARP", "VARPA",
+-
+-    // Logical functions
+-    "AND", "FALSE", "IF", "IFERROR", "IFNA", "NOT", "OR", "TRUE", "XOR",
+-
+-    // Text functions
+-    "CHAR", "CODE", "CONCATENATE", "EXACT", "FIND", "FIXED", "LEFT", "LEN",
+-    "LOWER", "MID", "PROPER", "REPLACE", "REPT", "RIGHT", "SEARCH", "SUBSTITUTE",
+-    "T", "TEXT", "TRIM", "UPPER", "VALUE",
+-
+-    // Date and time functions
+-    "DATE", "DATEVALUE", "DAY", "DAYS", "DAYS360", "HOUR", "MINUTE", "MONTH",
+-    "NOW", "SECOND", "TIME", "TIMEVALUE", "TODAY", "WEEKDAY", "YEAR",
+-
+-    // Lookup and reference functions
+-    "ADDRESS", "CHOOSE", "COLUMN", "COLUMNS", "HLOOKUP", "INDEX", "INDIRECT",
+-    "LOOKUP", "MATCH", "OFFSET", "ROW", "ROWS", "VLOOKUP",
+-
+-    // Information functions
+-    "CELL", "ERROR.TYPE", "INFO", "ISBLANK", "ISERR", "ISERROR", "ISEVEN",
+-    "ISLOGICAL", "ISNA", "ISNONTEXT", "ISNUMBER", "ISODD", "ISREF", "ISTEXT",
+-    "N", "NA", "TYPE",
+-
+-    // Financial functions
+-    "DB", "DDB", "FV", "IPMT", "IRR", "MIRR", "NPER", "NPV", "PMT", "PPMT",
+-    "PV", "RATE", "SLN", "SYD", "VDB",
+-};
++use functions::{MAX_STANDARD_FUNCTION_NAME_BYTES, STANDARD_FORMULA_FUNCTIONS};
+@@ -235,0 +194 @@ impl<'a> FormulaParser<'a> {
++        let mut segment_start = self.position;
+@@ -238,0 +198,10 @@ impl<'a> FormulaParser<'a> {
++                // Formula input has already been validated as UTF-8. Copy
++                // complete UTF-8 segments instead of treating each byte as a
++                // character; this preserves non-ASCII literals verbatim.
++                if segment_start < self.position {
++                    let segment = std::str::from_utf8(&self.input[segment_start..self.position])
++                        .map_err(|_error| {
++                            Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
++                        })?;
++                    result.push_str(segment);
++                }
+@@ -243,0 +213 @@ impl<'a> FormulaParser<'a> {
++                    segment_start = self.position;
+@@ -245 +215 @@ impl<'a> FormulaParser<'a> {
+-                    break;
++                    return Ok(Token::String(result));
+@@ -248 +217,0 @@ impl<'a> FormulaParser<'a> {
+-                result.push(ch as char);
+@@ -253 +222,3 @@ impl<'a> FormulaParser<'a> {
+-        Ok(Token::String(result))
++        Err(Error::InvalidFormat(
++            "Unterminated string literal".to_string(),
++        ))
+@@ -310,0 +282,9 @@ impl<'a> FormulaParser<'a> {
++        // A function name may also be a valid column-plus-row spelling (for
++        // example, `BIN2DEC` is column BIN, row 2, followed by `DEC`).  When
++        // the complete identifier is followed by an opening parenthesis, the
++        // function grammar takes precedence over that speculative cell parse.
++        // Keep the whitespace unconsumed so the normal token loop handles it.
++        if let Some(function) = self.try_parse_function_call() {
++            return Ok(function);
++        }
++
+@@ -346 +326 @@ impl<'a> FormulaParser<'a> {
+-            .to_uppercase();
++            .trim();
+@@ -349,2 +329,2 @@ impl<'a> FormulaParser<'a> {
+-        if FORMULA_FUNCTIONS.contains(ident.as_str()) {
+-            Ok(Token::Function(ident))
++        if let Some(function) = lookup_function(ident) {
++            Ok(Token::Function(function.to_owned()))
+@@ -358 +338,2 @@ impl<'a> FormulaParser<'a> {
+-                "Unknown identifier or invalid cell reference: {ident}"
++                "Unknown identifier or invalid cell reference: {}",
++                ident.to_uppercase()
+@@ -362,0 +344,54 @@ impl<'a> FormulaParser<'a> {
++    /// Recognize a known function invocation before trying a cell reference.
++    fn try_parse_function_call(&mut self) -> Option<Token> {
++        if !self.peek_is_letter() {
++            return None;
++        }
++
++        let start = self.position;
++        while self
++            .input
++            .get(self.position)
++            .is_some_and(|ch| ch.is_ascii_alphanumeric() || *ch == b'_' || *ch == b'.')
++        {
++            self.advance();
++            // This lexer accepts ASCII identifiers, so a longer spelling
++            // cannot match the standard catalog. Avoid scanning a large
++            // unknown identifier twice before its ordinary refusal path.
++            if self.position - start > MAX_STANDARD_FUNCTION_NAME_BYTES {
++                self.position = start;
++                return None;
++            }
++        }
++        let end = self.position;
++        if start == end {
++            return None;
++        }
++
++        let mut lookahead = end;
++        while self
++            .input
++            .get(lookahead)
++            .is_some_and(|ch| ch.is_ascii_whitespace())
++        {
++            lookahead += 1;
++        }
++        if self.input.get(lookahead) != Some(&b'(') {
++            self.position = start;
++            return None;
++        }
++
++        let identifier = match std::str::from_utf8(&self.input[start..end]) {
++            Ok(identifier) => identifier,
++            Err(_) => {
++                self.position = start;
++                return None;
++            },
++        };
++        let Some(function) = lookup_function(identifier) else {
++            self.position = start;
++            return None;
++        };
++        self.position = end;
++        Some(Token::Function(function.to_owned()))
++    }
++
+@@ -525,0 +561,49 @@ impl<'a> FormulaParser<'a> {
++// The catalog's longest canonical name is 19 ASCII bytes. Four bytes per
++// scalar is enough to bound the input that can be normalized without making
++// `is_valid_function` perform an unbounded Unicode uppercase allocation.
++const MAX_FUNCTION_INPUT_BYTES: usize = MAX_STANDARD_FUNCTION_NAME_BYTES * 4;
++
++fn lookup_function(name: &str) -> Option<&'static str> {
++    if name.is_empty() || name.len() > MAX_FUNCTION_INPUT_BYTES {
++        return None;
++    }
++
++    // Keep the common canonical spelling on the O(1) PHF path.
++    if let Some(function) = lookup_canonical_function(name) {
++        return Some(function);
++    }
++
++    let mut normalized = [0_u8; MAX_STANDARD_FUNCTION_NAME_BYTES];
++    let normalized_len = if name.is_ascii() {
++        if name.len() > MAX_STANDARD_FUNCTION_NAME_BYTES {
++            return None;
++        }
++        for (index, byte) in name.bytes().enumerate() {
++            normalized[index] = byte.to_ascii_uppercase();
++        }
++        name.len()
++    } else {
++        let mut normalized_len: usize = 0;
++        for character in name.chars() {
++            for uppercase in character.to_uppercase() {
++                let mut encoded = [0_u8; 4];
++                let encoded = uppercase.encode_utf8(&mut encoded).as_bytes();
++                let next_len = normalized_len.checked_add(encoded.len())?;
++                if next_len > normalized.len() {
++                    return None;
++                }
++                normalized[normalized_len..next_len].copy_from_slice(encoded);
++                normalized_len = next_len;
++            }
++        }
++        normalized_len
++    };
++
++    let normalized = std::str::from_utf8(&normalized[..normalized_len]).ok()?;
++    lookup_canonical_function(normalized)
++}
++
++fn lookup_canonical_function(name: &str) -> Option<&'static str> {
++    STANDARD_FORMULA_FUNCTIONS.get_key(name).copied()
++}
++
+@@ -684 +768,8 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
+-/// Check if a string is a valid `OpenFormula` function name
++/// Query whether a name matches the case-insensitive ODF 1.4 Part 4 chapter 6
++/// function catalog.
++///
++/// Function names are compared case-insensitively. The lookup uses a bounded
++/// stack buffer, so a caller-controlled name cannot trigger an unbounded
++/// Unicode-uppercase allocation. Names outside the bounded normalization
++/// envelope are rejected. This query does not validate invocation syntax or
++/// function arity.
+@@ -686 +776,0 @@ fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
+-#[allow(dead_code)] // Will be used for future enhancements
+@@ -689 +779 @@ pub fn is_valid_function(name: &str) -> bool {
+-    FORMULA_FUNCTIONS.contains(name.to_uppercase().as_str())
++    lookup_function(name).is_some()
+@@ -761,0 +852,24 @@ mod tests {
++    #[test]
++    fn test_function_calls_take_precedence_over_cell_reference_shape() {
++        let formula = FormulaParser::new("=BIN2DEC (\"101\")")
++            .parse()
++            .expect("test fixture or operation should succeed");
++        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BIN2DEC"));
++        assert!(matches!(formula.tokens[1], Token::LParen));
++
++        let formula = FormulaParser::new("=BINOM.DIST.RANGE(A1;1;2)")
++            .parse()
++            .expect("test fixture or operation should succeed");
++        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BINOM.DIST.RANGE"));
++
++        // Without an invocation parenthesis, the same spelling remains a
++        // valid cell reference (column LOG, row 10).
++        let formula = FormulaParser::new("=LOG10")
++            .parse()
++            .expect("test fixture or operation should succeed");
++        assert!(matches!(
++            &formula.tokens[0],
++            Token::CellRef(CellRef { column, row, .. }) if column == "LOG" && *row == 10
++        ));
++    }
++
+@@ -829,0 +944,29 @@ mod tests {
++    #[test]
++    fn test_function_lookup_is_bounded_and_case_insensitive_without_ascii_only_regression() {
++        assert!(is_valid_function("sum"));
++        assert!(is_valid_function("ſUM"));
++        assert!(is_valid_function("ıF"));
++        assert!(!is_valid_function(
++            &"A".repeat(MAX_FUNCTION_INPUT_BYTES + 1)
++        ));
++        assert!(!is_valid_function("not-a-function"));
++    }
++
++    #[test]
++    fn test_string_literals_preserve_utf8_and_require_a_closing_quote() {
++        let formula = FormulaParser::new("=UNICODE(\"α🌟\")")
++            .parse()
++            .expect("test fixture or operation should succeed");
++        assert!(matches!(
++            &formula.tokens[2],
++            Token::String(value) if value == "α🌟"
++        ));
++
++        let formula = FormulaParser::new("=\"a\"\"b\"")
++            .parse()
++            .expect("test fixture or operation should succeed");
++        assert!(matches!(&formula.tokens[0], Token::String(value) if value == "a\"b"));
++
++        assert!(FormulaParser::new("=\"unterminated").parse().is_err());
++    }
++
+@@ -1198,0 +1342,11 @@ mod tests {
++    #[test]
++    fn test_every_part4_catalog_name_is_tokenized_as_a_function_call() {
++        assert_eq!(STANDARD_FORMULA_FUNCTIONS.len(), 393);
++        for name in STANDARD_FORMULA_FUNCTIONS.iter() {
++            let formula = FormulaParser::new(&format!("={name}()"))
++                .parse()
++                .expect("catalog function should parse as an invocation");
++            assert!(matches!(&formula.tokens[0], Token::Function(found) if found == *name));
++        }
++    }
++
+diff --git a/crates/litchi-ods/src/codec/formula/functions.rs b/crates/litchi-ods/src/codec/formula/functions.rs
+new file mode 100644
+index 000000000..464a85805
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/functions.rs
+@@ -0,0 +1,407 @@
++//! The ODF 1.4 Part 4 (OpenFormula) function catalog.
++
++use phf::{Set, phf_set};
++
++/// Maximum UTF-8 byte length of a canonical standard function name.
++pub(crate) const MAX_STANDARD_FUNCTION_NAME_BYTES: usize = 19;
++
++/// Function names defined by ODF 1.4 Part 4, chapter 6.
++///
++/// Keep this set limited to the normative catalog. Host-specific names from
++/// Part 4 section 5.7 are not inferred by this syntax-only parser.
++pub(crate) static STANDARD_FORMULA_FUNCTIONS: Set<&'static str> = phf_set! {
++    "ABS",
++    "ACCRINT",
++    "ACCRINTM",
++    "ACOS",
++    "ACOSH",
++    "ACOT",
++    "ACOTH",
++    "ADDRESS",
++    "AMORLINC",
++    "AND",
++    "ARABIC",
++    "AREAS",
++    "ASC",
++    "ASIN",
++    "ASINH",
++    "ATAN",
++    "ATAN2",
++    "ATANH",
++    "AVEDEV",
++    "AVERAGE",
++    "AVERAGEA",
++    "AVERAGEIF",
++    "AVERAGEIFS",
++    "BASE",
++    "BESSELI",
++    "BESSELJ",
++    "BESSELK",
++    "BESSELY",
++    "BETADIST",
++    "BETAINV",
++    "BIN2DEC",
++    "BIN2HEX",
++    "BIN2OCT",
++    "BINOM.DIST.RANGE",
++    "BINOMDIST",
++    "BITAND",
++    "BITLSHIFT",
++    "BITOR",
++    "BITRSHIFT",
++    "BITXOR",
++    "CEILING",
++    "CELL",
++    "CHAR",
++    "CHISQDIST",
++    "CHISQINV",
++    "CHOOSE",
++    "CLEAN",
++    "CODE",
++    "COLUMN",
++    "COLUMNS",
++    "COMBIN",
++    "COMBINA",
++    "COMPLEX",
++    "CONCATENATE",
++    "CONFIDENCE",
++    "CONVERT",
++    "CORREL",
++    "COS",
++    "COSH",
++    "COT",
++    "COTH",
++    "COUNT",
++    "COUNTA",
++    "COUNTBLANK",
++    "COUNTIF",
++    "COUNTIFS",
++    "COUPDAYBS",
++    "COUPDAYS",
++    "COUPDAYSNC",
++    "COUPNCD",
++    "COUPNUM",
++    "COUPPCD",
++    "COVAR",
++    "CRITBINOM",
++    "CSC",
++    "CSCH",
++    "CUMIPMT",
++    "CUMPRINC",
++    "DATE",
++    "DATEDIF",
++    "DATEVALUE",
++    "DAVERAGE",
++    "DAY",
++    "DAYS",
++    "DAYS360",
++    "DB",
++    "DCOUNT",
++    "DCOUNTA",
++    "DDB",
++    "DDE",
++    "DEC2BIN",
++    "DEC2HEX",
++    "DEC2OCT",
++    "DECIMAL",
++    "DEGREES",
++    "DELTA",
++    "DEVSQ",
++    "DGET",
++    "DISC",
++    "DMAX",
++    "DMIN",
++    "DOLLAR",
++    "DOLLARDE",
++    "DOLLARFR",
++    "DPRODUCT",
++    "DSTDEV",
++    "DSTDEVP",
++    "DSUM",
++    "DURATION",
++    "DVAR",
++    "DVARP",
++    "EASTERSUNDAY",
++    "EDATE",
++    "EFFECT",
++    "EOMONTH",
++    "ERF",
++    "ERFC",
++    "ERROR.TYPE",
++    "EUROCONVERT",
++    "EVEN",
++    "EXACT",
++    "EXP",
++    "EXPONDIST",
++    "FACT",
++    "FACTDOUBLE",
++    "FALSE",
++    "FDIST",
++    "FIND",
++    "FINDB",
++    "FINV",
++    "FISHER",
++    "FISHERINV",
++    "FIXED",
++    "FLOOR",
++    "FORECAST",
++    "FORMULA",
++    "FREQUENCY",
++    "FTEST",
++    "FV",
++    "FVSCHEDULE",
++    "GAMMA",
++    "GAMMADIST",
++    "GAMMAINV",
++    "GAMMALN",
++    "GAUSS",
++    "GCD",
++    "GEOMEAN",
++    "GESTEP",
++    "GETPIVOTDATA",
++    "GROWTH",
++    "HARMEAN",
++    "HEX2BIN",
++    "HEX2DEC",
++    "HEX2OCT",
++    "HLOOKUP",
++    "HOUR",
++    "HYPERLINK",
++    "HYPGEOMDIST",
++    "IF",
++    "IFERROR",
++    "IFNA",
++    "IMABS",
++    "IMAGINARY",
++    "IMARGUMENT",
++    "IMCONJUGATE",
++    "IMCOS",
++    "IMCOSH",
++    "IMCOT",
++    "IMCSC",
++    "IMCSCH",
++    "IMDIV",
++    "IMEXP",
++    "IMLN",
++    "IMLOG10",
++    "IMLOG2",
++    "IMPOWER",
++    "IMPRODUCT",
++    "IMREAL",
++    "IMSEC",
++    "IMSECH",
++    "IMSIN",
++    "IMSINH",
++    "IMSQRT",
++    "IMSUB",
++    "IMSUM",
++    "IMTAN",
++    "INDEX",
++    "INDIRECT",
++    "INFO",
++    "INT",
++    "INTERCEPT",
++    "INTRATE",
++    "IPMT",
++    "IRR",
++    "ISBLANK",
++    "ISERR",
++    "ISERROR",
++    "ISEVEN",
++    "ISFORMULA",
++    "ISLOGICAL",
++    "ISNA",
++    "ISNONTEXT",
++    "ISNUMBER",
++    "ISODD",
++    "ISOWEEKNUM",
++    "ISPMT",
++    "ISREF",
++    "ISTEXT",
++    "JIS",
++    "KURT",
++    "LARGE",
++    "LCM",
++    "LEFT",
++    "LEFTB",
++    "LEGACY.CHIDIST",
++    "LEGACY.CHIINV",
++    "LEGACY.CHITEST",
++    "LEGACY.FDIST",
++    "LEGACY.FINV",
++    "LEGACY.NORMSDIST",
++    "LEGACY.NORMSINV",
++    "LEGACY.TDIST",
++    "LEN",
++    "LENB",
++    "LINEST",
++    "LN",
++    "LOG",
++    "LOG10",
++    "LOGEST",
++    "LOGINV",
++    "LOGNORMDIST",
++    "LOOKUP",
++    "LOWER",
++    "MATCH",
++    "MAX",
++    "MAXA",
++    "MDETERM",
++    "MDURATION",
++    "MEDIAN",
++    "MID",
++    "MIDB",
++    "MIN",
++    "MINA",
++    "MINUTE",
++    "MINVERSE",
++    "MIRR",
++    "MMULT",
++    "MOD",
++    "MODE",
++    "MONTH",
++    "MROUND",
++    "MULTINOMIAL",
++    "MULTIPLE.OPERATIONS",
++    "MUNIT",
++    "N",
++    "NA",
++    "NEGBINOMDIST",
++    "NETWORKDAYS",
++    "NOMINAL",
++    "NORMDIST",
++    "NORMINV",
++    "NOT",
++    "NOW",
++    "NPER",
++    "NPV",
++    "NUMBERVALUE",
++    "OCT2BIN",
++    "OCT2DEC",
++    "OCT2HEX",
++    "ODD",
++    "ODDFPRICE",
++    "ODDFYIELD",
++    "ODDLPRICE",
++    "ODDLYIELD",
++    "OFFSET",
++    "OR",
++    "PDURATION",
++    "PEARSON",
++    "PERCENTILE",
++    "PERCENTRANK",
++    "PERMUT",
++    "PERMUTATIONA",
++    "PHI",
++    "PI",
++    "PMT",
++    "POISSON",
++    "POWER",
++    "PPMT",
++    "PRICE",
++    "PRICEDISC",
++    "PRICEMAT",
++    "PROB",
++    "PRODUCT",
++    "PROPER",
++    "PV",
++    "QUARTILE",
++    "QUOTIENT",
++    "RADIANS",
++    "RAND",
++    "RANDBETWEEN",
++    "RANK",
++    "RATE",
++    "RECEIVED",
++    "REPLACE",
++    "REPLACEB",
++    "REPT",
++    "RIGHT",
++    "RIGHTB",
++    "ROMAN",
++    "ROUND",
++    "ROUNDDOWN",
++    "ROUNDUP",
++    "ROW",
++    "ROWS",
++    "RRI",
++    "RSQ",
++    "SEARCH",
++    "SEARCHB",
++    "SEC",
++    "SECH",
++    "SECOND",
++    "SERIESSUM",
++    "SHEET",
++    "SHEETS",
++    "SIGN",
++    "SIN",
++    "SINH",
++    "SKEW",
++    "SKEWP",
++    "SLN",
++    "SLOPE",
++    "SMALL",
++    "SQRT",
++    "SQRTPI",
++    "STANDARDIZE",
++    "STDEV",
++    "STDEVA",
++    "STDEVP",
++    "STDEVPA",
++    "STEYX",
++    "SUBSTITUTE",
++    "SUBTOTAL",
++    "SUM",
++    "SUMIF",
++    "SUMIFS",
++    "SUMPRODUCT",
++    "SUMSQ",
++    "SUMX2MY2",
++    "SUMX2PY2",
++    "SUMXMY2",
++    "SYD",
++    "T",
++    "TAN",
++    "TANH",
++    "TBILLEQ",
++    "TBILLPRICE",
++    "TBILLYIELD",
++    "TEXT",
++    "TIME",
++    "TIMEVALUE",
++    "TINV",
++    "TODAY",
++    "TRANSPOSE",
++    "TREND",
++    "TRIM",
++    "TRIMMEAN",
++    "TRUE",
++    "TRUNC",
++    "TTEST",
++    "TYPE",
++    "UNICHAR",
++    "UNICODE",
++    "UPPER",
++    "VALUE",
++    "VAR",
++    "VARA",
++    "VARP",
++    "VARPA",
++    "VDB",
++    "VLOOKUP",
++    "WEEKDAY",
++    "WEEKNUM",
++    "WEIBULL",
++    "WORKDAY",
++    "XIRR",
++    "XNPV",
++    "XOR",
++    "YEAR",
++    "YEARFRAC",
++    "YIELD",
++    "YIELDDISC",
++    "YIELDMAT",
++    "ZTEST",
++
++};
+diff --git a/crates/litchi-ods/tests/ods_formula_functions.rs b/crates/litchi-ods/tests/ods_formula_functions.rs
+new file mode 100644
+index 000000000..0b621424f
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_functions.rs
+@@ -0,0 +1,769 @@
++//! Integration coverage for inert OpenFormula 1.4 name recognition.
++//!
++//! The catalog below is a checked-in extraction of the standard function
++//! headings in ODF 1.4 Part 4, chapter 6. These tests inspect recognition and
++//! lexical tokens only; they deliberately make no evaluation or arity claim.
++
++use litchi_ods::codec::formula::{
++    Formula, FormulaParser, Token, extract_functions, is_valid_function,
++};
++
++/// Normative ODF 1.4 Part 4 chapter 6 function names, extracted independently from the specification headings.
++const STANDARD_OPENFORMULA_FUNCTION_NAMES: &[&str] = &[
++    "MDETERM",
++    "MINVERSE",
++    "MMULT",
++    "MUNIT",
++    "TRANSPOSE",
++    "BITAND",
++    "BITLSHIFT",
++    "BITOR",
++    "BITRSHIFT",
++    "BITXOR",
++    "FINDB",
++    "LEFTB",
++    "LENB",
++    "MIDB",
++    "REPLACEB",
++    "RIGHTB",
++    "SEARCHB",
++    "COMPLEX",
++    "IMABS",
++    "IMAGINARY",
++    "IMARGUMENT",
++    "IMCONJUGATE",
++    "IMCOS",
++    "IMCOSH",
++    "IMCOT",
++    "IMCSC",
++    "IMCSCH",
++    "IMDIV",
++    "IMEXP",
++    "IMLN",
++    "IMLOG10",
++    "IMLOG2",
++    "IMPOWER",
++    "IMPRODUCT",
++    "IMREAL",
++    "IMSIN",
++    "IMSINH",
++    "IMSEC",
++    "IMSECH",
++    "IMSQRT",
++    "IMSUB",
++    "IMSUM",
++    "IMTAN",
++    "DAVERAGE",
++    "DCOUNT",
++    "DCOUNTA",
++    "DGET",
++    "DMAX",
++    "DMIN",
++    "DPRODUCT",
++    "DSTDEV",
++    "DSTDEVP",
++    "DSUM",
++    "DVAR",
++    "DVARP",
++    "DATE",
++    "DATEDIF",
++    "DATEVALUE",
++    "DAY",
++    "DAYS",
++    "DAYS360",
++    "EASTERSUNDAY",
++    "EDATE",
++    "EOMONTH",
++    "HOUR",
++    "ISOWEEKNUM",
++    "MINUTE",
++    "MONTH",
++    "NETWORKDAYS",
++    "NOW",
++    "SECOND",
++    "TIME",
++    "TIMEVALUE",
++    "TODAY",
++    "WEEKDAY",
++    "WEEKNUM",
++    "WORKDAY",
++    "YEAR",
++    "YEARFRAC",
++    "DDE",
++    "HYPERLINK",
++    "ACCRINT",
++    "ACCRINTM",
++    "AMORLINC",
++    "COUPDAYBS",
++    "COUPDAYS",
++    "COUPDAYSNC",
++    "COUPNCD",
++    "COUPNUM",
++    "COUPPCD",
++    "CUMIPMT",
++    "CUMPRINC",
++    "DB",
++    "DDB",
++    "DISC",
++    "DOLLARDE",
++    "DOLLARFR",
++    "DURATION",
++    "EFFECT",
++    "FV",
++    "FVSCHEDULE",
++    "INTRATE",
++    "IPMT",
++    "IRR",
++    "ISPMT",
++    "MDURATION",
++    "MIRR",
++    "NOMINAL",
++    "NPER",
++    "NPV",
++    "ODDFPRICE",
++    "ODDFYIELD",
++    "ODDLPRICE",
++    "ODDLYIELD",
++    "PDURATION",
++    "PMT",
++    "PPMT",
++    "PRICE",
++    "PRICEDISC",
++    "PRICEMAT",
++    "PV",
++    "RATE",
++    "RECEIVED",
++    "RRI",
++    "SLN",
++    "SYD",
++    "TBILLEQ",
++    "TBILLPRICE",
++    "TBILLYIELD",
++    "VDB",
++    "XIRR",
++    "XNPV",
++    "YIELD",
++    "YIELDDISC",
++    "YIELDMAT",
++    "AREAS",
++    "CELL",
++    "COLUMN",
++    "COLUMNS",
++    "COUNT",
++    "COUNTA",
++    "COUNTBLANK",
++    "COUNTIF",
++    "COUNTIFS",
++    "ERROR.TYPE",
++    "FORMULA",
++    "INFO",
++    "ISBLANK",
++    "ISERR",
++    "ISERROR",
++    "ISEVEN",
++    "ISFORMULA",
++    "ISLOGICAL",
++    "ISNA",
++    "ISNONTEXT",
++    "ISNUMBER",
++    "ISODD",
++    "ISREF",
++    "ISTEXT",
++    "N",
++    "NA",
++    "NUMBERVALUE",
++    "ROW",
++    "ROWS",
++    "SHEET",
++    "SHEETS",
++    "TYPE",
++    "VALUE",
++    "ADDRESS",
++    "CHOOSE",
++    "GETPIVOTDATA",
++    "HLOOKUP",
++    "INDEX",
++    "INDIRECT",
++    "LOOKUP",
++    "MATCH",
++    "MULTIPLE.OPERATIONS",
++    "OFFSET",
++    "VLOOKUP",
++    "AND",
++    "FALSE",
++    "IF",
++    "IFERROR",
++    "IFNA",
++    "NOT",
++    "OR",
++    "TRUE",
++    "XOR",
++    "ABS",
++    "ACOS",
++    "ACOSH",
++    "ACOT",
++    "ACOTH",
++    "ASIN",
++    "ASINH",
++    "ATAN",
++    "ATAN2",
++    "ATANH",
++    "BESSELI",
++    "BESSELJ",
++    "BESSELK",
++    "BESSELY",
++    "COMBIN",
++    "COMBINA",
++    "CONVERT",
++    "COS",
++    "COSH",
++    "COT",
++    "COTH",
++    "CSC",
++    "CSCH",
++    "DEGREES",
++    "DELTA",
++    "ERF",
++    "ERFC",
++    "EUROCONVERT",
++    "EVEN",
++    "EXP",
++    "FACT",
++    "FACTDOUBLE",
++    "GAMMA",
++    "GAMMALN",
++    "GCD",
++    "GESTEP",
++    "LCM",
++    "LN",
++    "LOG",
++    "LOG10",
++    "MOD",
++    "MULTINOMIAL",
++    "ODD",
++    "PI",
++    "POWER",
++    "PRODUCT",
++    "QUOTIENT",
++    "RADIANS",
++    "RAND",
++    "RANDBETWEEN",
++    "SEC",
++    "SERIESSUM",
++    "SIGN",
++    "SIN",
++    "SINH",
++    "SECH",
++    "SQRT",
++    "SQRTPI",
++    "SUBTOTAL",
++    "SUM",
++    "SUMIF",
++    "SUMIFS",
++    "SUMPRODUCT",
++    "SUMSQ",
++    "SUMX2MY2",
++    "SUMX2PY2",
++    "SUMXMY2",
++    "TAN",
++    "TANH",
++    "CEILING",
++    "INT",
++    "FLOOR",
++    "MROUND",
++    "ROUND",
++    "ROUNDDOWN",
++    "ROUNDUP",
++    "TRUNC",
++    "AVEDEV",
++    "AVERAGE",
++    "AVERAGEA",
++    "AVERAGEIF",
++    "AVERAGEIFS",
++    "BETADIST",
++    "BETAINV",
++    "BINOM.DIST.RANGE",
++    "BINOMDIST",
++    "LEGACY.CHIDIST",
++    "CHISQDIST",
++    "LEGACY.CHIINV",
++    "CHISQINV",
++    "LEGACY.CHITEST",
++    "CONFIDENCE",
++    "CORREL",
++    "COVAR",
++    "CRITBINOM",
++    "DEVSQ",
++    "EXPONDIST",
++    "FDIST",
++    "LEGACY.FDIST",
++    "FINV",
++    "LEGACY.FINV",
++    "FISHER",
++    "FISHERINV",
++    "FORECAST",
++    "FREQUENCY",
++    "FTEST",
++    "GAMMADIST",
++    "GAMMAINV",
++    "GAUSS",
++    "GEOMEAN",
++    "GROWTH",
++    "HARMEAN",
++    "HYPGEOMDIST",
++    "INTERCEPT",
++    "KURT",
++    "LARGE",
++    "LINEST",
++    "LOGEST",
++    "LOGINV",
++    "LOGNORMDIST",
++    "MAX",
++    "MAXA",
++    "MEDIAN",
++    "MIN",
++    "MINA",
++    "MODE",
++    "NEGBINOMDIST",
++    "NORMDIST",
++    "NORMINV",
++    "LEGACY.NORMSDIST",
++    "LEGACY.NORMSINV",
++    "PEARSON",
++    "PERCENTILE",
++    "PERCENTRANK",
++    "PERMUT",
++    "PERMUTATIONA",
++    "PHI",
++    "POISSON",
++    "PROB",
++    "QUARTILE",
++    "RANK",
++    "RSQ",
++    "SKEW",
++    "SKEWP",
++    "SLOPE",
++    "SMALL",
++    "STANDARDIZE",
++    "STDEV",
++    "STDEVA",
++    "STDEVP",
++    "STDEVPA",
++    "STEYX",
++    "LEGACY.TDIST",
++    "TINV",
++    "TREND",
++    "TRIMMEAN",
++    "TTEST",
++    "VAR",
++    "VARA",
++    "VARP",
++    "VARPA",
++    "WEIBULL",
++    "ZTEST",
++    "ARABIC",
++    "BASE",
++    "BIN2DEC",
++    "BIN2HEX",
++    "BIN2OCT",
++    "DEC2BIN",
++    "DEC2HEX",
++    "DEC2OCT",
++    "DECIMAL",
++    "HEX2BIN",
++    "HEX2DEC",
++    "HEX2OCT",
++    "OCT2BIN",
++    "OCT2DEC",
++    "OCT2HEX",
++    "ROMAN",
++    "ASC",
++    "CHAR",
++    "CLEAN",
++    "CODE",
++    "CONCATENATE",
++    "DOLLAR",
++    "EXACT",
++    "FIND",
++    "FIXED",
++    "JIS",
++    "LEFT",
++    "LEN",
++    "LOWER",
++    "MID",
++    "PROPER",
++    "REPLACE",
++    "REPT",
++    "RIGHT",
++    "SEARCH",
++    "SUBSTITUTE",
++    "T",
++    "TEXT",
++    "TRIM",
++    "UNICHAR",
++    "UNICODE",
++    "UPPER",
++];
++
++/// Names accepted by the pre-catalog parser and retained as compatibility coverage.
++const LEGACY_COMPATIBILITY_FUNCTION_NAMES: &[&str] = &[
++    "ABS",
++    "ACOS",
++    "ACOSH",
++    "ACOT",
++    "ACOTH",
++    "ASIN",
++    "ASINH",
++    "ATAN",
++    "ATAN2",
++    "ATANH",
++    "CEILING",
++    "COS",
++    "COSH",
++    "COT",
++    "COTH",
++    "DEGREES",
++    "EXP",
++    "FACT",
++    "FLOOR",
++    "INT",
++    "LN",
++    "LOG",
++    "LOG10",
++    "MOD",
++    "PI",
++    "POWER",
++    "PRODUCT",
++    "QUOTIENT",
++    "RADIANS",
++    "RAND",
++    "ROUND",
++    "ROUNDDOWN",
++    "ROUNDUP",
++    "SIGN",
++    "SIN",
++    "SINH",
++    "SQRT",
++    "SUM",
++    "SUMIF",
++    "SUMIFS",
++    "SUMSQ",
++    "TAN",
++    "TANH",
++    "TRUNC",
++    "AVERAGE",
++    "AVERAGEA",
++    "AVERAGEIF",
++    "AVERAGEIFS",
++    "COUNT",
++    "COUNTA",
++    "COUNTBLANK",
++    "COUNTIF",
++    "COUNTIFS",
++    "MAX",
++    "MAXA",
++    "MEDIAN",
++    "MIN",
++    "MINA",
++    "MODE",
++    "PERCENTILE",
++    "PERCENTRANK",
++    "QUARTILE",
++    "RANK",
++    "STDEV",
++    "STDEVA",
++    "STDEVP",
++    "STDEVPA",
++    "VAR",
++    "VARA",
++    "VARP",
++    "VARPA",
++    "AND",
++    "FALSE",
++    "IF",
++    "IFERROR",
++    "IFNA",
++    "NOT",
++    "OR",
++    "TRUE",
++    "XOR",
++    "CHAR",
++    "CODE",
++    "CONCATENATE",
++    "EXACT",
++    "FIND",
++    "FIXED",
++    "LEFT",
++    "LEN",
++    "LOWER",
++    "MID",
++    "PROPER",
++    "REPLACE",
++    "REPT",
++    "RIGHT",
++    "SEARCH",
++    "SUBSTITUTE",
++    "T",
++    "TEXT",
++    "TRIM",
++    "UPPER",
++    "VALUE",
++    "DATE",
++    "DATEVALUE",
++    "DAY",
++    "DAYS",
++    "DAYS360",
++    "HOUR",
++    "MINUTE",
++    "MONTH",
++    "NOW",
++    "SECOND",
++    "TIME",
++    "TIMEVALUE",
++    "TODAY",
++    "WEEKDAY",
++    "YEAR",
++    "ADDRESS",
++    "CHOOSE",
++    "COLUMN",
++    "COLUMNS",
++    "HLOOKUP",
++    "INDEX",
++    "INDIRECT",
++    "LOOKUP",
++    "MATCH",
++    "OFFSET",
++    "ROW",
++    "ROWS",
++    "VLOOKUP",
++    "CELL",
++    "ERROR.TYPE",
++    "INFO",
++    "ISBLANK",
++    "ISERR",
++    "ISERROR",
++    "ISEVEN",
++    "ISLOGICAL",
++    "ISNA",
++    "ISNONTEXT",
++    "ISNUMBER",
++    "ISODD",
++    "ISREF",
++    "ISTEXT",
++    "N",
++    "NA",
++    "TYPE",
++    "DB",
++    "DDB",
++    "FV",
++    "IPMT",
++    "IRR",
++    "MIRR",
++    "NPER",
++    "NPV",
++    "PMT",
++    "PPMT",
++    "PV",
++    "RATE",
++    "SLN",
++    "SYD",
++    "VDB",
++];
++
++fn alternating_ascii_case(name: &str) -> String {
++    name.chars()
++        .enumerate()
++        .map(|(index, character)| {
++            if index % 2 == 0 {
++                character.to_ascii_lowercase()
++            } else {
++                character.to_ascii_uppercase()
++            }
++        })
++        .collect()
++}
++
++fn parse_call(name: &str, argument_list: &str) -> Formula {
++    let source = format!("of:={name}({argument_list})");
++    FormulaParser::new(&source)
++        .parse()
++        .unwrap_or_else(|error| panic!("standard function {name} should lex: {error}"))
++}
++
++fn assert_function_token(formula: &Formula, expected: &str) {
++    match formula.tokens.first() {
++        Some(Token::Function(actual)) => assert_eq!(actual, expected),
++        other => panic!("expected {expected} function token, got {other:?}"),
++    }
++}
++
++#[test]
++fn the_complete_odf14_catalog_is_case_insensitive() {
++    assert_eq!(STANDARD_OPENFORMULA_FUNCTION_NAMES.len(), 393);
++    for name in STANDARD_OPENFORMULA_FUNCTION_NAMES {
++        assert!(is_valid_function(name), "canonical name rejected: {name}");
++        let lower = name.to_ascii_lowercase();
++        assert!(
++            is_valid_function(&lower),
++            "lowercase standard name rejected: {name}"
++        );
++        let mixed = alternating_ascii_case(name);
++        assert!(
++            is_valid_function(&mixed),
++            "mixed-case standard name rejected: {name}"
++        );
++    }
++}
++
++#[test]
++fn every_standard_name_is_a_function_token_when_invoked() {
++    for name in STANDARD_OPENFORMULA_FUNCTION_NAMES {
++        let formula = parse_call(name, "");
++        assert_eq!(formula.text, format!("of:={name}()"));
++        assert_function_token(&formula, name);
++        let functions = extract_functions(&formula);
++        assert_eq!(functions.len(), 1, "unexpected function count for {name}");
++        assert_eq!(functions[0], *name);
++    }
++}
++
++#[test]
++fn representative_standard_families_are_lexed_without_evaluation() {
++    let cases = [
++        ("matrix", "MDETERM", "A1"),
++        ("bitwise", "BITAND", "A1"),
++        ("complex", "IMLOG10", "A1"),
++        ("database", "DAVERAGE", "A1"),
++        ("external DDE", "DDE", "\"never-contacted\""),
++        (
++            "external hyperlink",
++            "HYPERLINK",
++            "\"https://invalid.example/\"",
++        ),
++        ("base conversion", "BIN2DEC", "\"101\""),
++        ("base conversion", "BIN2HEX", "\"101\""),
++        ("digit-bearing math", "LOG10", "A1"),
++        ("existing compatibility", "SUM", "A1"),
++    ];
++
++    for (family, name, arguments) in cases {
++        let formula = parse_call(name, arguments);
++        assert_function_token(&formula, name);
++        assert_eq!(
++            extract_functions(&formula).as_slice(),
++            [name],
++            "{family} function was not lexed as a call"
++        );
++    }
++}
++
++#[test]
++fn prior_compatibility_names_remain_recognized() {
++    assert_eq!(LEGACY_COMPATIBILITY_FUNCTION_NAMES.len(), 161);
++    for name in LEGACY_COMPATIBILITY_FUNCTION_NAMES {
++        assert!(
++            STANDARD_OPENFORMULA_FUNCTION_NAMES.contains(name),
++            "legacy name is missing from the standard catalog: {name}"
++        );
++        assert!(is_valid_function(name), "legacy name rejected: {name}");
++    }
++}
++
++#[test]
++fn ordinary_cell_references_remain_cell_reference_tokens() {
++    for source in ["=A1", "=AA10", "=Sheet1.A1", "=$A$1", "=.A1"] {
++        let formula = FormulaParser::new(source)
++            .parse()
++            .unwrap_or_else(|error| panic!("cell reference should parse: {source}: {error}"));
++        assert!(
++            matches!(formula.tokens.as_slice(), [Token::CellRef(_)]),
++            "{source} was not retained as one cell-reference token: {:?}",
++            formula.tokens
++        );
++    }
++
++    // LOG10 is also lexically shaped like column LOG, row 10. Without an
++    // opening parenthesis it remains a cell reference; the call test above
++    // exercises the required function-call precedence.
++    let bare = FormulaParser::new("=LOG10")
++        .parse()
++        .expect("bare A1-shaped identifier should remain valid");
++    assert!(matches!(
++        bare.tokens.as_slice(),
++        [Token::CellRef(reference)]
++            if reference.column == "LOG" && reference.row == 10
++    ));
++}
++
++#[test]
++fn unknown_malformed_and_non_catalog_names_are_rejected() {
++    // The pre-existing lookup helper uppercases Unicode before consulting the
++    // ASCII catalog. Preserve its two established case-compatibility results;
++    // the parser's identifier lexer remains ASCII-only.
++    assert!(is_valid_function("ſUM"));
++    assert!(is_valid_function("ıF"));
++
++    for name in [
++        "",
++        "INVALID_FUNCTION",
++        "LOG10()",
++        "LOG10_",
++        "LOG１０",
++        "ℒOG10",
++        "LOG10\u{200B}",
++        "ＢＩＮ２ＤＥＣ",
++    ] {
++        assert!(
++            !is_valid_function(name),
++            "non-catalog name was accepted: {name:?}"
++        );
++    }
++
++    for source in [
++        "=INVALID_FUNCTION()",
++        "=BIN2DECC()",
++        "=LOG10_()",
++        "=LOG10.()",
++        "=ℒOG10()",
++        "=BIN２DEC()",
++        "=LOG10\u{200B}()",
++    ] {
++        assert!(
++            FormulaParser::new(source).parse().is_err(),
++            "malformed or non-ASCII function name unexpectedly parsed: {source:?}"
++        );
++    }
++}
++
++#[test]
++fn text_arguments_retain_unicode_and_require_a_terminating_quote() {
++    let unicode = parse_call("UNICODE", "\"α🌟\"");
++    assert_function_token(&unicode, "UNICODE");
++    assert!(matches!(
++        unicode.tokens.as_slice(),
++        [
++            Token::Function(name),
++            Token::LParen,
++            Token::String(value),
++            Token::RParen
++        ] if name == "UNICODE" && value == "α🌟"
++    ));
++
++    let doubled_quote = parse_call("CONCATENATE", "\"α\"\"🌟\"");
++    assert!(matches!(
++        doubled_quote.tokens.as_slice(),
++        [
++            Token::Function(name),
++            Token::LParen,
++            Token::String(value),
++            Token::RParen
++        ] if name == "CONCATENATE" && value == "α\"🌟"
++    ));
++
++    assert!(
++        FormulaParser::new("of:=SUM(\"unterminated)")
++            .parse()
++            .is_err(),
++        "an unterminated formula string must be rejected"
++    );
++}
