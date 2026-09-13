@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0562-zip-descriptor-read-once",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "idempotent_verification_memoized",
+    "counted_read_tests_fail_without_the_change",
+    "whole_child_positional_reads_fall_with_distinct_ranges_unchanged"
+  ],
+  "accepted_evidence": {
+    "pread64_change_percent": {
+      "docx_file_source_open": -15.79,
+      "docx_file_source_full_text": -16.31,
+      "pptx_file_source_open": -24.84,
+      "pptx_file_source_selected_slide": -24.84
+    },
+    "immediate_duplicate_percent": {
+      "docx_file_source_open": [
+        22.9,
+        8.5
+      ],
+      "docx_file_source_full_text": [
+        23.0,
+        8.1
+      ],
+      "pptx_file_source_open": [
+        25.0,
+        0.2
+      ],
+      "pptx_file_source_selected_slide": [
+        25.0,
+        0.2
+      ]
+    },
+    "distinct_ranges_unchanged": true,
+    "latency_matrix": {
+      "children": 36,
+      "rows": 9,
+      "comparisons": 36,
+      "improve_both_directions": 17,
+      "adverse_both_over_5_percent": 0,
+      "best_p50_both_directions": {
+        "opc_file_source_open": [
+          -5.21,
+          -1.7
+        ],
+        "pptx_file_source_list_slides": [
+          -3.51,
+          -3.68
+        ]
+      },
+      "note": "warm cache; a 16-byte pread64 from the page cache is cheap, so the syscall reduction dominates the durable result rather than the elapsed time"
+    }
+  },
+  "recorded_but_not_addressed": {
+    "docx_residual_immediate_duplicates": "one 840-byte read at offset 64 repeated two to four times; a structural member re-read, listed as an open follow-up in change 0561",
+    "remaining_repeat_share": "about 88% of positional reads still re-read a range"
+  },
+  "withheld": [
+    "cold cache",
+    "physical device",
+    "remote or range source",
+    "peak RSS",
+    "allocation",
+    "concurrency scaling",
+    "real-producer breadth",
+    "cross platform"
+  ],
+  "revision": "c845978d5b888aef01f1e8b2b1944cc256205482"
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0562-zip-descriptor-read-once",
+  "revision": "c845978d5b888aef01f1e8b2b1944cc256205482",
+  "created_utc": "2026-09-13T17:20:19Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred; iWork excluded.",
+    "production_crates": [
+      "soapberry-zip"
+    ],
+    "baseline_stage": "changes 0558, 0559 and 0560 applied"
+  },
+  "hypothesis": {
+    "statement": "ZipVerifier::read runs its completion branch on both the read that completes a member's payload and the terminating zero-length read that Read::read_to_end must observe, so a data-descriptor-framed entry resolves its descriptor twice from the source per verified read.",
+    "equivalence": "The skipped resolution would compare the same CRC and size against the same immutable entry, so it can only reach the same conclusion. The memo is written only after a successful verification.",
+    "predicted_effect": "one descriptor read per verified entry read; immediate back-to-back duplicate positional reads fall towards zero on descriptor-framed packages; distinct ranges and payload bytes unchanged."
+  },
+  "acceptance": {
+    "primary_gate": "counted-read tests must show exactly one payload-bearing read at the descriptor offset and zero immediate duplicate ranges, and must fail without the change.",
+    "secondary_gate": "whole-child pread64 counts must fall with the distinct-range count unchanged.",
+    "latency_gate": "paired A/G/G/A p50 reported for the OOXML file-source selectors; any cell adverse in both directions by more than 5% is reported explicitly."
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "aslr": "disabled with setarch -R for the selector matrix; CPU 21 for traces"
+  },
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured"
+}

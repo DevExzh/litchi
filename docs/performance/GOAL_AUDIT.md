@@ -1,5 +1,32 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0561-0562: the OOXML read pattern, attributed and first fix
+
+[0561](0561-opc-repeated-positional-reads.md) and
+[0562](0562-zip-descriptor-read-once.md) open the goal's OOXML I/O workstream
+with measurement rather than assumption. About nine in ten positional reads on
+file-backed OPC paths re-read a range the same child already read; each member
+read costs four reads, two of which recover values the archive index already
+holds. Removing the duplicated data-descriptor resolution cuts whole-child
+positional reads by 24.84% on the PPTX captures and 15.79-16.31% on the DOCX
+ones without changing which ranges are read.
+
+The goal's target for this path — work proportional to mandatory metadata plus
+accessed content — is not yet met. About 88% of reads still repeat a range.
+The named, unmeasured follow-ups are: memoize the resolved descriptor and the
+local-header framing per entry (a further ~50% and ~25% of the reads by the
+0561 model), coalesce the header/payload/descriptor span for small members, and
+give structural members such as `[Content_Types].xml` and the relationship parts
+a retention policy so they are not re-read on every package open.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, remote/range-source behaviour for OPC consumers, peak RSS
+and allocation accounting, concurrency scaling, real-producer breadth, and
+cross-platform confirmation.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0560: XLS freshness observations reduced to one
 
 [0560](0560-xls-single-observation-freshness.md) continues the goal's first
