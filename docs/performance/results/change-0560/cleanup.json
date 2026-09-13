@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-13T17:48:54Z",
+  "batch": [
+    "0560-xls-single-observation-freshness",
+    "0561-opc-repeated-positional-reads",
+    "0562-zip-descriptor-read-once"
+  ],
+  "removed": [
+    "the session scratchpad in full, 305,150,084 bytes: staged release binaries for the pre-batch, 0560 and 0562 stages, all build and gate logs, the raw strace and ABBA working directories, and one-off probes no record cites",
+    "tools/perf-baseline/target, the gitignored 13 GiB build directory for the harness workspace"
+  ],
+  "retained_in_the_repository": [
+    "every latency child, strace capture, receipt and summary cited by the three records",
+    "the summarizer, latency analyzer and plan for each packet, so both the before and after read counts are recomputed by the same script"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commits",
+  "background_tasks": "all monitors and background waits stopped; no measurement process remains",
+  "revision": "1de7e52dd42cf394629227f4ccff63affc046361"
+}
