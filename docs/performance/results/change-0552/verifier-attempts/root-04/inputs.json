@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:40:05.245386+00:00",
+  "reason": "Resolve the verifier-owned bundle-relative result_path against HERE while selecting byte-identical canonical quality result.",
+  "before_sha256": "0cf865579cf19e4d7c5ed17b72f1c65588a285a1599e544c49278df281d19c1c",
+  "after_sha256": "96a997434d0dda38f2c1f18e44ac04f73007175005425de4b65cc75a7e74039a",
+  "patch_sha256": "95c46b6d42f8a4b0d6e493de69f13b784ee9b278223aaf4ba7d897f94f56da40",
+  "failed_receipt_sha256": "41ea782d254e704d2a555c3ba13ecb9c501980bb4b9c5d3ecb0523462d4c5e78"
+}

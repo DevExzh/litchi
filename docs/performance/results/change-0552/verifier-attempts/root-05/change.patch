@@ -1,0 +1,31 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -3676,9 +3676,25 @@
+         sha(CANDIDATE / "source-manifest.json"),
+     )
+     final_manifest_sha = final_stage["manifest_sha256"]
+-    if "final_source" in value:
+-        require(value["final_source"] == "final",
+-                f"{rel(path)} final_source must select final stage")
++    final_manifest = read_json(FINAL / "source-manifest.json", "final manifest")
++    expected_final_source = {
++        "status": "pass", "stage": "final",
++        "manifest_sha256": final_manifest_sha,
++        "manifest_entries": len(final_manifest),
++        "selected": "candidate" if adoption else "baseline-plus-public-tests",
++        "patch_sha256": sha(FINAL / "source.patch"),
++        "public_children": {
++            name: final_manifest[name] for name in (
++                "crates/litchi-xlsx/tests/source_backed_cell_values/compact_source_proof.rs",
++                "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs",
++            )
++        },
++        "candidate_manifest_sha256": sha(CANDIDATE / "source-manifest.json"),
++    }
++    require(value.get("final_source") == expected_final_source,
++            f"{rel(path)} structured final_source differs from verified final stage")
++    require(value.get("source_manifest_sha256") == final_manifest_sha,
++            f"{rel(path)} top-level final source hash differs")
+     if "final_source_manifest_sha256" in value:
+         require(value["final_source_manifest_sha256"] == final_manifest_sha,
+                 f"{rel(path)} final source manifest hash differs")

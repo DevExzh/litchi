@@ -1,0 +1,8 @@
+{
+  "frozen_utc": "2026-09-13T06:11:35.385236+00:00",
+  "path": "Cargo.lock",
+  "sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "retained": "workspace-Cargo.lock",
+  "reason": "Workspace lock is ignored by git and absent from inherited source manifest; bound separately before first workspace cap/quality build. Main harness uses its tracked independent Cargo.lock. Root must check this binding before and after subsequent workspace builds and at final replay.",
+  "baseline_cap_not_started": true
+}

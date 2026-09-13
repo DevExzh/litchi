@@ -1,0 +1,70 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error[E0433]: cannot find type `CompactProofBuilder` in this scope
+    --> crates/litchi-xlsx/src/cell_values/source_proof.rs:1123:27
+     |
+1123 |         let mut builder = CompactProofBuilder::with_cap(source, 0);
+     |                           ^^^^^^^^^^^^^^^^^^^ use of undeclared type `CompactProofBuilder`
+     |
+help: consider importing this struct
+     |
+ 855 +     use crate::cell_values::source_proof::CompactProofBuilder;
+     |
+
+error[E0433]: cannot find type `CompactProofBuilder` in this scope
+    --> crates/litchi-xlsx/src/cell_values/source_proof.rs:1134:27
+     |
+1134 |         let mut builder = CompactProofBuilder::with_cap(source, usize::MAX);
+     |                           ^^^^^^^^^^^^^^^^^^^ use of undeclared type `CompactProofBuilder`
+     |
+help: consider importing this struct
+     |
+ 855 +     use crate::cell_values::source_proof::CompactProofBuilder;
+     |
+
+error[E0433]: cannot find type `ElementKind` in this scope
+    --> crates/litchi-xlsx/src/cell_values/source_proof.rs:1137:40
+     |
+1137 |         builder.stack.resize(capacity, ElementKind::Other);
+     |                                        ^^^^^^^^^^^ use of undeclared type `ElementKind`
+     |
+help: consider importing this enum
+     |
+ 855 +     use crate::cell_values::source_proof::ElementKind;
+     |
+
+error[E0308]: mismatched types
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:871:43
+    |
+871 |                 crate::cell::Number::from(9),
+    |                 ------------------------- ^ expected `Number`, found integer
+    |                 |
+    |                 arguments to this function are incorrect
+    |
+note: associated function defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/mod.rs:592:7
+
+error[E0308]: mismatched types
+   --> crates/litchi-xlsx/src/cell_values/source_proof.rs:980:43
+    |
+980 |                 crate::cell::Number::from(8),
+    |                 ------------------------- ^ expected `Number`, found integer
+    |                 |
+    |                 arguments to this function are incorrect
+    |
+note: associated function defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/convert/mod.rs:592:7
+
+error: variable does not need to be mutable
+    --> crates/litchi-xlsx/src/cell_values/source_proof.rs:1010:17
+     |
+1010 |             let mut actions = action(Address::at(0, 1).expect("B1"));
+     |                 ----^^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+     |
+     = note: `-D unused-mut` implied by `-D unused`
+     = help: to override `-D unused` add `#[allow(unused_mut)]`
+
+Some errors have detailed explanations: E0308, E0433.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-xlsx` (lib test) due to 6 previous errors

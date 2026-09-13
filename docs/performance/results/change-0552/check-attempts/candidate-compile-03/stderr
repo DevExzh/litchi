@@ -1,0 +1,17 @@
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error: function `parse_source_with_observer` is never used
+   --> crates/litchi-xlsx/src/raw/worksheet/mod.rs:188:15
+    |
+188 | pub(crate) fn parse_source_with_observer<'a, F, O>(
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `parse_source_with_observer` is never used
+    --> crates/litchi-xlsx/src/raw/worksheet/codec.rs:1122:15
+     |
+1122 | pub(super) fn parse_source_with_observer<'a, F, O>(
+     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `litchi-xlsx` (lib) due to 2 previous errors

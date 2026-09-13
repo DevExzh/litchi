@@ -1,0 +1,10 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -1167,6 +1167,7 @@
+         candidates = (
+             REPO / name,
+             HERE / "candidate-sources" / name,
++            HERE / "candidate-attempts" / "draft-07" / "sources" / name,
+             HERE / stage / "candidate-sources" / name,
+         )
+         matches = [path for path in candidates if path.is_file() and not path.is_symlink()]

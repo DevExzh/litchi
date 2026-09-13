@@ -1,0 +1,11 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -3480,7 +3480,7 @@
+     canonical = need(HERE / "quality.json", "quality.json")
+     canonical_bytes = read_bytes(canonical, "quality.json")
+     selected = [item for item in passing
+-                if canonical_bytes == read_bytes(REPO / item["result_path"],
++                if canonical_bytes == read_bytes(HERE / item["result_path"],
+                                                  item["result_path"])]
+     require(len(selected) == 1,
+             "quality.json is not the exact copy of one passing attempt")

@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-09-13T08:47:52.086010+00:00",
+  "scope": "Remove transient progress wording and correct relative outcome-document binding for final closure; all numerical outcomes, six reviewed row groups, source and quality evidence unchanged.",
+  "before": {
+    "docs/performance/0552-xlsx-compact-source-proof.md": "e2bff34b02ae9987d5fd564ec9c7261ff5d984211b5cd0a51d25a8db8b84a1c4",
+    "docs/performance/results/change-0552/adverse-review.json": "a5dad5ff29321b90f3377c846ce2f3a72e502ddc3aa7f10dd9e3354ed3d7fd75",
+    "docs/performance/results/change-0552/results-review.md": "79c6e764437f6d2534c1c7a1735063e5fcd70f44719d8bd22a27a035ceb91dd8",
+    "docs/performance/results/change-0552/README.md": "bf9f53b7ca7505ef0bb3d26876b6882626c5c712be6f3b7d1ff26d2a8485cca5",
+    "docs/performance/results/change-0552/decision.json": "38ef09523a5db33f9c54d969c5185f2771a4a649bb3dc2ce6bfff5221e27e85a"
+  },
+  "after": {
+    "docs/performance/0552-xlsx-compact-source-proof.md": "63f00c2c44ccd16b14040bd68ebf80d5a7c640b4d637044dd729d649aa55b0be",
+    "docs/performance/results/change-0552/results-review.md": "f6605b54c3eb18e9dd4d2c4e1e3afe8075b96c508c7b83f4dc57a56e5bcdf825",
+    "docs/performance/results/change-0552/adverse-review.json": "613e51a9a64d047b93142d34e1d077ea45a4c808962415c5d020aa872b56944a",
+    "docs/performance/results/change-0552/README.md": "a97aa790908a717958b07c8e724dbccf0b63f5ccbc8d09ccb5c47ac383e0140d"
+  },
+  "decision_preserved_for_regeneration": "decision.json"
+}

@@ -1,0 +1,11 @@
+--- a/docs/performance/results/change-0552/analyze_guards.py
++++ b/docs/performance/results/change-0552/analyze_guards.py
+@@ -630,7 +630,7 @@
+     return {"path": relative(path), "sha256": sha256(path),
+             "start_utc": value["start_utc"], "end_utc": value["end_utc"],
+             "seconds": value["seconds"], "command": value["command"],
+-            "interval": (start, end)}
++            "interval": (start.isoformat(), end.isoformat())}
+ 
+ 
+ def _guard_jobs(lane: str) -> list[dict[str, Any]]:

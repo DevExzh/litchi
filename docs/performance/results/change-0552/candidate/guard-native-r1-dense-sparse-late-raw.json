@@ -1,0 +1,2865 @@
+{
+  "schema": "litchi.xlsx.planning-refusal-guard.v1",
+  "tool": "xlsx_planning_guard",
+  "case": "late-raw",
+  "shape": "dense-sparse",
+  "warmup_iterations": 20,
+  "samples": 200,
+  "source": {
+    "generator": "litchi-xlsx-planning-refusal-guard-fixed-grid-v1",
+    "shape": "dense-sparse",
+    "rows": 128,
+    "columns": 128,
+    "archive_bytes": 451161,
+    "worksheet_bytes": 449347,
+    "source_sha256": "cdfc8588a6cb419fb8a2f673ad4f72a65628ffcc93881c7d84835e8b7179750b",
+    "worksheet_sha256": "01dffe32b8a666a8d78c42803b52d8dad454855f23af376da0b9ba27d2617ef7",
+    "worksheet_member": "xl/worksheets/sheet1.xml",
+    "compression": "stored",
+    "fixture_kind": "raw_zip_input_no_opc_authored_xml_validation"
+  },
+  "source_sha256": "cdfc8588a6cb419fb8a2f673ad4f72a65628ffcc93881c7d84835e8b7179750b",
+  "logical_error": {
+    "status": "expected_failure",
+    "variant": "Invalid",
+    "message": "invalid worksheet boolean 'maybe'"
+  },
+  "phase": {
+    "name": "edit_sheets",
+    "sample_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      168,
+      169,
+      170,
+      171,
+      172,
+      173,
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199
+    ],
+    "duration_ns": [
+      14379564,
+      14720356,
+      14412324,
+      14404454,
+      14433415,
+      14418144,
+      14436304,
+      14447604,
+      14416304,
+      14467744,
+      14484065,
+      14481945,
+      14559875,
+      14469074,
+      14447385,
+      14457524,
+      14438164,
+      14447995,
+      14446404,
+      14480554,
+      14475585,
+      14463445,
+      14425594,
+      14517874,
+      14416945,
+      14405364,
+      14408335,
+      14404254,
+      14364114,
+      14397554,
+      14371335,
+      14408235,
+      14415764,
+      14655845,
+      14417855,
+      14415994,
+      14396204,
+      14422645,
+      14453644,
+      14426225,
+      14411024,
+      14389364,
+      14416714,
+      14435954,
+      14422695,
+      14795996,
+      14336274,
+      14444414,
+      14445675,
+      14477694,
+      14370994,
+      14441314,
+      14379105,
+      14483974,
+      14457614,
+      14419054,
+      14454434,
+      14480585,
+      14513475,
+      14421404,
+      14449165,
+      14444954,
+      14444055,
+      14427715,
+      14459824,
+      14467324,
+      14447785,
+      14451564,
+      14410964,
+      14454494,
+      14442595,
+      14478525,
+      14435374,
+      14427815,
+      14427884,
+      14420194,
+      14487264,
+      14507684,
+      14466535,
+      14461195,
+      14474434,
+      14443014,
+      14446565,
+      14422414,
+      14479984,
+      14785626,
+      14504685,
+      14503714,
+      14898326,
+      14574915,
+      14340784,
+      14400314,
+      14401534,
+      14439954,
+      14406624,
+      14399064,
+      14404174,
+      14379274,
+      14381024,
+      14402284,
+      14443305,
+      14424474,
+      14422044,
+      14440684,
+      14462475,
+      14402924,
+      14438334,
+      14451814,
+      14407654,
+      14445044,
+      14721536,
+      14516745,
+      14450624,
+      14492144,
+      14488155,
+      14458134,
+      14460405,
+      14450935,
+      14466335,
+      14491795,
+      14441634,
+      14424984,
+      14470414,
+      14460774,
+      14483994,
+      14485025,
+      14482975,
+      14482595,
+      14398994,
+      14421905,
+      14406084,
+      14407744,
+      14424704,
+      14545535,
+      14453955,
+      14461264,
+      14426714,
+      14513464,
+      14561635,
+      14529965,
+      14560925,
+      14600395,
+      14539765,
+      14466484,
+      14516974,
+      14481134,
+      14485904,
+      14487624,
+      14511944,
+      14460214,
+      14387634,
+      14331244,
+      14380024,
+      14381924,
+      14488064,
+      14442345,
+      14404944,
+      14399874,
+      14406094,
+      14425224,
+      14409894,
+      14414774,
+      14417664,
+      14457414,
+      14398834,
+      14406514,
+      14509925,
+      14408534,
+      14509445,
+      14478805,
+      14535265,
+      14501825,
+      14561865,
+      14295274,
+      14376734,
+      14395994,
+      14387414,
+      14399924,
+      14406275,
+      14369545,
+      14353014,
+      14359344,
+      14384864,
+      14366464,
+      14355054,
+      14367524,
+      14371934,
+      14368495,
+      14342424,
+      14359704,
+      14394554,
+      14406844,
+      14371804,
+      14389585,
+      14355674,
+      14369274,
+      14355284,
+      14363974,
+      14362864,
+      14341004
+    ],
+    "allocation_metrics": [
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      }
+    ],
+    "samples": [
+      {
+        "order": 0,
+        "duration_ns": 14379564,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 1,
+        "duration_ns": 14720356,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 2,
+        "duration_ns": 14412324,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 3,
+        "duration_ns": 14404454,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 4,
+        "duration_ns": 14433415,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 5,
+        "duration_ns": 14418144,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 6,
+        "duration_ns": 14436304,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 7,
+        "duration_ns": 14447604,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 8,
+        "duration_ns": 14416304,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 9,
+        "duration_ns": 14467744,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 10,
+        "duration_ns": 14484065,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 11,
+        "duration_ns": 14481945,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 12,
+        "duration_ns": 14559875,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 13,
+        "duration_ns": 14469074,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 14,
+        "duration_ns": 14447385,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 15,
+        "duration_ns": 14457524,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 16,
+        "duration_ns": 14438164,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 17,
+        "duration_ns": 14447995,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 18,
+        "duration_ns": 14446404,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 19,
+        "duration_ns": 14480554,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 20,
+        "duration_ns": 14475585,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 21,
+        "duration_ns": 14463445,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 22,
+        "duration_ns": 14425594,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 23,
+        "duration_ns": 14517874,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 24,
+        "duration_ns": 14416945,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 25,
+        "duration_ns": 14405364,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 26,
+        "duration_ns": 14408335,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 27,
+        "duration_ns": 14404254,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 28,
+        "duration_ns": 14364114,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 29,
+        "duration_ns": 14397554,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 30,
+        "duration_ns": 14371335,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 31,
+        "duration_ns": 14408235,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 32,
+        "duration_ns": 14415764,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 33,
+        "duration_ns": 14655845,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 34,
+        "duration_ns": 14417855,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 35,
+        "duration_ns": 14415994,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 36,
+        "duration_ns": 14396204,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 37,
+        "duration_ns": 14422645,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 38,
+        "duration_ns": 14453644,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 39,
+        "duration_ns": 14426225,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 40,
+        "duration_ns": 14411024,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 41,
+        "duration_ns": 14389364,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 42,
+        "duration_ns": 14416714,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 43,
+        "duration_ns": 14435954,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 44,
+        "duration_ns": 14422695,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 45,
+        "duration_ns": 14795996,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 46,
+        "duration_ns": 14336274,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 47,
+        "duration_ns": 14444414,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 48,
+        "duration_ns": 14445675,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 49,
+        "duration_ns": 14477694,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 50,
+        "duration_ns": 14370994,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 51,
+        "duration_ns": 14441314,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 52,
+        "duration_ns": 14379105,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 53,
+        "duration_ns": 14483974,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 54,
+        "duration_ns": 14457614,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 55,
+        "duration_ns": 14419054,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 56,
+        "duration_ns": 14454434,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 57,
+        "duration_ns": 14480585,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 58,
+        "duration_ns": 14513475,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 59,
+        "duration_ns": 14421404,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 60,
+        "duration_ns": 14449165,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 61,
+        "duration_ns": 14444954,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 62,
+        "duration_ns": 14444055,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 63,
+        "duration_ns": 14427715,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 64,
+        "duration_ns": 14459824,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 65,
+        "duration_ns": 14467324,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 66,
+        "duration_ns": 14447785,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 67,
+        "duration_ns": 14451564,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 68,
+        "duration_ns": 14410964,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 69,
+        "duration_ns": 14454494,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 70,
+        "duration_ns": 14442595,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 71,
+        "duration_ns": 14478525,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 72,
+        "duration_ns": 14435374,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 73,
+        "duration_ns": 14427815,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 74,
+        "duration_ns": 14427884,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 75,
+        "duration_ns": 14420194,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 76,
+        "duration_ns": 14487264,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 77,
+        "duration_ns": 14507684,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 78,
+        "duration_ns": 14466535,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 79,
+        "duration_ns": 14461195,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 80,
+        "duration_ns": 14474434,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 81,
+        "duration_ns": 14443014,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 82,
+        "duration_ns": 14446565,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 83,
+        "duration_ns": 14422414,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 84,
+        "duration_ns": 14479984,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 85,
+        "duration_ns": 14785626,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 86,
+        "duration_ns": 14504685,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 87,
+        "duration_ns": 14503714,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 88,
+        "duration_ns": 14898326,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 89,
+        "duration_ns": 14574915,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 90,
+        "duration_ns": 14340784,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 91,
+        "duration_ns": 14400314,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 92,
+        "duration_ns": 14401534,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 93,
+        "duration_ns": 14439954,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 94,
+        "duration_ns": 14406624,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 95,
+        "duration_ns": 14399064,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 96,
+        "duration_ns": 14404174,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 97,
+        "duration_ns": 14379274,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 98,
+        "duration_ns": 14381024,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 99,
+        "duration_ns": 14402284,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 100,
+        "duration_ns": 14443305,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 101,
+        "duration_ns": 14424474,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 102,
+        "duration_ns": 14422044,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 103,
+        "duration_ns": 14440684,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 104,
+        "duration_ns": 14462475,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 105,
+        "duration_ns": 14402924,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 106,
+        "duration_ns": 14438334,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 107,
+        "duration_ns": 14451814,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 108,
+        "duration_ns": 14407654,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 109,
+        "duration_ns": 14445044,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 110,
+        "duration_ns": 14721536,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 111,
+        "duration_ns": 14516745,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 112,
+        "duration_ns": 14450624,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 113,
+        "duration_ns": 14492144,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 114,
+        "duration_ns": 14488155,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 115,
+        "duration_ns": 14458134,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 116,
+        "duration_ns": 14460405,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 117,
+        "duration_ns": 14450935,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 118,
+        "duration_ns": 14466335,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 119,
+        "duration_ns": 14491795,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 120,
+        "duration_ns": 14441634,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 121,
+        "duration_ns": 14424984,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 122,
+        "duration_ns": 14470414,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 123,
+        "duration_ns": 14460774,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 124,
+        "duration_ns": 14483994,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 125,
+        "duration_ns": 14485025,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 126,
+        "duration_ns": 14482975,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 127,
+        "duration_ns": 14482595,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 128,
+        "duration_ns": 14398994,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 129,
+        "duration_ns": 14421905,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 130,
+        "duration_ns": 14406084,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 131,
+        "duration_ns": 14407744,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 132,
+        "duration_ns": 14424704,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 133,
+        "duration_ns": 14545535,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 134,
+        "duration_ns": 14453955,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 135,
+        "duration_ns": 14461264,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 136,
+        "duration_ns": 14426714,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 137,
+        "duration_ns": 14513464,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 138,
+        "duration_ns": 14561635,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 139,
+        "duration_ns": 14529965,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 140,
+        "duration_ns": 14560925,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 141,
+        "duration_ns": 14600395,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 142,
+        "duration_ns": 14539765,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 143,
+        "duration_ns": 14466484,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 144,
+        "duration_ns": 14516974,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 145,
+        "duration_ns": 14481134,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 146,
+        "duration_ns": 14485904,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 147,
+        "duration_ns": 14487624,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 148,
+        "duration_ns": 14511944,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 149,
+        "duration_ns": 14460214,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 150,
+        "duration_ns": 14387634,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 151,
+        "duration_ns": 14331244,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 152,
+        "duration_ns": 14380024,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 153,
+        "duration_ns": 14381924,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 154,
+        "duration_ns": 14488064,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 155,
+        "duration_ns": 14442345,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 156,
+        "duration_ns": 14404944,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 157,
+        "duration_ns": 14399874,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 158,
+        "duration_ns": 14406094,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 159,
+        "duration_ns": 14425224,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 160,
+        "duration_ns": 14409894,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 161,
+        "duration_ns": 14414774,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 162,
+        "duration_ns": 14417664,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 163,
+        "duration_ns": 14457414,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 164,
+        "duration_ns": 14398834,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 165,
+        "duration_ns": 14406514,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 166,
+        "duration_ns": 14509925,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 167,
+        "duration_ns": 14408534,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 168,
+        "duration_ns": 14509445,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 169,
+        "duration_ns": 14478805,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 170,
+        "duration_ns": 14535265,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 171,
+        "duration_ns": 14501825,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 172,
+        "duration_ns": 14561865,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 173,
+        "duration_ns": 14295274,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 174,
+        "duration_ns": 14376734,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 175,
+        "duration_ns": 14395994,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 176,
+        "duration_ns": 14387414,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 177,
+        "duration_ns": 14399924,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 178,
+        "duration_ns": 14406275,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 179,
+        "duration_ns": 14369545,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 180,
+        "duration_ns": 14353014,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 181,
+        "duration_ns": 14359344,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 182,
+        "duration_ns": 14384864,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 183,
+        "duration_ns": 14366464,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 184,
+        "duration_ns": 14355054,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 185,
+        "duration_ns": 14367524,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 186,
+        "duration_ns": 14371934,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 187,
+        "duration_ns": 14368495,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 188,
+        "duration_ns": 14342424,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 189,
+        "duration_ns": 14359704,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 190,
+        "duration_ns": 14394554,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 191,
+        "duration_ns": 14406844,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 192,
+        "duration_ns": 14371804,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 193,
+        "duration_ns": 14389585,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 194,
+        "duration_ns": 14355674,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 195,
+        "duration_ns": 14369274,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 196,
+        "duration_ns": 14355284,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 197,
+        "duration_ns": 14363974,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 198,
+        "duration_ns": 14362864,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 199,
+        "duration_ns": 14341004,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      }
+    ]
+  },
+  "correctness": {
+    "source_unchanged": true,
+    "retry_preserved_error": true,
+    "valid_snapshot_values": false,
+    "empty_commit_is_noop": false,
+    "expected_error_exact": true,
+    "commit_outside_timing": false
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-goal-0552-target/retained/candidate/guard-normal",
+    "sha256": "5f23296f6f253f53a74496c41d27014b9ffcd02039f0c2c461d72de067e2ba6e",
+    "bytes": 7412168
+  },
+  "runner": {
+    "git_revision": "3d84cf64cd3ffbbd809e8677f37c331e93cf0b8c",
+    "git_dirty": true,
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "os": "linux",
+    "arch": "x86_64",
+    "profile": "release"
+  },
+  "allocation_scope": "operation_global_system_allocator",
+  "allocator": "Rust system allocator",
+  "instrumentation": "none",
+  "counter_revision": null,
+  "timing_scope": "source_open_and_fixture_and_selector_setup_excluded; edit_sheets_result_retained_until_clock_and_allocation_end; inspection_commit_and_drop_excluded",
+  "performance_claim": "none: correctness and planning diagnostic only; no speedup claim"
+}

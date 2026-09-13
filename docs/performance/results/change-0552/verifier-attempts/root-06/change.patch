@@ -1,0 +1,26 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -4192,6 +4192,13 @@
+     return component("all" if sealed else "precleanup")
+ 
+ 
++def json_output_default(value: Any) -> str:
++    """Serialize validated receipt timestamps without changing internal comparisons."""
++    if isinstance(value, dt.datetime):
++        return value.isoformat()
++    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
++
++
+ def main(argv: list[str] | None = None) -> int:
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--component", choices=(
+@@ -4216,7 +4223,8 @@
+             if str(args.output.resolve()).startswith(str(HERE.resolve()) + os.sep):
+                 raise SystemExit("verification output must be outside the evidence bundle")
+     result = run_bundle(args.component)
+-    encoded = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
++    encoded = json.dumps(result, indent=2, sort_keys=True, allow_nan=False,
++                         default=json_output_default) + "\n"
+     if args.output is not None:
+         args.output.parent.mkdir(parents=True, exist_ok=True)
+         args.output.write_text(encoded, encoding="utf-8")

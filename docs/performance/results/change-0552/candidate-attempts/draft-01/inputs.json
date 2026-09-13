@@ -1,0 +1,96 @@
+{
+  "schema": "xlsx_0552_candidate_attempt_v1",
+  "frozen_utc": "2026-09-13T07:09:18.214073+00:00",
+  "scope": "Frozen implementation draft for first compile/correctness checks; not admitted and not a performance capture source freeze. Independent final review pending.",
+  "revision": "3d84cf64cd3ffbbd809e8677f37c331e93cf0b8c",
+  "patch_sha256": "312859df0623c868354037940459498e24c80384ea4eac2fac49c74ce201688e",
+  "changes": {
+    "crates/litchi-xlsx/src/cell_values/mod.rs": {
+      "baseline": "520a499441efc45af429ee87300606a0b4ebd0ae4cc428ded40d5da78acb7880",
+      "candidate": "6c676b6ca0dd68041d6b5b8be2920c8801785bfb110402e4955bf5e22e8172e1"
+    },
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": {
+      "baseline": "c684c62aa523cc202027c733c92ad7cba3c91e456b4705c3f7dd9a7876cb53c2",
+      "candidate": "b424dafaf5ff5bf225e88cfeeb99a57ce2bb94d1921387abf35bbf78e018fad1"
+    },
+    "crates/litchi-xlsx/src/cell_values/source.rs": {
+      "baseline": "10c9a99892dea1cf5c0dd529f628313126c4908c0fdc6e3694439c1c3889213b",
+      "candidate": "82aab28b97e68adb1a76f73a4d4a6a6904c1e964e8b28e2e3e7e21451e554718"
+    },
+    "crates/litchi-xlsx/src/cell_values/source_proof.rs": {
+      "baseline": null,
+      "candidate": "a6b21564d7f214dbd182333b21cf6f2e4a18a83924a739cc438e22351170e609"
+    },
+    "crates/litchi-xlsx/src/cell_values/validation.rs": {
+      "baseline": "19b4cb00420f895416debe3879f993ad292b1f79973b285b9cc440d6fae11522",
+      "candidate": "2b6bee150f2c9c138abaf4beacb4e6211cb4263a2c9cc65f7cece3cd2e3d5113"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+      "baseline": "98a5cf4db40e316cdd58a6904c80bdd11c06f86bd360f0d293651ca521648119",
+      "candidate": "c854f1e3263c340ba1bb441bd44eeae46f88201461c777d2a2446356f310269b"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": {
+      "baseline": "ad57443eb60d48b175dc0669cb5298f34652129172ad4888f819a79cfe9f015c",
+      "candidate": "edeabb52f0b956f05a5c42a886847e7106bb3b3bbdbcf5f3dae824457a923974"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": {
+      "baseline": "71e23d40e8ef116ae833b51fb77c11067461fc6d5fb69f05fb2bfbe61644a0bd",
+      "candidate": "91c4a0a64cbb81d521056ce65932eefb2937a700511a2f9e822a39828cc8f928"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": {
+      "baseline": "8794651beee1843be650845d51d3056fb3b0b486feb29aa0587693f0a721b942",
+      "candidate": "3ca156cf37ef824d49c0cc9472767144ce57806be9741d31d86e2404c0e76187"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": {
+      "baseline": "71bf1f126205c97b9ca964c1c6f927481becf2195833488470b2823266b426a5",
+      "candidate": "2ae7cea4053a77e287f79c184f2306de6994fbb4ab0b81faa0f41f0831dfa0f9"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": {
+      "baseline": "f1e4666ce3c08f4aaa6affe4e684e596b30453166f95c17576457a5b8491ea05",
+      "candidate": "8a6586e63ea6e96e01eb64deeb351f7d4bca44fd73b2397e98d45cb674fe6f4b"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": {
+      "baseline": "057fb8ea5a0aef76fffb0a21f678983fcdefb562dac5eaaf3159cd2beac6566c",
+      "candidate": "215e31b587afa8c76ac8e95acc51793bb90076aa6afaa2b05c8093a758146a5e"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/model.rs": {
+      "baseline": "fe12bd8f93c21a88cd14951bb93de246de317c287de65747189047a6da63c95d",
+      "candidate": "58f40360528fc78d5440a4e6fd8c5397dd11e324fb3d75da0f191f29462ca750"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": {
+      "baseline": "b41af5d8c91a5c1e82f9030b8798a354ca4943072373846b8874c73996c03035",
+      "candidate": "ed143546247874fbdae3c0256dc296cc8c1af3bb527f69ae9bf841451a533f62"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": {
+      "baseline": "6db3c616e0e639b578b9aea2493cf717083f4d06f072a201a787002a9daa2178",
+      "candidate": "79c14f344b057b333cbd7ef932dbbb3fd1922db2d9d73aeb297bcb60c866ca23"
+    }
+  },
+  "snapshot_hashes": {
+    "crates/litchi-xlsx/src/cell_values/mod.rs": "6c676b6ca0dd68041d6b5b8be2920c8801785bfb110402e4955bf5e22e8172e1",
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": "b424dafaf5ff5bf225e88cfeeb99a57ce2bb94d1921387abf35bbf78e018fad1",
+    "crates/litchi-xlsx/src/cell_values/source.rs": "82aab28b97e68adb1a76f73a4d4a6a6904c1e964e8b28e2e3e7e21451e554718",
+    "crates/litchi-xlsx/src/cell_values/source_proof.rs": "a6b21564d7f214dbd182333b21cf6f2e4a18a83924a739cc438e22351170e609",
+    "crates/litchi-xlsx/src/cell_values/validation.rs": "2b6bee150f2c9c138abaf4beacb4e6211cb4263a2c9cc65f7cece3cd2e3d5113",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "c854f1e3263c340ba1bb441bd44eeae46f88201461c777d2a2446356f310269b",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": "edeabb52f0b956f05a5c42a886847e7106bb3b3bbdbcf5f3dae824457a923974",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": "91c4a0a64cbb81d521056ce65932eefb2937a700511a2f9e822a39828cc8f928",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": "3ca156cf37ef824d49c0cc9472767144ce57806be9741d31d86e2404c0e76187",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": "2ae7cea4053a77e287f79c184f2306de6994fbb4ab0b81faa0f41f0831dfa0f9",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": "8a6586e63ea6e96e01eb64deeb351f7d4bca44fd73b2397e98d45cb674fe6f4b",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": "215e31b587afa8c76ac8e95acc51793bb90076aa6afaa2b05c8093a758146a5e",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/model.rs": "58f40360528fc78d5440a4e6fd8c5397dd11e324fb3d75da0f191f29462ca750",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": "ed143546247874fbdae3c0256dc296cc8c1af3bb527f69ae9bf841451a533f62",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "79c14f344b057b333cbd7ef932dbbb3fd1922db2d9d73aeb297bcb60c866ca23"
+  },
+  "resources": {
+    "max_proof_logical_heap_bytes": 2097152,
+    "cell_slot_bytes": 8,
+    "source_byte_cap": 8388608,
+    "source_event_cap": 131072,
+    "record_initial_capacity": 8,
+    "record_growth": "checked geometric doubling; charged before fallible reserve_exact; oversized reported capacity declines proof",
+    "source_identity": "source allocation pointer/length and parser Store entries allocation pointer/length; same immutable Snapshot owns both; replaced worksheet payloads clear proof"
+  },
+  "adr_manifest_sha256": "fefccee2e05a78afce65ac8562658a3654fd60895cdcf5701e874e42146ac692"
+}

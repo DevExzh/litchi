@@ -20,6 +20,8 @@ use litchi_xlsx::cell_values::{
 use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
+#[path = "source_backed_cell_values/compact_source_proof.rs"]
+mod compact_source_proof;
 #[path = "source_backed_cell_values/planning_error_order.rs"]
 mod planning_error_order;
 #[path = "source_backed_cell_values/post_eof_raw_differential.rs"]
@@ -2904,3 +2906,6 @@ fn removing_a_cell_with_an_implicit_follower_refuses_shifted_readback() {
             if message == "value-only publication readback differs from staged state"
     ));
 }
+
+#[path = "source_backed_cell_values/public_exact_output.rs"]
+mod public_exact_output;

@@ -1,0 +1,42 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0552-target/retained/candidate/cap",
+    "--size",
+    "164",
+    "--samples",
+    "200",
+    "--warmup",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/cap-r1-164.json",
+    "--fixture-out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/cap-r1-164.zip"
+  ],
+  "start_utc": "2026-09-13T08:06:25.528100+00:00",
+  "end_utc": "2026-09-13T08:06:29.597602+00:00",
+  "seconds": 4.069519270007731,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "binary_sha256": "39b283ba3785215978eda24b4f2ba15ece1578a267c9926f330c99e1060fe0cc",
+  "source_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "script_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "cap-r1-164.host.json": "57a9b9893d2f611ae8b74dfc123752ed6b082723884006ee2ca7e389710f6ae8",
+    "cap-r1-164.json": "dabe8ba32f2e89d757b657174bfdf0037d154de3d0beaad407738883ba790917",
+    "cap-r1-164.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cap-r1-164.stdout": "8035dc8816e1741da0e2af0e8f279aa7b2e6432a7eb5d72520dea3b682606a5a",
+    "cap-r1-164.zip": "c8608d872c25ff5635226050ca6dbf04c0f6114d63b10243a123e57280216209"
+  }
+}

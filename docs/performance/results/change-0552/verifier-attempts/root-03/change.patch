@@ -1,0 +1,11 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -3407,7 +3407,7 @@
+             and value["source_manifest_sha256"] == stage_sha
+             and value["workspace_lock_sha256"] == WORKSPACE_LOCK_SHA256
+             and value["quality_plan_sha256"] == sha(QUALITY_PLAN)
+-            and value["inputs_path"] == rel(inputs_path)
++            and value["inputs_path"] == inputs_path.relative_to(REPO).as_posix()
+             and value["inputs_sha256"] == sha(inputs_path),
+             f"{label}/result source/plan binding differs")
+     require(isinstance(value["commands"], list),

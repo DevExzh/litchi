@@ -1,0 +1,46 @@
+{
+  "schema": "xlsx_0552_candidate_attempt_v1",
+  "frozen_utc": "2026-09-13T07:13:43.084513+00:00",
+  "scope": "Complete XML empty-event match and unused-binding compiler corrections; development check only.",
+  "revision": "3d84cf64cd3ffbbd809e8677f37c331e93cf0b8c",
+  "patch_sha256": "ba6f6a9feae1e69bd59c8fdf07b89a69c97b75922df69df07a9b845d4ab79d8b",
+  "changes": {
+    "crates/litchi-xlsx/src/cell_values/source_proof.rs": {
+      "baseline": "dc6a7376e794c39d8847c0966974890e963a40e36ae6092bf0eb38a86ee885ae",
+      "candidate": "f9cb97a211fe101a6a5d1c5a6ab2f952ba6a376407a7b469ce3b68edb32b8a3c"
+    },
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": {
+      "baseline": "61beb7b2d94c4a6067a394b12a42e70062f1e5996731617bb1c6efc038e17d3c",
+      "candidate": "ec9251a1ebff558101a64346aed93cd858d7c2b238d94df8e0933b81d2405453"
+    }
+  },
+  "snapshot_hashes": {
+    "crates/litchi-xlsx/src/cell_values/mod.rs": "6c676b6ca0dd68041d6b5b8be2920c8801785bfb110402e4955bf5e22e8172e1",
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": "052528463e609ac6ac6736ae0a14b1b25b071a7a37eba096859dfe4d266c5edb",
+    "crates/litchi-xlsx/src/cell_values/source.rs": "82aab28b97e68adb1a76f73a4d4a6a6904c1e964e8b28e2e3e7e21451e554718",
+    "crates/litchi-xlsx/src/cell_values/source_proof.rs": "f9cb97a211fe101a6a5d1c5a6ab2f952ba6a376407a7b469ce3b68edb32b8a3c",
+    "crates/litchi-xlsx/src/cell_values/validation.rs": "351c0c23b78b49d679620f1d43ddd538ff5923631ca7cadb4ada00263a699653",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "603be5199ef83474ea00b1a68765cc3d7beb955b49ee06346b3eb5624c6b75f3",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": "66bfac6d44a991af6888af5175d07403d53aeca7f7a809038867fcfc38796a6d",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": "91c4a0a64cbb81d521056ce65932eefb2937a700511a2f9e822a39828cc8f928",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": "3ca156cf37ef824d49c0cc9472767144ce57806be9741d31d86e2404c0e76187",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": "ec9251a1ebff558101a64346aed93cd858d7c2b238d94df8e0933b81d2405453",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": "da6738979620e7717de44d3164e4b7206cbbacdd84a5bc218a6d0ac31e5891f0",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": "cd2c83a0aa898d067161950eb357502fba264bee00b821f5ac3f6b0e7e45d215",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/model.rs": "58f40360528fc78d5440a4e6fd8c5397dd11e324fb3d75da0f191f29462ca750",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": "641cbb96209d9511d6b6fbc108c3113b11f47c160d3d63224673621b25ec5602",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "e8e804894bc0514c2c2c9199f0d39adf5075745a6bc164fd32775b014964878c"
+  },
+  "resources": {
+    "max_proof_logical_heap_bytes": 2097152,
+    "cell_slot_bytes": 8,
+    "source_byte_cap": 8388608,
+    "source_event_cap": 131072,
+    "record_initial_capacity": 8,
+    "record_growth": "checked geometric doubling; charged before fallible reserve_exact; oversized reported capacity declines proof",
+    "source_identity": "source allocation pointer/length and parser Store entries allocation pointer/length; same immutable Snapshot owns both; replaced worksheet payloads clear proof"
+  },
+  "adr_manifest_sha256": "fefccee2e05a78afce65ac8562658a3654fd60895cdcf5701e874e42146ac692",
+  "application_base_attempt": "draft-02",
+  "prior_check_receipt_sha256": "a525f3372025c811976e7ffe004a1174b7e159c80c0331182f8891749a9325ad"
+}

@@ -1,0 +1,6 @@
+{
+  "error": "quality-attempts/final-quality-01/result.json is missing or is a symlink",
+  "schema": "litchi.xlsx.verification.0552.v1",
+  "scope": "quality",
+  "status": "incomplete"
+}

@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-13T08:01:17.231250+00:00",
+  "compiler_processes": [
+    {
+      "pid": 2958060,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-tokenizer-baseline-20260913"
+    },
+    {
+      "pid": 2958087,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-tokenizer-baseline-20260913/crates/litchi-ods"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

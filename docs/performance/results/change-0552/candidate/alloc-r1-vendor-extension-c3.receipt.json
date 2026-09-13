@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0552-target/retained/candidate/alloc",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--samples",
+    "20",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/alloc-r1-vendor-extension-c3.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/candidate/alloc-r1-vendor-extension-c3.catalog.json"
+  ],
+  "start_utc": "2026-09-13T08:09:02.431848+00:00",
+  "end_utc": "2026-09-13T08:09:04.709472+00:00",
+  "seconds": 2.2776461399917025,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "binary_sha256": "75a3edaaeb75eac3aa7544551ce19fe2fdf7fb5eee869e6be208700a5c93dbca",
+  "source_manifest_sha256": "a4301f64aacff44628ce20b9db68e87de65c5723ba7167a31ee8cc216b32ac0b",
+  "script_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-r1-vendor-extension-c3.catalog.json": "230e99da932ad3bf9767558e31bfa43b2c4ee40a7ba74e1fc52e893bd93a29fe",
+    "alloc-r1-vendor-extension-c3.host.json": "a1e9df15f092ab0c68f4dcc2cdf4269915d11a9742d3ddeb6e1b36bfe5cc5c3f",
+    "alloc-r1-vendor-extension-c3.json": "cb650732c6d3c74ab44bb668fdf265a520b06cb7ac01e7d619c108599178c46f",
+    "alloc-r1-vendor-extension-c3.stderr": "69ab4ad8677f5405052e7ac55fbea059ffbfb6e1d8d0bd66703aa613755a2689",
+    "alloc-r1-vendor-extension-c3.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

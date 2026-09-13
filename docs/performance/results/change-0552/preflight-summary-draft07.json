@@ -1,0 +1,132 @@
+{
+  "schema": "xlsx_0552_preflight_summary_v1",
+  "created_utc": "2026-09-13T07:54:25.208902+00:00",
+  "candidate_attempt": "draft-07",
+  "candidate_inputs_sha256": "c72a173be7b6064df3df3bb0b70c7e3be56a48a702e2918147d86d0a613872b1",
+  "scope": "Pre-capture checks only. Baseline exact public oracle:2 passed. Draft06 private16 and integration74 passed. Draft07 replaces a never-loop with equivalent if; Clippy, no-default, fmt and crate boundaries pass. Full final quality and representative performance are still required.",
+  "checks": [
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/baseline-public-exact-05",
+      "receipt_sha256": "8d1413c8c626b2237f1b8389018394912b781968302b0a6d65e36065f1b06e8d",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--test",
+        "source_backed_cell_values",
+        "public_exact_output",
+        "--",
+        "--test-threads=2"
+      ],
+      "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-proof-tests-03",
+      "receipt_sha256": "bbccbd9ed314d45305d2fbe39d4125cfb531696a43b776a64ff12344a4538775",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "source_proof",
+        "--",
+        "--test-threads=2"
+      ],
+      "source_manifest_sha256": "7d5352e90bbabe61e8d939c8d6f3da103c0774accd04b45ba1d0cdefdb5353ac",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-source-integration-02",
+      "receipt_sha256": "de2838a299d9714103dd11a2855c20896a56e169f4ebff52a5083a74deec29c2",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--test",
+        "source_backed_cell_values",
+        "--",
+        "--test-threads=2"
+      ],
+      "source_manifest_sha256": "7d5352e90bbabe61e8d939c8d6f3da103c0774accd04b45ba1d0cdefdb5353ac",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-clippy-preflight-02",
+      "receipt_sha256": "3b652b2bb74126d439f9b3975b68c136c5cffc58e2c48c196e79d810ae38dc29",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-no-default-preflight-01",
+      "receipt_sha256": "3e2266296d826e5f8699b7de73709d9a96f2e9dea125f39279cc790710420d78",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--no-default-features"
+      ],
+      "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-fmt-preflight-01",
+      "receipt_sha256": "950c18038a9cbe4ddf2c0088b56a53fae0e8e10f8f217422bea8ac26015b5832",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+      "exit_code": 0,
+      "source_stable": true
+    },
+    {
+      "attempt": "docs/performance/results/change-0552/check-attempts/candidate-boundaries-preflight-01",
+      "receipt_sha256": "db9ac2c56e7d11147ac768c5127bf243ae5b0d3b16af56c970d3431a9de87248",
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+      "exit_code": 0,
+      "source_stable": true
+    }
+  ],
+  "performance_measured": false,
+  "admission": "pending",
+  "priority": "OLE2/OOXML first; ODF deferred; iWork excluded"
+}

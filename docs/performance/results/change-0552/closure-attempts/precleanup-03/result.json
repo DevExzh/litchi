@@ -1,0 +1,1887 @@
+{
+  "result": {
+    "disposition": {
+      "adoption_allowed": false,
+      "decision": "decision.json",
+      "decision_sha256": "df2fb73e62c0800898b585a04ac2a1eb2bc86f8b6f340f938bd0d557c3fc6a78",
+      "disposition": "rejected",
+      "final_source": {
+        "expected": "baseline-plus-public-oracle",
+        "live_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+        "manifest_entries": 8595,
+        "manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+        "stage": "final",
+        "status": "pass"
+      },
+      "gates": {
+        "cap": false,
+        "guard": false,
+        "main": false,
+        "profile": true,
+        "quality": true
+      },
+      "guards": {
+        "path": "guards-analysis.json",
+        "schema": "litchi.xlsx.guard-cap-analysis.v1",
+        "sha256": "b59becde85b91b30303a765441450c073ab2167feebb7427423f0509cde002bb"
+      },
+      "metrics": {
+        "path": "metrics-analysis.json",
+        "schema": "xlsx_multisource_edit_metrics_0552_v1",
+        "sha256": "c0dd9f49b7006c5d426211624e36217fc680af1ad37d1febaa5d82a6f10c2a3c"
+      },
+      "quality": {
+        "attempt": "quality-attempts/final-quality-01/result.json",
+        "sha256": "8a47d3a452e2db1cb6db3b1e64c70b4d1dd9caa1f5d399bff165a9b61b6beaaa"
+      },
+      "status": "pass"
+    },
+    "receipt_inventory": {
+      "abba": [
+        {
+          "groups": [
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T06:11:36.155832+00:00",
+              "group": "baseline-r1",
+              "last_end_utc": "2026-09-13T06:15:13.236895+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T07:57:49.917811+00:00",
+              "group": "candidate-r1",
+              "last_end_utc": "2026-09-13T08:01:17.011228+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T08:01:17.231386+00:00",
+              "group": "candidate-r2",
+              "last_end_utc": "2026-09-13T08:04:44.586635+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T08:10:22.467725+00:00",
+              "group": "baseline-r2",
+              "last_end_utc": "2026-09-13T08:13:57.844285+00:00"
+            }
+          ],
+          "order": [
+            "baseline-r1",
+            "candidate-r1",
+            "candidate-r2",
+            "baseline-r2"
+          ],
+          "passed": true,
+          "prefix": "native-"
+        },
+        {
+          "groups": [
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T06:18:30.208677+00:00",
+              "group": "baseline-r1",
+              "last_end_utc": "2026-09-13T06:19:12.319996+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T08:08:24.698742+00:00",
+              "group": "candidate-r1",
+              "last_end_utc": "2026-09-13T08:09:04.709472+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T08:09:04.925681+00:00",
+              "group": "candidate-r2",
+              "last_end_utc": "2026-09-13T08:09:44.961490+00:00"
+            },
+            {
+              "count": 16,
+              "first_start_utc": "2026-09-13T08:14:38.808232+00:00",
+              "group": "baseline-r2",
+              "last_end_utc": "2026-09-13T08:15:21.403476+00:00"
+            }
+          ],
+          "order": [
+            "baseline-r1",
+            "candidate-r1",
+            "candidate-r2",
+            "baseline-r2"
+          ],
+          "passed": true,
+          "prefix": "alloc-"
+        },
+        {
+          "groups": [
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T06:15:14.223788+00:00",
+              "group": "baseline-r1",
+              "last_end_utc": "2026-09-13T06:15:37.345356+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:04:45.583740+00:00",
+              "group": "candidate-r1",
+              "last_end_utc": "2026-09-13T08:05:12.003438+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:05:12.137282+00:00",
+              "group": "candidate-r2",
+              "last_end_utc": "2026-09-13T08:05:38.325161+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:13:57.984082+00:00",
+              "group": "baseline-r2",
+              "last_end_utc": "2026-09-13T08:14:21.293072+00:00"
+            }
+          ],
+          "order": [
+            "baseline-r1",
+            "candidate-r1",
+            "candidate-r2",
+            "baseline-r2"
+          ],
+          "passed": true,
+          "prefix": "guard-native-"
+        },
+        {
+          "groups": [
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T06:19:13.301097+00:00",
+              "group": "baseline-r1",
+              "last_end_utc": "2026-09-13T06:19:18.015253+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:09:45.971585+00:00",
+              "group": "candidate-r1",
+              "last_end_utc": "2026-09-13T08:09:51.097257+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:09:51.233687+00:00",
+              "group": "candidate-r2",
+              "last_end_utc": "2026-09-13T08:09:56.350219+00:00"
+            },
+            {
+              "count": 6,
+              "first_start_utc": "2026-09-13T08:15:21.542300+00:00",
+              "group": "baseline-r2",
+              "last_end_utc": "2026-09-13T08:15:26.324805+00:00"
+            }
+          ],
+          "order": [
+            "baseline-r1",
+            "candidate-r1",
+            "candidate-r2",
+            "baseline-r2"
+          ],
+          "passed": true,
+          "prefix": "guard-alloc-"
+        },
+        {
+          "groups": [
+            {
+              "count": 5,
+              "first_start_utc": "2026-09-13T06:16:45.186679+00:00",
+              "group": "baseline-r1",
+              "last_end_utc": "2026-09-13T06:17:02.163422+00:00"
+            },
+            {
+              "count": 5,
+              "first_start_utc": "2026-09-13T08:06:21.442319+00:00",
+              "group": "candidate-r1",
+              "last_end_utc": "2026-09-13T08:06:39.061826+00:00"
+            },
+            {
+              "count": 5,
+              "first_start_utc": "2026-09-13T08:06:39.189683+00:00",
+              "group": "candidate-r2",
+              "last_end_utc": "2026-09-13T08:06:56.884581+00:00"
+            },
+            {
+              "count": 5,
+              "first_start_utc": "2026-09-13T08:14:21.422656+00:00",
+              "group": "baseline-r2",
+              "last_end_utc": "2026-09-13T08:14:38.584139+00:00"
+            }
+          ],
+          "order": [
+            "baseline-r1",
+            "candidate-r1",
+            "candidate-r2",
+            "baseline-r2"
+          ],
+          "passed": true,
+          "prefix": "cap-"
+        }
+      ],
+      "check_attempts": {
+        "count": 46,
+        "rows": [
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T06:43:28.084445+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/baseline-owner-tests-01",
+            "receipt_sha256": "d463031683fa24cc56dd5115f08573a6f1e9a3aadf16db7dce83b31135a9c66a",
+            "seconds": 741.9245556459937,
+            "source_manifest_sha256": "38e76ca82f7540c208185453cbc4e00c2aa2cca899af520aba575c1b2644d388",
+            "start_utc": "2026-09-13T06:31:06.159881+00:00",
+            "times": [
+              "2026-09-13T06:31:06.159881+00:00",
+              "2026-09-13T06:43:28.084445+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--test",
+              "source_backed_cell_values",
+              "compact_public_guard",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T06:26:00.342499+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/baseline-public-01",
+            "receipt_sha256": "f19455775ff25592d7c49efa73f30a02ace5d567c82e8807642b3ee750ec6605",
+            "seconds": 76.633811348991,
+            "source_manifest_sha256": "38e76ca82f7540c208185453cbc4e00c2aa2cca899af520aba575c1b2644d388",
+            "start_utc": "2026-09-13T06:24:43.708682+00:00",
+            "times": [
+              "2026-09-13T06:24:43.708682+00:00",
+              "2026-09-13T06:26:00.342499+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "public_multi_edit_matches_baseline_whole_worksheet_output",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:25:39.917207+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/baseline-public-exact-01",
+            "receipt_sha256": "0d89a6490e4ac7d2ece164992b2327db97a38af50a57af0ef05b0dd291bf43ba",
+            "seconds": 54.37390699001844,
+            "source_manifest_sha256": "44d46e0a81d88f52ce6858ef42ea2bebf63b19523e85be5203ef0c82f663596f",
+            "start_utc": "2026-09-13T07:24:45.543290+00:00",
+            "times": [
+              "2026-09-13T07:24:45.543290+00:00",
+              "2026-09-13T07:25:39.917207+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "public_multi_edit_matches_baseline_whole_worksheet_output",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:29:24.464977+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/baseline-public-exact-02",
+            "receipt_sha256": "8f1612777e712799235c2efffe8b84cd2c5607c5fa5c6e81af5f2b36e77d0c9e",
+            "seconds": 25.609954158979235,
+            "source_manifest_sha256": "6c58b582fddc5c7a1aca94b805007886b806f8623f80c6fadb3e5b6ff7270a03",
+            "start_utc": "2026-09-13T07:28:58.855014+00:00",
+            "times": [
+              "2026-09-13T07:28:58.855014+00:00",
+              "2026-09-13T07:29:24.464977+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "public_multi_edit_matches_baseline_whole_worksheet_output",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:34:24.120913+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/baseline-public-exact-03",
+            "receipt_sha256": "b2a7b57a45d92a4e626fd7e3d76735850efbd8349427842222579a087d836775",
+            "seconds": 25.649733716010815,
+            "source_manifest_sha256": "82479ed6e5e5fc249b7477d75ea8cc3ba19bc0b0f0b4f74547d93bd8f626b520",
+            "start_utc": "2026-09-13T07:33:58.471179+00:00",
+            "times": [
+              "2026-09-13T07:33:58.471179+00:00",
+              "2026-09-13T07:34:24.120913+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "public_exact_output",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:35:53.957953+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/baseline-public-exact-04",
+            "receipt_sha256": "95e161e9193e8cff4073bdf39a96d56c75e56e09fe0c40bdab76e96e8dd6e6f0",
+            "seconds": 0.523144217004301,
+            "source_manifest_sha256": "08d634cb588067275c63f36645217eb3fbae00a28582bf6fc0ab13f4b67025ce",
+            "start_utc": "2026-09-13T07:35:53.434804+00:00",
+            "times": [
+              "2026-09-13T07:35:53.434804+00:00",
+              "2026-09-13T07:35:53.957953+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "public_exact_output",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:36:56.065641+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/baseline-public-exact-05",
+            "receipt_sha256": "8d1413c8c626b2237f1b8389018394912b781968302b0a6d65e36065f1b06e8d",
+            "seconds": 25.903513463999843,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T07:36:30.162123+00:00",
+            "times": [
+              "2026-09-13T07:36:30.162123+00:00",
+              "2026-09-13T07:36:56.065641+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "tools/check_crate_boundaries.py"
+            ],
+            "end_utc": "2026-09-13T07:53:51.061704+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-boundaries-preflight-01",
+            "receipt_sha256": "db9ac2c56e7d11147ac768c5127bf243ae5b0d3b16af56c970d3431a9de87248",
+            "seconds": 254.49806593399262,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T07:49:36.563628+00:00",
+            "times": [
+              "2026-09-13T07:49:36.563628+00:00",
+              "2026-09-13T07:53:51.061704+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "end_utc": "2026-09-13T07:45:21.645927+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/candidate-clippy-preflight-01",
+            "receipt_sha256": "2b3d6d560e2829db9e4ccb3a714c1f1ed13cc92c4bc548bf4f13cda8372180a4",
+            "seconds": 18.228451737988507,
+            "source_manifest_sha256": "7d5352e90bbabe61e8d939c8d6f3da103c0774accd04b45ba1d0cdefdb5353ac",
+            "start_utc": "2026-09-13T07:45:03.417478+00:00",
+            "times": [
+              "2026-09-13T07:45:03.417478+00:00",
+              "2026-09-13T07:45:21.645927+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "end_utc": "2026-09-13T07:46:54.922923+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-clippy-preflight-02",
+            "receipt_sha256": "3b652b2bb74126d439f9b3975b68c136c5cffc58e2c48c196e79d810ae38dc29",
+            "seconds": 11.152047247014707,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T07:46:43.770875+00:00",
+            "times": [
+              "2026-09-13T07:46:43.770875+00:00",
+              "2026-09-13T07:46:54.922923+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features"
+            ],
+            "end_utc": "2026-09-13T07:10:15.398348+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/candidate-compile-01",
+            "receipt_sha256": "2ac83c7e09ccf4dff62e38e0cab769ab61de8c65348290f19c5c0ef588525dfb",
+            "seconds": 21.8308591649984,
+            "source_manifest_sha256": "3070f0af17703387995e06170e1bc4b4e684221760aeaa32a6a46e386bd9b052",
+            "start_utc": "2026-09-13T07:09:53.567481+00:00",
+            "times": [
+              "2026-09-13T07:09:53.567481+00:00",
+              "2026-09-13T07:10:15.398348+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features"
+            ],
+            "end_utc": "2026-09-13T07:12:31.573171+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/candidate-compile-02",
+            "receipt_sha256": "a525f3372025c811976e7ffe004a1174b7e159c80c0331182f8891749a9325ad",
+            "seconds": 7.144166235986631,
+            "source_manifest_sha256": "e6125591999f346116fa810c6690de6221c3954fbe7d61421f9ba004ebadf312",
+            "start_utc": "2026-09-13T07:12:24.428997+00:00",
+            "times": [
+              "2026-09-13T07:12:24.428997+00:00",
+              "2026-09-13T07:12:31.573171+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features"
+            ],
+            "end_utc": "2026-09-13T07:13:50.811104+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/candidate-compile-03",
+            "receipt_sha256": "e0e2a5f7d79f454bc53a974317cb7f606decb2fe42944c12c61e051c4c7171e7",
+            "seconds": 7.4924270620103925,
+            "source_manifest_sha256": "1110e2e0500ec2932b53edff01649ab3f15374339ac395dad218e7933543fa0b",
+            "start_utc": "2026-09-13T07:13:43.318667+00:00",
+            "times": [
+              "2026-09-13T07:13:43.318667+00:00",
+              "2026-09-13T07:13:50.811104+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features"
+            ],
+            "end_utc": "2026-09-13T07:16:34.145896+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-compile-04",
+            "receipt_sha256": "e2e379595db33d6d054f5e1b689daf845487de9c8020e76049f2fc1431832613",
+            "seconds": 7.578563953982666,
+            "source_manifest_sha256": "036f347ab6a1c2c6d14bd16686588ad0f1c8ee0449439b45d977843240db7a04",
+            "start_utc": "2026-09-13T07:16:26.567328+00:00",
+            "times": [
+              "2026-09-13T07:16:26.567328+00:00",
+              "2026-09-13T07:16:34.145896+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "fmt",
+              "--all",
+              "--check"
+            ],
+            "end_utc": "2026-09-13T07:48:41.046801+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-fmt-preflight-01",
+            "receipt_sha256": "950c18038a9cbe4ddf2c0088b56a53fae0e8e10f8f217422bea8ac26015b5832",
+            "seconds": 17.78589903700049,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T07:48:23.260895+00:00",
+            "times": [
+              "2026-09-13T07:48:23.260895+00:00",
+              "2026-09-13T07:48:41.046801+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--no-default-features"
+            ],
+            "end_utc": "2026-09-13T07:47:46.167141+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-no-default-preflight-01",
+            "receipt_sha256": "3e2266296d826e5f8699b7de73709d9a96f2e9dea125f39279cc790710420d78",
+            "seconds": 13.689777097984916,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T07:47:32.477356+00:00",
+            "times": [
+              "2026-09-13T07:47:32.477356+00:00",
+              "2026-09-13T07:47:46.167141+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "source_proof",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:16:58.627775+00:00",
+            "exit_code": 101,
+            "path": "check-attempts/candidate-proof-tests-01",
+            "receipt_sha256": "46ae7829aa210ae9bfbd655f200bdac332a77be4708c6c610209cf663824b5b3",
+            "seconds": 10.180157785973279,
+            "source_manifest_sha256": "036f347ab6a1c2c6d14bd16686588ad0f1c8ee0449439b45d977843240db7a04",
+            "start_utc": "2026-09-13T07:16:48.447608+00:00",
+            "times": [
+              "2026-09-13T07:16:48.447608+00:00",
+              "2026-09-13T07:16:58.627775+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "source_proof",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:20:07.535411+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-proof-tests-02",
+            "receipt_sha256": "5c929090cbc92b40b2cfaf13eea2266af5ef08f6fa85b49adeffa107239eda67",
+            "seconds": 117.30969347700011,
+            "source_manifest_sha256": "422d12f23532699595daa8cbb7cde89f5a137bfd4e9b3a5e0c1c7620a9224ea1",
+            "start_utc": "2026-09-13T07:18:10.225711+00:00",
+            "times": [
+              "2026-09-13T07:18:10.225711+00:00",
+              "2026-09-13T07:20:07.535411+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "source_proof",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:43:18.484466+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-proof-tests-03",
+            "receipt_sha256": "bbccbd9ed314d45305d2fbe39d4125cfb531696a43b776a64ff12344a4538775",
+            "seconds": 119.0419817410002,
+            "source_manifest_sha256": "7d5352e90bbabe61e8d939c8d6f3da103c0774accd04b45ba1d0cdefdb5353ac",
+            "start_utc": "2026-09-13T07:41:19.442477+00:00",
+            "times": [
+              "2026-09-13T07:41:19.442477+00:00",
+              "2026-09-13T07:43:18.484466+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:22:10.230267+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-source-integration-01",
+            "receipt_sha256": "9b68608f87ba7c1583b8a7c51101633aae314b27a9c216a09f64ca8748c4a57f",
+            "seconds": 55.469693461986026,
+            "source_manifest_sha256": "422d12f23532699595daa8cbb7cde89f5a137bfd4e9b3a5e0c1c7620a9224ea1",
+            "start_utc": "2026-09-13T07:21:14.760564+00:00",
+            "times": [
+              "2026-09-13T07:21:14.760564+00:00",
+              "2026-09-13T07:22:10.230267+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "test",
+              "--release",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--test",
+              "source_backed_cell_values",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T07:44:52.712888+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/candidate-source-integration-02",
+            "receipt_sha256": "de2838a299d9714103dd11a2855c20896a56e169f4ebff52a5083a74deec29c2",
+            "seconds": 55.74558229997638,
+            "source_manifest_sha256": "7d5352e90bbabe61e8d939c8d6f3da103c0774accd04b45ba1d0cdefdb5353ac",
+            "start_utc": "2026-09-13T07:43:56.967303+00:00",
+            "times": [
+              "2026-09-13T07:43:56.967303+00:00",
+              "2026-09-13T07:44:52.712888+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "inputs",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:30:24.683908+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/closure-inputs-verify-01",
+            "receipt_sha256": "2057be61f2ea7e4235cdb7a98aca27238d270530e9442e72e1fc09b65a0613b3",
+            "seconds": 0.30356637699878775,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:30:24.380331+00:00",
+            "times": [
+              "2026-09-13T08:30:24.380331+00:00",
+              "2026-09-13T08:30:24.683908+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "quality",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:39:16.393229+00:00",
+            "exit_code": 1,
+            "path": "check-attempts/closure-quality-verify-01",
+            "receipt_sha256": "5bb73e70549bb810ab8f6bf936a5e3bdba5590ab77ee179e435f0f28bf085495",
+            "seconds": 0.2691221759887412,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:39:16.124096+00:00",
+            "times": [
+              "2026-09-13T08:39:16.124096+00:00",
+              "2026-09-13T08:39:16.393229+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "quality",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:39:34.707799+00:00",
+            "exit_code": 2,
+            "path": "check-attempts/closure-quality-verify-02",
+            "receipt_sha256": "41ea782d254e704d2a555c3ba13ecb9c501980bb4b9c5d3ecb0523462d4c5e78",
+            "seconds": 0.6020406610041391,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:39:34.105751+00:00",
+            "times": [
+              "2026-09-13T08:39:34.105751+00:00",
+              "2026-09-13T08:39:34.707799+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "quality",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:40:12.497270+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/closure-quality-verify-03",
+            "receipt_sha256": "51028446c4929d0fd6deece946d3c08c6f2058c4c5153bb716c636cc823aa944",
+            "seconds": 0.5990945710218512,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:40:11.898170+00:00",
+            "times": [
+              "2026-09-13T08:40:11.898170+00:00",
+              "2026-09-13T08:40:12.497270+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "source",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:30:33.898367+00:00",
+            "exit_code": 1,
+            "path": "check-attempts/closure-source-verify-01",
+            "receipt_sha256": "0ef69d09196eec8bbf34dedfae49bee4c01a0ec96302d21baaea34c0c1c63d11",
+            "seconds": 1.9707155069918372,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:30:31.927644+00:00",
+            "times": [
+              "2026-09-13T08:30:31.927644+00:00",
+              "2026-09-13T08:30:33.898367+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/verify.py",
+              "--component",
+              "source",
+              "--strict"
+            ],
+            "end_utc": "2026-09-13T08:31:25.428398+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/closure-source-verify-02",
+            "receipt_sha256": "dc4b5965126245fbceb3f16fc71614f041b9d6e31becb52a42e2a2cfc2b37a77",
+            "seconds": 2.2812140980095137,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:31:23.147179+00:00",
+            "times": [
+              "2026-09-13T08:31:23.147179+00:00",
+              "2026-09-13T08:31:25.428398+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/decide.py",
+              "--output",
+              "docs/performance/results/change-0552/decision.json"
+            ],
+            "end_utc": "2026-09-13T08:32:16.279723+00:00",
+            "exit_code": 2,
+            "path": "check-attempts/final-decision-01",
+            "receipt_sha256": "3fd8503bd2afcfad4e728038e85627a9f30c51d07fe76059c0992287f329c6a7",
+            "seconds": 28.41991866499302,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:31:47.859796+00:00",
+            "times": [
+              "2026-09-13T08:31:47.859796+00:00",
+              "2026-09-13T08:32:16.279723+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/decide.py",
+              "--output",
+              "docs/performance/results/change-0552/decision.json"
+            ],
+            "end_utc": "2026-09-13T08:33:42.035802+00:00",
+            "exit_code": 2,
+            "path": "check-attempts/final-decision-02",
+            "receipt_sha256": "41cf5d640cffd5f84e325e40c4d03602144579a0e9443c25c53bb75c08e70868",
+            "seconds": 28.4698467279959,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:33:13.565949+00:00",
+            "times": [
+              "2026-09-13T08:33:13.565949+00:00",
+              "2026-09-13T08:33:42.035802+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/decide.py",
+              "--output",
+              "docs/performance/results/change-0552/decision.json"
+            ],
+            "end_utc": "2026-09-13T08:37:22.902843+00:00",
+            "exit_code": 2,
+            "path": "check-attempts/final-decision-03",
+            "receipt_sha256": "b1721a2a838cfd4cbf00bea51e688da2ea12de8e85620853b18cb6a9455bfdfa",
+            "seconds": 173.25270893299603,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:34:29.650127+00:00",
+            "times": [
+              "2026-09-13T08:34:29.650127+00:00",
+              "2026-09-13T08:37:22.902843+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/decide.py",
+              "--output",
+              "docs/performance/results/change-0552/decision.json"
+            ],
+            "end_utc": "2026-09-13T08:43:14.981856+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-decision-04",
+            "receipt_sha256": "89701d765ff6862b6cafc63909f23e66eec5c4c2fa717aa4cd1b1b999cf546ee",
+            "seconds": 174.56468922097702,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:40:20.417158+00:00",
+            "times": [
+              "2026-09-13T08:40:20.417158+00:00",
+              "2026-09-13T08:43:14.981856+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/decide.py",
+              "--output",
+              "docs/performance/results/change-0552/decision.json"
+            ],
+            "end_utc": "2026-09-13T08:50:57.679888+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-decision-05",
+            "receipt_sha256": "de19263fcc82abda1354f69df5cf576404d6897af206b1a66938d8336f6797af",
+            "seconds": 175.1405021159735,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:48:02.539376+00:00",
+            "times": [
+              "2026-09-13T08:48:02.539376+00:00",
+              "2026-09-13T08:50:57.679888+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "python3",
+              "-B",
+              "tools/check_crate_boundaries.py"
+            ],
+            "end_utc": "2026-09-13T08:26:13.831425+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-boundaries",
+            "receipt_sha256": "b2524cbb6479db3af17203be982f91e50b7504386ad37e1935825b9767228722",
+            "seconds": 253.60905581299448,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:22:00.222362+00:00",
+            "times": [
+              "2026-09-13T08:22:00.222362+00:00",
+              "2026-09-13T08:26:13.831425+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--example",
+              "perf_cap_boundary",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "end_utc": "2026-09-13T08:27:23.849222+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-cap-clippy",
+            "receipt_sha256": "222cf9090f0dc09cfc39d035ea6edd0af84b835cc3d1ac01384d81009dbad715",
+            "seconds": 0.40735730799497105,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:27:23.441858+00:00",
+            "times": [
+              "2026-09-13T08:27:23.441858+00:00",
+              "2026-09-13T08:27:23.849222+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "check",
+              "--locked",
+              "--workspace",
+              "--all-features"
+            ],
+            "end_utc": "2026-09-13T08:21:24.949213+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-check",
+            "receipt_sha256": "fc4541cef2765a27dd1ad6d0123493d4a96c33cb8dc39e1e5345f27a8a270299",
+            "seconds": 97.06693317802274,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:19:47.882270+00:00",
+            "times": [
+              "2026-09-13T08:19:47.882270+00:00",
+              "2026-09-13T08:21:24.949213+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "tools/check_perf_claims.py",
+              "--registry",
+              "docs/performance/claim-registry-v1.json",
+              "--repo-root",
+              ".",
+              "--evidence-root",
+              ".",
+              "--mode",
+              "strict"
+            ],
+            "end_utc": "2026-09-13T08:28:34.385444+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-claims",
+            "receipt_sha256": "89982a0c8f2072d60f94a2cf7371d9ebe4797e2cccec933d35a17d0e14666703",
+            "seconds": 69.93744637700729,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:27:24.447995+00:00",
+            "times": [
+              "2026-09-13T08:27:24.447995+00:00",
+              "2026-09-13T08:28:34.385444+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "clippy",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--lib",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "end_utc": "2026-09-13T08:21:36.680363+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-clippy",
+            "receipt_sha256": "5d0ee97048547ed8e6ef4c05e39d53bcb7293e49293f14c4112d195decd42e0c",
+            "seconds": 11.132926360995043,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:21:25.547430+00:00",
+            "times": [
+              "2026-09-13T08:21:25.547430+00:00",
+              "2026-09-13T08:21:36.680363+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "fmt",
+              "--all",
+              "--check"
+            ],
+            "end_utc": "2026-09-13T08:21:59.627579+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-fmt",
+            "receipt_sha256": "b59bb07432d2cba13b29b7f9a124249b65e72b1623d4f73f8f27c25e63c9e52f",
+            "seconds": 17.940285721997498,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:21:41.687289+00:00",
+            "times": [
+              "2026-09-13T08:21:41.687289+00:00",
+              "2026-09-13T08:21:59.627579+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "clippy",
+              "--locked",
+              "--manifest-path",
+              "tools/perf-baseline/Cargo.toml",
+              "--bin",
+              "xlsx_planning_guard",
+              "--all-features",
+              "--",
+              "-D",
+              "warnings"
+            ],
+            "end_utc": "2026-09-13T08:27:03.008352+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-guard-clippy",
+            "receipt_sha256": "3028ca57487f2bbcc81493fc6c1bbf1b079a4fc7b3dd96522c03a5bafac46338",
+            "seconds": 48.57694100297522,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:26:14.431406+00:00",
+            "times": [
+              "2026-09-13T08:26:14.431406+00:00",
+              "2026-09-13T08:27:03.008352+00:00"
+            ]
+          },
+          {
+            "command": [
+              "cargo",
+              "fmt",
+              "--manifest-path",
+              "tools/perf-baseline/Cargo.toml",
+              "--all",
+              "--check"
+            ],
+            "end_utc": "2026-09-13T08:27:22.844908+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-guard-fmt",
+            "receipt_sha256": "f75470ab95038afcd10fb8a4244195ecf6965739b060a377fcd01cd151b7c3b5",
+            "seconds": 19.241748134983936,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:27:03.603168+00:00",
+            "times": [
+              "2026-09-13T08:27:03.603168+00:00",
+              "2026-09-13T08:27:22.844908+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "cargo",
+              "check",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--no-default-features"
+            ],
+            "end_utc": "2026-09-13T08:28:42.631995+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-no-default",
+            "receipt_sha256": "5fb05cf2f645ac5fd786aeeac7b5b1d7d3a9f63e80d78856e2def1d94575b957",
+            "seconds": 7.64703793800436,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:28:34.984952+00:00",
+            "times": [
+              "2026-09-13T08:28:34.984952+00:00",
+              "2026-09-13T08:28:42.631995+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "doc",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--no-deps"
+            ],
+            "end_utc": "2026-09-13T08:21:41.089552+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-rustdoc",
+            "receipt_sha256": "dc7d33144ab987b5a854812c77d9c8ab6fd8d7d005328ac42723d7242824f652",
+            "seconds": 3.8141570540028624,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:21:37.275384+00:00",
+            "times": [
+              "2026-09-13T08:21:37.275384+00:00",
+              "2026-09-13T08:21:41.089552+00:00"
+            ]
+          },
+          {
+            "command": [
+              "env",
+              "TMPDIR=/home/zhuhe/litchi-goal-0552-target/tmp",
+              "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0552-target",
+              "CARGO_BUILD_JOBS=2",
+              "CARGO_INCREMENTAL=0",
+              "RUSTDOCFLAGS=-D warnings",
+              "cargo",
+              "test",
+              "--locked",
+              "-p",
+              "litchi-xlsx",
+              "--all-features",
+              "--",
+              "--test-threads=2"
+            ],
+            "end_utc": "2026-09-13T08:19:47.284405+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/final-quality-01-quality-tests",
+            "receipt_sha256": "84fccd006de36ed33d344ce30d66876ca7aa63388569fff1e68b2e8c8f804c59",
+            "seconds": 79.65558455098653,
+            "source_manifest_sha256": "c560d0c9ad71adf3460773ba619cd51dd7f240aa9dcac01cefef4bee168cccd8",
+            "start_utc": "2026-09-13T08:18:27.628814+00:00",
+            "times": [
+              "2026-09-13T08:18:27.628814+00:00",
+              "2026-09-13T08:19:47.284405+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/analyze_guards.py",
+              "--output",
+              "docs/performance/results/change-0552/guards-analysis.json"
+            ],
+            "end_utc": "2026-09-13T08:15:52.604238+00:00",
+            "exit_code": 1,
+            "path": "check-attempts/matched-guards-analysis-01",
+            "receipt_sha256": "74a3082e75d3ab896c36fcebc60952d629a8ec05759a1a61697e625838dad602",
+            "seconds": 0.4472448189917486,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T08:15:52.156988+00:00",
+            "times": [
+              "2026-09-13T08:15:52.156988+00:00",
+              "2026-09-13T08:15:52.604238+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/analyze_guards.py",
+              "--output",
+              "docs/performance/results/change-0552/guards-analysis.json"
+            ],
+            "end_utc": "2026-09-13T08:17:16.586814+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/matched-guards-analysis-02",
+            "receipt_sha256": "8986170fc8a96bbca230353fcb8916ddc75aafb160a3b882deaa5039a34d64f7",
+            "seconds": 0.42833359001087956,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T08:17:16.158473+00:00",
+            "times": [
+              "2026-09-13T08:17:16.158473+00:00",
+              "2026-09-13T08:17:16.586814+00:00"
+            ]
+          },
+          {
+            "command": [
+              "python3",
+              "-B",
+              "docs/performance/results/change-0552/analyze_metrics.py",
+              "--output",
+              "docs/performance/results/change-0552/metrics-analysis.json"
+            ],
+            "end_utc": "2026-09-13T08:15:38.859532+00:00",
+            "exit_code": 0,
+            "path": "check-attempts/matched-metrics-analysis-01",
+            "receipt_sha256": "c57f39e7fe813c9f4d05a28309c8972d7a48e4b7c42150f04407b7b0c091f78e",
+            "seconds": 2.0603651130222715,
+            "source_manifest_sha256": "5d539d97ae3496af6cb4e08272265a5f2ea14cc7063d10059adb3809176337ea",
+            "start_utc": "2026-09-13T08:15:36.799160+00:00",
+            "times": [
+              "2026-09-13T08:15:36.799160+00:00",
+              "2026-09-13T08:15:38.859532+00:00"
+            ]
+          }
+        ],
+        "status": "pass"
+      },
+      "profile": {
+        "decision": "profile-decision.json",
+        "decision_sha256": "b243cd63327246e60bf69e9c8efee4b23f9076bee38788e119e3547fe4298b4a",
+        "gate_passed": true,
+        "intervals": 0,
+        "main_analysis_sha256": "c0dd9f49b7006c5d426211624e36217fc680af1ad37d1febaa5d82a6f10c2a3c",
+        "pilot_gates": {
+          "cap": false,
+          "guard": false,
+          "main": false
+        },
+        "pilot_passed": false,
+        "profile_rows": [],
+        "reported_gate_passed": true,
+        "required": false,
+        "status": "pass"
+      },
+      "stages": {
+        "baseline": {
+          "receipt_count": 119,
+          "receipts": [
+            "alloc-r1-dense-sparse-c0.receipt.json",
+            "alloc-r1-dense-sparse-c1.receipt.json",
+            "alloc-r1-dense-sparse-c2.receipt.json",
+            "alloc-r1-dense-sparse-c3.receipt.json",
+            "alloc-r1-medium-c0.receipt.json",
+            "alloc-r1-medium-c1.receipt.json",
+            "alloc-r1-medium-c2.receipt.json",
+            "alloc-r1-medium-c3.receipt.json",
+            "alloc-r1-noncompact-c0.receipt.json",
+            "alloc-r1-noncompact-c1.receipt.json",
+            "alloc-r1-noncompact-c2.receipt.json",
+            "alloc-r1-noncompact-c3.receipt.json",
+            "alloc-r1-vendor-extension-c0.receipt.json",
+            "alloc-r1-vendor-extension-c1.receipt.json",
+            "alloc-r1-vendor-extension-c2.receipt.json",
+            "alloc-r1-vendor-extension-c3.receipt.json",
+            "alloc-r2-dense-sparse-c0.receipt.json",
+            "alloc-r2-dense-sparse-c1.receipt.json",
+            "alloc-r2-dense-sparse-c2.receipt.json",
+            "alloc-r2-dense-sparse-c3.receipt.json",
+            "alloc-r2-medium-c0.receipt.json",
+            "alloc-r2-medium-c1.receipt.json",
+            "alloc-r2-medium-c2.receipt.json",
+            "alloc-r2-medium-c3.receipt.json",
+            "alloc-r2-noncompact-c0.receipt.json",
+            "alloc-r2-noncompact-c1.receipt.json",
+            "alloc-r2-noncompact-c2.receipt.json",
+            "alloc-r2-noncompact-c3.receipt.json",
+            "alloc-r2-vendor-extension-c0.receipt.json",
+            "alloc-r2-vendor-extension-c1.receipt.json",
+            "alloc-r2-vendor-extension-c2.receipt.json",
+            "alloc-r2-vendor-extension-c3.receipt.json",
+            "build-alloc.receipt.json",
+            "build-cap.receipt.json",
+            "build-guard-alloc.receipt.json",
+            "build-guard-normal.receipt.json",
+            "build-normal.receipt.json",
+            "cap-r1-1.receipt.json",
+            "cap-r1-160.receipt.json",
+            "cap-r1-164.receipt.json",
+            "cap-r1-2.receipt.json",
+            "cap-r1-256.receipt.json",
+            "cap-r2-1.receipt.json",
+            "cap-r2-160.receipt.json",
+            "cap-r2-164.receipt.json",
+            "cap-r2-2.receipt.json",
+            "cap-r2-256.receipt.json",
+            "guard-alloc-r1-dense-sparse-late-raw.receipt.json",
+            "guard-alloc-r1-dense-sparse-late-validator.receipt.json",
+            "guard-alloc-r1-dense-sparse-valid.receipt.json",
+            "guard-alloc-r1-medium-late-raw.receipt.json",
+            "guard-alloc-r1-medium-late-validator.receipt.json",
+            "guard-alloc-r1-medium-valid.receipt.json",
+            "guard-alloc-r2-dense-sparse-late-raw.receipt.json",
+            "guard-alloc-r2-dense-sparse-late-validator.receipt.json",
+            "guard-alloc-r2-dense-sparse-valid.receipt.json",
+            "guard-alloc-r2-medium-late-raw.receipt.json",
+            "guard-alloc-r2-medium-late-validator.receipt.json",
+            "guard-alloc-r2-medium-valid.receipt.json",
+            "guard-native-r1-dense-sparse-late-raw.receipt.json",
+            "guard-native-r1-dense-sparse-late-validator.receipt.json",
+            "guard-native-r1-dense-sparse-valid.receipt.json",
+            "guard-native-r1-medium-late-raw.receipt.json",
+            "guard-native-r1-medium-late-validator.receipt.json",
+            "guard-native-r1-medium-valid.receipt.json",
+            "guard-native-r2-dense-sparse-late-raw.receipt.json",
+            "guard-native-r2-dense-sparse-late-validator.receipt.json",
+            "guard-native-r2-dense-sparse-valid.receipt.json",
+            "guard-native-r2-medium-late-raw.receipt.json",
+            "guard-native-r2-medium-late-validator.receipt.json",
+            "guard-native-r2-medium-valid.receipt.json",
+            "native-r1-dense-sparse-c0.receipt.json",
+            "native-r1-dense-sparse-c1.receipt.json",
+            "native-r1-dense-sparse-c2.receipt.json",
+            "native-r1-dense-sparse-c3.receipt.json",
+            "native-r1-medium-c0.receipt.json",
+            "native-r1-medium-c1.receipt.json",
+            "native-r1-medium-c2.receipt.json",
+            "native-r1-medium-c3.receipt.json",
+            "native-r1-noncompact-c0.receipt.json",
+            "native-r1-noncompact-c1.receipt.json",
+            "native-r1-noncompact-c2.receipt.json",
+            "native-r1-noncompact-c3.receipt.json",
+            "native-r1-vendor-extension-c0.receipt.json",
+            "native-r1-vendor-extension-c1.receipt.json",
+            "native-r1-vendor-extension-c2.receipt.json",
+            "native-r1-vendor-extension-c3.receipt.json",
+            "native-r2-dense-sparse-c0.receipt.json",
+            "native-r2-dense-sparse-c1.receipt.json",
+            "native-r2-dense-sparse-c2.receipt.json",
+            "native-r2-dense-sparse-c3.receipt.json",
+            "native-r2-medium-c0.receipt.json",
+            "native-r2-medium-c1.receipt.json",
+            "native-r2-medium-c2.receipt.json",
+            "native-r2-medium-c3.receipt.json",
+            "native-r2-noncompact-c0.receipt.json",
+            "native-r2-noncompact-c1.receipt.json",
+            "native-r2-noncompact-c2.receipt.json",
+            "native-r2-noncompact-c3.receipt.json",
+            "native-r2-vendor-extension-c0.receipt.json",
+            "native-r2-vendor-extension-c1.receipt.json",
+            "native-r2-vendor-extension-c2.receipt.json",
+            "native-r2-vendor-extension-c3.receipt.json",
+            "preflight-r1-dense-sparse-c0.receipt.json",
+            "preflight-r1-dense-sparse-c1.receipt.json",
+            "preflight-r1-dense-sparse-c2.receipt.json",
+            "preflight-r1-dense-sparse-c3.receipt.json",
+            "preflight-r1-medium-c0.receipt.json",
+            "preflight-r1-medium-c1.receipt.json",
+            "preflight-r1-medium-c2.receipt.json",
+            "preflight-r1-medium-c3.receipt.json",
+            "preflight-r1-noncompact-c0.receipt.json",
+            "preflight-r1-noncompact-c1.receipt.json",
+            "preflight-r1-noncompact-c2.receipt.json",
+            "preflight-r1-noncompact-c3.receipt.json",
+            "preflight-r1-vendor-extension-c0.receipt.json",
+            "preflight-r1-vendor-extension-c1.receipt.json",
+            "preflight-r1-vendor-extension-c2.receipt.json",
+            "preflight-r1-vendor-extension-c3.receipt.json"
+          ]
+        },
+        "candidate": {
+          "receipt_count": 119,
+          "receipts": [
+            "alloc-r1-dense-sparse-c0.receipt.json",
+            "alloc-r1-dense-sparse-c1.receipt.json",
+            "alloc-r1-dense-sparse-c2.receipt.json",
+            "alloc-r1-dense-sparse-c3.receipt.json",
+            "alloc-r1-medium-c0.receipt.json",
+            "alloc-r1-medium-c1.receipt.json",
+            "alloc-r1-medium-c2.receipt.json",
+            "alloc-r1-medium-c3.receipt.json",
+            "alloc-r1-noncompact-c0.receipt.json",
+            "alloc-r1-noncompact-c1.receipt.json",
+            "alloc-r1-noncompact-c2.receipt.json",
+            "alloc-r1-noncompact-c3.receipt.json",
+            "alloc-r1-vendor-extension-c0.receipt.json",
+            "alloc-r1-vendor-extension-c1.receipt.json",
+            "alloc-r1-vendor-extension-c2.receipt.json",
+            "alloc-r1-vendor-extension-c3.receipt.json",
+            "alloc-r2-dense-sparse-c0.receipt.json",
+            "alloc-r2-dense-sparse-c1.receipt.json",
+            "alloc-r2-dense-sparse-c2.receipt.json",
+            "alloc-r2-dense-sparse-c3.receipt.json",
+            "alloc-r2-medium-c0.receipt.json",
+            "alloc-r2-medium-c1.receipt.json",
+            "alloc-r2-medium-c2.receipt.json",
+            "alloc-r2-medium-c3.receipt.json",
+            "alloc-r2-noncompact-c0.receipt.json",
+            "alloc-r2-noncompact-c1.receipt.json",
+            "alloc-r2-noncompact-c2.receipt.json",
+            "alloc-r2-noncompact-c3.receipt.json",
+            "alloc-r2-vendor-extension-c0.receipt.json",
+            "alloc-r2-vendor-extension-c1.receipt.json",
+            "alloc-r2-vendor-extension-c2.receipt.json",
+            "alloc-r2-vendor-extension-c3.receipt.json",
+            "build-alloc.receipt.json",
+            "build-cap.receipt.json",
+            "build-guard-alloc.receipt.json",
+            "build-guard-normal.receipt.json",
+            "build-normal.receipt.json",
+            "cap-r1-1.receipt.json",
+            "cap-r1-160.receipt.json",
+            "cap-r1-164.receipt.json",
+            "cap-r1-2.receipt.json",
+            "cap-r1-256.receipt.json",
+            "cap-r2-1.receipt.json",
+            "cap-r2-160.receipt.json",
+            "cap-r2-164.receipt.json",
+            "cap-r2-2.receipt.json",
+            "cap-r2-256.receipt.json",
+            "guard-alloc-r1-dense-sparse-late-raw.receipt.json",
+            "guard-alloc-r1-dense-sparse-late-validator.receipt.json",
+            "guard-alloc-r1-dense-sparse-valid.receipt.json",
+            "guard-alloc-r1-medium-late-raw.receipt.json",
+            "guard-alloc-r1-medium-late-validator.receipt.json",
+            "guard-alloc-r1-medium-valid.receipt.json",
+            "guard-alloc-r2-dense-sparse-late-raw.receipt.json",
+            "guard-alloc-r2-dense-sparse-late-validator.receipt.json",
+            "guard-alloc-r2-dense-sparse-valid.receipt.json",
+            "guard-alloc-r2-medium-late-raw.receipt.json",
+            "guard-alloc-r2-medium-late-validator.receipt.json",
+            "guard-alloc-r2-medium-valid.receipt.json",
+            "guard-native-r1-dense-sparse-late-raw.receipt.json",
+            "guard-native-r1-dense-sparse-late-validator.receipt.json",
+            "guard-native-r1-dense-sparse-valid.receipt.json",
+            "guard-native-r1-medium-late-raw.receipt.json",
+            "guard-native-r1-medium-late-validator.receipt.json",
+            "guard-native-r1-medium-valid.receipt.json",
+            "guard-native-r2-dense-sparse-late-raw.receipt.json",
+            "guard-native-r2-dense-sparse-late-validator.receipt.json",
+            "guard-native-r2-dense-sparse-valid.receipt.json",
+            "guard-native-r2-medium-late-raw.receipt.json",
+            "guard-native-r2-medium-late-validator.receipt.json",
+            "guard-native-r2-medium-valid.receipt.json",
+            "native-r1-dense-sparse-c0.receipt.json",
+            "native-r1-dense-sparse-c1.receipt.json",
+            "native-r1-dense-sparse-c2.receipt.json",
+            "native-r1-dense-sparse-c3.receipt.json",
+            "native-r1-medium-c0.receipt.json",
+            "native-r1-medium-c1.receipt.json",
+            "native-r1-medium-c2.receipt.json",
+            "native-r1-medium-c3.receipt.json",
+            "native-r1-noncompact-c0.receipt.json",
+            "native-r1-noncompact-c1.receipt.json",
+            "native-r1-noncompact-c2.receipt.json",
+            "native-r1-noncompact-c3.receipt.json",
+            "native-r1-vendor-extension-c0.receipt.json",
+            "native-r1-vendor-extension-c1.receipt.json",
+            "native-r1-vendor-extension-c2.receipt.json",
+            "native-r1-vendor-extension-c3.receipt.json",
+            "native-r2-dense-sparse-c0.receipt.json",
+            "native-r2-dense-sparse-c1.receipt.json",
+            "native-r2-dense-sparse-c2.receipt.json",
+            "native-r2-dense-sparse-c3.receipt.json",
+            "native-r2-medium-c0.receipt.json",
+            "native-r2-medium-c1.receipt.json",
+            "native-r2-medium-c2.receipt.json",
+            "native-r2-medium-c3.receipt.json",
+            "native-r2-noncompact-c0.receipt.json",
+            "native-r2-noncompact-c1.receipt.json",
+            "native-r2-noncompact-c2.receipt.json",
+            "native-r2-noncompact-c3.receipt.json",
+            "native-r2-vendor-extension-c0.receipt.json",
+            "native-r2-vendor-extension-c1.receipt.json",
+            "native-r2-vendor-extension-c2.receipt.json",
+            "native-r2-vendor-extension-c3.receipt.json",
+            "preflight-r1-dense-sparse-c0.receipt.json",
+            "preflight-r1-dense-sparse-c1.receipt.json",
+            "preflight-r1-dense-sparse-c2.receipt.json",
+            "preflight-r1-dense-sparse-c3.receipt.json",
+            "preflight-r1-medium-c0.receipt.json",
+            "preflight-r1-medium-c1.receipt.json",
+            "preflight-r1-medium-c2.receipt.json",
+            "preflight-r1-medium-c3.receipt.json",
+            "preflight-r1-noncompact-c0.receipt.json",
+            "preflight-r1-noncompact-c1.receipt.json",
+            "preflight-r1-noncompact-c2.receipt.json",
+            "preflight-r1-noncompact-c3.receipt.json",
+            "preflight-r1-vendor-extension-c0.receipt.json",
+            "preflight-r1-vendor-extension-c1.receipt.json",
+            "preflight-r1-vendor-extension-c2.receipt.json",
+            "preflight-r1-vendor-extension-c3.receipt.json"
+          ]
+        }
+      },
+      "status": "pass"
+    },
+    "receipt_timeline": {
+      "count": 284,
+      "first_start_utc": "2026-09-13T06:03:59.828075+00:00",
+      "last_end_utc": "2026-09-13T08:50:57.679888+00:00",
+      "receipts": [
+        "baseline/build-normal.receipt.json",
+        "baseline/preflight-r1-medium-c0.receipt.json",
+        "baseline/preflight-r1-medium-c1.receipt.json",
+        "baseline/preflight-r1-medium-c2.receipt.json",
+        "baseline/preflight-r1-medium-c3.receipt.json",
+        "baseline/preflight-r1-dense-sparse-c0.receipt.json",
+        "baseline/preflight-r1-dense-sparse-c1.receipt.json",
+        "baseline/preflight-r1-dense-sparse-c2.receipt.json",
+        "baseline/preflight-r1-dense-sparse-c3.receipt.json",
+        "baseline/preflight-r1-noncompact-c0.receipt.json",
+        "baseline/preflight-r1-noncompact-c1.receipt.json",
+        "baseline/preflight-r1-noncompact-c2.receipt.json",
+        "baseline/preflight-r1-noncompact-c3.receipt.json",
+        "baseline/preflight-r1-vendor-extension-c0.receipt.json",
+        "baseline/preflight-r1-vendor-extension-c1.receipt.json",
+        "baseline/preflight-r1-vendor-extension-c2.receipt.json",
+        "baseline/preflight-r1-vendor-extension-c3.receipt.json",
+        "baseline/native-r1-medium-c0.receipt.json",
+        "baseline/native-r1-medium-c1.receipt.json",
+        "baseline/native-r1-medium-c2.receipt.json",
+        "baseline/native-r1-medium-c3.receipt.json",
+        "baseline/native-r1-dense-sparse-c0.receipt.json",
+        "baseline/native-r1-dense-sparse-c1.receipt.json",
+        "baseline/native-r1-dense-sparse-c2.receipt.json",
+        "baseline/native-r1-dense-sparse-c3.receipt.json",
+        "baseline/native-r1-noncompact-c0.receipt.json",
+        "baseline/native-r1-noncompact-c1.receipt.json",
+        "baseline/native-r1-noncompact-c2.receipt.json",
+        "baseline/native-r1-noncompact-c3.receipt.json",
+        "baseline/native-r1-vendor-extension-c0.receipt.json",
+        "baseline/native-r1-vendor-extension-c1.receipt.json",
+        "baseline/native-r1-vendor-extension-c2.receipt.json",
+        "baseline/native-r1-vendor-extension-c3.receipt.json",
+        "baseline/build-guard-normal.receipt.json",
+        "baseline/guard-native-r1-medium-valid.receipt.json",
+        "baseline/guard-native-r1-medium-late-validator.receipt.json",
+        "baseline/guard-native-r1-medium-late-raw.receipt.json",
+        "baseline/guard-native-r1-dense-sparse-valid.receipt.json",
+        "baseline/guard-native-r1-dense-sparse-late-validator.receipt.json",
+        "baseline/guard-native-r1-dense-sparse-late-raw.receipt.json",
+        "baseline/build-cap.receipt.json",
+        "baseline/cap-r1-1.receipt.json",
+        "baseline/cap-r1-2.receipt.json",
+        "baseline/cap-r1-160.receipt.json",
+        "baseline/cap-r1-164.receipt.json",
+        "baseline/cap-r1-256.receipt.json",
+        "baseline/build-alloc.receipt.json",
+        "baseline/alloc-r1-medium-c0.receipt.json",
+        "baseline/alloc-r1-medium-c1.receipt.json",
+        "baseline/alloc-r1-medium-c2.receipt.json",
+        "baseline/alloc-r1-medium-c3.receipt.json",
+        "baseline/alloc-r1-dense-sparse-c0.receipt.json",
+        "baseline/alloc-r1-dense-sparse-c1.receipt.json",
+        "baseline/alloc-r1-dense-sparse-c2.receipt.json",
+        "baseline/alloc-r1-dense-sparse-c3.receipt.json",
+        "baseline/alloc-r1-noncompact-c0.receipt.json",
+        "baseline/alloc-r1-noncompact-c1.receipt.json",
+        "baseline/alloc-r1-noncompact-c2.receipt.json",
+        "baseline/alloc-r1-noncompact-c3.receipt.json",
+        "baseline/alloc-r1-vendor-extension-c0.receipt.json",
+        "baseline/alloc-r1-vendor-extension-c1.receipt.json",
+        "baseline/alloc-r1-vendor-extension-c2.receipt.json",
+        "baseline/alloc-r1-vendor-extension-c3.receipt.json",
+        "baseline/build-guard-alloc.receipt.json",
+        "baseline/guard-alloc-r1-medium-valid.receipt.json",
+        "baseline/guard-alloc-r1-medium-late-validator.receipt.json",
+        "baseline/guard-alloc-r1-medium-late-raw.receipt.json",
+        "baseline/guard-alloc-r1-dense-sparse-valid.receipt.json",
+        "baseline/guard-alloc-r1-dense-sparse-late-validator.receipt.json",
+        "baseline/guard-alloc-r1-dense-sparse-late-raw.receipt.json",
+        "check-attempts/baseline-public-01/receipt.json",
+        "check-attempts/baseline-owner-tests-01/receipt.json",
+        "check-attempts/candidate-compile-01/receipt.json",
+        "check-attempts/candidate-compile-02/receipt.json",
+        "check-attempts/candidate-compile-03/receipt.json",
+        "check-attempts/candidate-compile-04/receipt.json",
+        "check-attempts/candidate-proof-tests-01/receipt.json",
+        "check-attempts/candidate-proof-tests-02/receipt.json",
+        "check-attempts/candidate-source-integration-01/receipt.json",
+        "check-attempts/baseline-public-exact-01/receipt.json",
+        "check-attempts/baseline-public-exact-02/receipt.json",
+        "check-attempts/baseline-public-exact-03/receipt.json",
+        "check-attempts/baseline-public-exact-04/receipt.json",
+        "check-attempts/baseline-public-exact-05/receipt.json",
+        "check-attempts/candidate-proof-tests-03/receipt.json",
+        "check-attempts/candidate-source-integration-02/receipt.json",
+        "check-attempts/candidate-clippy-preflight-01/receipt.json",
+        "check-attempts/candidate-clippy-preflight-02/receipt.json",
+        "check-attempts/candidate-no-default-preflight-01/receipt.json",
+        "check-attempts/candidate-fmt-preflight-01/receipt.json",
+        "check-attempts/candidate-boundaries-preflight-01/receipt.json",
+        "candidate/build-normal.receipt.json",
+        "candidate/preflight-r1-medium-c0.receipt.json",
+        "candidate/preflight-r1-medium-c1.receipt.json",
+        "candidate/preflight-r1-medium-c2.receipt.json",
+        "candidate/preflight-r1-medium-c3.receipt.json",
+        "candidate/preflight-r1-dense-sparse-c0.receipt.json",
+        "candidate/preflight-r1-dense-sparse-c1.receipt.json",
+        "candidate/preflight-r1-dense-sparse-c2.receipt.json",
+        "candidate/preflight-r1-dense-sparse-c3.receipt.json",
+        "candidate/preflight-r1-noncompact-c0.receipt.json",
+        "candidate/preflight-r1-noncompact-c1.receipt.json",
+        "candidate/preflight-r1-noncompact-c2.receipt.json",
+        "candidate/preflight-r1-noncompact-c3.receipt.json",
+        "candidate/preflight-r1-vendor-extension-c0.receipt.json",
+        "candidate/preflight-r1-vendor-extension-c1.receipt.json",
+        "candidate/preflight-r1-vendor-extension-c2.receipt.json",
+        "candidate/preflight-r1-vendor-extension-c3.receipt.json",
+        "candidate/native-r1-medium-c0.receipt.json",
+        "candidate/native-r1-medium-c1.receipt.json",
+        "candidate/native-r1-medium-c2.receipt.json",
+        "candidate/native-r1-medium-c3.receipt.json",
+        "candidate/native-r1-dense-sparse-c0.receipt.json",
+        "candidate/native-r1-dense-sparse-c1.receipt.json",
+        "candidate/native-r1-dense-sparse-c2.receipt.json",
+        "candidate/native-r1-dense-sparse-c3.receipt.json",
+        "candidate/native-r1-noncompact-c0.receipt.json",
+        "candidate/native-r1-noncompact-c1.receipt.json",
+        "candidate/native-r1-noncompact-c2.receipt.json",
+        "candidate/native-r1-noncompact-c3.receipt.json",
+        "candidate/native-r1-vendor-extension-c0.receipt.json",
+        "candidate/native-r1-vendor-extension-c1.receipt.json",
+        "candidate/native-r1-vendor-extension-c2.receipt.json",
+        "candidate/native-r1-vendor-extension-c3.receipt.json",
+        "candidate/native-r2-vendor-extension-c0.receipt.json",
+        "candidate/native-r2-vendor-extension-c1.receipt.json",
+        "candidate/native-r2-vendor-extension-c2.receipt.json",
+        "candidate/native-r2-vendor-extension-c3.receipt.json",
+        "candidate/native-r2-noncompact-c0.receipt.json",
+        "candidate/native-r2-noncompact-c1.receipt.json",
+        "candidate/native-r2-noncompact-c2.receipt.json",
+        "candidate/native-r2-noncompact-c3.receipt.json",
+        "candidate/native-r2-dense-sparse-c0.receipt.json",
+        "candidate/native-r2-dense-sparse-c1.receipt.json",
+        "candidate/native-r2-dense-sparse-c2.receipt.json",
+        "candidate/native-r2-dense-sparse-c3.receipt.json",
+        "candidate/native-r2-medium-c0.receipt.json",
+        "candidate/native-r2-medium-c1.receipt.json",
+        "candidate/native-r2-medium-c2.receipt.json",
+        "candidate/native-r2-medium-c3.receipt.json",
+        "candidate/build-guard-normal.receipt.json",
+        "candidate/guard-native-r1-medium-valid.receipt.json",
+        "candidate/guard-native-r1-medium-late-validator.receipt.json",
+        "candidate/guard-native-r1-medium-late-raw.receipt.json",
+        "candidate/guard-native-r1-dense-sparse-valid.receipt.json",
+        "candidate/guard-native-r1-dense-sparse-late-validator.receipt.json",
+        "candidate/guard-native-r1-dense-sparse-late-raw.receipt.json",
+        "candidate/guard-native-r2-dense-sparse-valid.receipt.json",
+        "candidate/guard-native-r2-dense-sparse-late-validator.receipt.json",
+        "candidate/guard-native-r2-dense-sparse-late-raw.receipt.json",
+        "candidate/guard-native-r2-medium-valid.receipt.json",
+        "candidate/guard-native-r2-medium-late-validator.receipt.json",
+        "candidate/guard-native-r2-medium-late-raw.receipt.json",
+        "candidate/build-cap.receipt.json",
+        "candidate/cap-r1-1.receipt.json",
+        "candidate/cap-r1-2.receipt.json",
+        "candidate/cap-r1-160.receipt.json",
+        "candidate/cap-r1-164.receipt.json",
+        "candidate/cap-r1-256.receipt.json",
+        "candidate/cap-r2-256.receipt.json",
+        "candidate/cap-r2-164.receipt.json",
+        "candidate/cap-r2-160.receipt.json",
+        "candidate/cap-r2-2.receipt.json",
+        "candidate/cap-r2-1.receipt.json",
+        "candidate/build-alloc.receipt.json",
+        "candidate/alloc-r1-medium-c0.receipt.json",
+        "candidate/alloc-r1-medium-c1.receipt.json",
+        "candidate/alloc-r1-medium-c2.receipt.json",
+        "candidate/alloc-r1-medium-c3.receipt.json",
+        "candidate/alloc-r1-dense-sparse-c0.receipt.json",
+        "candidate/alloc-r1-dense-sparse-c1.receipt.json",
+        "candidate/alloc-r1-dense-sparse-c2.receipt.json",
+        "candidate/alloc-r1-dense-sparse-c3.receipt.json",
+        "candidate/alloc-r1-noncompact-c0.receipt.json",
+        "candidate/alloc-r1-noncompact-c1.receipt.json",
+        "candidate/alloc-r1-noncompact-c2.receipt.json",
+        "candidate/alloc-r1-noncompact-c3.receipt.json",
+        "candidate/alloc-r1-vendor-extension-c0.receipt.json",
+        "candidate/alloc-r1-vendor-extension-c1.receipt.json",
+        "candidate/alloc-r1-vendor-extension-c2.receipt.json",
+        "candidate/alloc-r1-vendor-extension-c3.receipt.json",
+        "candidate/alloc-r2-vendor-extension-c0.receipt.json",
+        "candidate/alloc-r2-vendor-extension-c1.receipt.json",
+        "candidate/alloc-r2-vendor-extension-c2.receipt.json",
+        "candidate/alloc-r2-vendor-extension-c3.receipt.json",
+        "candidate/alloc-r2-noncompact-c0.receipt.json",
+        "candidate/alloc-r2-noncompact-c1.receipt.json",
+        "candidate/alloc-r2-noncompact-c2.receipt.json",
+        "candidate/alloc-r2-noncompact-c3.receipt.json",
+        "candidate/alloc-r2-dense-sparse-c0.receipt.json",
+        "candidate/alloc-r2-dense-sparse-c1.receipt.json",
+        "candidate/alloc-r2-dense-sparse-c2.receipt.json",
+        "candidate/alloc-r2-dense-sparse-c3.receipt.json",
+        "candidate/alloc-r2-medium-c0.receipt.json",
+        "candidate/alloc-r2-medium-c1.receipt.json",
+        "candidate/alloc-r2-medium-c2.receipt.json",
+        "candidate/alloc-r2-medium-c3.receipt.json",
+        "candidate/build-guard-alloc.receipt.json",
+        "candidate/guard-alloc-r1-medium-valid.receipt.json",
+        "candidate/guard-alloc-r1-medium-late-validator.receipt.json",
+        "candidate/guard-alloc-r1-medium-late-raw.receipt.json",
+        "candidate/guard-alloc-r1-dense-sparse-valid.receipt.json",
+        "candidate/guard-alloc-r1-dense-sparse-late-validator.receipt.json",
+        "candidate/guard-alloc-r1-dense-sparse-late-raw.receipt.json",
+        "candidate/guard-alloc-r2-dense-sparse-valid.receipt.json",
+        "candidate/guard-alloc-r2-dense-sparse-late-validator.receipt.json",
+        "candidate/guard-alloc-r2-dense-sparse-late-raw.receipt.json",
+        "candidate/guard-alloc-r2-medium-valid.receipt.json",
+        "candidate/guard-alloc-r2-medium-late-validator.receipt.json",
+        "candidate/guard-alloc-r2-medium-late-raw.receipt.json",
+        "baseline/native-r2-vendor-extension-c0.receipt.json",
+        "baseline/native-r2-vendor-extension-c1.receipt.json",
+        "baseline/native-r2-vendor-extension-c2.receipt.json",
+        "baseline/native-r2-vendor-extension-c3.receipt.json",
+        "baseline/native-r2-noncompact-c0.receipt.json",
+        "baseline/native-r2-noncompact-c1.receipt.json",
+        "baseline/native-r2-noncompact-c2.receipt.json",
+        "baseline/native-r2-noncompact-c3.receipt.json",
+        "baseline/native-r2-dense-sparse-c0.receipt.json",
+        "baseline/native-r2-dense-sparse-c1.receipt.json",
+        "baseline/native-r2-dense-sparse-c2.receipt.json",
+        "baseline/native-r2-dense-sparse-c3.receipt.json",
+        "baseline/native-r2-medium-c0.receipt.json",
+        "baseline/native-r2-medium-c1.receipt.json",
+        "baseline/native-r2-medium-c2.receipt.json",
+        "baseline/native-r2-medium-c3.receipt.json",
+        "baseline/guard-native-r2-dense-sparse-valid.receipt.json",
+        "baseline/guard-native-r2-dense-sparse-late-validator.receipt.json",
+        "baseline/guard-native-r2-dense-sparse-late-raw.receipt.json",
+        "baseline/guard-native-r2-medium-valid.receipt.json",
+        "baseline/guard-native-r2-medium-late-validator.receipt.json",
+        "baseline/guard-native-r2-medium-late-raw.receipt.json",
+        "baseline/cap-r2-256.receipt.json",
+        "baseline/cap-r2-164.receipt.json",
+        "baseline/cap-r2-160.receipt.json",
+        "baseline/cap-r2-2.receipt.json",
+        "baseline/cap-r2-1.receipt.json",
+        "baseline/alloc-r2-vendor-extension-c0.receipt.json",
+        "baseline/alloc-r2-vendor-extension-c1.receipt.json",
+        "baseline/alloc-r2-vendor-extension-c2.receipt.json",
+        "baseline/alloc-r2-vendor-extension-c3.receipt.json",
+        "baseline/alloc-r2-noncompact-c0.receipt.json",
+        "baseline/alloc-r2-noncompact-c1.receipt.json",
+        "baseline/alloc-r2-noncompact-c2.receipt.json",
+        "baseline/alloc-r2-noncompact-c3.receipt.json",
+        "baseline/alloc-r2-dense-sparse-c0.receipt.json",
+        "baseline/alloc-r2-dense-sparse-c1.receipt.json",
+        "baseline/alloc-r2-dense-sparse-c2.receipt.json",
+        "baseline/alloc-r2-dense-sparse-c3.receipt.json",
+        "baseline/alloc-r2-medium-c0.receipt.json",
+        "baseline/alloc-r2-medium-c1.receipt.json",
+        "baseline/alloc-r2-medium-c2.receipt.json",
+        "baseline/alloc-r2-medium-c3.receipt.json",
+        "baseline/guard-alloc-r2-dense-sparse-valid.receipt.json",
+        "baseline/guard-alloc-r2-dense-sparse-late-validator.receipt.json",
+        "baseline/guard-alloc-r2-dense-sparse-late-raw.receipt.json",
+        "baseline/guard-alloc-r2-medium-valid.receipt.json",
+        "baseline/guard-alloc-r2-medium-late-validator.receipt.json",
+        "baseline/guard-alloc-r2-medium-late-raw.receipt.json",
+        "check-attempts/matched-metrics-analysis-01/receipt.json",
+        "check-attempts/matched-guards-analysis-01/receipt.json",
+        "check-attempts/matched-guards-analysis-02/receipt.json",
+        "check-attempts/final-quality-01-quality-tests/receipt.json",
+        "check-attempts/final-quality-01-quality-check/receipt.json",
+        "check-attempts/final-quality-01-quality-clippy/receipt.json",
+        "check-attempts/final-quality-01-quality-rustdoc/receipt.json",
+        "check-attempts/final-quality-01-quality-fmt/receipt.json",
+        "check-attempts/final-quality-01-quality-boundaries/receipt.json",
+        "check-attempts/final-quality-01-quality-guard-clippy/receipt.json",
+        "check-attempts/final-quality-01-quality-guard-fmt/receipt.json",
+        "check-attempts/final-quality-01-quality-cap-clippy/receipt.json",
+        "check-attempts/final-quality-01-quality-claims/receipt.json",
+        "check-attempts/final-quality-01-quality-no-default/receipt.json",
+        "check-attempts/closure-inputs-verify-01/receipt.json",
+        "check-attempts/closure-source-verify-01/receipt.json",
+        "check-attempts/closure-source-verify-02/receipt.json",
+        "check-attempts/final-decision-01/receipt.json",
+        "check-attempts/final-decision-02/receipt.json",
+        "check-attempts/final-decision-03/receipt.json",
+        "check-attempts/closure-quality-verify-01/receipt.json",
+        "check-attempts/closure-quality-verify-02/receipt.json",
+        "check-attempts/closure-quality-verify-03/receipt.json",
+        "check-attempts/final-decision-04/receipt.json",
+        "check-attempts/final-decision-05/receipt.json"
+      ],
+      "status": "pass"
+    },
+    "status": "pass"
+  },
+  "schema": "litchi.xlsx.verification.0552.v1",
+  "scope": "precleanup",
+  "status": "pass"
+}

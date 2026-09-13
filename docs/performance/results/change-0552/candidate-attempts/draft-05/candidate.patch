@@ -1,0 +1,37 @@
+--- a/crates/litchi-xlsx/src/cell_values/source_proof.rs
++++ b/crates/litchi-xlsx/src/cell_values/source_proof.rs
+@@ -857,6 +857,7 @@
+     use litchi_sheet::Cell as Address;
+ 
+     use super::super::validation::worksheet_xml_and_parse_source;
++    use super::{CompactProofBuilder, ElementKind};
+     use crate::raw::worksheet::edit::{
+         Action, rewrite_value_only_with_compact_proof, rewrite_value_only_with_provenance,
+     };
+@@ -868,7 +869,7 @@
+         actions.insert(
+             address,
+             Action::set(crate::cell::Content::from(crate::cell::Value::Number(
+-                crate::cell::Number::from(9),
++                crate::cell::Number::new("9").expect("valid number"),
+             ))),
+         );
+         actions
+@@ -977,7 +978,7 @@
+         actions.insert(
+             Address::at(0, 2).expect("C1"),
+             Action::set(crate::cell::Content::from(crate::cell::Value::Number(
+-                crate::cell::Number::from(8),
++                crate::cell::Number::new("8").expect("valid number"),
+             ))),
+         );
+         actions.insert(Address::at(1, 0).expect("A2"), Action::style(3));
+@@ -1007,7 +1008,7 @@
+         ] {
+             let (store, proof) = worksheet_xml_and_parse_source(&source).expect("source parse");
+             let proof = proof.expect("compact proof");
+-            let mut actions = action(Address::at(0, 1).expect("B1"));
++            let actions = action(Address::at(0, 1).expect("B1"));
+             let compact = rewrite_value_only_with_compact_proof(
+                 &source,
+                 "Sheet1",

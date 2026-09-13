@@ -1,0 +1,46 @@
+{
+  "observed_utc": "2026-09-13T07:59:29.412522+00:00",
+  "compiler_processes": [
+    {
+      "pid": 2944429,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-tokenizer-baseline-20260913"
+    },
+    {
+      "pid": 2944718,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7"
+    },
+    {
+      "pid": 2946094,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_derive-1.0.229"
+    },
+    {
+      "pid": 2946152,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21"
+    },
+    {
+      "pid": 2946166,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/der_derive-0.7.3"
+    },
+    {
+      "pid": 2946167,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-impl-2.0.18"
+    },
+    {
+      "pid": 2946168,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-tokenizer-baseline-20260913"
+    },
+    {
+      "pid": 2946169,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/phf_macros-0.14.0"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

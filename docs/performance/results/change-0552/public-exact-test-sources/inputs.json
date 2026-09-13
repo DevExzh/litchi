@@ -1,0 +1,10 @@
+{
+  "frozen_utc": "2026-09-13T07:24:45.249275+00:00",
+  "scope": "Explicit public whole-worksheet oracle; validate restored baseline first, then candidate.",
+  "source_hashes": {
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs": "e32fac36e09f17c3d2192d123ca78905f4be66c045d9e23d62342c4eeefd1cde",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs": "18c3e9578a2017cf2d223506aee3c8a548937442efa01ad54b40d7d2d4d5319a"
+  },
+  "parent_before_sha256": "b9a7ba857b832dfa8bec6af94308838e99e349cbb31584622e319f9e04bd64cf",
+  "patch_sha256": "359ca826c4f57eda8584910f927c32e5e52867d57a8b6df6c98ea7e1ffba6457"
+}

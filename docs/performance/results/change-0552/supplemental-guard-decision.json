@@ -1,0 +1,16 @@
+{
+  "schema": "xlsx_0552_supplemental_guard_decision_v1",
+  "status": "skipped",
+  "scope": "Prospective large-tag/large-cell supplementary diagnostic only",
+  "pilot_gates": {
+    "main": false,
+    "guard": false,
+    "cap": false
+  },
+  "metrics_analysis_sha256": "c0dd9f49b7006c5d426211624e36217fc680af1ad37d1febaa5d82a6f10c2a3c",
+  "guards_analysis_sha256": "b59becde85b91b30303a765441450c073ab2167feebb7427423f0509cde002bb",
+  "design_sha256": "215c85e3fde09ac69d6aca6e4cfaac1945fdc4722ef156e13693b11e18047f11",
+  "proof_review_sha256": "42d794d016d14be3019c6fab7dc9f090d3b46e31718c3dca9e8747fff2aaa150",
+  "reason": "The representative pilot fails mandatory gates and baseline production is restored. The conditional supplementary harness was not implemented or measured. No large-tag/cell performance claim is made.",
+  "measurements": []
+}

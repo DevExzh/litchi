@@ -1,0 +1,10 @@
+{
+  "schema": "xlsx_0552_verifier_attempt_v1",
+  "created_utc": "docs/performance/results/change-0552/verify.py",
+  "source_path": "docs/performance/results/change-0552/verify.py",
+  "copy_path": "docs/performance/results/change-0552/verifier-attempts/initial/verify.py",
+  "source_sha256": "2f921cd6ba42f4fadf1e703c5c9c160d50a3b1431edcf70b5cbb4f4e7838f2bf",
+  "copy_sha256": "2f921cd6ba42f4fadf1e703c5c9c160d50a3b1431edcf70b5cbb4f4e7838f2bf",
+  "reason": "Exact pre-edit verifier retained before custody corrections."
+}
+

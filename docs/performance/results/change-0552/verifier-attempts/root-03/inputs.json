@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:39:28.905200+00:00",
+  "reason": "Validate quality inputs_path in the repository-relative convention actually emitted by the frozen quality runner; keep exact path/hash binding.",
+  "before_sha256": "d52b90c76636637a0929c66c360893ccd9321fd5b1035212021f7b8a36a97d60",
+  "after_sha256": "0cf865579cf19e4d7c5ed17b72f1c65588a285a1599e544c49278df281d19c1c",
+  "patch_sha256": "c885e0b2fc320cb4fa0d288be702107749ef11f0c6f2250b71d4c682053ec9d2",
+  "failed_receipt_sha256": "5bb73e70549bb810ab8f6bf936a5e3bdba5590ab77ee179e435f0f28bf085495"
+}

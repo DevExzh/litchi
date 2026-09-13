@@ -1,0 +1,34 @@
+--- a/crates/litchi-xlsx/src/cell_values/source_proof.rs
++++ b/crates/litchi-xlsx/src/cell_values/source_proof.rs
+@@ -761,7 +761,7 @@
+                 }
+             },
+             SourceHandoff::CellEnd { address, span } => {
+-                let Some(mut cell) = self.cell.take() else {
++                let Some(cell) = self.cell.take() else {
+                     self.disable();
+                     return;
+                 };
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -479,7 +479,7 @@
+             empty: true,
+         });
+     }
+-    let mut close_start = tag_end;
++    let close_start;
+     loop {
+         let event_start = compact_absolute_offset(
+             start,
+@@ -511,8 +511,9 @@
+                     .checked_add(1)
+                     .ok_or_else(|| invalid("compact worksheet cell depth overflow"))?;
+             },
+-            Event::Empty(element) if depth == 1 => {
+-                if matches!(element.name().local_name().as_ref(), b"f" | b"v" | b"is") {
++            Event::Empty(element) => {
++                if depth == 1 && matches!(element.name().local_name().as_ref(), b"f" | b"v" | b"is")
++                {
+                     if primary.is_some() {
+                         return Err(invalid("compact worksheet cell has duplicate primary"));
+                     }

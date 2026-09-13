@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:33:06.317259+00:00",
+  "reason": "Exact public oracle was added after the first five public guards. Bind its parent-before hash to that validated augmented manifest rather than the earlier capture baseline.",
+  "before_sha256": "83ebf778f8b2eb12faadc59732263ee8f5dbe4a98838da209a3a54096021fb51",
+  "after_sha256": "82663d28208ea479ba5fdea88840503984f77a4f865560d94647061632e847da",
+  "patch_sha256": "76626a3db780ba09baf7b59d8dec67a345e62e7b6ebaf4f2dab5a8df7f6e6f20",
+  "failed_receipt_sha256": "3fd8503bd2afcfad4e728038e85627a9f30c51d07fe76059c0992287f329c6a7"
+}

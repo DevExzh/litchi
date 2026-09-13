@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-13T08:47:18.930609+00:00",
+  "reason": "Validate canonical decision structured final_source against the independently verified exact final manifest, patch, public children and candidate identity instead of expecting the obsolete string field.",
+  "before_sha256": "96a997434d0dda38f2c1f18e44ac04f73007175005425de4b65cc75a7e74039a",
+  "after_sha256": "fb8d1f68ce9f74367b744c0982115737ea1c243c7db02f9cab5507c4fc9e53f5",
+  "patch_sha256": "67af47c39a4c51c2897c863b76e3547a2095dcae7e549f99c28ad8b5fdb5fba2",
+  "failed_result_sha256": "acf599b1a0ae5d4afd3959e816ef680d48de7967200b82b30a37ecdd8e482fa4"
+}

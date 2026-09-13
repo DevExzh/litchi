@@ -1,0 +1,10 @@
+{
+  "frozen_utc": "2026-09-13T06:12:52.262861+00:00",
+  "scope": "Workspace-lock custody before first workspace build; per-child lock checks on later pipelines; quality commands frozen before use. Original capture inputs unchanged.",
+  "files": {
+    "docs/performance/results/change-0552/guarded_capture.py": "1e44a1a95d23622b4b3346caef20a6987f620cdbe58b3bb1e827418e71aa7092",
+    "docs/performance/results/change-0552/workspace-lock.json": "17e133cfcf68045ae0a507d3dba157496ad20f6388092bd81ee285c9d1d9a455",
+    "docs/performance/results/change-0552/workspace-Cargo.lock": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+    "docs/performance/results/change-0552/quality-plan.json": "72a806b08f5169113d701882543c3a39a2cbe6f829a8e49db0162c9b507d8f89"
+  }
+}

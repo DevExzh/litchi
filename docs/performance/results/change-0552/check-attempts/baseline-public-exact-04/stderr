@@ -1,0 +1,22 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error[E0382]: borrow of moved value: `editor`
+   --> crates/litchi-xlsx/tests/source_backed_cell_values/public_exact_output.rs:81:24
+    |
+ 79 |     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    |         ------ move occurs because `editor` has type `litchi_xlsx::cell_values::SourceBackedEditor`, which does not implement the `Copy` trait
+ 80 |     for _ in 0..2 {
+    |     ------------- inside of this loop
+ 81 |         let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
+    |                        ^^^^^^ value borrowed here after move
+...
+ 87 |             .publish_multi_commit_to_stream(&mut published, &commit)
+    |              ------------------------------------------------------- `editor` moved due to this method call, in previous iteration of loop
+    |
+note: `litchi_xlsx::cell_values::SourceBackedEditor::publish_multi_commit_to_stream` takes ownership of the receiver `self`, which moves `editor`
+   --> crates/litchi-xlsx/src/cell_values/source.rs:601:9
+    |
+601 |         self,
+    |         ^^^^
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-xlsx` (test "source_backed_cell_values") due to 1 previous error

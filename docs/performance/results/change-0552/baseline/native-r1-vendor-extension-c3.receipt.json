@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0552-target/retained/baseline/normal",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--samples",
+    "200",
+    "--warmup",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/baseline/native-r1-vendor-extension-c3.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0552/baseline/native-r1-vendor-extension-c3.catalog.json"
+  ],
+  "start_utc": "2026-09-13T06:15:00.338991+00:00",
+  "end_utc": "2026-09-13T06:15:13.236895+00:00",
+  "seconds": 12.897924393997528,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": "411f9b902f01f1128baffea2a3739010e9d06a09983598b0747365a74fff5c49",
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+  "plan_sha256": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r1-vendor-extension-c3.catalog.json": "230e99da932ad3bf9767558e31bfa43b2c4ee40a7ba74e1fc52e893bd93a29fe",
+    "native-r1-vendor-extension-c3.host.json": "b55a3cbc734ae47ec49e330c64133ae54876aebbaea198afe8960127ec100b67",
+    "native-r1-vendor-extension-c3.json": "66a5226560fb63c2e1d9b674f5a0bad0335acdfa6556371a3d049167ac616dd0",
+    "native-r1-vendor-extension-c3.stderr": "57a154dd1ee6f0b4f12e77039350af93f554130cabc39bc34c656c1ef7f7adcf",
+    "native-r1-vendor-extension-c3.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

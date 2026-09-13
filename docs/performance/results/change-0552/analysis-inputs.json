@@ -1,0 +1,15 @@
+{
+  "schema": "xlsx_0552_analysis_inputs_v1",
+  "frozen_utc": "2026-09-13T06:54:09.273840+00:00",
+  "scope": "Main workflow and guard/cap analyzers frozen before candidate capture; profile and final decision evidence remain conditional/pending.",
+  "files": {
+    "docs/performance/results/change-0552/analyze_metrics.py": "af6dc11cd31160ac267f695d76ff2422b19cce80a5376b8e704fdff9addca5cc",
+    "docs/performance/results/change-0552/analyze_guards.py": "c30dbe68e0d0db4ff15ab214f75eeda0a4e5d3ca042f646c6e46d79f5d7bf817",
+    "docs/performance/results/change-0552/run.py": "2dac95818ffdc24ced07a87bc8603e490ea1b62b976bfb36e7dcb0ec95a46709",
+    "docs/performance/results/change-0552/capture.py": "21b0153923e87a331906552457a5f77bb444686d4ce9c9c99e3efcb2dbe5d2c1",
+    "docs/performance/results/change-0552/plan.json": "0fa7066ad4649b07d0064574014215a0372ec0b98ab5eec3466635085b84eb42",
+    "docs/performance/results/change-0546/integration/analyze.py": "c380298762c64f104c4aaaf1bf53fae7e613bc7aa9148fe1d6f1da19b2eb9614",
+    "docs/performance/results/change-0521/analyze.py": "322357892b496ef09ca01aa69bb5a8708182a9a771a4541e3b21a6885a7616ad",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  }
+}

@@ -1,0 +1,11 @@
+--- a/docs/performance/results/change-0552/verify.py
++++ b/docs/performance/results/change-0552/verify.py
+@@ -1124,7 +1124,7 @@
+ 
+ 
+ def stage_manifest(stage: str) -> tuple[dict[str, str], str]:
+-    require(stage in STAGES, f"unknown stage {stage}")
++    require(stage in (*STAGES, "final"), f"unknown stage {stage}")
+     path = HERE / stage / "source-manifest.json"
+     manifest = source_manifest(path, f"{stage}/source-manifest.json")
+     require("tools/perf-baseline/src/xlsx_planning_guard.rs" in manifest,
