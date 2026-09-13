@@ -1,0 +1,16 @@
+{
+  "completed_utc": "2026-09-13T02:09:22.068299+00:00",
+  "full_test_count": 1306,
+  "receipts": {
+    "final-quality-boundaries.receipt.json": "75c87b487562cc06e48ad8d97763e6aeb1aecb1836968620569beb912b14a1ad",
+    "final-quality-cap-clippy.receipt.json": "5d7b20337ced827df8efdc3a4f08cc3b84dfcb708c169f7275f19ce66d68e459",
+    "final-quality-check.receipt.json": "f66f8a59afcd52aabefd3f19ff7b8291329eaebf37d37d6f5403ba5a632ef922",
+    "final-quality-clippy.receipt.json": "d337fe535cec9cb636a0b9b32e289c2b21410addb8a3b006c9504a2938fb0aba",
+    "final-quality-fmt.receipt.json": "8285d5ef77e91b52b93eb2daa898ede1811f303dcf248b822251c92861517104",
+    "final-quality-guard-clippy.receipt.json": "7b2b3d03c30ff16b574c9b1cc42acc255f077ea00e68d5855e2906148807c701",
+    "final-quality-guard-fmt.receipt.json": "2eab6b6ce4a42df6d915943c4e7314bdbe64776bdc054fb57498957f4c227ef6",
+    "final-quality-rustdoc.receipt.json": "db790b2a70742f31a5318ac47fe12527c589ab6463eadf6a7684b5d7f58dfed6",
+    "final-quality-tests.receipt.json": "43c2f8c46501c94ca7861bba9cd4e390c9ff70c5a60e071045ddaa3e7962b8a5"
+  },
+  "status": "pass"
+}

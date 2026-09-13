@@ -1,0 +1,90 @@
+diff --git a/crates/litchi-xlsx/examples/perf_cap_boundary.rs b/crates/litchi-xlsx/examples/perf_cap_boundary.rs
+index acbfaf1cb..75e894464 100644
+--- a/crates/litchi-xlsx/examples/perf_cap_boundary.rs
++++ b/crates/litchi-xlsx/examples/perf_cap_boundary.rs
+@@ -1,4 +1,4 @@
+-//! Supplemental valid-source event-cap guard for the 0544 XLSX campaign.
++//! Valid-source event-cap and sparse-source planning guards for XLSX.
+ //!
+ //! This retained benchmark example builds against the frozen baseline and
+ //! candidate source manifests.  It deliberately uses only public
+@@ -12,6 +12,11 @@
+ //! single-worksheet, stored-ZIP package with an ASCII/UTF-8 marker-free source
+ //! worksheet and a dense numeric `N x N` grid.
+ //!
++//! Sizes 1 and 2 append a one-MiB XML comment after the numeric grid. These
++//! valid sparse controls straddle the bulk counter's sixteen-marker prefix:
++//! size 1 stays in delimiter skipping; size 2 reaches the bulk-count path.
++//! The comment adds exactly one XML event and must survive exact no-op output.
++//!
+ //! Only `edit_sheets` is timed.  The source/editor and selector are prepared
+ //! before the clock, and the returned transaction remains alive until the
+ //! clock stops.  Cell inspection, empty commit, source-byte comparison, and
+@@ -47,6 +52,7 @@ const WORKSHEET_PART: &str = "xl/worksheets/sheet1.xml";
+ const SHARED_SOURCE_BYTES: usize = 8 * 1024 * 1024;
+ const SHARED_EVENT_CAP: usize = 131_072;
+ const RAW_EVENT_CAP: usize = 1_000_000;
++const SPARSE_COMMENT_BYTES: usize = 1024 * 1024;
+ const MAX_WARMUP: usize = 1_000;
+ const MAX_SAMPLES: usize = 1_000;
+ 
+@@ -65,12 +71,12 @@ struct Arguments {
+ }
+ 
+ fn usage() -> &'static str {
+-    "usage: perf_cap_boundary --size <160|164|256> [--warmup N] [--samples N] [--json PATH] [--fixture-out PATH]"
++    "usage: perf_cap_boundary --size <1|2|160|164|256> [--warmup N] [--samples N] [--json PATH] [--fixture-out PATH]"
+ }
+ 
+ fn parse_size(value: &str) -> AnyResult<usize> {
+     match value {
+-        "160" | "164" | "256" => Ok(value.parse()?),
++        "1" | "2" | "160" | "164" | "256" => Ok(value.parse()?),
+         other => Err(format!("unknown cap-boundary size '{other}'").into()),
+     }
+ }
+@@ -167,7 +173,7 @@ fn expected_event_count(size: usize) -> AnyResult<usize> {
+     cells
+         .checked_mul(5)
+         .and_then(|count| count.checked_add(size.checked_mul(2)?))
+-        .and_then(|count| count.checked_add(6))
++        .and_then(|count| count.checked_add(6 + usize::from(size <= 2)))
+         .ok_or_else(|| "cap-boundary event count overflow".into())
+ }
+ 
+@@ -204,7 +210,15 @@ fn worksheet_xml(size: usize) -> AnyResult<Vec<u8>> {
+         }
+         xml.push_str("</row>");
+     }
+-    xml.push_str("</sheetData></worksheet>");
++    xml.push_str("</sheetData>");
++    if size <= 2 {
++        xml.try_reserve(SPARSE_COMMENT_BYTES + 7)
++            .map_err(|source| format!("sparse comment reservation failed: {source}"))?;
++        xml.push_str("<!--");
++        xml.extend(std::iter::repeat_n('a', SPARSE_COMMENT_BYTES));
++        xml.push_str("-->");
++    }
++    xml.push_str("</worksheet>");
+     let bytes = xml.into_bytes();
+     if bytes.len() >= SHARED_SOURCE_BYTES {
+         return Err(format!(
+@@ -410,7 +424,8 @@ fn report(
+         "last_cell": fixture.last_cell,
+         "event_count": fixture.event_count,
+         "expected_event_count": fixture.expected_event_count,
+-        "event_count_formula": "5*N*N+2*N+6 (including EOF)",
++        "event_count_formula": "5*N*N+2*N+6+I(N<=2) (including EOF)",
++        "comment_bytes": if fixture.size <= 2 { SPARSE_COMMENT_BYTES } else { 0 },
+         "shared_provisional_event_cap": SHARED_EVENT_CAP,
+         "ordinary_parser_event_cap": RAW_EVENT_CAP,
+         "event_cap_relation": relation,
+@@ -424,7 +439,7 @@ fn report(
+             "rows": fixture.size,
+             "columns": fixture.size,
+             "format": "OOXML/XLSX",
+-            "fixture_kind": "single_worksheet_dense_numeric_grid",
++            "fixture_kind": if fixture.size <= 2 { "single_worksheet_sparse_numeric_with_comment" } else { "single_worksheet_dense_numeric_grid" },
+             "generator": "litchi-xlsx-cap-boundary-stored-grid-v1",
+             "worksheet_member": WORKSHEET_PART,
+             "compression": "stored",

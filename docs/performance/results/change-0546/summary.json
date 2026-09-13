@@ -1,0 +1,730 @@
+{
+  "scope": "Isolated hot scanner only. All raw samples retained; nearest-rank tails, median and arithmetic mean. Two process repeats describe variability, not a formal population confidence interval. No workflow or memory speedup claim.",
+  "rows": [
+    {
+      "fixture": "96",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 287451.0,
+        "mean": 290852.14,
+        "p95": 301831,
+        "p99": 304151
+      },
+      "counted_ns": {
+        "p50": 153170.5,
+        "mean": 154972.8,
+        "p95": 163821,
+        "p99": 169311
+      },
+      "change_percent": {
+        "p50": -46.714222597938424,
+        "mean": -46.717668984660044,
+        "p95": -45.72426291534004,
+        "p99": -44.33324236974398
+      }
+    },
+    {
+      "fixture": "96",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 287001.0,
+        "mean": 290462.04,
+        "p95": 301021,
+        "p99": 303421
+      },
+      "counted_ns": {
+        "p50": 153696.0,
+        "mean": 155619.81,
+        "p95": 166021,
+        "p99": 169381
+      },
+      "change_percent": {
+        "p50": -46.44757335340295,
+        "mean": -46.42335707619487,
+        "p95": -44.84736945262955,
+        "p99": -44.176243569166274
+      }
+    },
+    {
+      "fixture": "128",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 516627.5,
+        "mean": 517137.63,
+        "p95": 530782,
+        "p99": 536292
+      },
+      "counted_ns": {
+        "p50": 273676.0,
+        "mean": 277617.99,
+        "p95": 291651,
+        "p99": 294231
+      },
+      "change_percent": {
+        "p50": -47.02643587497762,
+        "mean": -46.316420640284875,
+        "p95": -45.0525827929357,
+        "p99": -45.1360452887606
+      }
+    },
+    {
+      "fixture": "128",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 518637.0,
+        "mean": 520213.24,
+        "p95": 535282,
+        "p99": 537462
+      },
+      "counted_ns": {
+        "p50": 271861.0,
+        "mean": 275903.78,
+        "p95": 291381,
+        "p99": 294881
+      },
+      "change_percent": {
+        "p50": -47.58164188054458,
+        "mean": -46.963329883722295,
+        "p95": -45.56495454732272,
+        "p99": -45.13453974420517
+      }
+    },
+    {
+      "fixture": "160",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 807958.5,
+        "mean": 810205.37,
+        "p95": 830393,
+        "p99": 839323
+      },
+      "counted_ns": {
+        "p50": 430366.5,
+        "mean": 433150.79,
+        "p95": 451122,
+        "p99": 454282
+      },
+      "change_percent": {
+        "p50": -46.734083495625086,
+        "mean": -46.53814871654085,
+        "p95": -45.67367499485183,
+        "p99": -45.875187502308414
+      }
+    },
+    {
+      "fixture": "160",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 809248.5,
+        "mean": 812603.98,
+        "p95": 840203,
+        "p99": 854343
+      },
+      "counted_ns": {
+        "p50": 430397.0,
+        "mean": 432951.89,
+        "p95": 452002,
+        "p99": 454762
+      },
+      "change_percent": {
+        "p50": -46.81522424817594,
+        "mean": -46.72043201166698,
+        "p95": -46.203238979151465,
+        "p99": -46.770559365500745
+      }
+    },
+    {
+      "fixture": "164",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 788588.0,
+        "mean": 791454.19,
+        "p95": 816743,
+        "p99": 830294
+      },
+      "counted_ns": {
+        "p50": 388146.0,
+        "mean": 395667.34,
+        "p95": 414212,
+        "p99": 416792
+      },
+      "change_percent": {
+        "p50": -50.77962129781331,
+        "mean": -50.00755002636349,
+        "p95": -49.284903574318975,
+        "p99": -49.801877407279825
+      }
+    },
+    {
+      "fixture": "164",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 786968.0,
+        "mean": 790699.59,
+        "p95": 822213,
+        "p99": 833254
+      },
+      "counted_ns": {
+        "p50": 387297.0,
+        "mean": 394828.85,
+        "p95": 413732,
+        "p99": 416242
+      },
+      "change_percent": {
+        "p50": -50.786181903203186,
+        "mean": -50.06588406097441,
+        "p95": -49.68067885085738,
+        "p99": -50.046204398658745
+      }
+    },
+    {
+      "fixture": "256",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 514707.0,
+        "mean": 518445.13,
+        "p95": 545812,
+        "p99": 549722
+      },
+      "counted_ns": {
+        "p50": 31690.0,
+        "mean": 32003.22,
+        "p95": 32000,
+        "p99": 39790
+      },
+      "change_percent": {
+        "p50": -93.84309908355628,
+        "mean": -93.82707674387837,
+        "p95": -94.1371754376965,
+        "p99": -92.76179596232276
+      }
+    },
+    {
+      "fixture": "256",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 512352.0,
+        "mean": 517458.93,
+        "p95": 544262,
+        "p99": 551552
+      },
+      "counted_ns": {
+        "p50": 31580.0,
+        "mean": 31833.73,
+        "p95": 31940,
+        "p99": 38650
+      },
+      "change_percent": {
+        "p50": -93.83626881518956,
+        "mean": -93.84806635765277,
+        "p95": -94.13150284238105,
+        "p99": -92.99250116036202
+      }
+    },
+    {
+      "fixture": "sparse",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 16160.0,
+        "mean": 16358.66,
+        "p95": 16340,
+        "p99": 25320
+      },
+      "counted_ns": {
+        "p50": 16100.0,
+        "mean": 16219.46,
+        "p95": 16250,
+        "p99": 16810
+      },
+      "change_percent": {
+        "p50": -0.3712871287128716,
+        "mean": -0.850925442548478,
+        "p95": -0.550795593635256,
+        "p99": -33.60979462875198
+      }
+    },
+    {
+      "fixture": "sparse",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 16150.0,
+        "mean": 16460.56,
+        "p95": 17370,
+        "p99": 24920
+      },
+      "counted_ns": {
+        "p50": 16270.0,
+        "mean": 16474.67,
+        "p95": 16771,
+        "p99": 24280
+      },
+      "change_percent": {
+        "p50": 0.7430340557275539,
+        "mean": 0.08572004840659009,
+        "p95": -3.4484743811168728,
+        "p99": -2.5682182985553803
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 554867.0,
+        "mean": 553456.65,
+        "p95": 562292,
+        "p99": 563942
+      },
+      "counted_ns": {
+        "p50": 36070.5,
+        "mean": 36428.44,
+        "p95": 36800,
+        "p99": 44180
+      },
+      "change_percent": {
+        "p50": -93.49925297413616,
+        "mean": -93.41801385889934,
+        "p95": -93.45535771449708,
+        "p99": -92.16586102826177
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 555292.5,
+        "mean": 552914.07,
+        "p95": 560333,
+        "p99": 561252
+      },
+      "counted_ns": {
+        "p50": 36435.5,
+        "mean": 36904.34,
+        "p95": 37250,
+        "p99": 45250
+      },
+      "change_percent": {
+        "p50": -93.43850313123264,
+        "mean": -93.32548365065118,
+        "p95": -93.35216737190206,
+        "p99": -91.9376679281321
+      }
+    },
+    {
+      "fixture": "clustered",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 16200.0,
+        "mean": 16490.57,
+        "p95": 16380,
+        "p99": 26060
+      },
+      "counted_ns": {
+        "p50": 44390.0,
+        "mean": 44763.88,
+        "p95": 45190,
+        "p99": 52340
+      },
+      "change_percent": {
+        "p50": 174.01234567901236,
+        "mean": 171.45138100138442,
+        "p95": 175.88522588522588,
+        "p99": 100.84420567920182
+      }
+    },
+    {
+      "fixture": "clustered",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 16140.0,
+        "mean": 16376.66,
+        "p95": 16830,
+        "p99": 24820
+      },
+      "counted_ns": {
+        "p50": 44320.0,
+        "mean": 44717.77,
+        "p95": 46230,
+        "p99": 52740
+      },
+      "change_percent": {
+        "p50": 174.5972738537794,
+        "mean": 173.05793733276502,
+        "p95": 174.68805704099825,
+        "p99": 112.48992747784045
+      }
+    },
+    {
+      "fixture": "references",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 386466.0,
+        "mean": 390847.83,
+        "p95": 403401,
+        "p99": 405102
+      },
+      "counted_ns": {
+        "p50": 208471.0,
+        "mean": 210822.23,
+        "p95": 222791,
+        "p99": 227691
+      },
+      "change_percent": {
+        "p50": -46.05709169758788,
+        "mean": -46.060278753498515,
+        "p95": -44.771827536372,
+        "p99": -43.794155546010636
+      }
+    },
+    {
+      "fixture": "references",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 386106.5,
+        "mean": 390167.62,
+        "p95": 402822,
+        "p99": 405312
+      },
+      "counted_ns": {
+        "p50": 207945.5,
+        "mean": 210173.02,
+        "p95": 221401,
+        "p99": 223471
+      },
+      "change_percent": {
+        "p50": -46.14296832609656,
+        "mean": -46.13263396895929,
+        "p95": -45.03751036437931,
+        "p99": -44.86445010263698
+      }
+    },
+    {
+      "fixture": "text-markers",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 386772.0,
+        "mean": 389428.43,
+        "p95": 397542,
+        "p99": 399891
+      },
+      "counted_ns": {
+        "p50": 400836.5,
+        "mean": 402182.28,
+        "p95": 408682,
+        "p99": 411372
+      },
+      "change_percent": {
+        "p50": 3.6363800895618192,
+        "mean": 3.2750176970900657,
+        "p95": 2.8022196396858767,
+        "p99": 2.8710323563170936
+      }
+    },
+    {
+      "fixture": "text-markers",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 389266.0,
+        "mean": 392064.73,
+        "p95": 400412,
+        "p99": 405312
+      },
+      "counted_ns": {
+        "p50": 399046.5,
+        "mean": 401273.18,
+        "p95": 407952,
+        "p99": 409332
+      },
+      "change_percent": {
+        "p50": 2.5125492593753407,
+        "mean": 2.348706551594182,
+        "p95": 1.8830604477388269,
+        "p99": 0.9918285172903829
+      }
+    }
+  ],
+  "drift": [
+    {
+      "fixture": "96",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.1565484204264389,
+        "mean": -0.13412313211793592,
+        "p95": -0.268362096669994,
+        "p99": -0.24001236228057277
+      }
+    },
+    {
+      "fixture": "96",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.34308172918413593,
+        "mean": 0.4174990708046833,
+        "p95": 1.3429291726945847,
+        "p99": 0.04134403553224253
+      }
+    },
+    {
+      "fixture": "128",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.38896496992513185,
+        "mean": 0.5947372269157869,
+        "p95": 0.8478056904718034,
+        "p99": 0.21816473115392476
+      }
+    },
+    {
+      "fixture": "128",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.6631929727122565,
+        "mean": -0.6174707914281652,
+        "p95": -0.0925764012466912,
+        "p99": 0.22091485941317934
+      }
+    },
+    {
+      "fixture": "160",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.15966166579099994,
+        "mean": 0.29604962998455164,
+        "p95": 1.1813683400510255,
+        "p99": 1.7895375201203878
+      }
+    },
+    {
+      "fixture": "160",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.007086982839044076,
+        "mean": -0.04591934370014039,
+        "p95": 0.19506918305913779,
+        "p99": 0.10566124125543919
+      }
+    },
+    {
+      "fixture": "164",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.20543046559166056,
+        "mean": -0.09534348412508775,
+        "p95": 0.6697333188040888,
+        "p99": 0.3565002276302076
+      }
+    },
+    {
+      "fixture": "164",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.21873212657093077,
+        "mean": -0.21191792074626292,
+        "p95": -0.1158826880920838,
+        "p99": -0.13196030633985112
+      }
+    },
+    {
+      "fixture": "256",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.45754186362337856,
+        "mean": -0.19022263744671308,
+        "p95": -0.2839805647365745,
+        "p99": 0.33289553628925717
+      }
+    },
+    {
+      "fixture": "256",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.34711265383401413,
+        "mean": -0.529602958702291,
+        "p95": -0.187499999999996,
+        "p99": -2.8650414677054536
+      }
+    },
+    {
+      "fixture": "sparse",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.061881188118806385,
+        "mean": 0.62291165657824,
+        "p95": 6.303549571603417,
+        "p99": -1.579778830963663
+      }
+    },
+    {
+      "fixture": "sparse",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 1.0559006211180222,
+        "mean": 1.5734802515003476,
+        "p95": 3.2061538461538364,
+        "p99": 44.43783462224866
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.07668504344284788,
+        "mean": -0.09803477833359997,
+        "p95": -0.34839549557881266,
+        "p99": -0.4769994077405082
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 1.0119072372160032,
+        "mean": 1.306396870137716,
+        "p95": 1.2228260869565188,
+        "p99": 2.4219103666817565
+      }
+    },
+    {
+      "fixture": "clustered",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.37037037037036535,
+        "mean": -0.6907584152639923,
+        "p95": 2.7472527472527375,
+        "p99": -4.758250191864932
+      }
+    },
+    {
+      "fixture": "clustered",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.15769317413831807,
+        "mean": -0.10300715666291538,
+        "p95": 2.3013941137419724,
+        "p99": 0.7642338555597927
+      }
+    },
+    {
+      "fixture": "references",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.09302241335589212,
+        "mean": -0.17403448293419332,
+        "p95": -0.14352963924234574,
+        "p99": 0.05183879615504594
+      }
+    },
+    {
+      "fixture": "references",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.2520734298775418,
+        "mean": -0.3079419091620572,
+        "p95": -0.6239031199644529,
+        "p99": -1.8533890228423555
+      }
+    },
+    {
+      "fixture": "text-markers",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.6448243409553855,
+        "mean": 0.6769664967706701,
+        "p95": 0.7219362985546152,
+        "p99": 1.355619406288211
+      }
+    },
+    {
+      "fixture": "text-markers",
+      "variant": "counted",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.4465661186044634,
+        "mean": -0.22604178383991425,
+        "p95": -0.17862298804449672,
+        "p99": -0.4959015197923078
+      }
+    }
+  ],
+  "reviews": [
+    {
+      "kind": "drift",
+      "fixture": "sparse",
+      "variant": "baseline",
+      "metric": "p95",
+      "percent": 6.303549571603417,
+      "review": "Repeat variability retained without rerun or sample filtering. Limits precise magnitude and tail claims; does not establish workflow admission."
+    },
+    {
+      "kind": "drift",
+      "fixture": "sparse",
+      "variant": "counted",
+      "metric": "p99",
+      "percent": 44.43783462224866,
+      "review": "Repeat variability retained without rerun or sample filtering. Limits precise magnitude and tail claims; does not establish workflow admission."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 1,
+      "metric": "p50",
+      "percent": 174.01234567901236,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 1,
+      "metric": "mean",
+      "percent": 171.45138100138442,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 1,
+      "metric": "p95",
+      "percent": 175.88522588522588,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 1,
+      "metric": "p99",
+      "percent": 100.84420567920182,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 2,
+      "metric": "p50",
+      "percent": 174.5972738537794,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 2,
+      "metric": "mean",
+      "percent": 173.05793733276502,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 2,
+      "metric": "p95",
+      "percent": 174.68805704099825,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "clustered",
+      "repeat": 2,
+      "metric": "p99",
+      "percent": 112.48992747784045,
+      "review": "Adverse tail retained; cannot infer workflow benefit from scanner median."
+    }
+  ],
+  "decision": "Isolated screening only; integrated admission requires fresh original gates."
+}

@@ -1,0 +1,388 @@
+0000000000023210 <xlsx_scanner_diagnostic::counted::counted>:
+   23210:	55                   	push   %rbp
+   23211:	41 57                	push   %r15
+   23213:	41 56                	push   %r14
+   23215:	41 55                	push   %r13
+   23217:	41 54                	push   %r12
+   23219:	53                   	push   %rbx
+   2321a:	48 81 ec e8 00 00 00 	sub    $0xe8,%rsp
+   23221:	48 89 f3             	mov    %rsi,%rbx
+   23224:	49 89 fe             	mov    %rdi,%r14
+   23227:	41 bc 01 00 00 00    	mov    $0x1,%r12d
+   2322d:	41 bf 01 00 00 00    	mov    $0x1,%r15d
+   23233:	48 85 f6             	test   %rsi,%rsi
+   23236:	74 1c                	je     23254 <xlsx_scanner_diagnostic::counted::counted+0x44>
+   23238:	41 0f b6 06          	movzbl (%r14),%eax
+   2323c:	3c 3c                	cmp    $0x3c,%al
+   2323e:	0f 94 c1             	sete   %cl
+   23241:	3c 26                	cmp    $0x26,%al
+   23243:	0f 94 c0             	sete   %al
+   23246:	08 c8                	or     %cl,%al
+   23248:	0f b6 c0             	movzbl %al,%eax
+   2324b:	41 bf 02 00 00 00    	mov    $0x2,%r15d
+   23251:	49 29 c7             	sub    %rax,%r15
+   23254:	49 8d 2c 1e          	lea    (%r14,%rbx,1),%rbp
+   23258:	4c 8b 2d 49 ab 04 00 	mov    0x4ab49(%rip),%r13        # 6dda8 <_DYNAMIC+0x3c8>
+   2325f:	49 8b 45 00          	mov    0x0(%r13),%rax
+   23263:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23268:	be 26 00 00 00       	mov    $0x26,%esi
+   2326d:	4c 89 f2             	mov    %r14,%rdx
+   23270:	48 89 e9             	mov    %rbp,%rcx
+   23273:	ff d0                	call   *%rax
+   23275:	48 83 f8 01          	cmp    $0x1,%rax
+   23279:	48 89 5c 24 08       	mov    %rbx,0x8(%rsp)
+   2327e:	4c 89 74 24 10       	mov    %r14,0x10(%rsp)
+   23283:	48 89 2c 24          	mov    %rbp,(%rsp)
+   23287:	0f 85 16 04 00 00    	jne    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2328d:	48 89 94 24 e0 00 00 	mov    %rdx,0xe0(%rsp)
+   23294:	00
+   23295:	48 ff c2             	inc    %rdx
+   23298:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2329c:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   232a1:	be 26 00 00 00       	mov    $0x26,%esi
+   232a6:	48 89 94 24 d8 00 00 	mov    %rdx,0xd8(%rsp)
+   232ad:	00
+   232ae:	48 89 e9             	mov    %rbp,%rcx
+   232b1:	ff d0                	call   *%rax
+   232b3:	48 83 f8 01          	cmp    $0x1,%rax
+   232b7:	0f 85 8f 03 00 00    	jne    2364c <xlsx_scanner_diagnostic::counted::counted+0x43c>
+   232bd:	48 89 94 24 d0 00 00 	mov    %rdx,0xd0(%rsp)
+   232c4:	00
+   232c5:	48 ff c2             	inc    %rdx
+   232c8:	49 8b 45 00          	mov    0x0(%r13),%rax
+   232cc:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   232d1:	be 26 00 00 00       	mov    $0x26,%esi
+   232d6:	48 89 94 24 c8 00 00 	mov    %rdx,0xc8(%rsp)
+   232dd:	00
+   232de:	48 89 e9             	mov    %rbp,%rcx
+   232e1:	ff d0                	call   *%rax
+   232e3:	48 83 f8 01          	cmp    $0x1,%rax
+   232e7:	0f 85 64 03 00 00    	jne    23651 <xlsx_scanner_diagnostic::counted::counted+0x441>
+   232ed:	48 89 94 24 c0 00 00 	mov    %rdx,0xc0(%rsp)
+   232f4:	00
+   232f5:	48 ff c2             	inc    %rdx
+   232f8:	49 8b 45 00          	mov    0x0(%r13),%rax
+   232fc:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23301:	be 26 00 00 00       	mov    $0x26,%esi
+   23306:	48 89 94 24 b8 00 00 	mov    %rdx,0xb8(%rsp)
+   2330d:	00
+   2330e:	48 89 e9             	mov    %rbp,%rcx
+   23311:	ff d0                	call   *%rax
+   23313:	48 83 f8 01          	cmp    $0x1,%rax
+   23317:	0f 85 3a 03 00 00    	jne    23657 <xlsx_scanner_diagnostic::counted::counted+0x447>
+   2331d:	48 89 94 24 b0 00 00 	mov    %rdx,0xb0(%rsp)
+   23324:	00
+   23325:	48 ff c2             	inc    %rdx
+   23328:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2332c:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23331:	be 26 00 00 00       	mov    $0x26,%esi
+   23336:	48 89 94 24 a8 00 00 	mov    %rdx,0xa8(%rsp)
+   2333d:	00
+   2333e:	48 89 e9             	mov    %rbp,%rcx
+   23341:	ff d0                	call   *%rax
+   23343:	48 83 f8 01          	cmp    $0x1,%rax
+   23347:	0f 85 10 03 00 00    	jne    2365d <xlsx_scanner_diagnostic::counted::counted+0x44d>
+   2334d:	48 89 94 24 a0 00 00 	mov    %rdx,0xa0(%rsp)
+   23354:	00
+   23355:	48 ff c2             	inc    %rdx
+   23358:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2335c:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23361:	be 26 00 00 00       	mov    $0x26,%esi
+   23366:	48 89 94 24 98 00 00 	mov    %rdx,0x98(%rsp)
+   2336d:	00
+   2336e:	48 89 e9             	mov    %rbp,%rcx
+   23371:	ff d0                	call   *%rax
+   23373:	48 83 f8 01          	cmp    $0x1,%rax
+   23377:	0f 85 e6 02 00 00    	jne    23663 <xlsx_scanner_diagnostic::counted::counted+0x453>
+   2337d:	48 89 94 24 90 00 00 	mov    %rdx,0x90(%rsp)
+   23384:	00
+   23385:	48 ff c2             	inc    %rdx
+   23388:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2338c:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23391:	be 26 00 00 00       	mov    $0x26,%esi
+   23396:	48 89 94 24 88 00 00 	mov    %rdx,0x88(%rsp)
+   2339d:	00
+   2339e:	48 89 e9             	mov    %rbp,%rcx
+   233a1:	ff d0                	call   *%rax
+   233a3:	48 83 f8 01          	cmp    $0x1,%rax
+   233a7:	0f 85 bc 02 00 00    	jne    23669 <xlsx_scanner_diagnostic::counted::counted+0x459>
+   233ad:	48 89 94 24 80 00 00 	mov    %rdx,0x80(%rsp)
+   233b4:	00
+   233b5:	48 ff c2             	inc    %rdx
+   233b8:	49 8b 45 00          	mov    0x0(%r13),%rax
+   233bc:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   233c1:	be 26 00 00 00       	mov    $0x26,%esi
+   233c6:	48 89 54 24 78       	mov    %rdx,0x78(%rsp)
+   233cb:	48 89 e9             	mov    %rbp,%rcx
+   233ce:	ff d0                	call   *%rax
+   233d0:	48 83 f8 01          	cmp    $0x1,%rax
+   233d4:	0f 85 95 02 00 00    	jne    2366f <xlsx_scanner_diagnostic::counted::counted+0x45f>
+   233da:	48 89 54 24 70       	mov    %rdx,0x70(%rsp)
+   233df:	48 ff c2             	inc    %rdx
+   233e2:	49 8b 45 00          	mov    0x0(%r13),%rax
+   233e6:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   233eb:	be 26 00 00 00       	mov    $0x26,%esi
+   233f0:	48 89 54 24 68       	mov    %rdx,0x68(%rsp)
+   233f5:	48 89 e9             	mov    %rbp,%rcx
+   233f8:	ff d0                	call   *%rax
+   233fa:	48 83 f8 01          	cmp    $0x1,%rax
+   233fe:	0f 85 71 02 00 00    	jne    23675 <xlsx_scanner_diagnostic::counted::counted+0x465>
+   23404:	48 89 54 24 60       	mov    %rdx,0x60(%rsp)
+   23409:	48 ff c2             	inc    %rdx
+   2340c:	49 8b 45 00          	mov    0x0(%r13),%rax
+   23410:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23415:	be 26 00 00 00       	mov    $0x26,%esi
+   2341a:	48 89 54 24 58       	mov    %rdx,0x58(%rsp)
+   2341f:	48 89 e9             	mov    %rbp,%rcx
+   23422:	ff d0                	call   *%rax
+   23424:	48 83 f8 01          	cmp    $0x1,%rax
+   23428:	0f 85 4d 02 00 00    	jne    2367b <xlsx_scanner_diagnostic::counted::counted+0x46b>
+   2342e:	48 89 54 24 50       	mov    %rdx,0x50(%rsp)
+   23433:	48 ff c2             	inc    %rdx
+   23436:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2343a:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   2343f:	be 26 00 00 00       	mov    $0x26,%esi
+   23444:	48 89 54 24 48       	mov    %rdx,0x48(%rsp)
+   23449:	48 89 e9             	mov    %rbp,%rcx
+   2344c:	ff d0                	call   *%rax
+   2344e:	48 83 f8 01          	cmp    $0x1,%rax
+   23452:	0f 85 29 02 00 00    	jne    23681 <xlsx_scanner_diagnostic::counted::counted+0x471>
+   23458:	49 89 d6             	mov    %rdx,%r14
+   2345b:	48 ff c2             	inc    %rdx
+   2345e:	49 8b 45 00          	mov    0x0(%r13),%rax
+   23462:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23467:	be 26 00 00 00       	mov    $0x26,%esi
+   2346c:	48 89 54 24 40       	mov    %rdx,0x40(%rsp)
+   23471:	48 89 e9             	mov    %rbp,%rcx
+   23474:	ff d0                	call   *%rax
+   23476:	48 83 f8 01          	cmp    $0x1,%rax
+   2347a:	0f 85 07 02 00 00    	jne    23687 <xlsx_scanner_diagnostic::counted::counted+0x477>
+   23480:	48 89 54 24 38       	mov    %rdx,0x38(%rsp)
+   23485:	48 ff c2             	inc    %rdx
+   23488:	49 8b 45 00          	mov    0x0(%r13),%rax
+   2348c:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23491:	be 26 00 00 00       	mov    $0x26,%esi
+   23496:	48 89 54 24 30       	mov    %rdx,0x30(%rsp)
+   2349b:	48 89 e9             	mov    %rbp,%rcx
+   2349e:	ff d0                	call   *%rax
+   234a0:	48 83 f8 01          	cmp    $0x1,%rax
+   234a4:	0f 85 e3 01 00 00    	jne    2368d <xlsx_scanner_diagnostic::counted::counted+0x47d>
+   234aa:	48 89 d3             	mov    %rdx,%rbx
+   234ad:	48 ff c2             	inc    %rdx
+   234b0:	49 8b 45 00          	mov    0x0(%r13),%rax
+   234b4:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   234b9:	be 26 00 00 00       	mov    $0x26,%esi
+   234be:	48 89 54 24 28       	mov    %rdx,0x28(%rsp)
+   234c3:	48 89 e9             	mov    %rbp,%rcx
+   234c6:	ff d0                	call   *%rax
+   234c8:	48 83 f8 01          	cmp    $0x1,%rax
+   234cc:	0f 85 c1 01 00 00    	jne    23693 <xlsx_scanner_diagnostic::counted::counted+0x483>
+   234d2:	48 89 d5             	mov    %rdx,%rbp
+   234d5:	48 ff c2             	inc    %rdx
+   234d8:	49 8b 45 00          	mov    0x0(%r13),%rax
+   234dc:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   234e1:	be 26 00 00 00       	mov    $0x26,%esi
+   234e6:	48 89 54 24 20       	mov    %rdx,0x20(%rsp)
+   234eb:	48 8b 0c 24          	mov    (%rsp),%rcx
+   234ef:	ff d0                	call   *%rax
+   234f1:	48 83 f8 01          	cmp    $0x1,%rax
+   234f5:	0f 85 9e 01 00 00    	jne    23699 <xlsx_scanner_diagnostic::counted::counted+0x489>
+   234fb:	49 89 d5             	mov    %rdx,%r13
+   234fe:	48 ff c2             	inc    %rdx
+   23501:	48 8b 05 a0 a8 04 00 	mov    0x4a8a0(%rip),%rax        # 6dda8 <_DYNAMIC+0x3c8>
+   23508:	48 8b 00             	mov    (%rax),%rax
+   2350b:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   23510:	be 26 00 00 00       	mov    $0x26,%esi
+   23515:	48 89 54 24 18       	mov    %rdx,0x18(%rsp)
+   2351a:	48 8b 0c 24          	mov    (%rsp),%rcx
+   2351e:	ff d0                	call   *%rax
+   23520:	48 83 f8 01          	cmp    $0x1,%rax
+   23524:	0f 85 75 01 00 00    	jne    2369f <xlsx_scanner_diagnostic::counted::counted+0x48f>
+   2352a:	48 8b 8c 24 e0 00 00 	mov    0xe0(%rsp),%rcx
+   23531:	00
+   23532:	48 2b 4c 24 10       	sub    0x10(%rsp),%rcx
+   23537:	48 ff c1             	inc    %rcx
+   2353a:	48 8b 44 24 08       	mov    0x8(%rsp),%rax
+   2353f:	48 29 c8             	sub    %rcx,%rax
+   23542:	48 8b 8c 24 d0 00 00 	mov    0xd0(%rsp),%rcx
+   23549:	00
+   2354a:	48 2b 8c 24 d8 00 00 	sub    0xd8(%rsp),%rcx
+   23551:	00
+   23552:	48 ff c1             	inc    %rcx
+   23555:	48 29 c8             	sub    %rcx,%rax
+   23558:	48 8b 8c 24 c0 00 00 	mov    0xc0(%rsp),%rcx
+   2355f:	00
+   23560:	48 2b 8c 24 c8 00 00 	sub    0xc8(%rsp),%rcx
+   23567:	00
+   23568:	48 ff c1             	inc    %rcx
+   2356b:	48 29 c8             	sub    %rcx,%rax
+   2356e:	48 8b 8c 24 b0 00 00 	mov    0xb0(%rsp),%rcx
+   23575:	00
+   23576:	48 2b 8c 24 b8 00 00 	sub    0xb8(%rsp),%rcx
+   2357d:	00
+   2357e:	48 ff c1             	inc    %rcx
+   23581:	48 29 c8             	sub    %rcx,%rax
+   23584:	48 8b 8c 24 a0 00 00 	mov    0xa0(%rsp),%rcx
+   2358b:	00
+   2358c:	48 2b 8c 24 a8 00 00 	sub    0xa8(%rsp),%rcx
+   23593:	00
+   23594:	48 ff c1             	inc    %rcx
+   23597:	48 29 c8             	sub    %rcx,%rax
+   2359a:	48 8b 8c 24 90 00 00 	mov    0x90(%rsp),%rcx
+   235a1:	00
+   235a2:	48 2b 8c 24 98 00 00 	sub    0x98(%rsp),%rcx
+   235a9:	00
+   235aa:	48 ff c1             	inc    %rcx
+   235ad:	48 29 c8             	sub    %rcx,%rax
+   235b0:	48 8b 8c 24 80 00 00 	mov    0x80(%rsp),%rcx
+   235b7:	00
+   235b8:	48 2b 8c 24 88 00 00 	sub    0x88(%rsp),%rcx
+   235bf:	00
+   235c0:	48 ff c1             	inc    %rcx
+   235c3:	48 29 c8             	sub    %rcx,%rax
+   235c6:	48 8b 4c 24 70       	mov    0x70(%rsp),%rcx
+   235cb:	48 2b 4c 24 78       	sub    0x78(%rsp),%rcx
+   235d0:	48 ff c1             	inc    %rcx
+   235d3:	48 29 c8             	sub    %rcx,%rax
+   235d6:	48 8b 4c 24 60       	mov    0x60(%rsp),%rcx
+   235db:	48 2b 4c 24 68       	sub    0x68(%rsp),%rcx
+   235e0:	48 ff c1             	inc    %rcx
+   235e3:	48 29 c8             	sub    %rcx,%rax
+   235e6:	48 8b 4c 24 50       	mov    0x50(%rsp),%rcx
+   235eb:	48 2b 4c 24 58       	sub    0x58(%rsp),%rcx
+   235f0:	48 ff c1             	inc    %rcx
+   235f3:	48 29 c8             	sub    %rcx,%rax
+   235f6:	4c 2b 74 24 48       	sub    0x48(%rsp),%r14
+   235fb:	49 ff c6             	inc    %r14
+   235fe:	4c 29 f0             	sub    %r14,%rax
+   23601:	48 8b 4c 24 38       	mov    0x38(%rsp),%rcx
+   23606:	48 2b 4c 24 40       	sub    0x40(%rsp),%rcx
+   2360b:	48 ff c1             	inc    %rcx
+   2360e:	48 29 c8             	sub    %rcx,%rax
+   23611:	48 2b 5c 24 30       	sub    0x30(%rsp),%rbx
+   23616:	48 ff c3             	inc    %rbx
+   23619:	48 29 d8             	sub    %rbx,%rax
+   2361c:	48 2b 6c 24 28       	sub    0x28(%rsp),%rbp
+   23621:	48 ff c5             	inc    %rbp
+   23624:	48 29 e8             	sub    %rbp,%rax
+   23627:	4c 2b 6c 24 20       	sub    0x20(%rsp),%r13
+   2362c:	49 ff c5             	inc    %r13
+   2362f:	4c 29 e8             	sub    %r13,%rax
+   23632:	48 89 d3             	mov    %rdx,%rbx
+   23635:	48 2b 5c 24 18       	sub    0x18(%rsp),%rbx
+   2363a:	48 f7 d3             	not    %rbx
+   2363d:	48 01 c3             	add    %rax,%rbx
+   23640:	49 83 cf 10          	or     $0x10,%r15
+   23644:	48 ff c2             	inc    %rdx
+   23647:	49 89 d4             	mov    %rdx,%r12
+   2364a:	eb 59                	jmp    236a5 <xlsx_scanner_diagnostic::counted::counted+0x495>
+   2364c:	49 ff c7             	inc    %r15
+   2364f:	eb 52                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23651:	49 83 c7 02          	add    $0x2,%r15
+   23655:	eb 4c                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23657:	49 83 c7 03          	add    $0x3,%r15
+   2365b:	eb 46                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2365d:	49 83 cf 04          	or     $0x4,%r15
+   23661:	eb 40                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23663:	49 83 c7 05          	add    $0x5,%r15
+   23667:	eb 3a                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23669:	49 83 c7 06          	add    $0x6,%r15
+   2366d:	eb 34                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2366f:	49 83 c7 07          	add    $0x7,%r15
+   23673:	eb 2e                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23675:	49 83 cf 08          	or     $0x8,%r15
+   23679:	eb 28                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2367b:	49 83 c7 09          	add    $0x9,%r15
+   2367f:	eb 22                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23681:	49 83 c7 0a          	add    $0xa,%r15
+   23685:	eb 1c                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23687:	49 83 c7 0b          	add    $0xb,%r15
+   2368b:	eb 16                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2368d:	49 83 cf 0c          	or     $0xc,%r15
+   23691:	eb 10                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23693:	49 83 c7 0d          	add    $0xd,%r15
+   23697:	eb 0a                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   23699:	49 83 c7 0e          	add    $0xe,%r15
+   2369d:	eb 04                	jmp    236a3 <xlsx_scanner_diagnostic::counted::counted+0x493>
+   2369f:	49 83 c7 0f          	add    $0xf,%r15
+   236a3:	31 db                	xor    %ebx,%ebx
+   236a5:	4c 8b 35 64 a7 04 00 	mov    0x4a764(%rip),%r14        # 6de10 <_DYNAMIC+0x430>
+   236ac:	48 85 db             	test   %rbx,%rbx
+   236af:	74 6e                	je     2371f <xlsx_scanner_diagnostic::counted::counted+0x50f>
+   236b1:	48 81 fb 00 00 01 00 	cmp    $0x10000,%rbx
+   236b8:	b8 00 00 01 00       	mov    $0x10000,%eax
+   236bd:	48 0f 42 c3          	cmovb  %rbx,%rax
+   236c1:	4d 8d 2c 04          	lea    (%r12,%rax,1),%r13
+   236c5:	48 29 c3             	sub    %rax,%rbx
+   236c8:	49 8b 06             	mov    (%r14),%rax
+   236cb:	bf 3c 00 00 00       	mov    $0x3c,%edi
+   236d0:	4c 89 e6             	mov    %r12,%rsi
+   236d3:	4c 89 ea             	mov    %r13,%rdx
+   236d6:	ff d0                	call   *%rax
+   236d8:	48 89 c5             	mov    %rax,%rbp
+   236db:	49 8b 06             	mov    (%r14),%rax
+   236de:	bf 26 00 00 00       	mov    $0x26,%edi
+   236e3:	4c 89 e6             	mov    %r12,%rsi
+   236e6:	4c 89 ea             	mov    %r13,%rdx
+   236e9:	ff d0                	call   *%rax
+   236eb:	4c 01 fd             	add    %r15,%rbp
+   236ee:	48 01 c5             	add    %rax,%rbp
+   236f1:	4c 39 fd             	cmp    %r15,%rbp
+   236f4:	0f 92 c0             	setb   %al
+   236f7:	48 81 fd 01 00 02 00 	cmp    $0x20001,%rbp
+   236fe:	0f 93 c1             	setae  %cl
+   23701:	08 c1                	or     %al,%cl
+   23703:	4d 89 ec             	mov    %r13,%r12
+   23706:	49 89 ef             	mov    %rbp,%r15
+   23709:	74 a1                	je     236ac <xlsx_scanner_diagnostic::counted::counted+0x49c>
+   2370b:	31 c0                	xor    %eax,%eax
+   2370d:	48 81 c4 e8 00 00 00 	add    $0xe8,%rsp
+   23714:	5b                   	pop    %rbx
+   23715:	41 5c                	pop    %r12
+   23717:	41 5d                	pop    %r13
+   23719:	41 5e                	pop    %r14
+   2371b:	41 5f                	pop    %r15
+   2371d:	5d                   	pop    %rbp
+   2371e:	c3                   	ret
+   2371f:	48 8b 05 82 a6 04 00 	mov    0x4a682(%rip),%rax        # 6dda8 <_DYNAMIC+0x3c8>
+   23726:	48 8b 00             	mov    (%rax),%rax
+   23729:	bf 3e 00 00 00       	mov    $0x3e,%edi
+   2372e:	be 3b 00 00 00       	mov    $0x3b,%esi
+   23733:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+   23738:	4c 89 f2             	mov    %r14,%rdx
+   2373b:	4c 8b 24 24          	mov    (%rsp),%r12
+   2373f:	4c 89 e1             	mov    %r12,%rcx
+   23742:	ff d0                	call   *%rax
+   23744:	48 89 c1             	mov    %rax,%rcx
+   23747:	b0 01                	mov    $0x1,%al
+   23749:	48 83 f9 01          	cmp    $0x1,%rcx
+   2374d:	75 be                	jne    2370d <xlsx_scanner_diagnostic::counted::counted+0x4fd>
+   2374f:	48 8b 5c 24 08       	mov    0x8(%rsp),%rbx
+   23754:	eb 2c                	jmp    23782 <xlsx_scanner_diagnostic::counted::counted+0x572>
+   23756:	49 ff c7             	inc    %r15
+   23759:	0f 1f 80 00 00 00 00 	nopl   0x0(%rax)
+   23760:	48 ff c2             	inc    %rdx
+   23763:	48 8b 05 3e a6 04 00 	mov    0x4a63e(%rip),%rax        # 6dda8 <_DYNAMIC+0x3c8>
+   2376a:	48 8b 00             	mov    (%rax),%rax
+   2376d:	bf 3e 00 00 00       	mov    $0x3e,%edi
+   23772:	be 3b 00 00 00       	mov    $0x3b,%esi
+   23777:	4c 89 e1             	mov    %r12,%rcx
+   2377a:	ff d0                	call   *%rax
+   2377c:	a8 01                	test   $0x1,%al
+   2377e:	b0 01                	mov    $0x1,%al
+   23780:	74 8b                	je     2370d <xlsx_scanner_diagnostic::counted::counted+0x4fd>
+   23782:	48 89 d0             	mov    %rdx,%rax
+   23785:	4c 29 f0             	sub    %r14,%rax
+   23788:	48 ff c0             	inc    %rax
+   2378b:	48 39 d8             	cmp    %rbx,%rax
+   2378e:	73 d0                	jae    23760 <xlsx_scanner_diagnostic::counted::counted+0x550>
+   23790:	41 0f b6 04 06       	movzbl (%r14,%rax,1),%eax
+   23795:	83 f8 26             	cmp    $0x26,%eax
+   23798:	74 c6                	je     23760 <xlsx_scanner_diagnostic::counted::counted+0x550>
+   2379a:	83 f8 3c             	cmp    $0x3c,%eax
+   2379d:	74 c1                	je     23760 <xlsx_scanner_diagnostic::counted::counted+0x550>
+   2379f:	49 81 ff ff ff 01 00 	cmp    $0x1ffff,%r15
+   237a6:	0f 87 5f ff ff ff    	ja     2370b <xlsx_scanner_diagnostic::counted::counted+0x4fb>
+   237ac:	eb a8                	jmp    23756 <xlsx_scanner_diagnostic::counted::counted+0x546>
+   237ae:	cc                   	int3
+   237af:	cc                   	int3

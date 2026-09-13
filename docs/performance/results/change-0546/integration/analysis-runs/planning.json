@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze_planning.py",
+    "--write",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/planning-profile-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:54:28.884363+00:00",
+  "end_utc": "2026-09-13T01:54:32.106614+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "1fe797ad760e0a2c2abea55c0bdc23e66e32d72a353afd9074d142445007040e",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/cap-boundary/analyze.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/cap-boundary/cap-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:45:53.764512+00:00",
+  "end_utc": "2026-09-13T01:45:53.869605+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "7b8da14e5355aec51f0762c8d1d9f2789ef83d3a7b6b118c3c80c3a6925e5f32",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

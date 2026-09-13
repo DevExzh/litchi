@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/comparison.json"
+  ],
+  "start_utc": "2026-09-13T01:45:51.982429+00:00",
+  "end_utc": "2026-09-13T01:45:53.494220+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "4c957d1c04d66858d37df947349d636b7d2d1c75c245d0ce2723beae96adcdd4",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

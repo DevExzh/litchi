@@ -1,0 +1,8 @@
+    Checking memchr v2.8.3
+    Checking serde_core v1.0.229
+    Checking zmij v1.0.23
+    Checking itoa v1.0.18
+    Checking quick-xml v0.41.0
+    Checking serde_json v1.0.149
+    Checking xlsx-scanner-diagnostic v0.0.0 (/home/zhuhe/litchi-goal-0546-target/scanner)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.00s

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0546/integration/analyze_hardware.py",
+    "--write",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0546/integration/hardware-analysis.json"
+  ],
+  "start_utc": "2026-09-13T01:54:32.106782+00:00",
+  "end_utc": "2026-09-13T01:54:32.291049+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "d16c550df0d2276cb21f59d24a8f57f063cafa645d5e686ba0f223c98745f86f",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

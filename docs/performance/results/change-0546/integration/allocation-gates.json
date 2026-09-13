@@ -1,0 +1,8 @@
+{
+  "status": "frozen-before-first-allocation-capture",
+  "planning_allocated_bytes_max_increase_percent": 1.0,
+  "planning_incremental_peak_live_bytes_max_increase_percent": 1.0,
+  "comparison": "maximum candidate <= 1.01 * minimum baseline in every shape/repeat",
+  "scope": "All 30 sample planning pairs; report allocation calls, bytes, reallocations and incremental peak for all phases. Instrumented timing is not compared.",
+  "created_utc": "2026-09-13T01:26:06.540574+00:00"
+}

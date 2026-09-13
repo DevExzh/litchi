@@ -2930,3 +2930,7 @@ allocations are outside the accounting boundary; no source-worksheet routing,
 OPC verified reader, CRC/size/source fence, full-worksheet streaming,
 latency, RSS, or OOM claim follows. See [Change 0362](changes/0362-xlsx-selected-worksheet-scan.md);
 `performance_claim: none`.
+
+## 0546 — retained XLSX shared traversal
+
+Retained exact-admission shared traversal: planning p50 improves 24.77–26.51%, workflow p50 7.09–10.80%, and planning Ir 21.81–22.36% on both primary shapes/repeats. All frozen gates and nine final quality commands pass (1,306 tests). Same-invalid refusal and clustered scanner regressions remain explicitly reviewed; no universal speedup, RSS, or cold-cache claim is made. Accepted ADR/index hashes remain unchanged. OLE2/OOXML optimization remains active; ODF is deferred until completion and iWork excluded. [Change and limitations](changes/0546-xlsx-shared-traversal-retained.md); [sealed evidence](results/change-0546/README.md).

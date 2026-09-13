@@ -1,0 +1,20 @@
+{
+  "created_utc": "2026-09-13T01:34:13.966267+00:00",
+  "files": {
+    "candidate.patch": "57cb7434e1c0be7c5b6ec3470941c044b048d7d7afce3a6783794e94b43caf64",
+    "applied-candidate.patch": "57cb7434e1c0be7c5b6ec3470941c044b048d7d7afce3a6783794e94b43caf64",
+    "design.md": "44a81e35090788df775790f6de9b2b3fa2128866e04ea1ee58586e7bca8a593f",
+    "source-review.md": "a50d44294bc9cb482c01c376024dd835c8b113d2d4e51db753d81b520eee8701",
+    "candidate-source-hashes.json": "889cbc45e5a74767b029bf70d5577f8deff8678073bb5ce8273b305238b4bba0",
+    "format-adaptation.json": "2c3cebf03965268bd7f58178ce06acf14bcdeebd8bd89b835205c36a1bdda786"
+  },
+  "candidate_sources": {
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs": "c684c62aa523cc202027c733c92ad7cba3c91e456b4705c3f7dd9a7876cb53c2",
+    "crates/litchi-xlsx/src/cell_values/validation.rs": "19b4cb00420f895416debe3879f993ad292b1f79973b285b9cc440d6fae11522",
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs": "cb6203005ecd752f285a55944b64e2133087b5640645ddc3b365dbe33ed02914",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "98a5cf4db40e316cdd58a6904c80bdd11c06f86bd360f0d293651ca521648119",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "6db3c616e0e639b578b9aea2493cf717083f4d06f072a201a787002a9daa2178"
+  },
+  "baseline_manifest_sha256": "8652ec659644cbf5cbc3e6ed46faf71158629c7c79239176cacf1075781667c6",
+  "status": "reviewed and applied after baseline terminal; formatting-only adaptation before candidate build"
+}

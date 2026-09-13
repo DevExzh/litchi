@@ -1,0 +1,9 @@
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.149
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling quick-xml v0.41.0
+   Compiling xlsx-scanner-diagnostic v0.0.0 (/home/zhuhe/litchi-goal-0546-target/scanner)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.40s
+     Running unittests src/main.rs (/home/zhuhe/litchi-goal-0546-target/scanner/target/debug/deps/xlsx_scanner_diagnostic-c4da5c386ff1ddd7)

@@ -1,0 +1,17 @@
+{
+  "utc": "2026-09-13T01:25:10.421625+00:00",
+  "reason": "Nested integration directory requires historical numerical helper to resolve from results, not change-0546. Correct analysis-only paths; preserve originals. Add unchanged 1% allocation gate JSON explicitly already specified by frozen plan. No measured Rust source, runner, capture order or threshold changed. Baseline release build still running; no performance rerun.",
+  "changes": {
+    "analyze.py": {
+      "initial_sha256": "f0a7895be44aa1986c629c84c96d136ccbd9bb22019c1ceccbbabb0ef012b1db",
+      "final_sha256": "c380298762c64f104c4aaaf1bf53fae7e613bc7aa9148fe1d6f1da19b2eb9614",
+      "original": "initial-analyzers/analyze.py"
+    },
+    "analyze_planning.py": {
+      "initial_sha256": "8e05fcfff7c251ee415f39dbd43a24b494c02e655a02e6cf56033e8625942da9",
+      "final_sha256": "212b9e074277d6c1a8d305640aeae1471331f3e7b89e1dd8cee4a2dce2ba3203",
+      "original": "initial-analyzers/analyze_planning.py"
+    }
+  },
+  "allocation_gates_sha256": "c745b37afcbcccdf75d342ed2dd25ccf4404a64d22b5b38ca38fe3e72424c86b"
+}

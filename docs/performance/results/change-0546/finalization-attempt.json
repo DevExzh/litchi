@@ -1,0 +1,5 @@
+{
+  "issue": "Writing a finalization script and precleanup stdout under /tmp failed with disk quota exceeded; zero-byte script did not run. No source or measurement changes. Retried using direct Python and workspace logs.",
+  "staged_whitespace_check": "Initial pathspec docs/performance/*.md also matched immutable nested source-review.md, flagging its frozen trailing blank line. Corrected to Git glob pathspec with no recursive match; original review hash preserved.",
+  "utc": "2026-09-13T02:09:22.068299+00:00"
+}
