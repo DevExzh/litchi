@@ -1,0 +1,114 @@
+{
+  "status": "complete",
+  "owned_paths": {
+    "timestamp_utc": "2026-09-13T08:36:49Z",
+    "paths": [
+      {
+        "path": "/var/tmp/ods-scan-worktree",
+        "exists": true,
+        "size_bytes": 2480912872
+      },
+      {
+        "path": "/var/tmp/ods-scan-target",
+        "exists": true,
+        "size_bytes": 7453205314
+      },
+      {
+        "path": "/var/tmp/ods-scan-baseline-snapshot",
+        "exists": true,
+        "size_bytes": 1171152,
+        "sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+        "exists": true,
+        "size_bytes": 1171152,
+        "sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+        "exists": true,
+        "size_bytes": 1171720,
+        "sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile",
+        "exists": true,
+        "size_bytes": 1172256,
+        "sha256": "e1054973ab6da8068f90728a2714d9cf505bafb8a37de8cd78280d231a224460"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/local-refs-abab/__pycache__",
+        "exists": true,
+        "size_bytes": 7630
+      },
+      {
+        "path": "/var/tmp/ods-perf-test.out",
+        "exists": true,
+        "size_bytes": 565,
+        "sha256": "a8cfe60dfb54d3acbfc5f62c7145d62011b9b98fd3139d5c340eb19423034165"
+      },
+      {
+        "path": "/var/tmp/ods-perf-test.err",
+        "exists": true,
+        "size_bytes": 190,
+        "sha256": "7a5e5d9dfaa4f19743e571447a1dca02556121b805785ec7d7a91caf3150df36"
+      },
+      {
+        "path": "/var/tmp/write_scan_report.py",
+        "exists": true,
+        "size_bytes": 13673,
+        "sha256": "9359a04ce3301347ad11a78059e5d13dd5386391cc271f99219a1011433f7580"
+      }
+    ],
+    "registered_worktrees": "worktree /home/zhuhe/code/litchi\nHEAD 3d84cf64cd3ffbbd809e8677f37c331e93cf0b8c\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-spec-gaps\nHEAD 5fae21a34e163a3300fc0ac4f9c302f5731e3cbb\nbranch refs/heads/feat/spec-gap-implementation\n\nworktree /var/tmp/ods-scan-worktree\nHEAD 5fae21a34e163a3300fc0ac4f9c302f5731e3cbb\ndetached\n\n",
+    "process_references": [
+      "3049766 /bin/bash -c cat > /var/tmp/ods_scan_cleanup.py <<'PY' from __future__ import annotations import hashlib, json, os, subprocess, time from pathlib import Path  E=Path('/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance') P=E/'performance' owned=[     Path('/var/tmp/ods-scan-worktree'),     Path('/var/tmp/ods-scan-target'),     Path('/var/tmp/ods-scan-baseline-snapshot'),     P/'baseline'/'ods-formula-reference-profile',     P/'candidate'/'ods-formula-reference-profile',     P/'annotation-removals'/'ods-formula-reference-profile',     P/'local-refs-abab'/'__pycache__',     Path('/var/tmp/ods-perf-test.out'),     Path('/var/tmp/ods-perf-test.err'),     Path('/var/tmp/write_scan_report.py'), ] receipt=P/'cleanup.json' def sh(args): return subprocess.run(args,check=False,text=True,capture_output=True).stdout  def sha(path):     h=hashlib.sha256()     with path.open('rb') as f:         for b in iter(lambda:f.read(1<<20),b''): h.update(b)     return h.hexdigest()  def size(path):     if not path.exists(): return None     p=subprocess.run(['du','-sb','--',str(path)],check=True,text=True,capture_output=True)     return int(p.stdout.split()[0])  def snapshot():     result=[]     for path in owned:         item={'path':str(path),'exists':path.exists()}         if path.exists():             item['size_bytes']=size(path)             if path.is_file(): item['sha256']=sha(path)         result.append(item)     procs=[]     ps=subprocess.run(['ps','-eo','pid=,args='],check=True,text=True,capture_output=True).stdout.splitlines()     for line in ps:         if any(str(path) in line for path in owned[:6]): procs.append(line.strip())     wt=sh(['git','worktree','list','--porcelain'])     return {'timestamp_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'paths':result,'registered_worktrees':wt,'process_references':procs} pre=snapshot() receipt.write_text(json.dumps({'status':'pending','owned_paths':pre},indent=2)+'\\n') print(json.dumps(pre,indent=2)) PY python3 /var/tmp/ods_scan_cleanup.py > /var/tmp/ods-scan-cleanup-pre.json cat /var/tmp/ods-scan-cleanup-pre.json | sed -n '1,240p'"
+    ]
+  },
+  "completed_at_utc": "2026-09-13T08:38:02Z",
+  "post_delete": [
+    {
+      "path": "/var/tmp/ods-scan-worktree",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-scan-target",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-scan-baseline-snapshot",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/local-refs-abab/__pycache__",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-perf-test.out",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-perf-test.err",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/write_scan_report.py",
+      "exists": false
+    }
+  ],
+  "registered_worktrees_after": "worktree /home/zhuhe/code/litchi\nHEAD 3d84cf64cd3ffbbd809e8677f37c331e93cf0b8c\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-spec-gaps\nHEAD 5fae21a34e163a3300fc0ac4f9c302f5731e3cbb\nbranch refs/heads/feat/spec-gap-implementation\n\n",
+  "process_references_after": []
+}

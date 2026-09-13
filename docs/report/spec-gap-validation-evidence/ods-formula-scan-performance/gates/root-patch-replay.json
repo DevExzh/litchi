@@ -1,0 +1,9 @@
+{
+  "base": "5fae21a34e163a3300fc0ac4f9c302f5731e3cbb",
+  "patch_sha256": "2de5e23fe7772e1458a9857e2762fa63998d4d28e0f31e83089e0b8b1be8cf9c",
+  "source_after": {
+    "crates/litchi-ods/src/codec/formula.rs": "8769d998a9c15299508892bb00ec7a2a52f6368bdb21ce4c0f252ddfdf37e8e6",
+    "crates/litchi-ods/tests/ods_formula_scan_regression.rs": "07f03b83546dd4b705637271d83bfa2449c6e841499d8ae2b7939455ca4a1e15"
+  },
+  "verified": true
+}

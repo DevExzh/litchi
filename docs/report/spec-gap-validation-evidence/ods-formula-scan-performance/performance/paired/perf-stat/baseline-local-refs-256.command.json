@@ -1,0 +1,28 @@
+{
+  "label": "baseline-local-refs-256",
+  "side": "baseline",
+  "lane": "local-refs-256",
+  "case": "parse-local-refs-256",
+  "repeat": 128,
+  "warmups": 3,
+  "iterations": 15,
+  "cpu_pin": "2",
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "binary": "docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+  "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+  "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -- taskset -c 2 docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile --workload parse --case parse-local-refs-256 --warmups 3 --iterations 15 --repeat 128",
+  "status": 0,
+  "started_at": "2026-09-13T08:34:00Z",
+  "finished_at": "2026-09-13T08:34:00Z",
+  "elapsed_seconds": 0.06437897682189941,
+  "stdout": "baseline-local-refs-256.stdout",
+  "stderr": "baseline-local-refs-256.stderr",
+  "stdout_sha256": "2028611e3ca6c1ce5fbae5d56d160ec5cedb409a0f9e34bfe116f46eb5efeede",
+  "stderr_sha256": "e37d6eea9873a03ff73df83e43329a43c39b75a8c8fe2cceab7aeac9e41cec1c"
+}

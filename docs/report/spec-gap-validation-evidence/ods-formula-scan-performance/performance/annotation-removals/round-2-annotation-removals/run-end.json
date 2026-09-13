@@ -1,0 +1,10 @@
+{
+  "label": "round-2-annotation-removals",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile",
+  "binary_sha256": "e1054973ab6da8068f90728a2714d9cf505bafb8a37de8cd78280d231a224460",
+  "status": 0,
+  "row_count": 4,
+  "raw_sha256": "b7ec4b35e8a0be0b21939e9a1f99eaacbd1783d778c06c2d18c86b81411d9c56",
+  "elapsed_seconds": 0.25605010986328125,
+  "finished_at": "2026-09-13T08:20:09Z"
+}

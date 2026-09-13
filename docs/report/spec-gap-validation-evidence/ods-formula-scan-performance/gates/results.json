@@ -1,0 +1,109 @@
+{
+  "head": "5fae21a34e163a3300fc0ac4f9c302f5731e3cbb",
+  "source_before": {
+    "crates/litchi-ods/src/codec/formula.rs": "8769d998a9c15299508892bb00ec7a2a52f6368bdb21ce4c0f252ddfdf37e8e6",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/src/codec/formula/reference.rs": "3707b3176e2714aa794bf28628eb27ec72923e001faaab22a987883b596bd27e",
+    "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961",
+    "crates/litchi-ods/src/model/cell.rs": "85d71d6e4c7986cc9450ded6d26eb41656adcaa1104ac4284b5338b2cf8cdc15",
+    "crates/litchi-ods/tests/ods_formula_references.rs": "b9d9fbd654e00e0dc4919451fc9b46aeedad8669dca0be541f757c1e779680db",
+    "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs": "55acf738b05b86c375e3bf96b31c7c0f6378c1f4554ba9d8842e78b6cd7814bc",
+    "crates/litchi-ods/tests/ods_formula_scan_regression.rs": "07f03b83546dd4b705637271d83bfa2449c6e841499d8ae2b7939455ca4a1e15"
+  },
+  "commands": [
+    {
+      "name": "test",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets"
+      ],
+      "status": 0,
+      "seconds": 16.395304679870605
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "status": 0,
+      "seconds": 13.582769393920898
+    },
+    {
+      "name": "doc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--no-deps"
+      ],
+      "status": 0,
+      "seconds": 5.306127071380615
+    },
+    {
+      "name": "doctest",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--doc"
+      ],
+      "status": 0,
+      "seconds": 0.6968865394592285
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ods",
+        "--",
+        "--check"
+      ],
+      "status": 0,
+      "seconds": 0.6905372142791748
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/var/tmp/ods-scan-target",
+    "TMPDIR": "/var/tmp/ods-scan-tmp",
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "source_after": {
+    "crates/litchi-ods/src/codec/formula.rs": "8769d998a9c15299508892bb00ec7a2a52f6368bdb21ce4c0f252ddfdf37e8e6",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/src/codec/formula/reference.rs": "3707b3176e2714aa794bf28628eb27ec72923e001faaab22a987883b596bd27e",
+    "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961",
+    "crates/litchi-ods/src/model/cell.rs": "85d71d6e4c7986cc9450ded6d26eb41656adcaa1104ac4284b5338b2cf8cdc15",
+    "crates/litchi-ods/tests/ods_formula_references.rs": "b9d9fbd654e00e0dc4919451fc9b46aeedad8669dca0be541f757c1e779680db",
+    "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs": "55acf738b05b86c375e3bf96b31c7c0f6378c1f4554ba9d8842e78b6cd7814bc",
+    "crates/litchi-ods/tests/ods_formula_scan_regression.rs": "07f03b83546dd4b705637271d83bfa2449c6e841499d8ae2b7939455ca4a1e15"
+  },
+  "sources_unchanged": true
+}

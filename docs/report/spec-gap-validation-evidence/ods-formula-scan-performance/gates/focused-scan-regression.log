@@ -1,0 +1,39 @@
+capture_kind=focused_formula_scan_regression
+timestamp_utc=2026-09-13T08:21:57Z
+baseline_commit=5fae21a34e163a3300fc0ac4f9c302f5731e3cbb
+git_head=5fae21a34e163a3300fc0ac4f9c302f5731e3cbb
+command=cargo test --locked --offline -p litchi-ods --test ods_formula_scan_regression -- --nocapture
+observed_status=0
+tests=6 passed, 0 failed, 0 ignored
+rustfmt_status=0
+diff_check_status=0
+target_directory=/home/zhuhe/code/litchi-spec-gaps/target
+target_directory_source=Cargo workspace default
+cargo_target_dir_env=<unset>
+cargo_build_target_env=<unset>
+target_artifact_cleanup=removed_and_verified_absent
+preserved_root_shared_target=/var/tmp/ods-scan-target
+removed_target_artifact=target/debug/deps/ods_formula_scan_regression-0a701daa5ef5eb23
+removed_target_artifact=target/debug/deps/ods_formula_scan_regression-0a701daa5ef5eb23.d
+removed_target_artifact=target/debug/incremental/ods_formula_scan_regression-0j4saw79bvw1k/
+source_hashes_stable=true
+sha256_before[crates/litchi-ods/src/codec/formula.rs]=8769d998a9c15299508892bb00ec7a2a52f6368bdb21ce4c0f252ddfdf37e8e6
+sha256_before[crates/litchi-ods/src/codec/formula/functions.rs]=1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1
+sha256_before[crates/litchi-ods/tests/ods_formula_scan_regression.rs]=07f03b83546dd4b705637271d83bfa2449c6e841499d8ae2b7939455ca4a1e15
+sha256_after[crates/litchi-ods/src/codec/formula.rs]=8769d998a9c15299508892bb00ec7a2a52f6368bdb21ce4c0f252ddfdf37e8e6
+sha256_after[crates/litchi-ods/src/codec/formula/functions.rs]=1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1
+sha256_after[crates/litchi-ods/tests/ods_formula_scan_regression.rs]=07f03b83546dd4b705637271d83bfa2449c6e841499d8ae2b7939455ca4a1e15
+test_output:
+
+running 6 tests
+test a_dot_after_a_long_suffix_uses_the_legacy_sheet_fallback ... ok
+test absolute_and_range_forms_retain_the_legacy_fallback_shape ... ok
+test formula_prefixes_normalize_for_scanning_but_retain_original_text ... ok
+test contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens ... ok
+test repeated_partial_cells_keep_boundaries_with_spaces_and_tabs ... ok
+test tabs_underscores_and_digit_boundaries_preserve_tokens_and_refusals ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/ods_formula_scan_regression.rs (target/debug/deps/ods_formula_scan_regression-0a701daa5ef5eb23)

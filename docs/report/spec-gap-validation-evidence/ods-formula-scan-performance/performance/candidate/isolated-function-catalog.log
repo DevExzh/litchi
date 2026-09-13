@@ -1,0 +1,15 @@
+
+running 7 tests
+test ordinary_cell_references_remain_cell_reference_tokens ... ok
+test representative_standard_families_are_lexed_without_evaluation ... ok
+test text_arguments_retain_unicode_and_require_a_terminating_quote ... ok
+test unknown_malformed_and_non_catalog_names_are_rejected ... ok
+test prior_compatibility_names_remain_recognized ... ok
+test every_standard_name_is_a_function_token_when_invoked ... ok
+test the_complete_odf14_catalog_is_case_insensitive ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-scan-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running tests/ods_formula_functions.rs (/var/tmp/ods-scan-target/debug/deps/ods_formula_functions-f619d5e504a91a62)

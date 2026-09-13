@@ -1,0 +1,10 @@
+diff --git a/crates/litchi-ods/src/codec/formula/reference.rs b/crates/litchi-ods/src/codec/formula/reference.rs
+index ad4d691ad..e57b60b6c 100644
+--- a/crates/litchi-ods/src/codec/formula/reference.rs
++++ b/crates/litchi-ods/src/codec/formula/reference.rs
+@@ -898 +897,0 @@ impl<'a> Parser<'a> {
+-    #[inline]
+@@ -952 +950,0 @@ fn invalid(message: impl Into<String>) -> Error {
+-#[cold]
+@@ -973 +970,0 @@ fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
+-#[inline]

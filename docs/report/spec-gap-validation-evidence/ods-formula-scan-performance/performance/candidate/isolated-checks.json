@@ -1,0 +1,42 @@
+{
+  "worktree": "/var/tmp/ods-scan-worktree",
+  "target": "/var/tmp/ods-scan-target",
+  "expected_total": 76,
+  "checks": [
+    {
+      "name": "formula-unit",
+      "command": "cargo test --locked --offline -p litchi-ods --lib codec::formula",
+      "status": 0,
+      "elapsed_seconds": 8.758,
+      "log": "candidate/isolated-formula-unit.log"
+    },
+    {
+      "name": "scan-regression",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_scan_regression -- --nocapture",
+      "status": 0,
+      "elapsed_seconds": 0.108,
+      "log": "candidate/isolated-scan-regression.log"
+    },
+    {
+      "name": "tokenizer-regression",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_tokenizer_regression -- --nocapture",
+      "status": 0,
+      "elapsed_seconds": 0.386,
+      "log": "candidate/isolated-tokenizer-regression.log"
+    },
+    {
+      "name": "function-catalog",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_functions",
+      "status": 0,
+      "elapsed_seconds": 0.388,
+      "log": "candidate/isolated-function-catalog.log"
+    },
+    {
+      "name": "reference-integration",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_references",
+      "status": 0,
+      "elapsed_seconds": 0.426,
+      "log": "candidate/isolated-reference-integration.log"
+    }
+  ]
+}

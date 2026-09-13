@@ -170,6 +170,12 @@ pub struct FormulaParser<'a> {
     input: &'a [u8],
     position: usize,
     limits: FormulaLimits,
+    // The legacy sheet grammar scans `[A-Za-z0-9_ ]+` before deciding whether
+    // a dot follows. Keep the last immutable-input run so compact misses and
+    // adjacent cell-shaped names do not rescan the same suffix quadratically.
+    legacy_sheet_scan: Option<(usize, usize)>,
+    #[cfg(test)]
+    legacy_sheet_scan_work: usize,
 }
 
 impl<'a> FormulaParser<'a> {
@@ -180,6 +186,9 @@ impl<'a> FormulaParser<'a> {
             input: input.as_bytes(),
             position: 0,
             limits: FormulaLimits::default(),
+            legacy_sheet_scan: None,
+            #[cfg(test)]
+            legacy_sheet_scan_work: 0,
         }
     }
 
@@ -473,9 +482,8 @@ impl<'a> FormulaParser<'a> {
     ///
     /// Spaced sheet names and malformed suffixes deliberately return `None` so
     /// the established parser below can preserve their exact behavior. This
-    /// method does not move `position` until a function or cell has passed all
-    /// syntax checks, which also lets us defer fallible component copies until
-    /// after the row has been parsed.
+    /// method restores `position` on a syntax miss, and defers fallible
+    /// component copies until after the row has been parsed.
     fn try_parse_compact_identifier_or_ref(&mut self) -> Result<Option<Token>> {
         if !self.peek_is_letter() {
             return Ok(None);
@@ -579,18 +587,11 @@ impl<'a> FormulaParser<'a> {
     /// Check whether a compact cell is followed by a legacy space-bearing
     /// sheet locator. This is only called after a compact coordinate matched,
     /// so it does no work on names, functions, or ordinary operator spacing.
-    fn has_spaced_sheet_qualifier(&self, end: usize) -> bool {
+    fn has_spaced_sheet_qualifier(&mut self, end: usize) -> bool {
         if self.input.get(end) != Some(&b' ') {
             return false;
         }
-        let mut position = end;
-        while self
-            .input
-            .get(position)
-            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
-        {
-            position += 1;
-        }
+        let position = self.legacy_sheet_scan_end(end);
         self.input.get(position) == Some(&b'.')
     }
 
@@ -646,16 +647,11 @@ impl<'a> FormulaParser<'a> {
             // If there is no dot after the identifier chunk, this is a plain
             // cell reference like A1 and we must rewind.
             let start = self.position;
-            while let Some(ch) = self.peek() {
-                if ch.is_ascii_alphanumeric() || ch == b'_' || ch == b' ' {
-                    self.advance();
-                } else {
-                    break;
-                }
-            }
+            let sheet_end = self.legacy_sheet_scan_end(start);
+            self.position = sheet_end;
 
             if self.peek() == Some(b'.') {
-                sheet_range = Some((start, self.position));
+                sheet_range = Some((start, sheet_end));
                 self.advance(); // Skip dot
             } else {
                 self.position = start;
@@ -772,6 +768,33 @@ impl<'a> FormulaParser<'a> {
                 break;
             }
         }
+    }
+
+    /// Return the end of the legacy unquoted sheet-name run beginning at
+    /// `start`. The input is immutable for a parser, so a cached run also
+    /// describes every suffix that starts inside it.
+    fn legacy_sheet_scan_end(&mut self, start: usize) -> usize {
+        if let Some((cached_start, cached_end)) = self.legacy_sheet_scan
+            && start >= cached_start
+            && start < cached_end
+        {
+            return cached_end;
+        }
+
+        let mut end = start;
+        while self
+            .input
+            .get(end)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
+        {
+            #[cfg(test)]
+            {
+                self.legacy_sheet_scan_work += 1;
+            }
+            end += 1;
+        }
+        self.legacy_sheet_scan = Some((start, end));
+        end
     }
 }
 
@@ -1355,6 +1378,101 @@ mod tests {
                 ..
             }) if sheet == "A1 " && column == "C"
         ));
+    }
+
+    #[test]
+    fn test_legacy_sheet_scan_cache_keeps_scan_work_linear() {
+        fn tokenize_and_measure(source: &str) -> (usize, usize) {
+            let mut parser = FormulaParser::new(source);
+            // Keep the original formula prefix out of this private tokenizer
+            // loop; parse_with_limits makes the same body transition.
+            parser.position = 1;
+            let mut token_count = 0;
+            while !parser.is_at_end() {
+                parser.skip_whitespace();
+                if parser.is_at_end() {
+                    break;
+                }
+                parser
+                    .next_token()
+                    .expect("the generated legacy sequence should tokenize");
+                token_count += 1;
+            }
+            (parser.legacy_sheet_scan_work, token_count)
+        }
+
+        const CELLS: usize = 1_024;
+
+        let mut spaced = String::from("=");
+        for index in 0..CELLS {
+            if index != 0 {
+                spaced.push(' ');
+            }
+            spaced.push_str("A1");
+        }
+        let (spaced_work, spaced_tokens) = tokenize_and_measure(&spaced);
+        assert_eq!(spaced_tokens, CELLS);
+        assert!(
+            spaced_work <= spaced.len(),
+            "spaced sequence rescanned too much input: {spaced_work} > {}",
+            spaced.len()
+        );
+
+        let contiguous = format!("={}", "A1".repeat(CELLS));
+        let (contiguous_work, contiguous_tokens) = tokenize_and_measure(&contiguous);
+        assert_eq!(contiguous_tokens, CELLS);
+        assert!(
+            contiguous_work <= contiguous.len(),
+            "contiguous compact misses rescanned too much input: {contiguous_work} > {}",
+            contiguous.len()
+        );
+
+        let mut ranges = String::from("=");
+        for index in 0..CELLS {
+            if index != 0 {
+                ranges.push(' ');
+            }
+            ranges.push_str("A1:A1");
+        }
+        let (range_work, range_tokens) = tokenize_and_measure(&ranges);
+        assert_eq!(range_tokens, CELLS);
+        assert!(
+            range_work <= ranges.len(),
+            "range endpoint scans rescanned too much input: {range_work} > {}",
+            ranges.len()
+        );
+
+        let absolute = format!("={}", "$A$1 ".repeat(CELLS));
+        let (absolute_work, absolute_tokens) = tokenize_and_measure(&absolute);
+        assert_eq!(absolute_tokens, CELLS);
+        assert_eq!(
+            absolute_work, 0,
+            "absolute cells should not enter sheet scans"
+        );
+
+        // The first compact A1 is rejected as a possible space-bearing sheet
+        // reference, then the legacy parser starts earlier than that cached
+        // suffix. It must rescan only once before later suffixes reuse the
+        // new cache endpoint.
+        let mut backward = String::from("=A1 ");
+        for index in 0..CELLS {
+            if index != 0 {
+                backward.push(' ');
+            }
+            backward.push_str("Alias");
+        }
+        backward.push_str(".B2");
+        let (backward_work, backward_tokens) = tokenize_and_measure(&backward);
+        assert_eq!(backward_tokens, 1);
+        assert!(
+            backward_work > backward.len(),
+            "backward compact-to-legacy handoff did not exercise its second bounded scan"
+        );
+        assert!(
+            backward_work <= backward.len() * 2,
+            "backward handoff exceeded two linear scans: {backward_work} > {}",
+            backward.len() * 2
+        );
     }
 
     #[test]

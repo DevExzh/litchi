@@ -1,0 +1,18 @@
+
+running 10 tests
+test all_six_range_alternatives_preserve_coordinate_kind_and_locator_state ... ok
+test formula_limits_are_exact_and_forward_into_nested_references ... ok
+test bracketed_references_are_tokens_and_original_formula_text_is_retained ... ok
+test quoted_unicode_delimited_and_nested_locators_keep_full_metadata ... ok
+test source_iris_are_decoded_and_remain_external_inert_metadata ... ok
+test representative_functions_and_bare_cell_controls_remain_unchanged ... ok
+test reference_error_is_distinct_and_cannot_be_made_source_qualified ... ok
+test public_reference_parser_requires_the_normative_bracket_wrapper ... ok
+test malformed_mixed_and_overflow_references_are_refused ... ok
+test source_and_locator_boundaries_are_bounded_without_losing_atomicity ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-scan-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running tests/ods_formula_references.rs (/var/tmp/ods-scan-target/debug/deps/ods_formula_references-a4da129fbd395bb6)
