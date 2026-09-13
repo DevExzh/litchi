@@ -447,6 +447,38 @@ fn large_union_geometry_planning_stays_within_default_work_budget() {
 }
 
 #[test]
+fn reference_operand_kind_planning_keeps_intersections_linear() {
+    const COUNT: usize = 4_096;
+    let intersections = repeated_union_source(&["[.A1]"], COUNT).replace('~', "!");
+    let body = intersections.strip_prefix('=').expect("formula prefix");
+    for source in [
+        format!("=IF({{TRUE()}};([.A1]:IF(AND({body});[.C1:.D1];0));0)"),
+        format!("=IF({{TRUE()}};([.A1]:IFERROR(({body}![.B1]);[.C1:.D1]));0)"),
+    ] {
+        let mut resolver = FixtureResolver::new();
+        for (column, value) in [10.0, 11.0, 12.0, 13.0].into_iter().enumerate() {
+            resolver.set("Main", 0, column, FixtureCell::Number(value));
+        }
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-intersection-kind-work");
+        let expression = parse(&source);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("linear intersection operand should evaluate: {error:?}"));
+        let array = result.as_array().expect("selected range array");
+        assert_eq!((array.shape().rows(), array.shape().columns()), (1, 4));
+        assert_array_numbers(array, &[10.0, 11.0, 12.0, 13.0]);
+    }
+}
+
+#[test]
 fn union_cell_limit_includes_intersection_left_operand_before_provider_reads() {
     let resolver = FixtureResolver::new();
     let (budget, _cancellation, execution) =
