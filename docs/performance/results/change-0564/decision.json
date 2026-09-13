@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0564-xls-open-read-attribution",
+  "decision": "attribution_only",
+  "code_state": "not_landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "dominant_cost_attributed_to_one_loop",
+    "conflict_with_four_tested_contracts_recorded_not_implemented",
+    "corrects_a_prior_records_inference"
+  ],
+  "measured": {
+    "pread64_per_open": 655,
+    "statx_per_open": 636,
+    "four_byte_read_share_percent": 94.7,
+    "reads_continuing_previous": [
+      6,
+      1311
+    ],
+    "globals_header_prepass_reads": 621,
+    "globals_header_prepass_share_of_reads_percent": 94.8,
+    "globals_header_prepass_share_of_bytes_percent": 0.44,
+    "bytes_read_twice": 2484
+  },
+  "blocked_by": [
+    "litchi-xls/tests/source_backed.rs:1509 raw_handoff_reads_global_headers_then_one_exact_global_range",
+    "litchi-xls/tests/source_backed.rs:1392 filepass_header_scan_never_reads_its_payload_or_worksheets",
+    "litchi-xls/tests/source_backed.rs:1252 supported_unknown_payload_is_skipped_without_source_overread",
+    "litchi-xls/tests/source_backed.rs:949 selected_queries_are_bounded_to_the_selected_owner"
+  ],
+  "corrects": {
+    "record": "0325-cfb-frame-transaction-rejected",
+    "what": "it closed this line after evaluating a candidate that addressed none of open's 655 reads, on the true but non-implying grounds that open has no WorksheetScan opportunity"
+  },
+  "withheld": [
+    "latency",
+    "resource",
+    "cold cache",
+    "physical device",
+    "remote or range source",
+    "real-producer breadth",
+    "cross platform"
+  ],
+  "revision": "210c5241ead791b32a82fba4b55344d317b6f05b",
+  "captured_utc": "2026-09-13T19:19:54Z"
+}

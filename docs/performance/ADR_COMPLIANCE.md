@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0564: a recorded conflict, not an exception
+
+[0564](0564-xls-open-read-attribution.md) changes no production code. It records
+that the highest-value remaining XLS optimization conflicts with four contracts
+asserted by tests — the exact open range list, never reading a `FILEPASS`
+payload, never reading a skipped payload, and never touching a sheet body — and
+enumerates what a fused pass would have to establish. Per `docs/GOAL.md` the
+conflict is recorded rather than implemented. No ADR exception is requested and
+none is needed for an attribution.
+
 ## 0563: unchanged precedence, unchanged ownership
 
 [0563](0563-opc-single-warm-part-observation.md) collapses observations with no
