@@ -1,0 +1,33 @@
+{
+  "utc": "2026-09-13T08:04:11Z",
+  "side": "candidate",
+  "case": "local-refs-256",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+  "command": [
+    "perf",
+    "stat",
+    "-x,",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses",
+    "--",
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+    "--workload",
+    "parse",
+    "--case",
+    "parse-local-refs-256",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15",
+    "--repeat",
+    "128"
+  ],
+  "status": 0,
+  "elapsed_seconds": 0.13495564460754395,
+  "stdout": "perf-stat-candidate-local-refs-256.stdout",
+  "stderr": "perf-stat-candidate-local-refs-256.stderr"
+}

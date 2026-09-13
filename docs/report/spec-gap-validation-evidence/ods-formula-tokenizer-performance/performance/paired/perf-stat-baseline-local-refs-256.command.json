@@ -1,0 +1,33 @@
+{
+  "utc": "2026-09-13T08:04:11Z",
+  "side": "baseline",
+  "case": "local-refs-256",
+  "binary": "/var/tmp/ods-tokenizer-baseline-snapshot-20260913",
+  "binary_sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+  "command": [
+    "perf",
+    "stat",
+    "-x,",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-misses",
+    "--",
+    "taskset",
+    "-c",
+    "2",
+    "/var/tmp/ods-tokenizer-baseline-snapshot-20260913",
+    "--workload",
+    "parse",
+    "--case",
+    "parse-local-refs-256",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15",
+    "--repeat",
+    "128"
+  ],
+  "status": 0,
+  "elapsed_seconds": 0.1670520305633545,
+  "stdout": "perf-stat-baseline-local-refs-256.stdout",
+  "stderr": "perf-stat-baseline-local-refs-256.stderr"
+}

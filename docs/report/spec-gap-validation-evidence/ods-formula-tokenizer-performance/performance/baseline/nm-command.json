@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-13T07:46:46.079940+00:00",
+  "command": [
+    "nm",
+    "-S",
+    "--size-sort",
+    "-C",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline/ods-formula-reference-profile"
+  ],
+  "status": 0,
+  "filtered_symbols": 4
+}

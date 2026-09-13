@@ -1,0 +1,35 @@
+capture_kind=historical_pre_compact-parser-fix
+git_head=b88341bf4175daa409dd12d3d5ed665b33bbaf78
+formula_sha256=d276e8e9190751ab949ce902deae7bfd90cc00f4f4029d24330329d066209005
+test_sha256=2679af82a4fbc82c397d3ef7701ce759af5979686347ae6c38dfbbe65fca21eb
+command=cargo test --locked --offline -p litchi-ods --test ods_formula_tokenizer_regression -- --nocapture
+expected_status=101
+observed_status=101
+source_hashes_unchanged=yes
+allocator_failure_observed=yes
+allocator_failure_resource=formula column
+fallback_error=Invalid format: Unknown identifier or invalid cell reference: A1
+capture_note=Captured before the common-path compact parser fix; the obsolete intermediate build-race receipt was removed after canonicalization.
+test_output:
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running tests/ods_formula_tokenizer_regression.rs (target/debug/deps/ods_formula_tokenizer_regression-fcd075db6a49d513)
+
+running 4 tests
+test repeated_function_and_cell_scans_keep_each_lexical_boundary ... ok
+test legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved ... ok
+test malformed_identifier_suffixes_remain_typed_syntax_errors ... ok
+
+thread 'speculative_cell_allocation_failure_is_not_swallowed_by_fallback' (2867071) panicked at crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs:176:9:
+speculative cell parse swallowed allocation failure: Invalid format: Unknown identifier or invalid cell reference: A1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test speculative_cell_allocation_failure_is_not_swallowed_by_fallback ... FAILED
+
+failures:
+
+failures:
+    speculative_cell_allocation_failure_is_not_swallowed_by_fallback
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_tokenizer_regression`

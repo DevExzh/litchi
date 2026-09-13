@@ -1,0 +1,24 @@
+{
+  "capture_kind": "focused_tokenizer_post_spaced_sheet_and_allocator_fix",
+  "timestamp_utc": "2026-09-13T07:58:54Z",
+  "git_head": "b88341bf4175daa409dd12d3d5ed665b33bbaf78",
+  "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_tokenizer_regression -- --nocapture",
+  "observed_status": 0,
+  "tests": "4 passed, 0 failed, 0 ignored",
+  "rustfmt_command": "rustfmt --edition 2024 --check crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs",
+  "rustfmt_status": 0,
+  "diff_check_command": "git diff --check -- crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs",
+  "diff_check_status": 0,
+  "source_hashes_before": {
+    "crates/litchi-ods/src/codec/formula.rs": "4084ab6a41f61477aeaa15d3dbe896544a15147b75b2e1028d079569f52a0e0a",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs": "55acf738b05b86c375e3bf96b31c7c0f6378c1f4554ba9d8842e78b6cd7814bc"
+  },
+  "source_hashes_after": {
+    "crates/litchi-ods/src/codec/formula.rs": "4084ab6a41f61477aeaa15d3dbe896544a15147b75b2e1028d079569f52a0e0a",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs": "55acf738b05b86c375e3bf96b31c7c0f6378c1f4554ba9d8842e78b6cd7814bc"
+  },
+  "source_hashes_stable": true,
+  "output": "\nrunning 4 tests\ntest legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved ... ok\ntest speculative_cell_allocation_failure_is_not_swallowed_by_fallback ... ok\ntest malformed_identifier_suffixes_remain_typed_syntax_errors ... ok\ntest repeated_function_and_cell_scans_keep_each_lexical_boundary ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/ods_formula_tokenizer_regression.rs (target/debug/deps/ods_formula_tokenizer_regression-fcd075db6a49d513)\n"
+}
