@@ -1,0 +1,17 @@
+{
+  "label": "ascii-candidate-expression",
+  "group": "expression",
+  "binary_sha256": "5be86d8b7c3d7d2d77cc7844fa905f4e203df40e31d80fb570596dc2be732149",
+  "harness": "/var/tmp/ods-scalar-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ast-harness/run.py",
+  "harness_sha256": "8a724b2dc0a224ab10024adda8402cc43fdffc9aed6f9d3cf40abd46e6847acc",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ascii-candidate",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": "2026-09-13T10:55:47Z",
+  "finished_at": "2026-09-13T10:55:47Z",
+  "elapsed_seconds": 0.17085933685302734,
+  "status": 0,
+  "raw_sha256": "67e37516f04097164a96f3d6b9f1ede9f95cef4d0a24af04ed6c1116d3320400",
+  "row_count": 24,
+  "timestamps_recorded": true
+}

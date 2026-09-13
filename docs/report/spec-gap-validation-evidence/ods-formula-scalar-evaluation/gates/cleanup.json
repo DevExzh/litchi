@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-09-13T11:52:49.551775+00:00",
+  "active_references": [],
+  "preserved_results": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation",
+  "removed": [
+    {
+      "path": "/var/tmp/ods-scalar-worktree",
+      "allocated_bytes": 265957376
+    },
+    {
+      "path": "/var/tmp/ods-scalar-target",
+      "allocated_bytes": 1642811392
+    },
+    {
+      "path": "/var/tmp/ods-scalar-tmp",
+      "allocated_bytes": 24576
+    }
+  ],
+  "allocated_bytes_reclaimed": 1908793344,
+  "worktrees_after": "worktree /home/zhuhe/code/litchi\nHEAD 53330ff6745dd7416f3bfb48ef891a020ee9d151\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-spec-gaps\nHEAD 9072e969e34263be73d5b8d2eb2700478d182101\nbranch refs/heads/feat/spec-gap-implementation\n\n"
+}

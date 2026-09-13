@@ -1,0 +1,2334 @@
+diff --git a/crates/litchi-ods/docs/FEATURE_MATRIX.md b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+index 32a1149f0..826e05f3a 100644
+--- a/crates/litchi-ods/docs/FEATURE_MATRIX.md
++++ b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+@@ -77,7 +77,7 @@ the existence of an XLSX feature is never treated as ODS support.
+ | Rich cell text, spans, whitespace, fields, and hyperlinks | 🟡 | 🟡 | 🟡 | `document::{RichText, RichRun}` authors bounded paragraphs, text spans, explicit spaces, tabs, line breaks, and inert safe hyperlinks in existing non-repeated cells through provenance splices. The ordinary worksheet projection remains collapsed plain text, and arbitrary fields/foreign inline markup are not structurally editable |
+ | Formula strings and references | ✅ | ✅ | ✅ | Public `codec::formula` recognizes all 393 ODF 1.4 Part 4 chapter-6 function names and tokenizes supported literals, A1 references, ranges, operators, and sheet references. Function calls take precedence over A1-shaped names; UTF-8 strings and doubled quotes retain their values; decoded literal storage is sized to its content and U+0000 is refused under Part 4 §5.4. The bounded `codec::formula::reference` reader represents ODF 1.4 Part 4 §5.8 source IRIs, whole-axis ranges, nested sheet locators, inheritance, absolute markers, and reference errors; external sources remain inert. Worksheet and unified transactions retain, set, or clear inert formula strings. Complete expression grammar, function arity, host-defined identifiers, and evaluation remain outside this tokenizer. [Catalog evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-functions/README.md), [reference evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-references/README.md), [literal validation](../../../docs/report/spec-gap-validation-evidence/ods-formula-string-performance/README.md) |
+ | OpenFormula expression syntax | ✅ | ✅ | N/A | `codec::formula::expression::Expression` parses ODF 1.4 Part 4 chapter 5 into a bounded immutable flat tree with source-preserving node views, precedence, arrays, missing parameters, names, labels, errors, and inert external references. Explicit byte/node/depth/array-cell/reference limits and fallible storage apply. It does not perform function arity/type validation, name/reference resolution, evaluation, or recalculation. [Grammar and measurement evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/README.md). |
+-| Formula evaluation and recalculation | ❌ | ❌ | N/A | No ODS evaluation adapter is exported; formulas and cached values remain inert and no recalculation, external I/O, or refresh occurs |
++| Formula evaluation and recalculation | 🟡 | 🟡 | N/A | `codec::formula::evaluation::evaluate_scalar` evaluates already-parsed constant scalar expressions (all scalar operators and `TRUE()`/`FALSE()`) with explicit finite limits and caller cancellation/resource charging. It preserves Number/Logical/Text/Error values, uses no workbook/cache/I/O, and returns typed refusals for references, arrays, names, labels, and unimplemented functions. Formula caches remain inert; dependency-graph recalculation, reference/name resolution, external sources, arrays, and cache publication remain outside this bounded profile. This does not claim an ODF Small Group evaluator. [Scalar evaluation evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/README.md) |
+ | Repeated rows/cells and merged/covered cells | ✅ | ✅ | ✅ | Physical repeated runs are retained, logical lookup/edit splits only the affected run, and merge/covered metadata is typed and validated |
+ | Named ranges and named expressions | ✅ | ✅ | ✅ | Global and sheet-scoped definitions are parsed and validated per ODF 1.4 Part 3 sections 9.4.11-9.4.13; `definitions::{Snapshot, Edit, Commit, Patch}` adds exact key/checked-position CRUD and reorder, compact authored XML, typed readback, exact no-op retention, and reversible exact-source patches alongside the minimal builder |
+ | Cell and sheet styles | 🟡 | 🟡 | 🟡 | Typed source structures cover alignment, borders, background, common number/date/time/currency/percentage/boolean data styles, text properties, and protection flags. Unified transactions add or same-family replace bounded automatic graphs, conservatively remove styles with no retained package references, apply cell/rich-run references, and resolve supported inherited properties across `styles.xml` plus content automatic styles. Full property vocabulary and effective layout remain unsupported |
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 90dd43005..c0bd59afb 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -1,18 +1,18 @@
+ //! ODF formula parsing and representation.
+ //!
+-//! This module tokenizes the supported subset of `OpenFormula` expressions and
+-//! represents formulas stored in ODS files. Function-name recognition covers
+-//! the complete normative Part 4, chapter 6 catalog; this remains a tokenizer,
+-//! not a complete expression grammar or evaluator, and it does not validate
+-//! function arity.
++//! The legacy tokenizer represents formulas stored in ODS files and recognizes
++//! the normative Part 4, chapter 6 function catalog without validating arity.
++//! Use [`expression`] for the strict, inert OpenFormula expression tree and
++//! [`evaluation`] for explicit, bounded scalar execution. Function recognition
++//! does not imply that a function can be evaluated.
+ //!
+ //! # Formula Syntax
+ //!
+ //! ODF uses `OpenFormula` syntax (similar to Excel but with some differences):
+-//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (sheet-qualified)
+-//! - Functions: `SUM(A1:A10)`, `IF(A1>0, "Positive", "Negative")`
++//! - Cell references: `[.A1]`, `[.$A$1]` (absolute), `[Sheet1.A1]` (sheet-qualified)
++//! - Functions: `SUM([.A1:.A10])`, `IF([.A1]>0;"Positive";"Negative")`
+ //! - Operators: `+`, `-`, `*`, `/`, `^`, `&` (concatenation)
+-//! - References: `.A1` (relative to current sheet), `[$Inputs.$A$1]` (bracketed)
++//! - References: `[.A1]` (current sheet), `[$Inputs.$A$1]` (absolute sheet/cell)
+ //!
+ //! # References
+ //!
+@@ -22,6 +22,8 @@ use litchi_core::{Error, Resource, ResourceLimit, Result};
+ use smallvec::SmallVec;
+ use std::{borrow::Cow, convert::TryFrom, sync::Arc};
+ 
++/// Bounded, read-only evaluation of scalar OpenFormula expressions.
++pub mod evaluation;
+ /// Strict, inert OpenFormula 1.4 expression grammar and flat syntax tree.
+ pub mod expression;
+ mod functions;
+diff --git a/crates/litchi-ods/src/codec/formula/evaluation.rs b/crates/litchi-ods/src/codec/formula/evaluation.rs
+new file mode 100644
+index 000000000..16cf8e296
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/evaluation.rs
+@@ -0,0 +1,1545 @@
++//! Bounded, read-only scalar evaluation for OpenFormula expressions.
++//!
++//! This module evaluates the already-parsed ODS expression tree directly.  It
++//! does not stringify and reparse formulas, inspect a workbook, resolve an
++//! external source, refresh a cache, or publish a cell change.  The first
++//! evaluation profile intentionally covers constants, scalar operators, and
++//! `TRUE()`/`FALSE()` only.  References, arrays, names, labels, and all other
++//! functions are reported as typed capability refusals.
++//!
++//! The profile makes the following deterministic choices for host-dependent
++//! scalar behavior:
++//!
++//! * all numbers are finite `f64` values; non-finite literals and results are
++//!   returned as a Number error;
++//! * number equality is exact `f64` equality;
++//! * text is compared without Unicode normalization, using case-sensitive
++//!   Unicode scalar ordering by default;
++//! * this bounded profile uses explicit case-sensitive text comparison; a
++//!   future host setting must use a specified Unicode case-folding policy
++//!   before being exposed here;
++//! * text-to-number conversion accepts only locale-independent decimal-point
++//!   syntax and reports a value error when conversion fails;
++//! * `0^0` is accepted as `1`, as permitted by this bounded profile.
++//!
++//! A successful text result keeps its memory reservation in
++//! [`EvaluatedScalar`](crate::codec::formula::evaluation::EvaluatedScalar) until that result is dropped. Borrowed source strings
++//! do not allocate or require an output reservation.
++//! Evaluation limits charge AST visits, operator applications, and admitted
++//! text/numeric byte work. The storage limit covers aggregate live requested
++//! heap capacity for the evaluator stacks and owned text, including capacity
++//! growth. Source-tree storage and caller-created copies are outside that
++//! limit. Stack/vector/string growth uses fallible reservations; the shared
++//! core budget and error bookkeeping retain their existing allocation behavior.
++//!
++//! With a caller-supplied execution context:
++//!
++//! ```rust
++//! use litchi_ods::codec::formula::{
++//!     expression::Expression,
++//!     evaluation::{evaluate_scalar_with_context, EvaluationLimits, ScalarValue},
++//! };
++//! # use litchi_core::{Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Profile};
++//! # use std::num::{NonZeroU64, NonZeroUsize};
++//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
++//! # let (_cancellation, token) = CancellationSource::pair();
++//! # let execution = ExecutionContext::new(
++//! #     Budget::root("formula", Limits::for_profile(Profile::Server)), token,
++//! #     ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MIN, 0)?,
++//! # );
++//! let expression = Expression::parse("of:=2+3*4")?;
++//! let result = evaluate_scalar_with_context(
++//!     &expression, &execution, &EvaluationLimits::default(),
++//! )?;
++//! assert_eq!(result.value(), &ScalarValue::Number(14.0));
++//! # Ok(())
++//! # }
++//! ```
++
++use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
++use litchi_core::{Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit};
++use std::{
++    borrow::Cow,
++    cmp::Ordering,
++    error::Error as StdError,
++    fmt::{self, Display, Formatter, Write as FmtWrite},
++    mem::size_of,
++    sync::Arc,
++};
++
++/// Default maximum number of evaluator steps for one scalar operation.
++pub const DEFAULT_MAX_EVALUATION_STEPS: u64 = 1_000_000;
++/// Default maximum UTF-8 bytes in one scalar text value.
++pub const DEFAULT_MAX_TEXT_BYTES: usize = 32_767;
++/// Default maximum bytes reserved for evaluator-owned temporary/result storage.
++pub const DEFAULT_MAX_STORAGE_BYTES: usize = 4 * 1024 * 1024;
++/// Default maximum entries in either explicit evaluator stack.
++pub const DEFAULT_MAX_STACK_ENTRIES: usize = 65_536;
++
++const EVALUATION_SCOPE: &str = "ods-formula-evaluation";
++// Rust's general `Display` formatter may choose fixed notation for very large
++// or very small finite values. Keep formatting fallible without a temporary
++// heap allocation; this covers the finite `f64` display range with room for
++// sign and punctuation.
++const MAX_NUMBER_TEXT_BYTES: usize = 1024;
++const STRING_COPY_CHUNK_BYTES: usize = 4096;
++
++/// Finite limits for one scalar evaluation.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct EvaluationLimits {
++    max_steps: u64,
++    max_text_bytes: usize,
++    max_storage_bytes: usize,
++    max_stack_entries: usize,
++}
++
++impl Default for EvaluationLimits {
++    fn default() -> Self {
++        Self {
++            max_steps: DEFAULT_MAX_EVALUATION_STEPS,
++            max_text_bytes: DEFAULT_MAX_TEXT_BYTES,
++            max_storage_bytes: DEFAULT_MAX_STORAGE_BYTES,
++            max_stack_entries: DEFAULT_MAX_STACK_ENTRIES,
++        }
++    }
++}
++
++impl EvaluationLimits {
++    /// Set the maximum combined AST, operator, and byte-work units.
++    #[must_use]
++    pub const fn with_max_steps(mut self, value: u64) -> Self {
++        self.max_steps = value;
++        self
++    }
++
++    /// Set the maximum UTF-8 byte length of a scalar text value.
++    #[must_use]
++    pub const fn with_max_text_bytes(mut self, value: usize) -> Self {
++        self.max_text_bytes = value;
++        self
++    }
++
++    /// Set the maximum bytes reserved by evaluator-owned storage.
++    #[must_use]
++    pub const fn with_max_storage_bytes(mut self, value: usize) -> Self {
++        self.max_storage_bytes = value;
++        self
++    }
++
++    /// Set the maximum number of entries in either explicit evaluator stack.
++    #[must_use]
++    pub const fn with_max_stack_entries(mut self, value: usize) -> Self {
++        self.max_stack_entries = value;
++        self
++    }
++
++    /// Return the maximum number of evaluation steps.
++    #[must_use]
++    pub const fn max_steps(self) -> u64 {
++        self.max_steps
++    }
++
++    /// Return the maximum text byte length.
++    #[must_use]
++    pub const fn max_text_bytes(self) -> usize {
++        self.max_text_bytes
++    }
++
++    /// Return the maximum evaluator-owned storage bytes.
++    #[must_use]
++    pub const fn max_storage_bytes(self) -> usize {
++        self.max_storage_bytes
++    }
++
++    /// Return the maximum explicit stack size.
++    #[must_use]
++    pub const fn max_stack_entries(self) -> usize {
++        self.max_stack_entries
++    }
++}
++
++/// Text comparison policy used by the scalar profile.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++#[non_exhaustive]
++pub enum TextCase {
++    /// Compare source Unicode scalar values exactly.
++    Sensitive,
++}
++
++/// Locale-independent scalar evaluation options.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct EvaluationOptions {
++    text_case: TextCase,
++}
++
++impl Default for EvaluationOptions {
++    fn default() -> Self {
++        Self {
++            text_case: TextCase::Sensitive,
++        }
++    }
++}
++
++impl EvaluationOptions {
++    /// Return the configured text comparison policy.
++    #[must_use]
++    pub const fn text_case(self) -> TextCase {
++        self.text_case
++    }
++}
++
++/// Evaluation context carrying the caller-owned execution policy.
++#[derive(Clone, Copy, Debug)]
++pub struct EvaluationContext<'a> {
++    execution: &'a ExecutionContext,
++    options: EvaluationOptions,
++}
++
++impl<'a> EvaluationContext<'a> {
++    /// Create a context using deterministic default options.
++    #[must_use]
++    pub const fn new(execution: &'a ExecutionContext) -> Self {
++        Self {
++            execution,
++            options: EvaluationOptions {
++                text_case: TextCase::Sensitive,
++            },
++        }
++    }
++
++    /// Create a context with explicit scalar options.
++    #[must_use]
++    pub const fn with_options(execution: &'a ExecutionContext, options: EvaluationOptions) -> Self {
++        Self { execution, options }
++    }
++
++    /// Return the caller-owned execution context.
++    #[must_use]
++    pub const fn execution(self) -> &'a ExecutionContext {
++        self.execution
++    }
++
++    /// Return the scalar options.
++    #[must_use]
++    pub const fn options(self) -> EvaluationOptions {
++        self.options
++    }
++}
++
++/// A formula-level error value.  Errors are values and do not become Rust
++/// failures during ordinary operator propagation.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++#[non_exhaustive]
++pub enum ScalarError {
++    /// The OpenFormula `#N/A` value.
++    NotAvailable,
++    /// An unknown or invalid error spelling, represented as `#NAME?`.
++    Name,
++    /// A type, domain, or mixed-comparison error.
++    Value,
++    /// Division by zero.
++    DivisionByZero,
++    /// A reference-related error value.
++    Reference,
++    /// A numeric domain or non-finite-result error.
++    Number,
++    /// The OpenFormula `#NULL!` value.
++    Null,
++}
++
++impl Display for ScalarError {
++    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
++        formatter.write_str(match self {
++            Self::NotAvailable => "#N/A",
++            Self::Name => "#NAME?",
++            Self::Value => "#VALUE!",
++            Self::DivisionByZero => "#DIV/0!",
++            Self::Reference => "#REF!",
++            Self::Number => "#NUM!",
++            Self::Null => "#NULL!",
++        })
++    }
++}
++
++/// Scalar value returned by the ODS evaluation profile.
++#[derive(Debug, PartialEq)]
++#[non_exhaustive]
++pub enum ScalarValue<'a> {
++    /// A finite OpenFormula Number.
++    Number(f64),
++    /// A logical value distinct from Number in this profile.
++    Logical(bool),
++    /// Text borrowed from the immutable expression where possible.
++    Text(Cow<'a, str>),
++    /// A formula-level Error value.
++    Error(ScalarError),
++}
++
++/// A successful scalar result.  Owned text retains its memory reservation
++/// until this value is dropped.  Use [`Self::value`] for a borrowed view.
++#[derive(Debug)]
++pub struct EvaluatedScalar<'a> {
++    value: ScalarValue<'a>,
++    output_reservation: Option<Reservation>,
++}
++
++impl<'a> EvaluatedScalar<'a> {
++    fn new(value: ScalarValue<'a>, output_reservation: Option<Reservation>) -> Self {
++        Self {
++            value,
++            output_reservation,
++        }
++    }
++
++    /// Borrow the evaluated scalar value.
++    #[must_use]
++    pub const fn value(&self) -> &ScalarValue<'a> {
++        &self.value
++    }
++
++    /// Return the owned output reservation amount, if any.
++    #[must_use]
++    pub fn reserved_output_bytes(&self) -> usize {
++        self.output_reservation
++            .as_ref()
++            .and_then(|reservation| usize::try_from(reservation.amount()).ok())
++            .unwrap_or(0)
++    }
++}
++
++/// Capability refusals from the bounded scalar profile.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++#[non_exhaustive]
++pub enum UnsupportedKind {
++    /// A bracketed or rich reference requires a resolver/context.
++    Reference,
++    /// A range, intersection, or union reference operator requires a resolver.
++    ReferenceOperator,
++    /// An inline array requires non-scalar evaluation.
++    Array,
++    /// A named expression requires a definition resolver.
++    NamedExpression,
++    /// A quoted label or automatic intersection requires a label resolver.
++    Label,
++    /// A missing function parameter is outside this scalar profile.
++    MissingArgument,
++    /// A standard or host-defined function other than TRUE/FALSE.
++    Function,
++}
++
++impl Display for UnsupportedKind {
++    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
++        formatter.write_str(match self {
++            Self::Reference => "ODS scalar evaluation does not resolve references",
++            Self::ReferenceOperator => "ODS scalar evaluation does not resolve reference operators",
++            Self::Array => "ODS scalar evaluation does not evaluate arrays",
++            Self::NamedExpression => "ODS scalar evaluation does not resolve named expressions",
++            Self::Label => "ODS scalar evaluation does not resolve labels",
++            Self::MissingArgument => "ODS scalar evaluation does not evaluate missing arguments",
++            Self::Function => "ODS scalar evaluation does not implement this function",
++        })
++    }
++}
++
++/// Failures of the evaluator operation itself.  Formula-level errors are
++/// represented by [`ScalarValue::Error`] instead.
++#[derive(Debug)]
++#[non_exhaustive]
++pub enum EvaluationFailure {
++    /// A value requires a capability outside this profile.
++    Unsupported(UnsupportedKind),
++    /// The immutable AST or evaluator invariant was inconsistent.
++    InvalidExpression(&'static str),
++    /// The caller's cancellation token was set.
++    Cancelled,
++    /// A finite local or hierarchical resource limit was exceeded.
++    ResourceLimit(ResourceLimit),
++    /// A fallible evaluator-owned allocation could not be admitted.
++    Allocation {
++        /// Resource description for the failed allocation.
++        resource: &'static str,
++        /// Original allocator error.
++        source: std::collections::TryReserveError,
++    },
++    /// A non-limit execution policy error from the caller context.
++    Execution(ExecutionError),
++}
++
++impl Display for EvaluationFailure {
++    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
++        match self {
++            Self::Unsupported(kind) => kind.fmt(formatter),
++            Self::InvalidExpression(message) => formatter.write_str(message),
++            Self::Cancelled => formatter.write_str("ODS scalar evaluation cancelled"),
++            Self::ResourceLimit(limit) => limit.fmt(formatter),
++            Self::Allocation { resource, source } => {
++                write!(formatter, "allocation failed for {resource}: {source}")
++            },
++            Self::Execution(error) => error.fmt(formatter),
++        }
++    }
++}
++
++impl StdError for EvaluationFailure {
++    fn source(&self) -> Option<&(dyn StdError + 'static)> {
++        match self {
++            Self::Allocation { source, .. } => Some(source),
++            Self::ResourceLimit(limit) => Some(limit),
++            Self::Execution(error) => Some(error),
++            Self::Unsupported(_) | Self::InvalidExpression(_) | Self::Cancelled => None,
++        }
++    }
++}
++
++/// Result returned by scalar evaluation.
++pub type EvaluationResult<T> = Result<T, EvaluationFailure>;
++
++/// Evaluate one already-parsed ODS expression using the caller's execution
++/// policy and finite evaluation limits.
++pub fn evaluate_scalar<'a>(
++    expression: &'a Expression,
++    context: &EvaluationContext<'_>,
++    limits: &EvaluationLimits,
++) -> EvaluationResult<EvaluatedScalar<'a>> {
++    context.execution.check().map_err(map_execution_error)?;
++    let storage_budget = context.execution.budget().child(
++        EVALUATION_SCOPE,
++        litchi_core::Limits::new(
++            u64::try_from(limits.max_storage_bytes).unwrap_or(u64::MAX),
++            u64::MAX,
++            u64::MAX,
++            u64::MAX,
++            u64::MAX,
++            u64::MAX,
++        ),
++    );
++    let mut evaluator = Evaluator::new(expression, context, *limits, storage_budget);
++    let value = evaluator.run()?;
++    Ok(evaluator.into_public(value))
++}
++
++/// Evaluate with explicit options without constructing an intermediate
++/// [`EvaluationContext`].
++pub fn evaluate_scalar_with_options<'a>(
++    expression: &'a Expression,
++    execution: &ExecutionContext,
++    options: EvaluationOptions,
++    limits: &EvaluationLimits,
++) -> EvaluationResult<EvaluatedScalar<'a>> {
++    let context = EvaluationContext::with_options(execution, options);
++    evaluate_scalar(expression, &context, limits)
++}
++
++/// Evaluate using deterministic default options.
++pub fn evaluate_scalar_with_context<'a>(
++    expression: &'a Expression,
++    execution: &ExecutionContext,
++    limits: &EvaluationLimits,
++) -> EvaluationResult<EvaluatedScalar<'a>> {
++    evaluate_scalar(expression, &EvaluationContext::new(execution), limits)
++}
++
++struct Evaluator<'a, 'ctx, 'exec> {
++    expression: &'a Expression,
++    context: &'ctx EvaluationContext<'exec>,
++    limits: EvaluationLimits,
++    storage_budget: Budget,
++    steps: u64,
++    frames: Vec<Frame<'a>>,
++    values: Vec<WorkingValue<'a>>,
++    frame_reservation: Option<Reservation>,
++    value_reservation: Option<Reservation>,
++}
++
++#[derive(Clone, Copy)]
++enum Frame<'a> {
++    Visit(Node<'a>),
++    Apply(Node<'a>),
++}
++
++enum WorkingValue<'a> {
++    Number(f64),
++    Logical(bool),
++    Text(TextValue<'a>),
++    Error(ScalarError),
++}
++
++struct TextValue<'a> {
++    text: Cow<'a, str>,
++    reservation: Option<Reservation>,
++}
++
++struct NumberText {
++    bytes: [u8; MAX_NUMBER_TEXT_BYTES],
++    length: usize,
++}
++
++struct StringScan {
++    decoded_len: usize,
++    has_escaped_quotes: bool,
++}
++
++impl NumberText {
++    fn new() -> Self {
++        Self {
++            bytes: [0; MAX_NUMBER_TEXT_BYTES],
++            length: 0,
++        }
++    }
++
++    fn as_str(&self) -> Result<&str, fmt::Error> {
++        std::str::from_utf8(&self.bytes[..self.length]).map_err(|_| fmt::Error)
++    }
++}
++
++impl FmtWrite for NumberText {
++    fn write_str(&mut self, value: &str) -> fmt::Result {
++        let end = self.length.checked_add(value.len()).ok_or(fmt::Error)?;
++        if end > self.bytes.len() {
++            return Err(fmt::Error);
++        }
++        self.bytes[self.length..end].copy_from_slice(value.as_bytes());
++        self.length = end;
++        Ok(())
++    }
++}
++
++fn copy_string_segment(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    output: &mut String,
++    segment: &str,
++) -> EvaluationResult<()> {
++    let mut offset = 0usize;
++    while offset < segment.len() {
++        evaluator
++            .context
++            .execution
++            .check()
++            .map_err(map_execution_error)?;
++        let mut end = offset
++            .saturating_add(STRING_COPY_CHUNK_BYTES)
++            .min(segment.len());
++        while end < segment.len() && !segment.is_char_boundary(end) {
++            end += 1;
++        }
++        let chunk = &segment[offset..end];
++        evaluator.charge_bytes(chunk.len())?;
++        output.push_str(chunk);
++        offset = end;
++    }
++    Ok(())
++}
++
++impl<'a> TextValue<'a> {
++    fn borrowed(text: &'a str) -> Self {
++        Self {
++            text: Cow::Borrowed(text),
++            reservation: None,
++        }
++    }
++
++    fn owned(text: String, reservation: Reservation) -> Self {
++        Self {
++            text: Cow::Owned(text),
++            reservation: Some(reservation),
++        }
++    }
++}
++
++impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
++    fn new(
++        expression: &'a Expression,
++        context: &'ctx EvaluationContext<'exec>,
++        limits: EvaluationLimits,
++        storage_budget: Budget,
++    ) -> Self {
++        Self {
++            expression,
++            context,
++            limits,
++            storage_budget,
++            steps: 0,
++            frames: Vec::new(),
++            values: Vec::new(),
++            frame_reservation: None,
++            value_reservation: None,
++        }
++    }
++
++    fn run(&mut self) -> EvaluationResult<WorkingValue<'a>> {
++        let root = self.expression.root();
++        self.push_frame(Frame::Visit(root))?;
++
++        while let Some(frame) = self.frames.pop() {
++            self.step()?;
++            match frame {
++                Frame::Visit(node) => self.visit(node)?,
++                Frame::Apply(node) => self.apply(node)?,
++            }
++        }
++
++        if self.values.len() != 1 {
++            return Err(EvaluationFailure::InvalidExpression(
++                "scalar evaluation did not produce exactly one value",
++            ));
++        }
++        self.values
++            .pop()
++            .ok_or(EvaluationFailure::InvalidExpression(
++                "scalar evaluation value stack was empty",
++            ))
++    }
++
++    fn step(&mut self) -> EvaluationResult<()> {
++        self.charge_work(1)
++    }
++
++    fn charge_work(&mut self, amount: u64) -> EvaluationResult<()> {
++        self.context
++            .execution
++            .check()
++            .map_err(map_execution_error)?;
++        let next = self
++            .steps
++            .checked_add(amount)
++            .ok_or_else(|| local_limit(Resource::Work, u64::MAX, self.limits.max_steps))?;
++        if next > self.limits.max_steps {
++            return Err(local_limit(Resource::Work, next, self.limits.max_steps));
++        }
++        if amount != 0 {
++            self.context
++                .execution
++                .consume(Resource::Work, amount)
++                .map_err(map_execution_error)?;
++        }
++        self.steps = next;
++        Ok(())
++    }
++
++    fn charge_bytes(&mut self, bytes: usize) -> EvaluationResult<()> {
++        self.charge_work(u64::try_from(bytes).unwrap_or(u64::MAX))
++    }
++
++    fn visit(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        match node.kind() {
++            Kind::Number => {
++                let value = self.parse_number(node.text())?;
++                self.push_value(value)
++            },
++            Kind::String => {
++                let value = self.parse_string(node.text())?;
++                self.push_value(value)
++            },
++            Kind::Error => {
++                let text = node.text();
++                self.charge_bytes(text.len())?;
++                self.push_value(WorkingValue::Error(parse_error(text)))
++            },
++            Kind::Parenthesized => self.push_frame(Frame::Visit(node.child(0).ok_or(
++                EvaluationFailure::InvalidExpression("parenthesized node has no child"),
++            )?)),
++            Kind::Prefix(_) => {
++                self.push_frame(Frame::Apply(node))?;
++                self.push_frame(Frame::Visit(node.child(0).ok_or(
++                    EvaluationFailure::InvalidExpression("prefix node has no child"),
++                )?))
++            },
++            Kind::Postfix(_) => {
++                self.push_frame(Frame::Apply(node))?;
++                self.push_frame(Frame::Visit(node.child(0).ok_or(
++                    EvaluationFailure::InvalidExpression("postfix node has no child"),
++                )?))
++            },
++            Kind::Infix(operator) => {
++                if matches!(
++                    operator,
++                    InfixOperator::Range | InfixOperator::Intersection | InfixOperator::Union
++                ) {
++                    return Err(EvaluationFailure::Unsupported(
++                        UnsupportedKind::ReferenceOperator,
++                    ));
++                }
++                let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
++                    "infix node has no left child",
++                ))?;
++                let right = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
++                    "infix node has no right child",
++                ))?;
++                self.push_frame(Frame::Apply(node))?;
++                self.push_frame(Frame::Visit(right))?;
++                self.push_frame(Frame::Visit(left))
++            },
++            Kind::Function { name } => self.visit_function(node, name),
++            Kind::Reference(_) => Err(EvaluationFailure::Unsupported(UnsupportedKind::Reference)),
++            Kind::Array(_) | Kind::ArrayRow => {
++                Err(EvaluationFailure::Unsupported(UnsupportedKind::Array))
++            },
++            Kind::NamedExpression { .. } => Err(EvaluationFailure::Unsupported(
++                UnsupportedKind::NamedExpression,
++            )),
++            Kind::QuotedLabel | Kind::AutomaticIntersection => {
++                Err(EvaluationFailure::Unsupported(UnsupportedKind::Label))
++            },
++            Kind::Missing => Err(EvaluationFailure::Unsupported(
++                UnsupportedKind::MissingArgument,
++            )),
++        }
++    }
++
++    fn visit_function(&mut self, node: Node<'a>, name: &'a str) -> EvaluationResult<()> {
++        self.charge_bytes(name.len())?;
++        let value = if name.eq_ignore_ascii_case("TRUE") {
++            true
++        } else if name.eq_ignore_ascii_case("FALSE") {
++            false
++        } else {
++            return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
++        };
++        if node.child_count() == 0 {
++            return self.push_value(WorkingValue::Logical(value));
++        }
++
++        // These supported functions have no lazy-argument exception. Visit
++        // arguments in source order before reporting their arity error; this
++        // also preserves child errors, capability refusals, and work limits.
++        self.charge_work(u64::try_from(node.child_count()).unwrap_or(u64::MAX))?;
++        self.push_frame(Frame::Apply(node))?;
++        for index in (0..node.child_count()).rev() {
++            if index % 4096 == 0 {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++            }
++            let child = node
++                .child(index)
++                .ok_or(EvaluationFailure::InvalidExpression(
++                    "function argument is missing from the expression tree",
++                ))?;
++            self.push_frame(Frame::Visit(child))?;
++        }
++        Ok(())
++    }
++
++    fn apply(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        match node.kind() {
++            Kind::Function { .. } => {
++                let mut propagated = None;
++                // Values are popped in reverse source order. Replacing the
++                // error each time retains the first source-ordered Error.
++                for index in 0..node.child_count() {
++                    if index % 4096 == 0 {
++                        self.context
++                            .execution
++                            .check()
++                            .map_err(map_execution_error)?;
++                    }
++                    if let WorkingValue::Error(error) = self.pop_value()? {
++                        propagated = Some(error);
++                    }
++                }
++                self.push_value(WorkingValue::Error(
++                    propagated.unwrap_or(ScalarError::Value),
++                ))
++            },
++            Kind::Prefix(operator) => {
++                let value = self.pop_value()?;
++                let value = apply_prefix(operator, value, self)?;
++                self.push_value(value)
++            },
++            Kind::Postfix(operator) => {
++                let value = self.pop_value()?;
++                let value = apply_postfix(operator, value, self)?;
++                self.push_value(value)
++            },
++            Kind::Infix(operator) => {
++                let right = self.pop_value()?;
++                let left = self.pop_value()?;
++                let value = self.apply_infix(operator, left, right)?;
++                self.push_value(value)
++            },
++            _ => Err(EvaluationFailure::InvalidExpression(
++                "non-operator reached evaluator apply frame",
++            )),
++        }
++    }
++
++    fn apply_infix(
++        &mut self,
++        operator: InfixOperator,
++        left: WorkingValue<'a>,
++        right: WorkingValue<'a>,
++    ) -> EvaluationResult<WorkingValue<'a>> {
++        if let WorkingValue::Error(error) = &left {
++            return Ok(WorkingValue::Error(*error));
++        }
++        if let WorkingValue::Error(error) = &right {
++            return Ok(WorkingValue::Error(*error));
++        }
++
++        match operator {
++            InfixOperator::Add => numeric_binary(self, left, right, |a, b| a + b),
++            InfixOperator::Subtract => numeric_binary(self, left, right, |a, b| a - b),
++            InfixOperator::Multiply => numeric_binary(self, left, right, |a, b| a * b),
++            InfixOperator::Divide => match numeric_pair(self, left, right)? {
++                Err(error) => Ok(WorkingValue::Error(error)),
++                Ok((_, 0.0)) => Ok(WorkingValue::Error(ScalarError::DivisionByZero)),
++                Ok((left, right)) => Ok(finite_number(left / right)),
++            },
++            InfixOperator::Power => match numeric_pair(self, left, right)? {
++                Err(error) => Ok(WorkingValue::Error(error)),
++                Ok((left, right)) if left == 0.0 && right == 0.0 => Ok(WorkingValue::Number(1.0)),
++                Ok((left, right)) => Ok(finite_number(left.powf(right))),
++            },
++            InfixOperator::Concatenate => concatenate(self, left, right),
++            InfixOperator::Equal => Ok(WorkingValue::Logical(compare_equal(
++                self,
++                &left,
++                &right,
++                self.context.options.text_case,
++            )?)),
++            InfixOperator::NotEqual => Ok(WorkingValue::Logical(!compare_equal(
++                self,
++                &left,
++                &right,
++                self.context.options.text_case,
++            )?)),
++            InfixOperator::Less
++            | InfixOperator::LessEqual
++            | InfixOperator::Greater
++            | InfixOperator::GreaterEqual => {
++                ordered_compare(self, operator, left, right, self.context.options.text_case)
++            },
++            InfixOperator::Range | InfixOperator::Intersection | InfixOperator::Union => Err(
++                EvaluationFailure::Unsupported(UnsupportedKind::ReferenceOperator),
++            ),
++        }
++    }
++
++    fn parse_number(&mut self, text: &'a str) -> EvaluationResult<WorkingValue<'a>> {
++        self.charge_bytes(text.len())?;
++        let value = fast_float2::parse::<f64, _>(text).unwrap_or(f64::NAN);
++        Ok(if value.is_finite() {
++            WorkingValue::Number(value)
++        } else {
++            WorkingValue::Error(ScalarError::Number)
++        })
++    }
++
++    fn parse_string(&mut self, text: &'a str) -> EvaluationResult<WorkingValue<'a>> {
++        let body = text
++            .strip_prefix('"')
++            .and_then(|value| value.strip_suffix('"'))
++            .ok_or(EvaluationFailure::InvalidExpression(
++                "string node is missing quote delimiters",
++            ))?;
++        let scan = self.scan_string_body(body)?;
++        if !scan.has_escaped_quotes {
++            if body.len() > self.limits.max_text_bytes {
++                return Err(local_limit(
++                    Resource::Memory,
++                    u64::try_from(body.len()).unwrap_or(u64::MAX),
++                    u64::try_from(self.limits.max_text_bytes).unwrap_or(u64::MAX),
++                ));
++            }
++            return Ok(WorkingValue::Text(TextValue::borrowed(body)));
++        }
++
++        let decoded_len = scan.decoded_len;
++        if decoded_len > self.limits.max_text_bytes {
++            return Err(local_limit(
++                Resource::Memory,
++                u64::try_from(decoded_len).unwrap_or(u64::MAX),
++                u64::try_from(self.limits.max_text_bytes).unwrap_or(u64::MAX),
++            ));
++        }
++
++        let reservation = self.reserve_storage(decoded_len, "formula scalar text")?;
++        let mut decoded = String::new();
++        if decoded_len != 0 {
++            decoded.try_reserve_exact(decoded_len).map_err(|source| {
++                EvaluationFailure::Allocation {
++                    resource: "formula scalar text",
++                    source,
++                }
++            })?;
++        }
++        self.copy_decoded_string(body, &mut decoded)?;
++        if decoded.len() != decoded_len {
++            return Err(EvaluationFailure::InvalidExpression(
++                "decoded string length did not match its admitted size",
++            ));
++        }
++        Ok(WorkingValue::Text(TextValue::owned(decoded, reservation)))
++    }
++
++    fn scan_string_body(&mut self, body: &str) -> EvaluationResult<StringScan> {
++        self.charge_bytes(body.len())?;
++        let bytes = body.as_bytes();
++        let mut decoded_len = body.len();
++        let mut escaped_quotes = 0usize;
++        let mut cursor = 0usize;
++        let mut next_check = 0usize;
++        while cursor < bytes.len() {
++            if cursor >= next_check {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                next_check = cursor.saturating_add(4096);
++            }
++            match bytes[cursor] {
++                0 => {
++                    return Err(EvaluationFailure::InvalidExpression(
++                        "string literal contains NUL",
++                    ));
++                },
++                b'"' => {
++                    if bytes.get(cursor + 1) != Some(&b'"') {
++                        return Err(EvaluationFailure::InvalidExpression(
++                            "unpaired quote in string literal",
++                        ));
++                    }
++                    escaped_quotes = escaped_quotes.checked_add(1).ok_or(
++                        EvaluationFailure::InvalidExpression("string escape count overflow"),
++                    )?;
++                    decoded_len =
++                        decoded_len
++                            .checked_sub(1)
++                            .ok_or(EvaluationFailure::InvalidExpression(
++                                "string escape length underflow",
++                            ))?;
++                    cursor = cursor
++                        .checked_add(2)
++                        .ok_or(EvaluationFailure::InvalidExpression(
++                            "string escape offset overflow",
++                        ))?;
++                },
++                _ => cursor += 1,
++            }
++        }
++        Ok(StringScan {
++            decoded_len,
++            has_escaped_quotes: escaped_quotes != 0,
++        })
++    }
++
++    fn copy_decoded_string(&mut self, body: &str, decoded: &mut String) -> EvaluationResult<()> {
++        // Finding copy segments is a second source scan, separate from the
++        // decoded bytes charged by copy_string_segment and quote writes.
++        self.charge_bytes(body.len())?;
++        let bytes = body.as_bytes();
++        let mut segment_start = 0usize;
++        let mut cursor = 0usize;
++        let mut next_check = 0usize;
++        while cursor < bytes.len() {
++            if cursor >= next_check {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                next_check = cursor.saturating_add(STRING_COPY_CHUNK_BYTES);
++            }
++            if bytes[cursor] == b'"' {
++                if segment_start < cursor {
++                    copy_string_segment(self, decoded, &body[segment_start..cursor])?;
++                }
++                self.charge_bytes(1)?;
++                decoded.push('"');
++                cursor = cursor
++                    .checked_add(2)
++                    .ok_or(EvaluationFailure::InvalidExpression(
++                        "string escape offset overflow",
++                    ))?;
++                segment_start = cursor;
++            } else {
++                cursor += 1;
++            }
++        }
++        if segment_start < body.len() {
++            copy_string_segment(self, decoded, &body[segment_start..])?;
++        }
++        Ok(())
++    }
++
++    fn reserve_storage(&self, bytes: usize, _scope: &'static str) -> EvaluationResult<Reservation> {
++        if bytes > self.limits.max_storage_bytes {
++            return Err(local_limit(
++                Resource::Memory,
++                u64::try_from(bytes).unwrap_or(u64::MAX),
++                u64::try_from(self.limits.max_storage_bytes).unwrap_or(u64::MAX),
++            ));
++        }
++        self.context
++            .execution
++            .check()
++            .map_err(map_execution_error)?;
++        self.storage_budget
++            .reserve(Resource::Memory, u64::try_from(bytes).unwrap_or(u64::MAX))
++            .map_err(EvaluationFailure::ResourceLimit)
++    }
++
++    fn push_frame(&mut self, frame: Frame<'a>) -> EvaluationResult<()> {
++        self.ensure_frame_capacity(1)?;
++        self.frames.push(frame);
++        Ok(())
++    }
++
++    fn push_value(&mut self, value: WorkingValue<'a>) -> EvaluationResult<()> {
++        self.ensure_value_capacity(1)?;
++        self.values.push(value);
++        Ok(())
++    }
++
++    fn pop_value(&mut self) -> EvaluationResult<WorkingValue<'a>> {
++        self.values
++            .pop()
++            .ok_or(EvaluationFailure::InvalidExpression(
++                "operator value stack underflow",
++            ))
++    }
++
++    fn ensure_frame_capacity(&mut self, additional: usize) -> EvaluationResult<()> {
++        let execution = self.context.execution;
++        let storage_budget = &self.storage_budget;
++        ensure_capacity(
++            &mut self.frames,
++            &mut self.frame_reservation,
++            additional,
++            self.limits.max_stack_entries,
++            execution,
++            storage_budget,
++            "formula scalar frame stack",
++        )
++    }
++
++    fn ensure_value_capacity(&mut self, additional: usize) -> EvaluationResult<()> {
++        let execution = self.context.execution;
++        let storage_budget = &self.storage_budget;
++        ensure_capacity(
++            &mut self.values,
++            &mut self.value_reservation,
++            additional,
++            self.limits.max_stack_entries,
++            execution,
++            storage_budget,
++            "formula scalar value stack",
++        )
++    }
++
++    fn into_public(self, value: WorkingValue<'a>) -> EvaluatedScalar<'a> {
++        match value {
++            WorkingValue::Number(value) => EvaluatedScalar::new(ScalarValue::Number(value), None),
++            WorkingValue::Logical(value) => EvaluatedScalar::new(ScalarValue::Logical(value), None),
++            WorkingValue::Error(value) => EvaluatedScalar::new(ScalarValue::Error(value), None),
++            WorkingValue::Text(value) => {
++                EvaluatedScalar::new(ScalarValue::Text(value.text), value.reservation)
++            },
++        }
++    }
++}
++
++fn ensure_capacity<T>(
++    values: &mut Vec<T>,
++    reservation: &mut Option<Reservation>,
++    additional: usize,
++    maximum: usize,
++    execution: &ExecutionContext,
++    storage_budget: &Budget,
++    scope: &'static str,
++) -> EvaluationResult<()> {
++    let required =
++        values
++            .len()
++            .checked_add(additional)
++            .ok_or(EvaluationFailure::InvalidExpression(
++                "evaluator stack length overflow",
++            ))?;
++    if required > maximum {
++        return Err(local_limit(
++            Resource::Objects,
++            u64::try_from(required).unwrap_or(u64::MAX),
++            u64::try_from(maximum).unwrap_or(u64::MAX),
++        ));
++    }
++    if required <= values.capacity() {
++        return Ok(());
++    }
++    let grown = values
++        .capacity()
++        .max(1)
++        .checked_mul(2)
++        .unwrap_or(maximum)
++        .max(required)
++        .min(maximum);
++    let bytes = grown
++        .checked_mul(size_of::<T>())
++        .ok_or(EvaluationFailure::InvalidExpression(
++            "evaluator stack byte size overflow",
++        ))?;
++    execution.check().map_err(map_execution_error)?;
++    let reservation_new = storage_budget
++        .reserve(Resource::Memory, u64::try_from(bytes).unwrap_or(u64::MAX))
++        .map_err(EvaluationFailure::ResourceLimit)?;
++    let old_reservation = reservation.take();
++    let result = values.try_reserve_exact(grown.saturating_sub(values.len()));
++    if let Err(source) = result {
++        *reservation = old_reservation;
++        return Err(EvaluationFailure::Allocation {
++            resource: scope,
++            source,
++        });
++    }
++    drop(old_reservation);
++    *reservation = Some(reservation_new);
++    Ok(())
++}
++
++fn apply_prefix<'a>(
++    operator: PrefixOperator,
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<WorkingValue<'a>> {
++    match operator {
++        PrefixOperator::Plus => Ok(value),
++        PrefixOperator::Minus => match to_number(value, evaluator)? {
++            Ok(number) => Ok(finite_number(-number)),
++            Err(error) => Ok(WorkingValue::Error(error)),
++        },
++    }
++}
++
++fn apply_postfix<'a>(
++    operator: PostfixOperator,
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<WorkingValue<'a>> {
++    match operator {
++        PostfixOperator::Percent => match to_number(value, evaluator)? {
++            Ok(number) => Ok(finite_number(number / 100.0)),
++            Err(error) => Ok(WorkingValue::Error(error)),
++        },
++    }
++}
++
++fn numeric_binary<'a>(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    left: WorkingValue<'a>,
++    right: WorkingValue<'a>,
++    operation: impl FnOnce(f64, f64) -> f64,
++) -> EvaluationResult<WorkingValue<'a>> {
++    match numeric_pair(evaluator, left, right)? {
++        Ok((left, right)) => Ok(finite_number(operation(left, right))),
++        Err(error) => Ok(WorkingValue::Error(error)),
++    }
++}
++
++fn numeric_pair<'a>(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    left: WorkingValue<'a>,
++    right: WorkingValue<'a>,
++) -> EvaluationResult<Result<(f64, f64), ScalarError>> {
++    let left = match to_number(left, evaluator)? {
++        Ok(value) => value,
++        Err(error) => return Ok(Err(error)),
++    };
++    let right = match to_number(right, evaluator)? {
++        Ok(value) => value,
++        Err(error) => return Ok(Err(error)),
++    };
++    Ok(Ok((left, right)))
++}
++
++fn finite_number<'a>(value: f64) -> WorkingValue<'a> {
++    if value.is_finite() {
++        WorkingValue::Number(value)
++    } else {
++        WorkingValue::Error(ScalarError::Number)
++    }
++}
++
++fn to_number<'a>(
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<Result<f64, ScalarError>> {
++    match value {
++        WorkingValue::Number(value) => Ok(Ok(value)),
++        WorkingValue::Logical(value) => Ok(Ok(if value { 1.0 } else { 0.0 })),
++        WorkingValue::Text(text) => {
++            evaluator.charge_bytes(text.text.len())?;
++            let parsed = fast_float2::parse::<f64, _>(text.text.as_ref()).ok();
++            match parsed.filter(|value| value.is_finite()) {
++                Some(value) => Ok(Ok(value)),
++                None => Ok(Err(ScalarError::Value)),
++            }
++        },
++        WorkingValue::Error(error) => Ok(Err(error)),
++    }
++}
++
++fn to_text<'a>(
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<TextValue<'a>> {
++    match value {
++        WorkingValue::Text(value) => Ok(value),
++        WorkingValue::Logical(value) => {
++            Ok(TextValue::borrowed(if value { "TRUE" } else { "FALSE" }))
++        },
++        WorkingValue::Number(value) => {
++            evaluator.charge_work(1)?;
++            let mut number = NumberText::new();
++            write!(&mut number, "{value}").map_err(|_| {
++                EvaluationFailure::InvalidExpression("number-to-text formatting failed")
++            })?;
++            let rendered = number
++                .as_str()
++                .map_err(|_| EvaluationFailure::InvalidExpression("invalid formatted number"))?;
++            evaluator.charge_bytes(rendered.len())?;
++            if rendered.len() > evaluator.limits.max_text_bytes {
++                return Err(local_limit(
++                    Resource::Memory,
++                    u64::try_from(rendered.len()).unwrap_or(u64::MAX),
++                    u64::try_from(evaluator.limits.max_text_bytes).unwrap_or(u64::MAX),
++                ));
++            }
++            let reservation =
++                evaluator.reserve_storage(rendered.len(), "formula scalar number text")?;
++            let mut text = String::new();
++            if !rendered.is_empty() {
++                text.try_reserve_exact(rendered.len()).map_err(|source| {
++                    EvaluationFailure::Allocation {
++                        resource: "formula scalar number text",
++                        source,
++                    }
++                })?;
++            }
++            text.push_str(rendered);
++            Ok(TextValue::owned(text, reservation))
++        },
++        WorkingValue::Error(_) => Err(EvaluationFailure::InvalidExpression(
++            "error reached text conversion after propagation check",
++        )),
++    }
++}
++
++fn concatenate<'a>(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    left: WorkingValue<'a>,
++    right: WorkingValue<'a>,
++) -> EvaluationResult<WorkingValue<'a>> {
++    let left = to_text(left, evaluator)?;
++    let right = to_text(right, evaluator)?;
++    let left_len = left.text.len();
++    let right_len = right.text.len();
++    let total = left_len.checked_add(right_len).ok_or_else(|| {
++        local_limit(
++            Resource::Memory,
++            u64::MAX,
++            evaluator.limits.max_text_bytes as u64,
++        )
++    })?;
++    if total > evaluator.limits.max_text_bytes {
++        return Err(local_limit(
++            Resource::Memory,
++            u64::try_from(total).unwrap_or(u64::MAX),
++            u64::try_from(evaluator.limits.max_text_bytes).unwrap_or(u64::MAX),
++        ));
++    }
++
++    if left_len == 0 {
++        return Ok(WorkingValue::Text(right));
++    }
++    if right_len == 0 {
++        return Ok(WorkingValue::Text(left));
++    }
++    let work = match &left.text {
++        Cow::Owned(output) if output.capacity() >= total => right_len,
++        _ => total,
++    };
++    evaluator.charge_bytes(work)?;
++
++    match left.text {
++        Cow::Owned(mut output) => {
++            let current_capacity = output.capacity();
++            let mut output_reservation = left.reservation;
++            if current_capacity < total {
++                let target_capacity = current_capacity
++                    .max(1)
++                    .checked_mul(2)
++                    .unwrap_or(total)
++                    .max(total);
++                let reservation =
++                    evaluator.reserve_storage(target_capacity, "formula scalar concatenation")?;
++                output
++                    .try_reserve_exact(target_capacity.saturating_sub(output.len()))
++                    .map_err(|source| EvaluationFailure::Allocation {
++                        resource: "formula scalar concatenation",
++                        source,
++                    })?;
++                drop(output_reservation.take());
++                output_reservation = Some(reservation);
++            }
++            output.push_str(right.text.as_ref());
++            drop(right.reservation);
++            Ok(WorkingValue::Text(TextValue {
++                text: Cow::Owned(output),
++                reservation: output_reservation,
++            }))
++        },
++        Cow::Borrowed(left_text) => {
++            let reservation = evaluator.reserve_storage(total, "formula scalar concatenation")?;
++            let mut output = String::new();
++            if total != 0 {
++                output.try_reserve_exact(total).map_err(|source| {
++                    EvaluationFailure::Allocation {
++                        resource: "formula scalar concatenation",
++                        source,
++                    }
++                })?;
++            }
++            output.push_str(left_text);
++            output.push_str(right.text.as_ref());
++            drop(right.reservation);
++            Ok(WorkingValue::Text(TextValue::owned(output, reservation)))
++        },
++    }
++}
++
++fn compare_equal(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    left: &WorkingValue<'_>,
++    right: &WorkingValue<'_>,
++    case: TextCase,
++) -> EvaluationResult<bool> {
++    match (left, right) {
++        (WorkingValue::Number(left), WorkingValue::Number(right)) => Ok(left == right),
++        (WorkingValue::Logical(left), WorkingValue::Logical(right)) => Ok(left == right),
++        (WorkingValue::Text(left), WorkingValue::Text(right)) => {
++            let bytes = left
++                .text
++                .len()
++                .checked_add(right.text.len())
++                .ok_or_else(|| local_limit(Resource::Work, u64::MAX, evaluator.limits.max_steps))?;
++            evaluator.charge_bytes(bytes)?;
++            Ok(
++                compare_text(evaluator, left.text.as_ref(), right.text.as_ref(), case)?
++                    == Ordering::Equal,
++            )
++        },
++        _ => Ok(false),
++    }
++}
++
++fn ordered_compare<'a>(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    operator: InfixOperator,
++    left: WorkingValue<'a>,
++    right: WorkingValue<'a>,
++    case: TextCase,
++) -> EvaluationResult<WorkingValue<'a>> {
++    let ordering = match (&left, &right) {
++        (WorkingValue::Number(left), WorkingValue::Number(right)) => left.partial_cmp(right),
++        (WorkingValue::Logical(left), WorkingValue::Logical(right)) => {
++            (*left as u8).partial_cmp(&(*right as u8))
++        },
++        (WorkingValue::Text(left), WorkingValue::Text(right)) => {
++            let bytes = left
++                .text
++                .len()
++                .checked_add(right.text.len())
++                .ok_or_else(|| local_limit(Resource::Work, u64::MAX, evaluator.limits.max_steps))?;
++            evaluator.charge_bytes(bytes)?;
++            Some(compare_text(
++                evaluator,
++                left.text.as_ref(),
++                right.text.as_ref(),
++                case,
++            )?)
++        },
++        _ => {
++            return Ok(WorkingValue::Error(ScalarError::Value));
++        },
++    }
++    .ok_or(EvaluationFailure::InvalidExpression(
++        "non-finite number reached ordered comparison",
++    ))?;
++
++    let result = match operator {
++        InfixOperator::Less => ordering == Ordering::Less,
++        InfixOperator::LessEqual => ordering != Ordering::Greater,
++        InfixOperator::Greater => ordering == Ordering::Greater,
++        InfixOperator::GreaterEqual => ordering != Ordering::Less,
++        _ => {
++            return Err(EvaluationFailure::InvalidExpression(
++                "non-ordering operator reached ordered comparison",
++            ));
++        },
++    };
++    Ok(WorkingValue::Logical(result))
++}
++
++fn compare_text(
++    evaluator: &mut Evaluator<'_, '_, '_>,
++    left: &str,
++    right: &str,
++    case: TextCase,
++) -> EvaluationResult<Ordering> {
++    match case {
++        TextCase::Sensitive => {
++            let shared = left.len().min(right.len());
++            let mut offset = 0usize;
++            while offset < shared {
++                evaluator
++                    .context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                let end = offset.saturating_add(4096).min(shared);
++                let ordering = left.as_bytes()[offset..end].cmp(&right.as_bytes()[offset..end]);
++                if ordering != Ordering::Equal {
++                    return Ok(ordering);
++                }
++                offset = end;
++            }
++            Ok(left.len().cmp(&right.len()))
++        },
++    }
++}
++
++fn parse_error(text: &str) -> ScalarError {
++    if text.eq_ignore_ascii_case("#N/A") {
++        ScalarError::NotAvailable
++    } else if text.eq_ignore_ascii_case("#DIV/0!") {
++        ScalarError::DivisionByZero
++    } else if text.eq_ignore_ascii_case("#REF!") {
++        ScalarError::Reference
++    } else if text.eq_ignore_ascii_case("#NUM!") {
++        ScalarError::Number
++    } else if text.eq_ignore_ascii_case("#NULL!") {
++        ScalarError::Null
++    } else if text.eq_ignore_ascii_case("#VALUE!") {
++        ScalarError::Value
++    } else {
++        ScalarError::Name
++    }
++}
++
++fn local_limit(resource: Resource, observed: u64, limit: u64) -> EvaluationFailure {
++    EvaluationFailure::ResourceLimit(ResourceLimit {
++        resource,
++        observed,
++        limit,
++        scope: Arc::from(EVALUATION_SCOPE),
++    })
++}
++
++fn map_execution_error(error: ExecutionError) -> EvaluationFailure {
++    match error {
++        ExecutionError::Cancelled => EvaluationFailure::Cancelled,
++        ExecutionError::ResourceLimit(limit) => EvaluationFailure::ResourceLimit(limit),
++        other => EvaluationFailure::Execution(other),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Profile};
++    use std::num::{NonZeroU64, NonZeroUsize};
++
++    fn context() -> (CancellationSource, ExecutionContext) {
++        let budget = Budget::root(
++            Arc::from("ods-formula-test"),
++            litchi_core::Limits::for_profile(Profile::Desktop),
++        );
++        let (source, token) = CancellationSource::pair();
++        let execution = ExecutionContext::new(
++            budget,
++            token,
++            ExecutionLimits::new(
++                NonZeroUsize::MIN,
++                NonZeroUsize::MIN,
++                NonZeroU64::new(1 << 30).unwrap(),
++                1 << 20,
++            )
++            .unwrap(),
++        );
++        (source, execution)
++    }
++
++    #[test]
++    fn evaluates_scalar_operators_without_recursive_walk() {
++        let (_, execution) = context();
++        for (source, expected) in [
++            ("=2+3*4", 14.0),
++            ("=-2^2", 4.0),
++            ("=2^3^2", 64.0),
++            ("=50%", 0.5),
++        ] {
++            let expression = Expression::parse(source).unwrap();
++            let result =
++                evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                    .unwrap();
++            assert_eq!(result.value(), &ScalarValue::Number(expected));
++        }
++    }
++
++    #[test]
++    fn preserves_text_and_maps_errors() {
++        let (_, execution) = context();
++        let expression = Expression::parse("=\"a\"&1").unwrap();
++        let result =
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                .unwrap();
++        assert_eq!(
++            result.value(),
++            &ScalarValue::Text(Cow::Owned("a1".to_string()))
++        );
++
++        let expression = Expression::parse("=#N/A+1").unwrap();
++        let result =
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                .unwrap();
++        assert_eq!(
++            result.value(),
++            &ScalarValue::Error(ScalarError::NotAvailable)
++        );
++
++        let expression = Expression::parse("=#UNKNOWN!").unwrap();
++        let result =
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                .unwrap();
++        assert_eq!(result.value(), &ScalarValue::Error(ScalarError::Name));
++
++        let expression = Expression::parse("=TRUE()&FALSE()").unwrap();
++        let result =
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                .unwrap();
++        assert_eq!(
++            result.value(),
++            &ScalarValue::Text(Cow::Owned("TRUEFALSE".to_string()))
++        );
++    }
++
++    #[test]
++    fn rejects_capabilities_and_honors_cancellation() {
++        let expression = Expression::parse("[.A1]").unwrap();
++        let (_, execution) = context();
++        let error =
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default())
++                .unwrap_err();
++        assert!(matches!(
++            error,
++            EvaluationFailure::Unsupported(UnsupportedKind::Reference)
++        ));
++
++        let (source, execution) = context();
++        source.cancel();
++        let expression = Expression::parse("1+2").unwrap();
++        assert!(matches!(
++            evaluate_scalar_with_context(&expression, &execution, &EvaluationLimits::default()),
++            Err(EvaluationFailure::Cancelled)
++        ));
++    }
++}
+diff --git a/crates/litchi-ods/tests/ods_formula_evaluation.rs b/crates/litchi-ods/tests/ods_formula_evaluation.rs
+new file mode 100644
+index 000000000..8358a7c04
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_evaluation.rs
+@@ -0,0 +1,724 @@
++//! Independent integration coverage for the bounded scalar OpenFormula
++//! evaluation profile.
++//!
++//! The cases in this file exercise an already parsed expression with an
++//! explicit caller context.  They keep formula errors as values, distinguish
++//! evaluator capability refusals from formula results, and check that local
++//! limits and cancellation release temporary budget reservations.
++
++use std::num::{NonZeroU64, NonZeroUsize};
++
++use litchi_core::{
++    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Profile,
++    Resource,
++};
++use litchi_ods::codec::formula::{
++    evaluation::{
++        EvaluatedScalar, EvaluationContext, EvaluationFailure, EvaluationLimits, ScalarError,
++        ScalarValue, UnsupportedKind, evaluate_scalar,
++    },
++    expression::Expression,
++};
++
++fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
++    execution_with_core_limits(scope, CoreLimits::for_profile(Profile::Server))
++}
++
++fn execution_with_memory(
++    scope: &str,
++    memory_bytes: usize,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    let memory_bytes = u64::try_from(memory_bytes).expect("test memory limit fits u64");
++    execution_with_core_limits(
++        scope,
++        CoreLimits::new(
++            memory_bytes,
++            1 << 30,
++            1 << 30,
++            10_000_000,
++            256,
++            1_000_000_000,
++        ),
++    )
++}
++
++fn execution_with_core_limits(
++    scope: &str,
++    core_limits: CoreLimits,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    let budget = Budget::root(scope.to_owned(), core_limits);
++    let (cancellation, token) = CancellationSource::pair();
++    let execution_limits = ExecutionLimits::new(
++        NonZeroUsize::new(1).expect("one worker"),
++        NonZeroUsize::new(1).expect("one in-flight task"),
++        NonZeroU64::new(1024 * 1024).expect("one in-flight MiB"),
++        0,
++    )
++    .expect("valid execution limits");
++    (
++        budget.clone(),
++        cancellation,
++        ExecutionContext::new(budget, token, execution_limits),
++    )
++}
++
++fn parse(source: &str) -> Expression {
++    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
++}
++
++fn escaped_literal(decoded_bytes: usize) -> String {
++    assert!(decoded_bytes >= 1);
++    let mut literal = String::from("\"");
++    literal.push_str(&"a".repeat(decoded_bytes - 1));
++    literal.push_str("\"\"");
++    literal.push('"');
++    literal
++}
++
++fn evaluate<'a>(
++    expression: &'a Expression,
++    context: &ExecutionContext,
++    limits: &EvaluationLimits,
++) -> Result<EvaluatedScalar<'a>, EvaluationFailure> {
++    // Keep the context explicit at the integration boundary.  This makes it
++    // impossible for a caller to accidentally bypass cancellation or budget
++    // charging by using an implicit evaluator context.
++    let evaluation_context = EvaluationContext::new(context);
++    evaluate_scalar(expression, &evaluation_context, limits)
++}
++
++fn number(result: &EvaluatedScalar<'_>) -> f64 {
++    match result.value() {
++        ScalarValue::Number(value) => *value,
++        value => panic!("expected Number, got {value:?}"),
++    }
++}
++
++fn logical(result: &EvaluatedScalar<'_>) -> bool {
++    match result.value() {
++        ScalarValue::Logical(value) => *value,
++        value => panic!("expected Logical, got {value:?}"),
++    }
++}
++
++fn text<'r>(result: &'r EvaluatedScalar<'_>) -> &'r str {
++    match result.value() {
++        ScalarValue::Text(value) => value.as_ref(),
++        value => panic!("expected Text, got {value:?}"),
++    }
++}
++
++fn formula_error(result: &EvaluatedScalar<'_>) -> ScalarError {
++    match result.value() {
++        ScalarValue::Error(error) => *error,
++        value => panic!("expected formula Error, got {value:?}"),
++    }
++}
++
++fn assert_unsupported(source: &str, expected: UnsupportedKind) {
++    let expression = parse(source);
++    let (_budget, _cancellation, context) = execution("ods-formula-unsupported");
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("capability-dependent expression should be refused");
++    assert!(
++        matches!(error, EvaluationFailure::Unsupported(kind) if kind == expected),
++        "{source:?} returned the wrong capability error: {error}"
++    );
++}
++
++#[test]
++fn arithmetic_uses_odf_precedence_and_left_associativity() {
++    let (_budget, _cancellation, context) = execution("ods-formula-arithmetic");
++    let cases = [
++        ("=2+3", 5.0),
++        ("=7-2", 5.0),
++        ("=6*7", 42.0),
++        ("=8/2", 4.0),
++        ("=2^3", 8.0),
++        ("=2^3^2", 64.0),
++        ("=2^(-1)", 0.5),
++        ("=+2", 2.0),
++        ("=-2", -2.0),
++        ("=-2^2", 4.0),
++        ("=-(2^2)", -4.0),
++        ("=50%", 0.5),
++        ("=(2+3)%", 0.05),
++        ("=2+3*4", 14.0),
++        ("=8-3-2", 3.0),
++        ("=8/2*2", 8.0),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn text_and_logical_values_follow_the_declared_scalar_profile() {
++    let (_budget, _cancellation, context) = execution("ods-formula-values");
++    let cases = [
++        ("=\"a\"&\"b\"", "ab"),
++        ("=\"\"&\"x\"", "x"),
++        ("=1&2", "12"),
++        ("=TRUE()&FALSE()", "TRUEFALSE"),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(text(&result), expected, "{source:?}");
++    }
++
++    let expression = parse("=TRUE()");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert!(logical(&result));
++
++    let expression = parse("=FALSE()");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert!(!logical(&result));
++
++    for (source, expected) in [("=TRUE()+2", 3.0), ("=FALSE()+2", 2.0)] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn comparisons_keep_scalar_types_and_use_exact_text_ordering() {
++    let (_budget, _cancellation, context) = execution("ods-formula-comparisons");
++    let cases = [
++        ("=2=2", true),
++        ("=2=3", false),
++        ("=2<3", true),
++        ("=3<=3", true),
++        ("=4>3", true),
++        ("=3>=3", true),
++        ("=\"a\"=\"a\"", true),
++        ("=\"a\"=\"b\"", false),
++        ("=1=\"1\"", false),
++        ("=2<>3", true),
++        ("=2<>2", false),
++        ("=TRUE()=TRUE()", true),
++        ("=TRUE()=FALSE()", false),
++        ("=TRUE()<>FALSE()", true),
++        ("=TRUE()>FALSE()", true),
++        ("=FALSE()<=TRUE()", true),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(logical(&result), expected, "{source:?}");
++    }
++
++    // The published profile compares Unicode scalar values without case
++    // folding or normalization.  The decomposed and precomposed spellings
++    // therefore remain distinct, and the insensitive host policy is deferred.
++    let expression = parse("=\"\u{00e9}\"=\"e\u{0301}\"");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert!(!logical(&result));
++    let expression = parse("=\"\u{00e9}\">\"e\u{0301}\"");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert!(logical(&result));
++}
++
++#[test]
++fn formula_errors_are_values_and_propagate_without_becoming_rust_failures() {
++    let (_budget, _cancellation, context) = execution("ods-formula-errors");
++    let cases = [
++        ("=#N/A", ScalarError::NotAvailable),
++        ("=#N/A+1", ScalarError::NotAvailable),
++        ("=1-#DIV/0!", ScalarError::DivisionByZero),
++        ("=#N/A*2", ScalarError::NotAvailable),
++        ("=#N/A^2", ScalarError::NotAvailable),
++        ("=#N/A<>1", ScalarError::NotAvailable),
++        ("=#N/A<1", ScalarError::NotAvailable),
++        ("=#N/A&\"x\"", ScalarError::NotAvailable),
++        ("=#N/A=#N/A", ScalarError::NotAvailable),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should produce a formula value: {error}"));
++        assert_eq!(formula_error(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn declared_text_conversion_and_mixed_ordering_profile_are_typed() {
++    let (_budget, _cancellation, context) = execution("ods-formula-conversion");
++    let expression = parse("=\"2\"+1");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(number(&result), 3.0);
++
++    let expression = parse("=\"not-a-number\"+1");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(formula_error(&result), ScalarError::Value);
++
++    let expression = parse("=1<\"2\"");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(formula_error(&result), ScalarError::Value);
++}
++
++#[test]
++fn numeric_domain_and_nonfinite_results_become_formula_number_errors() {
++    let (_budget, _cancellation, context) = execution("ods-formula-number-errors");
++    for source in ["=1e9999", "=1e308*1e308", "=0^(-1)"] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a formula result: {error}"));
++        assert_eq!(formula_error(&result), ScalarError::Number, "{source:?}");
++    }
++
++    // §6.16.46 permits 0^0 to be 0, 1, or an Error.  This profile documents
++    // and selects 1, so this is a profile assertion rather than a universal
++    // OpenFormula claim.
++    let expression = parse("=0^0");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(number(&result), 1.0);
++}
++
++#[test]
++fn source_and_forced_recalculation_marker_survive_evaluation() {
++    let source = "of:== 2 + 3 ";
++    let expression = parse(source);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++    let (_budget, _cancellation, context) = execution("ods-formula-source");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(number(&result), 5.0);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++}
++
++#[test]
++fn context_dependent_features_are_explicit_capability_refusals() {
++    assert_unsupported("=[.A1]", UnsupportedKind::Reference);
++    assert_unsupported("=[.A1:.B2]", UnsupportedKind::Reference);
++    assert_unsupported("={1;2|3}", UnsupportedKind::Array);
++    assert_unsupported("=Named", UnsupportedKind::NamedExpression);
++    assert_unsupported("='Column Label'", UnsupportedKind::Label);
++    assert_unsupported("=SUM(1)", UnsupportedKind::Function);
++}
++
++#[test]
++fn supported_boolean_functions_eagerly_evaluate_children_before_arity_errors() {
++    let expression = parse("=TRUE([.A1])");
++    let (_budget, _cancellation, context) = execution("ods-formula-eager-reference");
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("TRUE(reference) must visit the reference child");
++    assert!(
++        matches!(
++            &error,
++            EvaluationFailure::Unsupported(UnsupportedKind::Reference)
++        ),
++        "reference child was bypassed: {error}"
++    );
++
++    let expression = parse("=FALSE(1/0)");
++    let (_budget, _cancellation, context) = execution("ods-formula-eager-division");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("FALSE(1/0) should retain the child formula error");
++    assert_eq!(formula_error(&result), ScalarError::DivisionByZero);
++
++    let expression = parse("=TRUE(#N/A;#DIV/0!)");
++    let (_budget, _cancellation, context) = execution("ods-formula-eager-errors");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("boolean arity handling should retain child errors");
++    assert_eq!(
++        formula_error(&result),
++        ScalarError::NotAvailable,
++        "the first source-ordered child error must win"
++    );
++
++    let (budget, _cancellation, context) = execution("ods-formula-eager-arity");
++    let expression = parse("=TRUE(1+2)");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("a wrong-arity scalar call should produce a formula value");
++    assert_eq!(formula_error(&result), ScalarError::Value);
++    assert!(
++        budget.used(Resource::Work) > 0,
++        "argument evaluation must consume work before the arity value"
++    );
++
++    let (budget, _cancellation, context) = execution("ods-formula-eager-work");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(8),
++    )
++    .expect_err("a child that exceeds Work must not be bypassed by arity handling");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++        "child work failure was bypassed: {error}"
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn cancellation_is_checked_before_work_and_leaves_no_reservation() {
++    let (budget, cancellation, context) = execution("ods-formula-cancel");
++    cancellation.cancel();
++    let expression = parse("=1+2");
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("cancelled evaluation should refuse");
++    assert!(matches!(error, EvaluationFailure::Cancelled));
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Work), 0);
++}
++
++#[test]
++fn zero_step_and_zero_stack_limits_are_typed_and_atomic() {
++    let (budget, _cancellation, context) = execution("ods-formula-step-limit");
++    let expression = parse("=1+2");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(0),
++    )
++    .expect_err("zero step allowance should refuse before the first step");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Work), 0);
++
++    let (budget, _cancellation, context) = execution("ods-formula-stack-limit");
++    let expression = parse("=1");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_stack_entries(0),
++    )
++    .expect_err("zero stack allowance should refuse before adoption");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Objects)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn text_limit_failure_is_typed_and_releases_temporary_storage() {
++    let (budget, _cancellation, context) = execution("ods-formula-text-limit");
++    let expression = parse("=\"abcdefgh\"&\"ijkl\"");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_text_bytes(11),
++    )
++    .expect_err("the twelve-byte result should exceed the eleven-byte limit");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn decoded_quoted_text_obeys_the_decoded_byte_boundary() {
++    let expression = parse("=\"a\"\"b\"");
++    let (_budget, _cancellation, context) = execution("ods-formula-decoded-text");
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_text_bytes(3),
++    )
++    .expect("decoded three-byte text should fit exactly");
++    assert_eq!(text(&result), "a\"b");
++
++    let (budget, _cancellation, context) = execution("ods-formula-decoded-text-short");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_text_bytes(2),
++    )
++    .expect_err("decoded three-byte text should exceed a two-byte limit");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn escaped_literal_copy_has_its_own_work_boundary_after_source_scan() {
++    let expression = parse("=\"aaaa\"\"bbbb\"");
++    let root_text = expression.root().text();
++    let body = root_text
++        .strip_prefix('"')
++        .and_then(|value| value.strip_suffix('"'))
++        .expect("string root delimiters");
++    let escaped_quotes = body.matches("\"\"").count();
++    let decoded_bytes = body.len() - escaped_quotes;
++    assert_eq!(body.len(), 10);
++    assert_eq!(decoded_bytes, 9);
++
++    let (budget, _cancellation, context) = execution("ods-formula-string-copy-work");
++    // Evaluation charges the initial source scan and the second source scan
++    // used to locate copy segments before charging decoded output bytes.
++    let source_scan_only = 1 + 2 * body.len() as u64;
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(source_scan_only),
++    )
++    .expect_err("source scan should fit while decoded copy exceeds Work");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++        "decoded copy returned the wrong result: {error}"
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let (_budget, _cancellation, context) = execution("ods-formula-string-copy-exact");
++    let exact = EvaluationLimits::default().with_max_steps(source_scan_only + decoded_bytes as u64);
++    let result = evaluate(&expression, &context, &exact)
++        .expect("source scan plus decoded copy should fit exactly");
++    assert_eq!(text(&result), "aaaa\"bbbb");
++}
++
++#[test]
++fn cancellation_before_a_long_escaped_quote_scan_is_atomic() {
++    let mut source = String::from("=\"");
++    for _ in 0..4_097 {
++        source.push_str("\"\"");
++    }
++    source.push('"');
++    let expression = parse(&source);
++    let (budget, cancellation, context) = execution("ods-formula-string-cancel");
++    cancellation.cancel();
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("cancelled long escaped literal should refuse before scanning");
++    assert!(matches!(error, EvaluationFailure::Cancelled));
++    assert_eq!(budget.used(Resource::Memory), 0);
++    assert_eq!(budget.used(Resource::Work), 0);
++}
++
++#[test]
++fn borrowed_plain_text_has_no_output_reservation() {
++    let (budget, _cancellation, context) = execution("ods-formula-borrowed-text");
++    let expression = parse("=\"plain\"");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(text(&result), "plain");
++    assert_eq!(result.reserved_output_bytes(), 0);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn owned_text_result_keeps_its_output_reservation_until_drop() {
++    let (budget, _cancellation, context) = execution("ods-formula-text-result");
++    let expression = parse("=\"a\"\"b\"");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default()).unwrap();
++    assert_eq!(text(&result), "a\"b");
++    assert!(result.reserved_output_bytes() > 0);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(result);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn storage_admission_accounts_for_live_operands_and_ancestor_budget() {
++    const DECODED_BYTES: usize = 2_048;
++    const STORAGE_CAP: usize = 3_000;
++    const TEXT_CAP: usize = 4_096;
++    let left = escaped_literal(DECODED_BYTES);
++    let right = escaped_literal(DECODED_BYTES);
++    let single_source = format!("={left}");
++    let combined_source = format!("={left}&{right}");
++    let single = parse(&single_source);
++    let combined = parse(&combined_source);
++    let limits = EvaluationLimits::default()
++        .with_max_storage_bytes(STORAGE_CAP)
++        .with_max_text_bytes(TEXT_CAP);
++
++    // Each operand fits by itself under the cap, including its escaped quote
++    // decode and evaluator stack.  This prevents a test that only proves the
++    // cap is smaller than one allocation.
++    let (single_budget, _cancellation, single_context) = execution("ods-formula-storage-single");
++    let single_result = evaluate(&single, &single_context, &limits)
++        .expect("one 2048-byte decoded operand should fit under 3000 bytes");
++    assert_eq!(text(&single_result).len(), DECODED_BYTES);
++    assert!(single_result.reserved_output_bytes() >= DECODED_BYTES);
++    drop(single_result);
++    assert_eq!(single_budget.used(Resource::Memory), 0);
++
++    // During the binary operation both decoded operands are live.  The
++    // aggregate admission must fail before adopting the second operand or
++    // silently growing an uncharged result buffer.
++    let (budget, _cancellation, context) = execution("ods-formula-storage-local");
++    let error = evaluate(&combined, &context, &limits)
++        .expect_err("two live 2048-byte operands should exceed the 3000-byte cap");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    // The same local operation must also respect a tighter ancestor budget.
++    let (budget, _cancellation, context) =
++        execution_with_memory("ods-formula-storage-ancestor-short", STORAGE_CAP);
++    let error = evaluate(
++        &combined,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_storage_bytes(TEXT_CAP)
++            .with_max_text_bytes(TEXT_CAP),
++    )
++    .expect_err("the ancestor budget must cap aggregate evaluator storage");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    // A successful output reservation remains live independently of the
++    // caller's context handle and is released exactly when the result drops.
++    let (budget, _cancellation, context) =
++        execution_with_memory("ods-formula-storage-ancestor-output", STORAGE_CAP);
++    let result = evaluate(
++        &single,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_storage_bytes(TEXT_CAP)
++            .with_max_text_bytes(TEXT_CAP),
++    )
++    .expect("one decoded operand should fit the ancestor budget");
++    assert_eq!(text(&result).len(), DECODED_BYTES);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(context);
++    assert!(
++        budget.used(Resource::Memory) > 0,
++        "dropping the execution context must not release a live output"
++    );
++    drop(result);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn storage_limit_refusal_is_atomic_for_owned_text() {
++    let (budget, _cancellation, context) = execution("ods-formula-storage-limit");
++    let expression = parse("=\"a\"\"b\"");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_storage_bytes(2),
++    )
++    .expect_err("decoded three-byte text should exceed storage limit two");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn number_to_text_reservation_covers_tiny_and_large_finite_values() {
++    let (_budget, _cancellation, context) = execution("ods-formula-number-text");
++    for source in [
++        "=0.000000000000000000000000000000000000000001&\"\"",
++        "=10000000000000000000000000000000000000000&\"\"",
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        let value = text(&result);
++        assert!(!value.is_empty(), "{source:?} produced empty text");
++        assert!(
++            value.parse::<f64>().is_ok(),
++            "{source:?} produced nonnumeric text {value:?}"
++        );
++        assert!(
++            result.reserved_output_bytes() >= value.len(),
++            "{source:?} reserved {} bytes for {} output bytes",
++            result.reserved_output_bytes(),
++            value.len()
++        );
++        if source.starts_with("=100") {
++            assert!(
++                value.len() > 32,
++                "large finite value should exercise growth"
++            );
++        }
++    }
++}
++
++#[test]
++fn repeated_escaped_literals_and_left_associative_concat_keep_full_output_budgeted() {
++    const FRAGMENTS: usize = 128;
++    let mut source = String::from("=");
++    for index in 0..FRAGMENTS {
++        if index != 0 {
++            source.push('&');
++        }
++        source.push_str("\"x\"\"y\"");
++    }
++    let expression = parse(&source);
++    let (_budget, _cancellation, context) = execution("ods-formula-concat-growth");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("escaped literal concatenation should evaluate");
++    let expected = "x\"y".repeat(FRAGMENTS);
++    assert_eq!(text(&result), expected);
++    assert!(result.reserved_output_bytes() >= expected.len());
++}
++
++#[test]
++fn long_comparison_chain_honors_the_work_limit() {
++    let mut source = String::from("=1");
++    for value in 2..=256 {
++        source.push('<');
++        source.push_str(&value.to_string());
++    }
++    let expression = parse(&source);
++    let (budget, _cancellation, context) = execution("ods-formula-comparison-work");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(8),
++    )
++    .expect_err("a long comparison chain should exceed eight evaluator steps");
++    assert!(
++        matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work)
++    );
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn byte_work_limit_rejects_literal_number_and_comparison_scans() {
++    for source in [
++        "=\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
++        "=12345678901234567890123456789012",
++        "=1<2",
++    ] {
++        let expression = parse(source);
++        let (budget, _cancellation, context) = execution("ods-formula-byte-work");
++        let error = evaluate(
++            &expression,
++            &context,
++            &EvaluationLimits::default().with_max_steps(2),
++        )
++        .expect_err("byte accounting should stop the scan under two work units");
++        assert!(
++            matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++            "{source:?} returned the wrong limit: {error}"
++        );
++        assert_eq!(budget.used(Resource::Memory), 0);
++    }
++}
++
++#[test]
++fn long_left_chain_evaluates_iteratively_under_explicit_work_limit() {
++    const TERMS: usize = 8_192;
++    let mut source = String::from("=");
++    for index in 0..TERMS {
++        if index != 0 {
++            source.push('+');
++        }
++        source.push('1');
++    }
++    let expression = parse(&source);
++    let (_budget, _cancellation, context) = execution("ods-formula-long-chain");
++    let limits = EvaluationLimits::default()
++        .with_max_steps(100_000)
++        .with_max_stack_entries(16_384);
++    let result = evaluate(&expression, &context, &limits)
++        .unwrap_or_else(|error| panic!("long scalar chain should evaluate: {error}"));
++    assert_eq!(number(&result), TERMS as f64);
++}

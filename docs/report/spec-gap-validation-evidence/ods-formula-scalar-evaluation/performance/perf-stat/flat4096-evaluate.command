@@ -1,0 +1,1 @@
+perf stat -x, -e cycles,instructions,branches,branch-misses -- taskset -c 2 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/evaluation-candidate/ods-formula-scalar-evaluation-profile --workload evaluation --phase evaluate --case eval-flat-4096 --warmups 3 --iterations 15 --repeat 2

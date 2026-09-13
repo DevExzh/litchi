@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-09-13T10:59:05.477562+00:00",
+  "binaries": {
+    "baseline": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/baseline/ods-formula-expression-profile",
+      "sha256": "f359e853b887d121655b7e51d766c7de90421caedf22f8a4759bb5483ab72c70",
+      "bytes": 1074128
+    },
+    "ascii-candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ascii-candidate/ods-formula-expression-profile",
+      "sha256": "5be86d8b7c3d7d2d77cc7844fa905f4e203df40e31d80fb570596dc2be732149",
+      "bytes": 1074104
+    },
+    "ast-candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ast-candidate/ods-formula-expression-profile",
+      "sha256": "2d3ae0bdd1e174d6aaa47b8fbceb428a567c8f61f875094041e7336d6f90fab1",
+      "bytes": 1074616,
+      "verified_at": "2026-09-13T11:52:49.550010+00:00"
+    },
+    "evaluation-candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/evaluation-candidate/ods-formula-scalar-evaluation-profile",
+      "sha256": "acf4e57d11c301cbaad0cc318dabb70638d9686be631abd51d299b6c99d580b8",
+      "bytes": 1226672,
+      "verified_at": "2026-09-13T11:52:49.551643+00:00"
+    }
+  }
+}

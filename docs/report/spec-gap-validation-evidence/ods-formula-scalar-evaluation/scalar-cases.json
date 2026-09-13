@@ -1,0 +1,487 @@
+{
+  "schema": "ods-formula-scalar-evaluation-cases-v1",
+  "spec": {
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": ["4", "6.3", "6.4", "6.16"],
+    "source_note": "Cases are transcribed from the vendored OpenDocument v1.4 Part 4 formula standard; expected values are scalar semantics, not Excel compatibility assumptions."
+  },
+  "scope": {
+    "included": [
+      "constant Number, Text, Logical, and Error operands",
+      "implicit scalar conversions explicitly required by §§6.3.1, 6.3.5, and 6.3.14",
+      "standard arithmetic, comparison, concatenation, unary, percentage, and error propagation operators"
+    ],
+    "excluded_from_normative_values": [
+      "worksheet references and implied intersection, which require a formula-cell context",
+      "numeric overflow, precision, and Number subtypes where the standard permits implementation limits",
+      "text-to-Number conversion, case settings, collation, and distinct-Logical representation; those cases are listed separately"
+    ]
+  },
+  "normative_cases": [
+    {
+      "id": "add_numbers",
+      "expression": "=2+3",
+      "expected": {"type": "Number", "value": 5},
+      "sections": ["6.4.2"],
+      "why": "The addition operator adds two Number operands and returns a Number."
+    },
+    {
+      "id": "subtract_numbers",
+      "expression": "=7-2",
+      "expected": {"type": "Number", "value": 5},
+      "sections": ["6.4.3"],
+      "why": "The subtraction operator subtracts the second Number from the first."
+    },
+    {
+      "id": "multiply_numbers",
+      "expression": "=6*7",
+      "expected": {"type": "Number", "value": 42},
+      "sections": ["6.4.4"],
+      "why": "The multiplication operator multiplies two Number operands."
+    },
+    {
+      "id": "divide_numbers",
+      "expression": "=8/2",
+      "expected": {"type": "Number", "value": 4},
+      "sections": ["6.4.5"],
+      "why": "The division operator divides the first Number by the second."
+    },
+    {
+      "id": "divide_by_zero",
+      "expression": "=8/0",
+      "expected": {"type": "Error", "error": "an Error value; the standard does not select a specific error code"},
+      "sections": ["6.4.5"],
+      "why": "Division by zero is an explicit operator constraint and returns an Error."
+    },
+    {
+      "id": "power_numbers",
+      "expression": "=2^3",
+      "expected": {"type": "Number", "value": 8},
+      "sections": ["6.4.6"],
+      "why": "Exponentiation returns POWER(Left, Right), so 2 raised to 3 is 8."
+    },
+    {
+      "id": "power_is_left_associative",
+      "expression": "=2^3^2",
+      "expected": {"type": "Number", "value": 64},
+      "sections": ["5.5", "6.4.6"],
+      "why": "The operator table specifies left associativity: (2^3)^2, rather than a right-associated power."
+    },
+    {
+      "id": "power_with_negative_exponent",
+      "expression": "=2^(-1)",
+      "expected": {"type": "Number", "value": 0.5},
+      "sections": ["5.5", "6.4.6", "6.4.16"],
+      "why": "Parentheses make the negative exponent explicit; the power operation computes 2 raised to -1."
+    },
+    {
+      "id": "prefix_plus_number",
+      "expression": "=+2",
+      "expected": {"type": "Number", "value": 2},
+      "sections": ["6.4.15"],
+      "why": "Prefix plus returns its argument without conversion or numeric alteration."
+    },
+    {
+      "id": "prefix_plus_text_keeps_text",
+      "expression": "=+\"text\"",
+      "expected": {"type": "Text", "value": "text"},
+      "sections": ["6.4.15"],
+      "why": "Prefix plus accepts Any and performs no conversion on a Text operand."
+    },
+    {
+      "id": "prefix_minus_number",
+      "expression": "=-2",
+      "expected": {"type": "Number", "value": -2},
+      "sections": ["6.4.16"],
+      "why": "Prefix minus computes 0 minus its Number argument."
+    },
+    {
+      "id": "prefix_minus_precedes_power",
+      "expression": "=-2^2",
+      "expected": {"type": "Number", "value": 4},
+      "sections": ["5.5", "6.4.6", "6.4.16"],
+      "why": "The standard explicitly gives prefix minus higher precedence than power, yielding (-2)^2."
+    },
+    {
+      "id": "parentheses_override_precedence",
+      "expression": "=-(2^2)",
+      "expected": {"type": "Number", "value": -4},
+      "sections": ["5.5", "6.4.6", "6.4.16"],
+      "why": "Parentheses override the prefix/power precedence relationship, so the power is evaluated before negation."
+    },
+    {
+      "id": "postfix_percentage",
+      "expression": "=50%",
+      "expected": {"type": "Number", "value": 0.5},
+      "sections": ["6.4.14"],
+      "why": "The percentage postfix operator computes its Number operand divided by 100."
+    },
+    {
+      "id": "postfix_percentage_of_expression",
+      "expression": "=(2+3)%",
+      "expected": {"type": "Number", "value": 0.05},
+      "sections": ["5.5", "6.4.2", "6.4.14"],
+      "why": "The parenthesized addition produces 5, then percentage divides that result by 100."
+    },
+    {
+      "id": "arithmetic_precedence",
+      "expression": "=2+3*4",
+      "expected": {"type": "Number", "value": 14},
+      "sections": ["5.5", "6.4.2", "6.4.4"],
+      "why": "Multiplication has higher precedence than addition."
+    },
+    {
+      "id": "subtraction_is_left_associative",
+      "expression": "=8-3-2",
+      "expected": {"type": "Number", "value": 3},
+      "sections": ["5.5", "6.4.3"],
+      "why": "The operator table specifies left associativity: (8-3)-2."
+    },
+    {
+      "id": "division_and_multiplication_are_left_associative",
+      "expression": "=8/2*2",
+      "expected": {"type": "Number", "value": 8},
+      "sections": ["5.5", "6.4.4", "6.4.5"],
+      "why": "Division and multiplication share precedence and associate left: (8/2)*2."
+    },
+    {
+      "id": "concatenate_text",
+      "expression": "=\"a\"&\"b\"",
+      "expected": {"type": "Text", "value": "ab"},
+      "sections": ["6.4.10"],
+      "why": "The ampersand operator concatenates two Text values."
+    },
+    {
+      "id": "concatenate_empty_text",
+      "expression": "=\"\"&\"x\"",
+      "expected": {"type": "Text", "value": "x"},
+      "sections": ["4.2", "6.4.10"],
+      "why": "The empty Text value contributes no characters to concatenation."
+    },
+    {
+      "id": "number_to_text_for_concatenation",
+      "expression": "=1&2",
+      "expected": {"type": "Text", "value": "12"},
+      "sections": ["6.3.14", "6.4.10"],
+      "why": "Conversion to Text transforms each Number without whitespace before the required concatenation."
+    },
+    {
+      "id": "logical_to_text_for_concatenation",
+      "expression": "=TRUE()&FALSE()",
+      "expected": {"type": "Text", "value": "TRUEFALSE"},
+      "sections": ["6.3.14", "6.4.10", "6.15.3", "6.15.9"],
+      "why": "Conversion to Text spells logical values exactly TRUE and FALSE, independent of their concrete representation."
+    },
+    {
+      "id": "logical_to_number_for_addition_true",
+      "expression": "=TRUE()+2",
+      "expected": {"type": "Number", "value": 3},
+      "sections": ["6.3.5", "6.4.2", "6.15.9"],
+      "why": "Conversion to Number maps TRUE to 1 before addition."
+    },
+    {
+      "id": "logical_to_number_for_addition_false",
+      "expression": "=FALSE()+2",
+      "expected": {"type": "Number", "value": 2},
+      "sections": ["6.3.5", "6.4.2", "6.15.3"],
+      "why": "Conversion to Number maps FALSE to 0 before addition."
+    },
+    {
+      "id": "equal_numbers",
+      "expression": "=2=2",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.7"],
+      "why": "Two equal Number values compare equal and produce TRUE."
+    },
+    {
+      "id": "unequal_numbers",
+      "expression": "=2=3",
+      "expected": {"type": "Logical", "value": false},
+      "sections": ["6.4.7"],
+      "why": "Two unequal Number values compare unequal and produce FALSE."
+    },
+    {
+      "id": "numeric_less_than",
+      "expression": "=2<3",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.9"],
+      "why": "Ordered comparison of two Numbers uses numeric order."
+    },
+    {
+      "id": "numeric_less_equal",
+      "expression": "=3<=3",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.9"],
+      "why": "A Number compares less than or equal to itself."
+    },
+    {
+      "id": "numeric_greater_than",
+      "expression": "=4>3",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.9"],
+      "why": "Ordered comparison of two Numbers uses numeric order."
+    },
+    {
+      "id": "numeric_greater_equal",
+      "expression": "=3>=3",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.9"],
+      "why": "A Number compares greater than or equal to itself."
+    },
+    {
+      "id": "equal_text",
+      "expression": "=\"a\"=\"a\"",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.7"],
+      "why": "Identical Text values match and compare equal."
+    },
+    {
+      "id": "unequal_text",
+      "expression": "=\"a\"=\"b\"",
+      "expected": {"type": "Logical", "value": false},
+      "sections": ["6.4.7"],
+      "why": "Distinct same-case Text values do not match."
+    },
+    {
+      "id": "different_types_are_not_equal",
+      "expression": "=1=\"1\"",
+      "expected": {"type": "Logical", "value": false},
+      "sections": ["6.4.7"],
+      "why": "The equality operator returns FALSE when the operand types differ; it does not apply text-to-number conversion."
+    },
+    {
+      "id": "not_equal_numbers",
+      "expression": "=2<>3",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.8"],
+      "why": "Not-equal is the negation of equality when neither operand is an Error."
+    },
+    {
+      "id": "not_equal_identical_numbers",
+      "expression": "=2<>2",
+      "expected": {"type": "Logical", "value": false},
+      "sections": ["6.4.8"],
+      "why": "Identical Number values compare equal, so not-equal returns FALSE."
+    },
+    {
+      "id": "equal_logicals",
+      "expression": "=TRUE()=TRUE()",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.7", "6.15.9"],
+      "why": "Two identical Logical values compare equal regardless of whether the evaluator stores them as a distinct type or as logical Numbers."
+    },
+    {
+      "id": "unequal_logicals",
+      "expression": "=TRUE()=FALSE()",
+      "expected": {"type": "Logical", "value": false},
+      "sections": ["6.4.7", "6.15.3", "6.15.9"],
+      "why": "TRUE and FALSE are distinct logical values."
+    },
+    {
+      "id": "not_equal_logicals",
+      "expression": "=TRUE()<>FALSE()",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.4.8", "6.15.3", "6.15.9"],
+      "why": "Not-equal negates the comparison of the distinct TRUE and FALSE values."
+    },
+    {
+      "id": "ordered_logical_comparison",
+      "expression": "=TRUE()>FALSE()",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.3.5", "6.4.9", "6.15.3", "6.15.9"],
+      "why": "When both operands are Logical, ordered comparison converts them to Number; 1 is greater than 0."
+    },
+    {
+      "id": "ordered_logical_less_equal",
+      "expression": "=FALSE()<=TRUE()",
+      "expected": {"type": "Logical", "value": true},
+      "sections": ["6.3.5", "6.4.9", "6.15.3", "6.15.9"],
+      "why": "Logical ordered comparison uses Number conversion, so 0 is less than or equal to 1."
+    },
+    {
+      "id": "direct_na_error",
+      "expression": "=#N/A",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6"],
+      "why": "#N/A is a distinct OpenFormula Error value."
+    },
+    {
+      "id": "error_propagates_through_addition",
+      "expression": "=#N/A+1",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.3.1", "6.4.2"],
+      "why": "An operator receiving an Error returns an input Error unless specifically defined otherwise."
+    },
+    {
+      "id": "error_propagates_through_subtraction",
+      "expression": "=1-#DIV/0!",
+      "expected": {"type": "Error", "error": "#DIV/0!"},
+      "sections": ["4.6", "6.3.1", "6.4.3"],
+      "why": "The subtraction operator has no exception to the general Error propagation rule."
+    },
+    {
+      "id": "error_propagates_through_multiplication",
+      "expression": "=#N/A*2",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.3.1", "6.4.4"],
+      "why": "The multiplication operator propagates its Error operand."
+    },
+    {
+      "id": "error_propagates_through_power",
+      "expression": "=#N/A^2",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.3.1", "6.4.6"],
+      "why": "Power receives an Error operand and propagates it before numeric exponentiation."
+    },
+    {
+      "id": "error_propagates_through_not_equal",
+      "expression": "=#N/A<>1",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.4.8"],
+      "why": "The not-equal operator explicitly returns an Error when either operand is an Error."
+    },
+    {
+      "id": "error_propagates_through_ordered_comparison",
+      "expression": "=#N/A<1",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.3.1", "6.4.9"],
+      "why": "Ordered comparison cannot convert an Error to a scalar comparison operand and therefore propagates it."
+    },
+    {
+      "id": "error_propagates_through_concatenation",
+      "expression": "=#N/A&\"x\"",
+      "expected": {"type": "Error", "error": "#N/A"},
+      "sections": ["4.6", "6.3.1", "6.4.10"],
+      "why": "The ampersand operator has no Error-suppression exception, so the input Error is retained."
+    },
+    {
+      "id": "error_equality_is_not_a_test_for_error_identity",
+      "expression": "=#N/A=#N/A",
+      "expected": {"type": "Error", "error": "an Error value; equality cannot determine identity of constant Error values"},
+      "sections": ["4.6", "6.3.1", "6.4.7"],
+      "why": "The standard forbids using equality against a constant Error to determine whether two Error values are the same."
+    }
+  ],
+  "implementation_defined_cases": [
+    {
+      "id": "power_zero_to_zero",
+      "expression": "=0^0",
+      "expected": {
+        "type": "implementation-defined Number or Error",
+        "allowed_results": [
+          {"type": "Number", "value": 0},
+          {"type": "Number", "value": 1},
+          {"type": "Error", "error": "an Error value"}
+        ],
+        "chosen_profile": {"name": "profile 1", "result": {"type": "Number", "value": 1}}
+      },
+      "sections": ["6.4.6", "6.16.46"],
+      "why": "The infix POWER constraint permits evaluators to evaluate 0^0, and the POWER function explicitly makes the result implementation-defined: it shall be 0, 1, or an Error. This case must not be treated as a universal Error requirement."
+    }
+  ],
+  "host_dependent_cases": [
+    {
+      "id": "text_to_number_conversion",
+      "expression": "=\"2\"+1",
+      "expected": {
+        "type": "implementation-defined Number or Error",
+        "allowed_results": [
+          {"type": "Number", "value": 3, "condition": "text is converted to the Number 2"},
+          {"type": "Number", "value": 1, "condition": "text conversion falls back to 0"},
+          {"type": "Error", "error": "an Error value", "condition": "text conversion fails"}
+        ]
+      },
+      "sections": ["6.3.5", "6.4.2"],
+      "why": "Text-to-Number conversion is implementation-defined and may depend on locale; the evaluator may parse, use 0, or return Error."
+    },
+    {
+      "id": "locale_sensitive_text_to_number",
+      "expression": "=\"1,5\"+0",
+      "expected": {
+        "type": "implementation-defined Number or Error",
+        "allowed_results": [
+          {"type": "Number", "value": 1.5, "condition": "locale treats comma as decimal separator and conversion succeeds"},
+          {"type": "Number", "value": 15, "condition": "locale treats comma as a grouping separator and conversion succeeds"},
+          {"type": "Number", "value": 0, "condition": "conversion falls back to 0"},
+          {"type": "Error", "error": "an Error value", "condition": "conversion fails"}
+        ]
+      },
+      "sections": ["6.3.5", "6.4.2"],
+      "why": "The standard calls out locale-dependent group and decimal separators; this must not be fixed to an Excel-style result."
+    },
+    {
+      "id": "text_equality_case_setting",
+      "expression": "=\"a\"=\"A\"",
+      "expected": {
+        "type": "Logical",
+        "allowed_values": [true, false],
+        "condition": "TRUE when HOST-CASE-SENSITIVE is false; FALSE when it is true"
+      },
+      "sections": ["6.4.7", "3.4"],
+      "why": "Case sensitivity is a host calculation setting, so the standard does not select one result for case-only Text differences."
+    },
+    {
+      "id": "text_ordering_case_and_collation",
+      "expression": "=\"a\"<\"B\"",
+      "expected": {
+        "type": "Logical",
+        "allowed_values": [true, false],
+        "condition": "depends on HOST-CASE-SENSITIVE and host text ordering"
+      },
+      "sections": ["6.4.9", "3.4"],
+      "why": "Ordered Text comparison is subject to host case sensitivity and collation behavior; no Excel collation is assumed."
+    },
+    {
+      "id": "unicode_text_collation",
+      "expression": "=\"ä\"<\"z\"",
+      "expected": {
+        "type": "Logical",
+        "allowed_values": [true, false],
+        "condition": "depends on host Text collation"
+      },
+      "sections": ["4.2", "6.4.9"],
+      "why": "The type section leaves Unicode normalization behavior implementation-defined, and ordered Text comparison does not prescribe a universal collation."
+    },
+    {
+      "id": "distinct_logical_number_equality",
+      "expression": "=TRUE()=1",
+      "expected": {
+        "type": "Logical",
+        "allowed_values": [true, false],
+        "condition": "FALSE for a distinct Logical type; TRUE when Logical is represented by Number 1"
+      },
+      "sections": ["4.3.7", "6.4.7", "8.2"],
+      "why": "The standard explicitly permits distinct Logical values or Number representations and gives both equality outcomes."
+    },
+    {
+      "id": "different_type_ordered_comparison",
+      "expression": "=1<\"2\"",
+      "expected": {
+        "type": "Logical or Error",
+        "allowed_results": [
+          {"type": "Logical", "value": true},
+          {"type": "Logical", "value": false},
+          {"type": "Error", "error": "an Error value"}
+        ],
+        "condition": "the standard permits TRUE, FALSE, or Error when ordered-comparison operand types differ"
+      },
+      "sections": ["6.4.9"],
+      "why": "Ordered comparison leaves the result implementation-defined when operand types differ; this is not a text-to-number test."
+    },
+    {
+      "id": "non_numeric_text_to_number_conversion",
+      "expression": "=\"TRUE\"+0",
+      "expected": {
+        "type": "implementation-defined Number or Error",
+        "allowed_results": [
+          {"type": "Number", "value": 0, "condition": "text conversion falls back to 0"},
+          {"type": "Error", "error": "an Error value", "condition": "text-to-Number conversion fails"}
+        ]
+      },
+      "sections": ["6.3.5", "6.4.2"],
+      "why": "The expression deliberately exposes locale/text conversion policy instead of treating the word TRUE as a universally numeric literal."
+    }
+  ]
+}
