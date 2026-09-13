@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0561: file-backed OPC read baseline
+
+The [0561 packet](0561-opc-repeated-positional-reads.md) retains five `strace -f -e trace=pread64` captures, four `strace -f -c` isolation summaries at two sample counts, and a reproducible summarizer that reports only properties of the retained traces. It establishes the per-operation `statx`/`pread64` counts for the file-backed DOCX and PPTX paths and the four-read-per-member-read model, arithmetically checked against the size histogram. It adds no timing, resource or cold-cache measurement.
+
 ## Change 0560: XLS freshness observation counts re-baselined
 
 The [0560 packet](0560-xls-single-observation-freshness.md) retains an A/E/E/A matrix over ten XLS selectors, six `strace` children over the file-source matrix, and the instrumented observation counters. A retained metadata query now takes one source observation; file-source `open`, `list` and `one-cell` fall to 631, 631 and 902 observations with read calls and read bytes unchanged. The `xls-tiny` corpora are recorded as below useful clock resolution on this host.

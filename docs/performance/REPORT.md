@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0561: the OOXML file-source read pattern, attributed
+
+[0561](0561-opc-repeated-positional-reads.md) is attribution only. About nine of
+every ten positional reads on file-backed OPC paths re-read a range the same
+child already read, and a quarter repeat the preceding range verbatim. Each
+member read costs four reads, two of which recover values the archive index
+already holds. The record names the owners a fix must respect and lists the
+open follow-ups; change 0562 takes the first of them.
+
 ## 0560: XLS freshness checks observe the source once
 
 [0560](0560-xls-single-observation-freshness.md) removes two of the three source

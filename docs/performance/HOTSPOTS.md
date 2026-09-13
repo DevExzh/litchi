@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0561: nine in ten file-backed OPC reads are re-reads
+
+The [0561 attribution](0561-opc-repeated-positional-reads.md) traces file-backed OOXML opens and queries. `pptx_file_source_open` issues 13,592 positional reads over 1,262 distinct ranges (90.7% re-reads, 25.0% immediate duplicates, mean 120.6 B); `docx_file_source_open` issues 266 over 23 (91.4%). Isolated per operation, `pptx_file_source_selected_slide` costs 9,696 `statx` and 13,588 `pread64`, and `docx_file_source_full_text` 598 and 262. Every member read costs exactly four reads — local header, payload, descriptor, and the same descriptor again — and the retained index already holds the CRC the descriptor recovers and the invariant framing the header recovers, so about 73% of the reads recover values already in memory. The 6x-20x range multiplicity is process-tree and oracle work, not one operation looping. No production change or claim. This is now the largest measured OOXML hotspot.
+
 ## Change 0560: one observation per XLS freshness check
 
 The [0560 record](0560-xls-single-observation-freshness.md) collapses `ensure_current_parts` from three source observations to one and the two retained-metadata helpers from two fences to one, so a retained metadata query falls from six observations to one. `SourceInner` takes both its source and its expected version from the same `SharedOleFile`, so one observation discharges both expectations; nothing between the collapsed observations consumes a source byte. All six source-backed and owned-source XLS selectors improve in both ABBA directions (-0.09% to -14.78% p50); four `xls-tiny` cells are adverse at nanosecond scale and are reported as clock-resolution artifacts. A counted-observation test now pins the invariant. The remaining XLS file-source cost is the surviving one probe plus one positional read per BIFF record, so bounded span batching stays the next hypothesis. `performance_claim: none`.
