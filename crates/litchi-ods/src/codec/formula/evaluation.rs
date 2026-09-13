@@ -85,9 +85,12 @@
 
 mod radix;
 mod roman;
+pub mod value;
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
-use litchi_core::{Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit};
+use litchi_core::{
+    Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit, SourceVersion,
+};
 use std::{
     borrow::Cow,
     cmp::Ordering,
@@ -337,12 +340,14 @@ impl<'a> EvaluatedScalar<'a> {
     }
 }
 
-/// Capability refusals from the bounded scalar profile.
+/// Capability refusals from the bounded formula evaluation profiles.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UnsupportedKind {
     /// A bracketed or rich reference requires a resolver/context.
     Reference,
+    /// A resolved cell contains a value outside the supported evaluation profile.
+    CellValue,
     /// A range, intersection, or union reference operator requires a resolver.
     ReferenceOperator,
     /// An inline array requires non-scalar evaluation.
@@ -361,6 +366,7 @@ impl Display for UnsupportedKind {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::Reference => "ODS scalar evaluation does not resolve references",
+            Self::CellValue => "ODS formula evaluation does not support this cell value",
             Self::ReferenceOperator => "ODS scalar evaluation does not resolve reference operators",
             Self::Array => "ODS scalar evaluation does not evaluate arrays",
             Self::NamedExpression => "ODS scalar evaluation does not resolve named expressions",
@@ -393,6 +399,17 @@ pub enum EvaluationFailure {
     },
     /// A non-limit execution policy error from the caller context.
     Execution(ExecutionError),
+    /// The resolver's immutable source changed while values were being read.
+    SourceChanged {
+        /// Source identity captured before evaluation.
+        expected: SourceVersion,
+        /// Source identity observed after evaluation.
+        observed: SourceVersion,
+    },
+    /// The resolver changed whether it can provide an immutable source
+    /// identity during one evaluation.  A partially versioned run cannot
+    /// prove that its borrowed reads came from one source.
+    SourceVersionAvailabilityChanged,
 }
 
 impl Display for EvaluationFailure {
@@ -406,6 +423,13 @@ impl Display for EvaluationFailure {
                 write!(formatter, "allocation failed for {resource}: {source}")
             },
             Self::Execution(error) => error.fmt(formatter),
+            Self::SourceChanged { expected, observed } => write!(
+                formatter,
+                "formula reference source changed (expected {expected:?}, observed {observed:?})"
+            ),
+            Self::SourceVersionAvailabilityChanged => {
+                formatter.write_str("formula reference source identity availability changed")
+            },
         }
     }
 }
@@ -416,7 +440,11 @@ impl StdError for EvaluationFailure {
             Self::Allocation { source, .. } => Some(source),
             Self::ResourceLimit(limit) => Some(limit),
             Self::Execution(error) => Some(error),
-            Self::Unsupported(_) | Self::InvalidExpression(_) | Self::Cancelled => None,
+            Self::Unsupported(_)
+            | Self::InvalidExpression(_)
+            | Self::Cancelled
+            | Self::SourceChanged { .. }
+            | Self::SourceVersionAvailabilityChanged => None,
         }
     }
 }
@@ -488,6 +516,7 @@ enum Frame<'a> {
     VisitArgument(Node<'a>),
 }
 
+#[derive(Debug)]
 enum WorkingValue<'a> {
     Number(f64),
     Logical(bool),
@@ -495,6 +524,7 @@ enum WorkingValue<'a> {
     Error(ScalarError),
 }
 
+#[derive(Debug)]
 struct TextValue<'a> {
     text: Cow<'a, str>,
     reservation: Option<Reservation>,
@@ -1885,6 +1915,12 @@ fn map_execution_error(error: ExecutionError) -> EvaluationFailure {
         ExecutionError::Cancelled => EvaluationFailure::Cancelled,
         ExecutionError::ResourceLimit(limit) => EvaluationFailure::ResourceLimit(limit),
         other => EvaluationFailure::Execution(other),
+    }
+}
+
+impl From<ExecutionError> for EvaluationFailure {
+    fn from(error: ExecutionError) -> Self {
+        map_execution_error(error)
     }
 }
 

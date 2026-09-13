@@ -1,0 +1,61 @@
+{
+  "scope": "Tested integration checkpoint, not production acceptance; two known value planner failures remain",
+  "source_kind": "Exact isolated source snapshot; staged production files are taken from this snapshot",
+  "source_file_count": 452,
+  "source_manifest_member": "source-manifest.json",
+  "archive_sha256": "f747695cf3e5088fff6b5317394a533b14019fcea1540984431e3560ecfbf29a",
+  "members": {
+    "source-manifest.json": "2ca4903e3e67440b90c4cacb74a6a92f3805def4fc29f946814e1343863ab431",
+    "revision-14-library-worksheet.log": "31add66dbe522b3b60a5ac1a0ee35c816dc28805523fab9aa92226ddbd9a5c97",
+    "revision-14-value-confirmed.log": "8db15cd46ae32f4225d3cd0a293efcc8fce4cf8f3ab4f01cf672a76158bff553"
+  },
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-array-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-array-tmp",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--lib",
+        "--test",
+        "ods_worksheet_formula_resolver"
+      ],
+      "exit_code": 0,
+      "library_passed": 390,
+      "worksheet_passed": 16
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--test",
+        "ods_formula_array_reference_evaluation"
+      ],
+      "exit_code": 101,
+      "passed": 41,
+      "failed": 2
+    }
+  ],
+  "known_failures": [
+    "nested_if_scalar_branch_uses_selected_condition_shape_only: result 1x1 instead of 1x2",
+    "provider_driven_nested_handlers_keep_selected_shape_and_skip_unselected_metadata: 3 reads instead of 1"
+  ],
+  "performance_claim": false
+}
