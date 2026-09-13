@@ -54,7 +54,9 @@ struct FixtureResolver {
     read_order: Mutex<Vec<(String, usize, usize)>>,
     fail_after: Option<usize>,
     fail_missing_metadata: bool,
+    fail_current_sheet_metadata: bool,
     missing_metadata_calls: AtomicUsize,
+    sheet_index_calls: AtomicUsize,
     cancel_after_read: Option<CancellationSource>,
     cancel_on_final_source_version: Option<CancellationSource>,
     source_versions: Option<(SourceVersion, SourceVersion)>,
@@ -74,7 +76,9 @@ impl FixtureResolver {
             read_order: Mutex::new(Vec::new()),
             fail_after: None,
             fail_missing_metadata: false,
+            fail_current_sheet_metadata: false,
             missing_metadata_calls: AtomicUsize::new(0),
+            sheet_index_calls: AtomicUsize::new(0),
             cancel_after_read: None,
             cancel_on_final_source_version: None,
             source_versions: None,
@@ -103,8 +107,16 @@ impl FixtureResolver {
         self.fail_missing_metadata = true;
     }
 
+    fn fail_current_sheet_metadata(&mut self) {
+        self.fail_current_sheet_metadata = true;
+    }
+
     fn missing_metadata_calls(&self) -> usize {
         self.missing_metadata_calls.load(Ordering::Acquire)
+    }
+
+    fn sheet_index_calls(&self) -> usize {
+        self.sheet_index_calls.load(Ordering::Acquire)
     }
 
     fn cancel_after_read(&mut self, cancellation: &CancellationSource) {
@@ -191,11 +203,15 @@ impl Resolver for FixtureResolver {
         sheet: &str,
         _execution: &ExecutionContext,
     ) -> Result<Option<usize>, EvaluationFailure> {
+        self.sheet_index_calls.fetch_add(1, Ordering::AcqRel);
         if sheet == "Missing" {
             self.missing_metadata_calls.fetch_add(1, Ordering::AcqRel);
             if self.fail_missing_metadata {
                 return Err(EvaluationFailure::Unsupported(UnsupportedKind::Reference));
             }
+        }
+        if sheet == "Main" && self.fail_current_sheet_metadata {
+            return Err(EvaluationFailure::Unsupported(UnsupportedKind::Reference));
         }
         Ok(self.sheets.iter().position(|(name, _)| name == sheet))
     }
@@ -1085,6 +1101,189 @@ fn local_reference_values_keep_empty_text_logical_and_formula_errors_distinct() 
     )
     .expect("formula errors remain values");
     assert_error(result.value(), ScalarError::NotAvailable);
+}
+
+#[test]
+fn scalar_direct_cells_preserve_parenthesized_reference_operator_semantics() {
+    for source in ["=[.A1]", "=([.A1])", "=([.A1]:[.A1])", "=([.A1]![.A1])"] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 0, 0, FixtureCell::Number(42.0));
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-scalar-reference-parity");
+        let expression = parse(source);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Scalar,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{source:?} should select A1: {error:?}"));
+        assert_number(result.value(), 42.0);
+        assert_eq!(resolver.reads(), 1, "{source:?} should read A1 once");
+    }
+
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Number(42.0));
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-scalar-reference-list");
+    let expression = parse("=([.A1]~[.A1])");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Scalar,
+        &Limits::default(),
+    )
+    .expect("a scalar reference-list projection should remain a formula value");
+    assert_error(result.value(), ScalarError::Value);
+    assert_eq!(
+        resolver.reads(),
+        0,
+        "reference-list refusal should precede cell materialization"
+    );
+}
+
+#[test]
+fn scalar_and_or_distinguish_reference_sequences_from_scalarized_cells() {
+    for (source, expected) in [
+        ("=AND([.A1])", true),
+        ("=AND(+[.A1])", false),
+        ("=OR([.B1])", false),
+        ("=OR(+[.B1])", true),
+    ] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 0, 0, FixtureCell::Text("0".to_owned()));
+        resolver.set("Main", 0, 1, FixtureCell::Logical(true));
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-scalar-sequence-kinds");
+        let expression = parse(source);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Scalar,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error:?}"));
+        assert!(
+            matches!(result.value(), Value::Logical(value) if value == expected),
+            "{source:?} returned {:?}, expected Logical({expected})",
+            result.value()
+        );
+    }
+}
+
+#[test]
+fn matrix_bare_single_cell_reference_remains_first_class_and_unread() {
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Number(42.0));
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-matrix-bare-cell-reference");
+    let expression = parse("=[.A1]");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .expect("Matrix mode must retain a bare cell reference");
+    let reference = result
+        .as_reference()
+        .expect("bare Matrix cell should remain a reference view");
+    assert_eq!(reference.areas().len(), 1);
+    assert_eq!(reference.areas()[0].starts(), [0, 0, 0]);
+    assert_eq!(reference.areas()[0].extent(), [1, 1, 1]);
+    assert_eq!(resolver.reads(), 0);
+}
+
+#[test]
+fn scalar_direct_cell_paths_preserve_probe_admission_and_cancellation() {
+    // A named endpoint still probes the caller's current sheet before its
+    // scalar result is published.  Make that metadata operation fail to
+    // distinguish the probe from the Data-cell read.
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Data", 0, 0, FixtureCell::Number(17.0));
+    resolver.fail_current_sheet_metadata();
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-scalar-current-sheet-probe");
+    let expression = parse("=[Data.A1]");
+    let error = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Scalar,
+        &Limits::default(),
+    )
+    .expect_err("a current-sheet metadata failure must fence a scalar cell read");
+    assert!(matches!(
+        error,
+        EvaluationFailure::Unsupported(UnsupportedKind::Reference)
+    ));
+    assert!(
+        resolver.sheet_index_calls() >= 2,
+        "the named endpoint and caller sheet should both be probed"
+    );
+    assert_eq!(resolver.reads(), 0);
+
+    // Direct, parenthesized, range, and intersection forms all admit their
+    // complete reference geometry before asking the provider for A1.
+    for source in ["=[.A1]", "=([.A1])", "=([.A1]:[.A1])", "=([.A1]![.A1])"] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 0, 0, FixtureCell::Number(17.0));
+        let (budget, _cancellation, execution) =
+            make_execution("ods-formula-value-scalar-reference-admission");
+        let expression = parse(source);
+        let error = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Scalar,
+            &Limits::default().with_max_reference_cells(0),
+        )
+        .expect_err("{source:?} must refuse before its provider read");
+        assert!(matches!(
+            error,
+            EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Objects
+        ));
+        assert_eq!(resolver.reads(), 0, "{source:?}");
+        assert_eq!(budget.used(Resource::Memory), 0, "{source:?}");
+    }
+
+    for source in ["=[.A1]", "=([.A1])", "=([.A1]:[.A1])", "=([.A1]![.A1])"] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 0, 0, FixtureCell::Number(17.0));
+        let (budget, cancellation, execution) =
+            make_execution("ods-formula-value-scalar-reference-cancel");
+        resolver.cancel_after_read(&cancellation);
+        let expression = parse(source);
+        let error = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Scalar,
+            &Limits::default(),
+        )
+        .expect_err("{source:?} must not publish after a cancelled provider read");
+        assert!(matches!(error, EvaluationFailure::Cancelled), "{source:?}");
+        assert_eq!(resolver.reads(), 1, "{source:?}");
+        assert_eq!(budget.used(Resource::Memory), 0, "{source:?}");
+    }
 }
 
 #[test]
