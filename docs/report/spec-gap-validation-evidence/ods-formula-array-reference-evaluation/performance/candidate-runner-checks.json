@@ -1,0 +1,38 @@
+{
+  "scope": "Root helper and preflight checks only; no Rust builds or performance captures",
+  "runner_sha256": "75eb4d9a9dcce13bc8b64df49ec784845eac63a5e221bf7fcceffa179312ed8e",
+  "readme_sha256": "434cb0491116078d705dc4f0f7fe4e7ce1582ef0b9a897db3b149d99b67ef3c6",
+  "status": "pass",
+  "checks": [
+    "actual retained baseline ELF identity",
+    "fresh output creation, overwrite and protected subtree rejection",
+    "candidate path and hard-link alias rejection",
+    "capture count, failed status, duplicate and malformed row detection",
+    "review flags retained and invalid report refused",
+    "failed child exit status retained",
+    "actual stale harness mismatch rejected before any build",
+    "retained baseline unchanged after checks"
+  ],
+  "preflight_error": "RuntimeError: isolated workspace harness inputs differ from canonical harness inputs",
+  "temporary_check_directory_removed": true,
+  "retained_baseline": {
+    "raw_csv": {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/raw.csv",
+      "exists": true,
+      "bytes": 76196,
+      "sha256": "22ed898910a76723d81d5e93fe5f40a8d9f8f20b5a2e37166ebfd01c562f54e0"
+    },
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-array-target/retained/scalar-baseline",
+      "exists": true,
+      "bytes": 1317096,
+      "sha256": "b68d801f62a1ec6e4accdd090940dda46e58d97c7818b91e4dbcc38ca8cdf682"
+    },
+    "binary_sha256": {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/binary-sha256.txt",
+      "exists": true,
+      "bytes": 165,
+      "sha256": "29d656babc5ca81e3212c1cc7ecc3c6c50dc9af9299efd69299514fd2ef1699d"
+    }
+  }
+}
