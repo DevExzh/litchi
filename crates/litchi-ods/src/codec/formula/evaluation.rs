@@ -5,9 +5,11 @@
 //! external source, refresh a cache, or publish a cell change.  The scalar
 //! profile covers constants, scalar operators, the normative logical
 //! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
-//! and `XOR`), and the five bit-operation functions (`BITAND`, `BITLSHIFT`,
-//! `BITOR`, `BITRSHIFT`, and `BITXOR`).  References, arrays, names, labels,
-//! and other functions are reported as typed capability refusals.
+//! and `XOR`), the five bit-operation functions (`BITAND`, `BITLSHIFT`,
+//! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
+//! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions).  References,
+//! arrays, names, labels, and other functions are reported as typed
+//! capability refusals.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -30,6 +32,15 @@
 //!   right shift returns zero.  Integer conversion truncates toward zero;
 //!   unrepresentable data operands/results return `#NUM!` in this profile;
 //! * `0^0` is accepted as `1`, as permitted by this bounded profile.
+//! * `BASE` and `DECIMAL` use a fixed 1024-bit unsigned magnitude so every
+//!   finite integer `f64` can be converted without narrowing through `u64`.
+//!   Decimal text is accumulated once and rounded to `f64` using a
+//!   nearest-even conversion.  The direct binary, octal, and hexadecimal
+//!   conversions use the specified 10-, 30-, and 40-bit two's-complement
+//!   widths and uppercase text output.  Their optional `Digits` argument is
+//!   truncated toward zero, accepts values from zero through ten, pads
+//!   positive results, and is ignored for negative results after any formula
+//!   error in the argument has been propagated.
 //!
 //! A successful text result keeps its memory reservation in
 //! [`EvaluatedScalar`](crate::codec::formula::evaluation::EvaluatedScalar) until that result is dropped. Borrowed source strings
@@ -66,6 +77,8 @@
 //! # Ok(())
 //! # }
 //! ```
+
+mod radix;
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
 use litchi_core::{Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit};
@@ -753,6 +766,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if radix::is_radix_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -829,6 +846,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             || name.eq_ignore_ascii_case("BITXOR")
         {
             return self.apply_bitwise(node, name);
+        }
+        if radix::is_radix_function(name) {
+            return radix::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all

@@ -1,0 +1,12 @@
+{
+  "status": 0,
+  "claim": "fixed-limb nearest-even formula agrees with an independent Python IEEE-754 oracle",
+  "algorithm_scope": "mirrored radix.rs bit decisions; Rust binary was not executed",
+  "checks": 19251,
+  "boundary_cases": 11,
+  "random_seed": "0x4F44534652414449",
+  "radix_source_sha256": "48cf638a72a4946f8f3c8284b34ff817e4c5ba77c962776ad6c2ae981991cf9d",
+  "focused_test_sha256": "c2d0ee542fdc4e465b6236b1e6234d1b7980791a82995d7c315239af48ba32bf",
+  "script_sha256": "cd55d5aeabfd94e936886b82a851bf99004499c8315f3980694283a88455d801",
+  "command": "python3 check_nearest_even.py --receipt receipt.json"
+}

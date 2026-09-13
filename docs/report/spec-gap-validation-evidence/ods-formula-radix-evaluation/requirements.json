@@ -1,0 +1,20 @@
+{
+  "tests": 915,
+  "targets": 55,
+  "doctests": 2,
+  "subprocess_tests": 1,
+  "required_integration_groups": [
+    "base_and_decimal_use_the_specified_digit_alphabet",
+    "base_padding_and_large_finite_numbers_are_exact",
+    "decimal_ignores_only_documented_prefix_suffix_and_leading_tabs",
+    "radix_functions_distinguish_text_digits_from_numeric_values",
+    "binary_conversion_uses_ten_bit_twos_complement_and_known_vectors",
+    "decimal_hex_and_octal_conversions_cover_signed_width_boundaries",
+    "positive_results_pad_and_negative_results_ignore_digits",
+    "invalid_digits_ranges_and_arity_are_formula_errors",
+    "radix_calls_are_eager_for_present_children_even_when_arity_is_wrong",
+    "conditional_handlers_skip_radix_work_but_do_not_catch_refusals",
+    "limits_cancellation_and_owned_radix_results_are_atomic",
+    "radix_source_spelling_and_force_marker_survive_evaluation"
+  ]
+}
