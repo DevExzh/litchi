@@ -1,0 +1,43 @@
+{
+  "binaries": {
+    "baseline": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/baseline/ods-formula-bitwise-evaluation-profile",
+      "sha256": "cc03701b74689d33f1f90cbcdca7f8f5ad6d3aa86ea6affdfc0a212a49a22de3",
+      "bytes": 1249608,
+      "verified_at": "2026-09-13T13:10:14.649166+00:00"
+    },
+    "before-outline": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/before-outline/candidate/ods-formula-bitwise-evaluation-profile",
+      "sha256": "6b6a83496f40b173802f3f615880e8d755338fa34c5266345bcb12defffc89cb",
+      "bytes": 1258784,
+      "verified_at": "2026-09-13T13:10:14.650034+00:00"
+    },
+    "candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/candidate/ods-formula-bitwise-evaluation-profile",
+      "sha256": "63ba1ca4f10b4ec8c62d0ef506c6ee4f866676ddb6a7a74173bae26239aa1599",
+      "bytes": 1259168,
+      "verified_at": "2026-09-13T13:18:14.258737+00:00"
+    }
+  },
+  "removed_after_verification_at": "2026-09-13T13:19:55.306285+00:00",
+  "removed_binaries": [
+    {
+      "variant": "baseline",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/baseline/ods-formula-bitwise-evaluation-profile",
+      "sha256": "cc03701b74689d33f1f90cbcdca7f8f5ad6d3aa86ea6affdfc0a212a49a22de3",
+      "bytes": 1249608
+    },
+    {
+      "variant": "before-outline",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/before-outline/candidate/ods-formula-bitwise-evaluation-profile",
+      "sha256": "6b6a83496f40b173802f3f615880e8d755338fa34c5266345bcb12defffc89cb",
+      "bytes": 1258784
+    },
+    {
+      "variant": "candidate",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/candidate/ods-formula-bitwise-evaluation-profile",
+      "sha256": "63ba1ca4f10b4ec8c62d0ef506c6ee4f866676ddb6a7a74173bae26239aa1599",
+      "bytes": 1259168
+    }
+  ]
+}
