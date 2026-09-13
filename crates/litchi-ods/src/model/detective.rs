@@ -292,7 +292,7 @@ mod tests {
         detective
             .add_highlighted_range(
                 HighlightedRange::valid(
-                    Some("'A&B'.$A$1:$B$2".to_string()),
+                    Some("'A&B'.$A$1:.$B$2".to_string()),
                     Direction::FromAnotherTable,
                     Some(true),
                 )
@@ -302,7 +302,7 @@ mod tests {
             .add_operation(Operation::new(OperationKind::TraceErrors, 7));
         let mut xml = String::new();
         write_detective(&mut xml, &detective);
-        assert!(xml.contains("&apos;A&amp;B&apos;.$A$1:$B$2"));
+        assert!(xml.contains("&apos;A&amp;B&apos;.$A$1:.$B$2"));
         assert!(
             xml.find("highlighted-range")
                 .expect("test fixture or operation should succeed")

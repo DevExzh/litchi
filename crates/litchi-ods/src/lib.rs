@@ -72,6 +72,7 @@ mod open_parse;
 pub mod package;
 pub mod protection;
 pub mod settings;
+pub mod sheet_metadata;
 pub mod source_features;
 pub mod streaming;
 pub mod styles;

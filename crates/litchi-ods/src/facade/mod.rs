@@ -92,6 +92,20 @@ fn validate_cell_batch_len(length: usize) -> Result<()> {
     Ok(())
 }
 
+fn map_sheet_metadata_execution(error: litchi_core::ExecutionError) -> litchi_core::Error {
+    match error {
+        litchi_core::ExecutionError::ResourceLimit(value) => {
+            litchi_core::Error::ResourceLimit(value)
+        },
+        litchi_core::ExecutionError::Cancelled => {
+            litchi_core::Error::Unsupported("ODS metadata operation cancelled".to_string())
+        },
+        other => litchi_core::Error::Unsupported(format!(
+            "ODS metadata execution policy rejected operation: {other}"
+        )),
+    }
+}
+
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
     package: Arc<crate::package::Package>,
@@ -496,6 +510,102 @@ impl Spreadsheet {
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Capture the source-backed consolidation, label-range, cell-source, and
+    /// detective metadata catalog for this owned spreadsheet.
+    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
+        crate::sheet_metadata::Snapshot::parse(self.package.content_xml())
+    }
+
+    /// Capture sheet metadata under explicit finite limits and execution context.
+    pub fn sheet_metadata_with(
+        &self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::sheet_metadata::Snapshot> {
+        crate::sheet_metadata::Snapshot::parse_with_context(
+            self.package.content_xml(),
+            limits,
+            context,
+        )
+    }
+
+    /// Stage and publish one failure-atomic sheet metadata edit.
+    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.edit_sheet_metadata_with_context(
+            crate::sheet_metadata::Limits::default(),
+            &crate::sheet_metadata::default_context(),
+            update,
+        )
+    }
+
+    /// Stage and publish sheet metadata under explicit limits and context.
+    ///
+    /// The supplied context governs metadata parsing, staging, candidate
+    /// rendering, and target readback. Owned package replacement and facade
+    /// rehydration use the package's own bounded policy; the context is
+    /// checked again after rehydration and before this spreadsheet is replaced.
+    pub fn edit_sheet_metadata_with_context<F>(
+        &mut self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        let snapshot = self.sheet_metadata_with(limits, context)?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(context)?;
+        if commit.changed() {
+            self.ensure_sheet_metadata_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    /// Apply an exact source patch and rehydrate the owned spreadsheet only
+    /// after the candidate passes complete metadata readback.
+    pub fn apply_sheet_metadata_patch(
+        &mut self,
+        patch: &crate::sheet_metadata::Patch,
+    ) -> Result<()> {
+        let snapshot = self.sheet_metadata()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            self.ensure_sheet_metadata_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    fn ensure_sheet_metadata_publication_allowed(&self) -> Result<()> {
+        let signed = self
+            .package
+            .package()
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
+        if signed {
+            return Err(litchi_core::Error::Unsupported(
+                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy"
+                    .to_string(),
+            ));
         }
         Ok(())
     }

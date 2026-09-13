@@ -1,0 +1,16 @@
+UTC_START=2026-09-13T02:00:56Z
+CANDIDATE=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/worktree
+TARGET=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/target
+SOURCE_MANIFEST=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/source-hashes-final-freeze-0159.sha256
+57694910c10781679efd37df24888a6f3373cc42d2eb1dd13bce78349686e315  crates/litchi-ods/src/sheet_metadata/mod.rs
+b5104b744e738602243a644c32ef5ca0101560af7883b635cc041dcb9f5c2e38  crates/litchi-ods/src/sheet_metadata/index.rs
+1cf6482d82e2ff668911fccf2be39eea9aefe55562dbdfb2a88ac376d0143b97  crates/litchi-ods/tests/ods_sheet_metadata_transactions.rs
+a47e6bbfe095ae21483e43f28ccb23cd833138a23303385f79b605dc48457f58  crates/litchi-ods/tests/sheet_metadata_context.rs
+d4685958bb710b04bd29e758d3d7b002bde67c8fd57ba182ea80d08545975ead  crates/litchi-ods/tests/sheet_metadata_xml_conformance.rs
+COMMAND=cargo clippy --locked --offline -p litchi-ods --all-features --all-targets -- -D warnings
+
+    Checking litchi-ods v0.0.1 (/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/worktree/crates/litchi-ods)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.89s
+
+UTC_END=2026-09-13T02:01:00Z
+EXIT=0

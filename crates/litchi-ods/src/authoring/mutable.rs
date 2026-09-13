@@ -166,6 +166,55 @@ impl MutableSpreadsheet {
         self.spreadsheet.edit_scenarios(update)
     }
 
+    /// Capture the source-backed sheet metadata catalog.
+    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
+        self.spreadsheet.sheet_metadata()
+    }
+
+    /// Capture sheet metadata under explicit finite limits and context.
+    pub fn sheet_metadata_with(
+        &self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::sheet_metadata::Snapshot> {
+        self.spreadsheet.sheet_metadata_with(limits, context)
+    }
+
+    /// Stage and publish one failure-atomic sheet metadata edit.
+    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_sheet_metadata(update)
+    }
+
+    /// Stage and publish sheet metadata under explicit limits and context.
+    ///
+    /// The supplied context governs metadata parsing, staging, candidate
+    /// rendering, and target readback. Owned package replacement and facade
+    /// rehydration use the package's own bounded policy; the context is
+    /// checked again before the attached spreadsheet is replaced.
+    pub fn edit_sheet_metadata_with_context<F>(
+        &mut self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.spreadsheet
+            .edit_sheet_metadata_with_context(limits, context, update)
+    }
+
+    /// Apply an exact source sheet metadata patch atomically.
+    pub fn apply_sheet_metadata_patch(
+        &mut self,
+        patch: &crate::sheet_metadata::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_sheet_metadata_patch(patch)
+    }
+
     /// Borrow spreadsheet calculation settings, if present.
     #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {

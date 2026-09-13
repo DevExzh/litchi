@@ -1,0 +1,72 @@
+{
+  "package": "docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/ods_metadata_native_input.ods",
+  "package_sha256": "b419160f67a096663b9212ff3267d1de3f470a5e3a819e973a83cc77971b73f7",
+  "content_xml_sha256": "a8a4eb830831876a48db802e5cd91e1cd01802885a3d2a69eaef504107d78d92",
+  "schema_archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "schema_member": "schemas/OpenDocument-v1.4-schema.rng",
+  "schema_sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f",
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "owners": [
+    {
+      "owner": "consolidation",
+      "count": 1,
+      "checks": [
+        {
+          "valid": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "owner": "label-ranges",
+      "count": 1,
+      "checks": [
+        {
+          "valid": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "owner": "cell-range-source",
+      "count": 1,
+      "checks": [
+        {
+          "valid": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "owner": "detective",
+      "count": 1,
+      "checks": [
+        {
+          "valid": true,
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "whole_content_xml_valid": false,
+  "whole_content_xml_errors": [
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INTERSEQ: Invalid sequence in interleave",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_ATTRVALID: Element document-content failed to validate attributes",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_ELEMNAME: Expecting element table-header-rows, got table-row",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_CONTENTVALID: Element table failed to validate content",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_INVALIDATTR: Invalid attribute value-type for element table-cell",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_ELEMNAME: Expecting element table-header-rows, got table-row",
+    "<string>:1:0:ERROR:RELAXNGV:RELAXNG_ERR_EXTRACONTENT: Element table has extra content: table-row"
+  ],
+  "scope": "Owner datatypes and structures; not whole-package validation."
+}

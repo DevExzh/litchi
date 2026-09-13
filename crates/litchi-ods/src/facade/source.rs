@@ -24,7 +24,8 @@ use litchi_core::{
 };
 use litchi_odf_common::{
     core::{
-        SourceBackedPackage, SourcePackageLimits, private::ContentDocumentValidator,
+        SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
+        SourceContentPublicationReport, SourcePackageLimits, private::ContentDocumentValidator,
         validate_content_part,
     },
     package::{is_media_path, resolve_package_path},
@@ -354,6 +355,47 @@ impl SourceBackedSpreadsheet {
         let value = self.content_xml.as_ref();
         self.check_source()?;
         Ok(value)
+    }
+
+    pub(crate) fn content_xml_arc(&self) -> Result<Arc<str>> {
+        self.check_source()?;
+        let value = Arc::clone(&self.content_xml);
+        self.check_source()?;
+        Ok(value)
+    }
+
+    pub(crate) fn sheet_metadata_signed(&self) -> Result<bool> {
+        self.check_source()?;
+        let signed = self
+            .package
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
+        self.check_source()?;
+        Ok(signed)
+    }
+
+    pub(crate) fn write_sheet_metadata_content<W: Write>(
+        &self,
+        writer: W,
+        replacement: &[u8],
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        if let Err(error) = self.check_source() {
+            return Err(match error {
+                Error::SourceChanged { expected, observed } => {
+                    SourceContentPublicationError::SourceChanged {
+                        expected,
+                        observed,
+                        progress:
+                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
+                    }
+                },
+                other => SourceContentPublicationError::Core(other),
+            });
+        }
+        self.package
+            .write_content_xml_to_stream_with_options(writer, replacement, options)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot.
