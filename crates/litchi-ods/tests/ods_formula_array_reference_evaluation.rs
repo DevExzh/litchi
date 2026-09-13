@@ -834,6 +834,7 @@ fn reference_operand_error_handlers_use_resolved_reference_errors() {
     for operand in [
         "IFERROR([Missing.A1];[.C1:.D1])",
         "IFERROR(([Missing.A1]:[.A1]);[.C1:.D1])",
+        "IFERROR(([.A1]![.B1]);[.C1:.D1])",
     ] {
         let source = format!("=IF({{TRUE()}};([.A1]:{operand});0)");
         let mut resolver = FixtureResolver::new();

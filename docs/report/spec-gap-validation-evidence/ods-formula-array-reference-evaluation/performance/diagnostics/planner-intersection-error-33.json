@@ -1,0 +1,7 @@
+{
+  "scope": "Empty-intersection formula error operand regression on frozen draft32",
+  "result": "IFERROR on empty intersection wrongly typed-refuses instead of catching Null and selecting valid reference fallback",
+  "archive": "planner-intersection-error-33.tar.gz",
+  "sha256": "2fcfa2e6644239eaa371441f2b2191945c9bce67e023b093d7ba30e451d6830f",
+  "status": 101
+}
