@@ -441,6 +441,236 @@ fn union_cell_limit_includes_intersection_left_operand_before_provider_reads() {
 }
 
 #[test]
+fn sibling_shape_growth_reuses_broadcast_condition_cells() {
+    const ROWS: usize = 32;
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Logical(true));
+    // The outer FALSE branch prevents B1 from being selected. If the nested
+    // XOR condition is re-evaluated for every widened row, this unreadable
+    // sibling would also expose a wrong provider read.
+    resolver.set("Main", 0, 1, FixtureCell::Unsupported);
+
+    let mut false_branch = String::from("{");
+    for row in 0..ROWS {
+        if row != 0 {
+            false_branch.push('|');
+        }
+        false_branch.push_str(&row.to_string());
+    }
+    false_branch.push('}');
+    let source = format!("=IF({{TRUE();FALSE()}};IF(XOR([.A1:.B1]);{{1}};0);{false_branch})");
+    let expression = parse(&source);
+    let (budget, _cancellation, execution) = make_execution("ods-formula-value-sibling-growth");
+    let limits = Limits::default().with_max_reference_cells(ROWS - 1);
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &limits,
+    )
+    .unwrap_or_else(|error| panic!("broadcast condition should evaluate once: {error}"));
+    let array = result
+        .as_array()
+        .expect("the widened sibling branch should produce an array");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (ROWS, 2));
+    for row in 0..ROWS {
+        assert_number(array.get(row * 2).expect("selected branch cell"), 1.0);
+        assert_number(
+            array.get(row * 2 + 1).expect("outer false branch cell"),
+            row as f64,
+        );
+    }
+    assert_eq!(
+        resolver.reads(),
+        1,
+        "the broadcast A1 condition is read once"
+    );
+    assert_eq!(
+        resolver.read_order(),
+        vec![("Main".to_owned(), 0, 0)],
+        "the unreadable B1 sibling must remain unselected"
+    );
+    assert!(
+        budget.used(Resource::Work) < 100_000,
+        "condition-cache reuse should keep sibling growth bounded"
+    );
+}
+
+#[test]
+fn nested_range_conditions_contribute_their_matrix_shape() {
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Logical(true));
+    resolver.set("Main", 0, 1, FixtureCell::Logical(false));
+    let (_budget, _cancellation, execution) = make_execution("ods-formula-value-range-condition");
+    let expression = parse("=IF({TRUE()};IF(([.A1]:[.B1]);1;0);0)");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .expect("a bounded range condition should drive the nested shape");
+    let array = result
+        .as_array()
+        .expect("the range condition should produce a matrix");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (1, 2));
+    assert_array_numbers(array, &[1.0, 0.0]);
+    assert_eq!(
+        resolver.read_order(),
+        vec![("Main".to_owned(), 0, 0), ("Main".to_owned(), 0, 1),],
+        "both selected range-condition cells should be read in order"
+    );
+}
+
+#[test]
+fn nested_range_branches_contribute_their_matrix_shape() {
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Number(10.0));
+    resolver.set("Main", 0, 1, FixtureCell::Number(11.0));
+    let (_budget, _cancellation, execution) = make_execution("ods-formula-value-range-branch");
+    let expression = parse("=IF({TRUE()};([.A1]:[.B1]);0)");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .expect("a selected bounded range branch should retain its shape");
+    let array = result
+        .as_array()
+        .expect("the selected range branch should produce a matrix");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (1, 2));
+    assert_array_numbers(array, &[10.0, 11.0]);
+    assert_eq!(
+        resolver.read_order(),
+        vec![("Main".to_owned(), 0, 0), ("Main".to_owned(), 0, 1),],
+        "selected range cells should be materialized in row-major order"
+    );
+}
+
+#[test]
+fn nested_composed_range_condition_drives_selected_shape() {
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Logical(true));
+    resolver.set("Main", 0, 1, FixtureCell::Logical(false));
+    resolver.set("Main", 0, 2, FixtureCell::Logical(true));
+    resolver.fail_missing_metadata();
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-composed-range-condition");
+    let expression = parse("=IF({TRUE()};IF((([.A1]:[.B1]):[.C1]);1;0);[Missing.A1:.Z100])");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .expect("a composed range condition should retain its full shape");
+    let array = result
+        .as_array()
+        .expect("the composed condition should produce a matrix");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (1, 3));
+    assert_array_numbers(array, &[1.0, 0.0, 1.0]);
+    assert_eq!(
+        resolver.read_order(),
+        vec![
+            ("Main".to_owned(), 0, 0),
+            ("Main".to_owned(), 0, 1),
+            ("Main".to_owned(), 0, 2),
+        ],
+        "each cell of the selected composed condition should be read once"
+    );
+    assert_eq!(resolver.missing_metadata_calls(), 0);
+}
+
+#[test]
+fn nested_range_branch_collapses_disjoint_union_to_bounding_shape() {
+    let mut resolver = FixtureResolver::new();
+    resolver.set("Main", 0, 0, FixtureCell::Number(10.0));
+    resolver.set("Main", 0, 1, FixtureCell::Number(11.0));
+    resolver.set("Main", 0, 2, FixtureCell::Number(12.0));
+    resolver.fail_missing_metadata();
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-union-range-branch");
+    let expression = parse("=IF({TRUE()};([.A1]~[.C1]):[.B1];[Missing.A1:.Z100])");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .expect("a range over a disjoint union should collapse its bounding shape");
+    let array = result
+        .as_array()
+        .expect("the selected range branch should produce a matrix");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (1, 3));
+    assert_array_numbers(array, &[10.0, 11.0, 12.0]);
+    assert_eq!(
+        resolver.read_order(),
+        vec![
+            ("Main".to_owned(), 0, 0),
+            ("Main".to_owned(), 0, 1),
+            ("Main".to_owned(), 0, 2),
+        ],
+        "the bounding range should materialize cells in row-major order"
+    );
+    assert_eq!(resolver.missing_metadata_calls(), 0);
+}
+
+#[test]
+fn scalar_condition_broadcast_over_reference_shape_does_not_consume_alias_stack() {
+    const ROWS: usize = 64;
+    let mut resolver = FixtureResolver::new();
+    resolver.sheets[0].1 = SheetExtent::new(ROWS, 8);
+    for row in 0..ROWS {
+        resolver.set("Main", row, 0, FixtureCell::Number((row + 1) as f64));
+    }
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-condition-alias-stack");
+    let expression = parse("=IF({TRUE()};IF(TRUE();[.A1:.A64];0);0)");
+    let limits = Limits::default()
+        .with_max_array_cells(ROWS)
+        .with_max_stack_entries(32);
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &limits,
+    )
+    .expect("a scalar condition should broadcast without per-output aliases");
+    let array = result
+        .as_array()
+        .expect("the selected reference should produce a vertical array");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (ROWS, 1));
+    let expected: Vec<_> = (1..=ROWS).map(|value| value as f64).collect();
+    assert_array_numbers(array, &expected);
+    assert_eq!(
+        resolver.reads(),
+        ROWS,
+        "each selected reference cell should be read once"
+    );
+    let expected_order: Vec<_> = (0..ROWS).map(|row| ("Main".to_owned(), row, 0)).collect();
+    assert_eq!(resolver.read_order(), expected_order);
+}
+
+#[test]
 fn local_reference_values_keep_empty_text_logical_and_formula_errors_distinct() {
     let mut resolver = FixtureResolver::new();
     resolver.set("Main", 0, 0, FixtureCell::Empty);
