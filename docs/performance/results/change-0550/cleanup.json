@@ -1,0 +1,22 @@
+{
+  "accessible_process_references": [],
+  "binary_sha256_by_kind": {
+    "alloc": "edf9fe1cbc1701def642e7c63107a637b9aed6566f6383c4dfacdf8050bdf615",
+    "normal": "6d2d1ccf3a47e0db1c7188d509385ae75dd80ad81c60a4e13cab93c251b75c5b"
+  },
+  "input_sha256": {
+    "capture.py": "4df2b10d6e884effcb160a07bc811d7b9d45b0d35c227ebf8d4c7227cf702463",
+    "frozen-inputs.json": "113d7f263fd64d61fc9462d545d33038887009c8b05a05e7ac39afe421376845",
+    "plan.json": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+    "run.py": "dcb20341f9558bd6de1befcfe0afe43d2045c90c6c7c5673529fe234d2e6d39f"
+  },
+  "observed_utc": "2026-09-13T05:27:43.833503+00:00",
+  "owned_paths_absent": true,
+  "plan_sha256": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+  "python_cache_absent": true,
+  "removed": [
+    "/home/zhuhe/litchi-goal-0550-target"
+  ],
+  "scope": "All capture, quality and analysis processes terminal; strict precleanup passes. Two retained binary hashes checked before removal; accessible process command/cwd/exe/fd scan found no owned-target references.",
+  "target": "/home/zhuhe/litchi-goal-0550-target"
+}

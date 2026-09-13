@@ -1,0 +1,9 @@
+{
+  "revision": "090b15b64ae52da2f8bf765cbb745ef76122792e",
+  "files": {
+    "tools/check_crate_boundaries.py": "4300ffa943039f4dfe68307cf0e7b6d335142aef2c728c4d1ceafe52d54fd9e2",
+    "tools/check_perf_claims.py": "d53ab2fdab5d5a492a23ac0f85fb58b19cabec396ecfdb1edc3a5c89964f7fbc",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  },
+  "scope": "Current checker/helper bytes equal frozen baseline Git revision; observed after terminal metadata checks."
+}

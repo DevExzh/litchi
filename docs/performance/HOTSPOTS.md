@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0550: current XLSX commit attribution
+
+[0550](changes/0550-xlsx-source-commit-attribution.md) Fresh rewrite-to-
+layout-scan attribution is 53.24–54.94% of exact MultiSourceEdit commit Ir,
+ahead of XML validation at 30.40–35.11% and provenance merge at 4.64–6.03%.
+Next review targets a source-bound layout proof across planning and commit.
+Inclusive shares are not removable fractions; absent reduced-reader symbols do
+not mean zero work.
+
 ## 0549: checked bitset candidate rejected
 
 [0549](changes/0549-cfb-checked-test-and-mark.md) Combining checked membership

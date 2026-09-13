@@ -1,0 +1,5 @@
+{
+  "exit_code": 1,
+  "failure": "The valid control was copied outside the bundle, but validate_report returns a bundle-relative report path. ValueError was raised after control validation before negative cases. TemporaryDirectory removed the copy.",
+  "change": "Validate the retained original path as control. Negative copies must fail on their intended field before report construction; assert exact expected error labels."
+}

@@ -1,0 +1,12 @@
+{
+  "failed_pid": 2481284,
+  "removed": [
+    {
+      "path": "/tmp/vgdb-pipe-shared-mem-vgdb-2481284-by-zhuhe-on-???",
+      "uid": 1001,
+      "mode": 33152,
+      "bytes": 0
+    }
+  ],
+  "scope": "Only exact failed-child debugger paths; failed capture is terminal."
+}

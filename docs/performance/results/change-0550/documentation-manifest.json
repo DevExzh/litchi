@@ -1,0 +1,15 @@
+{
+  "docs/performance/ADR_COMPLIANCE.md": "7cec975c585e6e01437014a572e39dc34ae8a7c9b13b9a85ae4c944ce62d6cca",
+  "docs/performance/BASELINE.md": "94dcd1ea5eedd973a8d084680a3aa32cdbf522d46daaf816f668994bca9fa38f",
+  "docs/performance/GOAL_AUDIT.md": "10b6f67e7e3823cce3bbc5fc61fbe81077d720bc6cf3e3cc03d39f2ed0c408f1",
+  "docs/performance/HOTSPOTS.md": "5aa7a47181adede67d5222ecc55e3278f3e664bbdc43f29ac6486f28e16ffa15",
+  "docs/performance/REPORT.md": "c01d44ff8bbe587edc0b8ff166e3c7a91e728078af75913a3fdda558c3fa64f2",
+  "docs/performance/changes/0550-xlsx-source-commit-attribution.md": "c622cc0197c5ebb6a0f301cb00ee3e4292d1447ba5ad1ca5fc11fbc96e9ce3ee",
+  "docs/performance/results/change-0550/README.md": "6074f314ff2d5ea50c4e04d82511c3069df6af5cb77b4a05e913841f56ea8a3e",
+  "docs/performance/results/change-0550/adr-compliance.md": "c19d0509c74c0c7c1102404e8eee3f145b6fd15b238ffd27cf1620dbe6ca951e",
+  "docs/performance/results/change-0550/profile-review.md": "7aec1262e21c5932e8ac2e0db11a0825ce06f4eac2e45f294e58f9bd4b910411",
+  "docs/performance/results/change-0550/protocol.md": "c97d302adc23a4e28d9c3146d9d4b21c0051ffc27e2d05197b6fe9b238b4f38e",
+  "docs/performance/results/change-0550/results-review.md": "e01691d0717846409d694d7bde5586c0e23bd5f95517ad455b6b6deac8407a84",
+  "docs/performance/results/change-0550/scope-review.md": "b97b942863dc657ddd62c7343e99630dda9b26b056b8aec0515414aaaa929f05",
+  "docs/performance/results/change-0550/source-review.md": "0bfb5748fe0b7d8a528e43bd1ce1d4a32a2962b45bb4595fa8f636a7a3dd7430"
+}

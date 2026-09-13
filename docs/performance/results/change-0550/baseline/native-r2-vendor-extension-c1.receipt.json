@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-v",
+    "/home/zhuhe/litchi-goal-0550-target/retained/baseline/normal",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "vendor-extension",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/baseline/native-r2-vendor-extension-c1.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0550/baseline/native-r2-vendor-extension-c1.catalog.json"
+  ],
+  "start_utc": "2026-09-13T04:56:56.106774+00:00",
+  "end_utc": "2026-09-13T04:56:58.749792+00:00",
+  "seconds": 2.6430392090114765,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": "6d2d1ccf3a47e0db1c7188d509385ae75dd80ad81c60a4e13cab93c251b75c5b",
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "dcb20341f9558bd6de1befcfe0afe43d2045c90c6c7c5673529fe234d2e6d39f",
+  "plan_sha256": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r2-vendor-extension-c1.catalog.json": "01f14d1285a95844951e560378ba48befd6b020c4b49234e8133caff3ebef9a1",
+    "native-r2-vendor-extension-c1.host.json": "fd7c563313aefef7ab9e327f8db0a80c8cb775cd88e3eae542e5f07b6a20a925",
+    "native-r2-vendor-extension-c1.json": "e5fe08b589ee471c883619a2c60cfc15a041cc6ef6a46567d8e022b1a0b736d3",
+    "native-r2-vendor-extension-c1.stderr": "42160e7aff301dfa0e8f15b5129251b59488c7a044405f429816ffd3847d0a3d",
+    "native-r2-vendor-extension-c1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

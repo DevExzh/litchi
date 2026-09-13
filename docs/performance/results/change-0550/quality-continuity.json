@@ -1,0 +1,10 @@
+{
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "prior_manifest": "docs/performance/results/change-0549/final/source-manifest.json",
+  "prior_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "prior_quality": "docs/performance/results/change-0549/quality-summary.json",
+  "prior_quality_sha256": "aa8ca992855849dd9f5e85038106958cc37b0400747d8d9efd94f008abf17b81",
+  "prior_checks": 15,
+  "prior_executed_tests": 4382,
+  "scope": "Exact unchanged source inventory. Prior 15checks/4382executions are OLE owner tests and workspace/harness checks, not a fresh XLSX suite. This diagnostic runs fresh build/case oracles and four metadata checks; no new broad test/fuzz/native-Office claim."
+}

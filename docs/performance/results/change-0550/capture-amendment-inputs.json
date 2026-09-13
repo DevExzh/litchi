@@ -1,0 +1,34 @@
+{
+  "utc": "2026-09-13T04:52:06.686296+00:00",
+  "reason": "Valgrind gdbserver failed writing shared memory before first profile measured operation. Disable unused gdbserver and place any vgdb paths under owned target. No production, binary, plan threshold or native timing change.",
+  "inputs": {
+    "plan.json": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+    "run.py": "dcb20341f9558bd6de1befcfe0afe43d2045c90c6c7c5673529fe234d2e6d39f",
+    "capture.py": "4df2b10d6e884effcb160a07bc811d7b9d45b0d35c227ebf8d4c7227cf702463",
+    "capture_amended.py": "0ce6862199c2acae743c1aafaf942bd56b9b3d4f18611728a9e2c4a87a7ac3f0",
+    "resume.py": "2253bafe80d568ed11f19cba1b008bca9567eba697c0b24e45a222a596f5751d",
+    "failed-attempts/manifest.json": "05b13313523a1f68d8de2e0602c6cf4538aaaa58f33099f1331f2c11b3c9c7c6"
+  },
+  "failed_artifacts": {
+    "baseline/profile-r1-medium-c0.callgrind": {
+      "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.callgrind",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "baseline/profile-r1-medium-c0.host.json": {
+      "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.host.json",
+      "sha256": "79cf4f3c1c1b5cc6f0e8835f7c543e63fb63277b927ef83a87b8104f4d1c707e"
+    },
+    "baseline/profile-r1-medium-c0.receipt.json": {
+      "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.receipt.json",
+      "sha256": "35a76d0beb4346945686bec0b1091373bb033695c70270445276c694a210b38b"
+    },
+    "baseline/profile-r1-medium-c0.stderr": {
+      "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.stderr",
+      "sha256": "a0b53a6a61c0a23e14d89c822e6d4fd7a7e1e9ad9153270a8e23cde954fddf64"
+    },
+    "baseline/profile-r1-medium-c0.stdout": {
+      "retained": "failed-attempts/profile-r1-medium-c0/profile-r1-medium-c0.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

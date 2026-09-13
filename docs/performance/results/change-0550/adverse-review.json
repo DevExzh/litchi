@@ -1,0 +1,780 @@
+{
+  "schema": "litchi-xlsx-change-0550-adverse-review-v1",
+  "status": "complete",
+  "complete": true,
+  "disposition": "diagnostic-only",
+  "adoption_allowed": false,
+  "performance_claim": "none",
+  "scope": "Current source-backed XLSX MultiSourceEdit commit attribution; no optimization or speedup claim",
+  "comparison": "metrics-analysis.json",
+  "comparison_sha256": "49e7978f1dd41b21031abe45cc2394a51085ca701d17fca79eda4ab5a8de14e4",
+  "profile_analysis": "profile-analysis.json",
+  "profile_analysis_sha256": "64ee681a71674696e65f3d36922a03dec950e8af5d2e49ecf00b1c65c5dfd0ae",
+  "same_build": [
+    {
+      "id": "0550-review-0001",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 9.254809948381038,
+        "delta": 9861,
+        "first": 106550,
+        "lane": "native",
+        "metric": "timing.open.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 116411,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_edit_save shape=dense-sparse timing.open.p99 moved from 106550 to 116411 (+9.254810%; delta 9861). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0002",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -5.93817717020797,
+        "delta": -2643995,
+        "first": 44525364,
+        "lane": "native",
+        "metric": "timing.reopen.p50",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 41881369,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_edit_save shape=dense-sparse timing.reopen.p50 moved from 44525364 to 41881369 (-5.938177%; delta -2643995). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0003",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -5.572432889549484,
+        "delta": -2482102.93333333,
+        "first": 44542536.13333332,
+        "lane": "native",
+        "metric": "timing.reopen.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 42060433.19999999,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_edit_save shape=dense-sparse timing.reopen.mean moved from 44542536.13333332 to 42060433.19999999 (-5.572433%; delta -2482102.93333333). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0004",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -7.997400519896026,
+        "delta": -7999,
+        "first": 100020,
+        "lane": "native",
+        "metric": "timing.open.p50",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 92021,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.open.p50 moved from 100020 to 92021 (-7.997401%; delta -7999). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0005",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -7.9980812375224914,
+        "delta": -8069.93333333332,
+        "first": 100898.36666666667,
+        "lane": "native",
+        "metric": "timing.open.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 92828.43333333335,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.open.mean moved from 100898.36666666667 to 92828.43333333335 (-7.998081%; delta -8069.93333333332). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0006",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -8.016032064128254,
+        "delta": -8760,
+        "first": 109281,
+        "lane": "native",
+        "metric": "timing.open.p95",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 100521,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.open.p95 moved from 109281 to 100521 (-8.016032%; delta -8760). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0007",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -10.641134726888357,
+        "delta": -12131,
+        "first": 114001,
+        "lane": "native",
+        "metric": "timing.open.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 101870,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.open.p99 moved from 114001 to 101870 (-10.641135%; delta -12131). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0008",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -14.10220935765646,
+        "delta": -6469562,
+        "first": 45876230,
+        "lane": "native",
+        "metric": "timing.reopen.p50",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 39406668,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.reopen.p50 moved from 45876230 to 39406668 (-14.102209%; delta -6469562). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0009",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -14.213949399469318,
+        "delta": -6528707.866666645,
+        "first": 45931694.86666665,
+        "lane": "native",
+        "metric": "timing.reopen.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 39402987.00000001,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.reopen.mean moved from 45931694.86666665 to 39402987.00000001 (-14.213949%; delta -6528707.866666645). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0010",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -14.572947749273524,
+        "delta": -6780828,
+        "first": 46530243,
+        "lane": "native",
+        "metric": "timing.reopen.p95",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 39749415,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.reopen.p95 moved from 46530243 to 39749415 (-14.572948%; delta -6780828). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0011",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -14.232889490784606,
+        "delta": -6634548,
+        "first": 46614203,
+        "lane": "native",
+        "metric": "timing.reopen.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 39979655,
+        "shape": "dense-sparse",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=dense-sparse timing.reopen.p99 moved from 46614203 to 39979655 (-14.232889%; delta -6634548). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0012",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -6.460874027225616,
+        "delta": -6165.43333333332,
+        "first": 95427.23333333332,
+        "lane": "native",
+        "metric": "timing.open.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 89261.8,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.open.mean moved from 95427.23333333332 to 89261.8 (-6.460874%; delta -6165.43333333332). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0013",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -12.629842586483175,
+        "delta": -13399,
+        "first": 106090,
+        "lane": "native",
+        "metric": "timing.open.p95",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 92691,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.open.p95 moved from 106090 to 92691 (-12.629843%; delta -13399). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0014",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -12.726764549178537,
+        "delta": -14571,
+        "first": 114491,
+        "lane": "native",
+        "metric": "timing.open.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 99920,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.open.p99 moved from 114491 to 99920 (-12.726765%; delta -14571). It exceeds the absolute 5.0% repeat-drift review threshold. The open phase is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0015",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -9.554084197199785,
+        "delta": -640853,
+        "first": 6707634,
+        "lane": "native",
+        "metric": "timing.publication.p50",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 6066781,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.publication.p50 moved from 6707634 to 6066781 (-9.554084%; delta -640853). It exceeds the absolute 5.0% repeat-drift review threshold. Publication is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0016",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -9.62696844053329,
+        "delta": -646498.8666666653,
+        "first": 6715497.933333333,
+        "lane": "native",
+        "metric": "timing.publication.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 6068999.066666667,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.publication.mean moved from 6715497.933333333 to 6068999.066666667 (-9.626968%; delta -646498.8666666653). It exceeds the absolute 5.0% repeat-drift review threshold. Publication is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0017",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -9.91494430949521,
+        "delta": -671082,
+        "first": 6768389,
+        "lane": "native",
+        "metric": "timing.publication.p95",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 6097307,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.publication.p95 moved from 6768389 to 6097307 (-9.914944%; delta -671082). It exceeds the absolute 5.0% repeat-drift review threshold. Publication is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0018",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -10.044615051616523,
+        "delta": -682173,
+        "first": 6791430,
+        "lane": "native",
+        "metric": "timing.publication.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 6109257,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.publication.p99 moved from 6791430 to 6109257 (-10.044615%; delta -682173). It exceeds the absolute 5.0% repeat-drift review threshold. Publication is outside the exact owner profile. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0019",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 14.975688569099898,
+        "delta": 4232154,
+        "first": 28260163,
+        "lane": "native",
+        "metric": "timing.reopen.p50",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 32492317,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.reopen.p50 moved from 28260163 to 32492317 (+14.975689%; delta 4232154). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0020",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 14.767750153787706,
+        "delta": 4175023.666666668,
+        "first": 28271223.6,
+        "lane": "native",
+        "metric": "timing.reopen.mean",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 32446247.26666667,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.reopen.mean moved from 28271223.6 to 32446247.26666667 (+14.767750%; delta 4175023.666666668). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0021",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 14.389621346188243,
+        "delta": 4113969,
+        "first": 28589835,
+        "lane": "native",
+        "metric": "timing.reopen.p95",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 32703804,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.reopen.p95 moved from 28589835 to 32703804 (+14.389621%; delta 4113969). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-review-0022",
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "original": {
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 13.487727896745948,
+        "delta": 3897648,
+        "first": 28897736,
+        "lane": "native",
+        "metric": "timing.reopen.p99",
+        "over_five_percent": true,
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "second": 32795384,
+        "shape": "noncompact",
+        "threshold_percent": 5
+      },
+      "classification": "same_build_repeat_variability",
+      "interpretation": "Retain this native same-build repeat row individually: xlsx_source_backed_cell_values_one_percent_edit_save shape=noncompact timing.reopen.p99 moved from 28897736 to 32795384 (+13.487728%; delta 3897648). It exceeds the absolute 5.0% repeat-drift review threshold. Reopen is diagnostic and excluded from workflow timing and exact-owner Ir. The paired runs have matched corpus, sink, source, output, semantic, and untouched-member identity, so this is diagnostic repeat variation only; it supplies no candidate, latency, or causal claim.",
+      "disposition": "retain_diagnostic"
+    }
+  ],
+  "profile_same_build": [
+    {
+      "id": "0550-profile-review-0001",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "dense-sparse",
+        "repeat_1_profile": "profile-r1-dense-sparse-c0",
+        "repeat_2_profile": "profile-r2-dense-sparse-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": -115,
+            "observed_delta_percent": -45.09803921568627,
+            "repeat_1": 255,
+            "repeat_2": 140,
+            "repeat_2_over_repeat_1": 0.5490196078431373
+          },
+          "name": "__rustc::__rust_dealloc",
+          "repeat_1": 255,
+          "repeat_2": 140
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: __rustc::__rust_dealloc for shape=dense-sparse moved from 255 to 140 (-45.098039%; delta_ir -115). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-profile-review-0002",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "dense-sparse",
+        "repeat_1_profile": "profile-r1-dense-sparse-c0",
+        "repeat_2_profile": "profile-r2-dense-sparse-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": 362,
+            "observed_delta_percent": 94.76439790575917,
+            "repeat_1": 382,
+            "repeat_2": 744,
+            "repeat_2_over_repeat_1": 1.9476439790575917
+          },
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+          "repeat_1": 382,
+          "repeat_2": 744
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: alloc::raw_vec::RawVecInner<A>::finish_grow for shape=dense-sparse moved from 382 to 744 (+94.764398%; delta_ir 362). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-profile-review-0003",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "medium",
+        "repeat_1_profile": "profile-r1-medium-c0",
+        "repeat_2_profile": "profile-r2-medium-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": 76,
+            "observed_delta_percent": 18.401937046004836,
+            "repeat_1": 413,
+            "repeat_2": 489,
+            "repeat_2_over_repeat_1": 1.1840193704600483
+          },
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+          "repeat_1": 413,
+          "repeat_2": 489
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: alloc::raw_vec::RawVecInner<A>::finish_grow for shape=medium moved from 413 to 489 (+18.401937%; delta_ir 76). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-profile-review-0004",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "medium",
+        "repeat_1_profile": "profile-r1-medium-c0",
+        "repeat_2_profile": "profile-r2-medium-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": 115,
+            "observed_delta_percent": 5.253540429419834,
+            "repeat_1": 2189,
+            "repeat_2": 2304,
+            "repeat_2_over_repeat_1": 1.0525354042941983
+          },
+          "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+          "repeat_1": 2189,
+          "repeat_2": 2304
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState> for shape=medium moved from 2189 to 2304 (+5.253540%; delta_ir 115). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-profile-review-0005",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "noncompact",
+        "repeat_1_profile": "profile-r1-noncompact-c0",
+        "repeat_2_profile": "profile-r2-noncompact-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": -20,
+            "observed_delta_percent": -5.36193029490617,
+            "repeat_1": 373,
+            "repeat_2": 353,
+            "repeat_2_over_repeat_1": 0.9463806970509383
+          },
+          "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+          "repeat_1": 373,
+          "repeat_2": 353
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: alloc::raw_vec::RawVecInner<A>::finish_grow for shape=noncompact moved from 373 to 353 (-5.361930%; delta_ir -20). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    },
+    {
+      "id": "0550-profile-review-0006",
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*]",
+      "original": {
+        "shape": "vendor-extension",
+        "repeat_1_profile": "profile-r1-vendor-extension-c0",
+        "repeat_2_profile": "profile-r2-vendor-extension-c0",
+        "profile_native_identity_equal": true,
+        "source_row": {
+          "metric": {
+            "delta_ir": 202,
+            "observed_delta_percent": 10.166079516859593,
+            "repeat_1": 1987,
+            "repeat_2": 2189,
+            "repeat_2_over_repeat_1": 1.101660795168596
+          },
+          "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+          "repeat_1": 1987,
+          "repeat_2": 2189
+        }
+      },
+      "classification": "profile_same_build_repeat_variability",
+      "interpretation": "Retain this profile same-build repeat row individually: core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState> for shape=vendor-extension moved from 1987 to 2189 (+10.166080%; delta_ir 202). It is an immediate-child row in the exact litchi_xlsx::cell_values::source::MultiSourceEdit::commit profile and has equal profile/native output identity. This is simulated Callgrind Ir repeat variation, not native latency or allocator evidence; nested rows are not summed and no removable-work claim follows.",
+      "disposition": "retain_diagnostic"
+    }
+  ],
+  "all_diagnostic_rows_retained": true,
+  "thresholds": {
+    "same_build_repeat_absolute_percent": 5,
+    "metrics_rows_are_selected_when_absolute_change_exceeds": 5,
+    "profile_rows_are_selected_when_absolute_observed_delta_exceeds": 5
+  },
+  "counts": {
+    "metrics_same_build_drift_over_five_percent": 22,
+    "metrics_native_drift_over_five_percent": 22,
+    "metrics_allocation_drift_over_five_percent": 0,
+    "profile_immediate_child_drift_over_five_percent": 6,
+    "profile_nested_drift_over_five_percent": 0,
+    "reviewed_flags": 28,
+    "positive_metric_drift_rows": 5,
+    "negative_metric_drift_rows": 17
+  },
+  "classification_summary": {
+    "metrics_by_phase": {
+      "open": 8,
+      "reopen": 10,
+      "publication": 4
+    },
+    "metrics_lane": {
+      "native": 22,
+      "alloc": 0
+    },
+    "profile_lane": "same-baseline-binary immediate-child repeat diagnostics",
+    "no_candidate_comparison": true,
+    "no_admission_gate": true
+  },
+  "source_coverage": [
+    {
+      "source": "metrics-analysis.json:same_build_drift_over_five_percent",
+      "review_key": "same_build",
+      "count": 22
+    },
+    {
+      "source": "profile-analysis.json:repeat_drift.profiles[*].immediate_child_ir[*].metric",
+      "review_key": "profile_same_build",
+      "selection": "abs(observed_delta_percent) > 5",
+      "count": 6
+    },
+    {
+      "source": "profile-analysis.json:repeat_drift.profiles[*].nested_targets[*]",
+      "review_key": "profile_nested_same_build",
+      "selection": "abs(observed_delta_percent) > 5",
+      "count": 0
+    }
+  ],
+  "input_report_hashes": {
+    "docs/performance/results/change-0550/metrics-analysis.json": "49e7978f1dd41b21031abe45cc2394a51085ca701d17fca79eda4ab5a8de14e4",
+    "docs/performance/results/change-0550/profile-analysis.json": "64ee681a71674696e65f3d36922a03dec950e8af5d2e49ecf00b1c65c5dfd0ae",
+    "docs/performance/results/change-0550/analyze_metrics.py": "95cc7baadb0dcefff7c4e29bad84321d05ff71073b5f8522e26945622f359c0f",
+    "docs/performance/results/change-0550/analyze_profiles.py": "ac23bbe997c8753557c141752ea2bb2c3e59d634a549d75b6ecd517aabcd0fbc",
+    "docs/performance/results/change-0550/analysis-inputs.json": "0878a2a8963c13d91fe1ff365f544eb5e3eb23350706fb5e6f21e9de3aaf8435",
+    "docs/performance/results/change-0550/analysis_phase.py": "f406b7a6da04213d56304b42c6e6d954d8167a614618e67c9d8ff82b331f14de",
+    "docs/performance/results/change-0550/analysis-runs/metrics/receipt.json": "c49fe8ab3449754bfef21dd50d9e8e109900fabdaffdb42df92e4198be094cd2",
+    "docs/performance/results/change-0550/analysis-runs/profiles/receipt.json": "609326970ccd6efac0d7bbfdf02cd697ade55da1b329abc2eaa195549c79a5a3",
+    "docs/performance/results/change-0550/plan.json": "3eeb52cdad1312b3953006e538490d6523a707e9858354dcb6688b4a615471a7",
+    "docs/performance/results/change-0550/run.py": "dcb20341f9558bd6de1befcfe0afe43d2045c90c6c7c5673529fe234d2e6d39f",
+    "docs/performance/results/change-0550/capture.py": "4df2b10d6e884effcb160a07bc811d7b9d45b0d35c227ebf8d4c7227cf702463",
+    "docs/performance/results/change-0550/scope-review.md": "b97b942863dc657ddd62c7343e99630dda9b26b056b8aec0515414aaaa929f05",
+    "docs/performance/results/change-0550/profile-review.md": "7aec1262e21c5932e8ac2e0db11a0825ce06f4eac2e45f294e58f9bd4b910411",
+    "docs/performance/results/change-0550/source-review.md": "0bfb5748fe0b7d8a528e43bd1ce1d4a32a2962b45bb4595fa8f636a7a3dd7430",
+    "docs/performance/results/change-0550/baseline/source-manifest.json": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+    "docs/performance/results/change-0549/next-target.md": "5b9e75255cfe7010d4ca1bb9426ff389e235a76034d093fb5d14d7c58b930ae4",
+    "docs/performance/results/change-0512/scope-review.md": "25f0a25cab7722fd154a1f7b201705401fd36fe7ccebcea353f7333aa25f8ead"
+  },
+  "source_identity": {
+    "repository_revision": "090b15b64ae52da2f8bf765cbb745ef76122792e",
+    "baseline_source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+    "matched_identity_keys": [
+      "corpus",
+      "sink",
+      "source",
+      "output_sha256",
+      "semantic_sha256",
+      "untouched_member_count",
+      "untouched_member_sha256",
+      "catalog"
+    ],
+    "all_lanes_and_repeats_equal": true,
+    "binary_sha256": {
+      "alloc": "edf9fe1cbc1701def642e7c63107a637b9aed6566f6383c4dfacdf8050bdf615",
+      "normal": "6d2d1ccf3a47e0db1c7188d509385ae75dd80ad81c60a4e13cab93c251b75c5b"
+    }
+  },
+  "execution": {
+    "metrics_status": "pass",
+    "job_counts": {
+      "alloc": 16,
+      "native": 16,
+      "preflight": 8
+    },
+    "sample_counts": {
+      "alloc": 480,
+      "native": 480,
+      "preflight": 8
+    },
+    "native_timing_scope": "workflow is elapsed_ns and equals open + planning + commit + publication; commit_ns includes edit staging and MultiSourceEdit::commit; reopen is diagnostic and excluded",
+    "allocation_scope": "allocator binary operation_global_system_allocator",
+    "allocator_instrumented_elapsed_excluded": true,
+    "matched_identity": {
+      "all_lanes_and_repeats_equal": true,
+      "case_shape_count": 8,
+      "keys": [
+        "corpus",
+        "sink",
+        "source",
+        "output_sha256",
+        "semantic_sha256",
+        "untouched_member_count",
+        "untouched_member_sha256",
+        "catalog"
+      ]
+    }
+  },
+  "profile_execution": {
+    "status": "pass",
+    "selected_function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "lifecycle_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+    "measured_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+    "profile_job_count": 8,
+    "measured_commit_count": 8,
+    "lifecycle_dump_count": 26,
+    "repeat_shape_pair_count": 4,
+    "repeat_scope": "Same-baseline-binary repeat drift; observed changes are diagnostic only",
+    "repeat_validation": {
+      "immediate_child_partitions_compared_by_name": true,
+      "nested_targets_compared_without_removable_fraction": true,
+      "profile_native_identity_parity": true,
+      "repeat_matrix_matches": true
+    }
+  },
+  "next_target": {
+    "owner_partition": "litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance",
+    "nested_direct_child": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+    "basis": "The rewrite function is the largest immediate child partition of MultiSourceEdit::commit across all four shapes. Narrow the next diagnostic at its scan_with_limit child before considering a production change.",
+    "scan_with_limit_repeat_1_ir_by_shape": {
+      "medium": 70977241,
+      "dense-sparse": 137507562,
+      "noncompact": 91137124,
+      "vendor-extension": 71003018
+    },
+    "medium_repeat_1_scan_with_limit_ir": 70977241,
+    "reduced_parser_interpretation": "The reduced parser/readback source-level symbol is absent from the positive owner-reachable graph; that absence is not a zero-cost measurement and may reflect inlining or codegen omission.",
+    "validation_interpretation": "The validate_xml aggregate includes workbook checks from invalidation-related calls and is not a worksheet-only cost.",
+    "nested_overlap": "scan_with_limit is a direct child of the nested rewrite target; it is not an additional owner-level disjoint row."
+  },
+  "next_direction": "Retain the current source and close this batch as diagnostic-only. The next OOXML attribution should isolate rewrite_value_only_with_provenance -> scan_with_limit, writer work, and Snapshot::from_rewritten_value_source with fresh direct edges and route/copy/allocation counters. Preserve complete-output validation, reduced-readback/fallback, source lineage, publication, and semantic/error contracts. OLE2/OOXML remains first; ODF remains deferred and iWork is excluded."
+}
+
