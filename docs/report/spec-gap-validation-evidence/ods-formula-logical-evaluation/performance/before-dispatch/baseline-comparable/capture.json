@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/logical-harness/run.py",
+    "--binary",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/baseline/ods-formula-logical-evaluation-profile",
+    "--output",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/baseline/comparable",
+    "--revision",
+    "baseline",
+    "--group",
+    "comparable",
+    "--phase",
+    "all",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15"
+  ],
+  "started_at": "2026-09-13T12:31:13.068698+00:00",
+  "finished_at": "2026-09-13T12:31:13.498215+00:00",
+  "status": 0,
+  "binary_sha256": "412287de2566991d60f494fb0deffd768deb238c0ad5f020d8d72979ed544cc2",
+  "raw_sha256": "adbb5d62b8aab7846208617b61dd0113c262a8736bd10a4273fc20642a687783"
+}

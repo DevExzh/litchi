@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-09-13T12:30:12.273496+00:00",
+  "files": [
+    "crates/litchi-ods/src/codec/formula/evaluation.rs",
+    "crates/litchi-ods/tests/ods_formula_logical_evaluation.rs"
+  ],
+  "action": "Refreshed scratch input mtimes before final debug and release builds. Source content hashes remain unchanged. This prevents preserved copy timestamps from permitting reuse of a build made after an older-content baseline checkout."
+}

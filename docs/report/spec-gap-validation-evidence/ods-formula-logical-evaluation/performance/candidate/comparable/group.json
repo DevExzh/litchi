@@ -1,0 +1,117 @@
+{
+  "group": "comparable",
+  "revision": "candidate",
+  "candidate_only": false,
+  "phase_selection": "all",
+  "phases": [
+    "parse",
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "case_count": 25,
+  "cases": [
+    {
+      "case": "control-flat-64",
+      "repeat": 64
+    },
+    {
+      "case": "control-flat-256",
+      "repeat": 32
+    },
+    {
+      "case": "control-flat-1024",
+      "repeat": 8
+    },
+    {
+      "case": "control-flat-4096",
+      "repeat": 2
+    },
+    {
+      "case": "control-coerce-64",
+      "repeat": 64
+    },
+    {
+      "case": "control-coerce-256",
+      "repeat": 32
+    },
+    {
+      "case": "control-coerce-1024",
+      "repeat": 8
+    },
+    {
+      "case": "control-coerce-4096",
+      "repeat": 2
+    },
+    {
+      "case": "control-utf8-left-64",
+      "repeat": 64
+    },
+    {
+      "case": "control-utf8-left-256",
+      "repeat": 32
+    },
+    {
+      "case": "control-utf8-left-1024",
+      "repeat": 8
+    },
+    {
+      "case": "control-utf8-left-4096",
+      "repeat": 2
+    },
+    {
+      "case": "control-escaped-64",
+      "repeat": 64
+    },
+    {
+      "case": "control-escaped-256",
+      "repeat": 32
+    },
+    {
+      "case": "control-escaped-1024",
+      "repeat": 8
+    },
+    {
+      "case": "control-escaped-4096",
+      "repeat": 2
+    },
+    {
+      "case": "control-true",
+      "repeat": 128
+    },
+    {
+      "case": "control-false",
+      "repeat": 128
+    },
+    {
+      "case": "failure-reference",
+      "repeat": 128
+    },
+    {
+      "case": "failure-array",
+      "repeat": 128
+    },
+    {
+      "case": "failure-name",
+      "repeat": 128
+    },
+    {
+      "case": "failure-work",
+      "repeat": 128
+    },
+    {
+      "case": "failure-memory",
+      "repeat": 128
+    },
+    {
+      "case": "failure-stack",
+      "repeat": 128
+    },
+    {
+      "case": "failure-cancelled",
+      "repeat": 128
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/candidate/ods-formula-logical-evaluation-profile"
+}

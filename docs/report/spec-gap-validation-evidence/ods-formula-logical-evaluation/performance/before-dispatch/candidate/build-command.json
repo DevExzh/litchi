@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/logical-harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-logical-worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/var/tmp/ods-logical-target",
+    "TMPDIR": "/var/tmp/ods-logical-tmp",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "started_at": "2026-09-13T12:31:13.508451+00:00",
+  "finished_at": "2026-09-13T12:31:25.039476+00:00",
+  "status": 0
+}

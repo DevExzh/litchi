@@ -1,0 +1,23 @@
+{
+  "tests": 894,
+  "targets": 53,
+  "subprocess_tests": 1,
+  "doctests": 2,
+  "required_integration_groups": [
+    "all_standard_logical_functions_return_their_scalar_profile_values",
+    "logical_functions_apply_number_coercion_and_and_or_numeric_text_profile",
+    "conditional_functions_honor_all_optional_argument_forms",
+    "required_arity_errors_are_formula_values",
+    "eager_wrong_arity_still_evaluates_present_children",
+    "and_or_evaluate_all_children_and_propagate_source_errors",
+    "if_and_error_handlers_visit_only_the_selected_or_needed_value",
+    "iferror_and_ifna_handle_formula_errors_but_not_evaluator_failures",
+    "error_handlers_compute_a_successful_input_once",
+    "unused_conditional_work_and_storage_are_not_admitted",
+    "selected_owned_text_keeps_and_releases_its_result_reservation",
+    "eager_boolean_children_charge_work_and_limits",
+    "cancellation_is_checked_before_logical_work_and_is_not_caught",
+    "nested_conditionals_evaluate_iteratively_with_bounded_stack",
+    "logical_source_spelling_and_function_case_are_preserved"
+  ]
+}

@@ -2,10 +2,11 @@
 //!
 //! This module evaluates the already-parsed ODS expression tree directly.  It
 //! does not stringify and reparse formulas, inspect a workbook, resolve an
-//! external source, refresh a cache, or publish a cell change.  The first
-//! evaluation profile intentionally covers constants, scalar operators, and
-//! `TRUE()`/`FALSE()` only.  References, arrays, names, labels, and all other
-//! functions are reported as typed capability refusals.
+//! external source, refresh a cache, or publish a cell change.  The scalar
+//! profile covers constants, scalar operators, and the normative logical
+//! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
+//! and `XOR`).  References, arrays, names, labels, and other functions are
+//! reported as typed capability refusals.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -20,6 +21,8 @@
 //!   before being exposed here;
 //! * text-to-number conversion accepts only locale-independent decimal-point
 //!   syntax and reports a value error when conversion fails;
+//! * Text used where a Logical is required reports `#VALUE!`; AND/OR follow
+//!   their `NumberSequenceList` signature and convert scalar numeric Text;
 //! * `0^0` is accepted as `1`, as permitted by this bounded profile.
 //!
 //! A successful text result keeps its memory reservation in
@@ -47,11 +50,13 @@
 //! #     Budget::root("formula", Limits::for_profile(Profile::Server)), token,
 //! #     ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MIN, 0)?,
 //! # );
-//! let expression = Expression::parse("of:=2+3*4")?;
+//! // The reference in the unselected branch is never resolved, and IFERROR
+//! // catches the selected branch's formula-level division error.
+//! let expression = Expression::parse("of:=IF(FALSE();[.A1];IFERROR(1/0;42))")?;
 //! let result = evaluate_scalar_with_context(
 //!     &expression, &execution, &EvaluationLimits::default(),
 //! )?;
-//! assert_eq!(result.value(), &ScalarValue::Number(14.0));
+//! assert_eq!(result.value(), &ScalarValue::Number(42.0));
 //! # Ok(())
 //! # }
 //! ```
@@ -321,9 +326,9 @@ pub enum UnsupportedKind {
     NamedExpression,
     /// A quoted label or automatic intersection requires a label resolver.
     Label,
-    /// A missing function parameter is outside this scalar profile.
+    /// A missing function parameter outside a function's defined defaults.
     MissingArgument,
-    /// A standard or host-defined function other than TRUE/FALSE.
+    /// A standard or host-defined function outside this scalar profile.
     Function,
 }
 
@@ -455,6 +460,7 @@ struct Evaluator<'a, 'ctx, 'exec> {
 enum Frame<'a> {
     Visit(Node<'a>),
     Apply(Node<'a>),
+    VisitArgument(Node<'a>),
 }
 
 enum WorkingValue<'a> {
@@ -575,6 +581,7 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             match frame {
                 Frame::Visit(node) => self.visit(node)?,
                 Frame::Apply(node) => self.apply(node)?,
+                Frame::VisitArgument(node) => self.visit_argument(node)?,
             }
         }
 
@@ -686,62 +693,86 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
     }
 
+    fn visit_argument(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        if node.is_missing() {
+            self.push_value(WorkingValue::Error(ScalarError::Value))
+        } else {
+            self.visit(node)
+        }
+    }
+
     fn visit_function(&mut self, node: Node<'a>, name: &'a str) -> EvaluationResult<()> {
         self.charge_bytes(name.len())?;
-        let value = if name.eq_ignore_ascii_case("TRUE") {
-            true
-        } else if name.eq_ignore_ascii_case("FALSE") {
-            false
-        } else {
-            return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
-        };
-        if node.child_count() == 0 {
-            return self.push_value(WorkingValue::Logical(value));
+
+        if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") {
+            if node.child_count() == 0 {
+                return self.push_value(WorkingValue::Logical(name.eq_ignore_ascii_case("TRUE")));
+            }
+            return self.schedule_eager_function(node);
         }
 
-        // These supported functions have no lazy-argument exception. Visit
-        // arguments in source order before reporting their arity error; this
-        // also preserves child errors, capability refusals, and work limits.
-        self.charge_work(u64::try_from(node.child_count()).unwrap_or(u64::MAX))?;
+        if name.eq_ignore_ascii_case("IF") {
+            let count = node.child_count();
+            if !(1..=3).contains(&count) {
+                return self.push_value(WorkingValue::Error(ScalarError::Value));
+            }
+            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "IF condition is missing from the expression tree",
+            ))?;
+            self.push_frame(Frame::Apply(node))?;
+            return self.push_frame(Frame::VisitArgument(condition));
+        }
+
+        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
+            if node.child_count() != 2 {
+                return self.push_value(WorkingValue::Error(ScalarError::Value));
+            }
+            let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "error-handling value is missing from the expression tree",
+            ))?;
+            self.push_frame(Frame::Apply(node))?;
+            return self.push_frame(Frame::VisitArgument(value));
+        }
+
+        if name.eq_ignore_ascii_case("AND")
+            || name.eq_ignore_ascii_case("OR")
+            || name.eq_ignore_ascii_case("XOR")
+            || name.eq_ignore_ascii_case("NOT")
+        {
+            return self.schedule_eager_function(node);
+        }
+
+        Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
+    }
+
+    fn schedule_eager_function(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        let count = node.child_count();
+        self.charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
         self.push_frame(Frame::Apply(node))?;
-        for index in (0..node.child_count()).rev() {
-            if index % 4096 == 0 {
+        let mut processed = 0usize;
+        let mut next_check = 0usize;
+        for index in (0..count).rev() {
+            if processed >= next_check {
                 self.context
                     .execution
                     .check()
                     .map_err(map_execution_error)?;
+                next_check = processed.saturating_add(4096);
             }
+            processed = processed.saturating_add(1);
             let child = node
                 .child(index)
                 .ok_or(EvaluationFailure::InvalidExpression(
                     "function argument is missing from the expression tree",
                 ))?;
-            self.push_frame(Frame::Visit(child))?;
+            self.push_frame(Frame::VisitArgument(child))?;
         }
         Ok(())
     }
 
     fn apply(&mut self, node: Node<'a>) -> EvaluationResult<()> {
         match node.kind() {
-            Kind::Function { .. } => {
-                let mut propagated = None;
-                // Values are popped in reverse source order. Replacing the
-                // error each time retains the first source-ordered Error.
-                for index in 0..node.child_count() {
-                    if index % 4096 == 0 {
-                        self.context
-                            .execution
-                            .check()
-                            .map_err(map_execution_error)?;
-                    }
-                    if let WorkingValue::Error(error) = self.pop_value()? {
-                        propagated = Some(error);
-                    }
-                }
-                self.push_value(WorkingValue::Error(
-                    propagated.unwrap_or(ScalarError::Value),
-                ))
-            },
+            Kind::Function { name } => self.apply_function(node, name),
             Kind::Prefix(operator) => {
                 let value = self.pop_value()?;
                 let value = apply_prefix(operator, value, self)?;
@@ -762,6 +793,186 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
                 "non-operator reached evaluator apply frame",
             )),
         }
+    }
+
+    fn apply_function(&mut self, node: Node<'a>, name: &str) -> EvaluationResult<()> {
+        if name.eq_ignore_ascii_case("IF") {
+            return self.dispatch_if(node);
+        }
+        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
+            return self.dispatch_if_error(node);
+        }
+        if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
+            return self.apply_and_or(node, name.eq_ignore_ascii_case("AND"));
+        }
+        if name.eq_ignore_ascii_case("XOR") {
+            return self.apply_xor(node);
+        }
+        if name.eq_ignore_ascii_case("NOT") {
+            return self.apply_not(node);
+        }
+
+        // TRUE/FALSE reach this path only for an invalid arity.  Consume all
+        // scheduled arguments so the value stack remains balanced and retain
+        // the leftmost formula error if one was produced.
+        let mut propagated = None;
+        let mut next_check = 0usize;
+        for index in 0..node.child_count() {
+            if index >= next_check {
+                self.context
+                    .execution
+                    .check()
+                    .map_err(map_execution_error)?;
+                next_check = index.saturating_add(4096);
+            }
+            if let WorkingValue::Error(error) = self.pop_value()? {
+                propagated = Some(error);
+            }
+        }
+        self.push_value(WorkingValue::Error(
+            propagated.unwrap_or(ScalarError::Value),
+        ))
+    }
+
+    fn apply_and_or(&mut self, node: Node<'a>, conjunction: bool) -> EvaluationResult<()> {
+        if node.child_count() == 0 {
+            return self.push_value(WorkingValue::Error(ScalarError::Value));
+        }
+
+        let mut result = conjunction;
+        let mut propagated = None;
+        let mut next_check = 0usize;
+        for index in 0..node.child_count() {
+            if index >= next_check {
+                self.context
+                    .execution
+                    .check()
+                    .map_err(map_execution_error)?;
+                next_check = index.saturating_add(4096);
+            }
+            let value = self.pop_value()?;
+            match to_number_sequence(value, self)? {
+                Ok(value) => {
+                    if conjunction {
+                        result &= value;
+                    } else {
+                        result |= value;
+                    }
+                },
+                Err(error) => propagated = Some(error),
+            }
+        }
+        self.push_value(match propagated {
+            Some(error) => WorkingValue::Error(error),
+            None => WorkingValue::Logical(result),
+        })
+    }
+
+    fn apply_xor(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        if node.child_count() == 0 {
+            return self.push_value(WorkingValue::Error(ScalarError::Value));
+        }
+
+        let mut result = false;
+        let mut propagated = None;
+        let mut next_check = 0usize;
+        for index in 0..node.child_count() {
+            if index >= next_check {
+                self.context
+                    .execution
+                    .check()
+                    .map_err(map_execution_error)?;
+                next_check = index.saturating_add(4096);
+            }
+            let value = self.pop_value()?;
+            match to_logical(value, self)? {
+                Ok(value) => result ^= value,
+                Err(error) => propagated = Some(error),
+            }
+        }
+        self.push_value(match propagated {
+            Some(error) => WorkingValue::Error(error),
+            None => WorkingValue::Logical(result),
+        })
+    }
+
+    fn apply_not(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        if node.child_count() != 1 {
+            let mut propagated = None;
+            let mut next_check = 0usize;
+            for index in 0..node.child_count() {
+                if index >= next_check {
+                    self.context
+                        .execution
+                        .check()
+                        .map_err(map_execution_error)?;
+                    next_check = index.saturating_add(4096);
+                }
+                if let WorkingValue::Error(error) = self.pop_value()? {
+                    propagated = Some(error);
+                }
+            }
+            return self.push_value(WorkingValue::Error(
+                propagated.unwrap_or(ScalarError::Value),
+            ));
+        }
+
+        let value = self.pop_value()?;
+        let value = match to_logical(value, self)? {
+            Ok(value) => WorkingValue::Logical(!value),
+            Err(error) => WorkingValue::Error(error),
+        };
+        self.push_value(value)
+    }
+
+    fn dispatch_if(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        let condition = self.pop_value()?;
+        let condition = match to_logical(condition, self)? {
+            Ok(value) => value,
+            Err(error) => return self.push_value(WorkingValue::Error(error)),
+        };
+
+        match node.child_count() {
+            1 => self.push_value(WorkingValue::Logical(condition)),
+            2 if !condition => self.push_value(WorkingValue::Logical(false)),
+            2 => self.push_if_branch(node.child(1)),
+            3 if condition => self.push_if_branch(node.child(1)),
+            3 => self.push_if_branch(node.child(2)),
+            _ => self.push_value(WorkingValue::Error(ScalarError::Value)),
+        }
+    }
+
+    fn push_if_branch(&mut self, branch: Option<Node<'a>>) -> EvaluationResult<()> {
+        let branch = branch.ok_or(EvaluationFailure::InvalidExpression(
+            "IF branch is missing from the expression tree",
+        ))?;
+        if branch.is_missing() {
+            self.push_value(WorkingValue::Number(0.0))
+        } else {
+            self.push_frame(Frame::Visit(branch))
+        }
+    }
+
+    fn dispatch_if_error(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+        let value = self.pop_value()?;
+        let catches = match &value {
+            WorkingValue::Error(error) => match node.kind() {
+                Kind::Function { name } if name.eq_ignore_ascii_case("IFERROR") => true,
+                Kind::Function { name } if name.eq_ignore_ascii_case("IFNA") => {
+                    *error == ScalarError::NotAvailable
+                },
+                _ => false,
+            },
+            _ => false,
+        };
+
+        if !catches {
+            return self.push_value(value);
+        }
+        let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+            "error-handling alternative is missing from the expression tree",
+        ))?;
+        self.push_frame(Frame::VisitArgument(alternative))
     }
 
     fn apply_infix(
@@ -1174,6 +1385,38 @@ fn to_number<'a>(
             }
         },
         WorkingValue::Error(error) => Ok(Err(error)),
+    }
+}
+
+/// Conversion used by the scalar Logical parameter family.  Text conversion
+/// is deliberately deterministic for this profile: text is not accepted as a
+/// logical spelling and produces `#VALUE!`.  AND/OR use the separate numeric
+/// sequence conversion below, as required by their OpenFormula signatures.
+fn to_logical<'a>(
+    value: WorkingValue<'a>,
+    evaluator: &mut Evaluator<'_, '_, '_>,
+) -> EvaluationResult<Result<bool, ScalarError>> {
+    match value {
+        WorkingValue::Number(value) => Ok(Ok(value != 0.0)),
+        WorkingValue::Logical(value) => Ok(Ok(value)),
+        WorkingValue::Text(text) => {
+            evaluator.charge_bytes(text.text.len())?;
+            Ok(Err(ScalarError::Value))
+        },
+        WorkingValue::Error(error) => Ok(Err(error)),
+    }
+}
+
+/// Conversion for the `NumberSequenceList` alternative accepted by AND and
+/// OR.  A scalar Text therefore follows Conversion to Number, while the
+/// other Logical functions use `to_logical` directly.
+fn to_number_sequence<'a>(
+    value: WorkingValue<'a>,
+    evaluator: &mut Evaluator<'_, '_, '_>,
+) -> EvaluationResult<Result<bool, ScalarError>> {
+    match to_number(value, evaluator)? {
+        Ok(value) => Ok(Ok(value != 0.0)),
+        Err(error) => Ok(Err(error)),
     }
 }
 
