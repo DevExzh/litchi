@@ -1,0 +1,10 @@
+{
+  "base": "b88341bf4175daa409dd12d3d5ed665b33bbaf78",
+  "patch_sha256": "1be6d396f4042b81463e318456dba08608d393cdfc29d52efa3f273ad43df7db",
+  "source_after": {
+    "crates/litchi-ods/src/codec/formula.rs": "4084ab6a41f61477aeaa15d3dbe896544a15147b75b2e1028d079569f52a0e0a",
+    "crates/litchi-ods/src/codec/formula/reference.rs": "3707b3176e2714aa794bf28628eb27ec72923e001faaab22a987883b596bd27e",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs": "55acf738b05b86c375e3bf96b31c7c0f6378c1f4554ba9d8842e78b6cd7814bc"
+  },
+  "verified": true
+}

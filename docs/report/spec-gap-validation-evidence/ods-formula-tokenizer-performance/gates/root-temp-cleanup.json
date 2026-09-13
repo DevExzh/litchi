@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-13T08:07:23.756289+00:00",
+  "removed": [
+    {
+      "path": "/var/tmp/ods-tokenizer-root-gates-target",
+      "logical_bytes_removed": 6718587746,
+      "absent": true
+    },
+    {
+      "path": "/var/tmp/ods-tokenizer-root-gates-tmp",
+      "logical_bytes_removed": 0,
+      "absent": true
+    }
+  ]
+}

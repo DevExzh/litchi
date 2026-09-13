@@ -895,6 +895,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    #[inline]
     fn bump_component(&mut self) -> Result<()> {
         self.components = self
             .components
@@ -948,6 +949,7 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
+#[cold]
 fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
     let Some(observed) = u64::try_from(actual).ok() else {
         return invalid("OpenFormula reference limit exceeds u64");
@@ -968,6 +970,7 @@ fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
     })
 }
 
+#[inline]
 fn copy_component(value: &str, resource: &'static str) -> Result<String> {
     let mut result = String::new();
     result

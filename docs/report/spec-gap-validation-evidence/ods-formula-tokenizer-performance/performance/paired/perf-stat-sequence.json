@@ -1,0 +1,40 @@
+{
+  "events": "cycles,instructions,branches,branch-misses,cache-misses",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "side": "baseline",
+      "case": "sum",
+      "status": 0,
+      "binary_sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+      "elapsed_seconds": 0.117,
+      "stderr": "perf-stat-baseline-sum.stderr"
+    },
+    {
+      "side": "candidate",
+      "case": "sum",
+      "status": 0,
+      "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+      "elapsed_seconds": 0.04,
+      "stderr": "perf-stat-candidate-sum.stderr"
+    },
+    {
+      "side": "baseline",
+      "case": "local-refs-256",
+      "status": 0,
+      "binary_sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+      "elapsed_seconds": 0.167,
+      "stderr": "perf-stat-baseline-local-refs-256.stderr"
+    },
+    {
+      "side": "candidate",
+      "case": "local-refs-256",
+      "status": 0,
+      "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+      "elapsed_seconds": 0.135,
+      "stderr": "perf-stat-candidate-local-refs-256.stderr"
+    }
+  ],
+  "created_at": "2026-09-13T08:04:11Z"
+}

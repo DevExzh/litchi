@@ -1,0 +1,9 @@
+{
+  "binary_copy": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline/ods-formula-reference-profile",
+  "binary_sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+  "size_bytes": 1167256,
+  "source_commit": "b88341bf4175daa409dd12d3d5ed665b33bbaf78",
+  "source_manifest": "baseline/source-sha256.json",
+  "final_capture": true,
+  "temporary_snapshot": "/var/tmp/ods-tokenizer-baseline-snapshot-20260913"
+}

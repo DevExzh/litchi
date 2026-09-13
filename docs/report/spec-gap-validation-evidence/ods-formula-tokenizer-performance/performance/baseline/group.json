@@ -1,0 +1,56 @@
+{
+  "group": "comparable",
+  "case_count": 12,
+  "cases": [
+    {
+      "case": "parse-bracket-current-cell",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-bracket-sheet-cell",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-bracket-range",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-quoted-doubled-sheet",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-local-refs-256",
+      "repeat": 128
+    },
+    {
+      "case": "parse-sum-unbracketed",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-vlookup-unbracketed",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-malformed-zero-row",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-malformed-missing-separator",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-malformed-unclosed-bracket",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-malformed-missing-row",
+      "repeat": 1000
+    },
+    {
+      "case": "parse-malformed-bad-quote",
+      "repeat": 1000
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15
+}

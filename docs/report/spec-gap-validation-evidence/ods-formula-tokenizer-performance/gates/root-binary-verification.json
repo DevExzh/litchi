@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-13T08:03:14.512195+00:00",
+  "binaries": {
+    "baseline": {
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline/ods-formula-reference-profile",
+      "sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+      "bytes": 1167256
+    },
+    "candidate": {
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+      "sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+      "bytes": 1168912
+    }
+  }
+}
