@@ -1,5 +1,34 @@
 # Performance program phase report
 
+## 0567: one OOXML open builds one archive index, and two corrections
+
+[0567](0567-ooxml-single-index-per-open.md) is attribution only and disproves a
+standing hypothesis: every library-level OOXML open builds exactly one archive
+index, verified 52 times across three formats, both entry layers and two feature
+sets. It corrects change 0561, whose ten constructions per child are two per
+process across five, and change 0562, whose unexplained repeated 840-byte read is
+the dynamic loader rather than a structural member. Repeated indexing is real
+only across two calls: detecting a format and then opening costs 42 to 202
+microseconds, 42 to 48% of that caller's total.
+
+## 0566: a design for the windowed worksheet scan
+
+[0566](0566-xls-worksheet-window-design.md) is design only. The worksheet case is
+easier than the globals case because the sheet boundary is validated at open, so
+windows clamp exactly and no over-read clause is needed. Modelled at 266 reads to
+8 for one cell, at 22 times the bytes, which forces a density gate to cap the
+adversarial case. It supplies the contract change 0325 said was missing.
+
+## 0565: the XLS globals pre-pass is one pass
+
+[0565](0565-xls-globals-single-pass.md) implements what change 0564 attributed
+and blocked. A source-backed open falls from 655 positional reads to 53 and from
+636 stat calls to 34, with each globals byte read exactly once instead of the
+headers being read twice. All seven source-backed and owned-source selectors
+improve in both directions. The record states two bounded costs, a falsified
+prediction about the owned-source rows, and a third contract site — the perf
+harness's own locality gate — that was bounded rather than removed.
+
 ## 0564: the XLS open read shape, and a corrected inference
 
 [0564](0564-xls-open-read-attribution.md) is attribution only. One source-backed

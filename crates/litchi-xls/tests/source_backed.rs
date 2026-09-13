@@ -157,6 +157,270 @@ fn insert_before_global_eof(stream: &[u8], extra: &[u8]) -> Vec<u8> {
     output
 }
 
+/// Upper bound the globals fill window doubles to, from `source.rs`.
+const GLOBALS_MAX_WINDOW_BYTES: usize = 64 * 1024;
+/// Globals records the scan reads one header and one payload at a time.
+const GLOBALS_EXACT_PROLOGUE_RECORDS: usize = 4;
+
+fn global_bof_frame_end(stream: &[u8]) -> usize {
+    assert!(stream.len() >= 4);
+    assert_eq!(
+        u16::from_le_bytes([stream[0], stream[1]]),
+        0x0809,
+        "fixture globals do not start with BOF"
+    );
+    4 + usize::from(u16::from_le_bytes([stream[2], stream[3]]))
+}
+
+/// End of the globals record at `index`, counting BOF as index zero.
+fn global_record_end(stream: &[u8], index: usize) -> usize {
+    let mut offset = 0;
+    for _ in 0..=index {
+        assert!(offset + 4 <= stream.len());
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        offset += 4 + length;
+    }
+    offset
+}
+
+/// Inserts `extra` immediately after the globals record at `index`, patching
+/// `BoundSheet8` stream positions the way [`insert_before_global_eof`] does.
+fn insert_after_global_record(stream: &[u8], index: usize, extra: &[u8]) -> Vec<u8> {
+    let at = global_record_end(stream, index);
+    let eof = global_eof_offset(stream);
+    assert!(at <= eof);
+    let delta = u32::try_from(extra.len()).unwrap();
+    let mut patched = stream.to_vec();
+    let mut cursor = 0;
+    while cursor < eof {
+        assert!(cursor + 4 <= patched.len());
+        let kind = u16::from_le_bytes([patched[cursor], patched[cursor + 1]]);
+        let length = usize::from(u16::from_le_bytes([
+            patched[cursor + 2],
+            patched[cursor + 3],
+        ]));
+        if kind == 0x0085 && cursor + 8 <= patched.len() {
+            let position = u32::from_le_bytes([
+                patched[cursor + 4],
+                patched[cursor + 5],
+                patched[cursor + 6],
+                patched[cursor + 7],
+            ]);
+            if usize::try_from(position).unwrap() >= eof {
+                let shifted = position.checked_add(delta).unwrap();
+                patched[cursor + 4..cursor + 8].copy_from_slice(&shifted.to_le_bytes());
+            }
+        }
+        cursor += 4 + length;
+    }
+    let mut output = Vec::with_capacity(patched.len() + extra.len());
+    output.extend_from_slice(&patched[..at]);
+    output.extend_from_slice(extra);
+    output.extend_from_slice(&patched[at..]);
+    output
+}
+
+/// Index of the first globals record of `kind`, counting BOF as index zero.
+fn global_record_index_of(stream: &[u8], kind: u16) -> usize {
+    let eof = global_eof_offset(stream);
+    let mut offset = 0;
+    let mut index = 0;
+    while offset < eof {
+        let found = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        if found == kind {
+            return index;
+        }
+        offset += 4 + length;
+        index += 1;
+    }
+    panic!("fixture has no record of kind {kind:#06x}");
+}
+
+/// Offsets of every `BoundSheet8` record in the globals.
+fn bound_sheet_record_offsets(stream: &[u8]) -> Vec<usize> {
+    let eof = global_eof_offset(stream);
+    let mut offsets = Vec::new();
+    let mut offset = 0;
+    while offset < eof {
+        let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        if kind == 0x0085 {
+            offsets.push(offset);
+        }
+        offset += 4 + length;
+    }
+    offsets
+}
+
+/// Builds a fixture whose `BoundSheet8` positions descend and whose
+/// `BoundSheet8` run is split wide enough that a window fill lands inside the
+/// gap, so only a clamp that every `BoundSheet8` lowers keeps the fills off the
+/// sheet bodies.
+fn descending_bound_sheets_split_by_a_fill(stream: &[u8]) -> Vec<u8> {
+    // Padding before the globals EOF keeps a fill pending after the last
+    // BoundSheet8 has been framed; padding inside the run puts a fill boundary
+    // between the first BoundSheet8 and the rest.
+    let padded = insert_before_global_eof(stream, &frame_bytes(0x1234, &[0xA5; 2_000]));
+    let first = global_record_index_of(&padded, 0x0085);
+    let mut spread =
+        insert_after_global_record(&padded, first, &frame_bytes(0x1234, &[0xA5; 2_000]));
+    let offsets = bound_sheet_record_offsets(&spread);
+    let mut positions = workbook_bound_sheet_positions(&spread);
+    assert!(positions.len() >= 3);
+    positions.reverse();
+    for (offset, position) in offsets.iter().zip(positions) {
+        spread[offset + 4..offset + 8]
+            .copy_from_slice(&u32::try_from(position).unwrap().to_le_bytes());
+    }
+    spread
+}
+
+/// One past the last globals byte, so `[0, global_end)` is the globals range.
+fn global_end_offset(stream: &[u8]) -> usize {
+    global_eof_offset(stream) + 4
+}
+
+/// Bytes consumed by the exact prologue and an upper bound on the reads it
+/// takes, derived from the fixture's own framing rather than from a recorded
+/// schedule. The bound is loose: the prologue's payload fetch also covers the
+/// next record's header, so it takes fewer reads than this.
+fn globals_prologue(stream: &[u8]) -> (usize, usize) {
+    let mut offset = 0;
+    let mut reads = 0;
+    for _ in 0..GLOBALS_EXACT_PROLOGUE_RECORDS {
+        assert!(offset + 4 <= stream.len());
+        let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        reads += 1;
+        if length > 0 {
+            reads += 1;
+        }
+        offset += 4 + length;
+        if kind == 0x000A {
+            break;
+        }
+    }
+    (offset, reads)
+}
+
+/// Upper bound on window fills needed to cover `bytes`, given a first window of
+/// one CFB sector doubling to [`GLOBALS_MAX_WINDOW_BYTES`].
+fn globals_fill_bound(bytes: usize) -> usize {
+    let mut covered = 0;
+    let mut window = 512;
+    let mut fills = 1;
+    while covered < bytes {
+        covered += window;
+        window = (window * 2).min(GLOBALS_MAX_WINDOW_BYTES);
+        fills += 1;
+    }
+    fills
+}
+
+/// Merges recorded reads into maximal disjoint physical spans.
+fn merged_spans(ranges: &[(u64, usize)]) -> Vec<(u64, u64)> {
+    let mut spans = ranges
+        .iter()
+        .map(|(offset, length)| (*offset, offset + *length as u64))
+        .collect::<Vec<_>>();
+    spans.sort_unstable();
+    let mut merged = Vec::<(u64, u64)>::new();
+    for (start, end) in spans {
+        match merged.last_mut() {
+            Some(last) if start <= last.1 => last.1 = last.1.max(end),
+            _ => merged.push((start, end)),
+        }
+    }
+    merged
+}
+
+/// True when every range in `inner` lies inside one span of `outer`.
+fn spans_cover(outer: &[(u64, u64)], inner: &[(u64, usize)]) -> bool {
+    inner.iter().all(|(offset, length)| {
+        let end = offset + *length as u64;
+        outer
+            .iter()
+            .any(|(start, stop)| *start <= *offset && end <= *stop)
+    })
+}
+
+/// True when no two recorded reads share a byte.
+fn reads_are_disjoint(ranges: &[(u64, usize)]) -> bool {
+    let mut spans = ranges
+        .iter()
+        .map(|(offset, length)| (*offset, offset + *length as u64))
+        .collect::<Vec<_>>();
+    spans.sort_unstable();
+    spans.windows(2).all(|pair| pair[0].1 <= pair[1].0)
+}
+
+/// Physical ranges of the Workbook stream at or after `position`.
+fn physical_ranges_from(
+    source: &CountingSource,
+    stream: &[u8],
+    position: usize,
+) -> Vec<(u64, usize)> {
+    physical_ranges_for_stream_range(source, position as u64, stream.len() - position)
+}
+
+/// Opens the globals through the raw handoff and returns only the reads the
+/// globals scan itself performed, with the CFB catalog reads excluded.
+fn globals_reads(
+    source: &Arc<CountingSource>,
+) -> (Vec<(u64, usize)>, Result<(), SourceBackedError>) {
+    globals_reads_with_limits(source, SourceBackedLimits::default())
+}
+
+fn globals_reads_with_limits(
+    source: &Arc<CountingSource>,
+    limits: SourceBackedLimits,
+) -> (Vec<(u64, usize)>, Result<(), SourceBackedError>) {
+    let retained: Arc<dyn ReadAt> = source.clone();
+    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    source.clear_ranges();
+    let result = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(cfb, limits);
+    let ranges = source.ranges();
+    (ranges, result.map(|_| ()))
+}
+
+/// Asserts the one-pass globals contract: every globals byte read exactly once,
+/// nothing read past one window beyond the globals end, and a read count inside
+/// the prologue-plus-window bound. Returns the bytes read past the globals end.
+fn assert_globals_read_once(
+    source: &CountingSource,
+    stream: &[u8],
+    actual: &[(u64, usize)],
+) -> usize {
+    let global_end = global_end_offset(stream);
+    let globals_ranges = physical_ranges_for_stream_range(source, 0, global_end);
+    assert!(
+        reads_are_disjoint(actual),
+        "two globals reads share a byte: {actual:?}"
+    );
+    assert!(
+        spans_cover(&merged_spans(actual), &globals_ranges),
+        "a globals byte was never read"
+    );
+    let bound = (global_end + GLOBALS_MAX_WINDOW_BYTES).min(stream.len());
+    let allowed = merged_spans(&physical_ranges_for_stream_range(source, 0, bound));
+    assert!(
+        spans_cover(&allowed, actual),
+        "a globals read reached past one window beyond the globals end"
+    );
+    let (prologue_end, prologue_reads) = globals_prologue(stream);
+    let fills = globals_fill_bound(bound - prologue_end);
+    assert!(
+        actual.len() <= prologue_reads + fills + globals_ranges.len(),
+        "{} reads exceed the prologue-plus-window bound {}",
+        actual.len(),
+        prologue_reads + fills + globals_ranges.len()
+    );
+    let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+    assert!(read_bytes >= global_end);
+    read_bytes - global_end
+}
+
 fn late_codepage_bound_sheet_stream(stream: &[u8]) -> Vec<u8> {
     let eof = global_eof_offset(stream);
     let mut modified = stream.to_vec();
@@ -942,12 +1206,27 @@ fn selected_queries_are_bounded_to_the_selected_owner() {
     assert!(second_query > 0);
     assert!(first_query < bytes.len());
     assert!(second_query < bytes.len());
-    let all_sheet_ranges = sheet_ranges.iter().flatten().copied().collect::<Vec<_>>();
+    // Open frames the globals and retains their bytes in one pass. A window
+    // fill may run past the globals end, so the contract is that open reads no
+    // byte at or beyond the smallest BoundSheet8 stream position, and that its
+    // total is the CFB catalog plus the globals plus at most one window.
+    // The clamp is the minimum over the BoundSheet8 records framed so far; this
+    // fixture's lbPlyPos ascend, so it equals the minimum over the whole
+    // globals from the first BoundSheet8 on.
+    let smallest_sheet = workbook_bound_sheet_positions(&workbook)
+        .into_iter()
+        .min()
+        .unwrap();
+    let sheet_tail = physical_ranges_from(&source, &workbook, smallest_sheet);
+    assert!(!overlaps_any(&open_ranges, &sheet_tail));
+    let catalog_probe = Arc::new(CountingSource::new(bytes.clone()));
+    let catalog = SharedOleFile::open(catalog_probe.clone()).unwrap();
+    let catalog_bytes = catalog_probe.bytes_read();
+    drop(catalog);
+    let open_bytes: usize = open_ranges.iter().map(|(_, length)| *length).sum();
     assert!(
-        open_ranges
-            .iter()
-            .copied()
-            .all(|range| !overlaps_any(&[range], &all_sheet_ranges))
+        open_bytes <= catalog_bytes + global_end_offset(&workbook) + GLOBALS_MAX_WINDOW_BYTES,
+        "open read {open_bytes} bytes"
     );
     for (query_ranges, selected_workbook_index) in [
         (&first_ranges, first_workbook_index),
@@ -1348,80 +1627,159 @@ fn explicit_limits_and_filepass_are_typed() {
     ));
 }
 
+/// Builds a `FilePass` frame whose header always claims 8,192 payload bytes.
+fn filepass_frame(payload: &[u8]) -> Vec<u8> {
+    let mut frame = Vec::with_capacity(4 + payload.len());
+    frame.extend_from_slice(&0x002F_u16.to_le_bytes());
+    frame.extend_from_slice(&8_192_u16.to_le_bytes());
+    frame.extend_from_slice(payload);
+    frame
+}
+
 #[test]
 fn filepass_header_scan_never_reads_its_payload_or_worksheets() {
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
-    let filepass_offset = global_eof_offset(&original) as u64;
-    let worksheet_positions = workbook_bound_sheet_positions(&original);
-    let mut worksheet_boundaries = worksheet_positions.clone();
-    worksheet_boundaries.sort_unstable();
+    // A FilePass framed after the exact prologue may have payload bytes
+    // resident in the fill that carried its header; they are never framed,
+    // interpreted or published. The bound below is the stream prefix that
+    // framing the unmodified fixture's globals reads, so the refusal costs no
+    // more of the stream than a plain open of the same fixture and the
+    // declared payload is never walked.
+    let plain = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &original,
+    )])));
+    let (plain_ranges, plain_result) = globals_reads(&plain);
+    assert!(plain_result.is_ok());
+    let plain_bytes: usize = plain_ranges.iter().map(|(_, length)| *length).sum();
     for payload in [vec![0xA5; 8_192], vec![0xA5; 2]] {
-        let mut filepass = Vec::with_capacity(6 + payload.len());
-        filepass.extend_from_slice(&0x002F_u16.to_le_bytes());
-        filepass.extend_from_slice(&8_192_u16.to_le_bytes());
-        filepass.extend_from_slice(&payload);
+        let filepass = filepass_frame(&payload);
+        let filepass_offset = global_eof_offset(&original) as u64;
         let modified = insert_before_global_eof(&original, &filepass);
         let bytes = cfb_with_streams(&[("Workbook", &modified)]);
         let source = Arc::new(CountingSource::new(bytes));
 
         let header_ranges = physical_ranges_for_stream_range(&source, filepass_offset, 4);
-        let payload_ranges =
-            physical_ranges_for_stream_range(&source, filepass_offset + 4, payload.len());
-        let worksheet_ranges = worksheet_positions
-            .iter()
-            .map(|start| {
-                let end = worksheet_boundaries
-                    .iter()
-                    .copied()
-                    .find(|boundary| *boundary > *start)
-                    .unwrap_or(original.len());
-                physical_ranges_for_stream_range(
-                    &source,
-                    u64::try_from(*start + filepass.len()).unwrap(),
-                    end - start,
-                )
-            })
-            .collect::<Vec<_>>();
-        source.clear_ranges();
+        let allowed = merged_spans(&physical_ranges_for_stream_range(&source, 0, plain_bytes));
 
+        let (actual, result) = globals_reads(&source);
         assert!(matches!(
-            SourceBackedWorkbook::from_read_at(source.clone()),
+            result,
             Err(SourceBackedError::EncryptedUnsupported)
         ));
-        let actual = source.ranges();
         assert!(overlaps_any(&actual, &header_ranges));
-        assert!(!overlaps_any(&actual, &payload_ranges));
-        assert!(worksheet_ranges.iter().flatten().copied().all(|worksheet| {
-            actual
-                .iter()
-                .copied()
-                .all(|read| !ranges_overlap(read, worksheet))
-        }));
+        assert!(reads_are_disjoint(&actual));
+        assert!(
+            spans_cover(&allowed, &actual),
+            "the refusal read past the prefix a plain open reads: {actual:?}"
+        );
+        let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+        assert!(read_bytes <= plain_bytes);
     }
 }
 
 #[test]
-fn truncated_global_header_is_rejected_without_overread() {
+fn spec_position_filepass_is_refused_before_its_payload_is_read() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let smallest_sheet = workbook_bound_sheet_positions(&original)
+        .into_iter()
+        .min()
+        .unwrap();
+    // [MS-XLS] 2.1.7.20.1 places FilePass immediately after BOF, so index one
+    // is the spec position. The exact prologue covers indices one to three and
+    // its last fetch also buffers the header of index four, so a FilePass at
+    // any of those four positions is refused before a fill is ever issued and
+    // no byte of its payload and no worksheet byte is read.
+    for after in 0..GLOBALS_EXACT_PROLOGUE_RECORDS {
+        for payload in [vec![0xA5; 8_192], vec![0xA5; 2]] {
+            let filepass = filepass_frame(&payload);
+            let filepass_offset = global_record_end(&original, after) as u64;
+            let modified = insert_after_global_record(&original, after, &filepass);
+            let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+            let source = Arc::new(CountingSource::new(bytes));
+
+            let header_ranges = physical_ranges_for_stream_range(&source, filepass_offset, 4);
+            let payload_ranges =
+                physical_ranges_for_stream_range(&source, filepass_offset + 4, payload.len());
+            let sheet_tail =
+                physical_ranges_from(&source, &modified, smallest_sheet + filepass.len());
+
+            let (actual, result) = globals_reads(&source);
+            assert!(matches!(
+                result,
+                Err(SourceBackedError::EncryptedUnsupported)
+            ));
+            assert!(overlaps_any(&actual, &header_ranges));
+            assert!(
+                !overlaps_any(&actual, &payload_ranges),
+                "FilePass at index {} had payload bytes read",
+                after + 1
+            );
+            assert!(!overlaps_any(&actual, &sheet_tail));
+        }
+    }
+}
+
+#[test]
+fn encrypted_fixtures_are_refused_without_reading_a_filepass_payload() {
+    // Every FilePass carrier in the corpus places the record at stream offset
+    // 20, immediately after BOF, so the globals scan stops with the buffer
+    // holding exactly the BOF frame and the FilePass header.
+    for bytes in [
+        ole_fixture("password.xls"),
+        fixture("xor-encryption-abc.xls"),
+        fixture("35897-type4.xls"),
+    ] {
+        let stream = workbook_stream(bytes.clone(), "Workbook");
+        let filepass_offset = global_bof_frame_end(&stream);
+        assert_eq!(
+            u16::from_le_bytes([stream[filepass_offset], stream[filepass_offset + 1]]),
+            0x002F
+        );
+        let source = Arc::new(CountingSource::new(bytes));
+        let (actual, result) = globals_reads(&source);
+        assert!(matches!(
+            result,
+            Err(SourceBackedError::EncryptedUnsupported)
+        ));
+        let framed = physical_ranges_for_stream_range(&source, 0, filepass_offset + 4);
+        assert!(
+            spans_cover(&merged_spans(&framed), &actual),
+            "the scan read past the FilePass header: {actual:?}"
+        );
+        // The header-only pre-pass this replaced also took two reads to refuse
+        // these fixtures, so the refusal costs no more than it did.
+        assert_eq!(actual.len(), 2, "{actual:?}");
+    }
+}
+
+#[test]
+fn truncated_global_header_is_rejected_without_reading_past_the_stream() {
     let mut stream = frame_bytes(0x0809, &[0; 16]);
     stream.extend_from_slice(&[0x42, 0]);
-    let bytes = cfb_with_streams(&[("Workbook", &stream)]);
-    let source = Arc::new(CountingSource::new(bytes));
-    let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = SharedOleFile::open(Arc::clone(&retained)).unwrap();
-    let catalog_ranges = source.ranges();
-    drop(cfb);
-    source.clear_ranges();
-    let first_header_ranges = physical_ranges_for_stream_range(&source, 0, 4);
-    source.clear_ranges();
+    let framed_end = global_record_end(&stream, 0);
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &stream,
+    )])));
 
+    // The exact prologue reads the BOF header, then one fetch covering its
+    // payload and the next record's four-byte header, clamped by the stream
+    // length. The second record's header is then refused as truncated, so the
+    // scan reads at most the framed record plus one header and nothing at all
+    // past the stream.
+    let whole_stream = merged_spans(&physical_ranges_for_stream_range(&source, 0, stream.len()));
+    let (actual, result) = globals_reads(&source);
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at(source.clone()),
+        result,
         Err(SourceBackedError::InvalidData(message))
             if message == "truncated BIFF global record header"
     ));
-    let mut expected = catalog_ranges;
-    expected.extend(first_header_ranges);
-    assert_eq!(source.ranges(), expected);
+    assert!(
+        spans_cover(&whole_stream, &actual),
+        "a read passed the Workbook stream: {actual:?}"
+    );
+    assert!(reads_are_disjoint(&actual));
+    let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+    assert!(read_bytes <= framed_end + 4, "{read_bytes} bytes read");
 }
 
 #[test]
@@ -1466,102 +1824,181 @@ fn worksheet_bof_version_and_substream_type_are_deferred_to_selected_access() {
 }
 
 #[test]
-fn raw_handoff_reads_global_headers_then_one_exact_global_range() {
+fn raw_handoff_over_read_is_bounded_by_the_stream_on_a_small_fixture() {
+    // This fixture's Workbook stream is 4 KiB, so the binding bound on the
+    // over-read is the stream, not the window: no BoundSheet8 has been framed
+    // when the last fill is issued, and the fill stops at the stream end or
+    // sooner. The window bound biting is covered by the large fixture below.
     let workbook = workbook_stream(fixture("Simple.xls"), "Workbook");
-    let global_end = global_eof_offset(&workbook) + 4;
-    let mut header_offsets = Vec::new();
-    let mut offset = 0_usize;
-    loop {
-        header_offsets.push(offset);
-        let kind = u16::from_le_bytes([workbook[offset], workbook[offset + 1]]);
-        let length = usize::from(u16::from_le_bytes([
-            workbook[offset + 2],
-            workbook[offset + 3],
-        ]));
-        offset += 4 + length;
-        if kind == 0x000A {
-            break;
-        }
-    }
-
+    let global_end = global_end_offset(&workbook);
+    assert!(workbook.len() < global_end + GLOBALS_MAX_WINDOW_BYTES);
     let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
         "Workbook", &workbook,
     )])));
-    let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
-    source.clear_ranges();
-    let _owner = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
-        cfb,
-        SourceBackedLimits::default(),
-    )
-    .unwrap();
-    let actual = source.ranges();
+    let (actual, result) = globals_reads(&source);
+    assert!(result.is_ok());
 
-    let mut expected = Vec::new();
-    for header_offset in header_offsets {
-        expected.extend(physical_ranges_for_stream_range(
-            &source,
-            header_offset as u64,
-            4,
-        ));
+    let over_read = assert_globals_read_once(&source, &workbook, &actual);
+    assert!(over_read < workbook.len() - global_end);
+
+    // The fill reaches into the first sheet body and stops well before the
+    // next one, which is the bound a stream-clamped fill can promise.
+    let mut positions = workbook_bound_sheet_positions(&workbook);
+    positions.sort_unstable();
+    assert!(positions.len() >= 2);
+    let second_sheet = physical_ranges_from(&source, &workbook, positions[1]);
+    assert!(!overlaps_any(&actual, &second_sheet));
+}
+
+#[test]
+fn source_backed_open_reads_each_global_byte_once() {
+    // The globals of this fixture are 621 records and 551,377 bytes inside a
+    // 1.3 MB stream, so the one-window bound is well inside the stream and
+    // bites. Its first BoundSheet8 is framed long before the fills reach the
+    // globals end, so the clamp holds and no byte at or beyond the smallest
+    // sheet position is read. Before change 0565 each header was read twice.
+    let bytes = ole_fixture("ConditionalFormattingSamples.xls");
+    let workbook = workbook_stream(bytes.clone(), "Workbook");
+    let global_end = global_end_offset(&workbook);
+    assert!(workbook.len() > global_end + GLOBALS_MAX_WINDOW_BYTES);
+    let source = Arc::new(CountingSource::new(bytes));
+    let (actual, result) = globals_reads(&source);
+    assert!(result.is_ok());
+
+    let over_read = assert_globals_read_once(&source, &workbook, &actual);
+    assert_eq!(over_read, 0);
+    // This fixture's lbPlyPos ascend, so the running minimum the fill clamp
+    // keeps equals the minimum over the whole globals from the first
+    // BoundSheet8 on. The descending case is covered separately.
+    let smallest_sheet = workbook_bound_sheet_positions(&workbook)
+        .into_iter()
+        .min()
+        .unwrap();
+    let sheet_tail = physical_ranges_from(&source, &workbook, smallest_sheet);
+    assert!(!overlaps_any(&actual, &sheet_tail));
+    // Headroom over the count this schedule actually takes.
+    assert!(actual.len() <= 64, "{} globals reads", actual.len());
+}
+
+#[test]
+fn mini_stream_workbook_globals_are_read_once_each() {
+    // A Workbook stream below the 4,096-byte CFB cutoff lives in the mini
+    // stream, so the fills run through the MiniFAT range reader.
+    let bytes = ole_fixture("SimpleWithColours.xls");
+    let workbook = workbook_stream(bytes.clone(), "Workbook");
+    assert!(workbook.len() < 4_096);
+    let source = Arc::new(CountingSource::new(bytes));
+    let (actual, result) = globals_reads(&source);
+    assert!(result.is_ok());
+    let over_read = assert_globals_read_once(&source, &workbook, &actual);
+    assert!(over_read <= GLOBALS_MAX_WINDOW_BYTES);
+}
+
+#[test]
+fn corrupt_bound_sheet_positions_terminate_the_globals_scan() {
+    // One position is zero and one points inside the globals, so the fill clamp
+    // is contradicted by framing that has already passed it and is dropped for
+    // the rest of the scan. With only the stream and `max_global_bytes` left,
+    // the scan still stops within one window of the globals end rather than
+    // running to the stream end, and reports the offset error the semantic pass
+    // reported before change 0565.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut stream = original.clone();
+    let offsets = bound_sheet_record_offsets(&stream);
+    assert!(offsets.len() >= 3);
+    stream[offsets[0] + 4..offsets[0] + 8].copy_from_slice(&0_u32.to_le_bytes());
+    stream[offsets[1] + 4..offsets[1] + 8].copy_from_slice(&100_u32.to_le_bytes());
+    let global_end = global_end_offset(&stream);
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &stream,
+    )])));
+    let (actual, result) = globals_reads(&source);
+    assert!(matches!(
+        result,
+        Err(SourceBackedError::InvalidData(message))
+            if message == "BoundSheet8 stream offset is outside the Workbook stream"
+    ));
+    // The framing itself completed, so the one-pass contract still applies.
+    let over_read = assert_globals_read_once(&source, &stream, &actual);
+    assert!(
+        over_read < stream.len() - global_end,
+        "the dropped clamp let the scan run to the stream end"
+    );
+}
+
+#[test]
+fn every_bound_sheet_lowers_the_globals_fill_clamp() {
+    // The fixture's BoundSheet8 run is split by padding wide enough that a
+    // window fill boundary lands between the first record and the rest, and the
+    // declared positions descend, so the first BoundSheet8 alone gives a clamp
+    // that is too high. A later fill is still pending when the last BoundSheet8
+    // lowers the clamp to the true smallest position; only a clamp that every
+    // BoundSheet8 lowers keeps that fill off the sheet bodies.
+    let stream = descending_bound_sheets_split_by_a_fill(&workbook_stream(
+        fixture("Simple.xls"),
+        "Workbook",
+    ));
+    let offsets = bound_sheet_record_offsets(&stream);
+    let positions = workbook_bound_sheet_positions(&stream);
+    assert!(positions.windows(2).all(|pair| pair[0] > pair[1]));
+    assert!(
+        offsets[1] - offsets[0] > 2_000,
+        "the BoundSheet8 run was not split"
+    );
+
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &stream,
+    )])));
+    let (actual, result) = globals_reads(&source);
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(assert_globals_read_once(&source, &stream, &actual), 0);
+    let smallest_sheet = positions.iter().copied().min().unwrap();
+    let sheet_tail = physical_ranges_from(&source, &stream, smallest_sheet);
+    assert!(!overlaps_any(&actual, &sheet_tail));
+}
+
+#[test]
+fn mid_globals_byte_limit_reads_at_most_one_header_past_the_limit() {
+    // `max_global_bytes` bounds retained globals, not the four header bytes
+    // that prove a record crosses it: the header at the limit is read and the
+    // record's own end is then reported, which is the order and the `observed`
+    // value the header-only pre-pass produced. The limit is a record boundary
+    // inside the window phase, so it is reached through a clamped fill rather
+    // than through the exact prologue.
+    let stream = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut offset = 0;
+    while offset < 1_024 {
+        let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+        offset += 4 + length;
     }
-    expected.extend(physical_ranges_for_stream_range(&source, 0, global_end));
-    assert_eq!(actual, expected);
+    let limit = offset;
+    let length = usize::from(u16::from_le_bytes([stream[limit + 2], stream[limit + 3]]));
+    let observed = limit + 4 + length;
+    assert!(limit < global_end_offset(&stream));
 
-    let sheet_ranges = physical_ranges_for_workbook_sheets(&source, &workbook);
-    assert!(actual.iter().all(|range| {
-        sheet_ranges
-            .iter()
-            .flatten()
-            .copied()
-            .all(|sheet| !ranges_overlap(*range, sheet))
-    }));
-}
-
-#[test]
-fn shared_cfb_source_arc_preserves_pointer_identity() {
-    let source: Arc<dyn ReadAt> = Arc::new(CountingSource::new(fixture("Simple.xls")));
-    let cfb = SharedOleFile::open(Arc::clone(&source)).unwrap();
-    let retained = cfb.source_arc();
-    assert!(Arc::ptr_eq(&source, &retained));
-}
-
-#[test]
-fn raw_handoff_rejects_a_stale_retained_source_before_global_reads() {
-    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
-    let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
-    source.clear_ranges();
-    source.bump();
-    assert!(matches!(
-        litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
-            cfb,
-            SourceBackedLimits::default(),
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &stream,
+    )])));
+    let allowed = merged_spans(&physical_ranges_for_stream_range(&source, 0, limit + 4));
+    let limits = SourceBackedLimits::default().with_max_global_bytes(limit as u64);
+    let (actual, result) = globals_reads_with_limits(&source, limits);
+    assert!(
+        matches!(
+            result,
+            Err(SourceBackedError::ResourceLimit {
+                resource: "global bytes",
+                observed: seen,
+                maximum,
+            }) if seen == observed as u64 && maximum == limit as u64
         ),
-        Err(SourceBackedError::SourceChanged { .. })
-    ));
-    assert!(source.ranges().is_empty());
-}
-
-#[test]
-fn raw_handoff_enforces_input_limit_against_existing_cfb_size() {
-    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
-    let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
-    let maximum = cfb.file_size().saturating_sub(1);
-    assert!(maximum > 0);
-    source.clear_ranges();
-    assert!(matches!(
-        litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
-            cfb,
-            SourceBackedLimits::default().with_max_input_bytes(maximum),
-        ),
-        Err(SourceBackedError::ResourceLimit {
-            resource: "input bytes",
-            ..
-        })
-    ));
-    assert!(source.ranges().is_empty());
+        "{result:?}"
+    );
+    assert!(
+        spans_cover(&allowed, &actual),
+        "a read passed four bytes beyond the limit: {actual:?}"
+    );
+    let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+    assert!((limit..=limit + 4).contains(&read_bytes), "{read_bytes}");
 }
 
 fn append_eager_text_cell(output: &mut String, value: &CellValue) {

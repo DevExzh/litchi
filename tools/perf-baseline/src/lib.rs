@@ -26716,20 +26716,45 @@ fn xls_source_names_digest(names: &[String]) -> String {
     fingerprint_hex(&bytes)
 }
 
+/// Bytes of worksheet body an open may read past the end of the workbook
+/// globals.
+///
+/// Change 0565 replaced `litchi-xls`'s header-per-record globals pre-pass and
+/// its bulk re-read with one windowed pass. A fill is clamped by the smallest
+/// `BoundSheet8` stream position once one has been framed, but on a workbook
+/// whose globals are shorter than the fill schedule reaches, the last fill is
+/// issued before any `BoundSheet8` exists and is bounded by the stream instead.
+/// Those bytes are truncated away and never framed, interpreted or published.
+///
+/// This is the crate-private `GLOBALS_MAX_WINDOW_BYTES` of
+/// `litchi-xls/src/workbook/source.rs`, restated here because the harness
+/// cannot import it. The gate below still fails an open that materializes a
+/// worksheet, which is what it was written to catch: the corpus worksheets are
+/// far larger than one window.
+const XLS_GLOBALS_MAX_WINDOW_BYTES: u64 = 64 * 1024;
+
 fn validate_xls_source_locality(
     case: Case,
     metrics: &SourceSnapshot,
 ) -> Result<(), Box<dyn Error>> {
-    let open_zero = metrics.xls.selected_worksheet.read_bytes == 0
-        && metrics.xls.unselected_worksheets.read_bytes == 0;
+    let worksheet_bytes = metrics
+        .xls
+        .selected_worksheet
+        .read_bytes
+        .saturating_add(metrics.xls.unselected_worksheets.read_bytes);
+    // An open or list reads no worksheet payload beyond one bounded globals
+    // fill, and never touches the selected worksheet, whose body no globals
+    // fill can reach.
+    let open_bounded = metrics.xls.selected_worksheet.read_bytes == 0
+        && worksheet_bytes <= XLS_GLOBALS_MAX_WINDOW_BYTES;
     let selected_only = case == Case::XlsSourceBackedOpenOneCell
         && metrics.xls.selected_worksheet.read_bytes > 0
-        && metrics.xls.unselected_worksheets.read_bytes == 0;
+        && metrics.xls.unselected_worksheets.read_bytes <= XLS_GLOBALS_MAX_WINDOW_BYTES;
     if metrics.xls.cfb_structural.read_bytes == 0
         || metrics.xls.workbook_global.read_bytes == 0
         || metrics.xls.opaque_payload.read_bytes != 0
         || metrics.read_bytes == 0
-        || (!open_zero && case != Case::XlsSourceBackedOpenOneCell)
+        || (!open_bounded && case != Case::XlsSourceBackedOpenOneCell)
         || (case == Case::XlsSourceBackedOpenOneCell && !selected_only)
     {
         return Err("XLS source-backed read locality gates failed".into());

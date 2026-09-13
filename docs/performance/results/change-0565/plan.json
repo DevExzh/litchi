@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0565-xls-globals-single-pass",
+  "revision": "6b13261e54727724c5f794417bbfb92c83e91add",
+  "created_utc": "2026-09-13T21:42:14Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred; iWork excluded.",
+    "production_crates": [
+      "litchi-xls"
+    ],
+    "baseline_stage": "changes 0558 through 0564 applied; HEAD 6b13261e5"
+  },
+  "hypothesis": {
+    "statement": "parse_globals reads one four-byte header per BIFF globals record through a stream cursor and then re-reads the whole [0, global_end) range in bulk, so 621 of the 655 positional reads of a source-backed open of ConditionalFormattingSamples.xls are four bytes and every header byte is read twice (change 0564).",
+    "mechanism": "One pass fills a retained buffer. An exact prologue covers the first four records: each costs one header read plus one read carrying that record's payload and the next record's four-byte header. [MS-XLS] 2.1.7.20.1 places FilePass immediately after BOF, which is where all three encrypted fixtures in the repository actually carry it, so an encrypted workbook is refused at a header that arrived with the previous record's read and no byte of its payload is read. After the prologue the scan fills in windows of 512 bytes doubling to a 64 KiB cap, each fill clamped by the stream length, by max_global_bytes, and by the smallest BoundSheet8 position framed so far. The bulk re-read is removed and each globals byte is read once.",
+    "why_not_clamp_from_the_start": "A survey of 104 CFB fixtures shows the first BoundSheet8 record is late in record order but early in byte order: for ConditionalFormattingSamples.xls it is record 526 of 621 but byte 20,783 of 551,377. Windowing only after that clamp is available removes about 11% of the reads; windowing from the prologue removes about 97%.",
+    "predicted_effect": "logical stream reads for open fall from 622 to 19 on ConditionalFormattingSamples.xls and from 71 to 6 on Simple.xls; pread64 and statx per open fall by the same order; the 2,484 twice-read header bytes are read once; latency of the file-source XLS selectors falls by a share of the measured 149 microsecond file-source penalty. The owned-source selectors are NOT a control: the before-capture shows they perform the same 655 logical reads and 567,685 logical bytes with zero syscalls, so they separate per-logical-read cost from per-syscall cost.",
+    "window_schedule_model": {
+      "description": "Static model over the 54 XLS fixtures under test-data/ole/xls that carry a Workbook or Book stream, simulating the implemented fill schedule against each file's real BIFF framing. Logical stream reads for one open, not measured syscalls. Both schedules below are produced by the same retained generator, so the comparison that drove the design is reproducible.",
+      "first_window_bytes": 512,
+      "cap_bytes": 65536,
+      "exact_prologue_records": 4,
+      "prologue_fetches_next_header": true,
+      "corpus_files": 54,
+      "corpus_reads_current": 8543,
+      "corpus_reads_modelled": 434,
+      "corpus_reads_ratio_percent": 5.08,
+      "corpus_overread_bytes": 32532,
+      "worst_file_overread_bytes": 3949,
+      "worst_file": "WithChart.xls",
+      "files_that_get_worse": 0,
+      "per_file": {
+        "ConditionalFormattingSamples.xls": {
+          "current": 622,
+          "modelled": 19,
+          "overread_bytes": 0
+        },
+        "Simple.xls": {
+          "current": 71,
+          "modelled": 6,
+          "overread_bytes": 122
+        },
+        "password.xls": {
+          "current": 2,
+          "modelled": 2,
+          "overread_bytes": 0,
+          "note": "the only encrypted fixture; the prologue prefetch keeps it at parity, where a separate payload read would have cost one more"
+        }
+      },
+      "rejected_alternative": {
+        "first_window_bytes": 4096,
+        "corpus_reads_modelled": 331,
+        "corpus_overread_bytes": 109045,
+        "worst_file_overread_bytes": 11010,
+        "why_rejected": "about two fewer reads per file for three times the over-read; 512 bytes is also one CFB sector",
+        "replay": "survey.py --first-window 4096"
+      }
+    },
+    "corpus_facts": {
+      "source": "survey of 104 CFB fixtures under test-data/ole plus 72 XLS fixtures elsewhere, retained in the evidence packet",
+      "boundsheet8_run_contiguous": "54 of 54",
+      "lbplypos_strictly_ascending": "54 of 54",
+      "slack_between_globals_end_and_first_sheet": "zero in 54 of 54, so once the clamp is known the final fill stops exactly at global_end and every modelled over-read happens before the first BoundSheet8 is framed",
+      "corrupt_lbplypos": "none in the corpus; the corrupt-position test is synthetic and is the only coverage of that path",
+      "filepass_position": "record index 1, byte offset 20, in all three carriers (test-data/ole/xls/password.xls and two POI fixtures), so the four-record prologue covers every real encrypted fixture with zero payload bytes read"
+    }
+  },
+  "accepted_contract_changes": [
+    "Open's range list is no longer one four-byte range per globals header followed by one bulk range. The replacement invariants are that every byte of [0, global_end) is read exactly once, that no two reads overlap, and that the read count is bounded by the prologue plus the fill count.",
+    "A FILEPASS record in the position [MS-XLS] defines, immediately after BOF, is still refused before any byte of its payload is read. A FILEPASS placed later than the prologue may have payload bytes resident in a fill buffer; they are never framed, interpreted, logged, put in an error message or published, and the refusal is unchanged.",
+    "Open may read a bounded number of bytes past global_end: at most one fill, and never past the stream length or the smallest BoundSheet8 position once one has been framed. Those bytes are truncated away and never interpreted. Modelled at 0 bytes for ConditionalFormattingSamples.xls, 122 for Simple.xls, and at most 3,949 for any fixture in the corpus, with a hard ceiling of one window below 65,536 bytes.",
+    "max_global_bytes remains a plus-four bound rather than a hard bound, exactly as before this change: the four header bytes that prove a record crosses the limit are read, and then the limit error is reported with the record's real end as `observed`. No further byte at or past the limit is read.",
+    "Freshness observations fall from one per record to one per read.",
+    "Read coupling changes the error precedence in two places. In the fill phase an I/O or SourceChanged failure at a later offset can be reported before a FILEPASS or limit error of an earlier record covered by the same fill. In the prologue the same applies within one record pair, because a record's payload and the next record's header are fetched together. The per-record check order is unchanged everywhere.",
+    "The fill clamp is the smallest BoundSheet8 position framed SO FAR, a running minimum, not the minimum over the whole stream. [MS-XLS] 2.4.28 imposes no ordering on lbPlyPos; the corpus survey finds the positions ascending in 54 of 54 fixtures, which is empirical rather than normative. The running minimum is still a correct bound because it only ever lowers."
+  ],
+  "acceptance": {
+    "primary_gate": "counted-read tests must show every globals byte read exactly once with no overlapping reads, total bytes read bounded by global_end plus one fill, no read at or beyond the smallest BoundSheet8 position ONCE THAT POSITION HAS BEEN FRAMED, and a spec-position FILEPASS refused with its payload unread; the each-byte-once test must fail without the change.",
+    "secondary_gate": "per-open pread64 and statx, isolated by differencing strace -f -c at 1 and 11 samples as in 0564, must fall; the four-byte read share must collapse.",
+    "latency_gate": "paired A1/B1/B2/A2 p50 over the ten XLS selectors used by 0560, warmup 5 and samples 60 per child, CPU pinned and ASLR disabled; any cell adverse in both directions by more than 5% is reported explicitly and xls-tiny cells are reported as below clock resolution.",
+    "correctness_gate": "litchi-xls full suite, clippy -D warnings, rustdoc -D warnings, no-default-features check, fmt; the wider OLE2 and facade suites before commit."
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "aslr": "disabled with setarch -R for the selector matrix"
+  },
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured",
+  "amendments": [
+    {
+      "at_utc": "2026-09-13T21:54:52Z",
+      "after": "the before-capture, and before any candidate capture",
+      "why": "An independent adversarial review found that the plan and the corpus survey described a schedule the implementation no longer had. Two design refinements had landed since the freeze: the first fill size fell from 4096 to 512 bytes, and the prologue began fetching each record's payload together with the next record's four-byte header. The review also found three statements in this plan that were stronger than what the design provides. No candidate latency or syscall measurement had been taken when this amendment was made, so the acceptance gates below are still frozen before capture.",
+      "changed": [
+        "hypothesis.mechanism",
+        "hypothesis.window_schedule_model",
+        "accepted_contract_changes",
+        "acceptance.primary_gate",
+        "hypothesis.predicted_effect"
+      ]
+    }
+  ]
+}

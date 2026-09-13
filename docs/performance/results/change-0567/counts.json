@@ -1,0 +1,294 @@
+[
+  {
+    "trace": "docx_facade_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 10,
+    "reads_by_phase": {
+      "open-begin": 10
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 11456,
+        "eocd_bytes": 22,
+        "cd_bytes": 751,
+        "cd_reads": 2,
+        "reads": 9,
+        "bytes": 1731,
+        "member_reads": 3,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "docx_facade_open_text.txt",
+    "file_opens": 1,
+    "pread64_on_package": 12,
+    "reads_by_phase": {
+      "open-begin": 10,
+      "read-begin": 2
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 11456,
+        "eocd_bytes": 22,
+        "cd_bytes": 751,
+        "cd_reads": 2,
+        "reads": 11,
+        "bytes": 2399,
+        "member_reads": 4,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "docx_leaf_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 9,
+    "reads_by_phase": {
+      "open-begin": 9
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 11456,
+        "eocd_bytes": 22,
+        "cd_bytes": 751,
+        "cd_reads": 2,
+        "reads": 9,
+        "bytes": 1731,
+        "member_reads": 3,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "docx_leaf_open_paragraph.txt",
+    "file_opens": 1,
+    "pread64_on_package": 11,
+    "reads_by_phase": {
+      "open-begin": 9,
+      "read-begin": 2
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 11456,
+        "eocd_bytes": 22,
+        "cd_bytes": 751,
+        "cd_reads": 2,
+        "reads": 11,
+        "bytes": 2399,
+        "member_reads": 4,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "docx_leaf_open_text.txt",
+    "file_opens": 1,
+    "pread64_on_package": 11,
+    "reads_by_phase": {
+      "open-begin": 9,
+      "read-begin": 2
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 11456,
+        "eocd_bytes": 22,
+        "cd_bytes": 751,
+        "cd_reads": 2,
+        "reads": 11,
+        "bytes": 2399,
+        "member_reads": 4,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "pptx_facade_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 48,
+    "reads_by_phase": {
+      "open-begin": 48
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 68800,
+        "eocd_bytes": 22,
+        "cd_bytes": 3730,
+        "cd_reads": 2,
+        "reads": 47,
+        "bytes": 9755,
+        "member_reads": 22,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "pptx_facade_open_slide.txt",
+    "file_opens": 1,
+    "pread64_on_package": 48,
+    "reads_by_phase": {
+      "open-begin": 48
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 68800,
+        "eocd_bytes": 22,
+        "cd_bytes": 3730,
+        "cd_reads": 2,
+        "reads": 47,
+        "bytes": 9755,
+        "member_reads": 22,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "pptx_leaf_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 47,
+    "reads_by_phase": {
+      "open-begin": 47
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 68800,
+        "eocd_bytes": 22,
+        "cd_bytes": 3730,
+        "cd_reads": 2,
+        "reads": 47,
+        "bytes": 9755,
+        "member_reads": 22,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "pptx_leaf_open_slide.txt",
+    "file_opens": 1,
+    "pread64_on_package": 49,
+    "reads_by_phase": {
+      "open-begin": 47,
+      "read-begin": 2
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 68800,
+        "eocd_bytes": 22,
+        "cd_bytes": 3730,
+        "cd_reads": 2,
+        "reads": 49,
+        "bytes": 14541,
+        "member_reads": 23,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "xlsx_facade_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 11,
+    "reads_by_phase": {
+      "open-begin": 11
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 9403,
+        "eocd_bytes": 22,
+        "cd_bytes": 900,
+        "cd_reads": 2,
+        "reads": 11,
+        "bytes": 2325,
+        "member_reads": 4,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "xlsx_facade_open_cell.txt",
+    "file_opens": 1,
+    "pread64_on_package": 40,
+    "reads_by_phase": {
+      "open-begin": 11,
+      "read-begin": 29
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 9403,
+        "eocd_bytes": 22,
+        "cd_bytes": 900,
+        "cd_reads": 2,
+        "reads": 40,
+        "bytes": 5537,
+        "member_reads": 18,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "xlsx_leaf_open.txt",
+    "file_opens": 1,
+    "pread64_on_package": 11,
+    "reads_by_phase": {
+      "open-begin": 11
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 9403,
+        "eocd_bytes": 22,
+        "cd_bytes": 900,
+        "cd_reads": 2,
+        "reads": 11,
+        "bytes": 2325,
+        "member_reads": 4,
+        "in_cd": false
+      }
+    ]
+  },
+  {
+    "trace": "xlsx_leaf_open_cell.txt",
+    "file_opens": 1,
+    "pread64_on_package": 40,
+    "reads_by_phase": {
+      "open-begin": 11,
+      "read-begin": 29
+    },
+    "constructions": [
+      {
+        "n": 1,
+        "phase": "open-begin",
+        "eocd_off": 9403,
+        "eocd_bytes": 22,
+        "cd_bytes": 900,
+        "cd_reads": 2,
+        "reads": 40,
+        "bytes": 5537,
+        "member_reads": 18,
+        "in_cd": false
+      }
+    ]
+  }
+]

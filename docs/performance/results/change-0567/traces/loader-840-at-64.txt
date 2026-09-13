@@ -1,0 +1,41 @@
+# The 840-byte read at offset 64, resolved
+#
+# Change 0562 recorded this read as 'a structural member being re-read' and
+# listed it as an open follow-up. It is the dynamic loader reading libc's ELF
+# program-header table before main, on a transient descriptor 3 that the
+# package file later reuses.
+#
+# Captured on the change-0565 baseline harness binary (revision 6b13261e5) with:
+#   strace -f -k -e trace=pread64,openat -o <out> \
+#     taskset -c 17 litchi-perf-baseline --warmup 0 --samples 1 \
+#       --case docx_file_source_open --json /dev/null
+
+## The openat calls that produced descriptor 3
+1290005 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+1290005 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+1290005 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+1290005 openat(AT_FDCWD, "/usr/lib/locale/C.utf8/LC_IDENTIFICATION", O_RDONLY|O_CLOEXEC) = 3
+
+## The read itself, with resolved stack (first two occurrences)
+1290005 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(__GI___pread64_nocancel+0xe) [0x2a7fe]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(open_verify.constprop.0+0x1fb) [0x721b]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_map_new_object+0x5f2) [0xb4f2]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(openaux+0x3d) [0x3a7d]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(__GI__dl_catch_exception+0xa1) [0x2511]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_map_object_deps+0x421) [0x3eb1]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(dl_main+0x1c10) [0x26d10]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_sysdep_start+0x86) [0x23736]
+
+1290005 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(__GI___pread64_nocancel+0xe) [0x2a7fe]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_map_object_from_fd+0x82f) [0x9aff]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_map_new_object+0x10a) [0xb00a]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(openaux+0x3d) [0x3a7d]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(__GI__dl_catch_exception+0xa1) [0x2511]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_map_object_deps+0x421) [0x3eb1]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(dl_main+0x1c10) [0x26d10]
+ > /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2(_dl_sysdep_start+0x86) [0x23736]
+
+## Count in this capture
+840-byte reads at offset 64: 26

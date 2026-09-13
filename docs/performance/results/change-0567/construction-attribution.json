@@ -1,0 +1,65 @@
+{
+  "captures": [
+    {
+      "capture": "docx_file_source_full_text.pread.txt",
+      "distinct_per_process_counts": [
+        2
+      ],
+      "eocd_reads_total": 10,
+      "per_process": {
+        "636624": 2,
+        "636681": 2,
+        "636682": 2,
+        "636684": 2,
+        "636686": 2
+      },
+      "processes_issuing_them": 5
+    },
+    {
+      "capture": "docx_file_source_open.pread.txt",
+      "distinct_per_process_counts": [
+        2
+      ],
+      "eocd_reads_total": 10,
+      "per_process": {
+        "636469": 2,
+        "636490": 2,
+        "636497": 2,
+        "636500": 2,
+        "636518": 2
+      },
+      "processes_issuing_them": 5
+    },
+    {
+      "capture": "pptx_file_source_open.pread.txt.gz",
+      "distinct_per_process_counts": [
+        2
+      ],
+      "eocd_reads_total": 10,
+      "per_process": {
+        "636774": 2,
+        "636797": 2,
+        "636803": 2,
+        "636807": 2,
+        "636866": 2
+      },
+      "processes_issuing_them": 5
+    },
+    {
+      "capture": "pptx_file_source_selected_slide.pread.txt.gz",
+      "distinct_per_process_counts": [
+        2
+      ],
+      "eocd_reads_total": 10,
+      "per_process": {
+        "636951": 2,
+        "637025": 2,
+        "637028": 2,
+        "637029": 2,
+        "637030": 2
+      },
+      "processes_issuing_them": 5
+    }
+  ],
+  "note": "Counts 22-byte end-of-central-directory reads per process in the traces change 0562 retained. One such read marks one IndexedArchive construction."
+}

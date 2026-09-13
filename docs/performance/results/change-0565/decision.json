@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0565-xls-globals-single-pass",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "header_prepass_and_bulk_reread_replaced_by_one_windowed_pass",
+    "counted_read_tests_fail_without_the_change",
+    "syscalls_per_open_fall_by_more_than_ninety_percent",
+    "all_source_and_owned_xls_selectors_improve_in_both_directions",
+    "four_tested_contracts_replaced_deliberately_and_recorded"
+  ],
+  "accepted_evidence": {
+    "logical_reads_per_operation": {"open": [655, 53], "list": [655, 53], "one_cell": [921, 319]},
+    "version_calls_per_operation": {"open": [631, 29], "list": [631, 29], "one_cell": [902, 300]},
+    "read_bytes_per_operation": {"open": [567685, 565201], "one_cell": [569398, 566914]},
+    "syscalls_per_operation": {
+      "open": {"pread64": [655, 53], "statx": [636, 34]},
+      "list": {"pread64": [655, 53], "statx": [636, 34]},
+      "one_cell": {"pread64": [921, 319], "statx": [907, 305]}
+    },
+    "four_byte_reads_in_a_two_open_capture": [1242, 4],
+    "latency_matrix": {
+      "children": 40, "rows": 14, "comparisons": 56,
+      "improve_both_directions": 27,
+      "adverse_both_over_5_percent": 2,
+      "best_p50_both_directions": {
+        "xls_source_backed_open_list_worksheets": [-11.66, -3.82],
+        "xls_source_backed_open_one_cell": [-8.87, -6.27],
+        "xls_source_backed_open": [-7.48, -2.29]
+      },
+      "review_triggers": [
+        {"case": "xls_semantic_list_worksheets", "corpus": "xls-large", "statistic": "p50",
+         "percent": [16.67, 16.67], "absolute_ns": [60, 70],
+         "note": "one 10 ns clock tick; an A/A run on this host drifts further"},
+        {"case": "xls_semantic_list_worksheets", "corpus": "xls-large", "statistic": "mean",
+         "percent": [9.58, 22.83], "absolute_ns": [87, 95]}
+      ]
+    },
+    "falsified_prediction": "the plan predicted owned-source selectors would move within noise; they improve 2.38 to 9.41 percent at p50 in both directions, because an owned source performs the same logical reads with zero syscalls and the change removes per-logical-read cost as well as syscalls"
+  },
+  "accepted_costs": {
+    "bounded_over_read_past_globals_end": "zero on the flagship fixture, 93 bytes on the harness locality corpus, at most 3,949 across the surveyed corpus; bounded by one fill and by the stream, truncated away and never interpreted",
+    "byte_totals_can_rise_on_a_small_workbook": "one fixture reads 4,266 bytes before and 5,225 after while its reads fall from 84 to 12",
+    "harness_locality_gate_bounded": "the perf harness asserted an open reads zero worksheet bytes; it now requires zero bytes of the selected worksheet and at most one window of any worksheet body, which still fails an open that materializes a worksheet"
+  },
+  "withheld": [
+    "cold cache", "physical device", "remote or range source", "peak RSS",
+    "allocation", "concurrency scaling", "real-producer breadth", "cross platform"
+  ]
+}

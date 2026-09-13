@@ -1,5 +1,46 @@
 # Performance optimization ADR-compliance matrix
 
+## 0567: ownership confirmed, and the fix located within it
+
+[0567](0567-ooxml-single-index-per-open.md) changes no production code. It
+confirms that the single archive construction in a library-level open sits at the
+`litchi-opc` boundary ADR 0011 designates, and that the facade adds no archive
+knowledge of its own, which is what ADR 0010 requires. The repeated indexing it
+locates is across two calls, and the record places the smallest fix inside those
+same boundaries: an opaque prepared-source newtype owned by `litchi-opc`, a
+neutral detection entry point in the facade returning a format plus an opaque
+handle, and no change to `soapberry-zip`. ADR 0010's 2026-08-08 amendment already
+blesses that shape. No ADR exception is requested.
+
+## 0566: design only, with the contract 0325 required
+
+[0566](0566-xls-worksheet-window-design.md) changes no production code. It
+supplies, in draft, the contract change 0325 said was missing: an explicit rule
+separating payload bytes from skippable bytes, a bound on read-ahead that is
+exact rather than truncated because the sheet boundary is validated at open, and
+a byte limit that becomes a true read fence. It records that freshness and error
+precedence would change in the same way change 0565 changed them, and that the
+cancellation interval would grow in I/O terms only, for which the same owner has
+precedent at the same size. No ADR exception is requested.
+
+## 0565: no ADR weakened; four test-level contracts replaced deliberately
+
+[0565](0565-xls-globals-single-pass.md) changes only `litchi-xls`, which owns the
+BIFF grammar, and uses `litchi-cfb`'s existing stream-range API. Ownership,
+dependency direction and public API are unchanged, and no `unsafe` is introduced.
+The four contracts change 0564 enumerated are test-level statements of the
+previous read shape rather than ADR requirements, and each is replaced by an
+enforced invariant rather than dropped. ADR 0005's bounded-resource requirement
+is met: every fill is clamped by the stream length, by `max_global_bytes` and by
+the smallest framed sheet position, and the buffer is bounded by
+`min(stream_len, max_global_bytes + 4)` with fallible reservation throughout. ADR
+0006's security boundary is intact: an encrypted workbook is still refused before
+any byte of its payload is read in every position the format defines, and bytes
+resident behind a later refusal are never framed, interpreted, logged or placed
+in an error message. Three consequences are recorded explicitly rather than left
+implicit: the plus-four byte-limit bound, the error precedence within one read,
+and the running-minimum clamp. No ADR exception is requested.
+
 ## 0564: a recorded conflict, not an exception
 
 [0564](0564-xls-open-read-attribution.md) changes no production code. It records
