@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-13T16:47:07Z",
+  "removed": [
+    "the session scratchpad's staged release binaries for the baseline, 0558 and combined stages",
+    "all build, gate, driver and guardrail logs",
+    "the raw Callgrind working directory, after the dumps cited by the records were copied into the packets",
+    "one-off strace summaries and exploratory reports that no record cites"
+  ],
+  "retained_outside_the_repository": [
+    "tools/perf-baseline/target, the gitignored build directory for the harness workspace",
+    "one release binary built from the final source, kept for the next measurement batch; its SHA-256 is recorded in change-0559/source-identity.json"
+  ],
+  "retained_in_the_repository": [
+    "every child report, receipt, stdout, stderr, strace summary and Callgrind dump cited by the two records"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commits",
+  "revision": "7c70779e9883e8b23fa0190633f818319d2c81f1"
+}
