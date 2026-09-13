@@ -25,3 +25,16 @@ with the same 455-file closure checks. It moves the new private token after the
 existing array/reference variants without changing the reviewed matching behavior.
 Paired capture03 retains zero deterministic mismatches; a 5–6% one-cell matrix-range
 p50 regression remains open.
+
+## Const-demand specialization
+
+The next reviewed source is `value.rs` SHA
+`f191993cb9761d606664b7f9aacb575b84fde5bce0322a80498f4a6ffa911c0a`.
+The runtime demand parameter becomes a const generic, with ordinary visitation
+calling `visit_with_demand::<false>` and scalar visitation calling
+`visit_with_demand::<true>`. The reviewer verified identical grouping, unary,
+infix, and reference-selection conditions, including reference-operator
+exclusions. There is no behavior, ordering, coercion, cache, or budget change.
+No blocker was found. [All five gates](scalar-cell-candidate-03.json) pass.
+Paired captures04/05 retain zero deterministic mismatches; their latency and RSS
+review flags are documented in the performance report.
