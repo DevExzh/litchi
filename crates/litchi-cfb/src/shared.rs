@@ -552,6 +552,19 @@ impl SharedOleFile {
         Ok(self.expected_version)
     }
 
+    /// Returns the source identity captured when this view was opened, without
+    /// observing the source.
+    ///
+    /// Use this only to compare against an observation the caller has already
+    /// taken of the *same* source object, which [`Self::source_arc`] hands
+    /// out. It proves nothing about the source on its own: it is a stored
+    /// value, and a caller that needs to know the source is still current must
+    /// use [`Self::source_version`] or read through this view.
+    #[must_use]
+    pub const fn captured_source_version(&self) -> SourceVersion {
+        self.expected_version
+    }
+
     /// Clones the exact positional source retained by this shared CFB view.
     ///
     /// This is a low-level handoff for container owners that need to compose

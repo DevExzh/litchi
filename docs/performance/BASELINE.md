@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0560: XLS freshness observation counts re-baselined
+
+The [0560 packet](0560-xls-single-observation-freshness.md) retains an A/E/E/A matrix over ten XLS selectors, six `strace` children over the file-source matrix, and the instrumented observation counters. A retained metadata query now takes one source observation; file-source `open`, `list` and `one-cell` fall to 631, 631 and 902 observations with read calls and read bytes unchanged. The `xls-tiny` corpora are recorded as below useful clock resolution on this host.
+
 ## Change 0559: CFB name comparison cost re-baselined
 
 The [0559 packet](0559-cfb-ascii-simple-uppercase.md) retains deterministic Callgrind branch-simulation counters for `ole_common_one_edit_save`, `cfb_open`, `cfb_list_streams`, `cfb_create_stream_owned` and `doc_semantic_one_edit_save`, plus an ASLR-disabled three-stage latency comparison and a 21-selector OLE2 guardrail matrix against the pre-0558 baseline. Exhaustive per-scalar differential tests in both owners bind the equivalence. No cold-cache, RSS, allocation or producer-breadth evidence is added.

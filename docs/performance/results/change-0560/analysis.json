@@ -1,0 +1,649 @@
+{
+  "schema_version": 1,
+  "analysis_kind": "litchi-perf-change-0560-analysis",
+  "deterministic_counters": [
+    {
+      "operation": "open",
+      "baseline_version_calls": 644,
+      "candidate_version_calls": 631,
+      "version_calls_change_percent": -2.018633540372671,
+      "read_calls_unchanged": true,
+      "read_bytes_unchanged": true
+    },
+    {
+      "operation": "list",
+      "baseline_version_calls": 644,
+      "candidate_version_calls": 631,
+      "version_calls_change_percent": -2.018633540372671,
+      "read_calls_unchanged": true,
+      "read_bytes_unchanged": true
+    },
+    {
+      "operation": "one-cell",
+      "baseline_version_calls": 925,
+      "candidate_version_calls": 902,
+      "version_calls_change_percent": -2.4864864864864864,
+      "read_calls_unchanged": true,
+      "read_bytes_unchanged": true
+    }
+  ],
+  "syscalls": [
+    {
+      "operation": "open",
+      "baseline": {
+        "pread64": 3932,
+        "statx": 3898
+      },
+      "candidate": {
+        "pread64": 3932,
+        "statx": 3820
+      },
+      "statx_change_percent": -2.0010261672652643,
+      "pread64_unchanged": true
+    },
+    {
+      "operation": "list",
+      "baseline": {
+        "pread64": 3932,
+        "statx": 3898
+      },
+      "candidate": {
+        "pread64": 3932,
+        "statx": 3820
+      },
+      "statx_change_percent": -2.0010261672652643,
+      "pread64_unchanged": true
+    },
+    {
+      "operation": "one-cell",
+      "baseline": {
+        "pread64": 5528,
+        "statx": 5584
+      },
+      "candidate": {
+        "pread64": 5528,
+        "statx": 5446
+      },
+      "statx_change_percent": -2.4713467048710602,
+      "pread64_unchanged": true
+    }
+  ],
+  "latency_rows": [
+    {
+      "case": "xls_source_backed_open",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -5.4777354501212105,
+          "second_direction_percent": -5.842424026188331,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 109726.0,
+          "candidate_ns": 103715.5
+        },
+        "mean": {
+          "first_direction_percent": -3.9601349630162583,
+          "second_direction_percent": -5.406982366830957,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 109852.31666666667,
+          "candidate_ns": 105502.01666666666
+        },
+        "p95": {
+          "first_direction_percent": -3.392605007100861,
+          "second_direction_percent": -6.235100258090135,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 121781.05,
+          "candidate_ns": 117649.5
+        },
+        "p99": {
+          "first_direction_percent": 2.033779000384298,
+          "second_direction_percent": 5.23747519086286,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 123597.5,
+          "candidate_ns": 126111.19999999998
+        }
+      }
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -14.77551941094489,
+          "second_direction_percent": -2.847828816386562,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 124131.0,
+          "candidate_ns": 105790.0
+        },
+        "mean": {
+          "first_direction_percent": -14.521403268125527,
+          "second_direction_percent": -1.2423179864727887,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 126268.1,
+          "candidate_ns": 107932.2
+        },
+        "p95": {
+          "first_direction_percent": -11.854144636616198,
+          "second_direction_percent": -2.4403916689775635,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 139487.5,
+          "candidate_ns": 122952.44999999998
+        },
+        "p99": {
+          "first_direction_percent": -9.570956322279873,
+          "second_direction_percent": -6.224073670062233,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 140815.5,
+          "candidate_ns": 127338.10999999999
+        }
+      }
+    },
+    {
+      "case": "xls_source_backed_open_one_cell",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -6.011850344125714,
+          "second_direction_percent": -7.114855747057719,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 115946.0,
+          "candidate_ns": 108975.5
+        },
+        "mean": {
+          "first_direction_percent": -4.047800733789283,
+          "second_direction_percent": -8.19562786116346,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 115387.35,
+          "candidate_ns": 110716.7
+        },
+        "p95": {
+          "first_direction_percent": -3.145593724647807,
+          "second_direction_percent": -8.265621825875858,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 130720.95,
+          "candidate_ns": 126609.0
+        },
+        "p99": {
+          "first_direction_percent": -6.940186534909324,
+          "second_direction_percent": -9.105066813464695,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 141445.90999999995,
+          "candidate_ns": 131629.3
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -10.877016176952953,
+          "second_direction_percent": -8.17600594652829,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 105180.5,
+          "candidate_ns": 93740.0
+        },
+        "mean": {
+          "first_direction_percent": -10.730606036097122,
+          "second_direction_percent": -8.424356790833377,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 107155.33333333333,
+          "candidate_ns": 95656.91666666667
+        },
+        "p95": {
+          "first_direction_percent": -7.401764735130369,
+          "second_direction_percent": -11.089645633174683,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 117655.05,
+          "candidate_ns": 108946.5
+        },
+        "p99": {
+          "first_direction_percent": -7.874526032496615,
+          "second_direction_percent": -9.513592709749084,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 120358.99,
+          "candidate_ns": 110881.29000000001
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -5.284036662211189,
+          "second_direction_percent": -1.9112383679312814,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 104740.0,
+          "candidate_ns": 99205.5
+        },
+        "mean": {
+          "first_direction_percent": -3.9217598512348064,
+          "second_direction_percent": -5.281103464479052,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 105956.68333333333,
+          "candidate_ns": 101801.31666666667
+        },
+        "p95": {
+          "first_direction_percent": -0.49124586116443636,
+          "second_direction_percent": -11.995843948004445,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 117741.45,
+          "candidate_ns": 117163.05
+        },
+        "p99": {
+          "first_direction_percent": 0.799625151898975,
+          "second_direction_percent": -29.640231179201997,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 119429.70999999999,
+          "candidate_ns": 120384.7
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "corpus": "xls-comments-opaque-heavy",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -0.0853076312914378,
+          "second_direction_percent": -4.452384424675515,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 100225.5,
+          "candidate_ns": 100140.0
+        },
+        "mean": {
+          "first_direction_percent": -1.182067783337845,
+          "second_direction_percent": -6.701026729679439,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 102460.28333333334,
+          "candidate_ns": 101249.13333333333
+        },
+        "p95": {
+          "first_direction_percent": 0.4534411283091545,
+          "second_direction_percent": -8.122579682074209,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 111359.55,
+          "candidate_ns": 111864.5
+        },
+        "p99": {
+          "first_direction_percent": -0.34515744051275565,
+          "second_direction_percent": -16.076895816803262,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 117282.70999999999,
+          "candidate_ns": 116877.9
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_full_cell_scan",
+      "corpus": "xls-tiny",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": 5.263157894736842,
+          "second_direction_percent": 5.263157894736842,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 190.0,
+          "candidate_ns": 200.0
+        },
+        "mean": {
+          "first_direction_percent": 5.540661304736377,
+          "second_direction_percent": 6.548672566371671,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 186.5,
+          "candidate_ns": 196.83333333333334
+        },
+        "p95": {
+          "first_direction_percent": 5.263157894736842,
+          "second_direction_percent": 10.236220472440962,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 190.0,
+          "candidate_ns": 200.0
+        },
+        "p99": {
+          "first_direction_percent": 2.89073983341501,
+          "second_direction_percent": 19.22421142369977,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 204.09999999999997,
+          "candidate_ns": 210.0
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_full_cell_scan",
+      "corpus": "xls-large",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": 2.1927858723908953,
+          "second_direction_percent": -0.3771656772510606,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 72510.5,
+          "candidate_ns": 74100.5
+        },
+        "mean": {
+          "first_direction_percent": 2.0688843650009634,
+          "second_direction_percent": -1.1492058304812667,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 73085.28333333334,
+          "candidate_ns": 74597.33333333333
+        },
+        "p95": {
+          "first_direction_percent": -0.668190720902863,
+          "second_direction_percent": -7.679974714296342,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 79393.5,
+          "candidate_ns": 78862.99999999999
+        },
+        "p99": {
+          "first_direction_percent": -0.7214071512176009,
+          "second_direction_percent": -3.5800466451601016,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 81395.09,
+          "candidate_ns": 80807.9
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_one_cell",
+      "corpus": "xls-tiny",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": 0.0,
+          "second_direction_percent": 20.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 20.0,
+          "candidate_ns": 20.0
+        },
+        "mean": {
+          "first_direction_percent": -1.36054421768707,
+          "second_direction_percent": 2.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 24.5,
+          "candidate_ns": 24.166666666666668
+        },
+        "p95": {
+          "first_direction_percent": 0.0,
+          "second_direction_percent": 0.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 30.0,
+          "candidate_ns": 30.0
+        },
+        "p99": {
+          "first_direction_percent": 0.0,
+          "second_direction_percent": 0.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 30.0,
+          "candidate_ns": 30.0
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_one_cell",
+      "corpus": "xls-large",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -22.22222222222222,
+          "second_direction_percent": -12.5,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 90.0,
+          "candidate_ns": 70.0
+        },
+        "mean": {
+          "first_direction_percent": -4.432624113475183,
+          "second_direction_percent": -3.984819734345351,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 94.0,
+          "candidate_ns": 89.83333333333333
+        },
+        "p95": {
+          "first_direction_percent": 38.03278688524601,
+          "second_direction_percent": -0.7042253521126366,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 152.49999999999986,
+          "candidate_ns": 210.49999999999997
+        },
+        "p99": {
+          "first_direction_percent": 6.2846580406655015,
+          "second_direction_percent": 1.1047070124879437,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 216.39999999999986,
+          "candidate_ns": 230.0
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_list_worksheets",
+      "corpus": "xls-tiny",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": 0.0,
+          "second_direction_percent": 0.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 30.0,
+          "candidate_ns": 30.0
+        },
+        "mean": {
+          "first_direction_percent": 6.70731707317074,
+          "second_direction_percent": 4.294478527607353,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 27.333333333333332,
+          "candidate_ns": 29.166666666666668
+        },
+        "p95": {
+          "first_direction_percent": 0.0,
+          "second_direction_percent": 0.0,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 30.0,
+          "candidate_ns": 30.0
+        },
+        "p99": {
+          "first_direction_percent": 109.33333333333242,
+          "second_direction_percent": 115.33333333333265,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 30.0,
+          "candidate_ns": 62.79999999999973
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_list_worksheets",
+      "corpus": "xls-large",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -14.285714285714285,
+          "second_direction_percent": -14.285714285714285,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 70.0,
+          "candidate_ns": 60.0
+        },
+        "mean": {
+          "first_direction_percent": -11.50627615062762,
+          "second_direction_percent": -14.55576559546315,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 79.66666666666667,
+          "candidate_ns": 70.5
+        },
+        "p95": {
+          "first_direction_percent": -7.117437722419931,
+          "second_direction_percent": -8.333333333333332,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 140.49999999999997,
+          "candidate_ns": 130.49999999999997
+        },
+        "p99": {
+          "first_direction_percent": 10.817673946165703,
+          "second_direction_percent": 0.905155450609956,
+          "improves_both": false,
+          "adverse_both": true,
+          "baseline_ns": 196.8999999999997,
+          "candidate_ns": 218.19999999999993
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_one_edit_save",
+      "corpus": "xls-tiny",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -1.8844735764031135,
+          "second_direction_percent": -0.8269575797570683,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 24410.0,
+          "candidate_ns": 23950.0
+        },
+        "mean": {
+          "first_direction_percent": -1.3340151482269293,
+          "second_direction_percent": -1.5892325471471531,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 24574.933333333334,
+          "candidate_ns": 24247.1
+        },
+        "p95": {
+          "first_direction_percent": -2.5803940133137426,
+          "second_direction_percent": 1.5662362505978003,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 25560.05,
+          "candidate_ns": 24900.5
+        },
+        "p99": {
+          "first_direction_percent": 5.596479312107369,
+          "second_direction_percent": -15.442830303511407,
+          "improves_both": false,
+          "adverse_both": false,
+          "baseline_ns": 28562.599999999977,
+          "candidate_ns": 30161.099999999955
+        }
+      }
+    },
+    {
+      "case": "xls_semantic_one_edit_save",
+      "corpus": "xls-large",
+      "statistics": {
+        "p50": {
+          "first_direction_percent": -2.2599199722062373,
+          "second_direction_percent": -3.2596667361634566,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 1490982.0,
+          "candidate_ns": 1457287.0
+        },
+        "mean": {
+          "first_direction_percent": -2.3898048488648618,
+          "second_direction_percent": -3.409748855580444,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 1497120.85,
+          "candidate_ns": 1461342.5833333333
+        },
+        "p95": {
+          "first_direction_percent": -2.4913546649786755,
+          "second_direction_percent": -3.7439905426332944,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 1541872.0,
+          "candidate_ns": 1503458.5
+        },
+        "p99": {
+          "first_direction_percent": -3.719014247189403,
+          "second_direction_percent": -3.7279079879765,
+          "improves_both": true,
+          "adverse_both": false,
+          "baseline_ns": 1572709.49,
+          "candidate_ns": 1514220.2000000002
+        }
+      }
+    }
+  ],
+  "summary": {
+    "rows": 14,
+    "comparisons": 56,
+    "improve_both_directions": 34,
+    "review_triggers_adverse_both_over_5_percent": 4
+  },
+  "review_triggers": [
+    {
+      "case": "xls_semantic_full_cell_scan",
+      "corpus": "xls-tiny",
+      "statistic": "p50",
+      "first_direction_percent": 5.263157894736842,
+      "second_direction_percent": 5.263157894736842,
+      "baseline_ns": 190.0,
+      "candidate_ns": 200.0
+    },
+    {
+      "case": "xls_semantic_full_cell_scan",
+      "corpus": "xls-tiny",
+      "statistic": "mean",
+      "first_direction_percent": 5.540661304736377,
+      "second_direction_percent": 6.548672566371671,
+      "baseline_ns": 186.5,
+      "candidate_ns": 196.83333333333334
+    },
+    {
+      "case": "xls_semantic_full_cell_scan",
+      "corpus": "xls-tiny",
+      "statistic": "p95",
+      "first_direction_percent": 5.263157894736842,
+      "second_direction_percent": 10.236220472440962,
+      "baseline_ns": 190.0,
+      "candidate_ns": 200.0
+    },
+    {
+      "case": "xls_semantic_list_worksheets",
+      "corpus": "xls-tiny",
+      "statistic": "p99",
+      "first_direction_percent": 109.33333333333242,
+      "second_direction_percent": 115.33333333333265,
+      "baseline_ns": 30.0,
+      "candidate_ns": 62.79999999999973
+    }
+  ]
+}

@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0560: XLS freshness checks observe the source once
+
+[0560](0560-xls-single-observation-freshness.md) removes two of the three source
+observations in `ensure_current_parts` and one of the two fences in each
+retained-metadata helper, taking a metadata query from six observations to one.
+Every source-backed and owned-source XLS selector improves in both ABBA
+directions; four nanosecond-scale `xls-tiny` cells are adverse and reported as
+clock-resolution artifacts. Read calls and read bytes are unchanged.
+
 ## 0559: CFB uppercase mapping leaves the Unicode path for ASCII
 
 [0559](0559-cfb-ascii-simple-uppercase.md) adds an exhaustively proven ASCII

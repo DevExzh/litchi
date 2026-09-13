@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0560: one observation per XLS freshness check
+
+The [0560 record](0560-xls-single-observation-freshness.md) collapses `ensure_current_parts` from three source observations to one and the two retained-metadata helpers from two fences to one, so a retained metadata query falls from six observations to one. `SourceInner` takes both its source and its expected version from the same `SharedOleFile`, so one observation discharges both expectations; nothing between the collapsed observations consumes a source byte. All six source-backed and owned-source XLS selectors improve in both ABBA directions (-0.09% to -14.78% p50); four `xls-tiny` cells are adverse at nanosecond scale and are reported as clock-resolution artifacts. A counted-observation test now pins the invariant. The remaining XLS file-source cost is the surviving one probe plus one positional read per BIFF record, so bounded span batching stays the next hypothesis. `performance_claim: none`.
+
 ## Change 0559: CFB simple uppercase leaves the Unicode tables
 
 The [0559 record](0559-cfb-ascii-simple-uppercase.md) adds an ASCII branch to the `[MS-CFB]` 2.6.4 simple uppercase mapping in `litchi-cfb` and `litchi-ole-common`, proven equal to the Unicode path over every scalar. For one `ole_common_one_edit_save` many-small child, Ir falls 0.32%, conditional branch misses 30.42% and indirect branches 38.94% against the pre-0558 baseline; ASLR-disabled medians fall from 1,784-1,807 to 1,496-1,527 us, and the wide-root corpus loses its 37/51 ms bimodality at 34.2-34.6 ms. Directory-name case folding was previously 205,732 of 660,113 simulated branch misses in that child and is no longer the leading one. `performance_claim: none`. OLE2/OOXML remain active; ODF deferred, iWork excluded.

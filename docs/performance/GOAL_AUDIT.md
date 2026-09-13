@@ -1,5 +1,34 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0560: XLS freshness observations reduced to one
+
+[0560](0560-xls-single-observation-freshness.md) continues the goal's first
+optimization rule on the OLE2 spreadsheet path. A retained XLS metadata query
+took six source observations; it now takes one, and the collapse is strictly
+equivalent because nothing between the removed observations consumed a source
+byte. A counted-observation test makes the invariant enforceable.
+
+The measurement also re-established where the remaining XLS file-source cost
+lives: after changes 0558 and 0560 the path still takes one observation and one
+positional read per BIFF record, so the open/list/one-cell gap over an owned
+source is now dominated by read count rather than probe count. Bounded span
+batching is the next hypothesis for that gap, and it must preserve the exact
+source-byte accounting the program's evidence depends on.
+
+A separate OOXML diagnostic recorded during this batch is not yet addressed: one
+file-backed `pptx_file_source_selected_slide` operation issues 13,608 positional
+reads over only 1,262 distinct byte ranges, so 90.7% of its physical read calls
+re-read bytes already read, and 25% are immediate back-to-back duplicates of the
+identical range. Attribution is in progress; no fix is claimed.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, remote/range-source behaviour, peak RSS and allocation
+accounting, concurrency scaling, real-producer breadth, and cross-platform
+confirmation.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0558-0559: OLE2 read fencing and name folding
 
 [0558](0558-ole2-single-read-fence.md) and
