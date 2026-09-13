@@ -1,0 +1,289 @@
+{
+  "schema_version": 2,
+  "revision": "unknown",
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "revision": "unknown"
+  },
+  "binary": {
+    "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/0db5c175-cade-4685-8f04-7ebb02a30b4a/scratchpad/candidate/xls_source_attribution",
+    "bytes": 8951984,
+    "sha256": "aad3cd7b4a2f98b726cae46de78822781ea38407e116b41c0b9bca9ac5e279a4"
+  },
+  "input": {
+    "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "mode": "owned-readat",
+  "operation": "list",
+  "counter_scope": "custom immutable ReadAt over staged bytes; no filesystem I/O",
+  "limitation": null,
+  "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+  "process_scope": "samples share one benchmark process; invoke once per retained sample for fresh-child evidence",
+  "input_scope": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+  "warmups": 1,
+  "samples": 5,
+  "worksheet_index": 1,
+  "row": 1,
+  "column": 0,
+  "semantic_oracle": {
+    "source_implementation_projection": {
+      "worksheet_count": 16,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "Quarters",
+        "Bike rating",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Compare to totals",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "eager_implementation_projection": {
+      "worksheet_count": 13,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "elapsed_samples_ns": [
+    204521,
+    184651,
+    183171,
+    182361,
+    181281
+  ],
+  "records": [
+    {
+      "elapsed_ns": 204521,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "Quarters",
+          "Bike rating",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Compare to totals",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 644,
+        "len_calls": 1,
+        "read_ns": 23570,
+        "version_ns": 16460,
+        "len_ns": 30,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 184651,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "Quarters",
+          "Bike rating",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Compare to totals",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 644,
+        "len_calls": 1,
+        "read_ns": 22950,
+        "version_ns": 16610,
+        "len_ns": 20,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 183171,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "Quarters",
+          "Bike rating",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Compare to totals",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 644,
+        "len_calls": 1,
+        "read_ns": 22800,
+        "version_ns": 16470,
+        "len_ns": 20,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 182361,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "Quarters",
+          "Bike rating",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Compare to totals",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 644,
+        "len_calls": 1,
+        "read_ns": 22770,
+        "version_ns": 16611,
+        "len_ns": 20,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 181281,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "Quarters",
+          "Bike rating",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Compare to totals",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 644,
+        "len_calls": 1,
+        "read_ns": 22810,
+        "version_ns": 16450,
+        "len_ns": 30,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    }
+  ]
+}

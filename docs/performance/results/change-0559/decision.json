@@ -1,0 +1,53 @@
+{
+  "change_id": "0559-cfb-ascii-simple-uppercase",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "exhaustive_per_scalar_equivalence_proof",
+    "deterministic_counter_reduction_in_every_profiled_case",
+    "batch_guardrail_improves_222_of_376_comparisons_in_both_directions",
+    "resolves_the_0558_layout_regression"
+  ],
+  "accepted_evidence": {
+    "profiled_cases": 5,
+    "ir_change_percent_range": [
+      -0.36,
+      -0.01
+    ],
+    "conditional_branch_miss_change_percent_range": [
+      -30.42,
+      -2.04
+    ],
+    "indirect_branch_change_percent_range": [
+      -38.94,
+      -1.93
+    ],
+    "batch_guardrail": {
+      "rows": 94,
+      "comparisons": 376,
+      "improve_both_directions": 222,
+      "adverse_both_directions": 52,
+      "adverse_both_over_5_percent": 2
+    },
+    "xls_source_path": "neutral; version calls, statx, read calls and read bytes byte-identical"
+  },
+  "reported_regressions": {
+    "cfb_list_streams": "cfb-few-large-incompressible p99 only, +6.28%/+53.22%",
+    "cfb_shared_read_one": "cfb-few-large-incompressible p99 only, +12.48%/+11.04%"
+  },
+  "withheld": [
+    "cold cache",
+    "physical device",
+    "remote or range source",
+    "peak RSS",
+    "allocation",
+    "concurrency scaling",
+    "real-producer breadth",
+    "cross platform",
+    "non-ASCII directory-name corpora"
+  ],
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision"
+}

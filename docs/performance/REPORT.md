@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0559: CFB uppercase mapping leaves the Unicode path for ASCII
+
+[0559](0559-cfb-ascii-simple-uppercase.md) adds an exhaustively proven ASCII
+branch to the `[MS-CFB]` simple uppercase mapping in `litchi-cfb` and
+`litchi-ole-common`. Against the pre-0558 baseline, one profiled OLE2 edit/save
+child drops 0.32% Ir, 30.42% conditional branch misses and 38.94% indirect
+branches; its ASLR-disabled median falls 14.4-16.1% and the wide-root corpus
+loses its 37/51 ms bimodality. The change also removes the layout regression
+0558 left on that case. The source-backed XLS path is unaffected, as expected.
+
 ## 0558: one fence per shared CFB read
 
 [0558](0558-ole2-single-read-fence.md) removes the leading source-version

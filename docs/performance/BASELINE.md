@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0559: CFB name comparison cost re-baselined
+
+The [0559 packet](0559-cfb-ascii-simple-uppercase.md) retains deterministic Callgrind branch-simulation counters for `ole_common_one_edit_save`, `cfb_open`, `cfb_list_streams`, `cfb_create_stream_owned` and `doc_semantic_one_edit_save`, plus an ASLR-disabled three-stage latency comparison and a 21-selector OLE2 guardrail matrix against the pre-0558 baseline. Exhaustive per-scalar differential tests in both owners bind the equivalence. No cold-cache, RSS, allocation or producer-breadth evidence is added.
+
 ## Change 0558: file-source CFB read cost attributed and halved
 
 The [0558 packet](0558-ole2-single-read-fence.md) retains a 48-child ABBA latency capture, a 12-child `strace` syscall matrix, a 56-row OLE2 guardrail matrix, per-function Callgrind branch attribution, and the frozen plan and environment. The frozen baseline records that one selective XLS open over `FileSource` issued 1,266 `version()` observations and 655 positional reads, and that observation time was roughly half of elapsed. CPU 17 was pinned because CPU 2 was 93.97% busy; host quiescence is not established.

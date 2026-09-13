@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0559: CFB simple uppercase leaves the Unicode tables
+
+The [0559 record](0559-cfb-ascii-simple-uppercase.md) adds an ASCII branch to the `[MS-CFB]` 2.6.4 simple uppercase mapping in `litchi-cfb` and `litchi-ole-common`, proven equal to the Unicode path over every scalar. For one `ole_common_one_edit_save` many-small child, Ir falls 0.32%, conditional branch misses 30.42% and indirect branches 38.94% against the pre-0558 baseline; ASLR-disabled medians fall from 1,784-1,807 to 1,496-1,527 us, and the wide-root corpus loses its 37/51 ms bimodality at 34.2-34.6 ms. Directory-name case folding was previously 205,732 of 660,113 simulated branch misses in that child and is no longer the leading one. `performance_claim: none`. OLE2/OOXML remain active; ODF deferred, iWork excluded.
+
 ## Change 0558: the shared CFB reader fenced every read twice
 
 The [0558 record](0558-ole2-single-read-fence.md) confirms the largest open OLE2 file-source hotspot and removes half of it. `SharedOleFile::read_stream_range` and `SharedOleStreamCursor::read_exact` observed `ReadAt::version()` before and after each payload read, so every positional read on a `FileSource` cost two `statx` syscalls: 1,266 observations and 655 reads for one selective XLS open, with probe time measured at roughly half of elapsed. Removing only the leading observation halves `version()` calls (-48.98% to -49.13%) and whole-child `statx` (-48.83% to -48.91%) with `read_at` calls and bytes byte-identical, and improves all 48 paired ABBA cells (-26.88% to -28.98% file-source p50). The remaining file-source gap over an owned source is now dominated by the surviving one probe per read plus positional read cost; bounded span batching, which reduces reads rather than probes, is the next hypothesis for that gap. `performance_claim: none`.

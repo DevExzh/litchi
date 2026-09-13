@@ -101,6 +101,26 @@ impl CfbPath {
     }
 }
 
+/// Returns the `[MS-CFB]` 2.6.4 simple uppercase mapping of one scalar.
+///
+/// No ASCII scalar has a multi-character uppercase mapping, and its
+/// single-character mapping is the ASCII one, so the ASCII branch returns
+/// exactly what the general path returns while avoiding the Unicode
+/// case-mapping iterator. CFB path components are ASCII in practice.
+fn simple_uppercase(character: char) -> char {
+    if character.is_ascii() {
+        return character.to_ascii_uppercase();
+    }
+    let mut uppercase = character.to_uppercase();
+    let first = uppercase.next().unwrap_or(character);
+    if uppercase.next().is_some() {
+        // This is a multi-code-point mapping, not a simple mapping.
+        character
+    } else {
+        first
+    }
+}
+
 /// Iterates the Unicode simple-uppercase UTF-16 comparison units required by
 /// `[MS-CFB]` 2.6.4 without retaining a second copy of the component.
 struct UppercaseUnits<'a> {
@@ -121,14 +141,7 @@ impl Iterator for UppercaseUnits<'_> {
         }
 
         let character = self.input.next()?;
-        let mut uppercase = character.to_uppercase();
-        let first = uppercase.next().unwrap_or(character);
-        let simple = if uppercase.next().is_some() {
-            // This is a multi-code-point mapping, not a simple mapping.
-            character
-        } else {
-            first
-        };
+        let simple = simple_uppercase(character);
 
         self.pending = [0; 2];
         let encoded = simple.encode_utf16(&mut self.pending);
@@ -245,5 +258,56 @@ mod tests {
         }
         assert!(CfbPath::new(vec!["😀".repeat(15)]).is_ok());
         assert!(CfbPath::new(vec!["😀".repeat(16)]).is_err());
+    }
+
+    fn unicode_simple_uppercase(character: char) -> char {
+        let mut uppercase = character.to_uppercase();
+        let first = uppercase.next().unwrap_or(character);
+        if uppercase.next().is_some() {
+            character
+        } else {
+            first
+        }
+    }
+
+    #[test]
+    fn uppercase_matches_unicode_mapping_for_every_char() {
+        // Exhaustive over the whole Unicode scalar range, so the ASCII branch
+        // is proven equal rather than sampled.
+        for scalar in 0..=u32::from(char::MAX) {
+            let Some(character) = char::from_u32(scalar) else {
+                continue;
+            };
+            assert_eq!(
+                super::simple_uppercase(character),
+                unicode_simple_uppercase(character),
+                "uppercase mapping diverges for U+{scalar:04X}"
+            );
+        }
+    }
+
+    #[test]
+    fn uppercase_units_match_the_unicode_mapping_for_representative_components() {
+        for component in [
+            "Workbook",
+            "WordDocument",
+            "PowerPoint Document",
+            "mixedCASE-123",
+            "\u{df}stra\u{df}e",
+            "\u{fb01}le",
+            "\u{130}stanbul",
+            "\u{1f600}",
+        ] {
+            let observed: Vec<u16> = super::uppercase_units(component).collect();
+            let expected: Vec<u16> = component
+                .chars()
+                .map(unicode_simple_uppercase)
+                .flat_map(|character| {
+                    let mut encoded = [0u16; 2];
+                    character.encode_utf16(&mut encoded).to_vec()
+                })
+                .collect();
+            assert_eq!(observed, expected, "units changed for {component:?}");
+        }
     }
 }

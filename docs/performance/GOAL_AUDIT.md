@@ -1,5 +1,38 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0558-0559: OLE2 read fencing and name folding
+
+[0558](0558-ole2-single-read-fence.md) and
+[0559](0559-cfb-ascii-simple-uppercase.md) advance the goal's first two
+optimization rules — eliminate unnecessary work, then unnecessary I/O — on the
+shared OLE2 substrate rather than on one selector.
+
+Progress: a confirmed file-source hotspot is halved. The shared CFB reader
+observed `ReadAt::version()` twice per read, so every positional read on a
+`FileSource` cost two `statx` syscalls; one selective XLS open issued 1,266
+observations for 655 reads. Keeping one fence per read cuts observations and
+whole-child `statx` by about 49% with read calls and read bytes byte-identical,
+improving all 48 paired cells. Deterministic branch attribution then exposed
+CFB directory-name case folding as the leading branch-miss owner in OLE2
+edit/save; an exhaustively proven ASCII branch removes it. Against the pre-0558
+baseline, 222 of 376 guardrail comparisons improve in both directions with two
+p99-only review triggers.
+
+Still required by the goal, unchanged by this batch: cold-cache and physical
+device distributions; remote/range-source behaviour for CFB consumers; peak RSS
+and allocation accounting for these paths; concurrency scaling and Amdahl
+analysis; real-producer breadth beyond the one XLS fixture and the generated
+CFB/OLE2 corpora; cross-platform confirmation. The remaining file-source gap
+over an owned source is now dominated by the surviving one probe per read plus
+positional read cost, so bounded span batching — which reduces the number of
+reads rather than the probes per read — is the next hypothesis for that gap.
+The `litchi-xls`, `litchi-opc` and `litchi-doc` freshness sites that take two or
+three observations with no intervening read are a separate, strictly equivalent
+class and are not addressed here.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0551: layout handoff design prerequisites narrowed
 
 [0551](changes/0551-xlsx-layout-handoff-feasibility.md) adds reproducible

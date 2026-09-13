@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-source-identity",
+  "captured_utc": "2026-09-13T16:00:11Z",
+  "note": "The staged ABBA binaries were built before three post-build edits: rustfmt rewrapping inside `#[cfg(test)] mod tests`, one doc-comment clarification in shared.rs, and one repaired doc comment in cfb_path.rs. None reaches release codegen. Rust release builds are not bit-reproducible on this host, so identity is established by re-measuring with a binary built from the final source rather than by comparing binary hashes.",
+  "final_source_sha256": {
+    "crates/litchi-cfb/src/shared.rs": "d1185c7b50132c8ea71c9f04fe6626776f2f9f4644d1f612f898fbcacbace9dd",
+    "crates/litchi-cfb/src/directory_name.rs": "bba3623b3ad283dadd917966e4c9583825de00fadb2bff4b7ff7c106d52e8189",
+    "crates/litchi-ole-common/src/object/cfb_path.rs": "4f95c8e7b53f41bd8c21d0cb45277fcc772e678e6c4b3dd605df63d12ffa5794"
+  },
+  "final_binary_sha256": {
+    "litchi-perf-baseline": "fcaf263d069ace74c4ba75ce376ba309e54d7d231ef3345217bc20f3b02600e3",
+    "xls_source_attribution": "0cd3474e1e5968a5e9f97f1c25d0ee26a96b69ece61c9f91487a345ab9ee73ab"
+  },
+  "confirmation": {
+    "directory": "confirmation/",
+    "protocol": "pre-0558 baseline binary (leg A) versus a binary built from the final source (leg D); 20 warmups and 100 samples for the XLS cells, 5 warmups and 60 samples with ASLR disabled for the OLE2 cells; CPU 17",
+    "xls_file_source_p50_change_percent": {
+      "open": -27.55,
+      "list": -28.04,
+      "one-cell": -28.72
+    },
+    "xls_version_calls": {
+      "open": [
+        1266,
+        644
+      ],
+      "list": [
+        1266,
+        644
+      ],
+      "one-cell": [
+        1813,
+        925
+      ]
+    },
+    "xls_read_calls_unchanged": true,
+    "ole2_p50_change_percent": {
+      "cfb_open": {
+        "tiny-compressible": -14.16,
+        "tiny-incompressible": -15.65,
+        "many-small-compressible": -19.39,
+        "many-small-incompressible": -19.59,
+        "few-large-compressible": -0.69,
+        "few-large-incompressible": -0.63,
+        "wide-root-compressible": -22.63,
+        "wide-root-incompressible": -22.67
+      },
+      "ole_common_one_edit_save": {
+        "tiny-compressible": -22.68,
+        "tiny-incompressible": -22.46,
+        "many-small-compressible": -16.66,
+        "many-small-incompressible": -25.9,
+        "few-large-compressible": 0.18,
+        "few-large-incompressible": 0.53,
+        "wide-root-compressible": -33.41,
+        "wide-root-incompressible": -33.49
+      },
+      "ole_common_finish_render": {
+        "tiny-compressible": -25.91,
+        "tiny-incompressible": -25.82,
+        "many-small-compressible": -14.37,
+        "many-small-incompressible": -14.5,
+        "few-large-compressible": -0.28,
+        "few-large-incompressible": 0.14,
+        "wide-root-compressible": -34.56,
+        "wide-root-incompressible": -34.99
+      }
+    },
+    "few_large_note": "few-large corpora hold few directory entries, so they exercise almost no name comparison and stay within +/-0.7%"
+  },
+  "revision_at_capture": "5dc90f31a97e16c386d923b7b79932c3d5cd9ad2"
+}

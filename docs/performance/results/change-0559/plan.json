@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0559-cfb-ascii-simple-uppercase",
+  "revision": "5dc90f31a97e16c386d923b7b79932c3d5cd9ad2",
+  "created_utc": "2026-09-13T15:48:39Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred until that goal completes; iWork excluded.",
+    "production_crates": [
+      "litchi-cfb",
+      "litchi-ole-common"
+    ],
+    "harness_changed": false,
+    "baseline_stage": "change 0558 applied (stage1)"
+  },
+  "hypothesis": {
+    "statement": "CFB directory-entry name comparison computes the [MS-CFB] 2.6.4 simple uppercase mapping with char::to_uppercase, which constructs a Unicode case-mapping iterator per scalar. Deterministic branch-simulation attributed 205,732 of 660,113 baseline conditional branch misses in one OLE2 edit/save child to <core::char::ToUppercase as Iterator>::next.",
+    "mechanism": "No ASCII scalar has a multi-character uppercase mapping and its single-character mapping is the ASCII one, so an ASCII branch returns exactly the same scalar without touching the Unicode tables. CFB stream and path names are ASCII in practice.",
+    "equivalence": "Proven exhaustively over the entire Unicode scalar range by uppercase_matches_unicode_mapping_for_every_char in both owners, not sampled.",
+    "predicted_effect": "Lower instruction count and lower branch-miss count in CFB directory-name construction and comparison; measurable on OLE2 edit/save workloads that build or search directory trees."
+  },
+  "acceptance": {
+    "primary_gate": "exhaustive differential equality over every Unicode scalar, plus unchanged comparison keys, refusals and ordering.",
+    "secondary_gate": "deterministic Callgrind Ir and conditional-branch-miss counts must both fall for the profiled OLE2 edit/save child.",
+    "latency_gate": "paired A/B p50 must improve in both directions for the profiled OLE2 cases; every case with adverse movement above 5% in both directions is reported.",
+    "regression_context": "change 0558 left a reproducible layout-induced regression on ole_common_one_edit_save; this change is also measured against that state and against the pre-0558 baseline."
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "aslr": "disabled with setarch -R for the three-stage comparison; enabled for the ABBA legs"
+  },
+  "owned_paths": [
+    "docs/performance/results/change-0559"
+  ],
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured"
+}
