@@ -1,0 +1,3 @@
+# Preserve captured compiler output and unified diff context verbatim.
+*.patch -whitespace
+*.log -whitespace

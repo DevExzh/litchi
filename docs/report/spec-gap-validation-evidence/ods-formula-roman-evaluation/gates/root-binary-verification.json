@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-09-13T15:01:40.853317+00:00",
+  "binaries": {
+    "baseline": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/baseline/ods-formula-roman-evaluation-profile",
+      "sha256": "5d092ebb4d4d79236c5950c686955a86c8b1d39a309e23ccb1ae24d8192e94be",
+      "bytes": 1305776
+    },
+    "candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/candidate/ods-formula-roman-evaluation-profile",
+      "sha256": "aec187d79a9db7d607812671a66ea6294f6b9c87e1b53503fc8403f67a1dcdc0",
+      "bytes": 1316616
+    }
+  },
+  "removed_binaries": [
+    {
+      "variant": "baseline",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/baseline/ods-formula-roman-evaluation-profile",
+      "sha256": "5d092ebb4d4d79236c5950c686955a86c8b1d39a309e23ccb1ae24d8192e94be",
+      "bytes": 1305776
+    },
+    {
+      "variant": "candidate",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/performance/candidate/ods-formula-roman-evaluation-profile",
+      "sha256": "aec187d79a9db7d607812671a66ea6294f6b9c87e1b53503fc8403f67a1dcdc0",
+      "bytes": 1316616
+    }
+  ],
+  "removed_after_verification_at": "2026-09-13T15:01:40.853333+00:00"
+}

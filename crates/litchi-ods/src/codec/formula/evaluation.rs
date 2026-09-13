@@ -7,9 +7,9 @@
 //! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
 //! and `XOR`), the five bit-operation functions (`BITAND`, `BITLSHIFT`,
 //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
-//! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions).  References,
-//! arrays, names, labels, and other functions are reported as typed
-//! capability refusals.
+//! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
+//! `ARABIC` and `ROMAN` conversions.  References, arrays, names, labels, and
+//! other functions are reported as typed capability refusals.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -41,6 +41,11 @@
 //!   truncated toward zero, accepts values from zero through ten, pads
 //!   positive results, and is ignored for negative results after any formula
 //!   error in the argument has been propagated.
+//! * `ARABIC` accepts the ASCII Roman symbols case-insensitively and returns
+//!   zero for empty text.  `ROMAN` accepts integers from zero through 3999;
+//!   this profile returns an empty text for zero, maps `TRUE`/`FALSE` format
+//!   values to formats 0/4.  Formats 0 through 3 use their permitted
+//!   subtractive chunks; format 4 uses a bounded shortest-valid construction.
 //!
 //! A successful text result keeps its memory reservation in
 //! [`EvaluatedScalar`](crate::codec::formula::evaluation::EvaluatedScalar) until that result is dropped. Borrowed source strings
@@ -79,6 +84,7 @@
 //! ```
 
 mod radix;
+mod roman;
 
 use super::expression::{Expression, InfixOperator, Kind, Node, PostfixOperator, PrefixOperator};
 use litchi_core::{Budget, ExecutionContext, ExecutionError, Reservation, Resource, ResourceLimit};
@@ -770,6 +776,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             return self.schedule_eager_function(node);
         }
 
+        if roman::is_roman_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
     }
 
@@ -849,6 +859,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         }
         if radix::is_radix_function(name) {
             return radix::apply(self, node, name);
+        }
+        if roman::is_roman_function(name) {
+            return roman::apply(self, node, name);
         }
 
         // TRUE/FALSE reach this path only for an invalid arity.  Consume all
@@ -1159,43 +1172,42 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
         let mut decoded_len = body.len();
         let mut escaped_quotes = 0usize;
         let mut cursor = 0usize;
-        let mut next_check = 0usize;
         while cursor < bytes.len() {
-            if cursor >= next_check {
-                self.context
-                    .execution
-                    .check()
-                    .map_err(map_execution_error)?;
-                next_check = cursor.saturating_add(4096);
-            }
-            match bytes[cursor] {
-                0 => {
-                    return Err(EvaluationFailure::InvalidExpression(
-                        "string literal contains NUL",
-                    ));
-                },
-                b'"' => {
-                    if bytes.get(cursor + 1) != Some(&b'"') {
+            self.context
+                .execution
+                .check()
+                .map_err(map_execution_error)?;
+            // Keep cancellation bounded without a threshold branch per byte.
+            // A doubled quote may straddle the window by one byte.
+            let window_end = cursor.saturating_add(4096).min(bytes.len());
+            while cursor < window_end {
+                match bytes[cursor] {
+                    0 => {
                         return Err(EvaluationFailure::InvalidExpression(
-                            "unpaired quote in string literal",
+                            "string literal contains NUL",
                         ));
-                    }
-                    escaped_quotes = escaped_quotes.checked_add(1).ok_or(
-                        EvaluationFailure::InvalidExpression("string escape count overflow"),
-                    )?;
-                    decoded_len =
-                        decoded_len
-                            .checked_sub(1)
-                            .ok_or(EvaluationFailure::InvalidExpression(
-                                "string escape length underflow",
-                            ))?;
-                    cursor = cursor
-                        .checked_add(2)
-                        .ok_or(EvaluationFailure::InvalidExpression(
-                            "string escape offset overflow",
-                        ))?;
-                },
-                _ => cursor += 1,
+                    },
+                    b'"' => {
+                        if bytes.get(cursor + 1) != Some(&b'"') {
+                            return Err(EvaluationFailure::InvalidExpression(
+                                "unpaired quote in string literal",
+                            ));
+                        }
+                        escaped_quotes = escaped_quotes.checked_add(1).ok_or(
+                            EvaluationFailure::InvalidExpression("string escape count overflow"),
+                        )?;
+                        decoded_len = decoded_len.checked_sub(1).ok_or(
+                            EvaluationFailure::InvalidExpression("string escape length underflow"),
+                        )?;
+                        cursor =
+                            cursor
+                                .checked_add(2)
+                                .ok_or(EvaluationFailure::InvalidExpression(
+                                    "string escape offset overflow",
+                                ))?;
+                    },
+                    _ => cursor += 1,
+                }
             }
         }
         Ok(StringScan {
