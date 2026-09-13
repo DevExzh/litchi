@@ -40,6 +40,8 @@ mod geometry;
 mod owned;
 mod references;
 mod scalar;
+#[cfg(test)]
+mod tests;
 use geometry::Cuboid;
 pub use owned::{OwnedArrayView, OwnedEvaluated, OwnedReferenceListView, OwnedValueView};
 
@@ -2847,8 +2849,9 @@ where
     ) -> EvaluationResult<Option<Shape>> {
         self.shape_frames.clear();
         self.shape_values.clear();
+        // Clearing drops per-mask storage but retains the outer allocation.
+        // Keep its reservation until that capacity is released with the VM.
         self.shape_masks.clear();
-        self.shape_mask_reservation = None;
         let mask = root_mask
             .map(|mask| self.copy_shape_mask(mask))
             .transpose()?
@@ -2960,8 +2963,9 @@ where
         let result = self.shape_values.pop().flatten();
         self.shape_frames.clear();
         self.shape_values.clear();
+        // Clearing drops per-mask storage but retains the outer allocation.
+        // Keep its reservation until that capacity is released with the VM.
         self.shape_masks.clear();
-        self.shape_mask_reservation = None;
         Ok(result)
     }
 
