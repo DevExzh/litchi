@@ -1,0 +1,8 @@
+{
+  "schema": "ole2_0555_baseline_restoration_v1",
+  "restored_utc": "2026-09-13T12:39:30.224358+00:00",
+  "reason": "All eight mandatory primary XLS p50 rows failed, along with native controls; numerical gates require rejection",
+  "metrics_sha256": "89f772dce89ebb81983d1ce3766cc3fa81a4ca7c793f37ec9b63966a7db05ef6",
+  "source_path": "crates/litchi-cfb/src/file.rs",
+  "restored_source_sha256": "72fb5295dfbba5f3ed2192a9c24ecbf7d8aa2759f418b77563a4e2ff1042d03b"
+}

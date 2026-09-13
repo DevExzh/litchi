@@ -1,0 +1,9 @@
+{
+  "schema": "ole2_0555_documentation_manifest_v1",
+  "scope": "External performance documentation included in change0555",
+  "files": {
+    "docs/performance/0555-ole2-physical-accounting.md": "73f77fe90855456fd46237006ca8eb2337be0a7afd2a7fefb3fe0ad2b0836bc8",
+    "docs/performance/BASELINE.md": "67fa1121df64238ff54bed788f426ef77e55b63cad1c835c458a474cb9962c05",
+    "docs/performance/HOTSPOTS.md": "9f92d26112e30455aa73715782f9f1f48d75c177439f645bca9ebd2aea287286"
+  }
+}

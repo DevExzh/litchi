@@ -1,0 +1,14 @@
+{
+  "schema": "ole2_0555_candidate_binding_v1",
+  "frozen_utc": "2026-09-13T12:24:09.909326+00:00",
+  "baseline_revision": "d3c62f19a7632114f9cce5d1ad350e237215582d",
+  "source_path": "crates/litchi-cfb/src/file.rs",
+  "baseline_source_sha256": "72fb5295dfbba5f3ed2192a9c24ecbf7d8aa2759f418b77563a4e2ff1042d03b",
+  "candidate_source_sha256": "9860e87ab34ce88c7e05d2914248a5d51acf1b4f34f1cc42406dacafd1836afa",
+  "candidate_patch_sha256": "5b94327fbecd1902ecf50ff15c6419885d6388d03cd5a69bc535e0dcbdbd9b25",
+  "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+  "representation_selection_sha256": "552acc7559586cd0c6e46268a0785114ab1f4abbb716d4a38aa630afe85ad2f4",
+  "candidate_review_sha256": "5ddac55d9b0f5d7e1edbc05a47ce1ace284a171c0f504807ef95583e33cdadc4",
+  "resource_design_review_sha256": "f3d8dd8c7514b0a8f0fdde008c594bfa3c98210407df65c872863b85dc8d0d49",
+  "scope": "Reviewed allocation-free Pending role and ordered role-only final scan; correctness and matched performance gates remain required"
+}

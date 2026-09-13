@@ -1,0 +1,132 @@
+{
+  "schema": "ole2_0555_quality_plan_v1",
+  "frozen_utc": "2026-09-13T12:08:55.660047+00:00",
+  "commands": {
+    "tests": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "workspace": [
+      "cargo",
+      "check",
+      "--locked",
+      "--workspace",
+      "--all-features"
+    ],
+    "clippy": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "rustdoc": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-ole-common",
+      "-p",
+      "litchi-xls",
+      "-p",
+      "litchi-doc",
+      "-p",
+      "litchi-ppt",
+      "--all-features",
+      "--no-deps"
+    ],
+    "fmt": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "boundaries": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "no-default": [
+      "cargo",
+      "check",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "-p",
+      "litchi-xls",
+      "--no-default-features"
+    ],
+    "claims": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ]
+  },
+  "targeted": {
+    "cfb-tests": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "cfb-clippy": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-cfb",
+      "--all-features",
+      "--lib",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "fmt": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ]
+  }
+}

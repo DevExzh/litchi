@@ -1,0 +1,14 @@
+{
+  "schema": "ole2_0555_candidate_correctness_v1",
+  "status": "pass",
+  "source_manifest_sha256": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36",
+  "candidate_binding_sha256": "7829455eb6d68ddec8c9d0aca5e06b48376e1041afd5e894835502721065704c",
+  "review_sha256": "3f356c3d89df0681f43ae73d419687b01af386b96557438bed9ef6c21e9efc9a",
+  "quality_result_path": "quality-attempts/candidate-targeted-02/result.json",
+  "quality_result_sha256": "2f02bbe934b0b6c07632ccb9d037c8034c59648b3e53ad25526509f832c5d300",
+  "passed_tests": 313,
+  "failed_tests": 0,
+  "ignored_tests": 1,
+  "groups": 4,
+  "scope": "Targeted CFB correctness, warning-denied Clippy and formatting; no native performance or fuzz/sanitizer claim"
+}

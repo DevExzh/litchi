@@ -1,0 +1,62 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling crossbeam-utils v0.8.22
+   Compiling typenum v1.20.1
+   Compiling serde_core v1.0.229
+   Compiling hybrid-array v0.4.14
+   Compiling libc v0.2.189
+   Compiling crossbeam-epoch v0.9.20
+   Compiling cfg-if v1.0.4
+   Compiling autocfg v1.5.1
+   Compiling num-traits v0.2.19
+   Compiling syn v2.0.114
+   Compiling syn v3.0.4
+   Compiling cpufeatures v0.3.1
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling zmij v1.0.19
+   Compiling crossbeam-deque v0.8.7
+   Compiling rand_core v0.10.1
+   Compiling serde_derive v1.0.229
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling serde_json v1.0.149
+   Compiling zerocopy v0.8.56
+   Compiling const-oid v0.10.2
+   Compiling rayon-core v1.13.0
+   Compiling thiserror v2.0.18
+   Compiling digest v0.11.3
+   Compiling chacha20 v0.10.2
+   Compiling thiserror-impl v2.0.18
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling iana-time-zone v0.1.65
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling either v1.18.0
+   Compiling base64 v0.22.1
+   Compiling smallvec v1.16.0
+   Compiling once_cell v1.21.4
+   Compiling fast-float2 v0.2.4
+   Compiling rayon v1.12.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling zerocopy-derive v0.8.56
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+error: unnecessary qualification
+    --> crates/litchi-cfb/src/file.rs:3639:20
+     |
+3639 |         assert_eq!(std::mem::size_of::<PhysicalSectorRole>(), 1);
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+     |
+3639 -         assert_eq!(std::mem::size_of::<PhysicalSectorRole>(), 1);
+3639 +         assert_eq!(size_of::<PhysicalSectorRole>(), 1);
+     |
+
+error: could not compile `litchi-cfb` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

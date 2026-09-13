@@ -1,0 +1,14 @@
+{
+  "adoption_allowed": false,
+  "disposition": "rejected",
+  "metrics_sha256": "89f772dce89ebb81983d1ce3766cc3fa81a4ca7c793f37ec9b63966a7db05ef6",
+  "observed_utc": "2026-09-13T12:50:51.995431+00:00",
+  "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+  "profile_sha256": "c4f929006c2d8a28bff42fab73e20099f776ca1e840083c70711bed56fa8ae96",
+  "quality_sha256": "63dc04ddbb258f050624d1910b676165fb37b3888557b5df15401d5c4531727f",
+  "review_sha256": "632d48e81174425745f10a97607c155d3554316f00c9ce63bb2fff412facc457",
+  "schema": "ole2_0555_decision_v1",
+  "scope": "Full matched physical-marker accounting disposition; mandatory native and total-XLS-owner instruction gates failed; exact baseline restored",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "status": "pass"
+}

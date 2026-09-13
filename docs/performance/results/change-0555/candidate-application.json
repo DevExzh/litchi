@@ -1,0 +1,7 @@
+{
+  "schema": "ole2_0555_candidate_application_v1",
+  "applied_utc": "2026-09-13T12:25:55.133231+00:00",
+  "binding_sha256": "7829455eb6d68ddec8c9d0aca5e06b48376e1041afd5e894835502721065704c",
+  "source_verified": true,
+  "scope": "Corrected test-only candidate; original application retained under candidate-attempts/qualification-01"
+}

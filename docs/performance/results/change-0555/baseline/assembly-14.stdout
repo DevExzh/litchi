@@ -1,0 +1,78 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000016ec950 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE>:
+ 16ec950:	53                   	push   %rbx
+ 16ec951:	48 83 ec 50          	sub    $0x50,%rsp
+ 16ec955:	48 8b 86 88 00 00 00 	mov    0x88(%rsi),%rax
+ 16ec95c:	48 85 c0             	test   %rax,%rax
+ 16ec95f:	0f 84 98 00 00 00    	je     16ec9fd <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0xad>
+ 16ec965:	48 8b 8e 80 00 00 00 	mov    0x80(%rsi),%rcx
+ 16ec96c:	48 8b 56 08          	mov    0x8(%rsi),%rdx
+ 16ec970:	48 8b 76 10          	mov    0x10(%rsi),%rsi
+ 16ec974:	45 31 c0             	xor    %r8d,%r8d
+ 16ec977:	eb 0f                	jmp    16ec988 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0x38>
+ 16ec979:	0f 1f 80 00 00 00 00 	nopl   0x0(%rax)
+ 16ec980:	49 ff c0             	inc    %r8
+ 16ec983:	4c 39 c0             	cmp    %r8,%rax
+ 16ec986:	74 75                	je     16ec9fd <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0xad>
+ 16ec988:	4c 89 44 24 10       	mov    %r8,0x10(%rsp)
+ 16ec98d:	4c 39 c6             	cmp    %r8,%rsi
+ 16ec990:	74 78                	je     16eca0a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0xba>
+ 16ec992:	46 8b 0c 82          	mov    (%rdx,%r8,4),%r9d
+ 16ec996:	44 89 4c 24 0c       	mov    %r9d,0xc(%rsp)
+ 16ec99b:	41 83 f9 ff          	cmp    $0xffffffff,%r9d
+ 16ec99f:	74 df                	je     16ec980 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0x30>
+ 16ec9a1:	42 80 3c 01 00       	cmpb   $0x0,(%rcx,%r8,1)
+ 16ec9a6:	75 d8                	jne    16ec980 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE+0x30>
+ 16ec9a8:	48 8d 44 24 10       	lea    0x10(%rsp),%rax
+ 16ec9ad:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 16ec9b2:	48 8b 05 87 0d 9d 01 	mov    0x19d0d87(%rip),%rax        # 30bd740 <_DYNAMIC+0x588>
+ 16ec9b9:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 16ec9be:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 16ec9c3:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 16ec9c8:	48 8b 05 51 0d 9d 01 	mov    0x19d0d51(%rip),%rax        # 30bd720 <_DYNAMIC+0x568>
+ 16ec9cf:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+ 16ec9d4:	48 8d 47 08          	lea    0x8(%rdi),%rax
+ 16ec9d8:	48 8d 35 c3 ec ad fe 	lea    -0x152133d(%rip),%rsi        # 1cb6a2 <anon.b8394871a1415c43bb440f943de8f6fd.8.llvm.2662864827179425894+0x6fd>
+ 16ec9df:	48 8d 54 24 18       	lea    0x18(%rsp),%rdx
+ 16ec9e4:	48 89 fb             	mov    %rdi,%rbx
+ 16ec9e7:	48 89 c7             	mov    %rax,%rdi
+ 16ec9ea:	ff 15 d0 0d 9d 01    	call   *0x19d0dd0(%rip)        # 30bd7c0 <_DYNAMIC+0x608>
+ 16ec9f0:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 16ec9f7:	48 83 c4 50          	add    $0x50,%rsp
+ 16ec9fb:	5b                   	pop    %rbx
+ 16ec9fc:	c3                   	ret
+ 16ec9fd:	48 c7 07 0b 00 00 00 	movq   $0xb,(%rdi)
+ 16eca04:	48 83 c4 50          	add    $0x50,%rsp
+ 16eca08:	5b                   	pop    %rbx
+ 16eca09:	c3                   	ret
+ 16eca0a:	48 8d 44 24 10       	lea    0x10(%rsp),%rax
+ 16eca0f:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+ 16eca14:	48 8b 05 25 0d 9d 01 	mov    0x19d0d25(%rip),%rax        # 30bd740 <_DYNAMIC+0x588>
+ 16eca1b:	48 89 44 24 48       	mov    %rax,0x48(%rsp)
+ 16eca20:	48 8d 44 24 20       	lea    0x20(%rsp),%rax
+ 16eca25:	48 8d 35 84 01 9d fe 	lea    -0x162fe7c(%rip),%rsi        # bcbb0 <anon.8ef06b40d81327544857ea83829b9715.647.llvm.4620706390201315637+0x116>
+ 16eca2c:	48 8d 54 24 40       	lea    0x40(%rsp),%rdx
+ 16eca31:	48 89 fb             	mov    %rdi,%rbx
+ 16eca34:	48 89 c7             	mov    %rax,%rdi
+ 16eca37:	ff 15 83 0d 9d 01    	call   *0x19d0d83(%rip)        # 30bd7c0 <_DYNAMIC+0x608>
+ 16eca3d:	8b 44 24 20          	mov    0x20(%rsp),%eax
+ 16eca41:	0f 10 44 24 30       	movups 0x30(%rsp),%xmm0
+ 16eca46:	0f 11 43 18          	movups %xmm0,0x18(%rbx)
+ 16eca4a:	0f 10 44 24 24       	movups 0x24(%rsp),%xmm0
+ 16eca4f:	0f 11 43 0c          	movups %xmm0,0xc(%rbx)
+ 16eca53:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 16eca5a:	89 43 08             	mov    %eax,0x8(%rbx)
+ 16eca5d:	48 83 c4 50          	add    $0x50,%rsp
+ 16eca61:	5b                   	pop    %rbx
+ 16eca62:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

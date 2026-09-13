@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0555/analysis-attempts/baseline-r1-preflight-02/script.py"
+  ],
+  "exit_code": 0,
+  "observed_utc": "2026-09-13T12:29:10.802149+00:00",
+  "script_sha256": "e1be8ef71fb0be4b03d8016f75b0cd4952a0ec76d287a7089ac736801b7d7c7c",
+  "scope": "Read-only baseline R1 parser and build custody preflight after preserved metrics type correction"
+}

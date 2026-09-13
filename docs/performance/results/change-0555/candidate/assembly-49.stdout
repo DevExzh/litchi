@@ -1,0 +1,42 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f20aa0 <_ZN10litchi_cfb4file25claim_sector_bounds_error17h98130d60e26ed0b8E>:
+ 2f20aa0:	53                   	push   %rbx
+ 2f20aa1:	48 83 ec 40          	sub    $0x40,%rsp
+ 2f20aa5:	48 89 fb             	mov    %rdi,%rbx
+ 2f20aa8:	89 74 24 0c          	mov    %esi,0xc(%rsp)
+ 2f20aac:	0f b6 c2             	movzbl %dl,%eax
+ 2f20aaf:	c1 e0 03             	shl    $0x3,%eax
+ 2f20ab2:	48 8d 0d 4f 02 19 00 	lea    0x19024f(%rip),%rcx        # 30b0d08 <anon.d00dbc7dc7a2f97f576ff7feddf84097.1.llvm.9674563019715341993+0x1d8>
+ 2f20ab9:	48 8b 0c 08          	mov    (%rax,%rcx,1),%rcx
+ 2f20abd:	48 8d 15 2c 09 61 fd 	lea    -0x29ef6d4(%rip),%rdx        # 5313f0 <anon.e0572dd12dce1d6d78420bf0a335603a.8.llvm.17154920839617733857+0x142d>
+ 2f20ac4:	48 8b 04 10          	mov    (%rax,%rdx,1),%rax
+ 2f20ac8:	48 89 4c 24 10       	mov    %rcx,0x10(%rsp)
+ 2f20acd:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f20ad2:	48 8d 44 24 10       	lea    0x10(%rsp),%rax
+ 2f20ad7:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 2f20adc:	48 8d 05 ad 77 02 00 	lea    0x277ad(%rip),%rax        # 2f48290 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f20ae3:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f20ae8:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 2f20aed:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+ 2f20af2:	48 8b 05 57 a6 19 00 	mov    0x19a657(%rip),%rax        # 30bb150 <_DYNAMIC+0x558>
+ 2f20af9:	48 89 44 24 38       	mov    %rax,0x38(%rsp)
+ 2f20afe:	48 83 c7 08          	add    $0x8,%rdi
+ 2f20b02:	48 8d 35 d3 4f 1a fd 	lea    -0x2e5b02d(%rip),%rsi        # c5adc <anon.174b9ad362507c35be27e1edecad7361.745.llvm.1243185114027788912+0x2ff>
+ 2f20b09:	48 8d 54 24 20       	lea    0x20(%rsp),%rdx
+ 2f20b0e:	ff 15 ec a6 19 00    	call   *0x19a6ec(%rip)        # 30bb200 <_DYNAMIC+0x608>
+ 2f20b14:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f20b1b:	48 89 d8             	mov    %rbx,%rax
+ 2f20b1e:	48 83 c4 40          	add    $0x40,%rsp
+ 2f20b22:	5b                   	pop    %rbx
+ 2f20b23:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

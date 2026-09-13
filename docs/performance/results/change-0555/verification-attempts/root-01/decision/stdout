@@ -1,0 +1,12 @@
+{
+  "result": {
+    "adoption_allowed": false,
+    "disposition": "rejected",
+    "path": "decision.json",
+    "sha256": "36db80f0746e76b1e8b65c5b8097c0808b027d4dce9c17db6f22aa03211402fd",
+    "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9"
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "decision",
+  "status": "pass"
+}

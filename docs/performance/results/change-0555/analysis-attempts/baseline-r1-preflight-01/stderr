@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0555/analysis-attempts/baseline-r1-preflight-01/script.py", line 13, in <module>
+    row=m.binary_metadata('baseline',kind,m.plan_data())
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0555/analyze_metrics.py", line 592, in binary_metadata
+    validate_receipt_common(build, build_path.name)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0555/analyze_metrics.py", line 509, in validate_receipt_common
+    require(value.get("stage") in STAGES | {"final"},
+                                  ~~~~~~~^~~~~~~~~~~
+TypeError: unsupported operand type(s) for |: 'tuple' and 'set'

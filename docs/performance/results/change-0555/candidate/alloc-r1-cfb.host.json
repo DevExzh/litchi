@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-09-13T12:37:01.416007+00:00",
+  "compiler_processes": [
+    {
+      "pid": 4072119,
+      "comm": "cargo",
+      "cwd": "/var/tmp/ods-logical-worktree"
+    },
+    {
+      "pid": 4072133,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-logical-worktree"
+    },
+    {
+      "pid": 4072134,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-logical-worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

@@ -1,0 +1,11 @@
+{
+  "result": {
+    "gate_passed": false,
+    "path": "metrics-analysis.json",
+    "schema": "ole2_physical_marker_metrics_0555_v1",
+    "sha256": "89f772dce89ebb81983d1ce3766cc3fa81a4ca7c793f37ec9b63966a7db05ef6"
+  },
+  "schema": "litchi.ole2.verification.0555.v1",
+  "scope": "metrics",
+  "status": "pass"
+}

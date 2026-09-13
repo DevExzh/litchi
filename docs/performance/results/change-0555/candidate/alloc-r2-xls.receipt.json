@@ -1,0 +1,50 @@
+{
+  "schema": "ole2_0555_run_receipt_v1",
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0555-target/retained/candidate/alloc",
+    "--case",
+    "xls_semantic_open,xls_eager_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open,xls_source_backed_open_list_worksheets,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0555/candidate/alloc-r2-xls.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0555/candidate/alloc-r2-xls.catalog.json"
+  ],
+  "start_utc": "2026-09-13T12:37:21.358720+00:00",
+  "end_utc": "2026-09-13T12:37:22.111802+00:00",
+  "seconds": 0.7530925369937904,
+  "exit_code": 0,
+  "stage": "candidate",
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36",
+  "binary_sha256": "37faf941060227805f30f6cefcd0743d09f796554c2456d805f170e09c87ac5c",
+  "source_manifest_sha256": "0b3a2fd65270951db7049a1e5fcee80f0f80317af414b502d7102df82d677a36",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "workspace_lock_binding_sha256": "a9f083ce4e65d9149c3bf9d4e3b31619fe8cb00d2b2b836b8e73b75865120a02",
+  "script_sha256": "263918b60f17961d1c0261de9ac6d19294e0a113bb062434b3b7653b7898ad90",
+  "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+  "environment": {
+    "TMPDIR": "/home/zhuhe/litchi-goal-0555-target/tmp",
+    "CARGO_TARGET_DIR": null,
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-r2-xls.catalog.json": "7498285f2bbac3d6c1dd9b67d1097c01e14e2e1f83ea8356afc11f0829a0facb",
+    "alloc-r2-xls.host.json": "3d278717df8e0348f2abd5dcbf71d35b9d99ffd470df18972c2d140f038ff3e7",
+    "alloc-r2-xls.json": "d7624d51618e7a021b2b7c5bb94a7226117cf716bb89e26dddff740ee93161c4",
+    "alloc-r2-xls.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-xls.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

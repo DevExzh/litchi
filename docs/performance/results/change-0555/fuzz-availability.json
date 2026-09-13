@@ -1,0 +1,27 @@
+{
+  "schema": "ole2_0555_fuzz_availability_v1",
+  "observed_utc": "2026-09-13T12:23:06.041356+00:00",
+  "observations": [
+    {
+      "command": [
+        "rustup",
+        "toolchain",
+        "list"
+      ],
+      "exit_code": 0,
+      "stdout": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "fuzz",
+        "--version"
+      ],
+      "exit_code": 101,
+      "stdout": "",
+      "stderr": "error: no such command: `fuzz`\n\nhelp: a command with a similar name exists: `fix`\n\nhelp: view all installed commands with `cargo --list`\nhelp: find a package to install `fuzz` with `cargo search cargo-fuzz`\n"
+    }
+  ],
+  "scope": "Tool availability only; no fuzz campaign or sanitizer claim. Existing bounded malformed/parser tests remain required. Adoption would require resolving the applicable fuzz verification gap."
+}

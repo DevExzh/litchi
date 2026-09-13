@@ -1,0 +1,51 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f21210 <_ZN10litchi_cfb4file27claim_sector_conflict_error17h515e250eb377136eE>:
+ 2f21210:	53                   	push   %rbx
+ 2f21211:	48 83 ec 60          	sub    $0x60,%rsp
+ 2f21215:	48 89 fb             	mov    %rdi,%rbx
+ 2f21218:	89 74 24 0c          	mov    %esi,0xc(%rsp)
+ 2f2121c:	0f b6 c2             	movzbl %dl,%eax
+ 2f2121f:	c1 e0 03             	shl    $0x3,%eax
+ 2f21222:	48 8d 15 df fa 18 00 	lea    0x18fadf(%rip),%rdx        # 30b0d08 <anon.d00dbc7dc7a2f97f576ff7feddf84097.1.llvm.9674563019715341993+0x1d8>
+ 2f21229:	48 8b 34 10          	mov    (%rax,%rdx,1),%rsi
+ 2f2122d:	48 8d 3d bc 01 61 fd 	lea    -0x29efe44(%rip),%rdi        # 5313f0 <anon.e0572dd12dce1d6d78420bf0a335603a.8.llvm.17154920839617733857+0x142d>
+ 2f21234:	48 8b 04 38          	mov    (%rax,%rdi,1),%rax
+ 2f21238:	48 89 74 24 10       	mov    %rsi,0x10(%rsp)
+ 2f2123d:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f21242:	0f b6 c1             	movzbl %cl,%eax
+ 2f21245:	c1 e0 03             	shl    $0x3,%eax
+ 2f21248:	48 8b 0c 10          	mov    (%rax,%rdx,1),%rcx
+ 2f2124c:	48 8b 04 38          	mov    (%rax,%rdi,1),%rax
+ 2f21250:	48 89 4c 24 20       	mov    %rcx,0x20(%rsp)
+ 2f21255:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f2125a:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 2f2125f:	48 89 44 24 30       	mov    %rax,0x30(%rsp)
+ 2f21264:	48 8b 05 e5 9e 19 00 	mov    0x199ee5(%rip),%rax        # 30bb150 <_DYNAMIC+0x558>
+ 2f2126b:	48 89 44 24 38       	mov    %rax,0x38(%rsp)
+ 2f21270:	48 8d 44 24 10       	lea    0x10(%rsp),%rax
+ 2f21275:	48 89 44 24 40       	mov    %rax,0x40(%rsp)
+ 2f2127a:	48 8d 05 0f 70 02 00 	lea    0x2700f(%rip),%rax        # 2f48290 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f21281:	48 89 44 24 48       	mov    %rax,0x48(%rsp)
+ 2f21286:	48 8d 4c 24 20       	lea    0x20(%rsp),%rcx
+ 2f2128b:	48 89 4c 24 50       	mov    %rcx,0x50(%rsp)
+ 2f21290:	48 89 44 24 58       	mov    %rax,0x58(%rsp)
+ 2f21295:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f21299:	48 8d 35 da 0c 1d fd 	lea    -0x2e2f326(%rip),%rsi        # f1f7a <anon.f4c0557f5e0f4027ceb8a8b61a31f75e.79.llvm.8876640233236172260+0x149>
+ 2f212a0:	48 8d 54 24 30       	lea    0x30(%rsp),%rdx
+ 2f212a5:	ff 15 55 9f 19 00    	call   *0x199f55(%rip)        # 30bb200 <_DYNAMIC+0x608>
+ 2f212ab:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f212b2:	48 89 d8             	mov    %rbx,%rax
+ 2f212b5:	48 83 c4 60          	add    $0x60,%rsp
+ 2f212b9:	5b                   	pop    %rbx
+ 2f212ba:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

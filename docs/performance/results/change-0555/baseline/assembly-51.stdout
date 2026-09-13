@@ -1,0 +1,20 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f26360 <_ZN10litchi_cfb6shared13SharedOleFile16open_with_limits17hce2038fd8eb2916bE>:
+ 2f26360:	53                   	push   %rbx
+ 2f26361:	48 89 fb             	mov    %rdi,%rbx
+ 2f26364:	45 31 c9             	xor    %r9d,%r9d
+ 2f26367:	e8 34 3c 00 00       	call   2f29fa0 <_ZN10litchi_cfb6shared13SharedOleFile23open_source_with_limits17h58e22c959e198fa2E.llvm.8204096989170006825>
+ 2f2636c:	48 89 d8             	mov    %rbx,%rax
+ 2f2636f:	5b                   	pop    %rbx
+ 2f26370:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

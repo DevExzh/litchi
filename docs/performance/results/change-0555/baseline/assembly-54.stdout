@@ -1,0 +1,127 @@
+
+/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f2c800 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E>:
+ 2f2c800:	53                   	push   %rbx
+ 2f2c801:	48 83 ec 30          	sub    $0x30,%rsp
+ 2f2c805:	48 89 fb             	mov    %rdi,%rbx
+ 2f2c808:	8b 02                	mov    (%rdx),%eax
+ 2f2c80a:	85 c0                	test   %eax,%eax
+ 2f2c80c:	0f 84 80 00 00 00    	je     2f2c892 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x92>
+ 2f2c812:	83 f8 01             	cmp    $0x1,%eax
+ 2f2c815:	0f 85 cf 00 00 00    	jne    2f2c8ea <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0xea>
+ 2f2c81b:	48 03 4a 08          	add    0x8(%rdx),%rcx
+ 2f2c81f:	0f 82 69 01 00 00    	jb     2f2c98e <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x18e>
+ 2f2c825:	48 8b 46 10          	mov    0x10(%rsi),%rax
+ 2f2c829:	48 3b 88 f8 00 00 00 	cmp    0xf8(%rax),%rcx
+ 2f2c830:	0f 86 2e 01 00 00    	jbe    2f2c964 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x164>
+ 2f2c836:	ff 15 14 0c 19 00    	call   *0x190c14(%rip)        # 30bd450 <_DYNAMIC+0x298>
+ 2f2c83c:	bf 24 00 00 00       	mov    $0x24,%edi
+ 2f2c841:	be 01 00 00 00       	mov    $0x1,%esi
+ 2f2c846:	ff 15 0c 0c 19 00    	call   *0x190c0c(%rip)        # 30bd458 <_DYNAMIC+0x2a0>
+ 2f2c84c:	48 85 c0             	test   %rax,%rax
+ 2f2c84f:	0f 84 7a 01 00 00    	je     2f2c9cf <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x1cf>
+ 2f2c855:	0f 10 05 b5 5f 60 fd 	movups -0x29fa04b(%rip),%xmm0        # 532811 <anon.5e899635af63395caccb147f006999be.8.llvm.8204096989170006825+0x56b>
+ 2f2c85c:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+ 2f2c860:	0f 10 05 9a 5f 60 fd 	movups -0x29fa066(%rip),%xmm0        # 532801 <anon.5e899635af63395caccb147f006999be.8.llvm.8204096989170006825+0x55b>
+ 2f2c867:	0f 11 00             	movups %xmm0,(%rax)
+ 2f2c86a:	c7 40 20 64 61 72 79 	movl   $0x79726164,0x20(%rax)
+ 2f2c871:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f2c878:	48 c7 43 08 24 00 00 	movq   $0x24,0x8(%rbx)
+ 2f2c87f:	00 
+ 2f2c880:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2f2c884:	48 c7 43 18 24 00 00 	movq   $0x24,0x18(%rbx)
+ 2f2c88b:	00 
+ 2f2c88c:	48 83 c4 30          	add    $0x30,%rsp
+ 2f2c890:	5b                   	pop    %rbx
+ 2f2c891:	c3                   	ret
+ 2f2c892:	ff 15 b8 0b 19 00    	call   *0x190bb8(%rip)        # 30bd450 <_DYNAMIC+0x298>
+ 2f2c898:	bf 18 00 00 00       	mov    $0x18,%edi
+ 2f2c89d:	be 01 00 00 00       	mov    $0x1,%esi
+ 2f2c8a2:	ff 15 b0 0b 19 00    	call   *0x190bb0(%rip)        # 30bd458 <_DYNAMIC+0x2a0>
+ 2f2c8a8:	48 85 c0             	test   %rax,%rax
+ 2f2c8ab:	0f 84 0e 01 00 00    	je     2f2c9bf <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x1bf>
+ 2f2c8b1:	0f 10 05 74 5e 60 fd 	movups -0x29fa18c(%rip),%xmm0        # 53272c <anon.5e899635af63395caccb147f006999be.8.llvm.8204096989170006825+0x486>
+ 2f2c8b8:	0f 11 00             	movups %xmm0,(%rax)
+ 2f2c8bb:	48 b9 73 73 65 64 20 	movabs $0x464f452064657373,%rcx
+ 2f2c8c2:	45 4f 46 
+ 2f2c8c5:	48 89 48 10          	mov    %rcx,0x10(%rax)
+ 2f2c8c9:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f2c8d0:	48 c7 43 08 18 00 00 	movq   $0x18,0x8(%rbx)
+ 2f2c8d7:	00 
+ 2f2c8d8:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2f2c8dc:	48 c7 43 18 18 00 00 	movq   $0x18,0x18(%rbx)
+ 2f2c8e3:	00 
+ 2f2c8e4:	48 83 c4 30          	add    $0x30,%rsp
+ 2f2c8e8:	5b                   	pop    %rbx
+ 2f2c8e9:	c3                   	ret
+ 2f2c8ea:	48 03 4a 08          	add    0x8(%rdx),%rcx
+ 2f2c8ee:	0f 82 a4 00 00 00    	jb     2f2c998 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x198>
+ 2f2c8f4:	48 8b 46 10          	mov    0x10(%rsi),%rax
+ 2f2c8f8:	48 3b 88 00 01 00 00 	cmp    0x100(%rax),%rcx
+ 2f2c8ff:	76 6f                	jbe    2f2c970 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x170>
+ 2f2c901:	ff 15 49 0b 19 00    	call   *0x190b49(%rip)        # 30bd450 <_DYNAMIC+0x298>
+ 2f2c907:	bf 28 00 00 00       	mov    $0x28,%edi
+ 2f2c90c:	be 01 00 00 00       	mov    $0x1,%esi
+ 2f2c911:	ff 15 41 0b 19 00    	call   *0x190b41(%rip)        # 30bd458 <_DYNAMIC+0x2a0>
+ 2f2c917:	48 85 c0             	test   %rax,%rax
+ 2f2c91a:	0f 84 bf 00 00 00    	je     2f2c9df <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x1df>
+ 2f2c920:	0f 10 05 0e 5f 60 fd 	movups -0x29fa0f2(%rip),%xmm0        # 532835 <anon.5e899635af63395caccb147f006999be.8.llvm.8204096989170006825+0x58f>
+ 2f2c927:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+ 2f2c92b:	0f 10 05 f3 5e 60 fd 	movups -0x29fa10d(%rip),%xmm0        # 532825 <anon.5e899635af63395caccb147f006999be.8.llvm.8204096989170006825+0x57f>
+ 2f2c932:	0f 11 00             	movups %xmm0,(%rax)
+ 2f2c935:	48 b9 62 6f 75 6e 64 	movabs $0x797261646e756f62,%rcx
+ 2f2c93c:	61 72 79 
+ 2f2c93f:	48 89 48 20          	mov    %rcx,0x20(%rax)
+ 2f2c943:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f2c94a:	48 c7 43 08 28 00 00 	movq   $0x28,0x8(%rbx)
+ 2f2c951:	00 
+ 2f2c952:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2f2c956:	48 c7 43 18 28 00 00 	movq   $0x28,0x18(%rbx)
+ 2f2c95d:	00 
+ 2f2c95e:	48 83 c4 30          	add    $0x30,%rsp
+ 2f2c962:	5b                   	pop    %rbx
+ 2f2c963:	c3                   	ret
+ 2f2c964:	8b 42 04             	mov    0x4(%rdx),%eax
+ 2f2c967:	c7 43 08 01 00 00 00 	movl   $0x1,0x8(%rbx)
+ 2f2c96e:	eb 0a                	jmp    2f2c97a <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x17a>
+ 2f2c970:	8b 42 04             	mov    0x4(%rdx),%eax
+ 2f2c973:	c7 43 08 02 00 00 00 	movl   $0x2,0x8(%rbx)
+ 2f2c97a:	89 43 0c             	mov    %eax,0xc(%rbx)
+ 2f2c97d:	48 89 4b 10          	mov    %rcx,0x10(%rbx)
+ 2f2c981:	48 c7 03 0b 00 00 00 	movq   $0xb,(%rbx)
+ 2f2c988:	48 83 c4 30          	add    $0x30,%rsp
+ 2f2c98c:	5b                   	pop    %rbx
+ 2f2c98d:	c3                   	ret
+ 2f2c98e:	48 89 e7             	mov    %rsp,%rdi
+ 2f2c991:	e8 5a 00 00 00       	call   2f2c9f0 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within28_$u7b$$u7b$closure$u7d$$u7d$17hf23221f38a558c3eE>
+ 2f2c996:	eb 08                	jmp    2f2c9a0 <_ZN10litchi_cfb6shared21SharedOleStreamCursor14advance_within17h7a11c8b6b77099e3E+0x1a0>
+ 2f2c998:	48 89 e7             	mov    %rsp,%rdi
+ 2f2c99b:	e8 f0 fd ff ff       	call   2f2c790 <_ZN10litchi_cfb6shared21SharedOleStreamCursor13physical_span28_$u7b$$u7b$closure$u7d$$u7d$17h955729d78caab287E>
+ 2f2c9a0:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+ 2f2c9a5:	48 89 43 20          	mov    %rax,0x20(%rbx)
+ 2f2c9a9:	0f 28 44 24 10       	movaps 0x10(%rsp),%xmm0
+ 2f2c9ae:	0f 11 43 10          	movups %xmm0,0x10(%rbx)
+ 2f2c9b2:	0f 28 04 24          	movaps (%rsp),%xmm0
+ 2f2c9b6:	0f 11 03             	movups %xmm0,(%rbx)
+ 2f2c9b9:	48 83 c4 30          	add    $0x30,%rsp
+ 2f2c9bd:	5b                   	pop    %rbx
+ 2f2c9be:	c3                   	ret
+ 2f2c9bf:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f2c9c4:	be 18 00 00 00       	mov    $0x18,%esi
+ 2f2c9c9:	ff 15 b9 0a 19 00    	call   *0x190ab9(%rip)        # 30bd488 <_DYNAMIC+0x2d0>
+ 2f2c9cf:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f2c9d4:	be 24 00 00 00       	mov    $0x24,%esi
+ 2f2c9d9:	ff 15 a9 0a 19 00    	call   *0x190aa9(%rip)        # 30bd488 <_DYNAMIC+0x2d0>
+ 2f2c9df:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f2c9e4:	be 28 00 00 00       	mov    $0x28,%esi
+ 2f2c9e9:	ff 15 99 0a 19 00    	call   *0x190a99(%rip)        # 30bd488 <_DYNAMIC+0x2d0>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

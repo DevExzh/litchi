@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 4047866
+cmd:  /home/zhuhe/litchi-goal-0555-target/retained/baseline/normal --case cfb_open --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0555/baseline/profile-r1-cfb-many-small.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0555/baseline/profile-r1-cfb-many-small.catalog.json --shape many-small --payload incompressible
+part: 7
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 9671585 - 62711620
+desc: Trigger: Program termination
+
+positions: instr
+events: Ir
+summary: 0
+
+
+totals: 0

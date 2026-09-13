@@ -1,0 +1,33 @@
+{
+  "after_path": "docs/performance/results/change-0555/analyze_metrics.py",
+  "amended_sha256": "d81ec3237dcf36dc3b47d5239d44e15f8f4a98960f5871997b0670257a75ca13",
+  "before_path": "docs/performance/results/change-0555/analyzer-attempts/metrics-before-stage-set/analyze_metrics.py",
+  "changes": {
+    "analyze_metrics.py": {
+      "amended": "analyze_metrics.py",
+      "description": "Replace tuple/set membership with set(STAGES) | {'final'} for stage and execution-stage validation; no measurement, gate, matrix, or custody rule changes.",
+      "final_sha256": "d81ec3237dcf36dc3b47d5239d44e15f8f4a98960f5871997b0670257a75ca13",
+      "initial_sha256": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+      "original": "analyzer-attempts/metrics-before-stage-set/analyze_metrics.py"
+    }
+  },
+  "created_utc": "2026-09-13T12:28:34.896236938+00:00",
+  "failed_receipt_path": "docs/performance/results/change-0555/analysis-attempts/baseline-r1-preflight-01/receipt.json",
+  "failed_receipt_reason": "The frozen 0555 metrics analyzer failed before reading measurements because tuple STAGES was unioned with a set in receipt stage validation; all four profile preflight jobs had already passed.",
+  "failed_receipt_sha256": "528f0938fed55bf0cc893bb72364304995ccad3f1b658c70ad6b4cd15d23b804",
+  "original_analysis_inputs_path": "docs/performance/results/change-0555/analysis-inputs.json",
+  "original_analysis_inputs_sha256": "064adcb6f2f11552da6eee5eb49c56a7fc1a675942478d5748927a271b92dde8",
+  "original_sha256": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+  "path": "docs/performance/results/change-0555/analyze_metrics.py",
+  "preserved_analyzer_path": "docs/performance/results/change-0555/analyzer-attempts/metrics-before-stage-set/analyze_metrics.py",
+  "preserved_analyzer_sha256": "07b27ea42634548b3df8df83d662e2fe5eded4ebadfae7d02eedc980c0a0230b",
+  "preserved_failed_receipt_path": "docs/performance/results/change-0555/analyzer-attempts/metrics-before-stage-set/failed-metrics-receipt.json",
+  "preserved_failed_receipt_sha256": "528f0938fed55bf0cc893bb72364304995ccad3f1b658c70ad6b4cd15d23b804",
+  "preserved_failed_stderr_path": "docs/performance/results/change-0555/analyzer-attempts/metrics-before-stage-set/failed-metrics-stderr",
+  "preserved_failed_stderr_sha256": "0e35399f5f5e4197e49c674a6bf2ded1d5bda7adef304eec1808091fc056b19a",
+  "preserved_failed_stdout_path": "docs/performance/results/change-0555/analyzer-attempts/metrics-before-stage-set/failed-metrics-stdout",
+  "preserved_failed_stdout_sha256": "90f62cfb91b6deb578d2b1a9460eed16b0d4e5ddd9014efde9aa0fcafb87a6f8",
+  "reason": "The frozen 0555 metrics analyzer failed before reading measurements because tuple STAGES was unioned with a set in receipt stage validation; all four profile preflight jobs had already passed.",
+  "schema": "ole2_0555_analysis_amendment_v1",
+  "scope": "Analysis-consumer-only type correction after the baseline-R1 profile preflight; plan, Rust source, driver, captures, frozen analysis inputs, measurements, numeric gates, and profile evidence remain unchanged."
+}

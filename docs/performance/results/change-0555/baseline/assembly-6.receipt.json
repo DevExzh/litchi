@@ -1,0 +1,38 @@
+{
+  "schema": "ole2_0555_run_receipt_v1",
+  "command": [
+    "objdump",
+    "-d",
+    "--disassemble=_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4d858c2c704bd558E",
+    "/home/zhuhe/litchi-goal-0555-target/retained/baseline/normal"
+  ],
+  "start_utc": "2026-09-13T12:23:40.399211+00:00",
+  "end_utc": "2026-09-13T12:23:40.593830+00:00",
+  "seconds": 0.1946313529915642,
+  "exit_code": 0,
+  "stage": "baseline",
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "binary_sha256": "99be911319811de141ae0035c4e2d519fe05855f0d239ba94366925fee31dad1",
+  "source_manifest_sha256": "c6ec30f2e7c8116c6e9bd77d1622295d8245a36261daf9fabae657be4fe9a8e9",
+  "workspace_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "workspace_lock_binding_sha256": "a9f083ce4e65d9149c3bf9d4e3b31619fe8cb00d2b2b836b8e73b75865120a02",
+  "script_sha256": "263918b60f17961d1c0261de9ac6d19294e0a113bb062434b3b7653b7898ad90",
+  "plan_sha256": "60efb1b11412e18202341c589763c1e48c06823d60461b6aac71c0c01a5e1cef",
+  "environment": {
+    "TMPDIR": "/home/zhuhe/litchi-goal-0555-target/tmp",
+    "CARGO_TARGET_DIR": null,
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "assembly-6.host.json": "020ce6b4a47d4e7dba121037f6ecdb743290b40164445f68c038fb0174b9464f",
+    "assembly-6.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assembly-6.stdout": "ae79f072b0487049933fe1266cc3fb1250cd9c7d2009cd3ba61ad4c8126e9648"
+  }
+}
