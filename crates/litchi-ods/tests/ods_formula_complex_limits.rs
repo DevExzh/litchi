@@ -394,3 +394,151 @@ fn non_finite_complex_inputs_remain_formula_number_errors() {
         );
     }
 }
+
+#[test]
+fn owned_numeric_complex_retains_components_without_text_storage() {
+    let (budget, _cancellation, execution) = new_execution("ods-complex-owned-numeric");
+    let owned = {
+        let expression = parse("=COMPLEX(3;4;\"j\")");
+        let resolver = ComplexResolver::empty();
+        let result = evaluate_value_at(
+            &expression,
+            &resolver,
+            &execution,
+            Mode::Scalar,
+            &ValueLimits::default(),
+        )
+        .expect("numeric complex result");
+        match result.value() {
+            Value::Complex(value) => {
+                assert_eq!(value.real(), 3.0);
+                assert_eq!(value.imaginary(), 4.0);
+                assert_eq!(value.suffix(), 'j');
+            },
+            other => panic!("expected Complex: {other:?}"),
+        }
+        result
+            .to_owned(&execution, &ValueLimits::default())
+            .expect("own numeric complex")
+    };
+    assert_eq!(owned.reserved_storage_bytes(), 0);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    drop(execution);
+    match owned.value() {
+        OwnedValueView::Complex(value) => {
+            assert_eq!(value.real(), 3.0);
+            assert_eq!(value.imaginary(), 4.0);
+            assert_eq!(value.suffix(), 'j');
+        },
+        other => panic!("expected owned Complex: {other:?}"),
+    }
+    drop(owned);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn scalar_product_preserves_an_earlier_numeric_failure_over_later_bad_text() {
+    let cases = [
+        (
+            "=IMPRODUCT(COMPLEX(1e308;0);COMPLEX(1e308;0);\"bad\")",
+            ScalarError::Number,
+        ),
+        (
+            "=IMPRODUCT(#N/A;COMPLEX(1e308;0);\"bad\")",
+            ScalarError::NotAvailable,
+        ),
+        (
+            "=IMPRODUCT(COMPLEX(1e308;0);COMPLEX(1e308;0);#DIV/0!;\"bad\")",
+            ScalarError::DivisionByZero,
+        ),
+    ];
+    for (source, expected) in cases {
+        let expression = parse(source);
+        let (_budget, _cancellation, execution) = new_execution("ods-complex-product-errors");
+        let result = evaluate_scalar_at(&expression, &execution, &EvaluationLimits::default())
+            .unwrap_or_else(|error| panic!("{source:?} should return a formula value: {error}"));
+        match result.value() {
+            ScalarValue::Error(actual) => assert_eq!(*actual, expected, "{source:?}"),
+            value => panic!("{source:?} returned {value:?}, expected {expected:?}"),
+        }
+    }
+}
+
+#[test]
+fn value_product_preserves_numeric_failure_and_original_formula_error_precedence() {
+    let resolver = ComplexResolver::empty();
+    let (_budget, _cancellation, execution) = new_execution("ods-complex-value-product-errors");
+
+    let expression = parse("=IMPRODUCT({1e308;1e308};\"bad\")");
+    let result = evaluate_value_at(
+        &expression,
+        &resolver,
+        &execution,
+        Mode::Matrix,
+        &ValueLimits::default(),
+    )
+    .expect("value product should return its formula error as a value");
+    match result.value() {
+        Value::Error(error) => assert_eq!(error, ScalarError::Number),
+        value => panic!("expected Number formula error, got {value:?}"),
+    }
+
+    let expression = parse("=IMPRODUCT({#N/A;1e308};\"bad\")");
+    let result = evaluate_value_at(
+        &expression,
+        &resolver,
+        &execution,
+        Mode::Matrix,
+        &ValueLimits::default(),
+    )
+    .expect("original formula errors must remain values");
+    match result.value() {
+        Value::Error(error) => assert_eq!(error, ScalarError::NotAvailable),
+        value => panic!("expected original formula error, got {value:?}"),
+    }
+}
+
+#[test]
+fn scalar_product_has_a_bounded_work_cost_for_each_aggregate_argument() {
+    const ARGUMENTS: usize = 96;
+    let mut source = String::from("=IMREAL(IMPRODUCT(");
+    for index in 0..ARGUMENTS {
+        if index != 0 {
+            source.push(';');
+        }
+        source.push_str("COMPLEX(1;0)");
+    }
+    source.push_str("))");
+    let expression = parse(&source);
+
+    let (baseline_budget, _cancellation, baseline_execution) =
+        new_execution("ods-complex-product-work-baseline");
+    let result = evaluate_scalar_at(
+        &expression,
+        &baseline_execution,
+        &EvaluationLimits::default(),
+    )
+    .expect("the bounded aggregate should evaluate with default limits");
+    match result.value() {
+        ScalarValue::Number(value) => assert_eq!(*value, 1.0),
+        value => panic!("expected product identity projection, got {value:?}"),
+    }
+    let full_work = baseline_budget.used(Resource::Work);
+    assert!(
+        full_work > ARGUMENTS as u64,
+        "aggregate work must grow with its argument count: {full_work}"
+    );
+
+    let (budget, _cancellation, execution) = new_execution("ods-complex-product-work-limit");
+    let error = evaluate_scalar_at(
+        &expression,
+        &execution,
+        &EvaluationLimits::default().with_max_steps(full_work.saturating_sub(1)),
+    )
+    .expect_err("one less than the measured aggregate work must refuse");
+    assert!(
+        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
+        "wrong aggregate work failure: {error:?}"
+    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+}

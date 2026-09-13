@@ -21,6 +21,13 @@
 //! `TRANSPOSE` preserves element types. `MUNIT` truncates its size toward zero.
 //! Singular inverses and non-finite arithmetic produce formula errors.
 //!
+//! Both profiles support all 26 complex-number functions through
+//! [`Value::Complex`]. `IMSUM` and `IMPRODUCT` consume arrays and ordered
+//! reference sequences; referenced Empty and Logical cells are omitted.
+//! `IMSUM` ignores unconvertible text. Numeric complex components remain
+//! allocation-free values, including after an explicit owned conversion.
+//! See [`super::complex`] for the finite representation and selected profile.
+//!
 //! [`Context::new`] defaults to [`Mode::Matrix`]. A bare reference in that mode
 //! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
 //! reading its cells. A consuming operation, such as adding a number to a range,
@@ -115,6 +122,7 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // The scalar bridge is owned by the evaluator integration agent.  Keeping it
 // private here gives the future VM one place to preserve Empty until the
 // consuming operator/function chooses a target type.
+mod complex;
 #[allow(dead_code)]
 mod geometry;
 mod matrix;
@@ -758,6 +766,8 @@ pub enum Value<'a> {
     Text(&'a str),
     /// A formula-level error.
     Error(ScalarError),
+    /// A finite OpenFormula complex number retained as a numeric pair.
+    Complex(super::complex::Complex),
     /// A rectangular array view.
     Array(ArrayView<'a>),
     /// One resolved reference with its areas intact.
@@ -777,6 +787,7 @@ impl Value<'_> {
             | Self::Logical(_)
             | Self::Text(_)
             | Self::Error(_)
+            | Self::Complex(_)
             | Self::Reference(_)
             | Self::ReferenceList(_) => None,
         }
@@ -1290,6 +1301,10 @@ impl PartialEq for RuntimeElement<'_> {
                 Self::Present(WorkingValue::Error(left)),
                 Self::Present(WorkingValue::Error(right)),
             ) => left == right,
+            (
+                Self::Present(WorkingValue::Complex(left)),
+                Self::Present(WorkingValue::Complex(right)),
+            ) => left == right,
             _ => false,
         }
     }
@@ -1304,6 +1319,7 @@ impl<'a> RuntimeElement<'a> {
             Self::Present(WorkingValue::Logical(value)) => Value::Logical(*value),
             Self::Present(WorkingValue::Text(value)) => Value::Text(value.text.as_ref()),
             Self::Present(WorkingValue::Error(error)) => Value::Error(*error),
+            Self::Present(WorkingValue::Complex(value)) => Value::Complex(*value),
         }
     }
 }
@@ -1317,6 +1333,7 @@ impl<'a> RuntimeValue<'a> {
             Self::Scalar(WorkingValue::Logical(value)) => Value::Logical(*value),
             Self::Scalar(WorkingValue::Text(value)) => Value::Text(value.text.as_ref()),
             Self::Scalar(WorkingValue::Error(error)) => Value::Error(*error),
+            Self::Scalar(WorkingValue::Complex(value)) => Value::Complex(*value),
             // The evaluator consumes this private token before constructing
             // `Evaluated`; keep a defensive projection for any future frame
             // path that reaches the borrowed inspection boundary.
@@ -1577,6 +1594,7 @@ enum DemandCacheValue {
     Number(f64),
     Logical(bool),
     Error(ScalarError),
+    Complex(super::complex::Complex),
 }
 
 struct ConditionCacheEntry<'a> {
@@ -2472,16 +2490,16 @@ where
         }
 
         // A coordinate-independent sequence aggregate may sit inside an
-        // array-producing branch.  Its arguments normally belong to the
-        // eager function schedule, so looking in the cache only from
+        // array-producing branch. Its arguments normally belong to the eager
+        // function schedule, so looking in the cache only from
         // `apply_function` would resolve/read those arguments on every output
-        // cell before discovering the cached result.  Check before scheduling
-        // the argument visits; a miss follows the ordinary eager path and is
-        // inserted by `apply_function` after its first evaluation.
-        if self.projection.is_some()
-            && (name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR"))
-            && self.cacheable_scalar_branch(node)?
-        {
+        // cell before discovering the cached result. Check before scheduling
+        // the argument visits; a miss is inserted by `apply_function` after
+        // its first evaluation.
+        let is_sequence = name.eq_ignore_ascii_case("AND")
+            || name.eq_ignore_ascii_case("OR")
+            || complex::is_complex_sequence_function(name);
+        if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
             if let Some(value) = self.demand_cache_get(node)? {
                 return self.push_value(value);
             }
@@ -2497,7 +2515,16 @@ where
                 .ok_or(EvaluationFailure::InvalidExpression(
                     "function argument is missing",
                 ))?;
-            self.push_frame(ValueFrame::VisitArgument(child))?;
+            // In a projected lazy matrix branch, a complex sequence consumes
+            // the complete array/reference argument. Enter matrix context so
+            // an inline array is not reduced to the one selected cell.
+            let frame = if self.projection.is_some() && complex::is_complex_sequence_function(name)
+            {
+                ValueFrame::VisitMatrixArgument(child)
+            } else {
+                ValueFrame::VisitArgument(child)
+            };
+            self.push_frame(frame)?;
         }
         Ok(())
     }
@@ -2923,6 +2950,7 @@ where
                 &mut self.scalar,
                 scalar::Slot::Value(WorkingValue::Text(TextValue::borrowed(value.text.as_ref()))),
             ),
+            RuntimeElement::Present(WorkingValue::Complex(_)) => Ok(Err(ScalarError::Value)),
         }
     }
 
@@ -2954,7 +2982,9 @@ where
                 self.cacheable_matrix_branch(node)
             },
             super::Kind::Function { name }
-                if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") =>
+                if name.eq_ignore_ascii_case("AND")
+                    || name.eq_ignore_ascii_case("OR")
+                    || complex::is_complex_sequence_function(name) =>
             {
                 let mut cacheable = true;
                 for index in 0..node.child_count() {
@@ -3128,6 +3158,7 @@ where
             DemandCacheValue::Number(value) => RuntimeValue::Scalar(WorkingValue::Number(value)),
             DemandCacheValue::Logical(value) => RuntimeValue::Scalar(WorkingValue::Logical(value)),
             DemandCacheValue::Error(error) => RuntimeValue::Scalar(WorkingValue::Error(error)),
+            DemandCacheValue::Complex(value) => RuntimeValue::Scalar(WorkingValue::Complex(value)),
         }))
     }
 
@@ -3142,6 +3173,7 @@ where
             RuntimeValue::Scalar(WorkingValue::Number(value)) => DemandCacheValue::Number(*value),
             RuntimeValue::Scalar(WorkingValue::Logical(value)) => DemandCacheValue::Logical(*value),
             RuntimeValue::Scalar(WorkingValue::Error(error)) => DemandCacheValue::Error(*error),
+            RuntimeValue::Scalar(WorkingValue::Complex(value)) => DemandCacheValue::Complex(*value),
             RuntimeValue::Scalar(WorkingValue::Text(_))
             | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_)
@@ -3359,6 +3391,7 @@ where
                 ConditionCacheValue::Text(text)
             },
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ConditionCacheValue::Error(*error),
+            RuntimeValue::Scalar(WorkingValue::Complex(_)) => return Ok(()),
             RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
                 return Ok(());
             },
@@ -3495,7 +3528,8 @@ where
                         | RuntimeElement::Missing
                         | RuntimeElement::Present(WorkingValue::Number(_))
                         | RuntimeElement::Present(WorkingValue::Logical(_))
-                        | RuntimeElement::Present(WorkingValue::Text(_)) => false,
+                        | RuntimeElement::Present(WorkingValue::Text(_))
+                        | RuntimeElement::Present(WorkingValue::Complex(_)) => false,
                     };
                     if !catches {
                         matrix.output.push(element);
@@ -3633,6 +3667,14 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
+                        if complex::is_complex_sequence_function(name) {
+                            // IMSUM and IMPRODUCT reduce their complete
+                            // sequence arguments to one scalar value. Do not
+                            // let an array/reference child widen the result
+                            // shape during a projected lazy-branch probe.
+                            self.push_shape_value(Some(Shape::new(1, 1)?))?;
+                            continue;
+                        }
                         if let Some(function) = Self::matrix_function(name) {
                             match function {
                                 MatrixFunction::Determinant => {
@@ -5983,6 +6025,21 @@ where
         }
         arguments.reverse();
 
+        if complex::is_complex_sequence_function(name) {
+            let cacheable_sequence =
+                self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable_sequence {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = complex::apply_sequence(self, name, arguments)?;
+            if cacheable_sequence {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
+
         let cacheable_sequence = self.projection.is_some()
             && (name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR"))
             && self.cacheable_scalar_branch(node)?;
@@ -6199,6 +6256,11 @@ where
                     },
                 }
             },
+            WorkingValue::Complex(_) => {
+                if error.is_none() {
+                    *error = Some(ScalarError::Value);
+                }
+            },
         }
         Ok(())
     }
@@ -6226,7 +6288,7 @@ where
                         *error = Some(value);
                     }
                 },
-                WorkingValue::Logical(_) | WorkingValue::Text(_) => {},
+                WorkingValue::Logical(_) | WorkingValue::Text(_) | WorkingValue::Complex(_) => {},
             }
         }
         Ok(())
@@ -6769,6 +6831,7 @@ where
             WorkingValue::Number(value) => Ok(WorkingValue::Number(*value)),
             WorkingValue::Logical(value) => Ok(WorkingValue::Logical(*value)),
             WorkingValue::Error(error) => Ok(WorkingValue::Error(*error)),
+            WorkingValue::Complex(value) => Ok(WorkingValue::Complex(*value)),
             WorkingValue::Text(text) => {
                 if let Cow::Borrowed(value) = &text.text {
                     return Ok(WorkingValue::Text(TextValue::borrowed(value)));
