@@ -1,0 +1,1145 @@
+{
+ "cells": [
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 766119.102,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 752868.5,
+   "p90": 825996.0,
+   "p99": 832277.09,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 704390.29,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 702683.5,
+   "p90": 717944.0,
+   "p99": 724037.0,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 757167.058,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 743954.0,
+   "p90": 815409.0,
+   "p99": 825917.51,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 689172.231,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 686253.0,
+   "p90": 702442.0,
+   "p99": 710484.69,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 218788.158,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 217791.0,
+   "p90": 224088.0,
+   "p99": 230055.4,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 219554.637,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 217851.5,
+   "p90": 225011.0,
+   "p99": 233631.1,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 216498.187,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 215001.0,
+   "p90": 222062.9,
+   "p99": 230701.59999999998,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 210409.34,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 209531.0,
+   "p90": 215641.0,
+   "p99": 219543.1,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 210286.665,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 208946.5,
+   "p90": 215362.0,
+   "p99": 223445.4,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 208323.639,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 207301.0,
+   "p90": 212893.0,
+   "p99": 217002.71,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 110545.236,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 110111.0,
+   "p90": 114852.9,
+   "p99": 118990.01,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 125386.255,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 124380.0,
+   "p90": 130092.0,
+   "p99": 133871.30000000002,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 110035.985,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 109015.5,
+   "p90": 114831.0,
+   "p99": 118900.5,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 92148.53,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 91555.5,
+   "p90": 96321.0,
+   "p99": 101801.19,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 103031.004,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 102110.5,
+   "p90": 107333.90000000001,
+   "p99": 111112.01,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 91487.31,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 90490.0,
+   "p90": 96077.9,
+   "p99": 101283.9,
+   "round": "a1",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 765487.718,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 752449.0,
+   "p90": 825155.0,
+   "p99": 829899.6,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 704846.458,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 703108.0,
+   "p90": 718245.1,
+   "p99": 724244.39,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 755446.478,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 741759.0,
+   "p90": 813837.9,
+   "p99": 822765.7,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 692045.949,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 690083.5,
+   "p90": 705115.8999999999,
+   "p99": 712401.5,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 217978.981,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 217006.0,
+   "p90": 223312.0,
+   "p99": 227471.91,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 219217.107,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 217726.0,
+   "p90": 224232.9,
+   "p99": 233111.0,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 216523.328,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 214971.0,
+   "p90": 222443.0,
+   "p99": 230712.90000000002,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 211066.862,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 210121.0,
+   "p90": 216681.0,
+   "p99": 221402.2,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 211447.025,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 209996.0,
+   "p90": 216904.0,
+   "p99": 226400.51,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 210953.161,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 209486.5,
+   "p90": 216383.0,
+   "p99": 225068.0,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 110124.976,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 109365.5,
+   "p90": 115112.1,
+   "p99": 119503.59999999999,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 126655.165,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 125575.5,
+   "p90": 132093.0,
+   "p99": 136075.51,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 109603.243,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 108541.0,
+   "p90": 114684.1,
+   "p99": 118184.29000000001,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 91449.227,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 90811.0,
+   "p90": 95682.0,
+   "p99": 101541.69,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 103115.447,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 102031.0,
+   "p90": 108041.09999999999,
+   "p99": 112757.68999999999,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 91604.813,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 90550.5,
+   "p90": 95952.1,
+   "p99": 102922.2,
+   "round": "a2",
+   "sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 272353.779,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 270221.0,
+   "p90": 277663.0,
+   "p99": 280522.49,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 272025.277,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 270116.5,
+   "p90": 276812.9,
+   "p99": 280003.1,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 259344.087,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 257492.0,
+   "p90": 264261.0,
+   "p99": 267142.18999999994,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 258374.822,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 256476.5,
+   "p90": 263671.1,
+   "p99": 266631.10000000003,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 41442.38,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 41140.0,
+   "p90": 41801.9,
+   "p99": 48522.590000000004,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 41788.376,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 41430.0,
+   "p90": 41881.0,
+   "p99": 49382.09,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 39901.867,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 39520.0,
+   "p90": 40040.1,
+   "p99": 48022.9,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 33196.592,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 32940.0,
+   "p90": 33440.0,
+   "p99": 39750.3,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 32828.721,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 32550.0,
+   "p90": 32821.9,
+   "p99": 40720.799999999996,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 32222.644,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 31990.0,
+   "p90": 32290.1,
+   "p99": 39333.8,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 99120.683,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 98470.0,
+   "p90": 103466.0,
+   "p99": 108741.8,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 113870.361,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 112840.0,
+   "p90": 119431.0,
+   "p99": 123062.5,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 99597.407,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 98740.0,
+   "p90": 103950.10000000002,
+   "p99": 108251.29999999999,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 80919.15,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 80485.5,
+   "p90": 83384.0,
+   "p99": 90562.0,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 91437.76,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 90671.0,
+   "p90": 94032.0,
+   "p99": 99943.0,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 80968.056,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 80195.0,
+   "p90": 83661.09999999999,
+   "p99": 89761.8,
+   "round": "b1",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 272520.007,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 270466.5,
+   "p90": 277674.89999999997,
+   "p99": 280699.99,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 272783.831,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 270686.5,
+   "p90": 278272.0,
+   "p99": 280863.89,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 258824.725,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 256951.5,
+   "p90": 264061.1,
+   "p99": 266932.4,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    40,
+    317171,
+    25
+   ],
+   "fixture": "54016",
+   "mean": 258851.216,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 256931.0,
+   "p90": 263931.0,
+   "p99": 267092.29,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 40926.667,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 40581.0,
+   "p90": 41262.9,
+   "p99": 47981.2,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 41835.406,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 41465.5,
+   "p90": 42010.0,
+   "p99": 49280.1,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 39844.8,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 39490.5,
+   "p90": 39970.0,
+   "p99": 48282.59,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 33270.474,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 33000.0,
+   "p90": 33541.9,
+   "p99": 40410.0,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    17,
+    110656,
+    25
+   ],
+   "fixture": "cv",
+   "mean": 32985.41,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 32730.0,
+   "p90": 33030.0,
+   "p99": 40320.2,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    16,
+    110242,
+    22
+   ],
+   "fixture": "cv",
+   "mean": 32162.535,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 31910.0,
+   "p90": 32200.0,
+   "p99": 39401.2,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 99334.75,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "list",
+   "p50": 98570.5,
+   "p90": 104123.90000000001,
+   "p99": 109076.01,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 114262.876,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 113311.0,
+   "p90": 119512.0,
+   "p99": 122591.7,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 98740.776,
+   "mode": "file-source",
+   "n": 1000,
+   "operation": "open",
+   "p50": 97900.0,
+   "p90": 103064.1,
+   "p99": 107590.31,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 81132.53,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "list",
+   "p50": 80595.5,
+   "p90": 83015.90000000001,
+   "p99": 90888.98999999999,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    61,
+    603115,
+    42
+   ],
+   "fixture": "flagship",
+   "mean": 91682.877,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "one-cell",
+   "p50": 90800.0,
+   "p90": 95053.00000000001,
+   "p99": 100841.01000000001,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  },
+  {
+   "counters": [
+    53,
+    565201,
+    29
+   ],
+   "fixture": "flagship",
+   "mean": 80957.182,
+   "mode": "owned-readat",
+   "n": 1000,
+   "operation": "open",
+   "p50": 80080.5,
+   "p90": 83334.0,
+   "p99": 89491.5,
+   "round": "b2",
+   "sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c"
+  }
+ ],
+ "environment": {
+  "fixtures": {
+   "54016": {
+    "bytes": 984576,
+    "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+   },
+   "cv": {
+    "bytes": 165888,
+    "path": "test-data/ole/xls/WithCustomViews.xls",
+    "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64"
+   },
+   "flagship": {
+    "bytes": 1402368,
+    "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+   }
+  },
+  "host": {
+   "aslr": "disabled via setarch x86_64 -R",
+   "cores": 32,
+   "cpu": "AMD EPYC 9R45",
+   "kernel": "7.0.0-1012-aws",
+   "pinned_cpu": 17,
+   "quiescence": [
+    "capture window opened 2026-09-14T12:19:49-04:00",
+    "loadavg: 4.86 6.40 7.58 2/1946 3426773",
+    "nproc: 32  pinned CPU: 17  ASLR: disabled (setarch x86_64 -R)",
+    "capture window closed 2026-09-14T12:20:34-04:00",
+    "loadavg: 3.47 5.81 7.32 2/1745 3428900"
+   ]
+  },
+  "legs": {
+   "after": {
+    "binary_sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c",
+    "description": "HEAD plus this change's crates/litchi-xls/src/records.rs",
+    "records_rs_sha256": "ed6391cbc2c118bf57f4e6654893be013784921753fdaa1147601dc82e118b3f"
+   },
+   "before": {
+    "binary_sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0",
+    "description": "HEAD, unmodified",
+    "records_rs_sha256": "67f32ef82f8d8fcc718139435cd4c3070bcc43c16500983640e4919484d5148a"
+   },
+   "differ_only_in": "crates/litchi-xls/src/records.rs",
+   "worktree": "a detached git worktree at 163ac1bd67f2a0d72c27bfec60e0a2620768cc9d, outside the repository"
+  },
+  "toolchain": {
+   "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+   "perf": "perf version 7.0.14",
+   "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+   "valgrind": "valgrind-3.26.0"
+  }
+ }
+}

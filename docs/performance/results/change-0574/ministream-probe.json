@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-0574-ministream-probe",
+  "question": "does a source-backed XLS open of a mini-stream-resident Workbook materialize the whole CFB root mini stream?",
+  "method": "xls_source_attribution --mode owned-readat --operation open, 10 warmups and 40 samples, over every test-data/ole fixture whose Workbook stream lives in the CFB mini stream. CFB structural bytes are the exact geometry from change-0565 corpus-survey/survey.json: sector_size * (1 header + FAT + directory + MiniFAT sectors). payload_bytes is the remainder.",
+  "answer": "no: payload bytes track the globals substream, not the root mini stream, on every fixture",
+  "rows": [
+    {
+      "fixture": "SimpleWithColours",
+      "sector_size": 512,
+      "workbook_stream_len": 3177,
+      "globals_end": 1902,
+      "ministream_size": 3776,
+      "minifat_sectors": 1,
+      "read_calls": 12,
+      "read_bytes": 5225,
+      "cfb_structural_bytes": 2048,
+      "payload_bytes": 3177,
+      "payload_vs_globals": 1275,
+      "payload_lt_ministream": true
+    },
+    {
+      "fixture": "WithCheckBoxes",
+      "sector_size": 512,
+      "workbook_stream_len": 3623,
+      "globals_end": 2465,
+      "ministream_size": 12224,
+      "minifat_sectors": 2,
+      "read_calls": 17,
+      "read_bytes": 7073,
+      "cfb_structural_bytes": 4608,
+      "payload_bytes": 2465,
+      "payload_vs_globals": 0,
+      "payload_lt_ministream": true
+    },
+    {
+      "fixture": "WithExtendedStyles",
+      "sector_size": 512,
+      "workbook_stream_len": 2854,
+      "globals_end": 1386,
+      "ministream_size": 3456,
+      "minifat_sectors": 1,
+      "read_calls": 11,
+      "read_bytes": 4136,
+      "cfb_structural_bytes": 2560,
+      "payload_bytes": 1576,
+      "payload_vs_globals": 190,
+      "payload_lt_ministream": true
+    }
+  ]
+}

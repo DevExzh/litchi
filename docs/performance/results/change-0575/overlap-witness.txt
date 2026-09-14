@@ -1,0 +1,25 @@
+archive bytes            : 4405
+central directory offset : 4230
+
+member    local_off   csize  local_extra  exact_end  cd_min_end  cd_max_end
+A.bin             0      32         4096       4163          67       65626
+B.bin          2048      32            0       2115        2115       67674
+C.bin          4163      32            0       4230        4230       69789
+
+  (A.bin, B.bin): OVERLAP
+  (A.bin, C.bin): disjoint
+  (B.bin, C.bin): disjoint
+
+central-directory-only adjacency verdicts (zero I/O):
+  (A.bin, B.bin): UNDECIDED (only this entry's local header can decide)
+  (B.bin, C.bin): UNDECIDED (only this entry's local header can decide)
+
+read outcomes, by candidate and by target:
+  target   today/(d)/(e)    (a)          (b)          (c) alone   
+  A.bin    REFUSE           accept       REFUSE       accept      
+  B.bin    REFUSE           accept       REFUSE       accept      
+  C.bin    REFUSE           accept       accept       accept      
+
+(c) is order dependent: reading A then C accepts C, but reading B then C
+    still accepts C, while reading A then B refuses B.  (b) and (a) are
+    order independent: each target's verdict is a function of the bytes alone.

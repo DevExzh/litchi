@@ -1,0 +1,7028 @@
+{
+  "files": [
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 213,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 7168,
+      "first_boundsheet8_offset": 1174,
+      "globals_end": 1405,
+      "globals_records": 63,
+      "issue": null,
+      "last_boundsheet8_end": 1192,
+      "list_prefix_bytes": 1192,
+      "list_prefix_share": 0.8483985765124555,
+      "path": "test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls",
+      "sst_bytes": 36,
+      "sst_end": 1362,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.025622775800711744,
+      "sst_start": 1326,
+      "stream": "Workbook",
+      "stream_len": 3488,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          36
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 3582,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 41472,
+      "first_boundsheet8_offset": 11856,
+      "globals_end": 15474,
+      "globals_records": 295,
+      "issue": null,
+      "last_boundsheet8_end": 11892,
+      "list_prefix_bytes": 11892,
+      "list_prefix_share": 0.76851492826677,
+      "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls",
+      "sst_bytes": 12,
+      "sst_end": 12203,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0007754943776657619,
+      "sst_start": 12191,
+      "stream": "Workbook",
+      "stream_len": 18580,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3163
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          726
+        ],
+        [
+          "Format",
+          618
+        ],
+        [
+          "Lbl",
+          205
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 200,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 11264,
+      "first_boundsheet8_offset": 2735,
+      "globals_end": 2989,
+      "globals_records": 115,
+      "issue": null,
+      "last_boundsheet8_end": 2789,
+      "list_prefix_bytes": 2789,
+      "list_prefix_share": 0.9330879892940783,
+      "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls",
+      "sst_bytes": 27,
+      "sst_end": 2946,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.009033121445299431,
+      "sst_start": 2919,
+      "stream": "Workbook",
+      "stream_len": 6755,
+      "top_record_bytes": [
+        [
+          "XF",
+          1296
+        ],
+        [
+          "Font",
+          602
+        ],
+        [
+          "Format",
+          299
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 4,
+      "bytes_after_last_boundsheet8": 9277,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          693
+        ]
+      ],
+      "file_size": 25088,
+      "first_boundsheet8_offset": 2138,
+      "globals_end": 11486,
+      "globals_records": 107,
+      "issue": null,
+      "last_boundsheet8_end": 2209,
+      "list_prefix_bytes": 2209,
+      "list_prefix_share": 0.19232108654013583,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls",
+      "sst_bytes": 310,
+      "sst_end": 11460,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.026989378373672296,
+      "sst_start": 11150,
+      "stream": "Workbook",
+      "stream_len": 15122,
+      "top_record_bytes": [
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "XF",
+          1200
+        ],
+        [
+          "Continue",
+          693
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "SST",
+          310
+        ],
+        [
+          "Font",
+          210
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          71
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 8417,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 14336,
+      "first_boundsheet8_offset": 998,
+      "globals_end": 9433,
+      "globals_records": 62,
+      "issue": null,
+      "last_boundsheet8_end": 1016,
+      "list_prefix_bytes": 1016,
+      "list_prefix_share": 0.10770698611258349,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
+      "sst_bytes": 76,
+      "sst_end": 1206,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008056821795823173,
+      "sst_start": 1130,
+      "stream": "Workbook",
+      "stream_len": 9962,
+      "top_record_bytes": [
+        [
+          "ExtSST",
+          8198
+        ],
+        [
+          "XF",
+          528
+        ],
+        [
+          "Font",
+          150
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "SST",
+          76
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 245,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1392,
+      "globals_end": 1672,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1427,
+      "list_prefix_bytes": 1427,
+      "list_prefix_share": 0.8534688995215312,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls",
+      "sst_bytes": 93,
+      "sst_end": 1654,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.05562200956937799,
+      "sst_start": 1561,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "SST",
+          93
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BoundSheet8",
+          35
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 249,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 5632,
+      "first_boundsheet8_offset": 944,
+      "globals_end": 1211,
+      "globals_records": 63,
+      "issue": null,
+      "last_boundsheet8_end": 962,
+      "list_prefix_bytes": 962,
+      "list_prefix_share": 0.7943848059454995,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls",
+      "sst_bytes": 0,
+      "sst_end": null,
+      "sst_frames": 0,
+      "sst_share_of_globals": 0.0,
+      "sst_start": null,
+      "stream": "Workbook",
+      "stream_len": 1775,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "0x01AE",
+          61
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x005A",
+          25
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 385,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 9728,
+      "first_boundsheet8_offset": 2421,
+      "globals_end": 2860,
+      "globals_records": 126,
+      "issue": null,
+      "last_boundsheet8_end": 2475,
+      "list_prefix_bytes": 2475,
+      "list_prefix_share": 0.8653846153846154,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
+      "sst_bytes": 192,
+      "sst_end": 2817,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.06713286713286713,
+      "sst_start": 2625,
+      "stream": "Workbook",
+      "stream_len": 5347,
+      "top_record_bytes": [
+        [
+          "XF",
+          1248
+        ],
+        [
+          "Font",
+          372
+        ],
+        [
+          "Format",
+          334
+        ],
+        [
+          "Style",
+          207
+        ],
+        [
+          "SST",
+          192
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "BoundSheet8",
+          54
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 4144,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 27136,
+      "first_boundsheet8_offset": 13605,
+      "globals_end": 17785,
+      "globals_records": 372,
+      "issue": null,
+      "last_boundsheet8_end": 13641,
+      "list_prefix_bytes": 13641,
+      "list_prefix_share": 0.7669946584200169,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls",
+      "sst_bytes": 140,
+      "sst_end": 13869,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.007871802080404836,
+      "sst_start": 13729,
+      "stream": "Workbook",
+      "stream_len": 21341,
+      "top_record_bytes": [
+        [
+          "0x0896",
+          3824
+        ],
+        [
+          "XFExt",
+          3628
+        ],
+        [
+          "StyleExt",
+          3566
+        ],
+        [
+          "XF",
+          2520
+        ],
+        [
+          "Style",
+          1409
+        ],
+        [
+          "Font",
+          1122
+        ],
+        [
+          "Format",
+          608
+        ],
+        [
+          "0x0092",
+          230
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 8623,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 166912,
+      "first_boundsheet8_offset": 14281,
+      "globals_end": 22961,
+      "globals_records": 366,
+      "issue": null,
+      "last_boundsheet8_end": 14338,
+      "list_prefix_bytes": 14338,
+      "list_prefix_share": 0.6244501546099909,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls",
+      "sst_bytes": 7605,
+      "sst_end": 22337,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.3312137973084796,
+      "sst_start": 14732,
+      "stream": "Workbook",
+      "stream_len": 104952,
+      "top_record_bytes": [
+        [
+          "SST",
+          7605
+        ],
+        [
+          "XFExt",
+          5124
+        ],
+        [
+          "StyleExt",
+          3639
+        ],
+        [
+          "XF",
+          1944
+        ],
+        [
+          "Format",
+          1396
+        ],
+        [
+          "Style",
+          836
+        ],
+        [
+          "Font",
+          814
+        ],
+        [
+          "ExtSST",
+          502
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 4184,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 23040,
+      "first_boundsheet8_offset": 11790,
+      "globals_end": 16010,
+      "globals_records": 304,
+      "issue": null,
+      "last_boundsheet8_end": 11826,
+      "list_prefix_bytes": 11826,
+      "list_prefix_share": 0.7386633354153654,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls",
+      "sst_bytes": 180,
+      "sst_end": 12094,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.011242973141786383,
+      "sst_start": 11914,
+      "stream": "Workbook",
+      "stream_len": 17891,
+      "top_record_bytes": [
+        [
+          "0x0896",
+          3824
+        ],
+        [
+          "XFExt",
+          3628
+        ],
+        [
+          "StyleExt",
+          3566
+        ],
+        [
+          "XF",
+          1848
+        ],
+        [
+          "Style",
+          989
+        ],
+        [
+          "Font",
+          782
+        ],
+        [
+          "Format",
+          473
+        ],
+        [
+          "SST",
+          180
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 3527,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 23552,
+      "first_boundsheet8_offset": 13035,
+      "globals_end": 16580,
+      "globals_records": 313,
+      "issue": null,
+      "last_boundsheet8_end": 13053,
+      "list_prefix_bytes": 13053,
+      "list_prefix_share": 0.7872738238841979,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls",
+      "sst_bytes": 85,
+      "sst_end": 13226,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005126658624849216,
+      "sst_start": 13141,
+      "stream": "Workbook",
+      "stream_len": 18503,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          5039
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3270
+        ],
+        [
+          "XF",
+          1704
+        ],
+        [
+          "Font",
+          926
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Format",
+          453
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 178,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 76800,
+      "first_boundsheet8_offset": 1050,
+      "globals_end": 1246,
+      "globals_records": 64,
+      "issue": null,
+      "last_boundsheet8_end": 1068,
+      "list_prefix_bytes": 1068,
+      "list_prefix_share": 0.8571428571428571,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls",
+      "sst_bytes": 58,
+      "sst_end": 1228,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.04654895666131621,
+      "sst_start": 1170,
+      "stream": "Workbook",
+      "stream_len": 4562,
+      "top_record_bytes": [
+        [
+          "XF",
+          576
+        ],
+        [
+          "Font",
+          140
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "SST",
+          58
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 3411,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25600,
+      "first_boundsheet8_offset": 11597,
+      "globals_end": 15026,
+      "globals_records": 287,
+      "issue": null,
+      "last_boundsheet8_end": 11615,
+      "list_prefix_bytes": 11615,
+      "list_prefix_share": 0.7729934779715161,
+      "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls",
+      "sst_bytes": 12,
+      "sst_end": 11809,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0007986157327299348,
+      "sst_start": 11797,
+      "stream": "Workbook",
+      "stream_len": 15744,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3141
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          726
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 200,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 11264,
+      "first_boundsheet8_offset": 2735,
+      "globals_end": 2989,
+      "globals_records": 115,
+      "issue": null,
+      "last_boundsheet8_end": 2789,
+      "list_prefix_bytes": 2789,
+      "list_prefix_share": 0.9330879892940783,
+      "path": "test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls",
+      "sst_bytes": 27,
+      "sst_end": 2946,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.009033121445299431,
+      "sst_start": 2919,
+      "stream": "Workbook",
+      "stream_len": 6755,
+      "top_record_bytes": [
+        [
+          "XF",
+          1296
+        ],
+        [
+          "Font",
+          602
+        ],
+        [
+          "Format",
+          299
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 200,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 10752,
+      "first_boundsheet8_offset": 2735,
+      "globals_end": 2989,
+      "globals_records": 115,
+      "issue": null,
+      "last_boundsheet8_end": 2789,
+      "list_prefix_bytes": 2789,
+      "list_prefix_share": 0.9330879892940783,
+      "path": "test-data/office-interop/litchi-changed/tdf78897-litchi.xls",
+      "sst_bytes": 27,
+      "sst_end": 2946,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.009033121445299431,
+      "sst_start": 2919,
+      "stream": "Workbook",
+      "stream_len": 6755,
+      "top_record_bytes": [
+        [
+          "XF",
+          1296
+        ],
+        [
+          "Font",
+          602
+        ],
+        [
+          "Format",
+          299
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 2100,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 28160,
+      "first_boundsheet8_offset": 12404,
+      "globals_end": 14542,
+      "globals_records": 318,
+      "issue": null,
+      "last_boundsheet8_end": 12442,
+      "list_prefix_bytes": 12442,
+      "list_prefix_share": 0.8555907027919131,
+      "path": "test-data/ole/xls/ComplexFunctionTestCaseData.xls",
+      "sst_bytes": 1627,
+      "sst_end": 14414,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.11188282217026543,
+      "sst_start": 12787,
+      "stream": "Workbook",
+      "stream_len": 18227,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4541
+        ],
+        [
+          "StyleExt",
+          3723
+        ],
+        [
+          "XF",
+          1704
+        ],
+        [
+          "SST",
+          1627
+        ],
+        [
+          "Style",
+          844
+        ],
+        [
+          "Font",
+          816
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Lbl",
+          197
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 16,
+      "bytes_after_last_boundsheet8": 530243,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          508383
+        ]
+      ],
+      "file_size": 1402368,
+      "first_boundsheet8_offset": 20783,
+      "globals_end": 551377,
+      "globals_records": 621,
+      "issue": null,
+      "last_boundsheet8_end": 21134,
+      "list_prefix_bytes": 21134,
+      "list_prefix_share": 0.03832949143689345,
+      "path": "test-data/ole/xls/ConditionalFormattingSamples copy.xls",
+      "sst_bytes": 4603,
+      "sst_end": 550977,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008348190076843974,
+      "sst_start": 546374,
+      "stream": "Workbook",
+      "stream_len": 1314225,
+      "top_record_bytes": [
+        [
+          "Continue",
+          508383
+        ],
+        [
+          "MsoDrawingGroup",
+          16456
+        ],
+        [
+          "XFExt",
+          8217
+        ],
+        [
+          "SST",
+          4603
+        ],
+        [
+          "XF",
+          4080
+        ],
+        [
+          "StyleExt",
+          3639
+        ],
+        [
+          "0x088D",
+          1468
+        ],
+        [
+          "Font",
+          1312
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 16,
+      "bytes_after_last_boundsheet8": 530243,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          508383
+        ]
+      ],
+      "file_size": 1402368,
+      "first_boundsheet8_offset": 20783,
+      "globals_end": 551377,
+      "globals_records": 621,
+      "issue": null,
+      "last_boundsheet8_end": 21134,
+      "list_prefix_bytes": 21134,
+      "list_prefix_share": 0.03832949143689345,
+      "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+      "sst_bytes": 4603,
+      "sst_end": 550977,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008348190076843974,
+      "sst_start": 546374,
+      "stream": "Workbook",
+      "stream_len": 1314225,
+      "top_record_bytes": [
+        [
+          "Continue",
+          508383
+        ],
+        [
+          "MsoDrawingGroup",
+          16456
+        ],
+        [
+          "XFExt",
+          8217
+        ],
+        [
+          "SST",
+          4603
+        ],
+        [
+          "XF",
+          4080
+        ],
+        [
+          "StyleExt",
+          3639
+        ],
+        [
+          "0x088D",
+          1468
+        ],
+        [
+          "Font",
+          1312
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 95,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1689,
+      "globals_end": 1838,
+      "globals_records": 87,
+      "issue": null,
+      "last_boundsheet8_end": 1743,
+      "list_prefix_bytes": 1743,
+      "list_prefix_share": 0.9483133841131665,
+      "path": "test-data/ole/xls/DateFormats.xls",
+      "sst_bytes": 32,
+      "sst_end": 1795,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.017410228509249184,
+      "sst_start": 1763,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          672
+        ],
+        [
+          "Format",
+          495
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          64
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "SST",
+          32
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 1904,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 34304,
+      "first_boundsheet8_offset": 12623,
+      "globals_end": 14566,
+      "globals_records": 322,
+      "issue": null,
+      "last_boundsheet8_end": 12662,
+      "list_prefix_bytes": 12662,
+      "list_prefix_share": 0.8692846354524234,
+      "path": "test-data/ole/xls/DateTimeToNumberTestCases.xls",
+      "sst_bytes": 1485,
+      "sst_end": 14446,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.10194974598379788,
+      "sst_start": 12961,
+      "stream": "Workbook",
+      "stream_len": 24371,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4688
+        ],
+        [
+          "StyleExt",
+          3723
+        ],
+        [
+          "XF",
+          1776
+        ],
+        [
+          "SST",
+          1485
+        ],
+        [
+          "Style",
+          844
+        ],
+        [
+          "Font",
+          816
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Lbl",
+          197
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 4,
+      "bytes_after_last_boundsheet8": 16741,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          6768
+        ]
+      ],
+      "file_size": 178176,
+      "first_boundsheet8_offset": 15157,
+      "globals_end": 31993,
+      "globals_records": 436,
+      "issue": null,
+      "last_boundsheet8_end": 15252,
+      "list_prefix_bytes": 15252,
+      "list_prefix_share": 0.47672928453099117,
+      "path": "test-data/ole/xls/FormulaEvalTestData.xls",
+      "sst_bytes": 14994,
+      "sst_end": 30865,
+      "sst_frames": 2,
+      "sst_share_of_globals": 0.4686650204732285,
+      "sst_start": 15871,
+      "stream": "Workbook",
+      "stream_len": 158487,
+      "top_record_bytes": [
+        [
+          "SST",
+          8226
+        ],
+        [
+          "Continue",
+          6768
+        ],
+        [
+          "StyleExt",
+          3731
+        ],
+        [
+          "XF",
+          3600
+        ],
+        [
+          "XFExt",
+          3556
+        ],
+        [
+          "Format",
+          1650
+        ],
+        [
+          "Font",
+          1092
+        ],
+        [
+          "ExtSST",
+          1006
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 481,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 17408,
+      "first_boundsheet8_offset": 11565,
+      "globals_end": 12100,
+      "globals_records": 297,
+      "issue": null,
+      "last_boundsheet8_end": 11619,
+      "list_prefix_bytes": 11619,
+      "list_prefix_share": 0.9602479338842975,
+      "path": "test-data/ole/xls/FormulaRefs.xls",
+      "sst_bytes": 67,
+      "sst_end": 11996,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005537190082644628,
+      "sst_start": 11929,
+      "stream": "Workbook",
+      "stream_len": 13622,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "0x01AE",
+          146
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 5,
+      "bytes_after_last_boundsheet8": 335,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 22016,
+      "first_boundsheet8_offset": 1422,
+      "globals_end": 1845,
+      "globals_records": 79,
+      "issue": null,
+      "last_boundsheet8_end": 1510,
+      "list_prefix_bytes": 1510,
+      "list_prefix_share": 0.8184281842818428,
+      "path": "test-data/ole/xls/FormulaSheetRange.xls",
+      "sst_bytes": 244,
+      "sst_end": 1794,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.13224932249322494,
+      "sst_start": 1550,
+      "stream": "Workbook",
+      "stream_len": 12092,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "SST",
+          244
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          88
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 409,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1396,
+      "globals_end": 1863,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1454,
+      "list_prefix_bytes": 1454,
+      "list_prefix_share": 0.7804616210413312,
+      "path": "test-data/ole/xls/HyperlinksOnManySheets.xls",
+      "sst_bytes": 338,
+      "sst_end": 1812,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.18142780461621041,
+      "sst_start": 1474,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "SST",
+          338
+        ],
+        [
+          "Font",
+          150
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          58
+        ],
+        [
+          "Style",
+          56
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1450,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9572413793103448,
+      "path": "test-data/ole/xls/Simple.xls",
+      "sst_bytes": 24,
+      "sst_end": 1432,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.016551724137931035,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 156,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 14336,
+      "first_boundsheet8_offset": 1412,
+      "globals_end": 1622,
+      "globals_records": 77,
+      "issue": null,
+      "last_boundsheet8_end": 1466,
+      "list_prefix_bytes": 1466,
+      "list_prefix_share": 0.903822441430333,
+      "path": "test-data/ole/xls/SimpleChart.xls",
+      "sst_bytes": 12,
+      "sst_end": 1612,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.007398273736128237,
+      "sst_start": 1600,
+      "stream": "Workbook",
+      "stream_len": 4463,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          378
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 243,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 30720,
+      "first_boundsheet8_offset": 11588,
+      "globals_end": 11885,
+      "globals_records": 289,
+      "issue": null,
+      "last_boundsheet8_end": 11642,
+      "list_prefix_bytes": 11642,
+      "list_prefix_share": 0.979554059739167,
+      "path": "test-data/ole/xls/SimpleMacro.xls",
+      "sst_bytes": 39,
+      "sst_end": 11749,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.003281447202355911,
+      "sst_start": 11710,
+      "stream": "Workbook",
+      "stream_len": 13142,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1430,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9706293706293706,
+      "path": "test-data/ole/xls/SimpleMultiCell.xls",
+      "sst_bytes": 12,
+      "sst_end": 1420,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008391608391608392,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 3532,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 43008,
+      "first_boundsheet8_offset": 11701,
+      "globals_end": 15269,
+      "globals_records": 292,
+      "issue": null,
+      "last_boundsheet8_end": 11737,
+      "list_prefix_bytes": 11737,
+      "list_prefix_share": 0.7686816425437161,
+      "path": "test-data/ole/xls/SimpleScatterChart.xls",
+      "sst_bytes": 20,
+      "sst_end": 12045,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0013098434737048924,
+      "sst_start": 12025,
+      "stream": "Workbook",
+      "stream_len": 33273,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3140
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Font",
+          828
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 244,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1366,
+      "globals_end": 1664,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1420,
+      "list_prefix_bytes": 1420,
+      "list_prefix_share": 0.8533653846153846,
+      "path": "test-data/ole/xls/SimpleWithAutofilter copy.xls",
+      "sst_bytes": 36,
+      "sst_end": 1621,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.021634615384615384,
+      "sst_start": 1585,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          152
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          36
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 244,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1366,
+      "globals_end": 1664,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1420,
+      "list_prefix_bytes": 1420,
+      "list_prefix_share": 0.8533653846153846,
+      "path": "test-data/ole/xls/SimpleWithAutofilter.xls",
+      "sst_bytes": 36,
+      "sst_end": 1621,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.021634615384615384,
+      "sst_start": 1585,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          152
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          36
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 97,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1485,
+      "globals_records": 72,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9346801346801347,
+      "path": "test-data/ole/xls/SimpleWithChoose copy.xls",
+      "sst_bytes": 34,
+      "sst_end": 1442,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.022895622895622896,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          34
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 97,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1485,
+      "globals_records": 72,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9346801346801347,
+      "path": "test-data/ole/xls/SimpleWithChoose.xls",
+      "sst_bytes": 34,
+      "sst_end": 1442,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.022895622895622896,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          34
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 180,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6144,
+      "first_boundsheet8_offset": 1668,
+      "globals_end": 1902,
+      "globals_records": 79,
+      "issue": null,
+      "last_boundsheet8_end": 1722,
+      "list_prefix_bytes": 1722,
+      "list_prefix_share": 0.9053627760252366,
+      "path": "test-data/ole/xls/SimpleWithColours copy.xls",
+      "sst_bytes": 140,
+      "sst_end": 1884,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07360672975814932,
+      "sst_start": 1744,
+      "stream": "Workbook",
+      "stream_len": 3177,
+      "top_record_bytes": [
+        [
+          "XF",
+          648
+        ],
+        [
+          "Format",
+          340
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "SST",
+          140
+        ],
+        [
+          "Font",
+          124
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 180,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6144,
+      "first_boundsheet8_offset": 1668,
+      "globals_end": 1902,
+      "globals_records": 79,
+      "issue": null,
+      "last_boundsheet8_end": 1722,
+      "list_prefix_bytes": 1722,
+      "list_prefix_share": 0.9053627760252366,
+      "path": "test-data/ole/xls/SimpleWithColours.xls",
+      "sst_bytes": 140,
+      "sst_end": 1884,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07360672975814932,
+      "sst_start": 1744,
+      "stream": "Workbook",
+      "stream_len": 3177,
+      "top_record_bytes": [
+        [
+          "XF",
+          648
+        ],
+        [
+          "Format",
+          340
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "SST",
+          140
+        ],
+        [
+          "Font",
+          124
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 189,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1398,
+      "globals_end": 1641,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1452,
+      "list_prefix_bytes": 1452,
+      "list_prefix_share": 0.8848263254113345,
+      "path": "test-data/ole/xls/SimpleWithComments copy.xls",
+      "sst_bytes": 32,
+      "sst_end": 1598,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.019500304692260818,
+      "sst_start": 1566,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          32
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 189,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1398,
+      "globals_end": 1641,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1452,
+      "list_prefix_bytes": 1452,
+      "list_prefix_share": 0.8848263254113345,
+      "path": "test-data/ole/xls/SimpleWithComments.xls",
+      "sst_bytes": 32,
+      "sst_end": 1598,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.019500304692260818,
+      "sst_start": 1566,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          32
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1370,
+      "globals_end": 1466,
+      "globals_records": 72,
+      "issue": null,
+      "last_boundsheet8_end": 1424,
+      "list_prefix_bytes": 1424,
+      "list_prefix_share": 0.9713506139154161,
+      "path": "test-data/ole/xls/SimpleWithDataFormat copy.xls",
+      "sst_bytes": 12,
+      "sst_end": 1456,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008185538881309686,
+      "sst_start": 1444,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          396
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1370,
+      "globals_end": 1466,
+      "globals_records": 72,
+      "issue": null,
+      "last_boundsheet8_end": 1424,
+      "list_prefix_bytes": 1424,
+      "list_prefix_share": 0.9713506139154161,
+      "path": "test-data/ole/xls/SimpleWithDataFormat.xls",
+      "sst_bytes": 12,
+      "sst_end": 1456,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008185538881309686,
+      "sst_start": 1444,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          396
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1450,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9572413793103448,
+      "path": "test-data/ole/xls/SimpleWithFormula copy.xls",
+      "sst_bytes": 24,
+      "sst_end": 1432,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.016551724137931035,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1450,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9572413793103448,
+      "path": "test-data/ole/xls/SimpleWithFormula.xls",
+      "sst_bytes": 24,
+      "sst_end": 1432,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.016551724137931035,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 35178,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          26883
+        ]
+      ],
+      "file_size": 48128,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 36566,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.03795875950336378,
+      "path": "test-data/ole/xls/SimpleWithImages copy.xls",
+      "sst_bytes": 12,
+      "sst_end": 36531,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.00032817371328556583,
+      "sst_start": 36519,
+      "stream": "Workbook",
+      "stream_len": 38015,
+      "top_record_bytes": [
+        [
+          "Continue",
+          26883
+        ],
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 83840,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          74529
+        ]
+      ],
+      "file_size": 91648,
+      "first_boundsheet8_offset": 1558,
+      "globals_end": 85452,
+      "globals_records": 83,
+      "issue": null,
+      "last_boundsheet8_end": 1612,
+      "list_prefix_bytes": 1612,
+      "list_prefix_share": 0.01886439170528484,
+      "path": "test-data/ole/xls/SimpleWithImages-mac copy.xls",
+      "sst_bytes": 12,
+      "sst_end": 84401,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0001404297149276787,
+      "sst_start": 84389,
+      "stream": "Workbook",
+      "stream_len": 87130,
+      "top_record_bytes": [
+        [
+          "Continue",
+          74529
+        ],
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "ExtSST",
+          1022
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Font",
+          100
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 83840,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          74529
+        ]
+      ],
+      "file_size": 91648,
+      "first_boundsheet8_offset": 1558,
+      "globals_end": 85452,
+      "globals_records": 83,
+      "issue": null,
+      "last_boundsheet8_end": 1612,
+      "list_prefix_bytes": 1612,
+      "list_prefix_share": 0.01886439170528484,
+      "path": "test-data/ole/xls/SimpleWithImages-mac.xls",
+      "sst_bytes": 12,
+      "sst_end": 84401,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0001404297149276787,
+      "sst_start": 84389,
+      "stream": "Workbook",
+      "stream_len": 87130,
+      "top_record_bytes": [
+        [
+          "Continue",
+          74529
+        ],
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "ExtSST",
+          1022
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Font",
+          100
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 35178,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          26883
+        ]
+      ],
+      "file_size": 48128,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 36566,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.03795875950336378,
+      "path": "test-data/ole/xls/SimpleWithImages.xls",
+      "sst_bytes": 12,
+      "sst_end": 36531,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.00032817371328556583,
+      "sst_start": 36519,
+      "stream": "Workbook",
+      "stream_len": 38015,
+      "top_record_bytes": [
+        [
+          "Continue",
+          26883
+        ],
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 82,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1470,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9442176870748299,
+      "path": "test-data/ole/xls/SimpleWithPageBreaks copy.xls",
+      "sst_bytes": 19,
+      "sst_end": 1427,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.01292517006802721,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 82,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1470,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9442176870748299,
+      "path": "test-data/ole/xls/SimpleWithPageBreaks.xls",
+      "sst_bytes": 19,
+      "sst_end": 1427,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.01292517006802721,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 124,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1512,
+      "globals_records": 73,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.917989417989418,
+      "path": "test-data/ole/xls/SimpleWithPrintArea copy.xls",
+      "sst_bytes": 35,
+      "sst_end": 1494,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.023148148148148147,
+      "sst_start": 1459,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          35
+        ],
+        [
+          "Lbl",
+          31
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 124,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1512,
+      "globals_records": 73,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.917989417989418,
+      "path": "test-data/ole/xls/SimpleWithPrintArea.xls",
+      "sst_bytes": 35,
+      "sst_end": 1494,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.023148148148148147,
+      "sst_start": 1459,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          35
+        ],
+        [
+          "Lbl",
+          31
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 77,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1465,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9474402730375426,
+      "path": "test-data/ole/xls/SimpleWithSkip copy.xls",
+      "sst_bytes": 39,
+      "sst_end": 1447,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.026621160409556314,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          39
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 77,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1465,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9474402730375426,
+      "path": "test-data/ole/xls/SimpleWithSkip.xls",
+      "sst_bytes": 39,
+      "sst_end": 1447,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.026621160409556314,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          39
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1470,
+      "globals_end": 1586,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1524,
+      "list_prefix_bytes": 1524,
+      "list_prefix_share": 0.9609079445145019,
+      "path": "test-data/ole/xls/SimpleWithStyling copy.xls",
+      "sst_bytes": 24,
+      "sst_end": 1568,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.015132408575031526,
+      "sst_start": 1544,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          576
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1470,
+      "globals_end": 1586,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1524,
+      "list_prefix_bytes": 1524,
+      "list_prefix_share": 0.9609079445145019,
+      "path": "test-data/ole/xls/SimpleWithStyling.xls",
+      "sst_bytes": 24,
+      "sst_end": 1568,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.015132408575031526,
+      "sst_start": 1544,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          576
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 166,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1986,
+      "globals_end": 2170,
+      "globals_records": 80,
+      "issue": null,
+      "last_boundsheet8_end": 2004,
+      "list_prefix_bytes": 2004,
+      "list_prefix_share": 0.9235023041474655,
+      "path": "test-data/ole/xls/SingleLetterRanges.xls",
+      "sst_bytes": 103,
+      "sst_end": 2127,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.047465437788018434,
+      "sst_start": 2024,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "Format",
+          730
+        ],
+        [
+          "XF",
+          528
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "Font",
+          158
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "SST",
+          103
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 2093,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 35840,
+      "first_boundsheet8_offset": 12853,
+      "globals_end": 14984,
+      "globals_records": 329,
+      "issue": null,
+      "last_boundsheet8_end": 12891,
+      "list_prefix_bytes": 12891,
+      "list_prefix_share": 0.8603176721836626,
+      "path": "test-data/ole/xls/WeekNumFunctionTestCaseData.xls",
+      "sst_bytes": 1643,
+      "sst_end": 14856,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.10965029364655633,
+      "sst_start": 13213,
+      "stream": "Workbook",
+      "stream_len": 25994,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4688
+        ],
+        [
+          "StyleExt",
+          3723
+        ],
+        [
+          "XF",
+          1776
+        ],
+        [
+          "SST",
+          1643
+        ],
+        [
+          "Style",
+          844
+        ],
+        [
+          "Font",
+          816
+        ],
+        [
+          "Format",
+          614
+        ],
+        [
+          "Lbl",
+          197
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 5020,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 29696,
+      "first_boundsheet8_offset": 12299,
+      "globals_end": 17357,
+      "globals_records": 309,
+      "issue": null,
+      "last_boundsheet8_end": 12337,
+      "list_prefix_bytes": 12337,
+      "list_prefix_share": 0.710779512588581,
+      "path": "test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls",
+      "sst_bytes": 1647,
+      "sst_end": 14109,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.09488966987382612,
+      "sst_start": 12462,
+      "stream": "Workbook",
+      "stream_len": 19869,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4590
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3140
+        ],
+        [
+          "XF",
+          1728
+        ],
+        [
+          "SST",
+          1647
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          794
+        ],
+        [
+          "Format",
+          384
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 306,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 20992,
+      "first_boundsheet8_offset": 11599,
+      "globals_end": 11959,
+      "globals_records": 290,
+      "issue": null,
+      "last_boundsheet8_end": 11653,
+      "list_prefix_bytes": 11653,
+      "list_prefix_share": 0.9744125763023664,
+      "path": "test-data/ole/xls/WithChart.xls",
+      "sst_bytes": 12,
+      "sst_end": 11863,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.001003428380299356,
+      "sst_start": 11851,
+      "stream": "Workbook",
+      "stream_len": 17401,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          748
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 1069,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 16896,
+      "first_boundsheet8_offset": 1342,
+      "globals_end": 2465,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1396,
+      "list_prefix_bytes": 1396,
+      "list_prefix_share": 0.5663286004056796,
+      "path": "test-data/ole/xls/WithCheckBoxes.xls",
+      "sst_bytes": 22,
+      "sst_end": 2422,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008924949290060852,
+      "sst_start": 2400,
+      "stream": "Workbook",
+      "stream_len": 3623,
+      "top_record_bytes": [
+        [
+          "MsoDrawingGroup",
+          984
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 269,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25600,
+      "first_boundsheet8_offset": 12027,
+      "globals_end": 12346,
+      "globals_records": 297,
+      "issue": null,
+      "last_boundsheet8_end": 12077,
+      "list_prefix_bytes": 12077,
+      "list_prefix_share": 0.978211566499271,
+      "path": "test-data/ole/xls/WithConditionalFormatting.xls",
+      "sst_bytes": 69,
+      "sst_end": 12234,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005588854689778066,
+      "sst_start": 12165,
+      "stream": "Workbook",
+      "stream_len": 15747,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "0x088D",
+          438
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 101920,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          92897
+        ]
+      ],
+      "file_size": 165888,
+      "first_boundsheet8_offset": 5199,
+      "globals_end": 107170,
+      "globals_records": 218,
+      "issue": null,
+      "last_boundsheet8_end": 5250,
+      "list_prefix_bytes": 5250,
+      "list_prefix_share": 0.04898758981058132,
+      "path": "test-data/ole/xls/WithCustomViews.xls",
+      "sst_bytes": 101125,
+      "sst_end": 106655,
+      "sst_frames": 13,
+      "sst_share_of_globals": 0.9435942894466736,
+      "sst_start": 5530,
+      "stream": "Workbook",
+      "stream_len": 150437,
+      "top_record_bytes": [
+        [
+          "Continue",
+          92897
+        ],
+        [
+          "SST",
+          8228
+        ],
+        [
+          "XF",
+          2496
+        ],
+        [
+          "Format",
+          1147
+        ],
+        [
+          "Font",
+          1124
+        ],
+        [
+          "ExtSST",
+          486
+        ],
+        [
+          "Lbl",
+          146
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 9139,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          716
+        ]
+      ],
+      "file_size": 179712,
+      "first_boundsheet8_offset": 11929,
+      "globals_end": 21122,
+      "globals_records": 288,
+      "issue": null,
+      "last_boundsheet8_end": 11983,
+      "list_prefix_bytes": 11983,
+      "list_prefix_share": 0.5673231701543414,
+      "path": "test-data/ole/xls/WithEmbeddedObjects.xls",
+      "sst_bytes": 23,
+      "sst_end": 21018,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0010889120348451852,
+      "sst_start": 20995,
+      "stream": "Workbook",
+      "stream_len": 30778,
+      "top_record_bytes": [
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Format",
+          724
+        ],
+        [
+          "Continue",
+          716
+        ],
+        [
+          "Font",
+          714
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 184,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6656,
+      "first_boundsheet8_offset": 1148,
+      "globals_end": 1386,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1202,
+      "list_prefix_bytes": 1202,
+      "list_prefix_share": 0.8672438672438673,
+      "path": "test-data/ole/xls/WithExtendedStyles.xls",
+      "sst_bytes": 48,
+      "sst_end": 1368,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.03463203463203463,
+      "sst_start": 1320,
+      "stream": "Workbook",
+      "stream_len": 2854,
+      "top_record_bytes": [
+        [
+          "XF",
+          600
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "Style",
+          78
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "SST",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 228,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 14336,
+      "first_boundsheet8_offset": 1450,
+      "globals_end": 1706,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1478,
+      "list_prefix_bytes": 1478,
+      "list_prefix_share": 0.8663540445486518,
+      "path": "test-data/ole/xls/WithFormattedGraphTitle.xls",
+      "sst_bytes": 51,
+      "sst_end": 1663,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.029894490035169988,
+      "sst_start": 1612,
+      "stream": "Workbook",
+      "stream_len": 4508,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          240
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "SST",
+          51
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BoundSheet8",
+          28
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 161,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1396,
+      "globals_end": 1611,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1450,
+      "list_prefix_bytes": 1450,
+      "list_prefix_share": 0.9000620732464308,
+      "path": "test-data/ole/xls/WithHyperlink.xls",
+      "sst_bytes": 98,
+      "sst_end": 1568,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.06083178150217256,
+      "sst_start": 1470,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          150
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "SST",
+          98
+        ],
+        [
+          "Style",
+          56
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 411,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 32768,
+      "first_boundsheet8_offset": 11633,
+      "globals_end": 12098,
+      "globals_records": 292,
+      "issue": null,
+      "last_boundsheet8_end": 11687,
+      "list_prefix_bytes": 11687,
+      "list_prefix_share": 0.9660274425524881,
+      "path": "test-data/ole/xls/WithThreeCharts.xls",
+      "sst_bytes": 12,
+      "sst_end": 12002,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.000991899487518598,
+      "sst_start": 11990,
+      "stream": "Workbook",
+      "stream_len": 28892,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          782
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "MsoDrawingGroup",
+          174
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 369,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25600,
+      "first_boundsheet8_offset": 11599,
+      "globals_end": 12022,
+      "globals_records": 291,
+      "issue": null,
+      "last_boundsheet8_end": 11653,
+      "list_prefix_bytes": 11653,
+      "list_prefix_share": 0.9693062718349692,
+      "path": "test-data/ole/xls/WithTwoCharts.xls",
+      "sst_bytes": 12,
+      "sst_end": 11926,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.000998170021627017,
+      "sst_start": 11914,
+      "stream": "Workbook",
+      "stream_len": 21684,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          748
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "MsoDrawingGroup",
+          126
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 182,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1426,
+      "globals_end": 1662,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1480,
+      "list_prefix_bytes": 1480,
+      "list_prefix_share": 0.8904933814681107,
+      "path": "test-data/ole/xls/WithTwoHyperLinks.xls",
+      "sst_bytes": 119,
+      "sst_end": 1619,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07160048134777376,
+      "sst_start": 1500,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "SST",
+          119
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          56
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 286,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 24576,
+      "first_boundsheet8_offset": 12520,
+      "globals_end": 12872,
+      "globals_records": 287,
+      "issue": null,
+      "last_boundsheet8_end": 12586,
+      "list_prefix_bytes": 12586,
+      "list_prefix_share": 0.9777812305779987,
+      "path": "test-data/ole/xls/empty.xls",
+      "sst_bytes": 12,
+      "sst_end": 12776,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0009322560596643878,
+      "sst_start": 12764,
+      "stream": "Workbook",
+      "stream_len": 20564,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3687
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          1315
+        ],
+        [
+          "Format",
+          724
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 1237,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 22528,
+      "first_boundsheet8_offset": 12919,
+      "globals_end": 14222,
+      "globals_records": 294,
+      "issue": null,
+      "last_boundsheet8_end": 12985,
+      "list_prefix_bytes": 12985,
+      "list_prefix_share": 0.9130220784699761,
+      "path": "test-data/ole/xls/password.xls",
+      "sst_bytes": 1065,
+      "sst_end": 14118,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07488398256222753,
+      "sst_start": 13053,
+      "stream": "Workbook",
+      "stream_len": 18438,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4247
+        ],
+        [
+          "StyleExt",
+          3687
+        ],
+        [
+          "XF",
+          1512
+        ],
+        [
+          "Style",
+          1315
+        ],
+        [
+          "SST",
+          1065
+        ],
+        [
+          "Format",
+          958
+        ],
+        [
+          "Font",
+          748
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 82,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 7680,
+      "first_boundsheet8_offset": 1388,
+      "globals_end": 1530,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1448,
+      "list_prefix_bytes": 1448,
+      "list_prefix_share": 0.9464052287581699,
+      "path": "test-data/poi/test-data/hpsf/TestUnicode.xls",
+      "sst_bytes": 44,
+      "sst_end": 1512,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.02875816993464052,
+      "sst_start": 1468,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          438
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          60
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          44
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 18,
+      "bytes_after_last_boundsheet8": 18599,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          1033
+        ]
+      ],
+      "file_size": 692224,
+      "first_boundsheet8_offset": 9181,
+      "globals_end": 28184,
+      "globals_records": 492,
+      "issue": null,
+      "last_boundsheet8_end": 9585,
+      "list_prefix_bytes": 9585,
+      "list_prefix_share": 0.3400865739426625,
+      "path": "test-data/poi/test-data/spreadsheet/15228.xls",
+      "sst_bytes": 9260,
+      "sst_end": 27926,
+      "sst_frames": 2,
+      "sst_share_of_globals": 0.3285552086290094,
+      "sst_start": 18666,
+      "stream": "Workbook",
+      "stream_len": 606237,
+      "top_record_bytes": [
+        [
+          "SST",
+          8227
+        ],
+        [
+          "XF",
+          5880
+        ],
+        [
+          "MsoDrawingGroup",
+          3299
+        ],
+        [
+          "0x005A",
+          2880
+        ],
+        [
+          "Lbl",
+          1991
+        ],
+        [
+          "Format",
+          1624
+        ],
+        [
+          "Font",
+          1252
+        ],
+        [
+          "Continue",
+          1033
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6144,
+      "first_boundsheet8_offset": 1652,
+      "globals_end": 1748,
+      "globals_records": 73,
+      "issue": null,
+      "last_boundsheet8_end": 1706,
+      "list_prefix_bytes": 1706,
+      "list_prefix_share": 0.9759725400457666,
+      "path": "test-data/poi/test-data/spreadsheet/1900DateWindowing.xls",
+      "sst_bytes": 12,
+      "sst_end": 1738,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.006864988558352402,
+      "sst_start": 1726,
+      "stream": "Workbook",
+      "stream_len": 2640,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "Font",
+          170
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6144,
+      "first_boundsheet8_offset": 1652,
+      "globals_end": 1748,
+      "globals_records": 73,
+      "issue": null,
+      "last_boundsheet8_end": 1706,
+      "list_prefix_bytes": 1706,
+      "list_prefix_share": 0.9759725400457666,
+      "path": "test-data/poi/test-data/spreadsheet/1904DateWindowing.xls",
+      "sst_bytes": 12,
+      "sst_end": 1738,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.006864988558352402,
+      "sst_start": 1726,
+      "stream": "Workbook",
+      "stream_len": 2640,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "Font",
+          170
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 141,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1529,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.907782864617397,
+      "path": "test-data/poi/test-data/spreadsheet/24207.xls",
+      "sst_bytes": 12,
+      "sst_end": 1494,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.007848266841072597,
+      "sst_start": 1482,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Lbl",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 25332,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          16046
+        ]
+      ],
+      "file_size": 109056,
+      "first_boundsheet8_offset": 2966,
+      "globals_end": 28352,
+      "globals_records": 112,
+      "issue": null,
+      "last_boundsheet8_end": 3020,
+      "list_prefix_bytes": 3020,
+      "list_prefix_share": 0.10651805869074492,
+      "path": "test-data/poi/test-data/spreadsheet/29942.xls",
+      "sst_bytes": 24274,
+      "sst_end": 27334,
+      "sst_frames": 3,
+      "sst_share_of_globals": 0.8561653498871332,
+      "sst_start": 3060,
+      "stream": "Workbook",
+      "stream_len": 104933,
+      "top_record_bytes": [
+        [
+          "Continue",
+          16046
+        ],
+        [
+          "SST",
+          8228
+        ],
+        [
+          "ExtSST",
+          1014
+        ],
+        [
+          "Font",
+          900
+        ],
+        [
+          "Format",
+          796
+        ],
+        [
+          "XF",
+          696
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 3318,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 19968,
+      "first_boundsheet8_offset": 11893,
+      "globals_end": 15229,
+      "globals_records": 290,
+      "issue": null,
+      "last_boundsheet8_end": 11911,
+      "list_prefix_bytes": 11911,
+      "list_prefix_share": 0.7821262065795521,
+      "path": "test-data/poi/test-data/spreadsheet/35897-type4.xls",
+      "sst_bytes": 27,
+      "sst_end": 12026,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0017729332195153982,
+      "sst_start": 11999,
+      "stream": "Workbook",
+      "stream_len": 15969,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4247
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3119
+        ],
+        [
+          "XF",
+          1512
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          726
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "FilePass",
+          204
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 1443,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 37376,
+      "first_boundsheet8_offset": 6478,
+      "globals_end": 7935,
+      "globals_records": 239,
+      "issue": null,
+      "last_boundsheet8_end": 6492,
+      "list_prefix_bytes": 6492,
+      "list_prefix_share": 0.8181474480151228,
+      "path": "test-data/poi/test-data/spreadsheet/41139.xls",
+      "sst_bytes": 1090,
+      "sst_end": 7869,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.13736609955891618,
+      "sst_start": 6779,
+      "stream": "Workbook",
+      "stream_len": 27522,
+      "top_record_bytes": [
+        [
+          "XF",
+          3072
+        ],
+        [
+          "Format",
+          1931
+        ],
+        [
+          "Font",
+          1168
+        ],
+        [
+          "SST",
+          1090
+        ],
+        [
+          "Lbl",
+          153
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "ExtSST",
+          62
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 776,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 29696,
+      "first_boundsheet8_offset": 4205,
+      "globals_end": 5035,
+      "globals_records": 156,
+      "issue": null,
+      "last_boundsheet8_end": 4259,
+      "list_prefix_bytes": 4259,
+      "list_prefix_share": 0.8458788480635551,
+      "path": "test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls",
+      "sst_bytes": 199,
+      "sst_end": 5001,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.039523336643495534,
+      "sst_start": 4802,
+      "stream": "Workbook",
+      "stream_len": 13976,
+      "top_record_bytes": [
+        [
+          "XF",
+          1632
+        ],
+        [
+          "Format",
+          1506
+        ],
+        [
+          "MsoDrawingGroup",
+          454
+        ],
+        [
+          "Font",
+          450
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "SST",
+          199
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          64
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 17652,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          8406
+        ]
+      ],
+      "file_size": 167424,
+      "first_boundsheet8_offset": 12258,
+      "globals_end": 29939,
+      "globals_records": 316,
+      "issue": null,
+      "last_boundsheet8_end": 12287,
+      "list_prefix_bytes": 12287,
+      "list_prefix_share": 0.4104011490029727,
+      "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+      "sst_bytes": 16634,
+      "sst_end": 29056,
+      "sst_frames": 3,
+      "sst_share_of_globals": 0.5555963793045859,
+      "sst_start": 12422,
+      "stream": "Workbook",
+      "stream_len": 162400,
+      "top_record_bytes": [
+        [
+          "Continue",
+          8406
+        ],
+        [
+          "SST",
+          8228
+        ],
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3625
+        ],
+        [
+          "XF",
+          1704
+        ],
+        [
+          "Font",
+          976
+        ],
+        [
+          "Style",
+          968
+        ],
+        [
+          "ExtSST",
+          614
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 966,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 51712,
+      "first_boundsheet8_offset": 12341,
+      "globals_end": 13336,
+      "globals_records": 330,
+      "issue": null,
+      "last_boundsheet8_end": 12370,
+      "list_prefix_bytes": 12370,
+      "list_prefix_share": 0.9275644871025794,
+      "path": "test-data/poi/test-data/spreadsheet/45365.xls",
+      "sst_bytes": 20,
+      "sst_end": 13053,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0014997000599880025,
+      "sst_start": 13033,
+      "stream": "Workbook",
+      "stream_len": 47429,
+      "top_record_bytes": [
+        [
+          "StyleExt",
+          3714
+        ],
+        [
+          "XFExt",
+          3144
+        ],
+        [
+          "XF",
+          1776
+        ],
+        [
+          "Format",
+          1264
+        ],
+        [
+          "Font",
+          1050
+        ],
+        [
+          "Style",
+          984
+        ],
+        [
+          "0x0017",
+          540
+        ],
+        [
+          "0x0876",
+          179
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 93,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1846,
+      "globals_end": 1957,
+      "globals_records": 72,
+      "issue": null,
+      "last_boundsheet8_end": 1864,
+      "list_prefix_bytes": 1864,
+      "list_prefix_share": 0.9524782830863566,
+      "path": "test-data/poi/test-data/spreadsheet/45492.xls",
+      "sst_bytes": 55,
+      "sst_end": 1939,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.02810424118548799,
+      "sst_start": 1884,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "Format",
+          804
+        ],
+        [
+          "XF",
+          600
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "SST",
+          55
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 128,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 15872,
+      "first_boundsheet8_offset": 1329,
+      "globals_end": 1531,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1403,
+      "list_prefix_bytes": 1403,
+      "list_prefix_share": 0.9163945133899413,
+      "path": "test-data/poi/test-data/spreadsheet/45761.xls",
+      "sst_bytes": 45,
+      "sst_end": 1488,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.02939255388634879,
+      "sst_start": 1443,
+      "stream": "Workbook",
+      "stream_len": 2503,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          74
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          45
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 101,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1330,
+      "globals_end": 1449,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1348,
+      "list_prefix_bytes": 1348,
+      "list_prefix_share": 0.9302967563837129,
+      "path": "test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls",
+      "sst_bytes": 18,
+      "sst_end": 1406,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.012422360248447204,
+      "sst_start": 1388,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 3747,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 22016,
+      "first_boundsheet8_offset": 10707,
+      "globals_end": 14472,
+      "globals_records": 272,
+      "issue": null,
+      "last_boundsheet8_end": 10725,
+      "list_prefix_bytes": 10725,
+      "list_prefix_share": 0.7410862354892206,
+      "path": "test-data/poi/test-data/spreadsheet/48968.xls",
+      "sst_bytes": 232,
+      "sst_end": 11025,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.016030956329463792,
+      "sst_start": 10793,
+      "stream": "Workbook",
+      "stream_len": 18154,
+      "top_record_bytes": [
+        [
+          "StyleExt",
+          3566
+        ],
+        [
+          "0x0896",
+          3339
+        ],
+        [
+          "XFExt",
+          3144
+        ],
+        [
+          "XF",
+          1608
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          728
+        ],
+        [
+          "Format",
+          443
+        ],
+        [
+          "SST",
+          232
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 67338,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 134144,
+      "first_boundsheet8_offset": 7174,
+      "globals_end": 74548,
+      "globals_records": 322,
+      "issue": null,
+      "last_boundsheet8_end": 7210,
+      "list_prefix_bytes": 7210,
+      "list_prefix_share": 0.09671620969040082,
+      "path": "test-data/poi/test-data/spreadsheet/50939.xls",
+      "sst_bytes": 12,
+      "sst_end": 74513,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0001609701132156463,
+      "sst_start": 74501,
+      "stream": "Workbook",
+      "stream_len": 103771,
+      "top_record_bytes": [
+        [
+          "0x0866",
+          56947
+        ],
+        [
+          "MsoDrawingGroup",
+          7447
+        ],
+        [
+          "XF",
+          3624
+        ],
+        [
+          "Lbl",
+          2538
+        ],
+        [
+          "Format",
+          1949
+        ],
+        [
+          "Font",
+          842
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "0x01AE",
+          162
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 304,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 19456,
+      "first_boundsheet8_offset": 12038,
+      "globals_end": 12396,
+      "globals_records": 300,
+      "issue": null,
+      "last_boundsheet8_end": 12092,
+      "list_prefix_bytes": 12092,
+      "list_prefix_share": 0.9754759599870926,
+      "path": "test-data/poi/test-data/spreadsheet/53109.xls",
+      "sst_bytes": 12,
+      "sst_end": 12300,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.000968054211035818,
+      "sst_start": 12288,
+      "stream": "Workbook",
+      "stream_len": 15649,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4296
+        ],
+        [
+          "StyleExt",
+          3413
+        ],
+        [
+          "XF",
+          1536
+        ],
+        [
+          "Style",
+          1097
+        ],
+        [
+          "Font",
+          792
+        ],
+        [
+          "Format",
+          510
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 226246,
+      "continuation_bytes_by_continued_record": [
+        [
+          "SST",
+          216786
+        ]
+      ],
+      "file_size": 984576,
+      "first_boundsheet8_offset": 80667,
+      "globals_end": 306931,
+      "globals_records": 3421,
+      "issue": null,
+      "last_boundsheet8_end": 80685,
+      "list_prefix_bytes": 80685,
+      "list_prefix_share": 0.2628766726071984,
+      "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+      "sst_bytes": 225007,
+      "sst_end": 305811,
+      "sst_frames": 28,
+      "sst_share_of_globals": 0.7330865894940557,
+      "sst_start": 80804,
+      "stream": "Workbook",
+      "stream_len": 927178,
+      "top_record_bytes": [
+        [
+          "Continue",
+          216786
+        ],
+        [
+          "XF",
+          40920
+        ],
+        [
+          "Style",
+          34021
+        ],
+        [
+          "SST",
+          8221
+        ],
+        [
+          "StyleExt",
+          2244
+        ],
+        [
+          "Font",
+          1582
+        ],
+        [
+          "Format",
+          1267
+        ],
+        [
+          "ExtSST",
+          1030
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 176,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 28160,
+      "first_boundsheet8_offset": 13026,
+      "globals_end": 13262,
+      "globals_records": 310,
+      "issue": null,
+      "last_boundsheet8_end": 13086,
+      "list_prefix_bytes": 13086,
+      "list_prefix_share": 0.9867290001508068,
+      "path": "test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls",
+      "sst_bytes": 12,
+      "sst_end": 13166,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0009048408988086261,
+      "sst_start": 13154,
+      "stream": "Workbook",
+      "stream_len": 17084,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4786
+        ],
+        [
+          "StyleExt",
+          3713
+        ],
+        [
+          "XF",
+          1776
+        ],
+        [
+          "Style",
+          891
+        ],
+        [
+          "Format",
+          752
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 4362,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 66048,
+      "first_boundsheet8_offset": 11846,
+      "globals_end": 16226,
+      "globals_records": 294,
+      "issue": null,
+      "last_boundsheet8_end": 11864,
+      "list_prefix_bytes": 11864,
+      "list_prefix_share": 0.7311721927770245,
+      "path": "test-data/poi/test-data/spreadsheet/57456.xls",
+      "sst_bytes": 12,
+      "sst_end": 12008,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0007395538025391348,
+      "sst_start": 11996,
+      "stream": "Workbook",
+      "stream_len": 56319,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4247
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3140
+        ],
+        [
+          "XF",
+          1512
+        ],
+        [
+          "0x0876",
+          1002
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          726
+        ],
+        [
+          "Format",
+          560
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 7,
+      "bytes_after_last_boundsheet8": 735652,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          706290
+        ],
+        [
+          "SST",
+          8167
+        ]
+      ],
+      "file_size": 1103360,
+      "first_boundsheet8_offset": 36958,
+      "globals_end": 772760,
+      "globals_records": 1166,
+      "issue": null,
+      "last_boundsheet8_end": 37108,
+      "list_prefix_bytes": 37108,
+      "list_prefix_share": 0.04802008385527201,
+      "path": "test-data/poi/test-data/spreadsheet/59858.xls",
+      "sst_bytes": 16388,
+      "sst_end": 772296,
+      "sst_frames": 2,
+      "sst_share_of_globals": 0.021207101816864228,
+      "sst_start": 755908,
+      "stream": "Workbook",
+      "stream_len": 870403,
+      "top_record_bytes": [
+        [
+          "Continue",
+          714457
+        ],
+        [
+          "XFExt",
+          19654
+        ],
+        [
+          "XF",
+          9336
+        ],
+        [
+          "MsoDrawingGroup",
+          8228
+        ],
+        [
+          "SST",
+          8221
+        ],
+        [
+          "StyleExt",
+          3669
+        ],
+        [
+          "0x005A",
+          2497
+        ],
+        [
+          "Font",
+          1950
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 16,
+      "bytes_after_last_boundsheet8": 530243,
+      "continuation_bytes_by_continued_record": [
+        [
+          "MsoDrawingGroup",
+          508383
+        ]
+      ],
+      "file_size": 1402368,
+      "first_boundsheet8_offset": 20783,
+      "globals_end": 551377,
+      "globals_records": 621,
+      "issue": null,
+      "last_boundsheet8_end": 21134,
+      "list_prefix_bytes": 21134,
+      "list_prefix_share": 0.03832949143689345,
+      "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+      "sst_bytes": 4603,
+      "sst_end": 550977,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008348190076843974,
+      "sst_start": 546374,
+      "stream": "Workbook",
+      "stream_len": 1314225,
+      "top_record_bytes": [
+        [
+          "Continue",
+          508383
+        ],
+        [
+          "MsoDrawingGroup",
+          16456
+        ],
+        [
+          "XFExt",
+          8217
+        ],
+        [
+          "SST",
+          4603
+        ],
+        [
+          "XF",
+          4080
+        ],
+        [
+          "StyleExt",
+          3639
+        ],
+        [
+          "0x088D",
+          1468
+        ],
+        [
+          "Font",
+          1312
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 16384,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1430,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9706293706293706,
+      "path": "test-data/poi/test-data/spreadsheet/DBCSHeader.xls",
+      "sst_bytes": 12,
+      "sst_end": 1420,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008391608391608392,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 95,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1689,
+      "globals_end": 1838,
+      "globals_records": 87,
+      "issue": null,
+      "last_boundsheet8_end": 1743,
+      "list_prefix_bytes": 1743,
+      "list_prefix_share": 0.9483133841131665,
+      "path": "test-data/poi/test-data/spreadsheet/DateFormats.xls",
+      "sst_bytes": 32,
+      "sst_end": 1795,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.017410228509249184,
+      "sst_start": 1763,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          672
+        ],
+        [
+          "Format",
+          495
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          64
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "SST",
+          32
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 321,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 43520,
+      "first_boundsheet8_offset": 12271,
+      "globals_end": 12646,
+      "globals_records": 287,
+      "issue": null,
+      "last_boundsheet8_end": 12325,
+      "list_prefix_bytes": 12325,
+      "list_prefix_share": 0.9746164795192156,
+      "path": "test-data/poi/test-data/spreadsheet/DrawingAndComments.xls",
+      "sst_bytes": 55,
+      "sst_end": 12542,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.004349201328483315,
+      "sst_start": 12487,
+      "stream": "Workbook",
+      "stream_len": 33424,
+      "top_record_bytes": [
+        [
+          "StyleExt",
+          3818
+        ],
+        [
+          "XFExt",
+          3232
+        ],
+        [
+          "XF",
+          1536
+        ],
+        [
+          "Style",
+          1331
+        ],
+        [
+          "Format",
+          1108
+        ],
+        [
+          "Font",
+          852
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 350,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 12464,
+      "globals_end": 12868,
+      "globals_records": 315,
+      "issue": null,
+      "last_boundsheet8_end": 12518,
+      "list_prefix_bytes": 12518,
+      "list_prefix_share": 0.9728007460366801,
+      "path": "test-data/poi/test-data/spreadsheet/Formatting.xls",
+      "sst_bytes": 170,
+      "sst_end": 12756,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.013211066210755362,
+      "sst_start": 12586,
+      "stream": "Workbook",
+      "stream_len": 14686,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4688
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1728
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          529
+        ],
+        [
+          "SST",
+          170
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 409,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1396,
+      "globals_end": 1863,
+      "globals_records": 75,
+      "issue": null,
+      "last_boundsheet8_end": 1454,
+      "list_prefix_bytes": 1454,
+      "list_prefix_share": 0.7804616210413312,
+      "path": "test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls",
+      "sst_bytes": 338,
+      "sst_end": 1812,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.18142780461621041,
+      "sst_start": 1474,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "SST",
+          338
+        ],
+        [
+          "Font",
+          150
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          58
+        ],
+        [
+          "Style",
+          56
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 1569,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25088,
+      "first_boundsheet8_offset": 11860,
+      "globals_end": 13488,
+      "globals_records": 301,
+      "issue": null,
+      "last_boundsheet8_end": 11919,
+      "list_prefix_bytes": 11919,
+      "list_prefix_share": 0.8836743772241993,
+      "path": "test-data/poi/test-data/spreadsheet/MRExtraLines.xls",
+      "sst_bytes": 1137,
+      "sst_end": 13197,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.08429715302491103,
+      "sst_start": 12060,
+      "stream": "Workbook",
+      "stream_len": 21001,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3669
+        ],
+        [
+          "XF",
+          1632
+        ],
+        [
+          "SST",
+          1137
+        ],
+        [
+          "Style",
+          863
+        ],
+        [
+          "Font",
+          744
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "0x0876",
+          155
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 598,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 44544,
+      "first_boundsheet8_offset": 11760,
+      "globals_end": 12372,
+      "globals_records": 291,
+      "issue": null,
+      "last_boundsheet8_end": 11774,
+      "list_prefix_bytes": 11774,
+      "list_prefix_share": 0.9516650501131587,
+      "path": "test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls",
+      "sst_bytes": 390,
+      "sst_end": 12252,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.03152279340446169,
+      "sst_start": 11862,
+      "stream": "Workbook",
+      "stream_len": 34710,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4247
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1512
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "SST",
+          390
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "0x088D",
+          126
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 7252,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 31232,
+      "first_boundsheet8_offset": 4210,
+      "globals_end": 11475,
+      "globals_records": 273,
+      "issue": null,
+      "last_boundsheet8_end": 4223,
+      "list_prefix_bytes": 4223,
+      "list_prefix_share": 0.3680174291938998,
+      "path": "test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls",
+      "sst_bytes": 12,
+      "sst_end": 4407,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0010457516339869282,
+      "sst_start": 4395,
+      "stream": "Workbook",
+      "stream_len": 27459,
+      "top_record_bytes": [
+        [
+          "StyleExt",
+          3664
+        ],
+        [
+          "XFExt",
+          3144
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          873
+        ],
+        [
+          "Format",
+          847
+        ],
+        [
+          "Font",
+          728
+        ],
+        [
+          "Lbl",
+          132
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 241,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25088,
+      "first_boundsheet8_offset": 12296,
+      "globals_end": 12597,
+      "globals_records": 290,
+      "issue": null,
+      "last_boundsheet8_end": 12356,
+      "list_prefix_bytes": 12356,
+      "list_prefix_share": 0.9808684607446218,
+      "path": "test-data/poi/test-data/spreadsheet/ShrinkToFit.xls",
+      "sst_bytes": 69,
+      "sst_end": 12493,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005477494641581329,
+      "sst_start": 12424,
+      "stream": "Workbook",
+      "stream_len": 14933,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4296
+        ],
+        [
+          "StyleExt",
+          3713
+        ],
+        [
+          "XF",
+          1536
+        ],
+        [
+          "Style",
+          891
+        ],
+        [
+          "Format",
+          752
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 62,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1450,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9572413793103448,
+      "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+      "sst_bytes": 24,
+      "sst_end": 1432,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.016551724137931035,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          24
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 243,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 30720,
+      "first_boundsheet8_offset": 11588,
+      "globals_end": 11885,
+      "globals_records": 289,
+      "issue": null,
+      "last_boundsheet8_end": 11642,
+      "list_prefix_bytes": 11642,
+      "list_prefix_share": 0.979554059739167,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleMacro.xls",
+      "sst_bytes": 39,
+      "sst_end": 11749,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.003281447202355911,
+      "sst_start": 11710,
+      "stream": "Workbook",
+      "stream_len": 13142,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 3532,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 43008,
+      "first_boundsheet8_offset": 11701,
+      "globals_end": 15269,
+      "globals_records": 292,
+      "issue": null,
+      "last_boundsheet8_end": 11737,
+      "list_prefix_bytes": 11737,
+      "list_prefix_share": 0.7686816425437161,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls",
+      "sst_bytes": 20,
+      "sst_end": 12045,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0013098434737048924,
+      "sst_start": 12025,
+      "stream": "Workbook",
+      "stream_len": 33273,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "0x0896",
+          3140
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Font",
+          828
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 180,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 6144,
+      "first_boundsheet8_offset": 1668,
+      "globals_end": 1902,
+      "globals_records": 79,
+      "issue": null,
+      "last_boundsheet8_end": 1722,
+      "list_prefix_bytes": 1722,
+      "list_prefix_share": 0.9053627760252366,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleWithColours.xls",
+      "sst_bytes": 140,
+      "sst_end": 1884,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07360672975814932,
+      "sst_start": 1744,
+      "stream": "Workbook",
+      "stream_len": 3177,
+      "top_record_bytes": [
+        [
+          "XF",
+          648
+        ],
+        [
+          "Format",
+          340
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "SST",
+          140
+        ],
+        [
+          "Font",
+          124
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 189,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1398,
+      "globals_end": 1641,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1452,
+      "list_prefix_bytes": 1452,
+      "list_prefix_share": 0.8848263254113345,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleWithComments.xls",
+      "sst_bytes": 32,
+      "sst_end": 1598,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.019500304692260818,
+      "sst_start": 1566,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          32
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 82,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1470,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9442176870748299,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls",
+      "sst_bytes": 19,
+      "sst_end": 1427,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.01292517006802721,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 124,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1512,
+      "globals_records": 73,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.917989417989418,
+      "path": "test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls",
+      "sst_bytes": 35,
+      "sst_end": 1494,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.023148148148148147,
+      "sst_start": 1459,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          35
+        ],
+        [
+          "Lbl",
+          31
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 2,
+      "bytes_after_last_boundsheet8": 97,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1458,
+      "globals_end": 1591,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1494,
+      "list_prefix_bytes": 1494,
+      "list_prefix_share": 0.9390320553111251,
+      "path": "test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls",
+      "sst_bytes": 34,
+      "sst_end": 1548,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.021370207416719043,
+      "sst_start": 1514,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          270
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BoundSheet8",
+          36
+        ],
+        [
+          "SST",
+          34
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 42,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18432,
+      "first_boundsheet8_offset": 1702,
+      "globals_end": 1798,
+      "globals_records": 70,
+      "issue": null,
+      "last_boundsheet8_end": 1756,
+      "list_prefix_bytes": 1756,
+      "list_prefix_share": 0.9766407119021134,
+      "path": "test-data/poi/test-data/spreadsheet/UncalcedRecord.xls",
+      "sst_bytes": 12,
+      "sst_end": 1788,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.006674082313681869,
+      "sst_start": 1776,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "Format",
+          752
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 269,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 25600,
+      "first_boundsheet8_offset": 12027,
+      "globals_end": 12346,
+      "globals_records": 297,
+      "issue": null,
+      "last_boundsheet8_end": 12077,
+      "list_prefix_bytes": 12077,
+      "list_prefix_share": 0.978211566499271,
+      "path": "test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls",
+      "sst_bytes": 69,
+      "sst_end": 12234,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005588854689778066,
+      "sst_start": 12165,
+      "stream": "Workbook",
+      "stream_len": 15747,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "0x088D",
+          438
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 182,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1426,
+      "globals_end": 1662,
+      "globals_records": 76,
+      "issue": null,
+      "last_boundsheet8_end": 1480,
+      "list_prefix_bytes": 1480,
+      "list_prefix_share": 0.8904933814681107,
+      "path": "test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls",
+      "sst_bytes": 119,
+      "sst_end": 1619,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.07160048134777376,
+      "sst_start": 1500,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          552
+        ],
+        [
+          "Format",
+          360
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "SST",
+          119
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Style",
+          56
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "BookExt",
+          25
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 810,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 18944,
+      "first_boundsheet8_offset": 11771,
+      "globals_end": 12599,
+      "globals_records": 311,
+      "issue": null,
+      "last_boundsheet8_end": 11789,
+      "list_prefix_bytes": 11789,
+      "list_prefix_share": 0.9357091832685134,
+      "path": "test-data/poi/test-data/spreadsheet/XRefCalc.xls",
+      "sst_bytes": 74,
+      "sst_end": 12495,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.005873482022382729,
+      "sst_start": 12421,
+      "stream": "Workbook",
+      "stream_len": 15154,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4316
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1536
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          404
+        ],
+        [
+          "Lbl",
+          193
+        ],
+        [
+          "0x0023",
+          134
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 67,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1455,
+      "globals_records": 71,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9539518900343643,
+      "path": "test-data/poi/test-data/spreadsheet/colwidth.xls",
+      "sst_bytes": 12,
+      "sst_end": 1420,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.008247422680412371,
+      "sst_start": 1408,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "BookExt",
+          25
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 190,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 14336,
+      "first_boundsheet8_offset": 2150,
+      "globals_end": 2394,
+      "globals_records": 82,
+      "issue": null,
+      "last_boundsheet8_end": 2204,
+      "list_prefix_bytes": 2204,
+      "list_prefix_share": 0.9206349206349206,
+      "path": "test-data/poi/test-data/spreadsheet/comments.xls",
+      "sst_bytes": 33,
+      "sst_end": 2351,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.013784461152882205,
+      "sst_start": 2318,
+      "stream": "Workbook",
+      "stream_len": 4381,
+      "top_record_bytes": [
+        [
+          "Format",
+          1136
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Font",
+          184
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "SST",
+          33
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 1190,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 21504,
+      "first_boundsheet8_offset": 1888,
+      "globals_end": 3133,
+      "globals_records": 83,
+      "issue": null,
+      "last_boundsheet8_end": 1943,
+      "list_prefix_bytes": 1943,
+      "list_prefix_share": 0.6201723587615704,
+      "path": "test-data/poi/test-data/spreadsheet/duprich1.xls",
+      "sst_bytes": 1080,
+      "sst_end": 3043,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.34471752314075965,
+      "sst_start": 1963,
+      "stream": "Workbook",
+      "stream_len": 11424,
+      "top_record_bytes": [
+        [
+          "SST",
+          1080
+        ],
+        [
+          "Format",
+          910
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Font",
+          148
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "ExtSST",
+          86
+        ],
+        [
+          "BoundSheet8",
+          55
+        ],
+        [
+          "Style",
+          48
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 120,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1778,
+      "globals_end": 1952,
+      "globals_records": 81,
+      "issue": null,
+      "last_boundsheet8_end": 1832,
+      "list_prefix_bytes": 1832,
+      "list_prefix_share": 0.9385245901639344,
+      "path": "test-data/poi/test-data/spreadsheet/duprich2.xls",
+      "sst_bytes": 82,
+      "sst_end": 1934,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.042008196721311473,
+      "sst_start": 1852,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "Format",
+          744
+        ],
+        [
+          "XF",
+          528
+        ],
+        [
+          "Font",
+          180
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "SST",
+          82
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 325,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 16384,
+      "first_boundsheet8_offset": 11585,
+      "globals_end": 11928,
+      "globals_records": 286,
+      "issue": null,
+      "last_boundsheet8_end": 11603,
+      "list_prefix_bytes": 11603,
+      "list_prefix_share": 0.9727531857813548,
+      "path": "test-data/poi/test-data/spreadsheet/dvEmpty.xls",
+      "sst_bytes": 133,
+      "sst_end": 11824,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.011150234741784037,
+      "sst_start": 11691,
+      "stream": "Workbook",
+      "stream_len": 12388,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "SST",
+          133
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 325,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 16896,
+      "first_boundsheet8_offset": 11728,
+      "globals_end": 12071,
+      "globals_records": 294,
+      "issue": null,
+      "last_boundsheet8_end": 11746,
+      "list_prefix_bytes": 11746,
+      "list_prefix_share": 0.9730759671941016,
+      "path": "test-data/poi/test-data/spreadsheet/externalFunctionExample.xls",
+      "sst_bytes": 34,
+      "sst_end": 11967,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.0028166680473862976,
+      "sst_start": 11933,
+      "stream": "Workbook",
+      "stream_len": 12945,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4247
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1512
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Format",
+          454
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "TableStyles",
+          92
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 4,
+      "bytes_after_last_boundsheet8": 11343,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 173568,
+      "first_boundsheet8_offset": 10235,
+      "globals_end": 21679,
+      "globals_records": 531,
+      "issue": null,
+      "last_boundsheet8_end": 10336,
+      "list_prefix_bytes": 10336,
+      "list_prefix_share": 0.4767747589833479,
+      "path": "test-data/poi/test-data/spreadsheet/external_name.xls",
+      "sst_bytes": 2659,
+      "sst_end": 21548,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.12265325891415656,
+      "sst_start": 18889,
+      "stream": "Workbook",
+      "stream_len": 161745,
+      "top_record_bytes": [
+        [
+          "XF",
+          6648
+        ],
+        [
+          "0x0866",
+          4200
+        ],
+        [
+          "SST",
+          2659
+        ],
+        [
+          "Lbl",
+          2498
+        ],
+        [
+          "Format",
+          1850
+        ],
+        [
+          "Font",
+          1300
+        ],
+        [
+          "0x005A",
+          1082
+        ],
+        [
+          "0x01AE",
+          480
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 200,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 96768,
+      "first_boundsheet8_offset": 1002,
+      "globals_end": 1256,
+      "globals_records": 66,
+      "issue": null,
+      "last_boundsheet8_end": 1056,
+      "list_prefix_bytes": 1056,
+      "list_prefix_share": 0.8407643312101911,
+      "path": "test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls",
+      "sst_bytes": 0,
+      "sst_end": null,
+      "sst_frames": 0,
+      "sst_share_of_globals": 0.0,
+      "sst_start": null,
+      "stream": "Workbook",
+      "stream_len": 2776,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "Lbl",
+          58
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "Format",
+          32
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 171,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 96256,
+      "first_boundsheet8_offset": 1002,
+      "globals_end": 1227,
+      "globals_records": 65,
+      "issue": null,
+      "last_boundsheet8_end": 1056,
+      "list_prefix_bytes": 1056,
+      "list_prefix_share": 0.8606356968215159,
+      "path": "test-data/poi/test-data/spreadsheet/named-cell-test.xls",
+      "sst_bytes": 0,
+      "sst_end": null,
+      "sst_frames": 0,
+      "sst_share_of_globals": 0.0,
+      "sst_start": null,
+      "stream": "Workbook",
+      "stream_len": 2729,
+      "top_record_bytes": [
+        [
+          "XF",
+          528
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          110
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "Format",
+          32
+        ],
+        [
+          "Lbl",
+          29
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 152,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1334,
+      "globals_end": 1540,
+      "globals_records": 74,
+      "issue": null,
+      "last_boundsheet8_end": 1388,
+      "list_prefix_bytes": 1388,
+      "list_prefix_share": 0.9012987012987013,
+      "path": "test-data/poi/test-data/spreadsheet/namedinput.xls",
+      "sst_bytes": 12,
+      "sst_end": 1530,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.007792207792207792,
+      "sst_start": 1518,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "Format",
+          384
+        ],
+        [
+          "Font",
+          120
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "Lbl",
+          90
+        ],
+        [
+          "BoundSheet8",
+          54
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 531,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 31232,
+      "first_boundsheet8_offset": 12412,
+      "globals_end": 12961,
+      "globals_records": 305,
+      "issue": null,
+      "last_boundsheet8_end": 12430,
+      "list_prefix_bytes": 12430,
+      "list_prefix_share": 0.9590309389707584,
+      "path": "test-data/poi/test-data/spreadsheet/testNames.xls",
+      "sst_bytes": 16,
+      "sst_end": 12825,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.001234472648715377,
+      "sst_start": 12809,
+      "stream": "Workbook",
+      "stream_len": 13988,
+      "top_record_bytes": [
+        [
+          "XFExt",
+          4198
+        ],
+        [
+          "StyleExt",
+          3583
+        ],
+        [
+          "XF",
+          1488
+        ],
+        [
+          "Format",
+          1188
+        ],
+        [
+          "Style",
+          828
+        ],
+        [
+          "Font",
+          714
+        ],
+        [
+          "Lbl",
+          291
+        ],
+        [
+          "WriteAccess",
+          116
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 3,
+      "bytes_after_last_boundsheet8": 393,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 13824,
+      "first_boundsheet8_offset": 1600,
+      "globals_end": 2047,
+      "globals_records": 82,
+      "issue": null,
+      "last_boundsheet8_end": 1654,
+      "list_prefix_bytes": 1654,
+      "list_prefix_share": 0.8080117244748413,
+      "path": "test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls",
+      "sst_bytes": 168,
+      "sst_end": 2029,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.08207132388861749,
+      "sst_start": 1861,
+      "stream": "Workbook",
+      "stream_len": 4096,
+      "top_record_bytes": [
+        [
+          "Format",
+          510
+        ],
+        [
+          "XF",
+          504
+        ],
+        [
+          "Font",
+          260
+        ],
+        [
+          "SST",
+          168
+        ],
+        [
+          "WriteAccess",
+          116
+        ],
+        [
+          "MsoDrawingGroup",
+          94
+        ],
+        [
+          "Lbl",
+          73
+        ],
+        [
+          "BoundSheet8",
+          54
+        ]
+      ]
+    },
+    {
+      "boundsheet8_count": 1,
+      "bytes_after_last_boundsheet8": 82,
+      "continuation_bytes_by_continued_record": [],
+      "file_size": 4096,
+      "first_boundsheet8_offset": 1032,
+      "globals_end": 1132,
+      "globals_records": 53,
+      "issue": null,
+      "last_boundsheet8_end": 1050,
+      "list_prefix_bytes": 1050,
+      "list_prefix_share": 0.9275618374558304,
+      "path": "test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls",
+      "sst_bytes": 12,
+      "sst_end": 1102,
+      "sst_frames": 1,
+      "sst_share_of_globals": 0.01060070671378092,
+      "sst_start": 1090,
+      "stream": "Workbook",
+      "stream_len": 1620,
+      "top_record_bytes": [
+        [
+          "XF",
+          504
+        ],
+        [
+          "0x0092",
+          230
+        ],
+        [
+          "Font",
+          150
+        ],
+        [
+          "Style",
+          48
+        ],
+        [
+          "0x003D",
+          22
+        ],
+        [
+          "BOF",
+          20
+        ],
+        [
+          "0x088C",
+          20
+        ],
+        [
+          "BoundSheet8",
+          18
+        ]
+      ]
+    }
+  ],
+  "summary": {
+    "files_scanned": 126,
+    "files_where_sst_over_half_of_globals": 4,
+    "files_with_globals": 126,
+    "list_prefix_share": 0.20854545372721014,
+    "sst_share": 0.11224158648136583,
+    "total_globals_bytes": 3999694,
+    "total_list_prefix_bytes": 834118,
+    "total_sst_bytes": 448932
+  }
+}

@@ -1,0 +1,17 @@
+# Corpus differential: scan_shared_string_records_as::<MeasuredText> vs ::<String>
+# cargo test -p litchi-xls --lib every_sst_fixture_indexes_identically_both_ways -- --nocapture
+
+
+running 1 test
+sst-differential: fixtures=126 with_sst=121 indexed=117 refused=4 entries=17434
+sst-differential: skipped poi/test-data/spreadsheet/1900DateWindowing.xls: container: Corrupted file: FAT sector 10 is not marked FATSECT
+sst-differential: skipped poi/test-data/spreadsheet/1904DateWindowing.xls: container: Corrupted file: FAT sector 10 is not marked FATSECT
+sst-differential: without an SST = 3
+sst-differential: refused ole/xls/password.xls: invalid SST counts must be non-negative signed integers
+sst-differential: refused poi/test-data/spreadsheet/35897-type4.xls: invalid SST counts must be non-negative signed integers
+sst-differential: refused poi/test-data/spreadsheet/57456.xls: invalid SST total count is smaller than its unique count
+sst-differential: refused poi/test-data/spreadsheet/xor-encryption-abc.xls: invalid SST counts must be non-negative signed integers
+test records::sst_measure_tests::every_sst_fixture_indexes_identically_both_ways ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1044 filtered out; finished in 0.05s
+

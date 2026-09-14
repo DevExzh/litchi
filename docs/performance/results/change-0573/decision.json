@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0573-zip-single-local-header-read",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "one_speculative_read_replaces_two_per_strict_local_header",
+    "per_entry_heap_allocation_removed_on_the_fast_path",
+    "speculative_window_bounded_so_no_payload_byte_is_read",
+    "counted_read_tests_fail_without_the_change",
+    "error_identity_and_order_pinned_by_tests_that_pass_on_both_sides"
+  ],
+  "accepted_evidence": {
+    "ooxml_corpus": {
+      "fixtures": 168,
+      "members": 4089,
+      "descriptor_bearing_members": 148,
+      "reads": [8326, 4385],
+      "bytes": [514578, 517371],
+      "fixtures_byte_identical": 159,
+      "fixtures_reads_fell": 160,
+      "fixtures_reads_unchanged": 8,
+      "fixtures_reads_rose": 0,
+      "note": "one whole-archive strict layout proof per fixture, counted through a positional reader that records every read_at"
+    },
+    "named_fixture": {
+      "path": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+      "members": 132,
+      "reads": [264, 132],
+      "bytes": [10740, 10740],
+      "note": "change 0572's plan predicted 264 requests for this fixture; confirmed"
+    },
+    "allocations": {
+      "per_entry_metadata_vec": [4089, 148],
+      "note": "the heap buffer now exists only on the fallback path; in this corpus that is exactly the descriptor-bearing members"
+    },
+    "window_sizing": {
+      "corpus_archives": 533,
+      "corpus_members": 14744,
+      "max_local_variable_region_bytes": 539,
+      "ooxml_members_missed_by_a_512_byte_window": 301,
+      "members_needing_more_than_640": 2,
+      "chosen": 640
+    },
+    "latency": "none measured, none claimed"
+  },
+  "known_gaps": {
+    "descriptor_bearing_members": "unchanged in read count. The window reserves the widest data descriptor (24 bytes) because the real width is not knowable until the local header is parsed, and every descriptor in the corpus is narrower, so those members take the historical second read and pay their variable region's bytes twice. That is the whole of the +0.54% byte increase.",
+    "gaps_between_members": "an archive with padding between members lets the window read those filler bytes, up to the 640-byte ceiling. No corpus fixture has such a gap.",
+    "callers_without_member_order": "a caller that passes the central-directory offset as the next-member bound gets a window capped only by 640 and can read later members' bytes. Both production callers pass the real next-member offset."
+  },
+  "withheld": ["timing", "allocation profile", "cold cache", "physical device", "cross platform", "range-source request pricing"]
+}

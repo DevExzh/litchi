@@ -1,0 +1,53 @@
+{
+ "fixtures": {
+  "54016": {
+   "bytes": 984576,
+   "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+   "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+  },
+  "cv": {
+   "bytes": 165888,
+   "path": "test-data/ole/xls/WithCustomViews.xls",
+   "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64"
+  },
+  "flagship": {
+   "bytes": 1402368,
+   "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  }
+ },
+ "host": {
+  "aslr": "disabled via setarch x86_64 -R",
+  "cores": 32,
+  "cpu": "AMD EPYC 9R45",
+  "kernel": "7.0.0-1012-aws",
+  "pinned_cpu": 17,
+  "quiescence": [
+   "capture window opened 2026-09-14T12:19:49-04:00",
+   "loadavg: 4.86 6.40 7.58 2/1946 3426773",
+   "nproc: 32  pinned CPU: 17  ASLR: disabled (setarch x86_64 -R)",
+   "capture window closed 2026-09-14T12:20:34-04:00",
+   "loadavg: 3.47 5.81 7.32 2/1745 3428900"
+  ]
+ },
+ "legs": {
+  "after": {
+   "binary_sha256": "9cd2e21dccd24db00b8e6f23b4bc14c3835277e98b36bc40c4202dad13af8d9c",
+   "description": "HEAD plus this change's crates/litchi-xls/src/records.rs",
+   "records_rs_sha256": "ed6391cbc2c118bf57f4e6654893be013784921753fdaa1147601dc82e118b3f"
+  },
+  "before": {
+   "binary_sha256": "60cdd3da5965efbac8f0f87c92719e217af8f1eb3cdb3d19f37014a90da26cd0",
+   "description": "HEAD, unmodified",
+   "records_rs_sha256": "67f32ef82f8d8fcc718139435cd4c3070bcc43c16500983640e4919484d5148a"
+  },
+  "differ_only_in": "crates/litchi-xls/src/records.rs",
+  "worktree": "a detached git worktree at 163ac1bd67f2a0d72c27bfec60e0a2620768cc9d, outside the repository; HEAD has since advanced by one documentation-only commit (change 0572) that touches no file under crates/, so both legs remain code-identical to the branch tip apart from this change"
+ },
+ "toolchain": {
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "perf": "perf version 7.0.14",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "valgrind": "valgrind-3.26.0"
+ }
+}

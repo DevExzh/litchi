@@ -1,0 +1,26 @@
+# Allocations per source-backed open, counted by the test-only global
+# allocator in crates/litchi-xls/tests/sst_scan_allocations.rs.
+#
+# Both legs run the SAME test file. The before leg is a detached git
+# worktree at 163ac1bd6 with that file copied in and nothing else changed;
+# the after leg is the same worktree with this change's records.rs applied.
+
+== before (HEAD, unmodified library) ==
+WithCustomViews.xls open: allocations=1478 bytes=533308 unique_strings=474
+thread 'opening_a_long_string_workbook_allocates_less_than_once_per_shared_string' (3323118) panicked at crates/litchi-xls/tests/sst_scan_allocations.rs:178:5:
+one open allocated 1478 times for 474 shared strings; the scan is materializing them again
+test opening_a_long_string_workbook_allocates_less_than_once_per_shared_string ... FAILED
+54016.xls open: allocations=16031 bytes=1358519 unique_strings=7893
+thread 'opening_a_string_heavy_workbook_allocates_less_than_once_per_shared_string' (3323119) panicked at crates/litchi-xls/tests/sst_scan_allocations.rs:148:5:
+one open allocated 16031 times for 7893 shared strings; the scan is materializing them again
+test opening_a_string_heavy_workbook_allocates_less_than_once_per_shared_string ... FAILED
+test extracting_text_still_decodes_shared_strings ... ok
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+== after (this change) ==
+WithCustomViews.xls open: allocations=236 bytes=153369 unique_strings=474
+test opening_a_long_string_workbook_allocates_less_than_once_per_shared_string ... ok
+54016.xls open: allocations=247 bytes=754976 unique_strings=7893
+test opening_a_string_heavy_workbook_allocates_less_than_once_per_shared_string ... ok
+test extracting_text_still_decodes_shared_strings ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

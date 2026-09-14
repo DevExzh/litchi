@@ -510,6 +510,121 @@ impl SharedStringTable {
     }
 }
 
+/// Receives shared-string code units as [`SstCursor::walk_characters`] frames
+/// them.
+///
+/// The implementations differ only in what they do with the code units; where
+/// the units are, and which framings are refused, is decided once by the walk.
+/// Runs are delivered as whole slices so that neither implementation pays the
+/// per-code-unit segment lookup the framing walk would otherwise repeat.
+trait CodeUnitSink {
+    /// Accepts a run of little-endian UTF-16 code units. `chunk.len()` is even.
+    fn push_wide(&mut self, chunk: &[u8]);
+
+    /// Accepts a run of BIFF8 compressed-Unicode bytes. Each byte is an
+    /// implicit `U+0000..=U+00FF` code unit with a zero high byte, so no
+    /// compressed code unit can be a surrogate.
+    fn push_compressed(&mut self, chunk: &[u8]);
+}
+
+/// Materializes the code units so that they can be transcoded to UTF-8.
+struct CollectedCodeUnits {
+    units: Vec<u16>,
+}
+
+impl CollectedCodeUnits {
+    fn with_capacity(count: u16) -> Result<Self> {
+        let mut units = Vec::new();
+        units.try_reserve_exact(count as usize).map_err(|error| {
+            Error::InvalidData(format!("cannot allocate shared string characters: {error}"))
+        })?;
+        Ok(Self { units })
+    }
+}
+
+impl CodeUnitSink for CollectedCodeUnits {
+    fn push_wide(&mut self, chunk: &[u8]) {
+        self.units.extend(
+            chunk
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| u16::from_le_bytes(*pair)),
+        );
+    }
+
+    fn push_compressed(&mut self, chunk: &[u8]) {
+        self.units.extend(chunk.iter().copied().map(u16::from));
+    }
+}
+
+/// Decides UTF-16 well-formedness without materializing anything.
+///
+/// `String::from_utf16` succeeds exactly when every high surrogate is
+/// immediately followed by a low surrogate and no low surrogate stands alone,
+/// so carrying one pending high surrogate across chunks — and therefore across
+/// `Continue` record boundaries, including a boundary that switches between
+/// compressed and uncompressed encoding — decides the same predicate.
+#[derive(Default)]
+struct SurrogatePairing {
+    pending_high: bool,
+    malformed: bool,
+}
+
+impl SurrogatePairing {
+    /// Reports whether `String::from_utf16` would have accepted the walked
+    /// units. A high surrogate still pending at the end of the walk is the
+    /// end-of-input case `char::decode_utf16` also refuses.
+    fn is_well_formed(&self) -> bool {
+        !self.malformed && !self.pending_high
+    }
+}
+
+impl CodeUnitSink for SurrogatePairing {
+    fn push_wide(&mut self, chunk: &[u8]) {
+        let pairs = chunk.as_chunks::<2>().0;
+        // A little-endian code unit is a surrogate exactly when its high byte
+        // lies in `0xD8..=0xDF`, so a chunk containing no such byte cannot
+        // change either flag. This test is a byte scan the compiler can widen.
+        if !self.pending_high && !pairs.iter().any(|pair| pair[1] & 0xF8 == 0xD8) {
+            return;
+        }
+        let mut pending_high = self.pending_high;
+        let mut malformed = self.malformed;
+        for pair in pairs {
+            let unit = u16::from_le_bytes(*pair);
+            if pending_high {
+                pending_high = false;
+                if (0xDC00..=0xDFFF).contains(&unit) {
+                    continue;
+                }
+                // `char::decode_utf16` reports the unpaired high surrogate and
+                // then re-examines this unit, so this walk re-examines it too.
+                // The re-examination cannot change the answer once `malformed`
+                // is set — it is kept so that the two walks have the same shape.
+                malformed = true;
+            }
+            match unit {
+                0xD800..=0xDBFF => pending_high = true,
+                0xDC00..=0xDFFF => malformed = true,
+                _ => {},
+            }
+        }
+        self.pending_high = pending_high;
+        self.malformed = malformed;
+    }
+
+    fn push_compressed(&mut self, chunk: &[u8]) {
+        // No compressed code unit is a surrogate, so the only reachable state
+        // change is that a pending high surrogate is now followed by something
+        // that cannot complete it.
+        if self.pending_high && !chunk.is_empty() {
+            self.pending_high = false;
+            self.malformed = true;
+        }
+    }
+}
+
 struct SstCursor<'a> {
     segments: &'a [&'a [u8]],
     segment_index: usize,
@@ -616,39 +731,48 @@ impl<'a> SstCursor<'a> {
         Ok(bytes)
     }
 
-    fn read_characters(&mut self, count: u16, mut high_byte: bool) -> Result<String> {
-        let mut characters = Vec::new();
-        characters
-            .try_reserve_exact(count as usize)
-            .map_err(|error| {
-                Error::InvalidData(format!("cannot allocate shared string characters: {error}"))
-            })?;
-        while characters.len() < count as usize {
+    /// Walks `count` code units of shared-string character data, following
+    /// `Continue` record boundaries and their continuation flags, and hands
+    /// every code unit to `sink`.
+    ///
+    /// This is the only implementation of shared-string character framing.
+    /// [`Self::read_characters`], which materializes the text, and
+    /// [`Self::measure_characters`], which only advances over it, both walk
+    /// through here, so the two can never disagree about where a string ends or
+    /// about which malformed framings are refused, in which order.
+    fn walk_characters<S: CodeUnitSink>(
+        &mut self,
+        count: u16,
+        mut high_byte: bool,
+        sink: &mut S,
+    ) -> Result<()> {
+        let count = count as usize;
+        let mut consumed = 0usize;
+        while consumed < count {
             let bytes_per_character = if high_byte { 2 } else { 1 };
-            let available_characters = self.remaining() / bytes_per_character;
-            let wanted = count as usize - characters.len();
+            let remaining = self.remaining();
+            let available_characters = remaining / bytes_per_character;
+            let wanted = count - consumed;
             let chunk_characters = available_characters.min(wanted);
 
-            if high_byte && !self.remaining().is_multiple_of(2) && chunk_characters < wanted {
+            if high_byte && !remaining.is_multiple_of(2) && chunk_characters < wanted {
                 return Err(Error::InvalidData(
                     "a UTF-16 shared string is split inside a code unit".to_string(),
                 ));
             }
-            for _ in 0..chunk_characters {
-                let character = if high_byte {
-                    let low = self.current()[self.offset];
-                    let high = self.current()[self.offset + 1];
-                    self.offset += 2;
-                    u16::from_le_bytes([low, high])
-                } else {
-                    let character = u16::from(self.current()[self.offset]);
-                    self.offset += 1;
-                    character
-                };
-                characters.push(character);
+            // `chunk_characters <= remaining / bytes_per_character`, so the
+            // chunk is inside the current segment by construction.
+            let chunk_bytes = chunk_characters * bytes_per_character;
+            let chunk = &self.current()[self.offset..self.offset + chunk_bytes];
+            if high_byte {
+                sink.push_wide(chunk);
+            } else {
+                sink.push_compressed(chunk);
             }
+            self.offset += chunk_bytes;
+            consumed += chunk_characters;
 
-            if characters.len() == count as usize {
+            if consumed == count {
                 break;
             }
             if self.remaining() != 0 {
@@ -665,9 +789,36 @@ impl<'a> SstCursor<'a> {
             }
             high_byte = continuation_flags == 1;
         }
+        Ok(())
+    }
 
-        String::from_utf16(&characters)
+    fn read_characters(&mut self, count: u16, high_byte: bool) -> Result<String> {
+        let mut sink = CollectedCodeUnits::with_capacity(count)?;
+        self.walk_characters(count, high_byte, &mut sink)?;
+        String::from_utf16(&sink.units)
             .map_err(|error| Error::Encoding(format!("UTF-16 decoding error: {error}")))
+    }
+
+    /// Advances over exactly the character data [`Self::read_characters`] would
+    /// consume, and refuses exactly the inputs it refuses, without allocating
+    /// the `Vec<u16>`, allocating the `String`, or transcoding to UTF-8.
+    ///
+    /// UTF-16 well-formedness is still decided, streaming, as the walk runs. A
+    /// malformed string takes a cold path that rewinds and materializes the
+    /// same span, so that the refusal is produced by `String::from_utf16`
+    /// itself and its message is byte-identical to the materializing path's.
+    fn measure_characters(&mut self, count: u16, high_byte: bool) -> Result<()> {
+        let restart = (self.segment_index, self.offset);
+        let mut sink = SurrogatePairing::default();
+        self.walk_characters(count, high_byte, &mut sink)?;
+        if sink.is_well_formed() {
+            return Ok(());
+        }
+        // Cold path only: the walk above has already proven this string is
+        // malformed, so the cost of walking it a second time does not matter.
+        self.segment_index = restart.0;
+        self.offset = restart.1;
+        self.read_characters(count, high_byte).map(|_| ())
     }
 
     fn read_formatting_runs(
@@ -877,10 +1028,43 @@ impl<'a> SstCursor<'a> {
     }
 }
 
+/// What a shared-string walk does with the character data.
+///
+/// Every other part of one shared string — the header, the flags, the rich-text
+/// run count, the `ExtRst` phonetic block and the `Continue` framing between
+/// them — is walked once, by [`walk_one_shared_string`], for both modes.
+trait SharedStringText: Sized {
+    fn consume(cursor: &mut SstCursor<'_>, count: u16, high_byte: bool) -> Result<Self>;
+}
+
+impl SharedStringText for String {
+    fn consume(cursor: &mut SstCursor<'_>, count: u16, high_byte: bool) -> Result<Self> {
+        cursor.read_characters(count, high_byte)
+    }
+}
+
+/// The measure-only mode: the character data is validated and stepped over, and
+/// nothing is retained.
+struct MeasuredText;
+
+impl SharedStringText for MeasuredText {
+    fn consume(cursor: &mut SstCursor<'_>, count: u16, high_byte: bool) -> Result<Self> {
+        cursor.measure_characters(count, high_byte).map(|()| Self)
+    }
+}
+
+/// Parses one shared string, returning its text.
 fn parse_one_shared_string(
     cursor: &mut SstCursor<'_>,
     string_index: usize,
 ) -> Result<String, SharedStringScanError> {
+    walk_one_shared_string::<String>(cursor, string_index)
+}
+
+fn walk_one_shared_string<T: SharedStringText>(
+    cursor: &mut SstCursor<'_>,
+    string_index: usize,
+) -> Result<T, SharedStringScanError> {
     cursor
         .ensure_current(3, "shared string header")
         .map_err(SharedStringScanError::Biff)?;
@@ -917,8 +1101,7 @@ fn parse_one_shared_string(
         0
     };
 
-    let value = cursor
-        .read_characters(character_count, flags & 0x01 != 0)
+    let value = T::consume(cursor, character_count, flags & 0x01 != 0)
         .map_err(SharedStringScanError::Biff)?;
     cursor
         .read_formatting_runs(run_count, character_count, string_index)
@@ -934,6 +1117,19 @@ fn parse_one_shared_string(
 }
 
 pub(crate) fn scan_shared_string_records(
+    records: &[RecordRef<'_>],
+) -> Result<SharedStringSstScan, SharedStringScanError> {
+    scan_shared_string_records_as::<MeasuredText>(records)
+}
+
+/// The SST offset scan, parameterised by what it does with each string's
+/// character data.
+///
+/// Production only ever instantiates it with [`MeasuredText`]. The tests also
+/// instantiate it with `String`, which is what the scan did before the measure
+/// path existed, so the differential harness compares two instantiations of one
+/// framing walk rather than two hand-written walks that could drift apart.
+fn scan_shared_string_records_as<T: SharedStringText>(
     records: &[RecordRef<'_>],
 ) -> Result<SharedStringSstScan, SharedStringScanError> {
     if records.is_empty() {
@@ -1022,7 +1218,10 @@ pub(crate) fn scan_shared_string_records(
         })?;
     for string_index in 0..unique_count {
         let start = cursor.logical_position();
-        parse_one_shared_string(&mut cursor, string_index)?;
+        // The scan retains offsets, never text, so production walks the string
+        // rather than decoding it. The walk refuses the same inputs at the same
+        // point in the sequence, with the same typed errors.
+        walk_one_shared_string::<T>(&mut cursor, string_index)?;
         let end = cursor.logical_position();
         entries.push(SharedStringEntryLocation { start, end });
     }
@@ -1035,6 +1234,596 @@ pub(crate) fn decode_shared_string_entry(
 ) -> Result<String, SharedStringScanError> {
     let mut cursor = SstCursor::new(segments);
     parse_one_shared_string(&mut cursor, 0)
+}
+
+#[cfg(test)]
+mod sst_measure_tests {
+    use super::*;
+    use litchi_biff::{Encoder, Kind, Record as Frame, RecordRef, Records};
+    use litchi_cfb::SharedOleFile;
+    use litchi_core::OwnedSource;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+
+    /// The message `String::from_utf16` produces for malformed UTF-16, which is
+    /// the refusal the open-time scan has always reported and must keep
+    /// reporting. `char::decode_utf16` would say `unpaired surrogate found: …`
+    /// instead; that difference is the whole reason the measure-only walk takes
+    /// a cold path through `String::from_utf16` rather than reporting itself.
+    const LONE_SURROGATE_MESSAGE: &str =
+        "UTF-16 decoding error: invalid utf-16: lone surrogate found";
+
+    fn frame(kind: u16, payload: &[u8]) -> Frame {
+        let mut encoder = Encoder::new();
+        encoder
+            .push(Kind::from_wire(kind), payload)
+            .expect("test frame fits the BIFF wire limit");
+        Frame::open(encoder.finish()).expect("test frame is complete")
+    }
+
+    /// Frames `payloads` as one `SST` record followed by `Continue` records.
+    fn sst_frames(payloads: &[Vec<u8>]) -> Vec<Frame> {
+        payloads
+            .iter()
+            .enumerate()
+            .map(|(index, payload)| frame(if index == 0 { 0x00FC } else { 0x003C }, payload))
+            .collect()
+    }
+
+    fn sst_header(total: u32, unique: u32) -> Vec<u8> {
+        let mut header = Vec::new();
+        header.extend_from_slice(&total.to_le_bytes());
+        header.extend_from_slice(&unique.to_le_bytes());
+        header
+    }
+
+    /// Renders a scan outcome as text so that two instantiations can be compared
+    /// exactly, including every error message.
+    fn describe(result: &Result<SharedStringSstScan, SharedStringScanError>) -> String {
+        match result {
+            Ok(scan) => {
+                let entries: Vec<(usize, usize)> = scan
+                    .entries
+                    .iter()
+                    .map(|entry| (entry.start, entry.end))
+                    .collect();
+                format!("ok {entries:?}")
+            },
+            Err(SharedStringScanError::Biff(error)) => format!("biff {error}"),
+            Err(SharedStringScanError::Invalid(message)) => format!("invalid {message}"),
+            Err(SharedStringScanError::Allocation {
+                resource,
+                requested,
+            }) => format!("allocation {resource} {requested}"),
+        }
+    }
+
+    /// Runs both instantiations of the scan over the same records and asserts
+    /// they agree exactly. Returns that shared outcome.
+    fn scan_both_ways(records: &[RecordRef<'_>]) -> String {
+        let measured = describe(&scan_shared_string_records_as::<MeasuredText>(records));
+        let materialized = describe(&scan_shared_string_records_as::<String>(records));
+        assert_eq!(
+            measured, materialized,
+            "the measure-only walk and the materializing walk disagree"
+        );
+        measured
+    }
+
+    fn scan_payloads(payloads: &[Vec<u8>]) -> String {
+        let frames = sst_frames(payloads);
+        let records: Vec<RecordRef<'_>> = frames.iter().map(Frame::as_ref).collect();
+        scan_both_ways(&records)
+    }
+
+    /// One uncompressed string of `units`, entirely inside the `SST` record.
+    fn one_wide_string(units: &[u16]) -> Vec<Vec<u8>> {
+        let mut payload = sst_header(1, 1);
+        payload.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        payload.push(0x01);
+        for unit in units {
+            payload.extend_from_slice(&unit.to_le_bytes());
+        }
+        vec![payload]
+    }
+
+    /// The same string split after `split_after` code units, so the remainder
+    /// arrives in a `Continue` record that re-declares the encoding.
+    fn one_wide_string_split(units: &[u16], split_after: usize) -> Vec<Vec<u8>> {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&(units.len() as u16).to_le_bytes());
+        first.push(0x01);
+        for unit in &units[..split_after] {
+            first.extend_from_slice(&unit.to_le_bytes());
+        }
+        let mut second = vec![0x01u8];
+        for unit in &units[split_after..] {
+            second.extend_from_slice(&unit.to_le_bytes());
+        }
+        vec![first, second]
+    }
+
+    /// One string whose code units are delivered in the given runs. The first
+    /// run lives in the `SST` record and every later run opens a `Continue`
+    /// record with its own encoding flag, so a string can switch between
+    /// compressed and uncompressed more than once.
+    fn one_string_in_runs(runs: &[(bool, Vec<u16>)]) -> Vec<Vec<u8>> {
+        let total: usize = runs.iter().map(|(_, units)| units.len()).sum();
+        let mut payloads = Vec::new();
+        for (index, (wide, units)) in runs.iter().enumerate() {
+            let mut payload = if index == 0 {
+                let mut head = sst_header(1, 1);
+                head.extend_from_slice(&(total as u16).to_le_bytes());
+                head
+            } else {
+                Vec::new()
+            };
+            payload.push(u8::from(*wide));
+            for unit in units {
+                if *wide {
+                    payload.extend_from_slice(&unit.to_le_bytes());
+                } else {
+                    payload.push(u8::try_from(*unit).expect("a compressed unit fits in one byte"));
+                }
+            }
+            payloads.push(payload);
+        }
+        payloads
+    }
+
+    /// An uncompressed head continued by a compressed tail, which is the
+    /// boundary that can strand a high surrogate against bytes that cannot
+    /// complete it.
+    fn wide_head_compressed_tail(head: &[u16], tail: &[u8]) -> Vec<Vec<u8>> {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&((head.len() + tail.len()) as u16).to_le_bytes());
+        first.push(0x01);
+        for unit in head {
+            first.extend_from_slice(&unit.to_le_bytes());
+        }
+        let mut second = vec![0x00u8];
+        second.extend_from_slice(tail);
+        vec![first, second]
+    }
+
+    #[test]
+    fn a_lone_high_surrogate_keeps_the_from_utf16_message() {
+        let frames = sst_frames(&one_wide_string(&[0xD800]));
+        let records: Vec<RecordRef<'_>> = frames.iter().map(Frame::as_ref).collect();
+
+        let error = scan_shared_string_records(&records)
+            .expect_err("a shared string ending in a high surrogate is refused");
+        let SharedStringScanError::Biff(Error::Encoding(message)) = &error else {
+            panic!("expected a typed encoding refusal, got {error:?}");
+        };
+        assert_eq!(message, LONE_SURROGATE_MESSAGE);
+        assert!(
+            !message.contains("unpaired surrogate"),
+            "the refusal must not be produced by char::decode_utf16: {message}"
+        );
+        assert_eq!(
+            scan_both_ways(&records),
+            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+        );
+    }
+
+    #[test]
+    fn every_unpaired_surrogate_shape_keeps_the_from_utf16_message() {
+        let shapes: [(&str, Vec<u16>); 6] = [
+            ("trailing high surrogate", vec![0x0041, 0xD800]),
+            ("leading low surrogate", vec![0xDC00, 0x0041]),
+            ("high surrogate before a plain unit", vec![0xD800, 0x0041]),
+            ("two high surrogates", vec![0xD800, 0xD800]),
+            ("low surrogate after a pair", vec![0xD800, 0xDC00, 0xDC00]),
+            ("high surrogate at the maximum", vec![0xDBFF, 0x0041]),
+        ];
+        for (name, units) in shapes {
+            let frames = sst_frames(&one_wide_string(&units));
+            let records: Vec<RecordRef<'_>> = frames.iter().map(Frame::as_ref).collect();
+            assert_eq!(
+                scan_both_ways(&records),
+                format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}"),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_surrogate_pair_split_across_a_continue_record_is_accepted() {
+        // The high surrogate ends the SST record and the low surrogate opens the
+        // Continue record, so the pairing state has to survive the boundary.
+        let payloads = one_wide_string_split(&[0xD800, 0xDC00], 1);
+        assert_eq!(scan_payloads(&payloads), "ok [(8, 16)]");
+    }
+
+    #[test]
+    fn a_high_surrogate_stranded_by_a_compressed_continuation_is_refused() {
+        // No compressed code unit can be a low surrogate, so the pending high
+        // surrogate from the previous record can never be completed.
+        let payloads = wide_head_compressed_tail(&[0x0041, 0xD800], b"BC");
+        assert_eq!(
+            scan_payloads(&payloads),
+            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+        );
+    }
+
+    #[test]
+    fn a_high_surrogate_ending_a_string_before_a_compressed_continuation_is_refused() {
+        // The pending high surrogate is the last unit of the wide run and the
+        // continuation carries no unit at all, which is the end-of-input case.
+        let payloads = wide_head_compressed_tail(&[0xD800], b"");
+        assert_eq!(
+            scan_payloads(&payloads),
+            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+        );
+    }
+
+    #[test]
+    fn a_pending_high_surrogate_cannot_be_completed_across_an_intervening_run() {
+        // `String::from_utf16` refuses `[D800, 0041, DC00]`: the high surrogate
+        // is stranded by the plain unit and the low surrogate is then stray.
+        // Both shapes need three runs, because only then does a run that cannot
+        // complete the pair sit between the two halves.
+        for middle in [(false, vec![0x0041u16]), (true, vec![0x0041u16])] {
+            let runs = [
+                (true, vec![0xD800u16]),
+                middle.clone(),
+                (true, vec![0xDC00u16]),
+            ];
+            assert_eq!(
+                scan_payloads(&one_string_in_runs(&runs)),
+                format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}"),
+                "a pair must not form across {middle:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pair_still_forms_across_an_empty_intervening_run() {
+        // An empty run carries no code unit, so it cannot strand anything and
+        // the pair is still complete. This is the boundary case that stops the
+        // rule above from being stated as "any intervening run".
+        let runs = [
+            (true, vec![0xD800u16]),
+            (false, Vec::new()),
+            (true, vec![0xDC00u16]),
+        ];
+        assert_eq!(scan_payloads(&one_string_in_runs(&runs)), "ok [(8, 17)]");
+    }
+
+    #[test]
+    fn measuring_and_materializing_agree_over_every_three_run_delivery() {
+        const UNITS: [u16; 8] = [
+            0x0041, 0x00FF, 0xD7FF, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0xE000,
+        ];
+        let mut compared = 0usize;
+        for first in UNITS {
+            for middle in UNITS {
+                for last in UNITS {
+                    let mut deliveries = vec![vec![
+                        (true, vec![first]),
+                        (true, vec![middle]),
+                        (true, vec![last]),
+                    ]];
+                    if middle <= 0x00FF {
+                        deliveries.push(vec![
+                            (true, vec![first]),
+                            (false, vec![middle]),
+                            (true, vec![last]),
+                        ]);
+                    }
+                    for runs in deliveries {
+                        scan_payloads(&one_string_in_runs(&runs));
+                        compared += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(compared, 640);
+    }
+
+    #[test]
+    fn a_pair_survives_a_long_plain_run_before_it() {
+        // Long enough that the chunk-level surrogate pre-scan takes its fast
+        // exit on the leading units and still reports the trailing defect.
+        let mut units = vec![0x0041u16; 512];
+        units.push(0xD800);
+        let payloads = one_wide_string(&units);
+        assert_eq!(
+            scan_payloads(&payloads),
+            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+        );
+
+        units.push(0xDC00);
+        let payloads = one_wide_string(&units);
+        assert_eq!(scan_payloads(&payloads), "ok [(8, 1039)]");
+    }
+
+    #[test]
+    fn measuring_and_materializing_agree_over_every_short_code_unit_sequence() {
+        // Both surrogate halves, both extremes of each half, a plain unit, a
+        // unit whose high byte neighbours the surrogate block, and the
+        // replacement character.
+        const UNITS: [u16; 8] = [
+            0x0041, 0x00FF, 0xD7FF, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0xE000,
+        ];
+        let mut sequences: Vec<Vec<u16>> = UNITS.iter().map(|unit| vec![*unit]).collect();
+        for first in UNITS {
+            for second in UNITS {
+                sequences.push(vec![first, second]);
+                for third in UNITS {
+                    sequences.push(vec![first, second, third]);
+                }
+            }
+        }
+        let mut compared = 0usize;
+        for units in &sequences {
+            scan_payloads(&one_wide_string(units));
+            compared += 1;
+            for split_after in 0..units.len() {
+                scan_payloads(&one_wide_string_split(units, split_after));
+                compared += 1;
+            }
+            scan_payloads(&wide_head_compressed_tail(units, b"z"));
+            compared += 1;
+        }
+        assert_eq!(compared, 2_840);
+    }
+
+    #[test]
+    fn a_framing_defect_after_a_malformed_unit_still_wins() {
+        // The first record already holds an unpaired high surrogate; the
+        // continuation then ends inside a code unit. The framing refusal is
+        // reported, because `String::from_utf16` only ever ran after the walk.
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&3u16.to_le_bytes());
+        first.push(0x01);
+        first.extend_from_slice(&0xD800u16.to_le_bytes());
+        first.extend_from_slice(&0x0041u16.to_le_bytes());
+        let second = vec![0x01u8, 0x00];
+
+        assert_eq!(
+            scan_payloads(&[first, second]),
+            "biff Invalid data: a UTF-16 shared string is split inside a code unit"
+        );
+    }
+
+    #[test]
+    fn invalid_continuation_flags_after_a_malformed_unit_still_win() {
+        let mut first = sst_header(1, 1);
+        first.extend_from_slice(&3u16.to_le_bytes());
+        first.push(0x01);
+        first.extend_from_slice(&0xD800u16.to_le_bytes());
+        first.extend_from_slice(&0x0041u16.to_le_bytes());
+        let second = vec![0x02u8, 0x41, 0x00];
+
+        assert_eq!(
+            scan_payloads(&[first, second]),
+            "biff Invalid data: invalid shared string continuation flags 0x02"
+        );
+    }
+
+    #[test]
+    fn a_malformed_unit_is_reported_before_a_bad_formatting_run() {
+        // `read_characters` ran before `read_formatting_runs` and still does, so
+        // the cold path has to report from the same position in the sequence.
+        let mut payload = sst_header(1, 1);
+        payload.extend_from_slice(&1u16.to_le_bytes());
+        payload.push(0x09); // rich text plus the high-byte flag
+        payload.extend_from_slice(&1u16.to_le_bytes());
+        payload.extend_from_slice(&0xD800u16.to_le_bytes());
+        payload.extend_from_slice(&9u16.to_le_bytes()); // a run past the text
+        payload.extend_from_slice(&0u16.to_le_bytes());
+
+        assert_eq!(
+            scan_payloads(&[payload]),
+            format!("biff Encoding error: {LONE_SURROGATE_MESSAGE}")
+        );
+    }
+
+    #[test]
+    fn a_bad_formatting_run_is_still_reported_when_the_text_is_well_formed() {
+        let mut payload = sst_header(1, 1);
+        payload.extend_from_slice(&1u16.to_le_bytes());
+        payload.push(0x09);
+        payload.extend_from_slice(&1u16.to_le_bytes());
+        payload.extend_from_slice(&0x0041u16.to_le_bytes());
+        payload.extend_from_slice(&9u16.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+
+        assert_eq!(
+            scan_payloads(&[payload]),
+            "biff Invalid data: shared string 0 has a formatting run past its text"
+        );
+    }
+
+    #[test]
+    fn a_phonetic_block_is_still_walked_and_still_validated() {
+        // ExtRst is parsed on both paths, so its refusals keep their position
+        // after the character data and after the formatting runs.
+        let mut payload = sst_header(1, 1);
+        payload.extend_from_slice(&1u16.to_le_bytes());
+        payload.push(0x05); // ExtRst plus the high-byte flag
+        payload.extend_from_slice(&13u32.to_le_bytes()); // shorter than the 14-byte head
+        payload.extend_from_slice(&0x0041u16.to_le_bytes());
+        payload.extend_from_slice(&[0; 13]);
+
+        assert_eq!(
+            scan_payloads(&[payload]),
+            "biff Invalid length: expected 14, found 13"
+        );
+    }
+
+    #[test]
+    fn an_empty_string_and_a_compressed_string_still_measure_the_same_span() {
+        let mut payload = sst_header(2, 2);
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.push(0x00);
+        payload.extend_from_slice(&2u16.to_le_bytes());
+        payload.push(0x00);
+        payload.extend_from_slice(b"hi");
+
+        assert_eq!(scan_payloads(&[payload]), "ok [(8, 11), (11, 16)]");
+    }
+
+    fn test_data_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
+    }
+
+    fn collect_xls_fixtures(root: &Path, found: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(root) else {
+            return;
+        };
+        let mut children: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .collect();
+        children.sort();
+        for child in children {
+            if child.is_dir() {
+                collect_xls_fixtures(&child, found);
+            } else if child
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    extension.eq_ignore_ascii_case("xls") || extension.eq_ignore_ascii_case("xlt")
+                })
+            {
+                found.push(child);
+            }
+        }
+    }
+
+    /// Returns the byte range of the `SST` record and its `Continue` run inside
+    /// a workbook globals substream, framed by hand so that the harness does not
+    /// share code with the scan it is checking.
+    fn locate_sst(stream: &[u8]) -> Option<(usize, usize)> {
+        let mut offset = 0usize;
+        let mut start = None;
+        while offset + 4 <= stream.len() {
+            let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+            let length = usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+            let end = offset.checked_add(4)?.checked_add(length)?;
+            if end > stream.len() {
+                return None;
+            }
+            match (kind, start) {
+                (0x00FC, None) => start = Some(offset),
+                (0x003C, Some(_)) => {},
+                (_, Some(begin)) => return Some((begin, offset)),
+                // The globals substream ends at its first EOF; an SST never
+                // appears in a worksheet substream.
+                (0x000A, None) => return None,
+                (_, None) => {},
+            }
+            offset = end;
+        }
+        start.map(|begin| (begin, stream.len()))
+    }
+
+    fn workbook_stream(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+        let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
+            .map_err(|error| format!("container: {error}"))?;
+        let mut last = String::from("no workbook stream name matched");
+        for name in ["Workbook", "Book", "WORKBOOK", "BOOK"] {
+            match file.open_stream(&[name]) {
+                Ok(stream) => return Ok(stream),
+                Err(error) => last = format!("{name}: {error}"),
+            }
+        }
+        Err(last)
+    }
+
+    /// Change 0574's falsification criterion for this change: the measure-only
+    /// walk has to reproduce byte-identical `entries` over every fixture that
+    /// carries an SST.
+    #[test]
+    fn every_sst_fixture_indexes_identically_both_ways() {
+        let root = test_data_root();
+        let mut fixtures = Vec::new();
+        collect_xls_fixtures(&root, &mut fixtures);
+        assert!(
+            fixtures.len() > 100,
+            "the XLS corpus should be present, found {}",
+            fixtures.len()
+        );
+
+        let mut with_sst = 0usize;
+        let mut indexed = 0usize;
+        let mut refused = 0usize;
+        let mut entries_compared = 0usize;
+        let mut no_container = Vec::new();
+        let mut no_sst = Vec::new();
+        let mut refusals = Vec::new();
+
+        for fixture in &fixtures {
+            let relative = fixture
+                .strip_prefix(&root)
+                .unwrap_or(fixture)
+                .to_string_lossy()
+                .into_owned();
+            let Ok(bytes) = std::fs::read(fixture) else {
+                no_container.push(format!("{relative}: unreadable"));
+                continue;
+            };
+            let stream = match workbook_stream(bytes) {
+                Ok(stream) => stream,
+                Err(reason) => {
+                    no_container.push(format!("{relative}: {reason}"));
+                    continue;
+                },
+            };
+            let Some((begin, end)) = locate_sst(&stream) else {
+                no_sst.push(relative);
+                continue;
+            };
+            with_sst += 1;
+            let span = &stream[begin..end];
+            let Ok(records) = Records::new(span).collect::<Result<Vec<RecordRef<'_>>, _>>() else {
+                no_container.push(format!("{relative}: SST span does not reframe"));
+                continue;
+            };
+
+            let measured = scan_shared_string_records_as::<MeasuredText>(&records);
+            let materialized = scan_shared_string_records_as::<String>(&records);
+            match (&measured, &materialized) {
+                (Ok(left), Ok(right)) => {
+                    let left: Vec<(usize, usize)> =
+                        left.entries.iter().map(|e| (e.start, e.end)).collect();
+                    let right: Vec<(usize, usize)> =
+                        right.entries.iter().map(|e| (e.start, e.end)).collect();
+                    assert_eq!(left, right, "{relative} indexes differently");
+                    entries_compared += left.len();
+                    indexed += 1;
+                },
+                _ => {
+                    assert_eq!(
+                        describe(&measured),
+                        describe(&materialized),
+                        "{relative} is refused differently"
+                    );
+                    refused += 1;
+                    refusals.push(format!("{relative}: {}", describe(&measured)));
+                },
+            }
+        }
+
+        println!(
+            "sst-differential: fixtures={} with_sst={with_sst} indexed={indexed} refused={refused} entries={entries_compared}",
+            fixtures.len()
+        );
+        for line in &no_container {
+            println!("sst-differential: skipped {line}");
+        }
+        println!("sst-differential: without an SST = {}", no_sst.len());
+        for line in &refusals {
+            println!("sst-differential: refused {line}");
+        }
+        assert!(
+            indexed >= 100,
+            "expected the corpus to index at least 100 SSTs, indexed {indexed}"
+        );
+    }
 }
 
 #[cfg(test)]

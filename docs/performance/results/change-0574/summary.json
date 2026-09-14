@@ -1,0 +1,1796 @@
+{
+  "binary": {
+    "bytes": 8975728,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution",
+    "sha256": "a2955ff9ce8ef1246ada7d8414e72fc299aaf2cbad5db2e6cd6ff85d4ab34449"
+  },
+  "callgrind": {
+    "54016.xls": {
+      "categories": {
+        "allocator": {
+          "ir": 1577404,
+          "share": 0.08560552509707278
+        },
+        "cfb_whole_container_validation": {
+          "ir": 109749,
+          "share": 0.005956066446632499
+        },
+        "fat_chain_prefix_walk": {
+          "ir": 47880,
+          "share": 0.0025984424592913288
+        },
+        "formatting_parse": {
+          "ir": 851983,
+          "share": 0.046237043301921285
+        },
+        "memset_plus_memcpy": {
+          "ir": 1567572,
+          "share": 0.08507198584321658
+        },
+        "shared_string_scan": {
+          "ir": 13189101,
+          "share": 0.715771095202208
+        }
+      },
+      "instructions_per_open": 18426423.04,
+      "isolation": "difference of a 60-sample and a 10-sample child over 50 opens",
+      "top": [
+        {
+          "ir": 5781331,
+          "share": 0.31375221264864656,
+          "symbol": "???:<alloc::string::String>::from_utf16"
+        },
+        {
+          "ir": 4403645,
+          "share": 0.2389853413459892,
+          "symbol": "???:litchi_xls::records::SstCursor::read_characters"
+        },
+        {
+          "ir": 1258196,
+          "share": 0.06828213686773145,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms"
+        },
+        {
+          "ir": 1211624,
+          "share": 0.06575470439215532,
+          "symbol": "???:litchi_xls::records::scan_shared_string_records"
+        },
+        {
+          "ir": 931511,
+          "share": 0.05055300195691155,
+          "symbol": "???:litchi_xls::records::parse_one_shared_string"
+        },
+        {
+          "ir": 624100,
+          "share": 0.03386983999255886,
+          "symbol": "???:litchi_xls::records::SstCursor::read_exact"
+        },
+        {
+          "ir": 525074,
+          "share": 0.028495729141796586,
+          "symbol": "./malloc/./malloc/malloc.c:free"
+        },
+        {
+          "ir": 460746,
+          "share": 0.025004622926534093,
+          "symbol": "./malloc/./malloc/malloc.c:malloc"
+        },
+        {
+          "ir": 456486,
+          "share": 0.02477344620868967,
+          "symbol": "???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits"
+        },
+        {
+          "ir": 378510,
+          "share": 0.020541697060700935,
+          "symbol": "???:litchi_xls::border_fill::parse_xf_border_fill"
+        },
+        {
+          "ir": 322602,
+          "share": 0.017507597611305034,
+          "symbol": "???:alloc::raw_vec::RawVecInner<A>::finish_grow"
+        },
+        {
+          "ir": 309377,
+          "share": 0.01678984897548515,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms"
+        },
+        {
+          "ir": 297066,
+          "share": 0.016121739925059272,
+          "symbol": "???:litchi_xls::number_format::codec::parse_xf"
+        },
+        {
+          "ir": 236890,
+          "share": 0.012855994865946593,
+          "symbol": "???:litchi_xls::records::SstCursor::read_formatting_runs"
+        }
+      ]
+    },
+    "ConditionalFormattingSamples.xls": {
+      "categories": {
+        "allocator": {
+          "ir": 288001,
+          "share": 0.10279157582852763
+        },
+        "cfb_whole_container_validation": {
+          "ir": 158107,
+          "share": 0.05643074633908488
+        },
+        "fat_chain_prefix_walk": {
+          "ir": 139104,
+          "share": 0.049648141496860636
+        },
+        "formatting_parse": {
+          "ir": 203098,
+          "share": 0.07248849945116648
+        },
+        "memset_plus_memcpy": {
+          "ir": 1238433,
+          "share": 0.4420137928493256
+        },
+        "shared_string_scan": {
+          "ir": 299186,
+          "share": 0.10678362133281391
+        }
+      },
+      "instructions_per_open": 2801796.7199999997,
+      "isolation": "difference of a 220-sample and a 20-sample child over 200 opens",
+      "top": [
+        {
+          "ir": 681525,
+          "share": 0.24324568236342287,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms"
+        },
+        {
+          "ir": 556908,
+          "share": 0.1987681104859028,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms"
+        },
+        {
+          "ir": 139104,
+          "share": 0.049648141496860636,
+          "symbol": "???:litchi_cfb::shared::next_chain_sector"
+        },
+        {
+          "ir": 120463,
+          "share": 0.04299491077996551,
+          "symbol": "???:litchi_cfb::shared::SharedOleFile::read_stream_range"
+        },
+        {
+          "ir": 117033,
+          "share": 0.04177069634088229,
+          "symbol": "???:<alloc::string::String>::from_utf16"
+        },
+        {
+          "ir": 95589,
+          "share": 0.03411703615671304,
+          "symbol": "???:litchi_xls::records::SstCursor::read_characters"
+        },
+        {
+          "ir": 93714,
+          "share": 0.03344782272426959,
+          "symbol": "???:litchi_cfb::file::SectorChainScratch::collect_exact"
+        },
+        {
+          "ir": 85956,
+          "share": 0.030678885226191572,
+          "symbol": "???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits"
+        },
+        {
+          "ir": 65139,
+          "share": 0.023248894016836455,
+          "symbol": "./malloc/./malloc/malloc.c:_int_malloc"
+        },
+        {
+          "ir": 43780,
+          "share": 0.015625844547351747,
+          "symbol": "./malloc/./malloc/malloc.c:free"
+        },
+        {
+          "ir": 42243,
+          "share": 0.015077110947577955,
+          "symbol": "???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "ir": 40436,
+          "share": 0.014432142671649642,
+          "symbol": "./malloc/./malloc/malloc.c:_int_free_merge_chunk"
+        },
+        {
+          "ir": 39057,
+          "share": 0.013939983483170043,
+          "symbol": "???:litchi_xls::xf_ext::XfExt::parse"
+        },
+        {
+          "ir": 37740,
+          "share": 0.013469927968221765,
+          "symbol": "???:litchi_xls::border_fill::parse_xf_border_fill"
+        }
+      ]
+    },
+    "WithCustomViews.xls": {
+      "categories": {
+        "allocator": {
+          "ir": 344634,
+          "share": 0.06152350519758964
+        },
+        "cfb_whole_container_validation": {
+          "ir": 18848,
+          "share": 0.0033647180407698142
+        },
+        "fat_chain_prefix_walk": {
+          "ir": 10944,
+          "share": 0.001953707249479247
+        },
+        "formatting_parse": {
+          "ir": 80079,
+          "share": 0.014295513731177252
+        },
+        "memset_plus_memcpy": {
+          "ir": 343024,
+          "share": 0.06123619383780739
+        },
+        "shared_string_scan": {
+          "ir": 4613873,
+          "share": 0.8236620183001244
+        }
+      },
+      "instructions_per_open": 5601658.08,
+      "isolation": "difference of a 120-sample and a 20-sample child over 100 opens",
+      "top": [
+        {
+          "ir": 2635609,
+          "share": 0.47050515443098945,
+          "symbol": "???:<alloc::string::String>::from_utf16"
+        },
+        {
+          "ir": 1804670,
+          "share": 0.32216711092084366,
+          "symbol": "???:litchi_xls::records::SstCursor::read_characters"
+        },
+        {
+          "ir": 234448,
+          "share": 0.04185329355196917,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms"
+        },
+        {
+          "ir": 108576,
+          "share": 0.019382900285838226,
+          "symbol": "./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms"
+        },
+        {
+          "ir": 84029,
+          "share": 0.015000745993407723,
+          "symbol": "./malloc/./malloc/malloc.c:_int_malloc"
+        },
+        {
+          "ir": 56699,
+          "share": 0.010121824500934195,
+          "symbol": "???:litchi_xls::records::parse_one_shared_string"
+        },
+        {
+          "ir": 54286,
+          "share": 0.00969105918724693,
+          "symbol": "???:litchi_xls::records::scan_shared_string_records"
+        },
+        {
+          "ir": 53525,
+          "share": 0.009555238687470907,
+          "symbol": "./malloc/./malloc/malloc.c:_int_free_merge_chunk"
+        },
+        {
+          "ir": 46294,
+          "share": 0.008264338761640375,
+          "symbol": "???:litchi_xls::records::SstCursor::read_exact"
+        },
+        {
+          "ir": 34504,
+          "share": 0.006159619081927257,
+          "symbol": "./malloc/./malloc/malloc.c:free"
+        },
+        {
+          "ir": 30532,
+          "share": 0.005450564737075134,
+          "symbol": "./malloc/./malloc/malloc.c:malloc"
+        },
+        {
+          "ir": 30517,
+          "share": 0.00544785125478419,
+          "symbol": "???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits"
+        },
+        {
+          "ir": 25641,
+          "share": 0.0045774304025353865,
+          "symbol": "???:alloc::raw_vec::RawVecInner<A>::finish_grow"
+        },
+        {
+          "ir": 24567,
+          "share": 0.004385688960151598,
+          "symbol": "./malloc/./malloc/malloc.c:realloc"
+        }
+      ]
+    }
+  },
+  "corpus": {
+    "aggregate_p50_ns": 3065641.5,
+    "attribution_ns": {
+      "fixed_per_open": 505786.46662493143,
+      "opaque_skip": 154941.58414463108,
+      "other_closure": 1353858.3020637424,
+      "sst_bytes": 1051055.1471666982
+    },
+    "attribution_share": {
+      "fixed_per_open": 0.1649855231359999,
+      "opaque_skip": 0.0505413252477927,
+      "other_closure": 0.4416231650255721,
+      "sst_bytes": 0.3428499865906363
+    },
+    "coefficients": {
+      "a_ns": 4322.961253204542,
+      "b_ns_per_byte": 0.052163632060149866,
+      "c_ns_per_byte": 2.48213510789211,
+      "d_ns_per_byte": 2.6310529823284
+    },
+    "fixtures_opened": 117,
+    "model": "p50_open_ns = a + b*skipped_payload_bytes + c*sst_bytes + d*other_closure_bytes",
+    "ns_per_kib": {
+      "other_closure": 2694.1982539042815,
+      "skipped_opaque": 53.41555922959346,
+      "sst": 2541.7063504815205
+    },
+    "r_squared": 0.9933231442573823,
+    "rows": [
+      {
+        "closure_bytes": 750,
+        "globals_end": 1405,
+        "p50_ns": 7340.0,
+        "path": "test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls",
+        "read_bytes": 4136,
+        "read_calls": 11,
+        "skipped_payload_bytes": 655,
+        "sst_bytes": 36
+      },
+      {
+        "closure_bytes": 7032,
+        "globals_end": 15474,
+        "p50_ns": 22040.0,
+        "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls",
+        "read_bytes": 21032,
+        "read_calls": 20,
+        "skipped_payload_bytes": 8442,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1888,
+        "globals_end": 2989,
+        "p50_ns": 10635.0,
+        "path": "test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls",
+        "read_bytes": 6184,
+        "read_calls": 12,
+        "skipped_payload_bytes": 1101,
+        "sst_bytes": 27
+      },
+      {
+        "closure_bytes": 2161,
+        "globals_end": 11486,
+        "p50_ns": 11365.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls",
+        "read_bytes": 13022,
+        "read_calls": 13,
+        "skipped_payload_bytes": 9325,
+        "sst_bytes": 310
+      },
+      {
+        "closure_bytes": 806,
+        "globals_end": 9433,
+        "p50_ns": 7720.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
+        "read_bytes": 11993,
+        "read_calls": 13,
+        "skipped_payload_bytes": 8627,
+        "sst_bytes": 76
+      },
+      {
+        "closure_bytes": 1204,
+        "globals_end": 1672,
+        "p50_ns": 8445.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls",
+        "read_bytes": 3208,
+        "read_calls": 11,
+        "skipped_payload_bytes": 468,
+        "sst_bytes": 93
+      },
+      {
+        "closure_bytes": 718,
+        "globals_end": 1211,
+        "p50_ns": 7060.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls",
+        "read_bytes": 4136,
+        "read_calls": 11,
+        "skipped_payload_bytes": 493,
+        "sst_bytes": 0
+      },
+      {
+        "closure_bytes": 2068,
+        "globals_end": 2860,
+        "p50_ns": 12620.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
+        "read_bytes": 6184,
+        "read_calls": 12,
+        "skipped_payload_bytes": 792,
+        "sst_bytes": 192
+      },
+      {
+        "closure_bytes": 7784,
+        "globals_end": 17785,
+        "p50_ns": 21825.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls",
+        "read_bytes": 20857,
+        "read_calls": 17,
+        "skipped_payload_bytes": 10001,
+        "sst_bytes": 140
+      },
+      {
+        "closure_bytes": 16858,
+        "globals_end": 22961,
+        "p50_ns": 55890.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls",
+        "read_bytes": 30641,
+        "read_calls": 26,
+        "skipped_payload_bytes": 6103,
+        "sst_bytes": 7605
+      },
+      {
+        "closure_bytes": 6873,
+        "globals_end": 16010,
+        "p50_ns": 19570.5,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls",
+        "read_bytes": 19082,
+        "read_calls": 17,
+        "skipped_payload_bytes": 9137,
+        "sst_bytes": 180
+      },
+      {
+        "closure_bytes": 7975,
+        "globals_end": 16580,
+        "p50_ns": 19985.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls",
+        "read_bytes": 19140,
+        "read_calls": 16,
+        "skipped_payload_bytes": 8605,
+        "sst_bytes": 85
+      },
+      {
+        "closure_bytes": 6752,
+        "globals_end": 15026,
+        "p50_ns": 16235.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls",
+        "read_bytes": 17280,
+        "read_calls": 13,
+        "skipped_payload_bytes": 8274,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1888,
+        "globals_end": 2989,
+        "p50_ns": 10610.0,
+        "path": "test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls",
+        "read_bytes": 6184,
+        "read_calls": 12,
+        "skipped_payload_bytes": 1101,
+        "sst_bytes": 27
+      },
+      {
+        "closure_bytes": 1888,
+        "globals_end": 2989,
+        "p50_ns": 10625.0,
+        "path": "test-data/office-interop/litchi-changed/tdf78897-litchi.xls",
+        "read_bytes": 6184,
+        "read_calls": 12,
+        "skipped_payload_bytes": 1101,
+        "sst_bytes": 27
+      },
+      {
+        "closure_bytes": 9002,
+        "globals_end": 14542,
+        "p50_ns": 20815.0,
+        "path": "test-data/ole/xls/ComplexFunctionTestCaseData.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5540,
+        "sst_bytes": 1627
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 91120.5,
+        "path": "test-data/ole/xls/ConditionalFormattingSamples copy.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 91065.5,
+        "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 1441,
+        "globals_end": 1838,
+        "p50_ns": 10225.0,
+        "path": "test-data/ole/xls/DateFormats.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 397,
+        "sst_bytes": 32
+      },
+      {
+        "closure_bytes": 9072,
+        "globals_end": 14566,
+        "p50_ns": 20580.0,
+        "path": "test-data/ole/xls/DateTimeToNumberTestCases.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5494,
+        "sst_bytes": 1485
+      },
+      {
+        "closure_bytes": 24695,
+        "globals_end": 31993,
+        "p50_ns": 86330.0,
+        "path": "test-data/ole/xls/FormulaEvalTestData.xls",
+        "read_bytes": 38137,
+        "read_calls": 23,
+        "skipped_payload_bytes": 7298,
+        "sst_bytes": 14994
+      },
+      {
+        "closure_bytes": 6851,
+        "globals_end": 12100,
+        "p50_ns": 17680.0,
+        "path": "test-data/ole/xls/FormulaRefs.xls",
+        "read_bytes": 16182,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5249,
+        "sst_bytes": 67
+      },
+      {
+        "closure_bytes": 1432,
+        "globals_end": 1845,
+        "p50_ns": 9280.0,
+        "path": "test-data/ole/xls/FormulaSheetRange.xls",
+        "read_bytes": 3381,
+        "read_calls": 11,
+        "skipped_payload_bytes": 413,
+        "sst_bytes": 244
+      },
+      {
+        "closure_bytes": 1488,
+        "globals_end": 1863,
+        "p50_ns": 9590.0,
+        "path": "test-data/ole/xls/HyperlinksOnManySheets.xls",
+        "read_bytes": 3399,
+        "read_calls": 11,
+        "skipped_payload_bytes": 375,
+        "sst_bytes": 338
+      },
+      {
+        "closure_bytes": 1134,
+        "globals_end": 1450,
+        "p50_ns": 8360.0,
+        "path": "test-data/ole/xls/Simple.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 1160,
+        "globals_end": 1622,
+        "p50_ns": 8575.0,
+        "path": "test-data/ole/xls/SimpleChart.xls",
+        "read_bytes": 3158,
+        "read_calls": 11,
+        "skipped_payload_bytes": 462,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 6791,
+        "globals_end": 11885,
+        "p50_ns": 20900.0,
+        "path": "test-data/ole/xls/SimpleMacro.xls",
+        "read_bytes": 17750,
+        "read_calls": 19,
+        "skipped_payload_bytes": 5094,
+        "sst_bytes": 39
+      },
+      {
+        "closure_bytes": 1122,
+        "globals_end": 1430,
+        "p50_ns": 8210.0,
+        "path": "test-data/ole/xls/SimpleMultiCell.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 308,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 6794,
+        "globals_end": 15269,
+        "p50_ns": 16530.0,
+        "path": "test-data/ole/xls/SimpleScatterChart.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 8475,
+        "sst_bytes": 20
+      },
+      {
+        "closure_bytes": 1170,
+        "globals_end": 1664,
+        "p50_ns": 8750.0,
+        "path": "test-data/ole/xls/SimpleWithAutofilter copy.xls",
+        "read_bytes": 3200,
+        "read_calls": 11,
+        "skipped_payload_bytes": 494,
+        "sst_bytes": 36
+      },
+      {
+        "closure_bytes": 1170,
+        "globals_end": 1664,
+        "p50_ns": 9020.0,
+        "path": "test-data/ole/xls/SimpleWithAutofilter.xls",
+        "read_bytes": 3200,
+        "read_calls": 11,
+        "skipped_payload_bytes": 494,
+        "sst_bytes": 36
+      },
+      {
+        "closure_bytes": 1148,
+        "globals_end": 1485,
+        "p50_ns": 8690.0,
+        "path": "test-data/ole/xls/SimpleWithChoose copy.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 337,
+        "sst_bytes": 34
+      },
+      {
+        "closure_bytes": 1148,
+        "globals_end": 1485,
+        "p50_ns": 8655.0,
+        "path": "test-data/ole/xls/SimpleWithChoose.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 337,
+        "sst_bytes": 34
+      },
+      {
+        "closure_bytes": 1362,
+        "globals_end": 1902,
+        "p50_ns": 9740.0,
+        "path": "test-data/ole/xls/SimpleWithColours copy.xls",
+        "read_bytes": 5225,
+        "read_calls": 12,
+        "skipped_payload_bytes": 540,
+        "sst_bytes": 140
+      },
+      {
+        "closure_bytes": 1362,
+        "globals_end": 1902,
+        "p50_ns": 9855.0,
+        "path": "test-data/ole/xls/SimpleWithColours.xls",
+        "read_bytes": 5225,
+        "read_calls": 12,
+        "skipped_payload_bytes": 540,
+        "sst_bytes": 140
+      },
+      {
+        "closure_bytes": 1158,
+        "globals_end": 1641,
+        "p50_ns": 8415.0,
+        "path": "test-data/ole/xls/SimpleWithComments copy.xls",
+        "read_bytes": 3177,
+        "read_calls": 11,
+        "skipped_payload_bytes": 483,
+        "sst_bytes": 32
+      },
+      {
+        "closure_bytes": 1158,
+        "globals_end": 1641,
+        "p50_ns": 8585.0,
+        "path": "test-data/ole/xls/SimpleWithComments.xls",
+        "read_bytes": 3177,
+        "read_calls": 11,
+        "skipped_payload_bytes": 483,
+        "sst_bytes": 32
+      },
+      {
+        "closure_bytes": 1158,
+        "globals_end": 1466,
+        "p50_ns": 8450.0,
+        "path": "test-data/ole/xls/SimpleWithDataFormat copy.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 308,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1158,
+        "globals_end": 1466,
+        "p50_ns": 8475.0,
+        "path": "test-data/ole/xls/SimpleWithDataFormat.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 308,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1134,
+        "globals_end": 1450,
+        "p50_ns": 8350.0,
+        "path": "test-data/ole/xls/SimpleWithFormula copy.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 1134,
+        "globals_end": 1450,
+        "p50_ns": 8315.5,
+        "path": "test-data/ole/xls/SimpleWithFormula.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 1146,
+        "globals_end": 36566,
+        "p50_ns": 10235.0,
+        "path": "test-data/ole/xls/SimpleWithImages copy.xls",
+        "read_bytes": 38102,
+        "read_calls": 14,
+        "skipped_payload_bytes": 35420,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1174,
+        "globals_end": 85452,
+        "p50_ns": 13105.0,
+        "path": "test-data/ole/xls/SimpleWithImages-mac copy.xls",
+        "read_bytes": 88524,
+        "read_calls": 20,
+        "skipped_payload_bytes": 84278,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1174,
+        "globals_end": 85452,
+        "p50_ns": 13130.0,
+        "path": "test-data/ole/xls/SimpleWithImages-mac.xls",
+        "read_bytes": 88524,
+        "read_calls": 20,
+        "skipped_payload_bytes": 84278,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1146,
+        "globals_end": 36566,
+        "p50_ns": 10105.0,
+        "path": "test-data/ole/xls/SimpleWithImages.xls",
+        "read_bytes": 38102,
+        "read_calls": 14,
+        "skipped_payload_bytes": 35420,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1133,
+        "globals_end": 1470,
+        "p50_ns": 8730.0,
+        "path": "test-data/ole/xls/SimpleWithPageBreaks copy.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 337,
+        "sst_bytes": 19
+      },
+      {
+        "closure_bytes": 1133,
+        "globals_end": 1470,
+        "p50_ns": 8340.0,
+        "path": "test-data/ole/xls/SimpleWithPageBreaks.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 337,
+        "sst_bytes": 19
+      },
+      {
+        "closure_bytes": 1157,
+        "globals_end": 1512,
+        "p50_ns": 8860.0,
+        "path": "test-data/ole/xls/SimpleWithPrintArea copy.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 355,
+        "sst_bytes": 35
+      },
+      {
+        "closure_bytes": 1157,
+        "globals_end": 1512,
+        "p50_ns": 8775.0,
+        "path": "test-data/ole/xls/SimpleWithPrintArea.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 355,
+        "sst_bytes": 35
+      },
+      {
+        "closure_bytes": 1149,
+        "globals_end": 1465,
+        "p50_ns": 8515.0,
+        "path": "test-data/ole/xls/SimpleWithSkip copy.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 39
+      },
+      {
+        "closure_bytes": 1149,
+        "globals_end": 1465,
+        "p50_ns": 8510.0,
+        "path": "test-data/ole/xls/SimpleWithSkip.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 39
+      },
+      {
+        "closure_bytes": 1214,
+        "globals_end": 1586,
+        "p50_ns": 8785.0,
+        "path": "test-data/ole/xls/SimpleWithStyling copy.xls",
+        "read_bytes": 3122,
+        "read_calls": 11,
+        "skipped_payload_bytes": 372,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 1214,
+        "globals_end": 1586,
+        "p50_ns": 8635.0,
+        "path": "test-data/ole/xls/SimpleWithStyling.xls",
+        "read_bytes": 3122,
+        "read_calls": 11,
+        "skipped_payload_bytes": 372,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 1559,
+        "globals_end": 2170,
+        "p50_ns": 10980.0,
+        "path": "test-data/ole/xls/SingleLetterRanges.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 611,
+        "sst_bytes": 103
+      },
+      {
+        "closure_bytes": 9463,
+        "globals_end": 14984,
+        "p50_ns": 22225.0,
+        "path": "test-data/ole/xls/WeekNumFunctionTestCaseData.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5521,
+        "sst_bytes": 1643
+      },
+      {
+        "closure_bytes": 9051,
+        "globals_end": 17357,
+        "p50_ns": 20665.0,
+        "path": "test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls",
+        "read_bytes": 18893,
+        "read_calls": 14,
+        "skipped_payload_bytes": 8306,
+        "sst_bytes": 1647
+      },
+      {
+        "closure_bytes": 6768,
+        "globals_end": 11959,
+        "p50_ns": 17350.0,
+        "path": "test-data/ole/xls/WithChart.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5191,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1148,
+        "globals_end": 2465,
+        "p50_ns": 12970.0,
+        "path": "test-data/ole/xls/WithCheckBoxes.xls",
+        "read_bytes": 7073,
+        "read_calls": 17,
+        "skipped_payload_bytes": 1317,
+        "sst_bytes": 22
+      },
+      {
+        "closure_bytes": 7275,
+        "globals_end": 12346,
+        "p50_ns": 18980.0,
+        "path": "test-data/ole/xls/WithConditionalFormatting.xls",
+        "read_bytes": 17283,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5071,
+        "sst_bytes": 69
+      },
+      {
+        "closure_bytes": 105123,
+        "globals_end": 107170,
+        "p50_ns": 231366.0,
+        "path": "test-data/ole/xls/WithCustomViews.xls",
+        "read_bytes": 110242,
+        "read_calls": 16,
+        "skipped_payload_bytes": 2047,
+        "sst_bytes": 101125
+      },
+      {
+        "closure_bytes": 7135,
+        "globals_end": 21122,
+        "p50_ns": 35670.0,
+        "path": "test-data/ole/xls/WithEmbeddedObjects.xls",
+        "read_bytes": 32386,
+        "read_calls": 32,
+        "skipped_payload_bytes": 13987,
+        "sst_bytes": 23
+      },
+      {
+        "closure_bytes": 898,
+        "globals_end": 1386,
+        "p50_ns": 7650.0,
+        "path": "test-data/ole/xls/WithExtendedStyles.xls",
+        "read_bytes": 4136,
+        "read_calls": 11,
+        "skipped_payload_bytes": 488,
+        "sst_bytes": 48
+      },
+      {
+        "closure_bytes": 1167,
+        "globals_end": 1706,
+        "p50_ns": 8565.0,
+        "path": "test-data/ole/xls/WithFormattedGraphTitle.xls",
+        "read_bytes": 3242,
+        "read_calls": 11,
+        "skipped_payload_bytes": 539,
+        "sst_bytes": 51
+      },
+      {
+        "closure_bytes": 1244,
+        "globals_end": 1611,
+        "p50_ns": 9110.0,
+        "path": "test-data/ole/xls/WithHyperlink.xls",
+        "read_bytes": 3147,
+        "read_calls": 11,
+        "skipped_payload_bytes": 367,
+        "sst_bytes": 98
+      },
+      {
+        "closure_bytes": 6776,
+        "globals_end": 12098,
+        "p50_ns": 17670.0,
+        "path": "test-data/ole/xls/WithThreeCharts.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5322,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 6772,
+        "globals_end": 12022,
+        "p50_ns": 17580.0,
+        "path": "test-data/ole/xls/WithTwoCharts.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5250,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1269,
+        "globals_end": 1662,
+        "p50_ns": 8900.0,
+        "path": "test-data/ole/xls/WithTwoHyperLinks.xls",
+        "read_bytes": 3198,
+        "read_calls": 11,
+        "skipped_payload_bytes": 393,
+        "sst_bytes": 119
+      },
+      {
+        "closure_bytes": 7132,
+        "globals_end": 12872,
+        "p50_ns": 17660.0,
+        "path": "test-data/ole/xls/empty.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5740,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1214,
+        "globals_end": 1530,
+        "p50_ns": 8455.0,
+        "path": "test-data/poi/test-data/hpsf/TestUnicode.xls",
+        "read_bytes": 3624,
+        "read_calls": 11,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 44
+      },
+      {
+        "closure_bytes": 17940,
+        "globals_end": 28184,
+        "p50_ns": 65225.5,
+        "path": "test-data/poi/test-data/spreadsheet/15228.xls",
+        "read_bytes": 42520,
+        "read_calls": 39,
+        "skipped_payload_bytes": 10244,
+        "sst_bytes": 9260
+      },
+      {
+        "closure_bytes": 1142,
+        "globals_end": 1529,
+        "p50_ns": 8505.0,
+        "path": "test-data/poi/test-data/spreadsheet/24207.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 387,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 6415,
+        "globals_end": 7935,
+        "p50_ns": 24765.0,
+        "path": "test-data/poi/test-data/spreadsheet/41139.xls",
+        "read_bytes": 9471,
+        "read_calls": 13,
+        "skipped_payload_bytes": 1520,
+        "sst_bytes": 1090
+      },
+      {
+        "closure_bytes": 3647,
+        "globals_end": 5035,
+        "p50_ns": 18550.0,
+        "path": "test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls",
+        "read_bytes": 10792,
+        "read_calls": 15,
+        "skipped_payload_bytes": 1388,
+        "sst_bytes": 199
+      },
+      {
+        "closure_bytes": 23678,
+        "globals_end": 29939,
+        "p50_ns": 57920.5,
+        "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+        "read_bytes": 33523,
+        "read_calls": 18,
+        "skipped_payload_bytes": 6261,
+        "sst_bytes": 16634
+      },
+      {
+        "closure_bytes": 6981,
+        "globals_end": 13336,
+        "p50_ns": 22875.5,
+        "path": "test-data/poi/test-data/spreadsheet/45365.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 6355,
+        "sst_bytes": 20
+      },
+      {
+        "closure_bytes": 1645,
+        "globals_end": 1957,
+        "p50_ns": 9560.0,
+        "path": "test-data/poi/test-data/spreadsheet/45492.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 312,
+        "sst_bytes": 55
+      },
+      {
+        "closure_bytes": 1167,
+        "globals_end": 1531,
+        "p50_ns": 12400.0,
+        "path": "test-data/poi/test-data/spreadsheet/45761.xls",
+        "read_bytes": 5672,
+        "read_calls": 15,
+        "skipped_payload_bytes": 364,
+        "sst_bytes": 45
+      },
+      {
+        "closure_bytes": 1104,
+        "globals_end": 1449,
+        "p50_ns": 8230.0,
+        "path": "test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 345,
+        "sst_bytes": 18
+      },
+      {
+        "closure_bytes": 6089,
+        "globals_end": 14472,
+        "p50_ns": 18370.0,
+        "path": "test-data/poi/test-data/spreadsheet/48968.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 8383,
+        "sst_bytes": 232
+      },
+      {
+        "closure_bytes": 6181,
+        "globals_end": 74548,
+        "p50_ns": 33340.0,
+        "path": "test-data/poi/test-data/spreadsheet/50939.xls",
+        "read_bytes": 81716,
+        "read_calls": 28,
+        "skipped_payload_bytes": 68367,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 7072,
+        "globals_end": 12396,
+        "p50_ns": 18640.0,
+        "path": "test-data/poi/test-data/spreadsheet/53109.xls",
+        "read_bytes": 18209,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5324,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 273856,
+        "globals_end": 306931,
+        "p50_ns": 707774.0,
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "read_bytes": 317171,
+        "read_calls": 40,
+        "skipped_payload_bytes": 33075,
+        "sst_bytes": 225007
+      },
+      {
+        "closure_bytes": 8026,
+        "globals_end": 13262,
+        "p50_ns": 18980.0,
+        "path": "test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls",
+        "read_bytes": 17960,
+        "read_calls": 14,
+        "skipped_payload_bytes": 5236,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 48102,
+        "globals_end": 772760,
+        "p50_ns": 151940.5,
+        "path": "test-data/poi/test-data/spreadsheet/59858.xls",
+        "read_bytes": 792728,
+        "read_calls": 69,
+        "skipped_payload_bytes": 724658,
+        "sst_bytes": 16388
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 90660.5,
+        "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 1122,
+        "globals_end": 1430,
+        "p50_ns": 8400.0,
+        "path": "test-data/poi/test-data/spreadsheet/DBCSHeader.xls",
+        "read_bytes": 3624,
+        "read_calls": 11,
+        "skipped_payload_bytes": 308,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1441,
+        "globals_end": 1838,
+        "p50_ns": 10500.0,
+        "path": "test-data/poi/test-data/spreadsheet/DateFormats.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 397,
+        "sst_bytes": 32
+      },
+      {
+        "closure_bytes": 6665,
+        "globals_end": 12646,
+        "p50_ns": 18310.0,
+        "path": "test-data/poi/test-data/spreadsheet/DrawingAndComments.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5981,
+        "sst_bytes": 55
+      },
+      {
+        "closure_bytes": 7809,
+        "globals_end": 12868,
+        "p50_ns": 20660.0,
+        "path": "test-data/poi/test-data/spreadsheet/Formatting.xls",
+        "read_bytes": 17246,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5059,
+        "sst_bytes": 170
+      },
+      {
+        "closure_bytes": 1488,
+        "globals_end": 1863,
+        "p50_ns": 9760.0,
+        "path": "test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls",
+        "read_bytes": 3399,
+        "read_calls": 11,
+        "skipped_payload_bytes": 375,
+        "sst_bytes": 338
+      },
+      {
+        "closure_bytes": 8062,
+        "globals_end": 13488,
+        "p50_ns": 20415.0,
+        "path": "test-data/poi/test-data/spreadsheet/MRExtraLines.xls",
+        "read_bytes": 18472,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5426,
+        "sst_bytes": 1137
+      },
+      {
+        "closure_bytes": 7297,
+        "globals_end": 12372,
+        "p50_ns": 18295.0,
+        "path": "test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5075,
+        "sst_bytes": 390
+      },
+      {
+        "closure_bytes": 7353,
+        "globals_end": 12597,
+        "p50_ns": 17485.0,
+        "path": "test-data/poi/test-data/spreadsheet/ShrinkToFit.xls",
+        "read_bytes": 16469,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5244,
+        "sst_bytes": 69
+      },
+      {
+        "closure_bytes": 1134,
+        "globals_end": 1450,
+        "p50_ns": 8260.0,
+        "path": "test-data/poi/test-data/spreadsheet/Simple.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 316,
+        "sst_bytes": 24
+      },
+      {
+        "closure_bytes": 6791,
+        "globals_end": 11885,
+        "p50_ns": 20960.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleMacro.xls",
+        "read_bytes": 17750,
+        "read_calls": 19,
+        "skipped_payload_bytes": 5094,
+        "sst_bytes": 39
+      },
+      {
+        "closure_bytes": 6794,
+        "globals_end": 15269,
+        "p50_ns": 16520.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls",
+        "read_bytes": 17448,
+        "read_calls": 13,
+        "skipped_payload_bytes": 8475,
+        "sst_bytes": 20
+      },
+      {
+        "closure_bytes": 1362,
+        "globals_end": 1902,
+        "p50_ns": 9960.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleWithColours.xls",
+        "read_bytes": 5225,
+        "read_calls": 12,
+        "skipped_payload_bytes": 540,
+        "sst_bytes": 140
+      },
+      {
+        "closure_bytes": 1158,
+        "globals_end": 1641,
+        "p50_ns": 8455.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleWithComments.xls",
+        "read_bytes": 3177,
+        "read_calls": 11,
+        "skipped_payload_bytes": 483,
+        "sst_bytes": 32
+      },
+      {
+        "closure_bytes": 1133,
+        "globals_end": 1470,
+        "p50_ns": 8690.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 337,
+        "sst_bytes": 19
+      },
+      {
+        "closure_bytes": 1157,
+        "globals_end": 1512,
+        "p50_ns": 8820.0,
+        "path": "test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls",
+        "read_bytes": 3624,
+        "read_calls": 10,
+        "skipped_payload_bytes": 355,
+        "sst_bytes": 35
+      },
+      {
+        "closure_bytes": 1110,
+        "globals_end": 1591,
+        "p50_ns": 8510.0,
+        "path": "test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls",
+        "read_bytes": 3127,
+        "read_calls": 11,
+        "skipped_payload_bytes": 481,
+        "sst_bytes": 34
+      },
+      {
+        "closure_bytes": 1490,
+        "globals_end": 1798,
+        "p50_ns": 9600.0,
+        "path": "test-data/poi/test-data/spreadsheet/UncalcedRecord.xls",
+        "read_bytes": 5672,
+        "read_calls": 11,
+        "skipped_payload_bytes": 308,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 7275,
+        "globals_end": 12346,
+        "p50_ns": 19085.0,
+        "path": "test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls",
+        "read_bytes": 17283,
+        "read_calls": 13,
+        "skipped_payload_bytes": 5071,
+        "sst_bytes": 69
+      },
+      {
+        "closure_bytes": 1269,
+        "globals_end": 1662,
+        "p50_ns": 9120.0,
+        "path": "test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls",
+        "read_bytes": 3198,
+        "read_calls": 11,
+        "skipped_payload_bytes": 393,
+        "sst_bytes": 119
+      },
+      {
+        "closure_bytes": 7076,
+        "globals_end": 12599,
+        "p50_ns": 17960.0,
+        "path": "test-data/poi/test-data/spreadsheet/XRefCalc.xls",
+        "read_bytes": 17714,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5523,
+        "sst_bytes": 74
+      },
+      {
+        "closure_bytes": 1126,
+        "globals_end": 1455,
+        "p50_ns": 8135.0,
+        "path": "test-data/poi/test-data/spreadsheet/colwidth.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 329,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 1911,
+        "globals_end": 2394,
+        "p50_ns": 11000.0,
+        "path": "test-data/poi/test-data/spreadsheet/comments.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 483,
+        "sst_bytes": 33
+      },
+      {
+        "closure_bytes": 2721,
+        "globals_end": 3133,
+        "p50_ns": 14470.0,
+        "path": "test-data/poi/test-data/spreadsheet/duprich1.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 412,
+        "sst_bytes": 1080
+      },
+      {
+        "closure_bytes": 1584,
+        "globals_end": 1952,
+        "p50_ns": 10680.0,
+        "path": "test-data/poi/test-data/spreadsheet/duprich2.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 368,
+        "sst_bytes": 82
+      },
+      {
+        "closure_bytes": 6869,
+        "globals_end": 11928,
+        "p50_ns": 16840.0,
+        "path": "test-data/poi/test-data/spreadsheet/dvEmpty.xls",
+        "read_bytes": 14948,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5059,
+        "sst_bytes": 133
+      },
+      {
+        "closure_bytes": 6929,
+        "globals_end": 12071,
+        "p50_ns": 17725.5,
+        "path": "test-data/poi/test-data/spreadsheet/externalFunctionExample.xls",
+        "read_bytes": 15505,
+        "read_calls": 15,
+        "skipped_payload_bytes": 5142,
+        "sst_bytes": 34
+      },
+      {
+        "closure_bytes": 12018,
+        "globals_end": 21679,
+        "p50_ns": 43445.5,
+        "path": "test-data/poi/test-data/spreadsheet/external_name.xls",
+        "read_bytes": 26287,
+        "read_calls": 20,
+        "skipped_payload_bytes": 9661,
+        "sst_bytes": 2659
+      },
+      {
+        "closure_bytes": 790,
+        "globals_end": 1256,
+        "p50_ns": 7970.0,
+        "path": "test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls",
+        "read_bytes": 4648,
+        "read_calls": 12,
+        "skipped_payload_bytes": 466,
+        "sst_bytes": 0
+      },
+      {
+        "closure_bytes": 786,
+        "globals_end": 1227,
+        "p50_ns": 8075.0,
+        "path": "test-data/poi/test-data/spreadsheet/named-cell-test.xls",
+        "read_bytes": 4648,
+        "read_calls": 12,
+        "skipped_payload_bytes": 441,
+        "sst_bytes": 0
+      },
+      {
+        "closure_bytes": 1138,
+        "globals_end": 1540,
+        "p50_ns": 8505.0,
+        "path": "test-data/poi/test-data/spreadsheet/namedinput.xls",
+        "read_bytes": 3112,
+        "read_calls": 10,
+        "skipped_payload_bytes": 402,
+        "sst_bytes": 12
+      },
+      {
+        "closure_bytes": 7600,
+        "globals_end": 12961,
+        "p50_ns": 23376.0,
+        "path": "test-data/poi/test-data/spreadsheet/testNames.xls",
+        "read_bytes": 18596,
+        "read_calls": 19,
+        "skipped_payload_bytes": 5361,
+        "sst_bytes": 16
+      },
+      {
+        "closure_bytes": 1436,
+        "globals_end": 2047,
+        "p50_ns": 9870.0,
+        "path": "test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls",
+        "read_bytes": 5160,
+        "read_calls": 11,
+        "skipped_payload_bytes": 611,
+        "sst_bytes": 168
+      }
+    ],
+    "slowest": [
+      {
+        "closure_bytes": 273856,
+        "globals_end": 306931,
+        "p50_ns": 707774.0,
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "read_bytes": 317171,
+        "read_calls": 40,
+        "skipped_payload_bytes": 33075,
+        "sst_bytes": 225007
+      },
+      {
+        "closure_bytes": 105123,
+        "globals_end": 107170,
+        "p50_ns": 231366.0,
+        "path": "test-data/ole/xls/WithCustomViews.xls",
+        "read_bytes": 110242,
+        "read_calls": 16,
+        "skipped_payload_bytes": 2047,
+        "sst_bytes": 101125
+      },
+      {
+        "closure_bytes": 48102,
+        "globals_end": 772760,
+        "p50_ns": 151940.5,
+        "path": "test-data/poi/test-data/spreadsheet/59858.xls",
+        "read_bytes": 792728,
+        "read_calls": 69,
+        "skipped_payload_bytes": 724658,
+        "sst_bytes": 16388
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 91120.5,
+        "path": "test-data/ole/xls/ConditionalFormattingSamples copy.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 91065.5,
+        "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 20417,
+        "globals_end": 551377,
+        "p50_ns": 90660.5,
+        "path": "test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls",
+        "read_bytes": 565201,
+        "read_calls": 53,
+        "skipped_payload_bytes": 530960,
+        "sst_bytes": 4603
+      },
+      {
+        "closure_bytes": 24695,
+        "globals_end": 31993,
+        "p50_ns": 86330.0,
+        "path": "test-data/ole/xls/FormulaEvalTestData.xls",
+        "read_bytes": 38137,
+        "read_calls": 23,
+        "skipped_payload_bytes": 7298,
+        "sst_bytes": 14994
+      },
+      {
+        "closure_bytes": 17940,
+        "globals_end": 28184,
+        "p50_ns": 65225.5,
+        "path": "test-data/poi/test-data/spreadsheet/15228.xls",
+        "read_bytes": 42520,
+        "read_calls": 39,
+        "skipped_payload_bytes": 10244,
+        "sst_bytes": 9260
+      },
+      {
+        "closure_bytes": 23678,
+        "globals_end": 29939,
+        "p50_ns": 57920.5,
+        "path": "test-data/poi/test-data/spreadsheet/45365-2.xls",
+        "read_bytes": 33523,
+        "read_calls": 18,
+        "skipped_payload_bytes": 6261,
+        "sst_bytes": 16634
+      },
+      {
+        "closure_bytes": 16858,
+        "globals_end": 22961,
+        "p50_ns": 55890.0,
+        "path": "test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls",
+        "read_bytes": 30641,
+        "read_calls": 26,
+        "skipped_payload_bytes": 6103,
+        "sst_bytes": 7605
+      }
+    ]
+  },
+  "counters": {
+    "file-source/list": {
+      "elapsed_ns": {
+        "min": 107560,
+        "p50": 109695.5,
+        "p95": 117406.0
+      },
+      "in_source_read_ns_p50": 20705.5,
+      "in_source_version_ns_p50": 5810.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 83180.0,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    },
+    "file-source/one-cell": {
+      "elapsed_ns": {
+        "min": 123121,
+        "p50": 124916.0,
+        "p95": 134481.5
+      },
+      "in_source_read_ns_p50": 23125.0,
+      "in_source_version_ns_p50": 8405.5,
+      "len_calls": 1,
+      "outside_source_ns_p50": 93385.5,
+      "read_bytes": 603115,
+      "read_calls": 61,
+      "samples": 100,
+      "version_calls": 42
+    },
+    "file-source/open": {
+      "elapsed_ns": {
+        "min": 108420,
+        "p50": 110360.0,
+        "p95": 117464.0
+      },
+      "in_source_read_ns_p50": 20730.5,
+      "in_source_version_ns_p50": 5815.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 83814.5,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    },
+    "owned-readat/list": {
+      "elapsed_ns": {
+        "min": 91031,
+        "p50": 92820.5,
+        "p95": 101224.45
+      },
+      "in_source_read_ns_p50": 8920.0,
+      "in_source_version_ns_p50": 745.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 83155.5,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    },
+    "owned-readat/one-cell": {
+      "elapsed_ns": {
+        "min": 99561,
+        "p50": 101235.0,
+        "p95": 110243.55
+      },
+      "in_source_read_ns_p50": 9590.0,
+      "in_source_version_ns_p50": 1075.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 90570.0,
+      "read_bytes": 603115,
+      "read_calls": 61,
+      "samples": 100,
+      "version_calls": 42
+    },
+    "owned-readat/open": {
+      "elapsed_ns": {
+        "min": 90140,
+        "p50": 91840.5,
+        "p95": 100213.0
+      },
+      "in_source_read_ns_p50": 8950.0,
+      "in_source_version_ns_p50": 750.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 82140.5,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    },
+    "tracked-file/list": {
+      "elapsed_ns": {
+        "min": 115571,
+        "p50": 117881.0,
+        "p95": 128151.0
+      },
+      "in_source_read_ns_p50": 20125.0,
+      "in_source_version_ns_p50": 750.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 97006.0,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    },
+    "tracked-file/one-cell": {
+      "elapsed_ns": {
+        "min": 128581,
+        "p50": 130901.0,
+        "p95": 139723.5
+      },
+      "in_source_read_ns_p50": 22990.5,
+      "in_source_version_ns_p50": 1100.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 106810.5,
+      "read_bytes": 603115,
+      "read_calls": 61,
+      "samples": 100,
+      "version_calls": 42
+    },
+    "tracked-file/open": {
+      "elapsed_ns": {
+        "min": 113431,
+        "p50": 114740.0,
+        "p95": 122867.0
+      },
+      "in_source_read_ns_p50": 20290.5,
+      "in_source_version_ns_p50": 750.0,
+      "len_calls": 1,
+      "outside_source_ns_p50": 93699.5,
+      "read_bytes": 565201,
+      "read_calls": 53,
+      "samples": 100,
+      "version_calls": 29
+    }
+  },
+  "flagship_input": {
+    "bytes": 1402368,
+    "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "host": {
+    "aslr": "disabled via setarch -R",
+    "cpu_pinned": 17,
+    "note": "warm page cache; a staged immutable copy; no cold-cache or physical-device result"
+  },
+  "perf_stat": {
+    "file-source/one-cell": {
+      "branch_misses_per_op": 1273.01,
+      "branches_per_op": 405101.919,
+      "instructions_per_op": 2041457.276,
+      "isolation": "difference of a 1100-sample and a 100-sample child, divided by 1000",
+      "task_clock_us_per_op": 130.12
+    },
+    "file-source/open": {
+      "branch_misses_per_op": 1216.573,
+      "branches_per_op": 362098.044,
+      "instructions_per_op": 1818894.523,
+      "isolation": "difference of a 1100-sample and a 100-sample child, divided by 1000",
+      "task_clock_us_per_op": 116.85000000000001
+    },
+    "owned-readat/one-cell": {
+      "branch_misses_per_op": 1031.313,
+      "branches_per_op": 365627.247,
+      "instructions_per_op": 1832730.857,
+      "isolation": "difference of a 1100-sample and a 100-sample child, divided by 1000",
+      "task_clock_us_per_op": 107.65
+    },
+    "owned-readat/open": {
+      "branch_misses_per_op": 1018.554,
+      "branches_per_op": 328644.367,
+      "instructions_per_op": 1645028.142,
+      "isolation": "difference of a 1100-sample and a 100-sample child, divided by 1000",
+      "task_clock_us_per_op": 53.040000000000006
+    }
+  },
+  "schema": "litchi-perf-change-0574-attribution"
+}

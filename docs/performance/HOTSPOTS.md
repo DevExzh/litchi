@@ -1,5 +1,155 @@
 # Performance hotspot inventory
 
+## Change 0576: index the shared-string table without decoding it
+
+The [0576 record](0576-xls-sst-scan-without-materialization.md) implements
+opportunity 1 of change 0574 in its **conservative** form. The open-time
+shared-string scan obtained each entry boundary by parsing the string and
+throwing the `String` away; it now walks the same framing without building either
+the `Vec<u16>` or the `String`, while still validating UTF-16 well-formedness, so
+the refusal stays at open time and **its message stays byte-identical** — on
+detecting malformed input the cold path rewinds and lets `String::from_utf16`
+itself produce the error. Paired A/B/B/A medians, 50 warmups and 1,000 samples,
+CPU-pinned, against a floor measured in the same window rather than assumed:
+
+| fixture | before p50 | after p50 | both directions | instructions/open |
+| --- | ---: | ---: | --- | --- |
+| `WithCustomViews.xls` | 208,394 ns | **31,950 ns** | −84.57% / −84.77% | 5,312,769 → **627,989** |
+| `54016.xls` | 688,168 ns | **256,704 ns** | −62.63% / −62.77% | 17,139,968 → **5,979,090** |
+| `ConditionalFormattingSamples.xls` | 90,520 ns | **80,138 ns** | −11.38% / −11.56% | 1,643,022 → **1,391,409** |
+
+The measured floor is **±1.4%** and the smallest improvement, −9.43%, is 6.9
+times the widest same-binary excursion, so **change 0574's own prediction that
+the flagship would move inside noise is recorded as falsified**; that prediction
+was made against an unmeasured floor. A second capture of the same matrix in a
+busier window is retained alongside, measuring a wider floor and the same
+conclusion. Every logical read, byte and version counter is identical between the
+legs in all 16 cells, so **not one byte of I/O moved** and the before leg
+reproduces changes 0565 and 0574 to within 0.3%. Per-open allocations fall
+**16,031 to 247** on `54016.xls` and 1,478 to 236 on `WithCustomViews.xls`,
+matching a model with no free parameters: `16,031 − 247 = 15,784` against
+`2 × 7,893 = 15,786`, the two-allocation pair per unique string, short by the
+strings whose character count is zero. A corpus differential over 126 fixtures
+indexes **117 with byte-identical entries across 17,434 entries** and refuses 4
+byte-identically. `read_characters` self cost is exactly zero after; the residual
+`String::from_utf16` cost is traced to `BoundSheet8` name decoding and **corrected
+in the record rather than claimed as zero**. The 17 unit tests cannot fail
+pre-change, so they are justified by mutation checks instead — and two mutations
+initially **survived**, exposing a real gap where a three-run delivery would have
+let the scan silently accept a string `from_utf16` rejects. Host quiescence is
+not established and is logged. `performance_claim: none`.
+
+## Change 0575: a target-scoped ZIP strict-layout proof, designed
+
+The [0575 record](0575-zip-lazy-strict-layout-design.md) designs away the
+whole-archive cost change 0572 priced, and proves a lower bound on how far it can
+go. The local extra-field length is the only span input the ZIP central directory
+never carries, so two archives differing only in one record's local extra length
+have byte-identical central directories: **no decider for archive-wide
+non-overlap can be O(1)**, and any zero-I/O screen is useless in practice —
+it proves **0 of 12, 0 of 131 and 0 of 47** adjacent pairs on real fixtures,
+because OOXML packs members with no gaps against a 65,559-byte window. The
+recommended candidate validates the target, prunes predecessors with a
+central-directory bracket, and reads only the 30-byte fixed header of each
+predecessor still inside the residual window: **264 reads to 4** for one member
+of the 132-member workbook, 10,740 bytes to 144, order-independent, converging
+exactly on today's proof when every member is read. Two invariants turn out to be
+free: duplicate local-header offsets are a pure central-directory property, and
+the archive-wide central-directory-intrusion check is **dead code**, already
+enforced per entry. The archaeology is the uncomfortable part: both introducing
+commits have **empty message bodies**, no accepted ADR mentions ZIP overlap or a
+strict layout, there is no threat model, the only security framing is post-hoc
+and names no threat — and the proof is **already not a library invariant**,
+because `IndexedArchive::read` bypasses it while `read_entry_to` builds it. A
+rival incremental candidate is **rejected against accepted ADR 0005**, whose
+"Cache behavior is semantically invisible" it breaks by making a read's verdict
+depend on read order. The decision left to the project is one table cell, backed
+by a reproducible 4,405-byte witness: in an archive where A's inflated local
+extra field swallows B, today all three members are refused and under the
+proposal the member that overlaps nothing becomes readable.
+`performance_claim: none`.
+
+## Change 0574: a source-backed XLS open is now CPU, not I/O
+
+The [0574 record](0574-ole2-next-opportunity-survey.md) re-measures the OLE2 read
+path after changes 0565, 0568 and 0570 and reports that they have moved its
+bottleneck **off I/O entirely**: a source-backed open of the flagship fixture
+spends **75.9%** of wall time outside the source, 89.4% on an owned source, and
+costs **1.65 million instructions to return sixteen sheet names**. Open and list
+remain identical read-for-read and byte-for-byte; one cell adds 8 reads and
+37,914 bytes, so change 0568's window holds. The largest single category is the
+open-time shared-string scan, which obtains each entry boundary by parsing the
+string and **discarding the `String`** — `String::from_utf16` alone is **47.05%**
+and **31.38%** of one open of two string-heavy fixtures, and the scan is 88.33%,
+80.81% and 13.65% of three opens, or 34.3% of aggregate open time across 117
+fixtures. Ranked behind it: 75.08% of corpus globals payload bytes are read,
+framed twice and dropped, concentrated so that 90% of the skippable bytes live in
+15 of 126 fixtures; and `read_stream_range` re-walks each chain from sector 0,
+taking **5,796 chain steps per open** where about 1,077 suffice. Four hypotheses
+are settled by measurement rather than reading: the ministream is **not**
+materialized, stream reads are contiguous-only in all three paths and within one
+read of the physical-span minimum, **0 of 98 fixtures carry any DIFAT sector** so
+change 0570's untested DIFAT loop is unreachable for this size class, and change
+0547's 20.37% visited-map figure is **re-proportioned to about 1.4% of an open**,
+stated as a change of proportion rather than a refutation. No code changed; this
+packet is the before leg for change 0576. `performance_claim: none`.
+
+## Change 0573: one positional read per ZIP local header
+
+The [0573 record](0573-zip-single-local-header-read.md) collapses the two
+positional reads the strict-layout prover issued per member — a 30-byte fixed
+header, then the name-and-extra region — into one speculative bounded read, and
+removes the per-entry heap allocation with it. Over all 168 DOCX/PPTX/XLSX
+fixtures and 4,089 members, reads fall **8,326 to 4,385 (−47.3%)** while bytes
+rise **0.54%**, and per-entry heap allocations fall **4,089 to 148**. **159 of
+168 fixtures read byte-for-byte the same bytes while halving their reads**, and
+no fixture issues more reads than before. The measurement matches a model with no
+free parameters: `3,941 × 1 + 148 × 3 = 4,385`. Three records cross-confirm the
+result — change 0572's frozen plan predicted 264 requests for
+`ConditionalFormattingSamples.xlsx` and change 0572 measured exactly that through
+a different instrument at a different layer, while change 0575 independently
+predicted 132 after, which is what this change measures. The window is **640
+bytes and measured, not guessed**: across 14,744 members in 533 archives the
+largest OOXML local variable region is 539 bytes, because Office writes a growth
+hint whose payload is 260 or 516, so a 512-byte window would miss 301 of 4,270
+members; exactly two members in the whole corpus need the heap fallback. Two
+details decided the design. A clamp to the central-directory offset alone reads
+**payload** bytes and broke two existing tests asserting that indexing stays
+metadata-only; the bound is therefore the *next* member's local-header offset
+less the payload and the widest descriptor, which is why bytes rise by half a
+percent rather than several-fold. And a 30-byte floor is kept, because a local
+offset sitting inside the central directory must still report a signature error
+rather than a short read. Fifteen tests were added, **seven fail against the
+pre-change code**; the eight that pass on both sides are the error-identity
+contract. `performance_claim: none`.
+
+## Change 0572: what a source-backed OOXML read asks the source for
+
+The [0572 record](0572-ooxml-range-source-attribution.md) executes the plan
+frozen before capture and answers the question changes 0561 and 0567 left open:
+what the OOXML read path costs a caller-supplied range source. A counting
+`ReadAt` records every request in issue order across 132 arms and 660 runs; all
+five gates pass, 44 arms show **zero** sequence divergence, and the two-step
+adopt route reproduces the native constructor byte for byte on all eleven pairs.
+A single-cell read of the 132-member workbook costs **354 requests and 375.14 ms**
+on a 1 ms-per-request transport, of which **264 are the strict-layout proof** —
+10,740 bytes across 264 requests, an average of **41 bytes per request**, the
+worst possible shape for a latency-bearing source. The proof's size was predicted
+exactly (26, 264 and 39 on the three named fixtures); what the plan got wrong was
+the **open**, which reads content types, **every `*/_rels/*.rels` part in the
+package** and the format's main part, so that workbook pays 43 structural members
+and 89 requests before the cell read begins — a hotspot no prior record had
+modelled. Widening the read-ahead window from 4 KiB to 64 KiB is
+**indistinguishable**: 77 requests at 82.85 ms against 49 at 81.24 ms, a 1.9%
+difference against a 1.33% noise floor, because a 64 KiB fill costs 0.625 ms of
+transfer on top of the 1 ms service. Six predictions are confirmed, five refuted
+and one splits. Two disclosures are recorded rather than buried: the first
+capture **had to be discarded** because the probe's path dependencies linked
+another agent's uncommitted change, and an independent audit of the draft found
+the arithmetic clean across 100+ recomputed values but **six prose conclusions
+wrong**, including one that had scored a plan prediction as refuted when the
+record's own retained bytes confirmed it. `performance_claim: none`.
+
 ## Change 0571: one archive index per detect-and-open
 
 The [0571 record](0571-ooxml-prepared-source.md) implements the fix change 0569 measured after rejecting change 0567's documentation alternative. An opaque prepared-source handle carries the already-built package from detection to the opener, so a detect-then-open sequence builds **one** archive index instead of two: reads on the package fall 47 to 24, 132 to 59 and 44 to 25, and paired medians over 3,000 iterations twice give savings of 35.9, 201.7 and 42.0 microseconds, which are 48.6%, 46.4% and 39.3% of the two-call pattern. The repository's own conversion example, which change 0569 identified as having no correct rewrite under the rejected advice, now saves 227 microseconds on a presentation. Cost: a non-OOXML input pays +1.4 to +4.8 microseconds, deliberately, because every path that cannot prepare defers to the existing detector so the classification can never diverge. A **second, non-performance** change in the same diff stops ten sites discarding the classification and adds a typed wrong-format error, fixing the defect change 0569 measured where the workbook opener could not distinguish a Word document from a PNG. Thirty tests, all failing pre-change. The Clippy gate was **already red at HEAD** for these crates on five unrelated sites and is repaired here. `performance_claim: none`.
