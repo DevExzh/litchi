@@ -1,0 +1,54 @@
+# Mutation checks for change 0576.
+#
+# Each mutation is applied to crates/litchi-xls/src/records.rs by
+# mutate.py in this directory, the sst_measure_tests module is run, and
+# the file is restored. A mutation that no test catches is a gap in the
+# tests unless it can be shown to be semantically equivalent.
+#
+# cargo test -p litchi-xls --lib sst_measure_tests
+
+== M1 ==
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+   caught by a_pending_high_surrogate_cannot_be_completed_across_an_intervening_run
+   caught by measuring_and_materializing_agree_over_every_three_run_delivery
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+
+== M2 ==
+test result: FAILED. 10 passed; 7 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+   caught by a_malformed_unit_is_reported_before_a_bad_formatting_run
+   caught by a_pair_survives_a_long_plain_run_before_it
+   caught by a_high_surrogate_ending_a_string_before_a_compressed_continuation_is_refused
+   caught by every_unpaired_surrogate_shape_keeps_the_from_utf16_message
+   caught by a_lone_high_surrogate_keeps_the_from_utf16_message
+   caught by measuring_and_materializing_agree_over_every_three_run_delivery
+   caught by measuring_and_materializing_agree_over_every_short_code_unit_sequence
+test result: FAILED. 10 passed; 7 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+
+== M3 ==
+test result: FAILED. 8 passed; 9 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+   caught by a_high_surrogate_ending_a_string_before_a_compressed_continuation_is_refused
+   caught by a_pair_survives_a_long_plain_run_before_it
+   caught by a_pending_high_surrogate_cannot_be_completed_across_an_intervening_run
+   caught by a_high_surrogate_stranded_by_a_compressed_continuation_is_refused
+   caught by a_malformed_unit_is_reported_before_a_bad_formatting_run
+   caught by a_lone_high_surrogate_keeps_the_from_utf16_message
+   caught by every_unpaired_surrogate_shape_keeps_the_from_utf16_message
+   caught by measuring_and_materializing_agree_over_every_short_code_unit_sequence
+   caught by measuring_and_materializing_agree_over_every_three_run_delivery
+test result: FAILED. 8 passed; 9 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+
+== M4 ==
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+   caught by a_pending_high_surrogate_cannot_be_completed_across_an_intervening_run
+   caught by measuring_and_materializing_agree_over_every_three_run_delivery
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+
+== M5 ==
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+   caught by measuring_and_materializing_agree_over_every_three_run_delivery
+   caught by measuring_and_materializing_agree_over_every_short_code_unit_sequence
+test result: FAILED. 15 passed; 2 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+
+== M6 ==
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 1028 filtered out; finished in 0.04s
+

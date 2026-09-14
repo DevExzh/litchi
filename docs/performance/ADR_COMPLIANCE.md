@@ -1,5 +1,87 @@
 # Performance optimization ADR-compliance matrix
 
+## 0576: no ADR weakened; one refusal deliberately kept where it was
+
+[0576](0576-xls-sst-scan-without-materialization.md) changes how the XLS
+open-time shared-string scan obtains entry extents and nothing else. No public
+type, API layer, ownership boundary or crate dependency moves, so ADRs 0001,
+0002, 0011 and 0024 are untouched. ADR 0005 states that opening performs
+mandatory structural validation and that semantic payloads load lazily; this
+change moves the path further **toward** that shape by not materializing a
+semantic payload it immediately discards, and it does not attempt the further
+deferral, which would be a contract change and is left to its own design.
+
+ADR 0006 is the one that governs the interesting decision. Change 0574 identified
+that a naive measure-only walk would move an `Error::Encoding` refusal for
+malformed UTF-16 from open time to first shared-string access. That is a
+compatibility change, so it was **not** made: the walk still validates UTF-16
+well-formedness, and on detecting malformed input the cold path rewinds and lets
+`String::from_utf16` produce the refusal itself, so the error type, message text
+and position in the sequence are byte-identical. Fallible allocation is preserved
+on the materializing path. No `unsafe` is added. One bounded divergence is stated
+rather than left silent: the `cannot allocate shared string characters` error is
+unreachable on the measure path, because that path no longer allocates.
+
+## 0575: a recorded conflict and a rejected candidate, not an exception requested
+
+[0575](0575-zip-lazy-strict-layout-design.md) is design only and changes no code.
+It carries its own per-candidate ADR matrix; two results belong here.
+
+An incremental memoising candidate is **rejected against accepted ADR 0005**,
+whose decision text states that "Cache behavior is semantically invisible". Under
+that candidate the same read of the same bytes returns `Ok` or `Err` depending on
+what the reader happened to read earlier, which is precisely the property ADR 0005
+forbids. Per `docs/GOAL.md` the conflict is recorded and the candidate is not
+implemented, and no proposed ADR is drafted, because the recommended candidate
+reaches the same read-count class without breaching anything.
+
+The second result is that the archive-wide strict-layout proof this design would
+narrow has **no ADR basis at all**. No accepted ADR mentions ZIP overlap,
+ambiguous archives, duplicate local-header offsets or a strict layout; both
+commits introducing it have empty message bodies; there is no threat model; and
+the ordinary read path already bypasses it. That is recorded as an absence of
+documented rationale, not as permission — the recommended candidate remains gated
+on measurement and human review, and this batch implements none of it.
+
+## 0574: attribution only, with no boundary touched
+
+[0574](0574-ole2-next-opportunity-survey.md) modifies nothing under `crates/`. It
+measures the OLE2 read path and ranks opportunities. Its ranking records, for
+each candidate, which ADR governs it; the top candidate is noted as **aligned**
+with ADR 0005 rather than in tension with it, because a shared-string table is a
+semantic payload and no accepted ADR requires eager decoding.
+
+## 0573: unchanged ownership, and two test-level contracts left intact
+
+[0573](0573-zip-single-local-header-read.md) changes the I/O pattern of an
+existing private validator inside the crate that owns the ZIP grammar. No public
+type, signature or crate dependency changes, so ADRs 0002, 0010, 0011 and 0024
+are untouched, and the change is invisible above `soapberry-zip`.
+
+ADR 0006 governs the substance, and the change is deliberately conservative
+against it: every check keeps its position, its identity and its ordering, the
+speculative read cannot turn a previously-succeeding read into a failure, and a
+30-byte floor is kept specifically so that a local offset inside the central
+directory still reports a signature error rather than a short read. Allocation
+stays fallible and no `unsafe` is added. Two **existing** tests asserting that
+preservation indexing reads only framing bytes failed against the first design
+and were **not** modified; the read bound was tightened instead, so the invariant
+they encode is preserved rather than renegotiated. ADR 0005's positional-source
+model is followed unchanged — the change reduces the number of positional reads
+and adds none.
+
+## 0572: attribution only, through the provider the ADRs require
+
+[0572](0572-ooxml-range-source-attribution.md) modifies nothing under `crates/`.
+Its simulated range transport is a **caller-supplied** `litchi_core::ReadAt`
+implemented inside a throwaway probe, so ADR 0005's rule that remote and range
+behaviour is exercised through an explicit provider is satisfied, and
+`docs/GOAL.md`'s prohibition on adding ambient networking to a core or format
+crate is not engaged: no crate gained a dependency, a client or a runtime. The
+record reads which public entry points accept a `SourceReadPolicy` from source
+rather than inferring it, and reports that no PPTX or XLSX native leaf
+constructor accepts one — a boundary fact, recorded, not worked around.
+
 ## 0571: the shape ADR 0010 already blessed, implemented rather than worked around
 
 [0571](0571-ooxml-prepared-source.md) adds an opaque prepared-source handle. ADR

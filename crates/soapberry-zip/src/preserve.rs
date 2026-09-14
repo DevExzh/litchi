@@ -2265,8 +2265,11 @@ fn validate_local_span<R: ReaderAt>(
     local_end: u64,
     policy: PreservationPolicy,
 ) -> Result<bool, Error> {
+    // `local_end` is the next member's local start, or the central-directory
+    // offset for the last member.  It bounds the prover's speculative header
+    // read so that indexing still reads only framing bytes.
     let (layout, local_central_name_mismatch) = archive
-        .validate_preservation_entry_layout(entry.wayfinder, entry.raw_name_bytes())
+        .validate_preservation_entry_layout(entry.wayfinder, entry.raw_name_bytes(), local_end)
         .map_err(map_local_layout_error)?;
     if layout.local_header_offset != entry.local_span.start {
         return Err(unsupported("local header offset mismatch"));

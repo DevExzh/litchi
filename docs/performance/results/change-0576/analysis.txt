@@ -1,0 +1,120 @@
+== logical counters, both legs ==
+54016     file-source  list      reads=   40 bytes=   317171 version=  25 identical=yes
+54016     file-source  open      reads=   40 bytes=   317171 version=  25 identical=yes
+54016     owned-readat list      reads=   40 bytes=   317171 version=  25 identical=yes
+54016     owned-readat open      reads=   40 bytes=   317171 version=  25 identical=yes
+cv        file-source  list      reads=   16 bytes=   110242 version=  22 identical=yes
+cv        file-source  one-cell  reads=   17 bytes=   110656 version=  25 identical=yes
+cv        file-source  open      reads=   16 bytes=   110242 version=  22 identical=yes
+cv        owned-readat list      reads=   16 bytes=   110242 version=  22 identical=yes
+cv        owned-readat one-cell  reads=   17 bytes=   110656 version=  25 identical=yes
+cv        owned-readat open      reads=   16 bytes=   110242 version=  22 identical=yes
+flagship  file-source  list      reads=   53 bytes=   565201 version=  29 identical=yes
+flagship  file-source  one-cell  reads=   61 bytes=   603115 version=  42 identical=yes
+flagship  file-source  open      reads=   53 bytes=   565201 version=  29 identical=yes
+flagship  owned-readat list      reads=   53 bytes=   565201 version=  29 identical=yes
+flagship  owned-readat one-cell  reads=   61 bytes=   603115 version=  42 identical=yes
+flagship  owned-readat open      reads=   53 bytes=   565201 version=  29 identical=yes
+counter mismatches: 0
+
+== paired medians, two directions ==
+fixture   mode         op          before p50    after p50      dir1      dir2      A/A      B/B
+54016     file-source  list           752,659      270,344   -64.11%   -64.06%   -0.06%   +0.09%
+54016     file-source  open           702,896      270,402   -61.56%   -61.50%   +0.06%   +0.21%
+54016     owned-readat list           742,856      257,222   -65.39%   -65.36%   -0.30%   -0.21%
+54016     owned-readat open           688,168      256,704   -62.63%   -62.77%   +0.56%   +0.18%
+cv        file-source  list           217,398       40,860   -81.11%   -81.30%   -0.36%   -1.36%
+cv        file-source  one-cell       217,789       41,448   -80.98%   -80.96%   -0.06%   +0.09%
+cv        file-source  open           214,986       39,505   -81.62%   -81.63%   -0.01%   -0.07%
+cv        owned-readat list           209,826       32,970   -84.28%   -84.29%   +0.28%   +0.18%
+cv        owned-readat one-cell       209,471       32,640   -84.42%   -84.41%   +0.50%   +0.55%
+cv        owned-readat open           208,394       31,950   -84.57%   -84.77%   +1.05%   -0.25%
+flagship  file-source  list           109,738       98,520   -10.57%    -9.87%   -0.68%   +0.10%
+flagship  file-source  one-cell       124,978      113,076    -9.28%    -9.77%   +0.96%   +0.42%
+flagship  file-source  open           108,778       98,320    -9.43%    -9.80%   -0.44%   -0.85%
+flagship  owned-readat list            91,183       80,540   -12.09%   -11.25%   -0.81%   +0.14%
+flagship  owned-readat one-cell       102,071       90,736   -11.20%   -11.01%   -0.08%   +0.14%
+flagship  owned-readat open            90,520       80,138   -11.38%   -11.56%   +0.07%   -0.14%
+
+== p90 / p99, paired ==
+54016     file-source  list      p90    825,576 ->    277,669 (-66.37%)  p99    831,088 ->    280,611 (-66.24%)
+54016     file-source  open      p90    718,095 ->    277,542 (-61.35%)  p99    724,141 ->    280,433 (-61.27%)
+54016     owned-readat list      p90    814,623 ->    264,161 (-67.57%)  p99    824,342 ->    267,037 (-67.61%)
+54016     owned-readat open      p90    703,779 ->    263,801 (-62.52%)  p99    711,443 ->    266,862 (-62.49%)
+cv        file-source  list      p90    223,700 ->     41,532 (-81.43%)  p99    228,764 ->     48,252 (-78.91%)
+cv        file-source  one-cell  p90    224,622 ->     41,946 (-81.33%)  p99    233,371 ->     49,331 (-78.86%)
+cv        file-source  open      p90    222,253 ->     40,005 (-82.00%)  p99    230,707 ->     48,153 (-79.13%)
+cv        owned-readat list      p90    216,161 ->     33,491 (-84.51%)  p99    220,473 ->     40,080 (-81.82%)
+cv        owned-readat one-cell  p90    216,133 ->     32,926 (-84.77%)  p99    224,923 ->     40,520 (-81.98%)
+cv        owned-readat open      p90    214,638 ->     32,245 (-84.98%)  p99    221,035 ->     39,368 (-82.19%)
+flagship  file-source  list      p90    114,982 ->    103,795 ( -9.73%)  p99    119,247 ->    108,909 ( -8.67%)
+flagship  file-source  one-cell  p90    131,092 ->    119,472 ( -8.86%)  p99    134,973 ->    122,827 ( -9.00%)
+flagship  file-source  open      p90    114,758 ->    103,507 ( -9.80%)  p99    118,542 ->    107,921 ( -8.96%)
+flagship  owned-readat list      p90     96,002 ->     83,200 (-13.33%)  p99    101,671 ->     90,725 (-10.77%)
+flagship  owned-readat one-cell  p90    107,688 ->     94,542 (-12.21%)  p99    111,935 ->    100,392 (-10.31%)
+flagship  owned-readat open      p90     96,015 ->     83,498 (-13.04%)  p99    102,103 ->     89,627 (-12.22%)
+
+== hardware counters per open, isolated by differencing 1100 and 100 samples ==
+fixture   leg         instructions         branches    branch-misses       task-clock
+flagship  before         1,643,022          328,326            1,053                0
+flagship  after          1,391,409          276,359              681                0
+cv        before         5,312,769        1,056,288            4,850                0
+cv        after            627,989          118,774              195                0
+54016     before        17,139,968        3,244,204           10,241                1
+54016     after          5,979,090          981,312              364                0
+
+flagship  instructions        1,643,022 ->      1,391,409 (-15.31%)
+flagship  branches              328,326 ->        276,359 (-15.83%)
+flagship  branch-misses           1,053 ->            681 (-35.35%)
+flagship  task-clock                  0 ->              0 (+38.12%)
+cv        instructions        5,312,769 ->        627,989 (-88.18%)
+cv        branches            1,056,288 ->        118,774 (-88.76%)
+cv        branch-misses           4,850 ->            195 (-95.97%)
+cv        task-clock                  0 ->              0 (-84.51%)
+54016     instructions       17,139,968 ->      5,979,090 (-65.12%)
+54016     branches            3,244,204 ->        981,312 (-69.75%)
+54016     branch-misses          10,241 ->            364 (-96.45%)
+54016     task-clock                  1 ->              0 (-62.45%)
+
+== callgrind self cost per open ==
+flagship  before  total Ir/open=   2,798,346 shared-string self=     299,186 (10.69%)
+flagship  after   total Ir/open=   2,535,964 shared-string self=     113,797 ( 4.49%)
+flagship  delta   total Ir/open 2,798,346 -> 2,535,964 ( -9.38%)
+    ???:<alloc::string::String>::from_utf16                                             117,033 ->        5,114
+    ???:litchi_xls::records::SstCursor::read_characters                                  95,589 ->            0
+    ???:litchi_xls::records::parse_one_shared_string                                     35,835 ->            0
+    ???:litchi_xls::records::walk_one_shared_string                                           0 ->       32,199
+    ???:<litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringTex            0 ->       27,573
+    ./malloc/./malloc/malloc.c:free                                                      43,780 ->       23,782
+    ./malloc/./malloc/malloc.c:malloc                                                    34,804 ->       17,964
+    ???:alloc::raw_vec::RawVecInner<A>::finish_grow                                      24,441 ->       12,321
+cv        before  total Ir/open=   5,608,091 shared-string self=   4,613,702 (82.27%)
+cv        after   total Ir/open=     922,514 shared-string self=     240,146 (26.03%)
+cv        delta   total Ir/open 5,608,091 -> 922,514 (-83.55%)
+    ???:<alloc::string::String>::from_utf16                                           2,635,609 ->        2,272
+    ???:litchi_xls::records::SstCursor::read_characters                               1,804,670 ->            0
+    ???:<litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringTex            0 ->       73,007
+    ./malloc/./malloc/malloc.c:_int_malloc                                               83,557 ->       11,883
+    ???:litchi_xls::records::parse_one_shared_string                                     56,699 ->            0
+    ???:litchi_xls::records::walk_one_shared_string                                           0 ->       51,011
+    ./malloc/./malloc/malloc.c:_int_free_merge_chunk                                     53,353 ->        8,724
+    ./malloc/./malloc/malloc.c:free                                                      34,505 ->        5,202
+54016     before  total Ir/open=  18,219,149 shared-string self=  13,188,082 (72.39%)
+54016     after   total Ir/open=   7,305,937 shared-string self=   3,583,753 (49.05%)
+54016     delta   total Ir/open 18,219,149 -> 7,305,937 (-59.90%)
+    ???:<alloc::string::String>::from_utf16                                           5,781,331 ->        2,164
+    ???:litchi_xls::records::SstCursor::read_characters                               4,403,645 ->            0
+    ???:litchi_xls::records::parse_one_shared_string                                    931,511 ->            0
+    ???:litchi_xls::records::walk_one_shared_string                                           0 ->      836,795
+    ???:<litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringTex            0 ->      719,535
+    ./malloc/./malloc/malloc.c:free                                                     525,075 ->        4,939
+    ./malloc/./malloc/malloc.c:malloc                                                   462,133 ->        4,190
+    ???:alloc::raw_vec::RawVecInner<A>::finish_grow                                     322,602 ->        6,922
+
+== callgrind inclusive cost of the SST scan per open ==
+flagship  before  scan_shared_string_records inclusive Ir/open=     382,361
+flagship  after   scan_shared_string_records inclusive Ir/open=     115,701
+cv        before  scan_shared_string_records inclusive Ir/open=   4,946,335
+cv        after   scan_shared_string_records inclusive Ir/open=     252,497
+54016     before  scan_shared_string_records inclusive Ir/open=  14,848,546
+54016     after   scan_shared_string_records inclusive Ir/open=   3,724,624

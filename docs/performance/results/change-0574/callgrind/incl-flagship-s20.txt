@@ -1,0 +1,63 @@
+--------------------------------------------------------------------------------
+Profile data file 'cg/flagship-s20.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 47506791
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution --input /home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls --mode owned-readat --operation open --warmups 1 --samples 20 (PID 3162739, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+687,365,958 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+687,365,958 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+687,101,035 (99.96%)  ???:(below main) [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+687,101,023 (99.96%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+687,100,842 (99.96%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+687,099,048 (99.96%)  ???:main [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+687,099,037 (99.96%)  ???:std::rt::lang_start_internal [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+686,996,150 (99.95%)  ???:std::rt::lang_start::{{closure}} [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+686,996,129 (99.95%)  ???:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+686,996,125 (99.95%)  ???:xls_source_attribution::main [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+686,763,742 (99.91%)  ???:xls_source_attribution::run [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+613,381,141 (89.24%)  ???:xls_source_attribution::sha256_hex [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+613,328,223 (89.23%)  ???:sha2::sha256::compress256 [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+613,328,144 (89.23%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+467,320,697 (67.99%)  ???:xls_source_attribution::binary_identity [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 60,091,825 ( 8.74%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 60,091,385 ( 8.74%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 54,633,852 ( 7.95%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 33,768,883 ( 4.91%)  ???:litchi_xls::workbook::source::GlobalsBuffer::ensure [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 18,282,294 ( 2.66%)  ???:litchi_cfb::shared::SharedOleFile::read_stream_range [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 17,400,174 ( 2.53%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 12,333,935 ( 1.79%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 11,926,200 ( 1.74%)  ???:litchi_core::source::ReadAt::read_exact_at [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 10,724,212 ( 1.56%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+ 10,467,109 ( 1.52%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  9,042,848 ( 1.32%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  8,488,754 ( 1.23%)  ???:litchi_xls::records::scan_shared_string_records [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  7,685,479 ( 1.12%)  ???:litchi_xls::records::parse_one_shared_string [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  7,589,631 ( 1.10%)  ???:litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  6,290,850 ( 0.92%)  ???:litchi_xls::records::SstCursor::read_characters [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./csu/../csu/libc-start.c
+  ./csu/../sysdeps/nptl/libc_start_call_main.h
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+

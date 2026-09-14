@@ -1,0 +1,3 @@
+test-data/poi/test-data/spreadsheet/54016.xls: unique=7893 total=16055 empty=1 rich_text=1 extrst=0 crossing_a_continue=17 bound_sheets=1 sheet_name_bytes=8
+test-data/ole/xls/WithCustomViews.xls: unique=474 total=862 empty=0 rich_text=28 extrst=0 crossing_a_continue=11 bound_sheets=3 sheet_name_bytes=21
+test-data/ole/xls/ConditionalFormattingSamples.xls: unique=303 total=658 empty=0 rich_text=3 extrst=0 crossing_a_continue=0 bound_sheets=16 sheet_name_bytes=191

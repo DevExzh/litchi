@@ -3602,7 +3602,7 @@ where
                 })
             })?;
         let mut previous_end = None;
-        for layout_entry in &self.layout {
+        for (position, layout_entry) in self.layout.iter().enumerate() {
             let central_name = match &layout_entry.name {
                 IndexedLayoutName::Entry(entry_id) => {
                     &self
@@ -3619,9 +3619,22 @@ where
                 },
                 IndexedLayoutName::Directory(name) => name,
             };
-            let span = self
-                .archive
-                .validate_strict_entry_layout(layout_entry.wayfinder, central_name)?;
+            // Where the following member begins, or the central directory for
+            // the last one.  This is a read bound for the prover's speculative
+            // local-header read; the non-overlap proof below is what actually
+            // validates the order.
+            let next_local_header_offset = position
+                .checked_add(1)
+                .and_then(|next| self.layout.get(next))
+                .map_or_else(
+                    || self.archive.directory_offset(),
+                    |next| next.wayfinder.local_header_offset(),
+                );
+            let span = self.archive.validate_strict_entry_layout(
+                layout_entry.wayfinder,
+                central_name,
+                next_local_header_offset,
+            )?;
             if previous_end.is_some_and(|previous_end| span.local_header_offset < previous_end) {
                 return Err(Error::from(ErrorKind::InvalidInput {
                     msg: "strict streaming refuses overlapping ZIP local spans".to_string(),

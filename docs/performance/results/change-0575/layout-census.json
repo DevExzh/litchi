@@ -1,0 +1,1450 @@
+[
+ {
+  "path": "test-data/ooxml/xlsx/sheet-names.xlsx",
+  "total_size": 9425,
+  "central_directory_offset": 8549,
+  "entries": 13,
+  "descriptors": 0,
+  "stored": 0,
+  "local_extra_min": 0,
+  "local_extra_max": 520,
+  "local_extra_distinct": [
+   0,
+   264,
+   520
+  ],
+  "central_extra_min": 0,
+  "central_extra_max": 0,
+  "central_extra_distinct": [
+   0
+  ],
+  "gap_min": 0,
+  "gap_max": 0,
+  "gap_nonzero": 0,
+  "zero_io_proven_pairs": 0,
+  "zero_io_refuted_pairs": 0,
+  "zero_io_residual_pairs": 12,
+  "residual_headers_max": 12,
+  "residual_headers_mean": 6.0,
+  "residual_headers_last": 12,
+  "residual_headers_first_content": 0,
+  "per_target": [
+   {
+    "index": 0,
+    "name": "[Content_Types].xml",
+    "predecessors": 0,
+    "headers_needed": 0,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 1,
+    "name": "_rels/.rels",
+    "predecessors": 1,
+    "headers_needed": 1,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 2,
+    "name": "xl/_rels/workbook.xml.rels",
+    "predecessors": 2,
+    "headers_needed": 2,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 3,
+    "name": "xl/workbook.xml",
+    "predecessors": 3,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 4,
+    "name": "xl/worksheets/sheet4.xml",
+    "predecessors": 4,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 5,
+    "name": "xl/worksheets/sheet2.xml",
+    "predecessors": 5,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 6,
+    "name": "xl/worksheets/sheet3.xml",
+    "predecessors": 6,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 7,
+    "name": "xl/worksheets/sheet1.xml",
+    "predecessors": 7,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 8,
+    "name": "xl/theme/theme1.xml",
+    "predecessors": 8,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 9,
+    "name": "xl/worksheets/sheet5.xml",
+    "predecessors": 9,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 10,
+    "name": "xl/styles.xml",
+    "predecessors": 10,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 11,
+    "name": "docProps/core.xml",
+    "predecessors": 11,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 12,
+    "name": "docProps/app.xml",
+    "predecessors": 12,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   }
+  ]
+ },
+ {
+  "path": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+  "total_size": 654688,
+  "central_directory_offset": 644942,
+  "entries": 132,
+  "descriptors": 0,
+  "stored": 16,
+  "local_extra_min": 0,
+  "local_extra_max": 520,
+  "local_extra_distinct": [
+   0,
+   40,
+   264,
+   520
+  ],
+  "central_extra_min": 0,
+  "central_extra_max": 0,
+  "central_extra_distinct": [
+   0
+  ],
+  "gap_min": 0,
+  "gap_max": 0,
+  "gap_nonzero": 0,
+  "zero_io_proven_pairs": 0,
+  "zero_io_refuted_pairs": 0,
+  "zero_io_residual_pairs": 131,
+  "residual_headers_max": 39,
+  "residual_headers_mean": 15.234848484848484,
+  "residual_headers_last": 39,
+  "residual_headers_first_content": 0,
+  "per_target": [
+   {
+    "index": 0,
+    "name": "[Content_Types].xml",
+    "predecessors": 0,
+    "headers_needed": 0,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 1,
+    "name": "_rels/.rels",
+    "predecessors": 1,
+    "headers_needed": 1,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 2,
+    "name": "xl/_rels/workbook.xml.rels",
+    "predecessors": 2,
+    "headers_needed": 2,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 3,
+    "name": "xl/workbook.xml",
+    "predecessors": 3,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 4,
+    "name": "xl/worksheets/sheet4.xml",
+    "predecessors": 4,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 5,
+    "name": "xl/worksheets/_rels/sheet2.xml.rels",
+    "predecessors": 5,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 6,
+    "name": "xl/worksheets/_rels/sheet1.xml.rels",
+    "predecessors": 6,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 7,
+    "name": "xl/worksheets/sheet2.xml",
+    "predecessors": 7,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 8,
+    "name": "xl/worksheets/sheet3.xml",
+    "predecessors": 8,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 9,
+    "name": "xl/worksheets/_rels/sheet3.xml.rels",
+    "predecessors": 9,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 10,
+    "name": "xl/worksheets/_rels/sheet4.xml.rels",
+    "predecessors": 10,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 11,
+    "name": "xl/worksheets/_rels/sheet5.xml.rels",
+    "predecessors": 11,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 12,
+    "name": "xl/worksheets/_rels/sheet9.xml.rels",
+    "predecessors": 12,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 13,
+    "name": "xl/worksheets/_rels/sheet8.xml.rels",
+    "predecessors": 13,
+    "headers_needed": 13,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 14,
+    "name": "xl/worksheets/_rels/sheet7.xml.rels",
+    "predecessors": 14,
+    "headers_needed": 14,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 15,
+    "name": "xl/worksheets/_rels/sheet6.xml.rels",
+    "predecessors": 15,
+    "headers_needed": 15,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 16,
+    "name": "xl/media/image16.png",
+    "predecessors": 16,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 17,
+    "name": "xl/drawings/drawing18.xml",
+    "predecessors": 17,
+    "headers_needed": 17,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 18,
+    "name": "xl/media/image15.png",
+    "predecessors": 18,
+    "headers_needed": 18,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 19,
+    "name": "xl/worksheets/sheet1.xml",
+    "predecessors": 19,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 20,
+    "name": "xl/media/image11.png",
+    "predecessors": 20,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 21,
+    "name": "xl/drawings/drawing13.xml",
+    "predecessors": 21,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 22,
+    "name": "xl/drawings/drawing12.xml",
+    "predecessors": 22,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 23,
+    "name": "xl/media/image12.png",
+    "predecessors": 23,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 24,
+    "name": "xl/drawings/drawing15.xml",
+    "predecessors": 24,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 25,
+    "name": "xl/media/image13.png",
+    "predecessors": 25,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 26,
+    "name": "xl/drawings/drawing16.xml",
+    "predecessors": 26,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 27,
+    "name": "xl/media/image14.png",
+    "predecessors": 27,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 28,
+    "name": "xl/drawings/drawing17.xml",
+    "predecessors": 28,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 29,
+    "name": "xl/worksheets/_rels/sheet10.xml.rels",
+    "predecessors": 29,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 30,
+    "name": "xl/worksheets/_rels/sheet11.xml.rels",
+    "predecessors": 30,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 31,
+    "name": "xl/worksheets/_rels/sheet12.xml.rels",
+    "predecessors": 31,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 32,
+    "name": "xl/drawings/_rels/drawing11.xml.rels",
+    "predecessors": 32,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 33,
+    "name": "xl/drawings/_rels/drawing10.xml.rels",
+    "predecessors": 33,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 34,
+    "name": "xl/drawings/_rels/drawing9.xml.rels",
+    "predecessors": 34,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 35,
+    "name": "xl/drawings/_rels/drawing8.xml.rels",
+    "predecessors": 35,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 36,
+    "name": "xl/drawings/_rels/drawing12.xml.rels",
+    "predecessors": 36,
+    "headers_needed": 13,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 37,
+    "name": "xl/drawings/_rels/drawing13.xml.rels",
+    "predecessors": 37,
+    "headers_needed": 14,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 38,
+    "name": "xl/drawings/_rels/drawing14.xml.rels",
+    "predecessors": 38,
+    "headers_needed": 15,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 39,
+    "name": "xl/drawings/_rels/drawing18.xml.rels",
+    "predecessors": 39,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 40,
+    "name": "xl/drawings/_rels/drawing17.xml.rels",
+    "predecessors": 40,
+    "headers_needed": 17,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 41,
+    "name": "xl/drawings/_rels/drawing16.xml.rels",
+    "predecessors": 41,
+    "headers_needed": 18,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 42,
+    "name": "xl/drawings/_rels/drawing15.xml.rels",
+    "predecessors": 42,
+    "headers_needed": 19,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 43,
+    "name": "xl/drawings/_rels/drawing7.xml.rels",
+    "predecessors": 43,
+    "headers_needed": 20,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 44,
+    "name": "xl/drawings/_rels/drawing6.xml.rels",
+    "predecessors": 44,
+    "headers_needed": 21,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 45,
+    "name": "xl/drawings/_rels/drawing5.xml.rels",
+    "predecessors": 45,
+    "headers_needed": 22,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 46,
+    "name": "xl/worksheets/_rels/sheet16.xml.rels",
+    "predecessors": 46,
+    "headers_needed": 23,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 47,
+    "name": "xl/worksheets/_rels/sheet15.xml.rels",
+    "predecessors": 47,
+    "headers_needed": 24,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 48,
+    "name": "xl/worksheets/_rels/sheet14.xml.rels",
+    "predecessors": 48,
+    "headers_needed": 25,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 49,
+    "name": "xl/worksheets/_rels/sheet13.xml.rels",
+    "predecessors": 49,
+    "headers_needed": 26,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 50,
+    "name": "xl/worksheets/_rels/sheet17.xml.rels",
+    "predecessors": 50,
+    "headers_needed": 27,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 51,
+    "name": "xl/worksheets/_rels/sheet18.xml.rels",
+    "predecessors": 51,
+    "headers_needed": 28,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 52,
+    "name": "xl/drawings/_rels/drawing1.xml.rels",
+    "predecessors": 52,
+    "headers_needed": 29,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 53,
+    "name": "xl/drawings/_rels/drawing2.xml.rels",
+    "predecessors": 53,
+    "headers_needed": 30,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 54,
+    "name": "xl/drawings/_rels/drawing3.xml.rels",
+    "predecessors": 54,
+    "headers_needed": 31,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 55,
+    "name": "xl/drawings/_rels/drawing4.xml.rels",
+    "predecessors": 55,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 56,
+    "name": "xl/drawings/drawing11.xml",
+    "predecessors": 56,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 57,
+    "name": "xl/drawings/drawing14.xml",
+    "predecessors": 57,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 58,
+    "name": "xl/media/image10.png",
+    "predecessors": 58,
+    "headers_needed": 33,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 59,
+    "name": "xl/media/image1.png",
+    "predecessors": 59,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 60,
+    "name": "xl/drawings/drawing2.xml",
+    "predecessors": 60,
+    "headers_needed": 2,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 61,
+    "name": "xl/drawings/drawing1.xml",
+    "predecessors": 61,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 62,
+    "name": "xl/sharedStrings.xml",
+    "predecessors": 62,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 63,
+    "name": "xl/styles.xml",
+    "predecessors": 63,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 64,
+    "name": "xl/drawings/drawing3.xml",
+    "predecessors": 64,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 65,
+    "name": "xl/media/image2.png",
+    "predecessors": 65,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 66,
+    "name": "xl/drawings/drawing4.xml",
+    "predecessors": 66,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 67,
+    "name": "xl/media/image5.png",
+    "predecessors": 67,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 68,
+    "name": "xl/media/image4.png",
+    "predecessors": 68,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 69,
+    "name": "xl/drawings/drawing5.xml",
+    "predecessors": 69,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 70,
+    "name": "xl/media/image3.png",
+    "predecessors": 70,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 71,
+    "name": "xl/theme/theme1.xml",
+    "predecessors": 71,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 72,
+    "name": "xl/worksheets/sheet18.xml",
+    "predecessors": 72,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 73,
+    "name": "xl/worksheets/sheet17.xml",
+    "predecessors": 73,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 74,
+    "name": "xl/worksheets/sheet9.xml",
+    "predecessors": 74,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 75,
+    "name": "xl/worksheets/sheet8.xml",
+    "predecessors": 75,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 76,
+    "name": "xl/worksheets/sheet7.xml",
+    "predecessors": 76,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 77,
+    "name": "xl/worksheets/sheet6.xml",
+    "predecessors": 77,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 78,
+    "name": "xl/worksheets/sheet5.xml",
+    "predecessors": 78,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 79,
+    "name": "xl/worksheets/sheet10.xml",
+    "predecessors": 79,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 80,
+    "name": "xl/worksheets/sheet11.xml",
+    "predecessors": 80,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 81,
+    "name": "xl/worksheets/sheet12.xml",
+    "predecessors": 81,
+    "headers_needed": 13,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 82,
+    "name": "xl/worksheets/sheet16.xml",
+    "predecessors": 82,
+    "headers_needed": 14,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 83,
+    "name": "xl/worksheets/sheet15.xml",
+    "predecessors": 83,
+    "headers_needed": 15,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 84,
+    "name": "xl/worksheets/sheet14.xml",
+    "predecessors": 84,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 85,
+    "name": "xl/worksheets/sheet13.xml",
+    "predecessors": 85,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 86,
+    "name": "xl/drawings/drawing7.xml",
+    "predecessors": 86,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 87,
+    "name": "xl/drawings/drawing6.xml",
+    "predecessors": 87,
+    "headers_needed": 17,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 88,
+    "name": "xl/media/image7.png",
+    "predecessors": 88,
+    "headers_needed": 18,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 89,
+    "name": "xl/drawings/drawing8.xml",
+    "predecessors": 89,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 90,
+    "name": "xl/media/image8.png",
+    "predecessors": 90,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 91,
+    "name": "xl/drawings/drawing9.xml",
+    "predecessors": 91,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 92,
+    "name": "xl/media/image6.png",
+    "predecessors": 92,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 93,
+    "name": "xl/media/image9.png",
+    "predecessors": 93,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 94,
+    "name": "xl/drawings/drawing10.xml",
+    "predecessors": 94,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 95,
+    "name": "xl/tables/table8.xml",
+    "predecessors": 95,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 96,
+    "name": "customXml/_rels/item3.xml.rels",
+    "predecessors": 96,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 97,
+    "name": "xl/printerSettings/printerSettings8.bin",
+    "predecessors": 97,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 98,
+    "name": "docProps/app.xml",
+    "predecessors": 98,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 99,
+    "name": "xl/printerSettings/printerSettings14.bin",
+    "predecessors": 99,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 100,
+    "name": "xl/tables/table4.xml",
+    "predecessors": 100,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 101,
+    "name": "customXml/_rels/item2.xml.rels",
+    "predecessors": 101,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 102,
+    "name": "xl/tables/table5.xml",
+    "predecessors": 102,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 103,
+    "name": "customXml/_rels/item1.xml.rels",
+    "predecessors": 103,
+    "headers_needed": 13,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 104,
+    "name": "xl/printerSettings/printerSettings12.bin",
+    "predecessors": 104,
+    "headers_needed": 14,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 105,
+    "name": "xl/tables/table6.xml",
+    "predecessors": 105,
+    "headers_needed": 15,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 106,
+    "name": "xl/tables/table7.xml",
+    "predecessors": 106,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 107,
+    "name": "xl/printerSettings/printerSettings13.bin",
+    "predecessors": 107,
+    "headers_needed": 17,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 108,
+    "name": "xl/printerSettings/printerSettings9.bin",
+    "predecessors": 108,
+    "headers_needed": 18,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 109,
+    "name": "xl/printerSettings/printerSettings11.bin",
+    "predecessors": 109,
+    "headers_needed": 19,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 110,
+    "name": "xl/printerSettings/printerSettings15.bin",
+    "predecessors": 110,
+    "headers_needed": 20,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 111,
+    "name": "docProps/core.xml",
+    "predecessors": 111,
+    "headers_needed": 21,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 112,
+    "name": "xl/tables/table2.xml",
+    "predecessors": 112,
+    "headers_needed": 22,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 113,
+    "name": "customXml/itemProps2.xml",
+    "predecessors": 113,
+    "headers_needed": 23,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 114,
+    "name": "xl/printerSettings/printerSettings10.bin",
+    "predecessors": 114,
+    "headers_needed": 24,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 115,
+    "name": "xl/tables/table3.xml",
+    "predecessors": 115,
+    "headers_needed": 25,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 116,
+    "name": "customXml/item3.xml",
+    "predecessors": 116,
+    "headers_needed": 26,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 117,
+    "name": "xl/printerSettings/printerSettings6.bin",
+    "predecessors": 117,
+    "headers_needed": 27,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 118,
+    "name": "customXml/itemProps3.xml",
+    "predecessors": 118,
+    "headers_needed": 28,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 119,
+    "name": "docProps/custom.xml",
+    "predecessors": 119,
+    "headers_needed": 29,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 120,
+    "name": "customXml/item2.xml",
+    "predecessors": 120,
+    "headers_needed": 30,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 121,
+    "name": "xl/printerSettings/printerSettings5.bin",
+    "predecessors": 121,
+    "headers_needed": 31,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 122,
+    "name": "customXml/itemProps1.xml",
+    "predecessors": 122,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 123,
+    "name": "xl/printerSettings/printerSettings2.bin",
+    "predecessors": 123,
+    "headers_needed": 33,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 124,
+    "name": "xl/printerSettings/printerSettings7.bin",
+    "predecessors": 124,
+    "headers_needed": 34,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 125,
+    "name": "xl/tables/table9.xml",
+    "predecessors": 125,
+    "headers_needed": 35,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 126,
+    "name": "xl/printerSettings/printerSettings3.bin",
+    "predecessors": 126,
+    "headers_needed": 36,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 127,
+    "name": "xl/calcChain.xml",
+    "predecessors": 127,
+    "headers_needed": 37,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 128,
+    "name": "xl/printerSettings/printerSettings4.bin",
+    "predecessors": 128,
+    "headers_needed": 38,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 129,
+    "name": "customXml/item1.xml",
+    "predecessors": 129,
+    "headers_needed": 39,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 130,
+    "name": "xl/tables/table1.xml",
+    "predecessors": 130,
+    "headers_needed": 38,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 131,
+    "name": "xl/printerSettings/printerSettings1.bin",
+    "predecessors": 131,
+    "headers_needed": 39,
+    "zero_io_refuted": 0
+   }
+  ]
+ },
+ {
+  "path": "test-data/ooxml/pptx/shapes.pptx",
+  "total_size": 68822,
+  "central_directory_offset": 65116,
+  "entries": 48,
+  "descriptors": 0,
+  "stored": 2,
+  "local_extra_min": 0,
+  "local_extra_max": 520,
+  "local_extra_distinct": [
+   0,
+   264,
+   520
+  ],
+  "central_extra_min": 0,
+  "central_extra_max": 0,
+  "central_extra_distinct": [
+   0
+  ],
+  "gap_min": 0,
+  "gap_max": 0,
+  "gap_nonzero": 0,
+  "zero_io_proven_pairs": 0,
+  "zero_io_refuted_pairs": 0,
+  "zero_io_residual_pairs": 47,
+  "residual_headers_max": 47,
+  "residual_headers_mean": 23.5,
+  "residual_headers_last": 47,
+  "residual_headers_first_content": 0,
+  "per_target": [
+   {
+    "index": 0,
+    "name": "[Content_Types].xml",
+    "predecessors": 0,
+    "headers_needed": 0,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 1,
+    "name": "_rels/.rels",
+    "predecessors": 1,
+    "headers_needed": 1,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 2,
+    "name": "ppt/slides/_rels/slide1.xml.rels",
+    "predecessors": 2,
+    "headers_needed": 2,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 3,
+    "name": "ppt/slides/_rels/slide2.xml.rels",
+    "predecessors": 3,
+    "headers_needed": 3,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 4,
+    "name": "ppt/slides/_rels/slide3.xml.rels",
+    "predecessors": 4,
+    "headers_needed": 4,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 5,
+    "name": "ppt/slides/_rels/slide4.xml.rels",
+    "predecessors": 5,
+    "headers_needed": 5,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 6,
+    "name": "ppt/slides/_rels/slide5.xml.rels",
+    "predecessors": 6,
+    "headers_needed": 6,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 7,
+    "name": "ppt/slides/_rels/slide6.xml.rels",
+    "predecessors": 7,
+    "headers_needed": 7,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 8,
+    "name": "ppt/_rels/presentation.xml.rels",
+    "predecessors": 8,
+    "headers_needed": 8,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 9,
+    "name": "ppt/presentation.xml",
+    "predecessors": 9,
+    "headers_needed": 9,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 10,
+    "name": "ppt/slides/slide5.xml",
+    "predecessors": 10,
+    "headers_needed": 10,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 11,
+    "name": "ppt/slides/slide4.xml",
+    "predecessors": 11,
+    "headers_needed": 11,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 12,
+    "name": "ppt/slides/slide3.xml",
+    "predecessors": 12,
+    "headers_needed": 12,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 13,
+    "name": "ppt/slides/slide2.xml",
+    "predecessors": 13,
+    "headers_needed": 13,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 14,
+    "name": "ppt/slides/slide1.xml",
+    "predecessors": 14,
+    "headers_needed": 14,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 15,
+    "name": "ppt/slides/slide6.xml",
+    "predecessors": 15,
+    "headers_needed": 15,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 16,
+    "name": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+    "predecessors": 16,
+    "headers_needed": 16,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 17,
+    "name": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+    "predecessors": 17,
+    "headers_needed": 17,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 18,
+    "name": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+    "predecessors": 18,
+    "headers_needed": 18,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 19,
+    "name": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+    "predecessors": 19,
+    "headers_needed": 19,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 20,
+    "name": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+    "predecessors": 20,
+    "headers_needed": 20,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 21,
+    "name": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+    "predecessors": 21,
+    "headers_needed": 21,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 22,
+    "name": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+    "predecessors": 22,
+    "headers_needed": 22,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 23,
+    "name": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+    "predecessors": 23,
+    "headers_needed": 23,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 24,
+    "name": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+    "predecessors": 24,
+    "headers_needed": 24,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 25,
+    "name": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+    "predecessors": 25,
+    "headers_needed": 25,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 26,
+    "name": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+    "predecessors": 26,
+    "headers_needed": 26,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 27,
+    "name": "ppt/slideLayouts/slideLayout4.xml",
+    "predecessors": 27,
+    "headers_needed": 27,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 28,
+    "name": "ppt/slideLayouts/slideLayout3.xml",
+    "predecessors": 28,
+    "headers_needed": 28,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 29,
+    "name": "ppt/slideLayouts/slideLayout2.xml",
+    "predecessors": 29,
+    "headers_needed": 29,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 30,
+    "name": "ppt/slideLayouts/slideLayout1.xml",
+    "predecessors": 30,
+    "headers_needed": 30,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 31,
+    "name": "ppt/slideMasters/slideMaster1.xml",
+    "predecessors": 31,
+    "headers_needed": 31,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 32,
+    "name": "ppt/slideLayouts/slideLayout5.xml",
+    "predecessors": 32,
+    "headers_needed": 32,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 33,
+    "name": "ppt/slideLayouts/slideLayout6.xml",
+    "predecessors": 33,
+    "headers_needed": 33,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 34,
+    "name": "ppt/slideLayouts/slideLayout7.xml",
+    "predecessors": 34,
+    "headers_needed": 34,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 35,
+    "name": "ppt/slideLayouts/slideLayout11.xml",
+    "predecessors": 35,
+    "headers_needed": 35,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 36,
+    "name": "ppt/slideLayouts/slideLayout10.xml",
+    "predecessors": 36,
+    "headers_needed": 36,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 37,
+    "name": "ppt/slideLayouts/slideLayout9.xml",
+    "predecessors": 37,
+    "headers_needed": 37,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 38,
+    "name": "ppt/slideLayouts/slideLayout8.xml",
+    "predecessors": 38,
+    "headers_needed": 38,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 39,
+    "name": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+    "predecessors": 39,
+    "headers_needed": 39,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 40,
+    "name": "ppt/theme/theme1.xml",
+    "predecessors": 40,
+    "headers_needed": 40,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 41,
+    "name": "ppt/media/image1.jpg",
+    "predecessors": 41,
+    "headers_needed": 41,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 42,
+    "name": "docProps/thumbnail.jpeg",
+    "predecessors": 42,
+    "headers_needed": 42,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 43,
+    "name": "ppt/presProps.xml",
+    "predecessors": 43,
+    "headers_needed": 43,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 44,
+    "name": "ppt/tableStyles.xml",
+    "predecessors": 44,
+    "headers_needed": 44,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 45,
+    "name": "ppt/viewProps.xml",
+    "predecessors": 45,
+    "headers_needed": 45,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 46,
+    "name": "docProps/app.xml",
+    "predecessors": 46,
+    "headers_needed": 46,
+    "zero_io_refuted": 0
+   },
+   {
+    "index": 47,
+    "name": "docProps/core.xml",
+    "predecessors": 47,
+    "headers_needed": 47,
+    "zero_io_refuted": 0
+   }
+  ]
+ }
+]

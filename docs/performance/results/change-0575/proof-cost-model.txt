@@ -1,0 +1,58 @@
+== test-data/ooxml/xlsx/sheet-names.xlsx  (13 central records, 9425 bytes)
+   archive-wide proof, paid once on the first read of any member:
+     (d0) today, 2 reads/record       :    26 reads      2478 B
+     (d1) change 0573, 1 read/record  :    13 reads      2478 B
+     (e)  coalesced, gap<=     0 B    :    13 reads      2478 B
+     (e)  coalesced, gap<=   512 B    :     3 reads      5858 B
+     (e)  coalesced, gap<=  4096 B    :     1 reads      8126 B
+     (e)  coalesced, gap<= 65536 B    :     1 reads      8126 B
+   scenario 'one member (sheet1)' (1 members read; missing=[])
+     (a/c) target-only, memoised      :     1 reads        54 B
+     (b)   target + residual preds    :     8 reads      1711 B  (full headers)
+     (b')  same, 30-byte neighbour screen:    8 reads       264 B  (1 targets + 7 screened)
+           per-target residual        : {'xl/worksheets/sheet1.xml': 7}
+   scenario 'one-cell closure' (6 members read; missing=['xl/sharedStrings.xml'])
+     (a/c) target-only, memoised      :     6 reads      1592 B
+     (b)   target + residual preds    :    11 reads      1857 B  (full headers)
+     (b')  same, 30-byte neighbour screen:   11 reads      1742 B  (6 targets + 5 screened)
+           per-target residual        : {'[Content_Types].xml': 0, '_rels/.rels': 1, 'xl/_rels/workbook.xml.rels': 2, 'xl/workbook.xml': 3, 'xl/worksheets/sheet1.xml': 7, 'xl/styles.xml': 10}
+
+== test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx  (132 central records, 654688 bytes)
+   archive-wide proof, paid once on the first read of any member:
+     (d0) today, 2 reads/record       :   264 reads     10740 B
+     (d1) change 0573, 1 read/record  :   132 reads     10740 B
+     (e)  coalesced, gap<=     0 B    :   132 reads     10740 B
+     (e)  coalesced, gap<=   512 B    :    61 reads     28309 B
+     (e)  coalesced, gap<=  4096 B    :    22 reads     91707 B
+     (e)  coalesced, gap<= 65536 B    :     1 reads    644889 B
+   scenario 'one member (sheet1)' (1 members read; missing=[])
+     (a/c) target-only, memoised      :     1 reads        54 B
+     (b)   target + residual preds    :     4 reads       209 B  (full headers)
+     (b')  same, 30-byte neighbour screen:    4 reads       144 B  (1 targets + 3 screened)
+           per-target residual        : {'xl/worksheets/sheet1.xml': 3}
+   scenario 'one-cell closure' (7 members read; missing=[])
+     (a/c) target-only, memoised      :     7 reads      1642 B
+     (b)   target + residual preds    :    14 reads      2004 B  (full headers)
+     (b')  same, 30-byte neighbour screen:   14 reads      1852 B  (7 targets + 7 screened)
+           per-target residual        : {'[Content_Types].xml': 0, '_rels/.rels': 1, 'xl/_rels/workbook.xml.rels': 2, 'xl/workbook.xml': 3, 'xl/worksheets/sheet1.xml': 3, 'xl/sharedStrings.xml': 4, 'xl/styles.xml': 5}
+
+== test-data/ooxml/pptx/shapes.pptx  (48 central records, 68822 bytes)
+   archive-wide proof, paid once on the first read of any member:
+     (d0) today, 2 reads/record       :    96 reads      4748 B
+     (d1) change 0573, 1 read/record  :    48 reads      4748 B
+     (e)  coalesced, gap<=     0 B    :    48 reads      4748 B
+     (e)  coalesced, gap<=   512 B    :    25 reads     10238 B
+     (e)  coalesced, gap<=  4096 B    :     4 reads     31618 B
+     (e)  coalesced, gap<= 65536 B    :     1 reads     64746 B
+   scenario 'one member (slide1)' (1 members read; missing=[])
+     (a/c) target-only, memoised      :     1 reads        51 B
+     (b)   target + residual preds    :    15 reads      2132 B  (full headers)
+     (b')  same, 30-byte neighbour screen:   15 reads       471 B  (1 targets + 14 screened)
+           per-target residual        : {'ppt/slides/slide1.xml': 14}
+   scenario 'one-slide closure' (6 members read; missing=[])
+     (a/c) target-only, memoised      :     6 reads      1618 B
+     (b)   target + residual preds    :    15 reads      2132 B  (full headers)
+     (b')  same, 30-byte neighbour screen:   15 reads      1888 B  (6 targets + 9 screened)
+           per-target residual        : {'[Content_Types].xml': 0, '_rels/.rels': 1, 'ppt/_rels/presentation.xml.rels': 8, 'ppt/presentation.xml': 9, 'ppt/slides/_rels/slide1.xml.rels': 2, 'ppt/slides/slide1.xml': 14}
+
+wrote docs/performance/results/change-0575/proof-cost-model.json

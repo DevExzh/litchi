@@ -1,0 +1,287 @@
+[
+ {
+  "path": "test-data/ooxml/xlsx/sheet-names.xlsx",
+  "entries": 13,
+  "total_size": 9425,
+  "central_directory_offset": 8549,
+  "header_bytes_all": 2478,
+  "scenarios": {
+   "one member (sheet1)": {
+    "members": 1,
+    "missing": [],
+    "a": {
+     "reads": 1,
+     "bytes": 54
+    },
+    "b": {
+     "reads": 8,
+     "bytes": 1711,
+     "headers": 8
+    },
+    "b_fixed": {
+     "reads": 8,
+     "bytes": 264,
+     "targets": 1,
+     "screen_only": 7
+    },
+    "c": {
+     "reads": 1,
+     "bytes": 54
+    },
+    "per_target_residual": {
+     "xl/worksheets/sheet1.xml": 7
+    }
+   },
+   "one-cell closure": {
+    "members": 6,
+    "missing": [
+     "xl/sharedStrings.xml"
+    ],
+    "a": {
+     "reads": 6,
+     "bytes": 1592
+    },
+    "b": {
+     "reads": 11,
+     "bytes": 1857,
+     "headers": 11
+    },
+    "b_fixed": {
+     "reads": 11,
+     "bytes": 1742,
+     "targets": 6,
+     "screen_only": 5
+    },
+    "c": {
+     "reads": 6,
+     "bytes": 1592
+    },
+    "per_target_residual": {
+     "[Content_Types].xml": 0,
+     "_rels/.rels": 1,
+     "xl/_rels/workbook.xml.rels": 2,
+     "xl/workbook.xml": 3,
+     "xl/worksheets/sheet1.xml": 7,
+     "xl/styles.xml": 10
+    }
+   }
+  },
+  "archive_wide": {
+   "d0": {
+    "reads": 26,
+    "bytes": 2478
+   },
+   "d1": {
+    "reads": 13,
+    "bytes": 2478
+   },
+   "coalesced": {
+    "0": {
+     "reads": 13,
+     "bytes": 2478
+    },
+    "512": {
+     "reads": 3,
+     "bytes": 5858
+    },
+    "4096": {
+     "reads": 1,
+     "bytes": 8126
+    },
+    "65536": {
+     "reads": 1,
+     "bytes": 8126
+    }
+   }
+  }
+ },
+ {
+  "path": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+  "entries": 132,
+  "total_size": 654688,
+  "central_directory_offset": 644942,
+  "header_bytes_all": 10740,
+  "scenarios": {
+   "one member (sheet1)": {
+    "members": 1,
+    "missing": [],
+    "a": {
+     "reads": 1,
+     "bytes": 54
+    },
+    "b": {
+     "reads": 4,
+     "bytes": 209,
+     "headers": 4
+    },
+    "b_fixed": {
+     "reads": 4,
+     "bytes": 144,
+     "targets": 1,
+     "screen_only": 3
+    },
+    "c": {
+     "reads": 1,
+     "bytes": 54
+    },
+    "per_target_residual": {
+     "xl/worksheets/sheet1.xml": 3
+    }
+   },
+   "one-cell closure": {
+    "members": 7,
+    "missing": [],
+    "a": {
+     "reads": 7,
+     "bytes": 1642
+    },
+    "b": {
+     "reads": 14,
+     "bytes": 2004,
+     "headers": 14
+    },
+    "b_fixed": {
+     "reads": 14,
+     "bytes": 1852,
+     "targets": 7,
+     "screen_only": 7
+    },
+    "c": {
+     "reads": 7,
+     "bytes": 1642
+    },
+    "per_target_residual": {
+     "[Content_Types].xml": 0,
+     "_rels/.rels": 1,
+     "xl/_rels/workbook.xml.rels": 2,
+     "xl/workbook.xml": 3,
+     "xl/worksheets/sheet1.xml": 3,
+     "xl/sharedStrings.xml": 4,
+     "xl/styles.xml": 5
+    }
+   }
+  },
+  "archive_wide": {
+   "d0": {
+    "reads": 264,
+    "bytes": 10740
+   },
+   "d1": {
+    "reads": 132,
+    "bytes": 10740
+   },
+   "coalesced": {
+    "0": {
+     "reads": 132,
+     "bytes": 10740
+    },
+    "512": {
+     "reads": 61,
+     "bytes": 28309
+    },
+    "4096": {
+     "reads": 22,
+     "bytes": 91707
+    },
+    "65536": {
+     "reads": 1,
+     "bytes": 644889
+    }
+   }
+  }
+ },
+ {
+  "path": "test-data/ooxml/pptx/shapes.pptx",
+  "entries": 48,
+  "total_size": 68822,
+  "central_directory_offset": 65116,
+  "header_bytes_all": 4748,
+  "scenarios": {
+   "one member (slide1)": {
+    "members": 1,
+    "missing": [],
+    "a": {
+     "reads": 1,
+     "bytes": 51
+    },
+    "b": {
+     "reads": 15,
+     "bytes": 2132,
+     "headers": 15
+    },
+    "b_fixed": {
+     "reads": 15,
+     "bytes": 471,
+     "targets": 1,
+     "screen_only": 14
+    },
+    "c": {
+     "reads": 1,
+     "bytes": 51
+    },
+    "per_target_residual": {
+     "ppt/slides/slide1.xml": 14
+    }
+   },
+   "one-slide closure": {
+    "members": 6,
+    "missing": [],
+    "a": {
+     "reads": 6,
+     "bytes": 1618
+    },
+    "b": {
+     "reads": 15,
+     "bytes": 2132,
+     "headers": 15
+    },
+    "b_fixed": {
+     "reads": 15,
+     "bytes": 1888,
+     "targets": 6,
+     "screen_only": 9
+    },
+    "c": {
+     "reads": 6,
+     "bytes": 1618
+    },
+    "per_target_residual": {
+     "[Content_Types].xml": 0,
+     "_rels/.rels": 1,
+     "ppt/_rels/presentation.xml.rels": 8,
+     "ppt/presentation.xml": 9,
+     "ppt/slides/_rels/slide1.xml.rels": 2,
+     "ppt/slides/slide1.xml": 14
+    }
+   }
+  },
+  "archive_wide": {
+   "d0": {
+    "reads": 96,
+    "bytes": 4748
+   },
+   "d1": {
+    "reads": 48,
+    "bytes": 4748
+   },
+   "coalesced": {
+    "0": {
+     "reads": 48,
+     "bytes": 4748
+    },
+    "512": {
+     "reads": 25,
+     "bytes": 10238
+    },
+    "4096": {
+     "reads": 4,
+     "bytes": 31618
+    },
+    "65536": {
+     "reads": 1,
+     "bytes": 64746
+    }
+   }
+  }
+ }
+]

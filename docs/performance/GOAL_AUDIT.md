@@ -1,5 +1,66 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0572-0576: the range-source gap is closed, and the OLE2 open stops being I/O
+
+The previous batch's audit listed "remote and range-source behaviour" among the
+items this goal still required and no batch had supplied. [0572](0572-ooxml-range-source-attribution.md)
+supplies it for OOXML. It is a model rather than a device — a simulated
+transport, not a network — and the record says so, but it is the first evidence in
+this program of what the OOXML read path costs a caller-supplied source, captured
+through the explicit provider the ADRs require and with no ambient networking
+added. All five of its frozen gates pass, and its request sequences are identical
+across transports and repeats.
+
+What it found bears directly on the goal's definition of done. The clause
+"selective reads perform work proportional to mandatory metadata plus accessed
+content" is violated on the OOXML side in a way the clause's own wording does not
+name: the work is proportional to the archive's **member count**, not to its
+uncompressed size, and it is paid in requests before the first payload byte.
+[0573](0573-zip-single-local-header-read.md) halves that, and
+[0575](0575-zip-lazy-strict-layout-design.md) establishes both how much further it
+can go and that it cannot go to O(1), with a proof rather than an estimate.
+
+0575 also surfaces something the program should decide rather than inherit. The
+archive-wide strict-layout proof that costs those requests has **no documented
+rationale**: both introducing commits have empty message bodies, no accepted ADR
+mentions it, there is no threat model, and the ordinary read path already bypasses
+it. The goal forbids reinterpreting an accepted ADR to enable an optimization; it
+does not require preserving an undocumented behaviour forever. The design records
+the conflict, rejects the one candidate that would breach ADR 0005, and leaves the
+remaining decision to human review with a reproducible witness. No production
+change was made on the strength of it.
+
+On the OLE2 side the goal's target is now met further up the stack.
+[0574](0574-ole2-next-opportunity-survey.md) establishes that changes 0565, 0568
+and 0570 moved the bottleneck **off I/O**: a source-backed open now spends 75.9%
+of its time outside the source. That is a goal milestone worth naming, because it
+means the remaining OLE2 work is instruction and allocation work rather than read
+scheduling, and the optimization order in `docs/GOAL.md` moves accordingly from
+step 2 to step 1 — eliminating unnecessary work.
+[0576](0576-xls-sst-scan-without-materialization.md) does exactly that, removing
+up to 88.2% of the instructions in an open without changing one byte of I/O or one
+character of an error message.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, real range sources rather than a simulated transport, peak
+RSS, concurrency scaling, real-producer breadth, and cross-platform confirmation.
+Three new limitations are recorded rather than presented as covered. Only one PPTX
+fixture in the corpus has enough slides to exercise a genuine middle slide, and
+one DOCX fixture extracts zero bytes under a scenario labelled "full text". Ten of
+93 XLSX fixtures refuse the cell scenario outright, two of them fixtures the frozen
+plan itself named. And 0576's allocation-failure error is unreachable on the new
+measure path; the divergence is bounded and stated rather than left silent.
+
+A new OOXML hotspot is recorded and not yet addressed: the open reads every
+`*/_rels/*.rels` part in the package, so a 132-member workbook pays 89 of its 354
+requests before a cell read begins. Compressed-entry passthrough on save is also
+still a logical-byte copy — `write_precompressed_file` takes a fully materialized
+`&[u8]` — which the goal's "unchanged large media … without unnecessary
+decompression or logical-byte copies" clause names directly.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0568-0571: the XLS selective-read goal is met, and a recommendation is withdrawn
 
 This batch closes the other half of what change

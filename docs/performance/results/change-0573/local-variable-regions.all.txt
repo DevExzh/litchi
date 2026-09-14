@@ -1,0 +1,161 @@
+roots=['test-data'] archives=533 members=14744
+max local variable region = 2082 bytes (one-read window 2112)
+
+local variable-region size -> member count
+  var=    3  window=   33  members=2
+  var=    6  window=   36  members=9
+  var=    7  window=   37  members=2
+  var=    8  window=   38  members=133
+  var=    9  window=   39  members=9
+  var=   10  window=   40  members=57
+  var=   11  window=   41  members=106
+  var=   12  window=   42  members=99
+  var=   13  window=   43  members=187
+  var=   14  window=   44  members=8
+  var=   15  window=   45  members=254
+  var=   16  window=   46  members=161
+  var=   17  window=   47  members=341
+  var=   18  window=   48  members=362
+  var=   19  window=   49  members=406
+  var=   20  window=   50  members=517
+  var=   21  window=   51  members=361
+  var=   22  window=   52  members=89
+  var=   23  window=   53  members=195
+  var=   24  window=   54  members=788
+  var=   25  window=   55  members=165
+  var=   26  window=   56  members=328
+  var=   27  window=   57  members=212
+  var=   28  window=   58  members=300
+  var=   29  window=   59  members=32
+  var=   30  window=   60  members=102
+  var=   31  window=   61  members=1282
+  var=   32  window=   62  members=436
+  var=   33  window=   63  members=970
+  var=   34  window=   64  members=746
+  var=   35  window=   65  members=794
+  var=   36  window=   66  members=121
+  var=   37  window=   67  members=176
+  var=   38  window=   68  members=17
+  var=   39  window=   69  members=192
+  var=   40  window=   70  members=235
+  var=   41  window=   71  members=59
+  var=   42  window=   72  members=47
+  var=   43  window=   73  members=63
+  var=   44  window=   74  members=769
+  var=   45  window=   75  members=421
+  var=   46  window=   76  members=100
+  var=   47  window=   77  members=205
+  var=   48  window=   78  members=86
+  var=   49  window=   79  members=19
+  var=   50  window=   80  members=33
+  var=   51  window=   81  members=9
+  var=   52  window=   82  members=27
+  var=   53  window=   83  members=961
+  var=   54  window=   84  members=128
+  var=   56  window=   86  members=12
+  var=   58  window=   88  members=8
+  var=   59  window=   89  members=46
+  var=   60  window=   90  members=8
+  var=   61  window=   91  members=20
+  var=   62  window=   92  members=2
+  var=   63  window=   93  members=7
+  var=   64  window=   94  members=33
+  var=   67  window=   97  members=6
+  var=   70  window=  100  members=7
+  var=   72  window=  102  members=17
+  var=   73  window=  103  members=2
+  var=   74  window=  104  members=1
+  var=   81  window=  111  members=7
+  var=  231  window=  261  members=1
+  var=  246  window=  276  members=1
+  var=  280  window=  310  members=280
+  var=  281  window=  311  members=272
+  var=  283  window=  313  members=16
+  var=  290  window=  320  members=158
+  var=  292  window=  322  members=49
+  var=  294  window=  324  members=34
+  var=  295  window=  325  members=71
+  var=  348  window=  378  members=1
+  var=  350  window=  380  members=1
+  var=  413  window=  443  members=1
+  var=  415  window=  445  members=1
+  var=  430  window=  460  members=1
+  var=  449  window=  479  members=2
+  var=  450  window=  480  members=1
+  var=  456  window=  486  members=1
+  var=  457  window=  487  members=2
+  var=  473  window=  503  members=37
+  var=  474  window=  504  members=1
+  var=  480  window=  510  members=2
+  var=  481  window=  511  members=1
+  var=  482  window=  512  members=1
+  var=  484  window=  514  members=1
+  var=  487  window=  517  members=3
+  var=  488  window=  518  members=4
+  var=  489  window=  519  members=2
+  var=  490  window=  520  members=2
+  var=  492  window=  522  members=3
+  var=  493  window=  523  members=8
+  var=  494  window=  524  members=7
+  var=  495  window=  525  members=10
+  var=  496  window=  526  members=4
+  var=  498  window=  528  members=2
+  var=  514  window=  544  members=1
+  var=  531  window=  561  members=232
+  var=  539  window=  569  members=231
+  var= 2082  window= 2112  members=2
+
+local extra_field_len -> member count
+  extra=    0  members=12011
+  extra=    1  members=34
+  extra=   17  members=20
+  extra=   20  members=711
+  extra=   28  members=439
+  extra=   32  members=14
+  extra=   37  members=1
+  extra=   40  members=67
+  extra=  205  members=1
+  extra=  220  members=1
+  extra=  264  members=880
+  extra=  331  members=2
+  extra=  394  members=1
+  extra=  404  members=1
+  extra=  411  members=1
+  extra=  438  members=2
+  extra=  439  members=1
+  extra=  445  members=1
+  extra=  446  members=2
+  extra=  454  members=2
+  extra=  455  members=1
+  extra=  461  members=2
+  extra=  462  members=36
+  extra=  463  members=1
+  extra=  465  members=1
+  extra=  468  members=3
+  extra=  469  members=2
+  extra=  470  members=2
+  extra=  471  members=2
+  extra=  473  members=3
+  extra=  474  members=8
+  extra=  475  members=7
+  extra=  476  members=6
+  extra=  477  members=6
+  extra=  479  members=2
+  extra=  484  members=4
+  extra=  503  members=1
+  extra=  520  members=463
+  extra= 2056  members=2
+
+candidate window -> members proved in one read
+  window=  128: 13297/14744 fit, 1447 fall back
+  window=  256: 13297/14744 fit, 1447 fall back
+  window=  320: 14025/14744 fit, 719 fall back
+  window=  512: 14232/14744 fit, 512 fall back
+  window=  576: 14742/14744 fit, 2 fall back
+  window=  640: 14742/14744 fit, 2 fall back
+  window= 1024: 14742/14744 fit, 2 fall back
+  window= 2048: 14742/14744 fit, 2 fall back
+
+archives whose largest member exceeds a 640-byte window
+  test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx max_var=2082 window_needed=2112
+  test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx max_var=2082 window_needed=2112

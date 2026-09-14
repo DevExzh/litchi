@@ -1,0 +1,40 @@
+== test-data/ooxml/xlsx/sheet-names.xlsx
+   size=9425  central_directory_offset=8549
+   entries=13  stored=0  data_descriptors=0
+   local extra len: min=0 max=520 distinct=[0, 264, 520]
+   central extra len: min=0 max=0 distinct=[0]
+   inter-entry gap (exact end -> next offset): min=0 max=0 nonzero=0
+   zero-I/O adjacency screen over whole archive: proven=0 refuted=0 residual=12 (of 12 pairs)
+   per-target predecessor headers needed: max=12 mean=6.0 last-entry=12
+     target[  0] [Content_Types].xml                                  preds=  0 headers_needed=  0
+     target[  1] _rels/.rels                                          preds=  1 headers_needed=  1
+     target[  6] xl/worksheets/sheet3.xml                             preds=  6 headers_needed=  6
+     target[ 12] docProps/app.xml                                     preds= 12 headers_needed= 12
+
+== test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx
+   size=654688  central_directory_offset=644942
+   entries=132  stored=16  data_descriptors=0
+   local extra len: min=0 max=520 distinct=[0, 40, 264, 520]
+   central extra len: min=0 max=0 distinct=[0]
+   inter-entry gap (exact end -> next offset): min=0 max=0 nonzero=0
+   zero-I/O adjacency screen over whole archive: proven=0 refuted=0 residual=131 (of 131 pairs)
+   per-target predecessor headers needed: max=39 mean=15.2 last-entry=39
+     target[  0] [Content_Types].xml                                  preds=  0 headers_needed=  0
+     target[  1] _rels/.rels                                          preds=  1 headers_needed=  1
+     target[ 66] xl/drawings/drawing4.xml                             preds= 66 headers_needed=  7
+     target[131] xl/printerSettings/printerSettings1.bin              preds=131 headers_needed= 39
+
+== test-data/ooxml/pptx/shapes.pptx
+   size=68822  central_directory_offset=65116
+   entries=48  stored=2  data_descriptors=0
+   local extra len: min=0 max=520 distinct=[0, 264, 520]
+   central extra len: min=0 max=0 distinct=[0]
+   inter-entry gap (exact end -> next offset): min=0 max=0 nonzero=0
+   zero-I/O adjacency screen over whole archive: proven=0 refuted=0 residual=47 (of 47 pairs)
+   per-target predecessor headers needed: max=47 mean=23.5 last-entry=47
+     target[  0] [Content_Types].xml                                  preds=  0 headers_needed=  0
+     target[  1] _rels/.rels                                          preds=  1 headers_needed=  1
+     target[ 24] ppt/slideMasters/_rels/slideMaster1.xml.rels         preds= 24 headers_needed= 24
+     target[ 47] docProps/core.xml                                    preds= 47 headers_needed= 47
+
+wrote docs/performance/results/change-0575/layout-census.json

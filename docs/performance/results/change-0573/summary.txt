@@ -1,0 +1,31 @@
+fixtures 168   members 4089   descriptor-bearing members 148
+reads  8326 -> 4385   (-3941, -47.3%)
+bytes  514578 -> 517371   (+2793, +0.54%)
+model  descriptor-free members x1 + descriptor-bearing members x3 = 3941+444 = 4385
+
+fixtures with byte-identical proof reads: 159
+fixtures whose reads fell:                160
+fixtures whose reads were unchanged:      8  (every member carries a descriptor)
+fixtures whose reads rose:                0
+
+the nine fixtures whose reads did not fall (all members descriptor-bearing):
+  docx/comment.docx                                members= 10 descr= 10 reads 30->30 bytes 635->730
+  pptx/shape-soft-edges.pptx                       members= 65 descr= 65 reads 195->195 bytes 5117->6724
+  xlsx/autofilter.xlsx                             members= 11 descr= 11 reads 33->33 bytes 726->858
+  xlsx/column_style.xlsx                           members=  8 descr=  8 reads 24->24 bytes 509->586
+  xlsx/duplicate-defined-names.xlsx                members= 11 descr= 11 reads 33->33 bytes 710->826
+  xlsx/formats.xlsx                                members= 12 descr= 12 reads 36->36 bytes 785->922
+  xlsx/named-ranges-global.xlsx                    members=  9 descr=  9 reads 27->27 bytes 579->672
+  xlsx/universal-content.xlsx                      members= 13 descr= 13 reads 39->39 bytes 861->1020
+
+ten largest fixtures by member count:
+  xlsx/ConditionalFormattingSamples.xlsx           members=132 reads  264-> 132 bytes  10740-> 10740
+  pptx/shape-soft-edges.pptx                       members= 65 reads  195-> 195 bytes   5117->  6724
+  pptx/smartart-tdf134221.pptx                     members= 54 reads  108->  54 bytes   4606->  4606
+  pptx/smartart-autoTxRot.pptx                     members= 53 reads  106->  53 bytes   5013->  5013
+  pptx/activex/activex_checkbox.pptx               members= 51 reads  102->  51 bytes   4929->  4929
+  pptx/smartart-font-size.pptx                     members= 49 reads   98->  49 bytes   4787->  4787
+  pptx/smartart-snake-rows.pptx                    members= 49 reads   98->  49 bytes   4921->  4921
+  pptx/backgrounds.pptx                            members= 48 reads   96->  48 bytes   4727->  4727
+  pptx/shapes.pptx                                 members= 48 reads   96->  48 bytes   4748->  4748
+  pptx/smartart-picture-strip.pptx                 members= 47 reads   94->  47 bytes   4741->  4741

@@ -30,6 +30,40 @@ pub(crate) const CENTRAL_HEADER_SIGNATURE: u32 = 0x02014b50;
 /// > generally exceed 65,535 bytes.
 pub const RECOMMENDED_BUFFER_SIZE: usize = 1 << 16;
 
+/// Bytes read speculatively when proving one entry's strict local layout.
+///
+/// A local file header is 30 fixed bytes followed by a variable region that
+/// holds the file name and the extra field, so the region is at most
+/// `2 * u16::MAX` bytes and a fallback path is always required. One window of
+/// this size covers the fixed header plus 610 bytes of name and extra field,
+/// which is enough to prove an ordinary Office member's layout in a single
+/// positional read.
+///
+/// The size is measured, not guessed. Across every ZIP container in this
+/// repository's fixture corpus — 14,744 members in 533 archives — the largest
+/// local variable region is 539 bytes, except for two members of two revision-
+/// bearing XLSX fixtures that carry a 2,056-byte extra field. Within
+/// `test-data/ooxml` the maximum is 539 bytes, reached by 142 members. The
+/// distribution is bimodal because Microsoft Office writes a `0xa220` growth
+/// hint whose payload is 260 or 516 bytes; a 512-byte window would therefore
+/// miss 301 of 4,270 OOXML members, so 512 is measurably too small. This
+/// window covers all of them and leaves 71 bytes of headroom over the observed
+/// maximum.
+///
+/// This is a ceiling, not the read size. The actual read is also bounded by
+/// where the member's own payload must begin, so in a gapless archive it is
+/// exactly the fixed header plus that member's variable region.
+const STRICT_LOCAL_HEADER_WINDOW: usize = 640;
+
+/// The widest data descriptor the strict paths accept, in bytes.
+///
+/// This is the `maximum` [`DataDescriptor::parse_complete_at`] computes for
+/// its widest case: a 4-byte signature, a 4-byte CRC, and two 8-byte ZIP64
+/// sizes. The strict local-header window reserves this much room for a
+/// descriptor-bearing member, because the descriptor's real width is not known
+/// until that member's local header has been parsed.
+const MAX_DATA_DESCRIPTOR_SIZE: u64 = 24;
+
 /// Represents a Zip archive that operates on an in-memory data.
 ///
 /// A [`ZipSliceArchive`] is more efficient and easier to use than a [`ZipArchive`],
@@ -681,6 +715,7 @@ fn validate_reader_entry_layout<R: ReaderAt>(
     entry: &ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    next_local_header_offset: u64,
     archive_is_zip64: bool,
 ) -> Result<StrictEntryLayout, Error> {
     let (layout, local_name_mismatch) = validate_reader_entry_layout_with_name_policy(
@@ -688,6 +723,7 @@ fn validate_reader_entry_layout<R: ReaderAt>(
         entry,
         central_name,
         central_directory_offset,
+        next_local_header_offset,
         archive_is_zip64,
         false,
     )?;
@@ -695,11 +731,21 @@ fn validate_reader_entry_layout<R: ReaderAt>(
     Ok(layout)
 }
 
+/// Prove one entry's strict local layout from a positional source.
+///
+/// `next_local_header_offset` is where the member that follows this one
+/// begins, or `central_directory_offset` for the last member. It is a read
+/// hint only: it bounds the single speculative header read so that it cannot
+/// reach into any payload, and nothing else. A caller that does not know the
+/// following member passes `central_directory_offset`, and a wrong value can
+/// only change how many reads are issued, never which checks run, in which
+/// order, or which error is produced.
 fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
     reader: &R,
     entry: &ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    next_local_header_offset: u64,
     archive_is_zip64: bool,
     allow_name_mismatch: bool,
 ) -> Result<(StrictEntryLayout, bool), Error> {
@@ -708,9 +754,64 @@ fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
         return Err(Error::from(ErrorKind::Eof));
     }
 
-    let mut fixed_buffer = [0u8; ZipLocalFileHeaderFixed::SIZE];
-    reader.read_exact_at(&mut fixed_buffer, entry.local_header_offset)?;
-    let file_header = ZipLocalFileHeaderFixed::parse(&fixed_buffer)?;
+    // One speculative bounded read covers the fixed header and, for an
+    // ordinary Office member, the whole variable region as well.
+    //
+    // The window stops at the latest offset at which this member's payload can
+    // still begin. An accepted member satisfies `local_header_offset + 30 +
+    // variable_length + compressed_size + descriptor <=
+    // next_local_header_offset`, because that is what the `data_end_offset`
+    // and `span_end` checks below plus the caller's own non-overlap proof
+    // require, so reserving the payload and the widest descriptor can never
+    // truncate a variable region the two-read form would have accepted. A
+    // member whose descriptor is narrower than the reservation, or that
+    // violates the bound outright, falls through to the historical second read
+    // and keeps its error.
+    //
+    // Three consequences are deliberate. In a gapless archive the window ends
+    // exactly at the variable region, so proving a layout still reads only
+    // framing bytes: a source that fails inside a payload fails exactly where
+    // it failed before, and preservation indexing stays metadata-only. The
+    // window never reads a descriptor either. And it never reaches past the
+    // central directory, whatever the caller passed as the next offset.
+    //
+    // The one exception is the 30-byte floor. A local offset that sits inside
+    // the central directory passes the check above but leaves less than a
+    // fixed header before it, and the two-read form still read all 30 bytes
+    // and reported the signature. The floor keeps that error identity.
+    let mut window = [0u8; STRICT_LOCAL_HEADER_WINDOW];
+    let reserved_descriptor = if entry.has_data_descriptor {
+        MAX_DATA_DESCRIPTOR_SIZE
+    } else {
+        0
+    };
+    let window_len = usize::try_from(
+        next_local_header_offset
+            .min(central_directory_offset)
+            .saturating_sub(entry.local_header_offset)
+            .saturating_sub(entry.compressed_size)
+            .saturating_sub(reserved_descriptor),
+    )
+    .unwrap_or(STRICT_LOCAL_HEADER_WINDOW)
+    .clamp(ZipLocalFileHeaderFixed::SIZE, STRICT_LOCAL_HEADER_WINDOW);
+    let window = window
+        .get_mut(..window_len)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    // A short source must fail exactly where `read_exact_at` failed: only the
+    // 30 fixed bytes are required here, and a variable region the window did
+    // not reach is resolved below, after the bounds check that precedes it.
+    let present = reader.try_read_at_least_at(
+        window,
+        ZipLocalFileHeaderFixed::SIZE,
+        entry.local_header_offset,
+    )?;
+    if present < ZipLocalFileHeaderFixed::SIZE {
+        return Err(Error::from(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "failed to fill whole buffer",
+        )));
+    }
+    let file_header = ZipLocalFileHeaderFixed::parse(window)?;
     let variable_length = file_header.variable_length();
     let variable_end = ZipLocalFileHeaderFixed::SIZE
         .checked_add(variable_length)
@@ -724,23 +825,34 @@ fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
         return Err(Error::from(ErrorKind::Eof));
     }
 
-    let mut variable_data = Vec::new();
-    variable_data
-        .try_reserve_exact(variable_length)
-        .map_err(|source| {
-            Error::from(ErrorKind::Allocation {
-                resource: "strict ZIP local metadata",
-                source,
-            })
-        })?;
-    variable_data.resize(variable_length, 0);
-    if variable_length != 0 {
-        let variable_offset = entry
-            .local_header_offset
-            .checked_add(ZipLocalFileHeaderFixed::SIZE as u64)
-            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-        reader.read_exact_at(&mut variable_data, variable_offset)?;
-    }
+    // The window already holds the variable region of every member whose name
+    // and extra field fit it.  Only an unusually large name or extra field, or
+    // a source that returned a short read, needs the heap buffer and a second
+    // positional read; that path is byte-for-byte the historical one.
+    let mut spilled_variable_data = Vec::new();
+    let variable_data: &[u8] = if variable_end <= present {
+        window
+            .get(ZipLocalFileHeaderFixed::SIZE..variable_end)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?
+    } else {
+        spilled_variable_data
+            .try_reserve_exact(variable_length)
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "strict ZIP local metadata",
+                    source,
+                })
+            })?;
+        spilled_variable_data.resize(variable_length, 0);
+        if variable_length != 0 {
+            let variable_offset = entry
+                .local_header_offset
+                .checked_add(ZipLocalFileHeaderFixed::SIZE as u64)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            reader.read_exact_at(&mut spilled_variable_data, variable_offset)?;
+        }
+        &spilled_variable_data
+    };
 
     if file_header.compression_method != entry.compression_method {
         return Err(Error::from(ErrorKind::InvalidInput {
@@ -1572,16 +1684,24 @@ where
         validate_borrowed_wayfinder(&entry)
     }
 
+    /// Prove one entry's strict local layout.
+    ///
+    /// `next_local_header_offset` is where the following member begins, or the
+    /// central-directory offset for the last member. It bounds one speculative
+    /// header read and nothing else. A caller that does not track member order
+    /// passes the central-directory offset.
     pub(crate) fn validate_strict_entry_layout(
         &self,
         entry: ZipArchiveEntryWayfinder,
         central_name: &[u8],
+        next_local_header_offset: u64,
     ) -> Result<StrictEntryLayout, Error> {
         validate_reader_entry_layout(
             &self.reader,
             &entry,
             central_name,
             self.eocd.directory_offset(),
+            next_local_header_offset,
             self.eocd.is_zip64(),
         )
     }
@@ -1597,12 +1717,14 @@ where
         &self,
         entry: ZipArchiveEntryWayfinder,
         central_name: &[u8],
+        next_local_header_offset: u64,
     ) -> Result<(StrictEntryLayout, bool), Error> {
         validate_reader_entry_layout_with_name_policy(
             &self.reader,
             &entry,
             central_name,
             self.eocd.directory_offset(),
+            next_local_header_offset,
             self.eocd.is_zip64(),
             true,
         )
@@ -3940,7 +4062,11 @@ mod tests {
                     entries.next_entry().unwrap().unwrap().wayfinder()
                 };
                 let layout = reader_archive
-                    .validate_strict_entry_layout(wayfinder, b"x")
+                    .validate_strict_entry_layout(
+                        wayfinder,
+                        b"x",
+                        reader_archive.directory_offset(),
+                    )
                     .unwrap();
                 assert_eq!(layout.span_end, reader_archive.directory_offset());
             }
@@ -4072,7 +4198,7 @@ mod tests {
             entries.next_entry().unwrap().unwrap().wayfinder()
         };
         let layout = reader_archive
-            .validate_strict_entry_layout(wayfinder, b"x")
+            .validate_strict_entry_layout(wayfinder, b"x", reader_archive.directory_offset())
             .unwrap();
         assert_eq!(layout.span_end, reader_archive.directory_offset());
     }
@@ -4511,5 +4637,743 @@ mod tests {
         // Verify both APIs return identical ranges
         assert_eq!(slice_range1, reader_range1);
         assert_eq!(slice_range2, reader_range2);
+    }
+
+    /// A positional source that records every request and can serve a
+    /// truncated or deliberately short-reading view of its bytes.
+    ///
+    /// The recorded tuple is `(offset, requested, returned)`, so a test can
+    /// pin the exact request sequence the strict-layout prover issues as well
+    /// as the bytes it receives.
+    #[derive(Debug)]
+    struct StrictWindowProbe {
+        bytes: Vec<u8>,
+        visible: usize,
+        max_chunk: usize,
+        reads: std::sync::Mutex<Vec<(u64, usize, usize)>>,
+    }
+
+    impl StrictWindowProbe {
+        fn new(bytes: Vec<u8>) -> Self {
+            let visible = bytes.len();
+            Self {
+                bytes,
+                visible,
+                max_chunk: usize::MAX,
+                reads: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+
+        /// A source whose bytes stop at `visible`, as a truncated file does.
+        fn truncated_to(bytes: Vec<u8>, visible: usize) -> Self {
+            let mut probe = Self::new(bytes);
+            probe.visible = visible.min(probe.bytes.len());
+            probe
+        }
+
+        /// A source that never returns more than `max_chunk` bytes per call,
+        /// as a chunked transport does.
+        fn chunked(bytes: Vec<u8>, max_chunk: usize) -> Self {
+            let mut probe = Self::new(bytes);
+            probe.max_chunk = max_chunk;
+            probe
+        }
+
+        /// `(offset, requested)` for every call, in order.
+        fn requests(&self) -> Vec<(u64, usize)> {
+            self.reads
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|&(offset, requested, _)| (offset, requested))
+                .collect()
+        }
+
+        fn call_count(&self) -> usize {
+            self.reads.lock().unwrap().len()
+        }
+    }
+
+    impl ReaderAt for StrictWindowProbe {
+        fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize> {
+            let start = usize::try_from(offset).unwrap_or(self.visible);
+            let available = self.visible.saturating_sub(start);
+            let count = buffer.len().min(available).min(self.max_chunk);
+            if count != 0 {
+                buffer[..count].copy_from_slice(&self.bytes[start..start + count]);
+            }
+            self.reads
+                .lock()
+                .unwrap()
+                .push((offset, buffer.len(), count));
+            Ok(count)
+        }
+    }
+
+    /// Builds one raw ZIP local member plus the central wayfinder describing
+    /// it, and returns `(bytes, wayfinder, central_directory_offset)`.
+    ///
+    /// The returned bytes hold only the member, so the central directory
+    /// begins exactly where the member ends.  That is the same relationship
+    /// the prover sees inside a real archive, without needing an EOCD.
+    fn strict_member_fixture(
+        name: &[u8],
+        local_extra: &[u8],
+        payload: &[u8],
+        has_data_descriptor: bool,
+    ) -> (Vec<u8>, ZipArchiveEntryWayfinder, u64) {
+        let crc = crate::crc32(payload);
+        let size = u64::try_from(payload.len()).unwrap();
+        let size32 = u32::try_from(payload.len()).unwrap();
+        let mut bytes = Vec::new();
+        push_u32(&mut bytes, 0x0403_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, if has_data_descriptor { 0x08 } else { 0 });
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, if has_data_descriptor { 0 } else { crc });
+        push_u32(&mut bytes, if has_data_descriptor { 0 } else { size32 });
+        push_u32(&mut bytes, if has_data_descriptor { 0 } else { size32 });
+        push_u16(&mut bytes, u16::try_from(name.len()).unwrap());
+        push_u16(&mut bytes, u16::try_from(local_extra.len()).unwrap());
+        bytes.extend_from_slice(name);
+        bytes.extend_from_slice(local_extra);
+        bytes.extend_from_slice(payload);
+        if has_data_descriptor {
+            bytes.extend_from_slice(&descriptor_bytes(4, true, crc, size, size));
+        }
+        let central_directory_offset = u64::try_from(bytes.len()).unwrap();
+        let wayfinder = ZipArchiveEntryWayfinder {
+            uncompressed_size: size,
+            compressed_size: size,
+            local_header_offset: 0,
+            crc,
+            has_data_descriptor,
+            flags: if has_data_descriptor { 0x08 } else { 0 },
+            compression_method: CompressionMethodId(0),
+            zip64_sizes: false,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        };
+        (bytes, wayfinder, central_directory_offset)
+    }
+
+    /// The same member shape with the ZIP64 `u32::MAX` size sentinels and a
+    /// local ZIP64 extra field, which is the input
+    /// `resolve_local_entry_size_framing` resolves sizes from.
+    fn strict_zip64_member_fixture(
+        name: &[u8],
+        padding_extra: &[u8],
+        payload: &[u8],
+    ) -> (Vec<u8>, ZipArchiveEntryWayfinder, u64) {
+        let crc = crate::crc32(payload);
+        let size = u64::try_from(payload.len()).unwrap();
+        let mut local_extra = Vec::new();
+        let mut sizes = Vec::new();
+        sizes.extend_from_slice(&size.to_le_bytes());
+        sizes.extend_from_slice(&size.to_le_bytes());
+        local_extra.extend_from_slice(&zip64_extra(&sizes));
+        local_extra.extend_from_slice(padding_extra);
+
+        let mut bytes = Vec::new();
+        push_u32(&mut bytes, 0x0403_4b50);
+        push_u16(&mut bytes, 45);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc);
+        push_u32(&mut bytes, u32::MAX);
+        push_u32(&mut bytes, u32::MAX);
+        push_u16(&mut bytes, u16::try_from(name.len()).unwrap());
+        push_u16(&mut bytes, u16::try_from(local_extra.len()).unwrap());
+        bytes.extend_from_slice(name);
+        bytes.extend_from_slice(&local_extra);
+        bytes.extend_from_slice(payload);
+        let central_directory_offset = u64::try_from(bytes.len()).unwrap();
+        let wayfinder = ZipArchiveEntryWayfinder {
+            uncompressed_size: size,
+            compressed_size: size,
+            local_header_offset: 0,
+            crc,
+            has_data_descriptor: false,
+            flags: 0,
+            compression_method: CompressionMethodId(0),
+            zip64_sizes: true,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        };
+        (bytes, wayfinder, central_directory_offset)
+    }
+
+    /// Proves one member's layout with the central-directory offset as the
+    /// next-member bound, which is what a caller that does not track member
+    /// order passes and what the last member of an archive always gets.
+    fn prove_strict_layout(
+        reader: &StrictWindowProbe,
+        entry: &ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+        central_directory_offset: u64,
+    ) -> Result<(StrictEntryLayout, bool), Error> {
+        validate_reader_entry_layout_with_name_policy(
+            reader,
+            entry,
+            central_name,
+            central_directory_offset,
+            central_directory_offset,
+            false,
+            false,
+        )
+    }
+
+    fn is_historical_fill_eof(error: &Error) -> bool {
+        matches!(
+            error.kind(),
+            ErrorKind::IO(source)
+                if source.kind() == std::io::ErrorKind::UnexpectedEof
+                    && source.to_string() == "failed to fill whole buffer"
+        )
+    }
+
+    #[test]
+    fn strict_layout_proves_an_ordinary_member_in_one_positional_read() {
+        // An Office-shaped member: a 24-byte name and a 264-byte growth hint,
+        // which is the commonest padded local header in the fixture corpus.
+        let name = b"xl/worksheets/sheet1.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![7_u8; 400];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, mismatch) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert!(!mismatch);
+        assert_eq!(layout.local_header_offset, 0);
+        assert_eq!(
+            layout.data_start_offset,
+            u64::try_from(ZipLocalFileHeaderFixed::SIZE + name.len() + local_extra.len()).unwrap()
+        );
+        assert_eq!(layout.data_end_offset, central_directory_offset);
+        assert_eq!(layout.span_end, central_directory_offset);
+        assert!(!layout.local_zip64);
+        assert_eq!(
+            reader.requests(),
+            vec![(
+                0,
+                ZipLocalFileHeaderFixed::SIZE + name.len() + local_extra.len()
+            )],
+            "one speculative window must prove an ordinary member; the \
+             two-read form issued (0, 30) then (30, 288)"
+        );
+    }
+
+    #[test]
+    fn strict_layout_reads_exactly_the_window_boundary_in_one_call() {
+        let name = b"boundary.xml";
+        let fits = STRICT_LOCAL_HEADER_WINDOW - ZipLocalFileHeaderFixed::SIZE - name.len();
+        let payload = vec![0_u8; 1024];
+
+        let exact_extra = vec![0_u8; fits];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &exact_extra, &payload, false);
+        let reader = StrictWindowProbe::new(bytes);
+        prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+        assert_eq!(
+            reader.requests(),
+            vec![(0, STRICT_LOCAL_HEADER_WINDOW)],
+            "a variable region that exactly fills the window needs one read"
+        );
+
+        let spilling_extra = vec![0_u8; fits + 1];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &spilling_extra, &payload, false);
+        let reader = StrictWindowProbe::new(bytes);
+        prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+        assert_eq!(
+            reader.requests(),
+            vec![
+                (0, STRICT_LOCAL_HEADER_WINDOW),
+                (ZipLocalFileHeaderFixed::SIZE as u64, name.len() + fits + 1)
+            ],
+            "one byte past the window falls back to the historical second read"
+        );
+    }
+
+    #[test]
+    fn an_oversized_variable_region_still_takes_the_historical_second_read() {
+        // The two members in this repository's corpus that exceed the window
+        // carry a 2,056-byte extra field, which is the shape reproduced here.
+        let name = b"xl/revisions/userNames.xml";
+        let local_extra = custom_extra(0xa220, &[0; 2052]);
+        let payload = vec![3_u8; 64];
+        let variable_length = name.len() + local_extra.len();
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, mismatch) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert!(!mismatch);
+        assert_eq!(
+            layout.data_start_offset,
+            u64::try_from(ZipLocalFileHeaderFixed::SIZE + variable_length).unwrap()
+        );
+        assert_eq!(layout.data_end_offset, central_directory_offset);
+        assert_eq!(layout.span_end, central_directory_offset);
+        let requests = reader.requests();
+        assert_eq!(requests.len(), 2, "the fallback path still costs two reads");
+        assert_eq!(
+            requests[1],
+            (ZipLocalFileHeaderFixed::SIZE as u64, variable_length),
+            "the second read is byte-for-byte the historical variable read"
+        );
+    }
+
+    #[test]
+    fn the_speculative_window_never_reads_this_members_payload() {
+        let name = b"_rels/.rels";
+        let payload = vec![9_u8; 20];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &[], &payload, false);
+        assert!(
+            central_directory_offset < STRICT_LOCAL_HEADER_WINDOW as u64,
+            "this fixture must be smaller than the window"
+        );
+        let reader = StrictWindowProbe::new(bytes);
+
+        prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert_eq!(
+            reader.requests(),
+            vec![(0, ZipLocalFileHeaderFixed::SIZE + name.len())],
+            "the window stops where this member's payload must begin, so a \
+             source that fails inside a payload still fails where it did"
+        );
+    }
+
+    #[test]
+    fn the_window_may_reach_past_this_member_but_stops_at_its_size() {
+        // A caller that does not track member order passes the
+        // central-directory offset as the next-member bound.  Later members
+        // then sit inside the bound, so the window is capped by its own size
+        // rather than by the archive layout.
+        let name = b"ppt/presentation.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![9_u8; 100];
+        let (mut bytes, entry, member_end) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+        bytes.extend_from_slice(&[0x5a; 2000]);
+        let central_directory_offset = u64::try_from(bytes.len()).unwrap();
+        assert!(member_end < central_directory_offset);
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, _) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert_eq!(layout.span_end, member_end);
+        assert_eq!(
+            reader.requests(),
+            vec![(0, STRICT_LOCAL_HEADER_WINDOW)],
+            "the window caps at its own size, not at the central directory"
+        );
+    }
+
+    #[test]
+    fn a_local_offset_inside_the_central_directory_keeps_its_signature_error() {
+        // `local_header_offset <= central_directory_offset` passes, but fewer
+        // than thirty bytes separate them.  The historical code still read the
+        // whole fixed header and reported the signature, so the window keeps a
+        // thirty-byte floor rather than clamping below it.
+        let bytes = vec![0x5a_u8; 128];
+        let entry = ZipArchiveEntryWayfinder {
+            uncompressed_size: 0,
+            compressed_size: 0,
+            local_header_offset: 0,
+            crc: 0,
+            has_data_descriptor: false,
+            flags: 0,
+            compression_method: CompressionMethodId(0),
+            zip64_sizes: false,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        };
+        let reader = StrictWindowProbe::new(bytes);
+
+        let error = prove_strict_layout(&reader, &entry, b"x", 10).unwrap_err();
+
+        assert!(
+            matches!(
+                error.kind(),
+                ErrorKind::InvalidSignature {
+                    expected: ZipLocalFileHeaderFixed::SIGNATURE,
+                    ..
+                }
+            ),
+            "expected the historical signature error, got {error:?}"
+        );
+        assert_eq!(
+            reader.requests(),
+            vec![(0, ZipLocalFileHeaderFixed::SIZE)],
+            "the window floor keeps the fixed header readable"
+        );
+    }
+
+    #[test]
+    fn a_source_ending_before_the_fixed_header_reports_the_historical_eof() {
+        let name = b"short.xml";
+        let payload = vec![1_u8; 256];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &[], &payload, false);
+
+        for visible in [0, 1, 17, ZipLocalFileHeaderFixed::SIZE - 1] {
+            let reader = StrictWindowProbe::truncated_to(bytes.clone(), visible);
+            let error =
+                prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap_err();
+            assert!(
+                is_historical_fill_eof(&error),
+                "a source truncated at {visible} must report the historical \
+                 UnexpectedEof, got {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_source_ending_inside_the_variable_region_reports_the_historical_eof() {
+        let name = b"xl/sharedStrings.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![2_u8; 256];
+        let variable_length = name.len() + local_extra.len();
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+
+        for visible in [
+            ZipLocalFileHeaderFixed::SIZE,
+            ZipLocalFileHeaderFixed::SIZE + 1,
+            ZipLocalFileHeaderFixed::SIZE + variable_length - 1,
+        ] {
+            let reader = StrictWindowProbe::truncated_to(bytes.clone(), visible);
+            let error =
+                prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap_err();
+            assert!(
+                is_historical_fill_eof(&error),
+                "a source truncated at {visible} must report the historical \
+                 UnexpectedEof, got {error:?}"
+            );
+            let requests = reader.requests();
+            assert_eq!(
+                requests.get(1).copied(),
+                Some((ZipLocalFileHeaderFixed::SIZE as u64, variable_length)),
+                "the truncated variable region is resolved by the historical \
+                 second read"
+            );
+        }
+    }
+
+    #[test]
+    fn the_directory_bounds_check_still_wins_over_a_truncated_variable_region() {
+        // Both faults are present at once: the declared variable region runs
+        // past the central directory, and the source stops right after the
+        // fixed header.  The bounds check precedes the variable read, so `Eof`
+        // must still win over the I/O error.
+        let mut bytes = Vec::new();
+        push_u32(&mut bytes, 0x0403_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        push_u16(&mut bytes, 600);
+        push_u16(&mut bytes, 0);
+        assert_eq!(bytes.len(), ZipLocalFileHeaderFixed::SIZE);
+
+        let entry = ZipArchiveEntryWayfinder {
+            uncompressed_size: 0,
+            compressed_size: 0,
+            local_header_offset: 0,
+            crc: 0,
+            has_data_descriptor: false,
+            flags: 0,
+            compression_method: CompressionMethodId(0),
+            zip64_sizes: false,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        };
+        let reader = StrictWindowProbe::truncated_to(bytes, ZipLocalFileHeaderFixed::SIZE);
+
+        let error = prove_strict_layout(&reader, &entry, b"", 100).unwrap_err();
+
+        assert!(
+            matches!(error.kind(), ErrorKind::Eof),
+            "the directory bounds check must precede the variable read, got \
+             {error:?}"
+        );
+        assert_eq!(
+            reader.call_count(),
+            1,
+            "no second read may be issued once the bounds check refuses"
+        );
+    }
+
+    #[test]
+    fn a_zip64_local_sentinel_resolves_from_the_single_read_window() {
+        let name = b"xl/worksheets/sheet1.xml";
+        let payload = vec![5_u8; 512];
+        let (bytes, entry, central_directory_offset) =
+            strict_zip64_member_fixture(name, &custom_extra(0xa220, &[0; 260]), &payload);
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, mismatch) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert!(!mismatch);
+        assert!(
+            layout.local_zip64,
+            "the local ZIP64 sentinel must still be recognised"
+        );
+        assert_eq!(layout.data_end_offset, central_directory_offset);
+        assert_eq!(
+            reader.requests().len(),
+            1,
+            "the ZIP64 extra field is resolved out of the same window"
+        );
+    }
+
+    #[test]
+    fn a_descriptor_bearing_member_still_reaches_the_descriptor_reader() {
+        let name = b"word/document.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![4_u8; 700];
+        let (mut bytes, entry, member_end) =
+            strict_member_fixture(name, &local_extra, &payload, true);
+        // Later members sit between this one and the directory, which is the
+        // ordinary case for a descriptor-bearing OOXML member.
+        bytes.extend_from_slice(&[0x5a; 2000]);
+        let central_directory_offset = u64::try_from(bytes.len()).unwrap();
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, mismatch) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert!(!mismatch);
+        let data_end = u64::try_from(
+            ZipLocalFileHeaderFixed::SIZE + name.len() + local_extra.len() + payload.len(),
+        )
+        .unwrap();
+        assert_eq!(layout.data_end_offset, data_end);
+        assert_eq!(
+            layout.span_end, member_end,
+            "the descriptor is still measured and closes the span"
+        );
+        let requests = reader.requests();
+        assert_eq!(
+            requests.len(),
+            2,
+            "one window plus one descriptor read; the two-read form cost three"
+        );
+        assert_eq!(requests[0], (0, STRICT_LOCAL_HEADER_WINDOW));
+        assert_eq!(
+            requests[1].0, data_end,
+            "the descriptor read still starts at the payload end"
+        );
+    }
+
+    #[test]
+    fn a_final_narrow_descriptor_keeps_the_historical_two_reads() {
+        // The window reserves the widest descriptor because the real width is
+        // unknown until the local header is parsed. The last member of an
+        // archive, carrying a narrower descriptor, therefore keeps the
+        // historical second read rather than reading descriptor bytes
+        // speculatively.
+        let name = b"word/document.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![4_u8; 700];
+        let variable_length = name.len() + local_extra.len();
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, true);
+        let reader = StrictWindowProbe::new(bytes);
+
+        let (layout, _) =
+            prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+
+        assert_eq!(layout.span_end, central_directory_offset);
+        let requests = reader.requests();
+        assert_eq!(requests.len(), 3, "window, variable region, descriptor");
+        assert_eq!(
+            requests[1],
+            (ZipLocalFileHeaderFixed::SIZE as u64, variable_length),
+            "the fallback is byte-for-byte the historical variable read"
+        );
+        let last = requests[2];
+        assert!(
+            last.0
+                >= u64::try_from(ZipLocalFileHeaderFixed::SIZE + variable_length).unwrap()
+                    + u64::try_from(payload.len()).unwrap(),
+            "the descriptor read still starts at the payload end"
+        );
+    }
+
+    #[test]
+    fn preservation_keeps_its_name_mismatch_policy_on_the_single_read_path() {
+        let local_name = b"local/name.xml";
+        let central_name = b"central/name.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![6_u8; 300];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(local_name, &local_extra, &payload, false);
+
+        let reader = StrictWindowProbe::new(bytes.clone());
+        let (layout, mismatch) = validate_reader_entry_layout_with_name_policy(
+            &reader,
+            &entry,
+            central_name,
+            central_directory_offset,
+            central_directory_offset,
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(mismatch, "preservation still reports the name mismatch");
+        assert_eq!(layout.span_end, central_directory_offset);
+        assert_eq!(
+            reader.requests(),
+            vec![(
+                0,
+                ZipLocalFileHeaderFixed::SIZE + local_name.len() + local_extra.len()
+            )],
+            "preservation shares the single-read path"
+        );
+
+        let reader = StrictWindowProbe::new(bytes);
+        let error = validate_reader_entry_layout_with_name_policy(
+            &reader,
+            &entry,
+            central_name,
+            central_directory_offset,
+            central_directory_offset,
+            false,
+            false,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                ErrorKind::InvalidInput { msg }
+                    if msg == "strict local and central names differ"
+            ),
+            "the strict policy still refuses the mismatch, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn a_short_reading_source_still_proves_the_same_layout() {
+        let name = b"ppt/slides/slide1.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![8_u8; 900];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+
+        let whole = StrictWindowProbe::new(bytes.clone());
+        let (expected, _) =
+            prove_strict_layout(&whole, &entry, name, central_directory_offset).unwrap();
+
+        for max_chunk in [1, 7, 16, 29, 31, 512] {
+            let reader = StrictWindowProbe::chunked(bytes.clone(), max_chunk);
+            let (layout, mismatch) =
+                prove_strict_layout(&reader, &entry, name, central_directory_offset).unwrap();
+            assert!(!mismatch);
+            assert_eq!(layout.local_header_offset, expected.local_header_offset);
+            assert_eq!(layout.data_start_offset, expected.data_start_offset);
+            assert_eq!(layout.data_end_offset, expected.data_end_offset);
+            assert_eq!(layout.span_end, expected.span_end);
+            assert_eq!(layout.local_zip64, expected.local_zip64);
+        }
+    }
+
+    #[test]
+    fn strict_layout_checks_keep_their_order_around_the_single_read() {
+        let name = b"xl/styles.xml";
+        let local_extra = custom_extra(0xa220, &[0; 260]);
+        let payload = vec![1_u8; 256];
+        let (bytes, entry, central_directory_offset) =
+            strict_member_fixture(name, &local_extra, &payload, false);
+
+        // Method before flags.
+        let mut mismatched = entry;
+        mismatched.compression_method = CompressionMethodId(8);
+        mismatched.flags = 0x0800;
+        let reader = StrictWindowProbe::new(bytes.clone());
+        let error =
+            prove_strict_layout(&reader, &mismatched, name, central_directory_offset).unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                ErrorKind::InvalidInput { msg }
+                    if msg == "strict local and central compression methods differ"
+            ),
+            "the method check still precedes the flags check, got {error:?}"
+        );
+
+        // Flags before name.
+        let mut mismatched = entry;
+        mismatched.flags = 0x0800;
+        let reader = StrictWindowProbe::new(bytes.clone());
+        let error =
+            prove_strict_layout(&reader, &mismatched, b"other.xml", central_directory_offset)
+                .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                ErrorKind::InvalidInput { msg }
+                    if msg == "strict local and central flags differ"
+            ),
+            "the flags check still precedes the name check, got {error:?}"
+        );
+
+        // Name before sizes.
+        let mut mismatched = entry;
+        mismatched.compressed_size = u64::try_from(payload.len()).unwrap() + 1;
+        let reader = StrictWindowProbe::new(bytes.clone());
+        let error =
+            prove_strict_layout(&reader, &mismatched, b"other.xml", central_directory_offset)
+                .unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                ErrorKind::InvalidInput { msg }
+                    if msg == "strict local and central names differ"
+            ),
+            "the name check still precedes the size check, got {error:?}"
+        );
+
+        // Sizes before CRC.
+        let mut mismatched = entry;
+        mismatched.compressed_size = u64::try_from(payload.len()).unwrap() + 1;
+        mismatched.crc ^= 0xFFFF_FFFF;
+        let reader = StrictWindowProbe::new(bytes);
+        let error =
+            prove_strict_layout(&reader, &mismatched, name, central_directory_offset).unwrap_err();
+        assert!(
+            matches!(error.kind(), ErrorKind::InvalidSize { .. }),
+            "the size check still precedes the CRC check, got {error:?}"
+        );
     }
 }

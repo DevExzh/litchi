@@ -1,5 +1,86 @@
 # Performance program phase report
 
+## 0572-0576: the OOXML range source priced, and the OLE2 open stops decoding
+
+Five records. Two production changes, one attribution, one survey and one design,
+and they interlock: the attribution priced a cost, the design proved how far it
+can be driven down, one production change took the safe half of it, the survey
+found where the OLE2 path had moved, and the other production change took what
+the survey found.
+
+[0572](0572-ooxml-range-source-attribution.md) answers what changes 0561 and 0567
+left open: what a source-backed OOXML read costs a caller-supplied range source.
+A single-cell read of a 132-member workbook costs 354 requests and 375.14 ms on a
+1 ms-per-request transport, and 264 of those requests are the strict-layout
+proof — 10,740 bytes across 264 requests, an average of 41 bytes each, which is
+the worst possible shape for a latency-bearing source. The proof's size was
+predicted exactly. The open was not: it reads content types, every `.rels` part
+in the package and the format's main part, so that workbook pays 43 structural
+members and 89 requests before the cell read begins, where the plan predicted
+three. Widening the read-ahead window from 4 KiB to 64 KiB is indistinguishable,
+1.9% against a 1.33% floor, because every request it removes is paid back in
+transfer.
+
+[0573](0573-zip-single-local-header-read.md) collapses the proof's two positional
+reads per member into one. Across all 168 OOXML fixtures reads fall 8,326 to
+4,385, bytes rise 0.54%, per-entry heap allocations fall 4,089 to 148, and 159 of
+168 fixtures read byte-for-byte the same bytes while halving their reads. The
+window is 640 bytes because that is what the corpus measures — 14,744 members in
+533 archives, largest OOXML variable region 539 bytes — and a 512-byte window
+would miss 301 of 4,270 members. The clamp that first suggested itself reads
+payload bytes and broke two existing tests asserting that indexing stays
+metadata-only; the bound is therefore the next member's local-header offset less
+the payload and the widest descriptor, which is why bytes rise by half a percent
+rather than several-fold. Those two tests were right and the first design was
+wrong.
+
+[0575](0575-zip-lazy-strict-layout-design.md) asks how far the same cost can be
+driven and returns a lower bound rather than a wish: the local extra-field length
+is the only span input the central directory never carries, so archive-wide
+non-overlap cannot be decided in O(1), and a zero-I/O screen proves nothing at
+all on real OOXML, which packs members with no gaps. The recommended design still
+reaches 264 reads to 4 for one member. Its archaeology is the uncomfortable part.
+Both commits that introduced the archive-wide proof have empty message bodies, no
+accepted ADR mentions ZIP overlap or a strict layout, there is no threat model,
+the only security framing is post-hoc and names no threat, and the proof is
+already not a library invariant because the ordinary read path bypasses it. A
+rival incremental design is rejected against accepted ADR 0005 and not
+implemented. What is left for the project is one table cell in a reproducible
+4,405-byte witness.
+
+[0574](0574-ole2-next-opportunity-survey.md) re-measures the OLE2 path after
+changes 0565, 0568 and 0570 and reports that they moved its bottleneck off I/O
+entirely: 75.9% of a source-backed open is now spent outside the source, and it
+costs 1.65 million instructions to return sixteen sheet names. The largest single
+category is an open-time scan that decodes every shared string in the workbook
+and discards it.
+
+[0576](0576-xls-sst-scan-without-materialization.md) removes that, in the
+conservative form 0574 left open: the walk still validates UTF-16, so the refusal
+stays at open and its message stays byte-identical. Paired medians in both
+directions fall 84.6%, 62.6% and 11.4%, instructions per open fall 88.2%, 65.1%
+and 15.3%, and allocations per open fall 16,031 to 247 on one fixture. Not one
+byte of I/O moved. A corpus differential indexes 117 fixtures with byte-identical
+entries across 17,434 entries.
+
+Three things in this batch are about the program's instruments rather than the
+library. A measurement probe with path dependencies on the shared working tree
+**measured another agent's uncommitted change without warning**; 0572's first
+capture was discarded and every figure rebuilt from a `git archive` of the
+committed revision. An independent audit of 0572's draft found its arithmetic
+clean across 100+ recomputed values but **six prose conclusions wrong**, one of
+which had scored a plan prediction as refuted when the record's own retained
+bytes confirmed it. And 0576's unit tests cannot fail pre-change, so they were
+justified by mutation instead — two mutations initially survived, exposing a real
+gap where the scan would have silently accepted a string `from_utf16` rejects.
+
+Every claim-bearing number here is a read count, an instruction count, an
+allocation count or a paired median against a floor measured in the same window.
+`tools/check_example_targets.py` is red at HEAD on three duplicate example
+targets, all in iWork crates, which is outside this batch's scope and untouched
+by it. Three facade `document::doc` tests fail at HEAD and were reproduced in a
+pristine worktree before being recorded as pre-existing.
+
 ## 0568-0571: the XLS worksheet scan, CFB run batching, and one OOXML index per open
 
 [0568](0568-xls-worksheet-window.md) windows the source-backed XLS worksheet

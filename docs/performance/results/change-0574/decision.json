@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0574",
+  "title": "OLE2 next-opportunity survey: a source-backed XLS open is now CPU, and most of it decodes strings nobody asked for",
+  "decision": "attribution retained, no production change",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the highest-ranked opportunity changes when a malformed UTF-16 shared string is refused, which is a tested contract and needs a frozen design record first",
+    "the second-ranked opportunity raises read counts on the majority of the corpus and needs a density gate designed with it",
+    "the third-ranked opportunity changes which CFB primitive the globals scan uses and would have to prove read and observation counts unchanged",
+    "no before/after pair and no A/B/B/A matrix were captured, so no speedup is admissible from this batch"
+  ],
+  "accepted_evidence": {
+    "deterministic_counters": "nine cells, three source implementations by three operations, 20 warmups and 100 samples, every logical counter constant across all samples; reproduces change 0565's retained read and byte counts exactly as a control",
+    "hardware_counters": "perf stat isolation pairs at 1100 and 100 samples divided by 1000",
+    "instruction_attribution": "callgrind isolation pairs on three fixtures of different globals composition, self and inclusive",
+    "static_model": "consumed-closure and composition models over 126 XLS fixtures, olefile plus the standard library, no repository code executed",
+    "corpus_regression": "one open of each of the 117 XLS fixtures that open, fitted to three byte classes, R^2 0.9933"
+  },
+  "accepted_costs": {
+    "latency_scope": "single-leg attribution medians only; warm page cache, staged immutable copy, one host, one binary",
+    "callgrind_string_ops": "memset and memcpy instruction counts are upper bounds because Valgrind instruments ERMS string loops per iteration"
+  },
+  "known_gaps": {
+    "formats": "no DOC or PPT scenario was measured; only the CFB findings transfer without fresh measurement",
+    "concentration": "both leading opportunities are concentrated: 90% of skippable globals bytes live in 15 of 126 fixtures, and only 7 of 117 fixtures have an SST above a quarter of their globals",
+    "regression_separability": "the SST and other-closure coefficients are within 6% of each other and their classes correlate with globals size, so the regression establishes that consumed bytes dominate, not the SST share specifically",
+    "change_0547": "its absolute instruction magnitudes cannot be bound to this tree because its fixture and harness binding is not reproducible from the retained record",
+    "fixtures": "9 of 126 XLS fixtures do not open, including all three encrypted ones, and are excluded rather than imputed"
+  },
+  "withheld": [
+    "any speedup, cold-cache, physical-device, remote or range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "git_revision": "163ac1bd67f2a0d72c27bfec60e0a2620768cc9d",
+    "binary_sha256": "a2955ff9ce8ef1246ada7d8414e72fc299aaf2cbad5db2e6cd6ff85d4ab34449",
+    "note": "a candidate implementing opportunity 1 entered the working tree after every capture in this packet; this packet is its before leg and measures none of it"
+  }
+}

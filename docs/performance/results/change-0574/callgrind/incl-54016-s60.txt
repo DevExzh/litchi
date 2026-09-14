@@ -1,0 +1,84 @@
+--------------------------------------------------------------------------------
+Profile data file 'cg/54016-s60.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 330170235
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution --input /home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls --mode owned-readat --operation open --warmups 1 --samples 60 (PID 3180086, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+1,854,374,765 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+1,854,374,765 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+1,854,109,853 (99.99%)  ???:(below main) [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,854,109,841 (99.99%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+1,854,109,660 (99.99%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+1,854,107,866 (99.99%)  ???:main [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,854,107,855 (99.99%)  ???:std::rt::lang_start_internal [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,854,005,001 (99.98%)  ???:std::rt::lang_start::{{closure}} [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,854,004,980 (99.98%)  ???:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,854,004,976 (99.98%)  ???:xls_source_attribution::main [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,853,387,849 (99.95%)  ???:xls_source_attribution::run [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,140,945,650 (61.53%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,140,944,410 (61.53%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+1,131,050,376 (60.99%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  922,706,743 (49.76%)  ???:litchi_xls::records::scan_shared_string_records [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  830,177,083 (44.77%)  ???:litchi_xls::records::parse_one_shared_string [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  722,703,074 (38.97%)  ???:litchi_xls::records::SstCursor::read_characters [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  569,878,820 (30.73%)  ???:xls_source_attribution::sha256_hex [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  569,825,631 (30.73%)  ???:sha2::sha256::compress256 [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  569,825,552 (30.73%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  467,320,953 (25.20%)  ???:xls_source_attribution::binary_identity [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  385,850,222 (20.81%)  ???:<alloc::string::String>::from_utf16 [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  131,147,137 ( 7.07%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  130,984,557 ( 7.06%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+  110,928,783 ( 5.98%)  ???:litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   96,692,064 ( 5.21%)  ???:litchi_xls::workbook::source::GlobalsBuffer::ensure [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   95,169,722 ( 5.13%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   90,750,577 ( 4.89%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   66,548,355 ( 3.59%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   52,766,672 ( 2.85%)  ???:litchi_xls::workbook::codec::semantic::worksheet::add_cell [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   52,185,099 ( 2.81%)  ???:__rustc::__rust_realloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   52,178,632 ( 2.81%)  ???:__rustc::__rdl_realloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   52,037,169 ( 2.81%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   51,572,089 ( 2.78%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   49,771,451 ( 2.68%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+   49,753,144 ( 2.68%)  ???:0x0000000004eec680 [???]
+   48,276,522 ( 2.60%)  ???:litchi_xls::records::SstCursor::read_exact [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   46,094,021 ( 2.49%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   45,066,185 ( 2.43%)  ???:__rustc::__rdl_alloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   44,065,098 ( 2.38%)  ???:litchi_xls::number_format::codec::parse_xf [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   41,131,087 ( 2.22%)  ???:__rustc::__rust_dealloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   40,103,252 ( 2.16%)  ???:__rustc::__rdl_dealloc [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   39,075,954 ( 2.11%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   35,816,918 ( 1.93%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   32,896,987 ( 1.77%)  ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   25,623,636 ( 1.38%)  ???:litchi_cfb::shared::SharedOleFile::read_stream_range [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   25,349,940 ( 1.37%)  ???:litchi_xls::border_fill::parse_xf_border_fill [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+   20,114,050 ( 1.08%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   18,369,694 ( 0.99%)  ???:litchi_core::source::ReadAt::read_exact_at [/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xls_source_attribution]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./csu/../csu/libc-start.c
+  ./csu/../sysdeps/nptl/libc_start_call_main.h
+  ./malloc/../string/bits/string_fortified.h
+  ./malloc/./malloc/malloc.c
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+
