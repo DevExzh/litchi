@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0572-ooxml-range-source-attribution",
+  "revision": "163ac1bd67f2a0d72c27bfec60e0a2620768cc9d",
+  "created_utc": "2026-09-14T04:20:00Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred; iWork excluded.",
+    "production_crates": [],
+    "baseline_stage": "attribution only over the committed tree at the revision above; no production change is planned or permitted by this record"
+  },
+  "hypothesis": {
+    "statement": "Change 0561 concluded that collapsing repeated positional reads is worth nothing on a warm local file but about 85% on a latency-bearing source, and that future work here must be justified against a range-source measurement. Change 0567 found that the XLSX streaming cell read triggers a whole-archive strict-layout proof issuing two positional reads per member. Nobody has measured either on a range source.",
+    "mechanism": "Every soapberry-zip ReaderAt call on a source-backed OOXML package reaches the caller-supplied litchi_core::ReadAt unchanged through litchi-opc's SourceReader (exact policy) or through the ArchiveReadAhead window (forward-start policy). A counting ReadAt that records every (offset, length) in order therefore observes exactly the requests the library issues, and the ZIP structure of the fixture classifies each request by region without inference.",
+    "predicted_effect": {
+      "transport_independence": "the ordered request sequence of every scenario is identical between the zero-delay and the 1 ms plus 100 MiB/s transports and across at least five repeats",
+      "open_exact": "one 22-byte end-of-central-directory read, one 46-byte first-central-record probe, one whole-central-directory read, then two requests per structural member (30-byte local header, then the payload) plus one 12-to-16-byte descriptor read for each member that carries a data descriptor; three structural members for DOCX and XLSX, twenty-one for the six-slide shapes.pptx",
+      "docx_text_exact": "two more requests for word/document.xml (three when it carries a descriptor); no strict-layout proof, because write_text_to materializes the main part through the read_entry path",
+      "pptx_slide_exact": "two to four more requests for the selected slide part (plus descriptors)",
+      "xlsx_cell_exact": "a strict-layout proof of two requests per member, three per descriptor-bearing member, issued before the first worksheet payload byte: 26 on sheet-names.xlsx (13 members), 264 on ConditionalFormattingSamples.xlsx (132 members), 39 on universal-content.xlsx (13 members, all with descriptors); then worksheet, shared-strings and styles payload reads. The proof is more than 85 percent of the cell phase and roughly 95 percent of the whole scenario on the 132-member fixture, so about 264 of roughly 280 ms at 1 ms per request",
+      "read_ahead_4k": "the 0493 configuration collapses the open where the central directory and the structural members fall inside 4 KiB windows, but a request larger than the window is served in window-sized fills, so a member payload larger than 4 KiB costs more requests than exact; the proof sweep gains only where consecutive local headers are less than 4 KiB apart, so the 132-member proof is predicted to remain above 100 requests",
+      "read_ahead_64k": "the maximum window collapses the proof sweep to about one fill per 64 KiB of local-entry span, about 11 on the 655 KB fixture, and the whole 132-member XLSX scenario to below 25 requests, at the cost of window-sized fills that read most or all of a small fixture"
+    }
+  },
+  "method": {
+    "fixtures": "repository test-data fixtures only; at least one small and one larger-member-count fixture per format, including at least one descriptor-bearing fixture per format; sizes, member counts and SHA-256 recorded by the analysis script",
+    "scenarios": ["DOCX open then write_text_to (full text)", "PPTX open then SourceSlide::text on the middle slide", "XLSX open then SourceWorksheet::cell(A1) on sheet 0 through the streaming verified-reader path"],
+    "policies": ["exact (the pinned default, native leaf constructors)", "forward_start(4096) (the 0493 configuration)", "forward_start(65536) (the policy maximum)"],
+    "transports": ["zero delay control", "1 ms fixed service per physical request plus 104857600 bytes per second, minimum-service policy, 65536-byte maximum physical range (the 0493 configuration)"],
+    "control": "the two-step SourceBackedPackage-then-adopt route with the exact policy must reproduce the native leaf constructor's request sequence, otherwise the read-ahead arms are not comparable",
+    "repeats": 5,
+    "build": "scratch probe crate with path dependencies on the workspace crates, release profile, pinned 1.95.0 toolchain, CARGO_TARGET_DIR in the session scratchpad"
+  },
+  "acceptance": {
+    "determinism_gate": "request sequences identical across repeats and transports, or the record must say where they differ",
+    "attribution_gate": "every request classified by ZIP region; zero requests in gaps; the proof identified as the contiguous local-header and descriptor sweep in layout order that precedes the first worksheet payload read",
+    "timing_gate": "delayed-transport wall-clock reported as medians over the repeats with the host load average at capture; the record does not claim warm-local latency",
+    "policy_gate": "which public entry points accept SourceReadPolicy and which do not is read from source and stated, not inferred"
+  },
+  "status": "frozen-before-capture",
+  "performance_claim": "none"
+}

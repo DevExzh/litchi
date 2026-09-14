@@ -1,0 +1,16 @@
+[package]
+name = "litchi-0572-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+litchi-xlsx = { path = "../../../../../crates/litchi-xlsx" }
+serde_json = "1"
+sha2 = "0.11"
+
+[workspace]

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0572-ooxml-range-source-attribution",
+  "decision": "attribution-only",
+  "code_state": "no production change",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "plan_status_at_capture": "frozen-before-capture",
+  "library_revision": "163ac1bd67f2a0d72c27bfec60e0a2620768cc9d",
+  "reason_codes": [
+    "request_sequence_is_independent_of_transport",
+    "strict_layout_proof_sized_exactly_as_predicted",
+    "structural_member_count_tracks_relationship_parts_not_format",
+    "read_ahead_trades_requests_for_bytes",
+    "scattered_open_does_not_collapse_under_a_single_forward_window",
+    "capture_had_to_be_pinned_against_a_concurrent_working_tree_edit"
+  ],
+  "gates": {
+    "determinism_gate": {
+      "verdict": "pass",
+      "arms_checked": 44,
+      "divergent_arms": 0,
+      "detail": "identical ordered (offset, length) sequence across five repeats and across the zero-delay, zero-delay-plus-64-KiB-cap and 1 ms/100 MiB/s transports"
+    },
+    "attribution_gate": {
+      "verdict": "pass",
+      "requests_in_gap": 0,
+      "bytes_beyond_end_of_file": 0,
+      "caveat": "the parsed layout tiles every byte of all eleven fixtures with no hole and no overlap, so the gap category is empty by construction for this corpus rather than by the library's restraint; the gate is reported as passed and as uninformative"
+    },
+    "timing_gate": {
+      "verdict": "pass",
+      "loadavg_at_capture": "7.88 14.70 9.49",
+      "detail": "delayed-transport medians over five repeats; two independent captures agree within 1.33 percent at all 33 medians; no warm-local latency is claimed"
+    },
+    "policy_gate": {
+      "verdict": "pass",
+      "detail": "read from source at the pinned revision: four public entry points accept SourceReadPolicy, two on litchi_opc::SourceBackedPackage and two on litchi_docx::source_backed::Package; litchi-pptx, litchi-xlsx, litchi-xlsb, litchi-ooxml-common and the litchi facade have zero occurrences in src/"
+    },
+    "control": {
+      "verdict": "pass",
+      "pairs_checked": 11,
+      "detail": "the two-step SourceBackedPackage-then-adopt route with the exact policy reproduces the native leaf constructor's request sequence byte for byte on every scenario and fixture, so the read-ahead arms are comparable"
+    }
+  },
+  "predictions_confirmed": [
+    "transport_independence: identical sequences across transports and repeats",
+    "docx_text_exact: two more requests for the main part, three with a descriptor, and no strict-layout proof",
+    "pptx_slide_exact: two to four more requests for the selected slide part",
+    "xlsx_cell_exact proof size: two requests per member and three per descriptor-bearing member, giving exactly 26, 264 and 39 on the three plan-named fixtures, contiguous, ascending in layout order, immediately before the first worksheet payload read, and 99.6 percent of the cell phase on the 132-member fixture",
+    "xlsx_cell_exact follow-on reads: the plan predicted worksheet, shared-strings and styles payload reads after the proof. On ExcelPivotTableSample.xlsx all three are read, in that order, in the seven requests following the proof. The list is on demand, not unconditional: SimpleNormal.xlsx reads worksheet and shared strings but not styles (five requests) and sheet-names.xlsx, whose A1 is absent, reads only the worksheet (three). No fixture reads a part the prediction did not name",
+    "read_ahead_64k small-fixture cost: the plan predicted window-sized fills that read most or all of a small fixture. Every one of the ten fixtures below 100 KB is read at 101 to 135 percent of its own size under forward_start(65536)"
+  ],
+  "predictions_wrong": [
+    "open_exact structural-member count: predicted three for DOCX and XLSX and twenty-one for shapes.pptx; measured 3 to 4, 4 to 43, and 22. The exact rule, verified on all eleven fixtures, is one [Content_Types].xml plus every .rels part plus the format's main part (xl/workbook.xml, ppt/presentation.xml; DOCX reads no main part during the open because word/document.xml is the scenario's target and falls in the read phase). The open scales with the relationship-part count, not the format and not the member count",
+    "xlsx_cell_exact scenario share: predicted roughly 95 percent of the whole scenario on the 132-member fixture; measured 74.6 percent",
+    "xlsx_cell_exact total: predicted about 280 requests and milliseconds on the 132-member fixture; measured 354 requests and a 375.14 ms median",
+    "read_ahead_4k proof floor: predicted the 132-member proof stays above 100 requests under forward_start(4096); measured 36 for the whole cell phase",
+    "read_ahead_64k scenario total: predicted the whole 132-member XLSX scenario below 25 requests; measured 49, because the scattered open costs 39 on its own. The sweep half of the same prediction is nearly exact, about 11 predicted against 9 measured"
+  ],
+  "predictions_untested": [
+    "read_ahead_4k split consequence: the mechanism is confirmed -- the only two reads in the corpus larger than the 4 KiB window, the 9,724-byte and 5,117-byte central directories, are split into 3 and 2 fills against 1 request under exact -- but the case the prediction names is absent: no member payload read anywhere in the eleven fixtures exceeds 4,096 bytes (largest 1,251 B), because these scenarios touch only content types, relationship parts and one target part. No arm has forward_start(4096) costing more requests than exact on this corpus"
+  ],
+  "corrections": {
+    "0567": "change 0567 states 'three for DOCX and XLSX, twenty-one for a six-slide PPTX' structural members per open. Those are one fixture triple's counts, not the formats', and the measured number for shapes.pptx is 22. Its 'one archive index per open' conclusion is untouched"
+  },
+  "incidental_findings": [
+    "write_text_to refuses drawing.docx and table-alignment.docx with InvalidFormat(\"semantic DOCX XML exceeds 4096 namespace bindings\"); both were dropped from the corpus and the largest DOCX measured is 17 members",
+    "SourceWorksheet::cell(\"A1\") returns Invalid(\"worksheet mergeCells appears before sheetData\") on 10 of the 93 .xlsx fixtures under test-data/ooxml/xlsx, including universal-content.xlsx and ConditionalFormattingSamples.xlsx, two of the three fixtures the plan itself names. 82 complete and one more refuses on a deliberately malformed shared-string count. The strict-layout proof runs in full before the refusal, so the request counts are sound. SimpleNormal.xlsx and ExcelPivotTableSample.xlsx were added beyond the plan so the proof is also observed on a path that completes with a stored value. Retained as xlsx-cell-survey.json",
+    "after the proof, the XLSX cell read issues a payload read of the selected worksheet and then reads the same member's local header and payload again"
+  ],
+  "withheld": [
+    "warm-local latency",
+    "filesystem and cold-cache behaviour",
+    "allocation profile and peak RSS",
+    "instruction counts and syscall counts",
+    "physical device and cross-platform results",
+    "any before/after or ABBA comparison, there being no candidate"
+  ],
+  "cross_checks": {
+    "0573": "change 0573, written concurrently, counts the same strict-layout proof through soapberry-zip's own instrumented reader and reports the identical before figures: 264 reads / 10,740 bytes for ConditionalFormattingSamples.xlsx and 13 reads / 2,478 bytes for sheet-names.xlsx. Two instruments at two layers, no adjustment. This record's numbers are the pre-0573 state at revision 163ac1bd6",
+    "discarded_first_capture": "the first capture linked change 0573 while it was an uncommitted working-tree edit and reported the proof as one read per member. It was discarded and the build repinned; DOCX and PPTX counts were identical in both builds, confirming the contamination was confined to the XLSX strict-layout path"
+  },
+  "corrections_made_in_review": {
+    "styles_payload": "the first draft stated that no styles payload is ever read and scored the xlsx_cell_exact follow-on-reads prediction as WRONG. That was contradicted by this record's own retained bytes -- ExcelPivotTableSample.xlsx reads xl/styles.xml at requests 84 and 85 -- and was caught by an independent audit of the draft against results.json before publication. The draft had generalised from SimpleNormal.xlsx, where styles genuinely is not read. The prediction is now scored confirmed",
+    "cross_check_figure": "the first draft cited 0573's sheet-names.xlsx AFTER figure (13 reads) as the agreeing BEFORE figure, contradicting this record's own table on the same page. The before figure is 26 reads / 2,478 bytes",
+    "full_window_fills": "the first draft called all 37 open-phase fills on the 132-member fixture full-window. 34 are the full 65,536 bytes; three are shorter because they hit end of file",
+    "arm_matrix": "the first draft described the matrix as three policies x two routes x three transports, which is 198, not 132. The matrix is four policy-and-route combinations, because no read-ahead arm was run through a native leaf constructor -- no PPTX or XLSX leaf constructor accepts a policy",
+    "scenario_outcomes": "the first draft did not disclose that comment.docx extracts zero bytes of text and that two of the three PPTX fixtures carry one slide, so their middle slide is slide 0. Only shapes.pptx exercises a genuine middle slide",
+    "window_comparison": "the first draft concluded that widening the window from 4 KiB to 64 KiB buys nothing. The 64 KiB window is 1.9 percent faster on that scenario, against a capture-to-capture spread of 1.33 percent. The defensible statement is that the two are indistinguishable",
+    "gates_in_results_json": "results.json originally carried verdicts for three of the five gates, so the packet README's own verification snippet printed three where the record asserts five. timing_gate and policy_gate are now recorded there too"
+  }
+}
