@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-14T03:49:18Z",
+  "batch": [
+    "0568-xls-worksheet-window",
+    "0569-ooxml-detect-then-open-priced",
+    "0570-cfb-fat-run-batching",
+    "0571-ooxml-prepared-source"
+  ],
+  "removed": [
+    "the session scratchpad in full, 16,808,551,538 bytes: the staged baseline and candidate binaries, both isolated cargo target directories, all build and gate logs, the raw strace working directories, and the scratch probe packages with their build output",
+    "four git worktrees: two created for the measurement legs and two created for isolated agent runs, all removed with git worktree remove and pruned",
+    "three throwaway branches that existed only to make those worktrees clean for the measurement tooling",
+    "two temporary measurement tests that never entered a commit, deleted by their authors before hand-off"
+  ],
+  "retained_in_the_repository": [
+    "for change 0568: the 40 latency children with their receipts, the matrix, the analysis, the same-binary A/A noise-floor matrix measured in the same quiet window, the quiescence log, the before and after counters, the syscall isolation pairs for both sides, and the opaque-corpus captures that separate change 0568 from change 0570 by region",
+    "for change 0570: per-file container open read and byte counts for all 98 CFB fixtures on both sides, with the instrumentation that produced them",
+    "for change 0569: the mismatched-input behaviour table, two independent paired benchmark runs, the try-each-opener comparison, the traces segmented per file open, and the probe sources",
+    "for change 0571: the public API verbatim and the gate output"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commit",
+  "background_tasks": "no measurement process remains; every subagent has completed",
+  "notes": [
+    "target/ is 477 GiB of gitignored build output for the main workspace and is retained as ordinary build state rather than temporary files",
+    "two __pycache__ bytecode files under docs/performance/results/change-0546 and change-0547 are tracked deliberately and one is listed in a sealed SHA256SUMS manifest; a routine cleanup that deletes them dirties the tree and makes the measurement tooling refuse a leg. They were removed by mistake during this batch and restored, and the 0547 manifest was re-verified at 160 files with no failures.",
+    "agent worktrees are created under .claude/worktrees, which is now gitignored so they can never be committed"
+  ],
+  "revision": "2391a346254cbbcaf7eabf5683128f1dbfca5521"
+}
