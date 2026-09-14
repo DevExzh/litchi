@@ -62,6 +62,9 @@ changes, so it does not describe candidate-09's exact allocation layout. Its
 measured requested bytes were fully released, with equal live bytes before and
 after the measured scopes. `performance/release-09` repeats all 87 successful children against the final
 candidate-09 source, with stable checked metrics across rounds and all measured
-allocations released. Full acceptance still requires common-value before/after
-comparisons; no overall speedup or absence of regressions is claimed from these
-release windows.
+allocations released. Two common-value comparison windows now retain 324 child runs with no
+result/work/read/allocation-counter changes. One initial timing flag was not
+reproduced, while peak-RSS flags remain under review. The separate live-memory
+probe found higher executable RSS and equal median heap/stack RSS for its
+sustained range scenario. See the [performance report](performance/report.md);
+no overall speedup or unconditional performance acceptance is claimed.

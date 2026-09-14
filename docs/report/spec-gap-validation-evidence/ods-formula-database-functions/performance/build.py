@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+import tomllib
 
 
 def digest(path):
@@ -21,6 +22,8 @@ def main():
     parser.add_argument("--source-receipt", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--retain-binary", type=Path, required=True)
+    parser.add_argument("--harness", type=Path,
+                        help="alternate standalone harness within the repository")
     args = parser.parse_args()
     workspace = args.workspace.resolve(strict=True)
     output = args.output.resolve()
@@ -42,9 +45,12 @@ def main():
     if gates.hashes(workspace) != source:
         parser.error("workspace differs from captured source receipt")
     output.mkdir(parents=True)
-    harness = runner.parent / "harness"
+    harness = (args.harness or runner.parent / "harness").resolve(strict=True)
     relative = harness.relative_to(root)
     files = ("Cargo.toml", "Cargo.lock", "src/main.rs")
+    if (harness / "run.py").is_file():
+        files += ("run.py",)
+    binary_name = tomllib.loads((harness / "Cargo.toml").read_text())["package"]["name"]
     for name in files:
         destination = workspace / relative / name
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -67,7 +73,7 @@ def main():
         name: digest(workspace / relative / name) for name in files}
     binary_hash = None
     if status == 0 and unchanged:
-        binary = Path(env["CARGO_TARGET_DIR"]) / "release/ods-formula-database-functions-performance"
+        binary = Path(env["CARGO_TARGET_DIR"]) / "release" / binary_name
         retained.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(binary, retained)
         binary_hash = digest(retained)

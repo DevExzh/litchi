@@ -1,0 +1,22 @@
+{
+  "source_basis": "../../candidate-09/receipt.json",
+  "before_source_basis": "../../../ods-formula-complex-functions/performance/common-09/build.tar.gz",
+  "archives": {
+    "build.tar.gz": "249fc193b8e5329ba022f85eb1854a4bd8efb71868b657b8440c4ffeddf7a8f9",
+    "capture.tar.gz": "122388c6436a5a48592776e6207ea080208805d43ddc0df64b15194d07b9a09b"
+  },
+  "children": 162,
+  "pairs": 81,
+  "deterministic_mismatches": 0,
+  "memory_counter_change_cases": 0,
+  "review_flag_cases": [
+    "reference-error",
+    "reference-limit-cells",
+    "reference-limit-memory",
+    "reference-limit-work",
+    "reference-range-1",
+    "reference-range-16",
+    "reference-range-256",
+    "reference-repeat-256"
+  ]
+}
