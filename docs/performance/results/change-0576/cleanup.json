@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-14T16:33:00Z",
+  "batch": [
+    "0572-ooxml-range-source-attribution",
+    "0573-zip-single-local-header-read",
+    "0574-ole2-next-opportunity-survey",
+    "0575-zip-lazy-strict-layout-design",
+    "0576-xls-sst-scan-without-materialization"
+  ],
+  "removed": [
+    "the session scratchpad in full: the staged before and after binaries, five isolated cargo target directories, all build and gate logs, the throwaway probe packages, the raw callgrind and perf working directories, and the coordinator's draft sections for the summary documents",
+    "three git worktrees under the gitignored .claude/worktrees path: two created for isolated agent runs and one created as change 0573's baseline leg, all removed with git worktree remove and pruned",
+    "one detached measurement worktree created inside the session scratchpad for change 0576's before leg, removed by its author",
+    "two throwaway branches that existed only to keep the agent worktrees clean",
+    "target/debug/incremental, 107.4 GiB of regenerable compiler cache. This is the one deliberate departure from the previous batch, which retained target/ whole as ordinary build state. The incremental directory is a cache rather than build output, it had grown to 111 GiB, and this program disables incremental compilation for every measurement run, so nothing that produces evidence depends on it. It was removed only after confirming no cargo or rustc process was running and that nothing had written to target/debug for ten minutes."
+  ],
+  "retained_in_the_repository": [
+    "for change 0572: the full ordered request sequences under the exact policy, the classified per-region totals for all 132 arms, the timing repeatability capture across two windows, the XLSX cell survey, the probe sources, and decision.json including the seven corrections an independent audit of the draft produced",
+    "for change 0573: per-fixture proof read and byte counts on both sides for all 168 OOXML fixtures, the local-variable-region census over 14,744 members in 533 archives that sized the window, and the probe generator",
+    "for change 0574: the counter captures, the callgrind inclusive and annotated trees for three fixtures, the globals composition and closure models, the ministream probe, and replay.py, which recomputes every number the record cites",
+    "for change 0575: the layout census, the proof cost model, and overlap_witness.py with its 4,405-byte adversarial witness, which reproduces the one behavioural difference the design turns on",
+    "for change 0576: the paired A/B/B/A latency matrices from two capture windows, the isolated hardware counters, the callgrind before and after trees, the per-open allocation counts, the corpus differential over 126 fixtures, and the SST composition analysis"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commits 8c665ee67 and 39f36c192",
+  "background_tasks": "no measurement process remains; every subagent has completed",
+  "notes": [
+    "target/ is 399 GiB of gitignored build output for the main workspace after the incremental cache was reclaimed, and is retained as ordinary build state",
+    "tools/perf-baseline/target is 948 MiB and target/non-iwork-gate is 1.2 GiB, both gitignored build output retained for the next batch's measurement and gate legs",
+    "the two tracked __pycache__ bytecode files under change-0546 and change-0547 were left untouched, as the previous batch's cleanup record warns; both survive and the 124 retained evidence manifests verify in exactly the state they were in before this batch, with the same four historical manifests failing because they deliberately seal pre-cleanup state that was subsequently removed",
+    "four git worktrees outside the repository -- litchi-array-worktree, litchi-inline-images, litchi-spec-gaps and litchi-current-baseline-orchestration -- belong to other concurrent sessions and were deliberately not touched; litchi-spec-gaps carries its own 244 GiB target directory that is not this session's to reclaim",
+    "a measurement probe with path dependencies on the shared working tree links whatever is uncommitted in it. Change 0572's first capture was discarded for exactly this reason and rebuilt from a git archive of the committed revision. Running a measurement and a mutation of the same crate concurrently is a coordinator error, and the isolation the measuring agent adopted is the fix."
+  ],
+  "revision": "39f36c192"
+}
