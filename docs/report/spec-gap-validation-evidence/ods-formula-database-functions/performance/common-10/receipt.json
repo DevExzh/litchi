@@ -1,0 +1,5 @@
+{
+  "build_basis": "../common-09/build.tar.gz",
+  "source_basis": "../../candidate-09/receipt.json",
+  "archive_sha256": "8914c4cb36b963a4a0bd28a127622845e6ac7ba51df78643927581926a37a8f6"
+}
