@@ -56,3 +56,10 @@ process runs and an existing-value comparison of 162 processes. Six RSS flags
 and one small allocation-byte change remain explicit review items; passing
 correctness checks is not broad performance acceptance. Database functions and
 other missing audit work remain outside this implemented family.
+
+## Cache follow-up
+
+The suffix-specific prototype in `cache-10` is diagnostic, not the adopted
+production representation. Actual layout probes and a 162-process comparison
+found no storage benefit, so it was discarded. See the performance report for
+the corrected 32-byte cache-entry measurement and retained regression coverage.

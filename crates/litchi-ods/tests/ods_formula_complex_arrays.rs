@@ -506,3 +506,25 @@ fn single_cell_sequences_omit_logicals_and_empty_but_keep_numbers() {
         assert_eq!(result.value(), Value::Number(expected), "{source}");
     }
 }
+
+#[test]
+fn projected_sequence_cache_retains_both_suffixes_and_avoids_repeated_reads() {
+    for suffix in ['i', 'j'] {
+        let mut resolver = ComplexArrayResolver::with_shape(1, 1, false);
+        resolver.set(0, 0, FixtureCell::Text(format!("3+4{suffix}")));
+        let expression = parse("=IF({TRUE();TRUE();TRUE()};IMSUM([.A1]);0)");
+        let (budget, _cancellation, execution) = new_execution("ods-complex-demand-cache");
+        let result = evaluate(
+            &expression,
+            &resolver,
+            &execution,
+            Mode::Matrix,
+            &ValueLimits::default(),
+        )
+        .expect("projected cached complex sequence");
+        assert_complex_array(&result, 1, 3, &[(3.0, 4.0, suffix); 3]);
+        assert_eq!(resolver.reads(), 1, "scalar sequence should be cached");
+        drop(result);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+}

@@ -83,3 +83,22 @@ python3 docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/pe
 All archive members were compared byte-for-byte with their loose inputs before
 cleanup. Retained ELFs and the single disk-backed build workspace remain for
 follow-up comparisons; no repository/build duplicates are placed in tmpfs.
+
+## Cache layout follow-up
+
+[Cache10 diagnostics](cache-10/receipt.json) tested a suffix-specific private
+cache representation. Actual private-type probes against both source snapshots
+report `Complex=24`, `DemandCacheValue=24`, and `DemandCacheEntry=32` bytes.
+The earlier inferred 40-byte entry size was incorrect: Rust's enum niche
+layout already keeps the original entry at 32 bytes. An empty cache reserves
+two entries, so the earlier +16-byte delta is consistent with two entries
+increasing by 8 bytes from the pre-Complex representation.
+
+The 162-child AB/BA/AB comparison has no deterministic or instrumented memory
+counter changes, and no per-case median p50/p95/RSS increase above 5%. This
+window does not dismiss the earlier RSS flags; it compares a different,
+non-beneficial prototype against candidate09. Root removed the prototype
+because it saves no storage and adds checked reconstruction. The frozen
+prototype source/gates remain in `../cache-10`, and exact paired capture,
+build and instrumented layout-probe receipts are retained here. Public
+cache suffix/read-reuse coverage and the 32-byte footprint guard remain useful.
