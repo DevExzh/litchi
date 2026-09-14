@@ -244,6 +244,57 @@ pub struct Workbook {
 }
 
 impl Workbook {
+    /// Open a workbook from a package already prepared by
+    /// [`detect_and_prepare`](crate::detection_smart::detect_and_prepare).
+    ///
+    /// The prepared package is adopted as-is: no ZIP central directory is read
+    /// and no OPC catalog is parsed a second time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] when the prepared package is a
+    /// different OOXML family — a DOCX or PPTX, say — naming the format that
+    /// was detected. Returns [`Error::SourceChanged`] when the file changed
+    /// between preparation and this call.
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    pub fn from_prepared(prepared: crate::opc::PreparedOoxmlSource) -> Result<Self> {
+        let Some(detected) = crate::detection_smart::ooxml::format_for_main_content_type(
+            prepared.main_part_content_type(),
+        ) else {
+            return Err(Box::new(Error::NotOfficeFile));
+        };
+
+        #[cfg(feature = "xlsx")]
+        if detected == litchi_core::detection::FileFormat::Xlsx {
+            let package = prepared.into_package()?;
+            let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
+                .map(Metadata::from)
+                .unwrap_or_default();
+            let workbook = crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
+            return Ok(Self {
+                inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(workbook)),
+                cached_metadata: metadata,
+            });
+        }
+
+        #[cfg(feature = "xlsb")]
+        if detected == litchi_core::detection::FileFormat::Xlsb {
+            let package = prepared.into_package()?;
+            let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
+                .map(Metadata::from)
+                .unwrap_or_default();
+            let workbook = crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)?;
+            return Ok(Self {
+                inner: WorkbookImpl::XlsbSource(super::adapters::XlsbWorkbook::from_source_backed(
+                    workbook,
+                )?),
+                cached_metadata: metadata,
+            });
+        }
+
+        Err(Box::new(Error::UnexpectedFormat { detected }))
+    }
+
     /// Open a workbook from a file path.
     ///
     /// The format is automatically detected based on the file signature.
@@ -299,18 +350,17 @@ impl Workbook {
                     inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, cfb)),
                     cached_metadata: Metadata::default(),
                 }),
-                crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(_) => {
-                    Err(Box::new(Error::NotOfficeFile)
-                        as Box<dyn std::error::Error + Send + Sync>)
-                },
+                crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(
+                    detected,
+                ) => Err(Box::new(Error::UnexpectedFormat { detected })
+                    as Box<dyn std::error::Error + Send + Sync>),
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
                     Self::from_bytes(bytes)
                 },
                 crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
-                    _,
-                ) => {
-                    Err(Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>)
-                },
+                    detected,
+                ) => Err(Box::new(Error::UnexpectedFormat { detected })
+                    as Box<dyn std::error::Error + Send + Sync>),
             }
         }
 
@@ -517,15 +567,17 @@ impl Workbook {
                     as Box<dyn std::error::Error + Send + Sync>);
             },
 
-            // Handle mismatched formats
+            // A recognized format that this opener does not own. Detection
+            // already classified it, so report which format it was.
             #[allow(
                 unreachable_patterns,
                 reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
             )]
-            _ => {
-                return Err(
-                    Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>
-                );
+            detected => {
+                return Err(Box::new(Error::UnexpectedFormat {
+                    detected: detected.format(),
+                })
+                    as Box<dyn std::error::Error + Send + Sync>);
             },
         };
 
@@ -1986,7 +2038,7 @@ mod source_xls_path_tests {
 
         fn version(&self) -> io::Result<SourceVersion> {
             Ok(SourceVersion::new(
-                0x584c_535f_46414345,
+                0x584c_535f_4641_4345,
                 self.revision.load(Ordering::Relaxed),
             ))
         }
@@ -2086,7 +2138,7 @@ mod source_xls_path_tests {
         .expect("valid XLS source probe");
         let actual = source.ranges();
         assert_eq!(actual.first().copied(), Some((0, 8)));
-        assert!(actual.len() >= 1 + catalog_ranges.len());
+        assert!(actual.len() > catalog_ranges.len());
         assert_eq!(&actual[1..1 + catalog_ranges.len()], &catalog_ranges);
 
         // The globals reads are asserted by invariant rather than by an exact

@@ -1,0 +1,546 @@
+{
+  "schema_version": 1,
+  "comparison_kind": "litchi-perf-change-0568-before-after-counters",
+  "before_summary": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/before/summary.json",
+  "after_summary": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/after/summary.json",
+  "candidate_carries": [
+    "change 0568 windowed worksheet scan (crates/litchi-xls/)",
+    "change 0570 contiguous CFB FAT run batching (crates/litchi-cfb/src/file.rs)"
+  ],
+  "control": {
+    "file-source/list": {
+      "held": true,
+      "read_calls_before": 53,
+      "read_calls_after": 53,
+      "read_bytes_before": 565201,
+      "read_bytes_after": 565201,
+      "pread64_before": 53.0,
+      "pread64_after": 53.0,
+      "statx_before": 34.0,
+      "statx_after": 34.0
+    },
+    "file-source/open": {
+      "held": true,
+      "read_calls_before": 53,
+      "read_calls_after": 53,
+      "read_bytes_before": 565201,
+      "read_bytes_after": 565201,
+      "pread64_before": 53.0,
+      "pread64_after": 53.0,
+      "statx_before": 34.0,
+      "statx_after": 34.0
+    },
+    "owned-readat/list": {
+      "held": true,
+      "read_calls_before": 53,
+      "read_calls_after": 53,
+      "read_bytes_before": 565201,
+      "read_bytes_after": 565201,
+      "pread64_before": 0.0,
+      "pread64_after": 0.0,
+      "statx_before": 0.0,
+      "statx_after": 0.0
+    },
+    "owned-readat/open": {
+      "held": true,
+      "read_calls_before": 53,
+      "read_calls_after": 53,
+      "read_bytes_before": 565201,
+      "read_bytes_after": 565201,
+      "pread64_before": 0.0,
+      "pread64_after": 0.0,
+      "statx_before": 0.0,
+      "statx_after": 0.0
+    }
+  },
+  "control_verdict": "HELD - open and list unchanged at 53 logical reads",
+  "rows": [
+    {
+      "mode": "file-source",
+      "operation": "list",
+      "read_calls": {
+        "before": 53,
+        "after": 53,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "read_bytes": {
+        "before": 565201,
+        "after": 565201,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "version_calls": {
+        "before": 29,
+        "after": 29,
+        "delta": 0
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 53.0,
+        "after": 53.0,
+        "delta": 0.0
+      },
+      "statx_per_op": {
+        "before": 34.0,
+        "after": 34.0,
+        "delta": 0.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 108,
+            "statx": 72
+          },
+          "n11": {
+            "pread64": 638,
+            "statx": 412
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 108,
+            "statx": 72
+          },
+          "n11": {
+            "pread64": 638,
+            "statx": 412
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 105955.5,
+        "after": 110231.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    },
+    {
+      "mode": "file-source",
+      "operation": "one-cell",
+      "read_calls": {
+        "before": 319,
+        "after": 61,
+        "delta": -258,
+        "percent": -80.87774294670847
+      },
+      "read_bytes": {
+        "before": 566914,
+        "after": 603115,
+        "delta": 36201,
+        "percent": 6.385624627368525
+      },
+      "version_calls": {
+        "before": 300,
+        "after": 42,
+        "delta": -258
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 319.0,
+        "after": 61.0,
+        "delta": -258.0
+      },
+      "statx_per_op": {
+        "before": 305.0,
+        "after": 47.0,
+        "delta": -258.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 640,
+            "statx": 614
+          },
+          "n11": {
+            "pread64": 3830,
+            "statx": 3664
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 124,
+            "statx": 98
+          },
+          "n11": {
+            "pread64": 734,
+            "statx": 568
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 228376.0,
+        "after": 123946.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    },
+    {
+      "mode": "file-source",
+      "operation": "open",
+      "read_calls": {
+        "before": 53,
+        "after": 53,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "read_bytes": {
+        "before": 565201,
+        "after": 565201,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "version_calls": {
+        "before": 29,
+        "after": 29,
+        "delta": 0
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 53.0,
+        "after": 53.0,
+        "delta": 0.0
+      },
+      "statx_per_op": {
+        "before": 34.0,
+        "after": 34.0,
+        "delta": 0.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 108,
+            "statx": 72
+          },
+          "n11": {
+            "pread64": 638,
+            "statx": 412
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 108,
+            "statx": 72
+          },
+          "n11": {
+            "pread64": 638,
+            "statx": 412
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 105380.5,
+        "after": 106521.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "list",
+      "read_calls": {
+        "before": 53,
+        "after": 53,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "read_bytes": {
+        "before": 565201,
+        "after": 565201,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "version_calls": {
+        "before": 29,
+        "after": 29,
+        "delta": 0
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "statx_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 92735.5,
+        "after": 92805.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "read_calls": {
+        "before": 319,
+        "after": 61,
+        "delta": -258,
+        "percent": -80.87774294670847
+      },
+      "read_bytes": {
+        "before": 566914,
+        "after": 603115,
+        "delta": 36201,
+        "percent": 6.385624627368525
+      },
+      "version_calls": {
+        "before": 300,
+        "after": 42,
+        "delta": -258
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "statx_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 133790.5,
+        "after": 102830.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "open",
+      "read_calls": {
+        "before": 53,
+        "after": 53,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "read_bytes": {
+        "before": 565201,
+        "after": 565201,
+        "delta": 0,
+        "percent": 0.0
+      },
+      "version_calls": {
+        "before": 29,
+        "after": 29,
+        "delta": 0
+      },
+      "len_calls": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "seek_calls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0
+      },
+      "pread64_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "statx_per_op": {
+        "before": 0.0,
+        "after": 0.0,
+        "delta": 0.0
+      },
+      "isolation_raw": {
+        "before": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        },
+        "after": {
+          "n1": {
+            "pread64": 2,
+            "statx": 4
+          },
+          "n11": {
+            "pread64": 2,
+            "statx": 4
+          }
+        }
+      },
+      "attribution_p50_ns": {
+        "before": 91900.0,
+        "after": 91966.0
+      },
+      "source_version_stable": {
+        "before": true,
+        "after": true
+      },
+      "warmups_samples": {
+        "before": [
+          20,
+          100
+        ],
+        "after": [
+          20,
+          100
+        ]
+      }
+    }
+  ],
+  "divergences": []
+}

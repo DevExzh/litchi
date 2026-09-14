@@ -1,0 +1,18 @@
+iters=3000 warm=300
+
+-- isolated cost of the extra call --
+detect_file_format DOCX            median    42.81 us (p25   42.53 p75   43.04 min   41.31)
+detect_file_format PPTX            median   207.21 us (p25  206.39 p75  209.52 min  203.96)
+detect_file_format XLSX            median    47.63 us (p25   47.43 p75   47.86 min   46.74)
+
+-- isolated cost of the single-call open --
+Document::open DOCX                median    45.23 us (p25   44.97 p75   45.50 min   44.08)
+Presentation::open PPTX            median   256.40 us (p25  255.10 p75  261.55 min  251.97)
+sheet::Workbook::open XLSX         median    77.41 us (p25   77.05 p75   77.85 min   75.99)
+sheet::open_workbook XLSX          median    65.83 us (p25   65.56 p75   66.14 min   64.68)
+
+-- paired A/B: two-call vs single-call --
+DOCX Document::open                two-call median    86.75 us (p25   86.35 p75   87.23 min   85.12)  single-call median    44.54 us (p25   44.31 p75   44.82 min   43.39)  delta   42.21 us  ( 48.7% of two-call)
+PPTX Presentation::open            two-call median   475.71 us (p25  470.66 p75  478.70 min  464.87)  single-call median   255.97 us (p25  253.37 p75  260.26 min  250.31)  delta  219.74 us  ( 46.2% of two-call)
+XLSX sheet::Workbook::open         two-call median   127.69 us (p25  127.19 p75  128.49 min  125.74)  single-call median    78.43 us (p25   78.13 p75   78.84 min   77.10)  delta   49.26 us  ( 38.6% of two-call)
+XLSX sheet::open_workbook          two-call median   115.70 us (p25  115.27 p75  116.34 min  113.83)  single-call median    66.95 us (p25   66.68 p75   67.28 min   65.83)  delta   48.75 us  ( 42.1% of two-call)

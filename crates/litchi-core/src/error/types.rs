@@ -28,6 +28,19 @@ pub enum Error {
     #[error("Not a valid Office file")]
     NotOfficeFile,
 
+    /// The input is a recognized Office format, but not one this opener owns.
+    ///
+    /// This is distinct from [`Error::NotOfficeFile`]: detection succeeded and
+    /// named the format, so a caller can report "this is a Word document" or
+    /// re-dispatch to the right opener instead of being told only that the
+    /// input was unusable. Openers return it wherever a classification is
+    /// already in hand.
+    #[error("Detected {detected:?}, which this opener does not handle")]
+    UnexpectedFormat {
+        /// Neutral classification produced by detection.
+        detected: crate::detection::FileFormat,
+    },
+
     /// Corrupted or malformed file
     #[error("Corrupted file: {0}")]
     CorruptedFile(String),

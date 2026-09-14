@@ -279,10 +279,10 @@ pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
             crate::detection_smart::detected::WorkbookSourcePathDetection::Xls { .. } => {
                 Err(Box::new(litchi_core::Error::NotOfficeFile))
             },
-            crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(_)
+            crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(detected)
             | crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
-                _,
-            ) => Err(Box::new(litchi_core::Error::NotOfficeFile)),
+                detected,
+            ) => Err(Box::new(litchi_core::Error::UnexpectedFormat { detected })),
         }
     }
 

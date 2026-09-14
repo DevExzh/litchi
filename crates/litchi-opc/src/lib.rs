@@ -49,6 +49,7 @@ pub mod part;
 pub mod phys_pkg;
 pub mod pkgreader;
 pub mod pkgwriter;
+pub mod prepared;
 pub mod rel;
 #[cfg(feature = "sign")]
 pub mod sign;
@@ -72,6 +73,7 @@ pub use pkgreader::{
     probe_package_catalog_from_reader_with_limits,
 };
 pub use pkgwriter::PackageWriter;
+pub use prepared::PreparedOoxmlSource;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     AuthorizedPrecompressedPart, PartBatch, PartData, PartView, RetainedPrecompressedPart,

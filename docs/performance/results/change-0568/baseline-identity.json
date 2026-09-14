@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-staged-binary-identity",
+  "role": "baseline (pre-change 0568; change 0565 applied)",
+  "change_id": "0568-xls-worksheet-window",
+  "revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+  "worktree": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree",
+  "worktree_dirty": false,
+  "worktree_canonical_path": "/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree",
+  "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "build": {
+    "target_dir": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-baseline",
+    "cwd_for_both_commands": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree/tools/perf-baseline",
+    "commands": [
+      "CARGO_TARGET_DIR=/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-baseline cargo build --release --locked --offline --manifest-path /tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+      "CARGO_TARGET_DIR=/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-baseline cargo build --release --locked --offline --manifest-path /tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree/tools/perf-baseline/Cargo.toml --features xls-source-attribution --bin xls_source_attribution"
+    ],
+    "note": "litchi-perf-baseline is src/main.rs, the auto-discovered default bin, with no required-features; xls_source_attribution declares required-features [\"xls-source-attribution\"], which enables litchi/xls."
+  },
+  "binaries": {
+    "litchi-perf-baseline": {
+      "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/baseline/litchi-perf-baseline",
+      "bytes": 59914200,
+      "sha256": "2ddd10f6d4c61503433431789225bae6002c03fb6308a4e55c00d7c986052c08",
+      "mode_bits": 493,
+      "built_from": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-baseline/release/litchi-perf-baseline"
+    },
+    "xls_source_attribution": {
+      "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/baseline/xls_source_attribution",
+      "bytes": 8946744,
+      "sha256": "71976b1096319a80952cb1bf61808ecd2686eaae0fcab2c6e6e79b5da048a865",
+      "mode_bits": 493,
+      "built_from": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-baseline/release/xls_source_attribution"
+    }
+  },
+  "staged_utc": "2026-09-14T02:45:29Z",
+  "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "toolchain": {
+    "channel": "1.95.0",
+    "source": "rust-toolchain.toml at the worktree root, resolved by cargo from the manifest directory upward",
+    "verified": true,
+    "verification": {
+      "rustup_show_active_toolchain_in_manifest_dir": "1.95.0-x86_64-unknown-linux-gnu (overridden by '/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree/rust-toolchain.toml')",
+      "rustc_version_in_manifest_dir": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo_version_in_manifest_dir": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "rustup_default_elsewhere_NOT_USED": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "embedded_rustc_source_path_prefix": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/",
+      "harness_child_environment_rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "harness_child_environment_git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+      "harness_child_environment_git_worktree_dirty": false,
+      "proofs": [
+        "rustup show active-toolchain inside baseline-tree/tools/perf-baseline reports 1.95.0 overridden by baseline-tree/rust-toolchain.toml",
+        "the staged litchi-perf-baseline embeds the source path prefix /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860, the 1.95.0 commit",
+        "a harness child run from the staged binary records environment.rustc_version = rustc 1.95.0 (59807616e 2026-04-14)"
+      ]
+    },
+    "why_this_matters": "tools/perf_abba_summary.py requires every environment field except git_revision to match across legs, rustc_version included. Running rustc --version from a directory rust-toolchain.toml does not govern reports the rustup default and is wrong; change 0565 had to correct exactly this."
+  },
+  "harness_child_environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "17",
+    "storage_identifier": null
+  }
+}

@@ -382,7 +382,7 @@ mod wrong_family_workbook {
     use litchi::common::Error;
 
     #[test]
-    fn wrong_family_ooxml_path_returns_not_office_file() {
+    fn wrong_family_ooxml_path_reports_the_detected_family() {
         let temporary = tempfile::Builder::new()
             .suffix(".xlsx")
             .tempfile()
@@ -397,10 +397,16 @@ mod wrong_family_workbook {
             Ok(_) => panic!("PPTX content was accepted by the XLSX facade"),
             Err(error) => error,
         };
+        // The workbook facade knows this is a PowerPoint package; saying only
+        // "not an Office file" would throw that away.
         assert!(
-            error
-                .downcast_ref::<Error>()
-                .is_some_and(|error| matches!(error, Error::NotOfficeFile))
+            error.downcast_ref::<Error>().is_some_and(|error| matches!(
+                error,
+                Error::UnexpectedFormat {
+                    detected: litchi::common::detection::FileFormat::Pptx
+                }
+            )),
+            "{error:?}"
         );
     }
 }

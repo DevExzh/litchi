@@ -1,0 +1,99 @@
+CORPUS doc/3endnotes.doc reads=5 bytes=2560
+CORPUS doc/DiffFirstPageHeadFoot.doc reads=4 bytes=2560
+CORPUS doc/FancyFoot.doc reads=4 bytes=2560
+CORPUS doc/FloatingPictures.doc reads=12 bytes=6144
+CORPUS doc/HeaderFooterProblematic.doc reads=4 bytes=2560
+CORPUS doc/HeaderFooterUnicode.doc reads=4 bytes=2560
+CORPUS doc/Lists.doc reads=4 bytes=2560
+CORPUS doc/NoHeadFoot.doc reads=4 bytes=2560
+CORPUS doc/PasswordProtected.doc reads=4 bytes=2560
+CORPUS doc/PngPicture.doc reads=5 bytes=2560
+CORPUS doc/ThreeColFoot.doc reads=4 bytes=2560
+CORPUS doc/ThreeColHead.doc reads=4 bytes=2560
+CORPUS doc/ThreeColHeadFoot.doc reads=4 bytes=2560
+CORPUS doc/cfb-truncated-final-sector.doc reads=4 bytes=2560
+CORPUS doc/cfb-v3-uninitialized-size-high-word.doc reads=5 bytes=2560
+CORPUS doc/cjklist30.doc reads=4 bytes=2560
+CORPUS doc/cjklist31.doc reads=4 bytes=2560
+CORPUS doc/cjklist34.doc reads=4 bytes=2560
+CORPUS doc/cjklist35.doc reads=4 bytes=2560
+CORPUS doc/commented-table.doc reads=5 bytes=2560
+CORPUS doc/documentProperties.doc reads=4 bytes=2560
+CORPUS doc/duplicate-style-names.doc reads=4 bytes=2560
+CORPUS doc/empty.doc reads=4 bytes=2560
+CORPUS doc/endingnote.doc reads=4 bytes=2560
+CORPUS doc/equation.doc reads=5 bytes=4096
+CORPUS doc/first-header-footer.doc reads=4 bytes=2560
+CORPUS doc/footnote.doc reads=4 bytes=2560
+CORPUS doc/hyperlink.doc reads=4 bytes=2560
+CORPUS doc/image-comment-at-char.doc reads=5 bytes=2560
+CORPUS doc/inline-endnote-and-footnote.doc reads=4 bytes=3072
+CORPUS doc/lists-margins.doc reads=4 bytes=2560
+CORPUS doc/picture.doc reads=26 bytes=13824
+CORPUS doc/pictures_escher.doc reads=5 bytes=3584
+CORPUS doc/table-merged-cells.doc reads=4 bytes=2560
+CORPUS doc/tdf71749_with_footnote.doc reads=4 bytes=2560
+CORPUS doc/testPictures.doc reads=8 bytes=4608
+CORPUS doc/watermark.doc reads=4 bytes=3072
+CORPUS doc/word6-no-table-stream.doc reads=4 bytes=2560
+CORPUS ppt/SampleShow.ppt reads=7 bytes=3584
+CORPUS ppt/empty.ppt reads=5 bytes=2560
+CORPUS ppt/empty_textbox.ppt reads=5 bytes=2560
+CORPUS ppt/ppt_with_png.ppt reads=5 bytes=2560
+CORPUS ppt/text-margins.ppt reads=5 bytes=2560
+CORPUS ppt/text_shapes.ppt reads=5 bytes=2560
+CORPUS xls/ComplexFunctionTestCaseData.xls reads=3 bytes=1536
+CORPUS xls/ConditionalFormattingSamples copy.xls reads=25 bytes=13824
+CORPUS xls/ConditionalFormattingSamples.xls reads=25 bytes=13824
+CORPUS xls/DateFormats.xls reads=3 bytes=1536
+CORPUS xls/DateTimeToNumberTestCases.xls reads=3 bytes=1536
+CORPUS xls/FormulaEvalTestData.xls reads=12 bytes=6144
+CORPUS xls/FormulaRefs.xls reads=5 bytes=2560
+CORPUS xls/FormulaSheetRange.xls reads=3 bytes=1536
+CORPUS xls/HyperlinksOnManySheets.xls reads=3 bytes=1536
+CORPUS xls/Simple.xls reads=3 bytes=1536
+CORPUS xls/SimpleChart.xls reads=3 bytes=1536
+CORPUS xls/SimpleMacro.xls reads=9 bytes=4608
+CORPUS xls/SimpleMultiCell.xls reads=3 bytes=1536
+CORPUS xls/SimpleScatterChart.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithAutofilter copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithAutofilter.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithChoose copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithChoose.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithColours copy.xls reads=4 bytes=2048
+CORPUS xls/SimpleWithColours.xls reads=4 bytes=2048
+CORPUS xls/SimpleWithComments copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithComments.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithDataFormat copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithDataFormat.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithFormula copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithFormula.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithImages copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithImages-mac copy.xls reads=6 bytes=3072
+CORPUS xls/SimpleWithImages-mac.xls reads=6 bytes=3072
+CORPUS xls/SimpleWithImages.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithPageBreaks copy.xls reads=3 bytes=2048
+CORPUS xls/SimpleWithPageBreaks.xls reads=3 bytes=2048
+CORPUS xls/SimpleWithPrintArea copy.xls reads=3 bytes=2048
+CORPUS xls/SimpleWithPrintArea.xls reads=3 bytes=2048
+CORPUS xls/SimpleWithSkip copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithSkip.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithStyling copy.xls reads=3 bytes=1536
+CORPUS xls/SimpleWithStyling.xls reads=3 bytes=1536
+CORPUS xls/SingleLetterRanges.xls reads=3 bytes=1536
+CORPUS xls/WeekNumFunctionTestCaseData.xls reads=3 bytes=1536
+CORPUS xls/WeekNumFunctionTestCaseData2013.xls reads=3 bytes=1536
+CORPUS xls/WithChart.xls reads=5 bytes=2560
+CORPUS xls/WithCheckBoxes.xls reads=9 bytes=4608
+CORPUS xls/WithConditionalFormatting.xls reads=3 bytes=1536
+CORPUS xls/WithCustomViews.xls reads=5 bytes=3072
+CORPUS xls/WithEmbeddedObjects.xls reads=21 bytes=11264
+CORPUS xls/WithExtendedStyles.xls reads=4 bytes=2560
+CORPUS xls/WithFormattedGraphTitle.xls reads=3 bytes=1536
+CORPUS xls/WithHyperlink.xls reads=3 bytes=1536
+CORPUS xls/WithThreeCharts.xls reads=5 bytes=2560
+CORPUS xls/WithTwoCharts.xls reads=5 bytes=2560
+CORPUS xls/WithTwoHyperLinks.xls reads=3 bytes=1536
+CORPUS xls/empty.xls reads=5 bytes=2560
+CORPUS xls/password.xls reads=5 bytes=2560
+CORPUSTOTAL files=98 opened=98 reads=493 bytes=276992

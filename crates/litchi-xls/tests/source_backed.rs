@@ -318,6 +318,115 @@ fn globals_fill_bound(bytes: usize) -> usize {
     fills
 }
 
+/// First window fill of a worksheet scan, from `source.rs`.
+const WORKSHEET_FIRST_WINDOW_BYTES: usize = 512;
+/// Upper bound the worksheet window fill size doubles to, from `source.rs`.
+const WORKSHEET_MAX_WINDOW_BYTES: usize = 64 * 1024;
+/// Mean framed bytes per record above which fills become exact, from
+/// `source.rs`.
+const WORKSHEET_DENSE_FRAME_BYTES: usize = 1024;
+
+/// Upper bound on window fills needed to cover `bytes`, given a first fill of
+/// one CFB sector doubling to [`WORKSHEET_MAX_WINDOW_BYTES`].
+fn worksheet_fill_bound(bytes: usize) -> usize {
+    let mut covered = 0;
+    let mut window = WORKSHEET_FIRST_WINDOW_BYTES;
+    let mut fills = 1;
+    while covered < bytes {
+        covered += window;
+        window = (window * 2).min(WORKSHEET_MAX_WINDOW_BYTES);
+        fills += 1;
+    }
+    fills
+}
+
+/// Stream region of each sheet in `BoundSheet8` order, derived the way
+/// `validate_sheet_offsets` derives it: the next start in offset order, or the
+/// stream end.
+fn workbook_sheet_regions(stream: &[u8]) -> Vec<(usize, usize)> {
+    let positions = workbook_bound_sheet_positions(stream);
+    let mut sorted = positions.clone();
+    sorted.sort_unstable();
+    positions
+        .iter()
+        .map(|start| {
+            let end = sorted
+                .iter()
+                .copied()
+                .find(|value| value > start)
+                .unwrap_or(stream.len());
+            (*start, end)
+        })
+        .collect()
+}
+
+/// Records framed in one sheet substream, and the bytes they frame, up to and
+/// including its EOF.
+fn worksheet_frame_totals(stream: &[u8], region: (usize, usize)) -> (usize, usize) {
+    let mut at = region.0;
+    let mut records = 0;
+    while at + 4 <= region.1 {
+        let kind = u16::from_le_bytes([stream[at], stream[at + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[at + 2], stream[at + 3]]));
+        records += 1;
+        at += 4 + length;
+        if kind == 0x000A {
+            break;
+        }
+    }
+    (records, at - region.0)
+}
+
+/// Validated region of the sheet one worksheet index selects.
+fn selected_sheet_region(
+    owner: &SourceBackedWorkbook,
+    stream: &[u8],
+    worksheet_index: usize,
+) -> (usize, usize) {
+    let descriptor = owner
+        .worksheet_descriptor(worksheet_index)
+        .unwrap()
+        .expect("fixture has the selected worksheet");
+    workbook_sheet_regions(stream)[descriptor.workbook_index()]
+}
+
+/// Asserts the windowed worksheet contract: no two reads share a byte, so every
+/// byte is read at most once; every read lies inside the selected sheet's own
+/// validated region or inside `extra`, which carries the workbook globals when
+/// the query also resolves a shared string; and the reads inside the region are
+/// within the window schedule plus one read per physically contiguous run of it.
+fn assert_worksheet_window(
+    source: &CountingSource,
+    region: (usize, usize),
+    extra: &[(u64, usize)],
+    actual: &[(u64, usize)],
+) {
+    assert!(
+        reads_are_disjoint(actual),
+        "two worksheet reads share a byte: {actual:?}"
+    );
+    let span = region.1 - region.0;
+    let region_ranges = physical_ranges_for_stream_range(source, region.0 as u64, span);
+    let region_spans = merged_spans(&region_ranges);
+    let mut allowed = region_ranges.clone();
+    allowed.extend_from_slice(extra);
+    assert!(
+        spans_cover(&merged_spans(&allowed), actual),
+        "a worksheet read left the selected sheet's validated region: \
+         region={region:?} spans={region_spans:?} actual={actual:?}"
+    );
+    let scan_reads = actual
+        .iter()
+        .filter(|range| spans_cover(&region_spans, std::slice::from_ref(range)))
+        .count();
+    let bound = worksheet_fill_bound(span) + region_ranges.len();
+    assert!(
+        scan_reads <= bound,
+        "{scan_reads} of {} reads exceed the window bound {bound}",
+        actual.len()
+    );
+}
+
 /// Merges recorded reads into maximal disjoint physical spans.
 fn merged_spans(ranges: &[(u64, usize)]) -> Vec<(u64, u64)> {
     let mut spans = ranges
@@ -342,6 +451,15 @@ fn spans_cover(outer: &[(u64, u64)], inner: &[(u64, usize)]) -> bool {
         outer
             .iter()
             .any(|(start, stop)| *start <= *offset && end <= *stop)
+    })
+}
+
+/// True when a recorded read begins at an offset inside one of `probes`.
+fn begins_inside(ranges: &[(u64, usize)], probes: &[(u64, usize)]) -> bool {
+    ranges.iter().any(|(offset, _)| {
+        probes
+            .iter()
+            .any(|(start, length)| *start <= *offset && *offset < start + *length as u64)
     })
 }
 
@@ -1479,7 +1597,11 @@ fn malformed_unselected_cell_after_a_match_is_refused() {
 }
 
 #[test]
-fn oversized_unknown_record_is_refused_before_payload_read() {
+fn oversized_record_is_refused_on_its_header_alone() {
+    // A record header declaring more than `MAX_RECORD_BYTES` is refused on the
+    // header alone: no read is issued for that payload and no window grows to
+    // cover it. Payload bytes a fill taken to frame earlier records already
+    // carries are never framed, interpreted or published.
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
     let payload = vec![0xA5; litchi_biff::MAX_RECORD_BYTES + 1];
     let oversized = frame_bytes(0x1234, &payload);
@@ -1488,9 +1610,16 @@ fn oversized_unknown_record_is_refused_before_payload_read() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let source = Arc::new(CountingSource::new(bytes));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &modified, 0);
     let header_ranges = physical_ranges_for_stream_range(&source, oversized_offset as u64, 4);
     let payload_ranges =
         physical_ranges_for_stream_range(&source, oversized_offset as u64 + 4, payload.len());
+    let payload_end_ranges = physical_ranges_for_stream_range(
+        &source,
+        (oversized_offset + 4 + payload.len() - 1) as u64,
+        1,
+    );
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&modified));
     source.clear_ranges();
     assert!(matches!(
         owner.cell_by_index(0, 0, 0),
@@ -1501,11 +1630,25 @@ fn oversized_unknown_record_is_refused_before_payload_read() {
     ));
     let query_ranges = source.ranges();
     assert!(overlaps_any(&query_ranges, &header_ranges));
-    assert!(!overlaps_any(&query_ranges, &payload_ranges));
+    assert!(
+        !begins_inside(&query_ranges, &payload_ranges),
+        "a read was issued for the oversized payload"
+    );
+    assert!(
+        !overlaps_any(&query_ranges, &payload_end_ranges),
+        "a window grew to cover the oversized payload"
+    );
+    assert_worksheet_window(&source, region, &globals_ranges, &query_ranges);
 }
 
 #[test]
-fn supported_unknown_payload_is_skipped_without_source_overread() {
+fn supported_unknown_payload_is_skipped_without_a_read_of_its_own() {
+    // A skipped payload is never framed, interpreted or published, and the scan
+    // issues no read whose purpose is one: no read begins inside it, and a
+    // payload that extends past the filled end is passed without reading the
+    // remainder. Bytes of it inside a window already filled to frame earlier
+    // records are read, bounded by the window ceiling and confined to the
+    // selected sheet's own validated region.
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
     let payload = vec![0xA5; 4_096];
     let unknown_offset = worksheet_eof_offset(&original, first_sheet_offset(&original));
@@ -1513,12 +1656,21 @@ fn supported_unknown_payload_is_skipped_without_source_overread() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let source = Arc::new(CountingSource::new(bytes.clone()));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &modified, 0);
     let header_ranges = physical_ranges_for_stream_range(&source, unknown_offset as u64, 4);
     let payload_ranges =
         physical_ranges_for_stream_range(&source, unknown_offset as u64 + 4, payload.len());
+    let tail = unknown_offset + 4 + WORKSHEET_FIRST_WINDOW_BYTES;
+    let payload_tail_ranges = physical_ranges_for_stream_range(
+        &source,
+        tail as u64,
+        unknown_offset + 4 + payload.len() - tail,
+    );
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&modified));
     source.clear_ranges();
 
     let actual = owner.cell_value_by_index(0, 0, 0).unwrap();
+    let query_ranges = source.ranges();
     let eager = Workbook::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
@@ -1527,9 +1679,22 @@ fn supported_unknown_payload_is_skipped_without_source_overread() {
         .map(CellTrait::value);
     assert_eq!(actual.as_ref(), expected);
 
-    let query_ranges = source.ranges();
     assert!(overlaps_any(&query_ranges, &header_ranges));
-    assert!(!overlaps_any(&query_ranges, &payload_ranges));
+    assert!(
+        !begins_inside(&query_ranges, &payload_ranges),
+        "a read was issued for the skipped payload"
+    );
+    assert!(
+        !overlaps_any(&query_ranges, &payload_tail_ranges),
+        "the skipped remainder past one window was read"
+    );
+    let read_bytes: usize = query_ranges.iter().map(|(_, length)| *length).sum();
+    assert!(
+        read_bytes < payload.len(),
+        "{read_bytes} bytes read for a {}-byte skipped payload",
+        payload.len()
+    );
+    assert_worksheet_window(&source, region, &globals_ranges, &query_ranges);
 }
 
 #[test]
@@ -1999,6 +2164,340 @@ fn mid_globals_byte_limit_reads_at_most_one_header_past_the_limit() {
     );
     let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
     assert!((limit..=limit + 4).contains(&read_bytes), "{read_bytes}");
+}
+
+#[test]
+fn selected_worksheet_scan_reads_each_byte_at_most_once() {
+    // Worksheet 1 of this fixture is 177 records in a 46,843-byte region, and
+    // change 0564 measured a one-cell query there at one four-byte read per
+    // record header plus one read per consumed payload. The window schedule
+    // covers the scanned span in disjoint, forward fills clamped to that
+    // region.
+    let bytes = ole_fixture("ConditionalFormattingSamples.xls");
+    let stream = workbook_stream(bytes.clone(), "Workbook");
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &stream, 1);
+    assert!(region.1 - region.0 > WORKSHEET_FIRST_WINDOW_BYTES);
+    let regions = workbook_sheet_regions(&stream);
+    source.clear_ranges();
+    assert!(owner.cell_value_by_index(1, 20, 4).unwrap().is_none());
+    let actual = source.ranges();
+
+    assert_worksheet_window(&source, region, &[], &actual);
+    let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+    assert!(read_bytes <= region.1 - region.0, "{read_bytes} bytes read");
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&stream));
+    assert!(!overlaps_any(&actual, &globals_ranges));
+    for neighbour in regions.iter().copied().filter(|candidate| {
+        *candidate != region && (candidate.1 == region.0 || candidate.0 == region.1)
+    }) {
+        let neighbour_ranges = physical_ranges_for_stream_range(
+            &source,
+            neighbour.0 as u64,
+            neighbour.1 - neighbour.0,
+        );
+        assert!(
+            !overlaps_any(&actual, &neighbour_ranges),
+            "a read reached the sheet at {neighbour:?}"
+        );
+    }
+}
+
+#[test]
+fn worksheet_scan_byte_limit_is_a_read_fence() {
+    // `max_worksheet_scan_bytes` bounds the reads as well as the framing: no
+    // byte at or past `sheet.start + limit` is read. The limit is a record
+    // boundary past the first window, so it is reached through clamped fills,
+    // and the header that would prove the limit is crossed leaves fewer than
+    // four bytes of budget and is not read.
+    let bytes = ole_fixture("ConditionalFormattingSamples.xls");
+    let stream = workbook_stream(bytes.clone(), "Workbook");
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let probe = SourceBackedWorkbook::from_read_at(source).unwrap();
+    let region = selected_sheet_region(&probe, &stream, 1);
+    drop(probe);
+    let mut limit = 0;
+    while limit <= WORKSHEET_FIRST_WINDOW_BYTES {
+        let at = region.0 + limit;
+        limit += 4 + usize::from(u16::from_le_bytes([stream[at + 2], stream[at + 3]]));
+    }
+    let at = region.0 + limit;
+    let frame_len = 4 + usize::from(u16::from_le_bytes([stream[at + 2], stream[at + 3]]));
+    assert!(frame_len > 4, "the record at the limit has no payload");
+
+    let source = Arc::new(CountingSource::new(bytes));
+    let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(limit as u64);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let fence_ranges =
+        physical_ranges_for_stream_range(&source, at as u64, region.1 - region.0 - limit);
+    source.clear_ranges();
+    let result = owner.cell_value_by_index(1, 20, 4);
+    let actual = source.ranges();
+    assert!(
+        matches!(
+            result,
+            Err(SourceBackedError::ResourceLimit {
+                resource: "worksheet scan bytes",
+                observed,
+                maximum,
+            }) if observed == limit as u64 + 4 && maximum == limit as u64
+        ),
+        "{result:?}"
+    );
+    assert!(
+        !overlaps_any(&actual, &fence_ranges),
+        "a read reached the byte fence"
+    );
+    assert_worksheet_window(&source, region, &[], &actual);
+}
+
+#[test]
+fn worksheet_byte_limit_below_one_header_reports_the_header_it_does_not_read() {
+    // With fewer than four bytes of budget the header cannot be read inside the
+    // fence, so the limit is reported against the four bytes it would have
+    // taken and the scan issues no read at all.
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(2);
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    source.clear_ranges();
+    let result = owner.cell_value_by_index(0, 0, 0);
+    assert!(
+        matches!(
+            result,
+            Err(SourceBackedError::ResourceLimit {
+                resource: "worksheet scan bytes",
+                observed: 4,
+                maximum: 2,
+            })
+        ),
+        "{result:?}"
+    );
+    assert_eq!(source.bytes_read(), 0, "the refused header was read");
+}
+
+#[test]
+fn mini_stream_worksheet_scan_reads_each_byte_at_most_once() {
+    // A Workbook stream below the 4,096-byte CFB cutoff lives in the mini
+    // stream, so the worksheet fills run through the MiniFAT reader rather than
+    // the FAT one.
+    let bytes = ole_fixture("SimpleWithColours.xls");
+    let stream = workbook_stream(bytes.clone(), "Workbook");
+    assert!(stream.len() < 4_096);
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &stream, 0);
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&stream));
+    source.clear_ranges();
+    let value = owner.cell_value_by_index(0, 0, 0).unwrap();
+    let actual = source.ranges();
+
+    assert_eq!(
+        value,
+        Some(CellValue::String("I'm plain".to_string())),
+        "the mini-stream fixture's first cell changed"
+    );
+    assert_worksheet_window(&source, region, &globals_ranges, &actual);
+}
+
+#[test]
+fn opaque_heavy_worksheet_falls_back_to_exact_fills() {
+    // 200 near-maximum opaque records raise the mean framed bytes per record
+    // far past the density bound. Their payloads are skipped rather than
+    // framed, so a window that reads ahead over them spends bytes without
+    // saving reads; above the bound each fill covers only what the current
+    // record needs and the scan stays at one four-byte header per record.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut opaque = Vec::new();
+    for _ in 0..200 {
+        opaque.extend_from_slice(&frame_bytes(0x1234, &[0xA5; 8_224]));
+    }
+    let modified = insert_before_worksheet_eof(&original, &opaque);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &modified, 0);
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&modified));
+    source.clear_ranges();
+    let value = owner.cell_value_by_index(0, 0, 0).unwrap();
+    let actual = source.ranges();
+
+    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let expected = eager
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .map(CellTrait::value);
+    assert_eq!(value.as_ref(), expected);
+
+    assert!(reads_are_disjoint(&actual), "two reads share a byte");
+    let mut allowed =
+        physical_ranges_for_stream_range(&source, region.0 as u64, region.1 - region.0);
+    allowed.extend_from_slice(&globals_ranges);
+    assert!(
+        spans_cover(&merged_spans(&allowed), &actual),
+        "a read left the selected sheet's validated region"
+    );
+    // One header per record plus the windows taken before the running mean
+    // crossed the bound, which is the ceiling the opaque corpus gate states:
+    // today's bytes plus one window.
+    let read_bytes: usize = actual.iter().map(|(_, length)| *length).sum();
+    let ceiling = 4 * (actual.len() + 1) + WORKSHEET_MAX_WINDOW_BYTES;
+    assert!(
+        read_bytes <= ceiling,
+        "{read_bytes} bytes read, ceiling {ceiling}"
+    );
+    let exact = actual.iter().filter(|(_, length)| *length == 4).count();
+    assert!(
+        exact >= 150,
+        "only {exact} of {} reads covered one header",
+        actual.len()
+    );
+}
+
+#[test]
+fn a_real_worksheet_scan_stays_on_the_windowed_path() {
+    // No XLS fixture in `test-data` frames a mean of more than 1 KiB per
+    // record, so the density bound never binds on a real workbook and the fills
+    // follow the doubling schedule unbroken. This sheet frames 46,843 bytes in
+    // 177 records and its region is one contiguous physical run, so each fill is
+    // one read and the recorded sizes are the schedule itself.
+    let bytes = ole_fixture("ConditionalFormattingSamples.xls");
+    let stream = workbook_stream(bytes.clone(), "Workbook");
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &stream, 1);
+    let (records, framed) = worksheet_frame_totals(&stream, region);
+    assert!(
+        framed / records < WORKSHEET_DENSE_FRAME_BYTES,
+        "{framed} bytes over {records} records is not below the density bound"
+    );
+    assert_eq!(
+        physical_ranges_for_stream_range(&source, region.0 as u64, region.1 - region.0).len(),
+        1,
+        "the selected sheet is no longer one contiguous physical run"
+    );
+    source.clear_ranges();
+    assert!(owner.cell_value_by_index(1, 20, 4).unwrap().is_none());
+    let actual = source.ranges();
+
+    let mut expected = WORKSHEET_FIRST_WINDOW_BYTES;
+    for (index, (_, length)) in actual.iter().enumerate() {
+        if index + 1 < actual.len() {
+            assert_eq!(*length, expected, "fill {index} left the doubling schedule");
+        } else {
+            assert!(
+                *length <= expected,
+                "the last fill of {length} bytes exceeds its window"
+            );
+        }
+        expected = (expected * 2).min(WORKSHEET_MAX_WINDOW_BYTES);
+    }
+    assert_worksheet_window(&source, region, &[], &actual);
+}
+
+#[test]
+fn worksheet_density_gate_releases_when_the_running_mean_falls() {
+    // The density bound is re-evaluated for every fill against the running
+    // mean, so it is not a latch: a sheet whose mean rises past the bound and
+    // then falls back below it takes exact fills in between and returns to
+    // window fills afterwards. Ten near-maximum opaque records raise the mean,
+    // and the empty records after them bring it back down.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut mixed = Vec::new();
+    for _ in 0..10 {
+        mixed.extend_from_slice(&frame_bytes(0x1234, &[0xA5; 8_224]));
+    }
+    let dense_bytes = mixed.len();
+    for _ in 0..120 {
+        mixed.extend_from_slice(&frame_bytes(0x1234, &[]));
+    }
+    let sparse_bytes = mixed.len() - dense_bytes;
+    let inserted = worksheet_eof_offset(&original, first_sheet_offset(&original));
+    let modified = insert_before_worksheet_eof(&original, &mixed);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &modified, 0);
+    let dense_ranges = physical_ranges_for_stream_range(&source, inserted as u64, dense_bytes);
+    let sparse_ranges =
+        physical_ranges_for_stream_range(&source, (inserted + dense_bytes) as u64, sparse_bytes);
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&modified));
+    source.clear_ranges();
+    let value = owner.cell_value_by_index(0, 0, 0).unwrap();
+    let actual = source.ranges();
+
+    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let expected = eager
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .map(CellTrait::value);
+    assert_eq!(value.as_ref(), expected);
+    let exact = actual
+        .iter()
+        .filter(|(_, length)| *length == 4)
+        .copied()
+        .collect::<Vec<_>>();
+    assert!(
+        begins_inside(&exact, &dense_ranges),
+        "no exact fill was taken over the dense run"
+    );
+    let windowed = actual
+        .iter()
+        .filter(|(_, length)| *length > 4)
+        .copied()
+        .collect::<Vec<_>>();
+    assert!(
+        begins_inside(&windowed, &sparse_ranges),
+        "the window never returned after the running mean fell: {actual:?}"
+    );
+    let mut allowed =
+        physical_ranges_for_stream_range(&source, region.0 as u64, region.1 - region.0);
+    allowed.extend_from_slice(&globals_ranges);
+    assert!(reads_are_disjoint(&actual));
+    assert!(spans_cover(&merged_spans(&allowed), &actual));
+}
+
+#[test]
+fn worksheet_window_reads_the_sheet_slack_but_no_other_region() {
+    // A sheet's validated end is the next sheet's start, not its own EOF, so a
+    // fill can carry trailing bytes of the selected sheet's own region that a
+    // record-at-a-time scan never reached. The clamp is still exact: no byte of
+    // another sheet, of the globals, or past the stream is read.
+    let bytes = fixture("Simple.xls");
+    let stream = workbook_stream(bytes.clone(), "Workbook");
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let region = selected_sheet_region(&owner, &stream, 2);
+    let eof_end = worksheet_eof_offset(&stream, region.0) + 4;
+    assert!(
+        region.1 - eof_end > WORKSHEET_FIRST_WINDOW_BYTES,
+        "the selected sheet has no trailing slack"
+    );
+    let slack_ranges =
+        physical_ranges_for_stream_range(&source, eof_end as u64, region.1 - eof_end);
+    let globals_ranges = physical_ranges_for_stream_range(&source, 0, global_end_offset(&stream));
+    let earlier = workbook_sheet_regions(&stream)[0];
+    let earlier_ranges =
+        physical_ranges_for_stream_range(&source, earlier.0 as u64, earlier.1 - earlier.0);
+    source.clear_ranges();
+    owner.cell_value_by_index(2, 0, 0).unwrap();
+    let actual = source.ranges();
+
+    assert!(
+        overlaps_any(&actual, &slack_ranges),
+        "no fill reached the selected sheet's trailing slack"
+    );
+    assert!(
+        !overlaps_any(&actual, &globals_ranges),
+        "a read reached the globals"
+    );
+    assert!(
+        !overlaps_any(&actual, &earlier_ranges),
+        "a read reached an unselected sheet"
+    );
+    assert_worksheet_window(&source, region, &[], &actual);
 }
 
 fn append_eager_text_cell(output: &mut String, value: &CellValue) {

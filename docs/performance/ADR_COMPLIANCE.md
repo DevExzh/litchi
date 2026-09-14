@@ -1,5 +1,58 @@
 # Performance optimization ADR-compliance matrix
 
+## 0571: the shape ADR 0010 already blessed, implemented rather than worked around
+
+[0571](0571-ooxml-prepared-source.md) adds an opaque prepared-source handle. ADR
+0010's 2026-08-08 amendment fixes the accepted shape as one classified immutable
+package snapshot consumed by exactly one adapter, and that is what this is: the
+handle owns one package, yields it through a consuming accessor, and is not
+cloneable, so a second adapter cannot receive the same snapshot. It stores the
+content type and never a format classification, and the mapping between them
+stays in the facade in one table shared by the catalog scan and the classifier,
+so a handle cannot disagree with the classification that produced it — which is
+ADR 0010's requirement that the coordinator own that mapping. No archive type,
+physical identifier, lock or executor reaches the public surface, and the facade
+gained no archive dependency. ADR 0011 holds because the type lives in
+`litchi-opc`, reuses its existing constructor, adds no parser and no ZIP code,
+and leaves `soapberry-zip` unchanged; constructing the handle does no I/O at all.
+The typed wrong-format error is within boundary because ADR 0010's decision
+section already assigns the coordinator the content-type-to-format mapping, and
+the format type already lives in the same crate as the error. No ADR exception is
+requested.
+
+## 0570: unchanged ownership, and an error identity deliberately preserved
+
+[0570](0570-cfb-fat-run-batching.md) changes only `litchi-cfb`, which owns the
+container grammar. The compliance point worth recording is a refusal: the
+existing batching helper would have been the obvious reuse, but it
+position-checks only the first sector of a run and then clamps, so a run whose
+later sector begins past the end of the file would be silently zero-filled where
+the old path raised a typed error. Reusing it would have traded an error identity
+for a smaller diff, so it was left untouched and a bounded run reader added
+instead. Every validation keeps its position and its identity, allocation stays
+fallible, and the scratch is bounded by a named constant. No ADR exception is
+needed.
+
+## 0569: a recommendation withdrawn, not an exception requested
+
+[0569](0569-ooxml-detect-then-open-priced.md) changes no production code. It
+withdraws a recommendation this program made in change 0567 after measuring it,
+and records that the advice would have cost callers information the neutral
+detector gives them. No ADR exception is requested and none is needed.
+
+## 0568: no ADR weakened; two test-level contracts replaced with stronger ones
+
+[0568](0568-xls-worksheet-window.md) changes only `litchi-xls`. The two payload
+contracts it replaces are unachievable under any coalescing scheme, because a
+record's kind is knowable only from its header and the header sits inside the
+window — the gap change 0325 named. Both replacements assert the strong form: no
+read begins inside a skipped or oversized payload, and the remainder past one
+window is never read. ADR 0005's bounded-resource requirement is met more tightly
+than before, because `max_worksheet_scan_bytes` becomes a true read fence rather
+than the old limit-plus-four. Cancellation keeps every check site, so the CPU
+interval is unchanged and only the I/O interval grows, for which the same owner
+has documented precedent at the same size. No ADR exception is requested.
+
 ## 0567: ownership confirmed, and the fix located within it
 
 [0567](0567-ooxml-single-index-per-open.md) changes no production code. It

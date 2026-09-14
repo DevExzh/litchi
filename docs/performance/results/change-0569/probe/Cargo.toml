@@ -1,0 +1,20 @@
+[package]
+name = "detect-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "shapes"
+path = "src/bin/shapes.rs"
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+
+[dependencies]
+litchi = { path = "/home/zhuhe/code/litchi/crates/litchi", features = ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls", "odt", "ods", "odp", "rtf"] }
+litchi-core = { path = "/home/zhuhe/code/litchi/crates/litchi-core" }
+
+[profile.release]
+debug = 1

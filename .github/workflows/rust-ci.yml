@@ -353,7 +353,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run unit and integration tests
-        run: cargo test --workspace --all-features --lib --tests
+        # --no-fail-fast so one failing target does not hide the rest. cargo
+        # aborts after the first failing target by default, which silently skips
+        # every later test binary; a batch gate run in September 2026 found a
+        # facade integration failure that had been invisible for that reason.
+        run: cargo test --workspace --all-features --lib --tests --no-fail-fast
 
       - name: Run doc tests
         run: cargo test --workspace --all-features --doc

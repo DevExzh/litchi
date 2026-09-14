@@ -451,7 +451,7 @@ fn matching_original_hint_reuses_exact_bytes_without_extra_budget_work() {
 
 #[test]
 fn equal_version_foreign_lineage_falls_back_to_current_original() {
-    let version = SourceVersion::new(0x464f_5245_4947_4e, 7);
+    let version = SourceVersion::new(0x0046_4f52_4549_474e, 7);
     let (first, first_budget, _first_cancellation) = managed_package(
         Arc::new(FixedVersionSource::new(
             archive_bytes(FORMATTED_DOCUMENT),

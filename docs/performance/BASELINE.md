@@ -1,5 +1,11 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Changes 0568-0571: worksheet, container and OOXML open baselines
+
+The [0568 packet](results/change-0568/README.md) re-establishes the source-backed XLS baseline after change 0565 — open and list at 53 logical reads, one-cell at 319 — and records the post-change counterparts, 53 and 61. It also measures this host's same-binary noise floor **in the same quiet window as the result**: p50 4.10%, mean 4.60%, p95 7.33%, p99 13.70%, with zero A/A review triggers. That is the figure against which the batch's single p99 trigger should be read. Quiescence was verified before the run rather than assumed: the pinned core at 99.67% idle and a one-minute load average of 3.21, reached after waiting 340 seconds.
+
+The [0570 packet](results/change-0570/README.md) establishes per-file container open read and byte counts for all 98 CFB fixtures, before and after. The [0571 packet](results/change-0571/README.md) establishes archive-construction and package-read counts for a detect-then-open sequence in three OOXML formats.
+
 ## Change 0567: OOXML archive-construction counts established
 
 The [0567 packet](results/change-0567/README.md) establishes that one library-level OOXML open builds exactly one `IndexedArchive`, for DOCX, PPTX and XLSX, leaf and facade, under two feature sets. It retains a re-derivation of that result from traces change 0562 already published, plus the resolved stack showing that the repeated 840-byte read those traces contain is the dynamic loader rather than a package member. Per-construction byte counts for the end-of-central-directory record and the central directory are recorded for three fixtures.

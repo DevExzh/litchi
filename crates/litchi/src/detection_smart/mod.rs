@@ -76,7 +76,17 @@ pub(crate) fn catalog_probe_limits(
     )
 }
 
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub use detected::PreparedDetection;
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub use detected::detect_format_smart_with_limits;
 pub use detected::{DetectedFormat, detect_format_smart};
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub use functions::{detect_and_prepare, detect_and_prepare_with_limits};
 pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};
