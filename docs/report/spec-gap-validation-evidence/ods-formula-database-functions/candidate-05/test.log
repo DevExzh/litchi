@@ -1,0 +1,72 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 7.05s
+     Running tests/ods_formula_database_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_evaluation-803b39d1abe9e97a)
+
+running 15 tests
+test a_unique_empty_text_header_is_selectable_without_treating_an_empty_cell_header_as_text ... ok
+test criteria_text_preserves_leading_and_trailing_whitespace ... ok
+test database_formula_errors_propagate_and_selected_error_is_not_a_number ... ok
+test criteria_rows_are_or_and_fields_in_each_row_are_and ... FAILED
+test dcount_and_dcounta_support_omitted_fields ... ok
+test successful_dget_number_cannot_be_used_as_a_reference_operand ... ok
+test dget_converts_empty_logical_numeric_text_and_rejects_bad_text ... ok
+test numeric_field_selectors_use_position_even_with_duplicate_non_text_and_empty_headers ... ok
+test iferror_can_return_a_reference_union_when_dget_fails ... ok
+test numeric_criteria_headers_and_duplicate_criteria_columns_form_an_and_bound ... ok
+test field_selection_is_case_insensitive_one_based_and_type_aware ... ok
+test dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero ... FAILED
+test empty_database_selection_uses_profiled_zero_sum_extrema_and_unit_product ... ok
+test reference_database_runs_all_twelve_functions ... FAILED
+test rectangular_inline_database_and_criteria_cover_the_same_numeric_family ... ok
+
+failures:
+
+---- criteria_rows_are_or_and_fields_in_each_row_are_and stdout ----
+
+thread 'criteria_rows_are_or_and_fields_in_each_row_are_and' (1603480) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:383:18:
+"=DSUM([.A1:.E8];\"Amount\";[.U1:.U2])": expected Number(90), got Error(NotAvailable)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero stdout ----
+
+thread 'dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero' (1603485) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:383:18:
+"=DGET([.A1:.E8];\"Score\";[.S1:.S2])": expected Number(7), got Error(NotAvailable)
+
+---- reference_database_runs_all_twelve_functions stdout ----
+
+thread 'reference_database_runs_all_twelve_functions' (1603492) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:378:13:
+"=DSTDEV([.A1:.E8];\"Amount\";[.G1:.H3])": expected 14.142135623730951, got 10.000000000000002
+
+
+failures:
+    criteria_rows_are_or_and_fields_in_each_row_are_and
+    dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero
+    reference_database_runs_all_twelve_functions
+
+test result: FAILED. 12 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_database_evaluation`
+     Running tests/ods_formula_database_limits.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_limits-cbdd995ed03bad94)
+
+running 7 tests
+test database_provider_cancellation_stops_mid_scan_and_releases_memory ... ok
+test owned_dget_number_survives_source_and_resolver_drop ... ok
+test unselected_database_branch_is_lazy_and_does_not_read_the_provider ... ok
+test projected_scalar_database_result_is_cached_and_broadcast_with_shape ... ok
+test database_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test database_reference_read_admission_is_cumulative_and_atomic ... ok
+test dget_avoids_unrelated_record_fields_when_the_projection_does_not_need_them ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_numerics.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_numerics-ce416b78f71b0a1a)
+
+running 3 tests
+test database_product_retains_exponent_until_final_result ... ok
+test database_sum_and_mean_preserve_finite_cancellation_and_extreme_scale ... ok
+test database_statistics_keep_finite_standard_deviation_when_variance_overflows ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p litchi-ods --test ods_formula_database_evaluation`

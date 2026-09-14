@@ -123,6 +123,7 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // private here gives the future VM one place to preserve Empty until the
 // consuming operator/function chooses a target type.
 mod complex;
+mod database;
 #[allow(dead_code)]
 mod geometry;
 mod matrix;
@@ -2467,6 +2468,13 @@ where
         if let Some(function) = Self::matrix_function(name) {
             return self.visit_matrix_function(node, function);
         }
+        if database::is_database_function(name)
+            && node.child_count() != 3
+            && !(node.child_count() == 2
+                && (name.eq_ignore_ascii_case("DCOUNT") || name.eq_ignore_ascii_case("DCOUNTA")))
+        {
+            return self.push_scalar(WorkingValue::Error(ScalarError::Value));
+        }
         if name.eq_ignore_ascii_case("IF") {
             let count = node.child_count();
             if !(1..=3).contains(&count) {
@@ -2498,7 +2506,8 @@ where
         // its first evaluation.
         let is_sequence = name.eq_ignore_ascii_case("AND")
             || name.eq_ignore_ascii_case("OR")
-            || complex::is_complex_sequence_function(name);
+            || complex::is_complex_sequence_function(name)
+            || database::is_database_function(name);
         if self.projection.is_some() && is_sequence && self.cacheable_scalar_branch(node)? {
             if let Some(value) = self.demand_cache_get(node)? {
                 return self.push_value(value);
@@ -2518,8 +2527,13 @@ where
             // In a projected lazy matrix branch, a complex sequence consumes
             // the complete array/reference argument. Enter matrix context so
             // an inline array is not reduced to the one selected cell.
-            let frame = if self.projection.is_some() && complex::is_complex_sequence_function(name)
-            {
+            let frame = if database::is_database_function(name) {
+                if index == 1 && node.child_count() == 3 {
+                    ValueFrame::VisitScalarArgument(child)
+                } else {
+                    ValueFrame::VisitMatrixArgument(child)
+                }
+            } else if self.projection.is_some() && complex::is_complex_sequence_function(name) {
                 ValueFrame::VisitMatrixArgument(child)
             } else {
                 ValueFrame::VisitArgument(child)
@@ -2980,6 +2994,20 @@ where
             // evaluated once and indexed for every subsequent demand.
             super::Kind::Function { .. } if Self::matrix_function_node(node) => {
                 self.cacheable_matrix_branch(node)
+            },
+            super::Kind::Function { name } if database::is_database_function(name) => {
+                for index in 0..node.child_count() {
+                    self.scalar.charge_work(1)?;
+                    let Some(child) = node.child(index) else {
+                        return Ok(false);
+                    };
+                    if !self.cacheable_sequence_operand(child)?
+                        && !self.cacheable_matrix_branch(child)?
+                    {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
             },
             super::Kind::Function { name }
                 if name.eq_ignore_ascii_case("AND")
@@ -3667,8 +3695,10 @@ where
                         continue;
                     }
                     if let super::Kind::Function { name } = node.kind() {
-                        if complex::is_complex_sequence_function(name) {
-                            // IMSUM and IMPRODUCT reduce their complete
+                        if complex::is_complex_sequence_function(name)
+                            || database::is_database_function(name)
+                        {
+                            // Database functions, IMSUM and IMPRODUCT reduce their complete
                             // sequence arguments to one scalar value. Do not
                             // let an array/reference child widen the result
                             // shape during a projected lazy-branch probe.
@@ -4571,7 +4601,11 @@ where
                     let mut kind = ReferenceOperandKind::Scalar;
                     for _ in 0..count {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
-                        if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
+                        if name.eq_ignore_ascii_case("AND")
+                            || name.eq_ignore_ascii_case("OR")
+                            || complex::is_complex_sequence_function(name)
+                            || database::is_database_function(name)
+                        {
                             continue;
                         }
                         kind = match (kind, Self::reference_kind_value_into_kind(child)) {
@@ -6024,6 +6058,20 @@ where
             arguments.push(self.pop_value()?);
         }
         arguments.reverse();
+
+        if database::is_database_function(name) {
+            let cacheable = self.projection.is_some() && self.cacheable_scalar_branch(node)?;
+            if cacheable {
+                if let Some(value) = self.demand_cache_get(node)? {
+                    return self.push_value(value);
+                }
+            }
+            let value = database::apply(self, name, arguments)?;
+            if cacheable {
+                self.demand_cache_put(node, &value)?;
+            }
+            return self.push_value(value);
+        }
 
         if complex::is_complex_sequence_function(name) {
             let cacheable_sequence =

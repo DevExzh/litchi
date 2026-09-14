@@ -1,0 +1,37 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error: unused variable: `field`
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:485:43
+    |
+485 |                 let matcher = if let Some(field) = field {
+    |                                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_field`
+    |
+    = note: `-D unused-variables` implied by `-D unused`
+    = help: to override `-D unused` add `#[allow(unused_variables)]`
+
+error: field `0` is never read
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:285:13
+    |
+285 |     Complex(Complex),
+    |     ------- ^^^^^^^
+    |     |
+    |     field in this variant
+    |
+    = note: `DbCell` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `-D dead-code` implied by `-D unused`
+    = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+    |
+285 -     Complex(Complex),
+285 +     Complex(()),
+    |
+
+error: method `columns` is never used
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:389:8
+    |
+347 | impl<'source, 'expr> DatabasePlan<'source, 'expr> {
+    | ------------------------------------------------- method in this implementation
+...
+389 |     fn columns(&self) -> usize {
+    |        ^^^^^^^
+
+error: could not compile `litchi-ods` (lib) due to 3 previous errors
