@@ -1,0 +1,66 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 6.89s
+     Running tests/ods_formula_database_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_evaluation-803b39d1abe9e97a)
+
+running 7 tests
+test database_formula_errors_propagate_and_selected_error_is_not_a_number ... FAILED
+test criteria_rows_are_or_and_fields_in_each_row_are_and ... FAILED
+test dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero ... FAILED
+test dcount_and_dcounta_support_omitted_fields ... FAILED
+test reference_database_runs_all_twelve_functions ... FAILED
+test rectangular_inline_database_and_criteria_cover_the_same_numeric_family ... FAILED
+test field_selection_is_case_insensitive_one_based_and_type_aware ... FAILED
+
+failures:
+
+---- database_formula_errors_propagate_and_selected_error_is_not_a_number stdout ----
+
+thread 'database_formula_errors_propagate_and_selected_error_is_not_a_number' (1570482) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:487:33:
+"=DSUM(#N/A;\"Amount\";[.G1:.H2])" should evaluate: ODS formula evaluation profile does not implement this function
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- criteria_rows_are_or_and_fields_in_each_row_are_and stdout ----
+
+thread 'criteria_rows_are_or_and_fields_in_each_row_are_and' (1570481) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:413:37:
+"=DCOUNT([.A1:.E8];\"Amount\";[.G1:.H2])" should evaluate: ODS formula evaluation profile does not implement this function
+
+---- dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero stdout ----
+
+thread 'dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero' (1570484) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:452:33:
+"=DGET([.A1:.E8];\"Amount\";[.J1:.K2])" should evaluate: ODS formula evaluation profile does not implement this function
+
+---- dcount_and_dcounta_support_omitted_fields stdout ----
+
+thread 'dcount_and_dcounta_support_omitted_fields' (1570483) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:439:37:
+"=DCOUNT([.A1:.E8];;[.G1:.H3])" should evaluate: ODS formula evaluation profile does not implement this function
+
+---- reference_database_runs_all_twelve_functions stdout ----
+
+thread 'reference_database_runs_all_twelve_functions' (1570487) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:306:37:
+"=DAVERAGE([.A1:.E8];\"Amount\";[.G1:.H3])" should evaluate: ODS formula evaluation profile does not implement this function
+
+---- rectangular_inline_database_and_criteria_cover_the_same_numeric_family stdout ----
+
+thread 'rectangular_inline_database_and_criteria_cover_the_same_numeric_family' (1570486) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:346:37:
+"=DAVERAGE({\"Name\";\"Region\";\"Amount\";\"Score\";\"Active\"|\"Alice\";\"East\";10;1;TRUE()|\"Bob\";\"West\";20;2;FALSE()|\"Carol\";\"East\";30;3;TRUE()|\"Dave\";\"East\";\"n/a\";4;TRUE()};\"Amount\";{\"Region\";\"Active\"|\"East\";TRUE()})" should evaluate: ODS formula evaluation profile does not implement this function
+
+---- field_selection_is_case_insensitive_one_based_and_type_aware stdout ----
+
+thread 'field_selection_is_case_insensitive_one_based_and_type_aware' (1570485) panicked at crates/litchi-ods/tests/ods_formula_database_evaluation.rs:374:37:
+"=DSUM([.A1:.E8];\"amount\";[.G1:.H3])" should evaluate: ODS formula evaluation profile does not implement this function
+
+
+failures:
+    criteria_rows_are_or_and_fields_in_each_row_are_and
+    database_formula_errors_propagate_and_selected_error_is_not_a_number
+    dcount_and_dcounta_support_omitted_fields
+    dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero
+    field_selection_is_case_insensitive_one_based_and_type_aware
+    rectangular_inline_database_and_criteria_cover_the_same_numeric_family
+    reference_database_runs_all_twelve_functions
+
+test result: FAILED. 0 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_database_evaluation`
+error: 1 target failed:
+    `-p litchi-ods --test ods_formula_database_evaluation`
