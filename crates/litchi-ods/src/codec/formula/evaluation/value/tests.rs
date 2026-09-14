@@ -160,3 +160,8 @@ fn shape_planner_retains_mask_capacity_reservation_across_reuse() {
         "dropping the VM must release retained planner reservations"
     );
 }
+
+#[test]
+fn demand_cache_entry_has_a_bounded_inline_footprint() {
+    assert!(size_of::<super::DemandCacheEntry>() <= 32);
+}

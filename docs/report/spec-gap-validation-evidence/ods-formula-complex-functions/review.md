@@ -44,3 +44,9 @@ This matches the observed delta but remains a layout inference without a
 private-type size probe. No frame/reservation-ownership change was found on
 that path. The harness lockfile is retained directly as well as in the exact
 build archive, so the documented locked build can be replayed from Git.
+
+Subsequent actual-type probes corrected that layout inference: both the
+original Complex cache and a suffix-specific prototype use 32-byte entries.
+The +16-byte sample difference corresponds to two allocated entries, not one
+40-byte entry. The prototype had no measured memory benefit and was removed;
+its exact evidence remains under performance/cache-10.
