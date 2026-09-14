@@ -1,0 +1,87 @@
+== request counts (route = package_then_adopt except exact/native) ==
+scenario                    fixture                        members  desc  exact/native  exact/adopt  fs(4096)  fs(64K)
+docx_open_full_text         docx-comment                        10    10            15           15         4        4
+docx_open_full_text         docx-endnotes                       16     0            13           13         5        3
+docx_open_full_text         docx-test-comment                   17     0            13           13         5        3
+pptx_open_middle_slide_text pptx-shape-glow-effect              17     0            19           19         5        3
+pptx_open_middle_slide_text pptx-shapes                         48     0            49           49        14        3
+pptx_open_middle_slide_text pptx-shape-soft-edges               65    65            87           87        30        4
+xlsx_open_cell_a1           xlsx-sheet-names                    13     0            40           40         6        3
+xlsx_open_cell_a1           xlsx-universal-content              13    13            58           58         8        4
+xlsx_open_cell_a1           xlsx-conditional-formatting        132     0           354          354        77       49
+xlsx_open_cell_a1           xlsx-simple-normal                  12     0            40           40         4        3
+xlsx_open_cell_a1           xlsx-pivot-sample                   27     0            86           86        15        3
+
+== requested bytes and open/read phase split (zero delay) ==
+fixture                           size  exact  open  read    bytes  fs4k  open    bytes  fs64k  open    bytes    amp
+docx-comment                      4926     15    12     3     2114     4     4     5809      4     4     6639  1.35x
+docx-endnotes                    13553     13    11     2     3571     5     4    13375      3     3    14640  1.08x
+docx-test-comment                65298     13    11     2     3336     5     4    13451      3     3    66461  1.02x
+pptx-shape-glow-effect           13691     19    17     2     4254     5     5    13531      3     3    14934  1.09x
+pptx-shapes                      68822     49    47     2    10830    14    13    52880      3     3    69264  1.01x
+pptx-shape-soft-edges            50092     87    84     3    13152    30    29   115753      4     4    61085  1.22x
+xlsx-sheet-names                  9425     40    11    29     5537     6     3    17282      3     3    10323  1.10x
+xlsx-universal-content            7296     58    18    40     4398     8     5    20873      4     4     9501  1.30x
+xlsx-conditional-formatting     654688    354    89   265    35252    77    41   308776     49    39  2953536  4.51x
+xlsx-simple-normal                8871     40    11    29     5831     4     3     8019      3     3     9687  1.09x
+xlsx-pivot-sample                19460     86    25    61    11706    15     6    52251      3     3    21509  1.11x
+
+== gate: control (native leaf exact == two-step adopt exact) ==
+  PASS  docx_open_full_text         docx-comment                  ae651a09698a3ba4 vs ae651a09698a3ba4
+  PASS  docx_open_full_text         docx-endnotes                 b2289b929a0669c8 vs b2289b929a0669c8
+  PASS  docx_open_full_text         docx-test-comment             9e59a834c9b9e758 vs 9e59a834c9b9e758
+  PASS  pptx_open_middle_slide_text pptx-shape-glow-effect        b0eaa150a6138cca vs b0eaa150a6138cca
+  PASS  pptx_open_middle_slide_text pptx-shapes                   1e71ea98251c4a97 vs 1e71ea98251c4a97
+  PASS  pptx_open_middle_slide_text pptx-shape-soft-edges         e0a191e3d3551f19 vs e0a191e3d3551f19
+  PASS  xlsx_open_cell_a1           xlsx-sheet-names              a28e8f803dc4d38e vs a28e8f803dc4d38e
+  PASS  xlsx_open_cell_a1           xlsx-universal-content        2298f79923ed1660 vs 2298f79923ed1660
+  PASS  xlsx_open_cell_a1           xlsx-conditional-formatting   dc338b8ca81b0a7f vs dc338b8ca81b0a7f
+  PASS  xlsx_open_cell_a1           xlsx-simple-normal            b0f4a4a939cc467c vs b0f4a4a939cc467c
+  PASS  xlsx_open_cell_a1           xlsx-pivot-sample             70ad9f9209119a9b vs 70ad9f9209119a9b
+
+== gate: determinism across transports (same policy/route) ==
+  arms checked: 44   divergent: 0
+
+== gate: attribution (exact policy, native leaf, zero delay) ==
+fixture                         reqs  eocd   cd  probe  lhdr  lvar  payl  desc  GAP pastEOF     bytes
+docx-comment                      15     1    2      4     0     0     4     4    0       0      2114
+docx-endnotes                     13     1    2      5     0     0     5     0    0       0      3571
+docx-test-comment                 13     1    2      5     0     0     5     0    0       0      3336
+pptx-shape-glow-effect            19     1    2      8     0     0     8     0    0       0      4254
+pptx-shapes                       49     1    2     23     0     0    23     0    0       0     10830
+pptx-shape-soft-edges             87     1    2     28     0     0    28    28    0       0     13152
+xlsx-sheet-names                  40     1    2     18     0    13     6     0    0       0      5537
+xlsx-universal-content            58     1    2     18     0    13     6    18    0       0      4398
+xlsx-conditional-formatting      354     1    2    175     0   132    44     0    0       0     35252
+xlsx-simple-normal                40     1    2     18     0    12     7     0    0       0      5831
+xlsx-pivot-sample                 86     1    2     41     0    27    15     0    0       0     11706
+
+== strict-layout proof: longest run of consecutive local-record probes ==
+fixture                         mem  sweep  probes  desc  frame distinct   asc        idx   bytes  ofTotal  next request
+docx-comment                     10      2       1     1      0        1  True       5..6      46    13.3%  #7 off=41 len=217 payload 0
+docx-endnotes                    16      1       1     0      0        1  True       3..3      30     7.7%  #4 off=569 len=404 payload 0
+docx-test-comment                17      1       1     0      0        1  True       3..3      30     7.7%  #4 off=569 len=395 payload 0
+pptx-shape-glow-effect           17      1       1     0      0        1  True       3..3      30     5.3%  #4 off=569 len=389 payload 0
+pptx-shapes                      48      1       1     0      0        1  True       3..3      30     2.0%  #4 off=569 len=489 payload 0
+pptx-shape-soft-edges            65      2       1     1      0        1  True       5..6      46     2.3%  #7 off=41 len=232 payload 0
+xlsx-sheet-names                 13     26      13     0     13       13  True     11..36    2478    65.0%  #37 off=4050 len=352 payload 7
+xlsx-universal-content           13     40      13    14     13       13  True     17..56     877    69.0%  #57 off=2272 len=969 payload 5
+xlsx-conditional-formatting     132    264     132     0    132      132  True    89..352   10740    74.6%  #353 off=106935 len=1251 payload 19
+xlsx-simple-normal               12     24      12     0     12       12  True     11..34    2412    60.0%  #35 off=5818 len=493 payload 7
+xlsx-pivot-sample                27     54      27     0     27       27  True     25..78    3405    62.8%  #79 off=3350 len=804 payload 4
+
+== delayed-transport wall clock, medians over 5 repeats (ms) ==
+scenario                    fixture                            exact  fs(4096)   fs(64K)  exact/req
+docx_open_full_text         docx-comment                       16.07      4.44      4.45     1.071ms
+docx_open_full_text         docx-endnotes                      14.73      6.24      4.26     1.133ms
+docx_open_full_text         docx-test-comment                  14.57      6.09      4.56     1.120ms
+pptx_open_middle_slide_text pptx-shape-glow-effect             20.23      5.47      3.44     1.065ms
+pptx_open_middle_slide_text pptx-shapes                        52.25     15.26      4.16     1.066ms
+pptx_open_middle_slide_text pptx-shape-soft-edges              93.64     33.18      6.12     1.076ms
+xlsx_open_cell_a1           xlsx-sheet-names                   42.45      6.50      3.39     1.061ms
+xlsx_open_cell_a1           xlsx-universal-content             61.53      8.68      4.50     1.061ms
+xlsx_open_cell_a1           xlsx-conditional-formatting       375.14     82.85     81.24     1.060ms
+xlsx_open_cell_a1           xlsx-simple-normal                 42.55      4.49      3.51     1.064ms
+xlsx_open_cell_a1           xlsx-pivot-sample                  91.93     16.90      4.37     1.069ms
+
+wrote /tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0572/summaryA.json

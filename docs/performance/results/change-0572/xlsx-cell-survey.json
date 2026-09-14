@@ -1,0 +1,758 @@
+{
+ "schema_version": 1,
+ "record_kind": "litchi-perf-0572-xlsx-cell-survey",
+ "library_revision": "163ac1bd67f2a0d72c27bfec60e0a2620768cc9d",
+ "note": "every .xlsx fixture directly under test-data/ooxml/xlsx driven through the same open-then-cell(\"A1\") scenario with the exact policy and the zero-delay transport, one repeat. Recorded because two of the three fixtures the frozen plan names refuse this scenario, and the record should say how common that is rather than leave it to the reader.",
+ "fixtures_surveyed": 93,
+ "outcome_counts": {
+  "refused_merge_cells_before_sheet_data": 10,
+  "completed": 82,
+  "refused_other": 1
+ },
+ "fixtures": [
+  {
+   "fixture": "ConditionalFormattingSamples",
+   "path": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+   "requests": 354,
+   "open_requests": 89,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Home\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "CustomXMLMappings-complex-type",
+   "path": "test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx",
+   "requests": 62,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Foglio1\" a1=Missing"
+  },
+  {
+   "fixture": "CustomXMLMappings",
+   "path": "test-data/ooxml/xlsx/CustomXMLMappings.xlsx",
+   "requests": 50,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Foglio1\" a1=Stored(Value(Text(\"ro\")))"
+  },
+  {
+   "fixture": "CustomXmlMappings-inverse-order",
+   "path": "test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx",
+   "requests": 50,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Foglio1\" a1=Stored(Value(Text(\"ro\")))"
+  },
+  {
+   "fixture": "DataValidationEvaluations",
+   "path": "test-data/ooxml/xlsx/DataValidationEvaluations.xlsx",
+   "requests": 52,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Data Validation Tests\")))"
+  },
+  {
+   "fixture": "DataValidationListTooLong",
+   "path": "test-data/ooxml/xlsx/DataValidationListTooLong.xlsx",
+   "requests": 34,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet0\" a1=Stored(Value(Text(\"testing\")))"
+  },
+  {
+   "fixture": "DateFormatNumberTests",
+   "path": "test-data/ooxml/xlsx/DateFormatNumberTests.xlsx",
+   "requests": 42,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Flags\" a1=Stored(Value(Text(\"Flag Name\")))"
+  },
+  {
+   "fixture": "DateFormatTests",
+   "path": "test-data/ooxml/xlsx/DateFormatTests.xlsx",
+   "requests": 42,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Flags\" a1=Stored(Value(Text(\"Flag Name\")))"
+  },
+  {
+   "fixture": "ExcelPivotTableSample",
+   "path": "test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx",
+   "requests": 86,
+   "open_requests": 25,
+   "outcome": "completed",
+   "observation": "sheet0=\"Tabelle1\" a1=Stored(Value(Text(\"Field1\")))"
+  },
+  {
+   "fixture": "ExcelTables",
+   "path": "test-data/ooxml/xlsx/ExcelTables.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"ExcelTable\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "FormatChoiceTests",
+   "path": "test-data/ooxml/xlsx/FormatChoiceTests.xlsx",
+   "requests": 44,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Flags\" a1=Stored(Value(Text(\"Flag Name\")))"
+  },
+  {
+   "fixture": "FormatConditionTests",
+   "path": "test-data/ooxml/xlsx/FormatConditionTests.xlsx",
+   "requests": 42,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Flags\" a1=Stored(Value(Text(\"Flag Name\")))"
+  },
+  {
+   "fixture": "Formatting",
+   "path": "test-data/ooxml/xlsx/Formatting.xlsx",
+   "requests": 42,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Dates, all 24th November 2006\")))"
+  },
+  {
+   "fixture": "HeaderFooterComplexFormats",
+   "path": "test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx",
+   "requests": 42,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "InlineString",
+   "path": "test-data/ooxml/xlsx/InlineString.xlsx",
+   "requests": 34,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"\ud83d\ude1cmore text\")))"
+  },
+  {
+   "fixture": "InlineStrings",
+   "path": "test-data/ooxml/xlsx/InlineStrings.xlsx",
+   "requests": 50,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Numbers\")))"
+  },
+  {
+   "fixture": "MatrixFormulaEvalTestData",
+   "path": "test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx",
+   "requests": 40,
+   "open_requests": 13,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Sheet1\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "NewStyleConditionalFormattings",
+   "path": "test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"CF\" a1=Stored(Value(Text(\"Values\")))"
+  },
+  {
+   "fixture": "NewlineInFormulas",
+   "path": "test-data/ooxml/xlsx/NewlineInFormulas.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Formula(Formula { text: \"SUM(\\r\\n1,2\\r\\n)\", kind: Scalar, cached:"
+  },
+  {
+   "fixture": "Pivot1_Row",
+   "path": "test-data/ooxml/xlsx/Pivot1_Row.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot1_Row_Grand",
+   "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot1_Row_Grand_Subtotals",
+   "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row_Compact",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row_Grand",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row_Grand_Subtotals",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row_Subtotals",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot2_Row_Subtotals_SortDescendingAll",
+   "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot3_Column_Grand_Subtotals",
+   "path": "test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "Pivot4_Column_Grand_Subtotals_SortDescending",
+   "path": "test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx",
+   "requests": 56,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Name\")))"
+  },
+  {
+   "fixture": "SimpleMultiCell",
+   "path": "test-data/ooxml/xlsx/SimpleMultiCell.xlsx",
+   "requests": 36,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"1\"))))"
+  },
+  {
+   "fixture": "SimpleNormal",
+   "path": "test-data/ooxml/xlsx/SimpleNormal.xlsx",
+   "requests": 40,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"test\")))"
+  },
+  {
+   "fixture": "SimpleScatterChart",
+   "path": "test-data/ooxml/xlsx/SimpleScatterChart.xlsx",
+   "requests": 78,
+   "open_requests": 23,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"X\")))"
+  },
+  {
+   "fixture": "SimpleStrict",
+   "path": "test-data/ooxml/xlsx/SimpleStrict.xlsx",
+   "requests": 40,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"test\")))"
+  },
+  {
+   "fixture": "SimpleWithComments",
+   "path": "test-data/ooxml/xlsx/SimpleWithComments.xlsx",
+   "requests": 48,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"1\"))))"
+  },
+  {
+   "fixture": "SingleCellTable",
+   "path": "test-data/ooxml/xlsx/SingleCellTable.xlsx",
+   "requests": 40,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "Sparklines",
+   "path": "test-data/ooxml/xlsx/Sparklines.xlsx",
+   "requests": 36,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "StructuredReferences",
+   "path": "test-data/ooxml/xlsx/StructuredReferences.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Formulas\" a1=Stored(Formula(Formula { text: \"SUM(\\\\_Prime.1[calc='#*'#])\", kind: Scal"
+  },
+  {
+   "fixture": "StructuredRefs-lots-with-lookups",
+   "path": "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx",
+   "requests": 108,
+   "open_requests": 31,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Profile\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "Tables",
+   "path": "test-data/ooxml/xlsx/Tables.xlsx",
+   "requests": 128,
+   "open_requests": 35,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Exp1\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "TablesWithDifferentHeaders",
+   "path": "test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx",
+   "requests": 58,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"IntHeaders\" a1=Stored(Value(Text(\"12\")))"
+  },
+  {
+   "fixture": "TextColor",
+   "path": "test-data/ooxml/xlsx/TextColor.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "TwoSheetsNoneHidden",
+   "path": "test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Sheet1A1\")))"
+  },
+  {
+   "fixture": "TwoSheetsOneHidden",
+   "path": "test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Sheet1A1\")))"
+  },
+  {
+   "fixture": "autofilter-colors-fg",
+   "path": "test-data/ooxml/xlsx/autofilter-colors-fg.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Background\")))"
+  },
+  {
+   "fixture": "autofilter-colors",
+   "path": "test-data/ooxml/xlsx/autofilter-colors.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Background\")))"
+  },
+  {
+   "fixture": "autofilter",
+   "path": "test-data/ooxml/xlsx/autofilter.xlsx",
+   "requests": 61,
+   "open_requests": 18,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"column1\")))"
+  },
+  {
+   "fixture": "autofilternamedrange",
+   "path": "test-data/ooxml/xlsx/autofilternamedrange.xlsx",
+   "requests": 40,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"A\")))"
+  },
+  {
+   "fixture": "cell-borders",
+   "path": "test-data/ooxml/xlsx/cell-borders.xlsx",
+   "requests": 66,
+   "open_requests": 19,
+   "outcome": "completed",
+   "observation": "sheet0=\"Borders\" a1=Missing"
+  },
+  {
+   "fixture": "cell-multi-line",
+   "path": "test-data/ooxml/xlsx/cell-multi-line.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Hoja1\" a1=Stored(Value(Text(\"Line1\\r\\nLine2\\r\\nLine3\")))"
+  },
+  {
+   "fixture": "chart_hyperlink",
+   "path": "test-data/ooxml/xlsx/chart_hyperlink.xlsx",
+   "requests": 74,
+   "open_requests": 21,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"1\"))))"
+  },
+  {
+   "fixture": "column_style",
+   "path": "test-data/ooxml/xlsx/column_style.xlsx",
+   "requests": 46,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "condFormat_cellis",
+   "path": "test-data/ooxml/xlsx/condFormat_cellis.xlsx",
+   "requests": 40,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"2\"))))"
+  },
+  {
+   "fixture": "condformat_databar",
+   "path": "test-data/ooxml/xlsx/condformat_databar.xlsx",
+   "requests": 32,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Hoja1\" a1=Missing"
+  },
+  {
+   "fixture": "condformat_theme_color",
+   "path": "test-data/ooxml/xlsx/condformat_theme_color.xlsx",
+   "requests": 34,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"databar\" a1=Stored(Value(Number(Number(\"1\"))))"
+  },
+  {
+   "fixture": "conditional_fmt_checkpriority",
+   "path": "test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"ABC\")))"
+  },
+  {
+   "fixture": "conditional_fmt_origin",
+   "path": "test-data/ooxml/xlsx/conditional_fmt_origin.xlsx",
+   "requests": 42,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "conditional_formatting_multiple_ranges",
+   "path": "test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "customxml",
+   "path": "test-data/ooxml/xlsx/customxml.xlsx",
+   "requests": 74,
+   "open_requests": 15,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Sheet1\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "decimal-format",
+   "path": "test-data/ooxml/xlsx/decimal-format.xlsx",
+   "requests": 52,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"1.005\"))))"
+  },
+  {
+   "fixture": "duplicate-defined-names",
+   "path": "test-data/ooxml/xlsx/duplicate-defined-names.xlsx",
+   "requests": 49,
+   "open_requests": 15,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Sheet1 (2)\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "empty",
+   "path": "test-data/ooxml/xlsx/empty.xlsx",
+   "requests": 34,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"11\"))))"
+  },
+  {
+   "fixture": "enhanced-protection",
+   "path": "test-data/ooxml/xlsx/enhanced-protection.xlsx",
+   "requests": 36,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"locked\")))"
+  },
+  {
+   "fixture": "external-cache-multi-letter-column",
+   "path": "test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx",
+   "requests": 130,
+   "open_requests": 39,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"\u041b\u0438\u0441\u04421\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "external-link-path-missing",
+   "path": "test-data/ooxml/xlsx/external-link-path-missing.xlsx",
+   "requests": 64,
+   "open_requests": 19,
+   "outcome": "completed",
+   "observation": "sheet0=\"Munka1\" a1=Stored(Value(Text(\" \")))"
+  },
+  {
+   "fixture": "external-link-path-startup",
+   "path": "test-data/ooxml/xlsx/external-link-path-startup.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Invoice_sample\" a1=Stored(Value(Text(\"CUSTNUMBER,INVOICENUMBER,INVOICEDATE,PACK,SIZE,UPC,DE"
+  },
+  {
+   "fixture": "fontSize",
+   "path": "test-data/ooxml/xlsx/fontSize.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "formats",
+   "path": "test-data/ooxml/xlsx/formats.xlsx",
+   "requests": 58,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"2\"))))"
+  },
+  {
+   "fixture": "headerFooterTest",
+   "path": "test-data/ooxml/xlsx/headerFooterTest.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"abc\")))"
+  },
+  {
+   "fixture": "hyperlink",
+   "path": "test-data/ooxml/xlsx/hyperlink.xlsx",
+   "requests": 44,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "hyperlink_export",
+   "path": "test-data/ooxml/xlsx/hyperlink_export.xlsx",
+   "requests": 42,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Munka1\" a1=Stored(Value(Text(\"C:\\\\TEMP\\\\test.xlsx#Munka1!A5\")))"
+  },
+  {
+   "fixture": "hyperlink_formula",
+   "path": "test-data/ooxml/xlsx/hyperlink_formula.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Munka1\" a1=Stored(Value(Text(\"formula\")))"
+  },
+  {
+   "fixture": "hyperlinks",
+   "path": "test-data/ooxml/xlsx/hyperlinks.xlsx",
+   "requests": 44,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Error\" a1=Stored(Value(Text(\"Key\")))"
+  },
+  {
+   "fixture": "named-ranges-global",
+   "path": "test-data/ooxml/xlsx/named-ranges-global.xlsx",
+   "requests": 49,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"1\"))))"
+  },
+  {
+   "fixture": "named-ranges-hidden",
+   "path": "test-data/ooxml/xlsx/named-ranges-hidden.xlsx",
+   "requests": 36,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Planilha1\" a1=Stored(Value(Text(\"This file has 2 named ranges\")))"
+  },
+  {
+   "fixture": "noSharedStringTable",
+   "path": "test-data/ooxml/xlsx/noSharedStringTable.xlsx",
+   "requests": 34,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Number(Number(\"38819\"))))"
+  },
+  {
+   "fixture": "sample",
+   "path": "test-data/ooxml/xlsx/sample.xlsx",
+   "requests": 60,
+   "open_requests": 17,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Lorem\")))"
+  },
+  {
+   "fixture": "shared-strings-malformed-count",
+   "path": "test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx",
+   "requests": 59,
+   "open_requests": 15,
+   "outcome": "refused_other",
+   "observation": "sheet0=\"Sheet1\" REFUSED: Invalid(\"shared-string count exceeds 2147483647\")"
+  },
+  {
+   "fixture": "shared_formulas",
+   "path": "test-data/ooxml/xlsx/shared_formulas.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Label\" a1=Stored(Value(Text(\"Currently Using\")))"
+  },
+  {
+   "fixture": "sharedhyperlink",
+   "path": "test-data/ooxml/xlsx/sharedhyperlink.xlsx",
+   "requests": 42,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Hoja1\" a1=Stored(Value(Text(\"http://www.apache.org\")))"
+  },
+  {
+   "fixture": "sheet-names",
+   "path": "test-data/ooxml/xlsx/sheet-names.xlsx",
+   "requests": 40,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"S&P\" a1=Missing"
+  },
+  {
+   "fixture": "sheet-state-show",
+   "path": "test-data/ooxml/xlsx/sheet-state-show.xlsx",
+   "requests": 46,
+   "open_requests": 11,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"\u0441\u0442\u04401\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "sheet-tab-color",
+   "path": "test-data/ooxml/xlsx/sheet-tab-color.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Green\" a1=Missing"
+  },
+  {
+   "fixture": "sheetProtection_allLocked",
+   "path": "test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx",
+   "requests": 36,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Foglio1\" a1=Missing"
+  },
+  {
+   "fixture": "sheetProtection_not_protected",
+   "path": "test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx",
+   "requests": 40,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"locked cell\")))"
+  },
+  {
+   "fixture": "sortconditionref",
+   "path": "test-data/ooxml/xlsx/sortconditionref.xlsx",
+   "requests": 38,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"consumos\" a1=Missing"
+  },
+  {
+   "fixture": "sortconditionref2",
+   "path": "test-data/ooxml/xlsx/sortconditionref2.xlsx",
+   "requests": 54,
+   "open_requests": 15,
+   "outcome": "completed",
+   "observation": "sheet0=\"Tabelle1\" a1=Missing"
+  },
+  {
+   "fixture": "style-alternate-content",
+   "path": "test-data/ooxml/xlsx/style-alternate-content.xlsx",
+   "requests": 32,
+   "open_requests": 11,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Sheet2\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  },
+  {
+   "fixture": "styles",
+   "path": "test-data/ooxml/xlsx/styles.xlsx",
+   "requests": 42,
+   "open_requests": 11,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Lorem\")))"
+  },
+  {
+   "fixture": "table-sample",
+   "path": "test-data/ooxml/xlsx/table-sample.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Tabelle1\" a1=Missing"
+  },
+  {
+   "fixture": "tableStyle",
+   "path": "test-data/ooxml/xlsx/tableStyle.xlsx",
+   "requests": 48,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Missing"
+  },
+  {
+   "fixture": "test_conditional_formatting",
+   "path": "test-data/ooxml/xlsx/test_conditional_formatting.xlsx",
+   "requests": 46,
+   "open_requests": 13,
+   "outcome": "completed",
+   "observation": "sheet0=\"Sheet1\" a1=Stored(Value(Text(\"Fooo\")))"
+  },
+  {
+   "fixture": "universal-content",
+   "path": "test-data/ooxml/xlsx/universal-content.xlsx",
+   "requests": 58,
+   "open_requests": 18,
+   "outcome": "refused_merge_cells_before_sheet_data",
+   "observation": "sheet0=\"Sheet1\" REFUSED: Invalid(\"worksheet mergeCells appears before sheetData\")"
+  }
+ ]
+}

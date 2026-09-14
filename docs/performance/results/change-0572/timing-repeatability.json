@@ -1,0 +1,743 @@
+{
+ "schema_version": 1,
+ "record_kind": "litchi-perf-0572-timing-repeatability",
+ "note": "two independent captures of the whole matrix, run minutes apart on a host carrying unrelated load. The request counts are identical arm for arm; the delayed-transport medians agree within the maximum below. The transport is sleep-dominated, which is why an eight-deep load average on a 32-core host does not move it.",
+ "capture_a": {
+  "loadavg_before": "7.88 14.70 9.49 6/1964 3272072",
+  "loadavg_after": "7.43 14.38 9.44 5/1924 3273128"
+ },
+ "capture_b": {
+  "loadavg_before": "7.21 14.11 9.40 5/1926 3273941",
+  "loadavg_after": "6.72 13.77 9.34 5/1792 3274381"
+ },
+ "max_absolute_percent_difference": 1.327,
+ "all_request_counts_identical": true,
+ "arms": [
+  {
+   "arm": "docx-comment|exact",
+   "requests": 15,
+   "requests_match": true,
+   "a_median_ns": 16067340,
+   "b_median_ns": 16055222,
+   "percent_difference": -0.075,
+   "a_elapsed_ns": [
+    16051861,
+    16065291,
+    16067340,
+    16075761,
+    16079211
+   ],
+   "b_elapsed_ns": [
+    16052893,
+    16054913,
+    16055222,
+    16061443,
+    16069612
+   ]
+  },
+  {
+   "arm": "docx-comment|forward_start(4096)",
+   "requests": 4,
+   "requests_match": true,
+   "a_median_ns": 4443392,
+   "b_median_ns": 4440912,
+   "percent_difference": -0.056,
+   "a_elapsed_ns": [
+    4423862,
+    4436582,
+    4443392,
+    4445362,
+    4478933
+   ],
+   "b_elapsed_ns": [
+    4437583,
+    4438733,
+    4440912,
+    4443303,
+    4453913
+   ]
+  },
+  {
+   "arm": "docx-comment|forward_start(65536)",
+   "requests": 4,
+   "requests_match": true,
+   "a_median_ns": 4451252,
+   "b_median_ns": 4438133,
+   "percent_difference": -0.295,
+   "a_elapsed_ns": [
+    4439553,
+    4449083,
+    4451252,
+    4456353,
+    4490862
+   ],
+   "b_elapsed_ns": [
+    4431403,
+    4436913,
+    4438133,
+    4438182,
+    4490263
+   ]
+  },
+  {
+   "arm": "docx-endnotes|exact",
+   "requests": 13,
+   "requests_match": true,
+   "a_median_ns": 14725024,
+   "b_median_ns": 14664575,
+   "percent_difference": -0.411,
+   "a_elapsed_ns": [
+    14672204,
+    14685804,
+    14725024,
+    14768034,
+    14796735
+   ],
+   "b_elapsed_ns": [
+    14607535,
+    14661705,
+    14664575,
+    14681986,
+    14692046
+   ]
+  },
+  {
+   "arm": "docx-endnotes|forward_start(4096)",
+   "requests": 5,
+   "requests_match": true,
+   "a_median_ns": 6242182,
+   "b_median_ns": 6219642,
+   "percent_difference": -0.361,
+   "a_elapsed_ns": [
+    6240401,
+    6240461,
+    6242182,
+    6243142,
+    6246021
+   ],
+   "b_elapsed_ns": [
+    6216632,
+    6218072,
+    6219642,
+    6224761,
+    6451684
+   ]
+  },
+  {
+   "arm": "docx-endnotes|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 4257031,
+   "b_median_ns": 4244041,
+   "percent_difference": -0.305,
+   "a_elapsed_ns": [
+    4227412,
+    4249861,
+    4257031,
+    4265681,
+    4325612
+   ],
+   "b_elapsed_ns": [
+    4203862,
+    4242992,
+    4244041,
+    4245232,
+    4252692
+   ]
+  },
+  {
+   "arm": "docx-test-comment|exact",
+   "requests": 13,
+   "requests_match": true,
+   "a_median_ns": 14565283,
+   "b_median_ns": 14488914,
+   "percent_difference": -0.524,
+   "a_elapsed_ns": [
+    14511723,
+    14528613,
+    14565283,
+    14573934,
+    14596444
+   ],
+   "b_elapsed_ns": [
+    14483394,
+    14487215,
+    14488914,
+    14489204,
+    14509275
+   ]
+  },
+  {
+   "arm": "docx-test-comment|forward_start(4096)",
+   "requests": 5,
+   "requests_match": true,
+   "a_median_ns": 6091041,
+   "b_median_ns": 6042531,
+   "percent_difference": -0.796,
+   "a_elapsed_ns": [
+    6044550,
+    6090901,
+    6091041,
+    6095291,
+    6192761
+   ],
+   "b_elapsed_ns": [
+    6035401,
+    6041301,
+    6042531,
+    6072851,
+    6073911
+   ]
+  },
+  {
+   "arm": "docx-test-comment|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 4557553,
+   "b_median_ns": 4537474,
+   "percent_difference": -0.441,
+   "a_elapsed_ns": [
+    4523573,
+    4555762,
+    4557553,
+    4558443,
+    4558673
+   ],
+   "b_elapsed_ns": [
+    4527443,
+    4534724,
+    4537474,
+    4539293,
+    4569653
+   ]
+  },
+  {
+   "arm": "pptx-shape-glow-effect|exact",
+   "requests": 19,
+   "requests_match": true,
+   "a_median_ns": 20231212,
+   "b_median_ns": 20185074,
+   "percent_difference": -0.228,
+   "a_elapsed_ns": [
+    20204882,
+    20212182,
+    20231212,
+    20233212,
+    20246402
+   ],
+   "b_elapsed_ns": [
+    20174504,
+    20183263,
+    20185074,
+    20204724,
+    20220294
+   ]
+  },
+  {
+   "arm": "pptx-shape-glow-effect|forward_start(4096)",
+   "requests": 5,
+   "requests_match": true,
+   "a_median_ns": 5466327,
+   "b_median_ns": 5417198,
+   "percent_difference": -0.899,
+   "a_elapsed_ns": [
+    5424187,
+    5424458,
+    5466327,
+    5483147,
+    5521698
+   ],
+   "b_elapsed_ns": [
+    5369377,
+    5415138,
+    5417198,
+    5423798,
+    5426028
+   ]
+  },
+  {
+   "arm": "pptx-shape-glow-effect|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 3438168,
+   "b_median_ns": 3425308,
+   "percent_difference": -0.374,
+   "a_elapsed_ns": [
+    3395757,
+    3433737,
+    3438168,
+    3438617,
+    3440317
+   ],
+   "b_elapsed_ns": [
+    3384007,
+    3422867,
+    3425308,
+    3425898,
+    3444878
+   ]
+  },
+  {
+   "arm": "pptx-shape-soft-edges|exact",
+   "requests": 87,
+   "requests_match": true,
+   "a_median_ns": 93644952,
+   "b_median_ns": 93322910,
+   "percent_difference": -0.344,
+   "a_elapsed_ns": [
+    93457851,
+    93519641,
+    93644952,
+    93662221,
+    93723892
+   ],
+   "b_elapsed_ns": [
+    93251589,
+    93303329,
+    93322910,
+    93393131,
+    93463881
+   ]
+  },
+  {
+   "arm": "pptx-shape-soft-edges|forward_start(4096)",
+   "requests": 30,
+   "requests_match": true,
+   "a_median_ns": 33183407,
+   "b_median_ns": 33227611,
+   "percent_difference": 0.133,
+   "a_elapsed_ns": [
+    33138687,
+    33172247,
+    33183407,
+    33193028,
+    33288997
+   ],
+   "b_elapsed_ns": [
+    33115730,
+    33142520,
+    33227611,
+    33294922,
+    33315742
+   ]
+  },
+  {
+   "arm": "pptx-shape-soft-edges|forward_start(65536)",
+   "requests": 4,
+   "requests_match": true,
+   "a_median_ns": 6116101,
+   "b_median_ns": 6081591,
+   "percent_difference": -0.564,
+   "a_elapsed_ns": [
+    6062050,
+    6113041,
+    6116101,
+    6121321,
+    6121621
+   ],
+   "b_elapsed_ns": [
+    6078872,
+    6079161,
+    6081591,
+    6090171,
+    6111511
+   ]
+  },
+  {
+   "arm": "pptx-shapes|exact",
+   "requests": 49,
+   "requests_match": true,
+   "a_median_ns": 52246773,
+   "b_median_ns": 52118978,
+   "percent_difference": -0.245,
+   "a_elapsed_ns": [
+    52204493,
+    52226003,
+    52246773,
+    52263694,
+    52313173
+   ],
+   "b_elapsed_ns": [
+    52082258,
+    52109728,
+    52118978,
+    52152369,
+    52176658
+   ]
+  },
+  {
+   "arm": "pptx-shapes|forward_start(4096)",
+   "requests": 14,
+   "requests_match": true,
+   "a_median_ns": 15259437,
+   "b_median_ns": 15162718,
+   "percent_difference": -0.634,
+   "a_elapsed_ns": [
+    15200747,
+    15214277,
+    15259437,
+    15290767,
+    15309027
+   ],
+   "b_elapsed_ns": [
+    15150478,
+    15162478,
+    15162718,
+    15163508,
+    15200758
+   ]
+  },
+  {
+   "arm": "pptx-shapes|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 4156001,
+   "b_median_ns": 4147052,
+   "percent_difference": -0.215,
+   "a_elapsed_ns": [
+    4146571,
+    4148751,
+    4156001,
+    4156041,
+    4193261
+   ],
+   "b_elapsed_ns": [
+    4139161,
+    4146691,
+    4147052,
+    4153911,
+    4154231
+   ]
+  },
+  {
+   "arm": "xlsx-conditional-formatting|exact",
+   "requests": 354,
+   "requests_match": true,
+   "a_median_ns": 375143829,
+   "b_median_ns": 375082758,
+   "percent_difference": -0.016,
+   "a_elapsed_ns": [
+    374947369,
+    375083229,
+    375143829,
+    375158479,
+    375175239
+   ],
+   "b_elapsed_ns": [
+    374954488,
+    375014298,
+    375082758,
+    375150179,
+    375230010
+   ]
+  },
+  {
+   "arm": "xlsx-conditional-formatting|forward_start(4096)",
+   "requests": 77,
+   "requests_match": true,
+   "a_median_ns": 82850157,
+   "b_median_ns": 82775549,
+   "percent_difference": -0.09,
+   "a_elapsed_ns": [
+    82811187,
+    82836628,
+    82850157,
+    83010258,
+    83140579
+   ],
+   "b_elapsed_ns": [
+    82544974,
+    82754286,
+    82775549,
+    82840706,
+    82865221
+   ]
+  },
+  {
+   "arm": "xlsx-conditional-formatting|forward_start(65536)",
+   "requests": 49,
+   "requests_match": true,
+   "a_median_ns": 81241649,
+   "b_median_ns": 80924590,
+   "percent_difference": -0.39,
+   "a_elapsed_ns": [
+    81163319,
+    81167819,
+    81241649,
+    81264479,
+    81482830
+   ],
+   "b_elapsed_ns": [
+    80893740,
+    80909980,
+    80924590,
+    80928920,
+    81047621
+   ]
+  },
+  {
+   "arm": "xlsx-pivot-sample|exact",
+   "requests": 86,
+   "requests_match": true,
+   "a_median_ns": 91926153,
+   "b_median_ns": 91908166,
+   "percent_difference": -0.02,
+   "a_elapsed_ns": [
+    91912423,
+    91921463,
+    91926153,
+    91940303,
+    91942613
+   ],
+   "b_elapsed_ns": [
+    91778906,
+    91846386,
+    91908166,
+    91983497,
+    92072656
+   ]
+  },
+  {
+   "arm": "xlsx-pivot-sample|forward_start(4096)",
+   "requests": 15,
+   "requests_match": true,
+   "a_median_ns": 16896345,
+   "b_median_ns": 16882825,
+   "percent_difference": -0.08,
+   "a_elapsed_ns": [
+    16872665,
+    16890285,
+    16896345,
+    16947555,
+    17017356
+   ],
+   "b_elapsed_ns": [
+    16870696,
+    16878586,
+    16882825,
+    16884806,
+    16917065
+   ]
+  },
+  {
+   "arm": "xlsx-pivot-sample|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 4374682,
+   "b_median_ns": 4360742,
+   "percent_difference": -0.319,
+   "a_elapsed_ns": [
+    4365072,
+    4370332,
+    4374682,
+    4381392,
+    4387292
+   ],
+   "b_elapsed_ns": [
+    4307572,
+    4316022,
+    4360742,
+    4366292,
+    4384232
+   ]
+  },
+  {
+   "arm": "xlsx-sheet-names|exact",
+   "requests": 40,
+   "requests_match": true,
+   "a_median_ns": 42445444,
+   "b_median_ns": 42504189,
+   "percent_difference": 0.138,
+   "a_elapsed_ns": [
+    42347733,
+    42383333,
+    42445444,
+    42469024,
+    42496354
+   ],
+   "b_elapsed_ns": [
+    42423018,
+    42472718,
+    42504189,
+    42509889,
+    42563119
+   ]
+  },
+  {
+   "arm": "xlsx-sheet-names|forward_start(4096)",
+   "requests": 6,
+   "requests_match": true,
+   "a_median_ns": 6502263,
+   "b_median_ns": 6466923,
+   "percent_difference": -0.544,
+   "a_elapsed_ns": [
+    6482442,
+    6486833,
+    6502263,
+    6504453,
+    6510012
+   ],
+   "b_elapsed_ns": [
+    6456033,
+    6464914,
+    6466923,
+    6469373,
+    6474303
+   ]
+  },
+  {
+   "arm": "xlsx-sheet-names|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 3393017,
+   "b_median_ns": 3386707,
+   "percent_difference": -0.186,
+   "a_elapsed_ns": [
+    3357087,
+    3392057,
+    3393017,
+    3393317,
+    3427047
+   ],
+   "b_elapsed_ns": [
+    3379047,
+    3385087,
+    3386707,
+    3388118,
+    3392108
+   ]
+  },
+  {
+   "arm": "xlsx-simple-normal|exact",
+   "requests": 40,
+   "requests_match": true,
+   "a_median_ns": 42554104,
+   "b_median_ns": 42588216,
+   "percent_difference": 0.08,
+   "a_elapsed_ns": [
+    42527875,
+    42554084,
+    42554104,
+    42555194,
+    42613735
+   ],
+   "b_elapsed_ns": [
+    42556326,
+    42577996,
+    42588216,
+    42690237,
+    42711266
+   ]
+  },
+  {
+   "arm": "xlsx-simple-normal|forward_start(4096)",
+   "requests": 4,
+   "requests_match": true,
+   "a_median_ns": 4486253,
+   "b_median_ns": 4487043,
+   "percent_difference": 0.018,
+   "a_elapsed_ns": [
+    4456012,
+    4478022,
+    4486253,
+    4490113,
+    4498533
+   ],
+   "b_elapsed_ns": [
+    4482893,
+    4486872,
+    4487043,
+    4493503,
+    4508233
+   ]
+  },
+  {
+   "arm": "xlsx-simple-normal|forward_start(65536)",
+   "requests": 3,
+   "requests_match": true,
+   "a_median_ns": 3511647,
+   "b_median_ns": 3503858,
+   "percent_difference": -0.222,
+   "a_elapsed_ns": [
+    3461778,
+    3510157,
+    3511647,
+    3513648,
+    3530828
+   ],
+   "b_elapsed_ns": [
+    3478857,
+    3498488,
+    3503858,
+    3511178,
+    3525598
+   ]
+  },
+  {
+   "arm": "xlsx-universal-content|exact",
+   "requests": 58,
+   "requests_match": true,
+   "a_median_ns": 61531790,
+   "b_median_ns": 61503056,
+   "percent_difference": -0.047,
+   "a_elapsed_ns": [
+    61512220,
+    61525140,
+    61531790,
+    61555420,
+    61570010
+   ],
+   "b_elapsed_ns": [
+    61441106,
+    61477227,
+    61503056,
+    61512556,
+    61575347
+   ]
+  },
+  {
+   "arm": "xlsx-universal-content|forward_start(4096)",
+   "requests": 8,
+   "requests_match": true,
+   "a_median_ns": 8682783,
+   "b_median_ns": 8609534,
+   "percent_difference": -0.844,
+   "a_elapsed_ns": [
+    8661604,
+    8662354,
+    8682783,
+    8697104,
+    8759194
+   ],
+   "b_elapsed_ns": [
+    8600024,
+    8605874,
+    8609534,
+    8621145,
+    8658905
+   ]
+  },
+  {
+   "arm": "xlsx-universal-content|forward_start(65536)",
+   "requests": 4,
+   "requests_match": true,
+   "a_median_ns": 4499143,
+   "b_median_ns": 4439443,
+   "percent_difference": -1.327,
+   "a_elapsed_ns": [
+    4449823,
+    4471072,
+    4499143,
+    4518073,
+    4527833
+   ],
+   "b_elapsed_ns": [
+    4435833,
+    4436933,
+    4439443,
+    4440353,
+    4444422
+   ]
+  }
+ ]
+}
