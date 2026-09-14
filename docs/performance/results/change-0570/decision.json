@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0570-cfb-fat-run-batching",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "contiguous_sector_runs_read_in_one_call",
+    "bytes_read_byte_identical",
+    "counted_read_tests_fail_without_the_change",
+    "existing_helper_deliberately_not_reused_to_preserve_error_identity"
+  ],
+  "accepted_evidence": {
+    "real_corpus": {"files": 98, "reads": [493, 463], "bytes": [276992, 276992], "files_improved": 5, "files_unchanged": 93},
+    "large_synthetic_corpus": {"cfb_structural_reads": [265, 8], "cfb_structural_bytes": [136704, 136704],
+      "note": "a 16,995,840-byte container; 257 reads removed from one open. The small-document corpus is the right one for how often this helps and the wrong one for how much."},
+    "peak_memory": {"before": "one sector", "after": "min(65536, longest contiguous run times sector size)"},
+    "latency": "no timing is claimed for the real corpus. On the large synthetic corpus this change is responsible for the whole of the measured open and list improvement, -7.40 to -13.23 percent p50 in both directions, because change 0568's worksheet component is zero for those selectors; measured with both changes in one binary and attributed by region."
+  },
+  "known_gaps": {
+    "difat_path": "the expected-FAT-sector-count mismatch is only reachable past the header's 109 DIFAT entries and no corpus fixture has any DIFAT sector, so that check stays as untested as it was; the DIFAT loop is unchanged",
+    "small_sector_multi_piece": "exercised through the MiniFAT loader rather than the FAT loader, because a 512-byte FAT run past the bound would need more FAT sectors than the header can express; both reach it through the same run reader"
+  },
+  "withheld": ["timing on the real corpus", "allocation profile", "cold cache", "physical device", "cross platform"]
+}

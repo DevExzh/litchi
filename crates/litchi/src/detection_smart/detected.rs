@@ -69,6 +69,51 @@ pub enum DetectedFormat {
     Rtf(Vec<u8>),
 }
 
+impl DetectedFormat {
+    /// The neutral classification this detection result carries.
+    ///
+    /// Detection already knows the format; this accessor lets an opener that
+    /// cannot handle the result say *which* format it declined instead of
+    /// discarding the classification and reporting only "not an Office file".
+    #[must_use]
+    pub const fn format(&self) -> litchi_core::detection::FileFormat {
+        use litchi_core::detection::FileFormat;
+
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(_) => FileFormat::Docx,
+            #[cfg(feature = "pptx")]
+            Self::Pptx(_) => FileFormat::Pptx,
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(_) => FileFormat::Xlsx,
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(_) => FileFormat::Xlsb,
+            #[cfg(feature = "doc")]
+            Self::Doc(_) => FileFormat::Doc,
+            #[cfg(feature = "ppt")]
+            Self::Ppt(_) => FileFormat::Ppt,
+            #[cfg(feature = "xls")]
+            Self::Xls(_) => FileFormat::Xls,
+            #[cfg(feature = "pages")]
+            Self::Pages(_) => FileFormat::Pages,
+            #[cfg(feature = "keynote")]
+            Self::Keynote(_) => FileFormat::Keynote,
+            #[cfg(feature = "numbers")]
+            Self::Numbers(_) => FileFormat::Numbers,
+            #[cfg(feature = "odt")]
+            Self::Odt(_) => FileFormat::Odt,
+            #[cfg(feature = "odp")]
+            Self::Odp(_) => FileFormat::Odp,
+            #[cfg(feature = "ods")]
+            Self::Ods(_) => FileFormat::Ods,
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            Self::FlatOdf(format, _) => *format,
+            #[cfg(feature = "rtf")]
+            Self::Rtf(_) => FileFormat::Rtf,
+        }
+    }
+}
+
 impl std::fmt::Debug for DetectedFormat {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match self {
@@ -241,6 +286,10 @@ pub(crate) fn detect_prepared_ods(
     bytes: Vec<u8>,
 ) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[allow(
+        clippy::needless_return,
+        reason = "the two feature-gated bodies are alternatives; without the return the second block would follow the first"
+    )]
     {
         return match detect_prepared_ods_with_limits(bytes, crate::opc::ReadLimits::default()) {
             Ok(result) => result,
@@ -3238,6 +3287,412 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
         #[cfg(feature = "xlsb")]
         FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
         _ => None,
+    }
+}
+
+/// One path classification that may carry the OOXML package the classification
+/// used.
+///
+/// Produced by [`crate::detection_smart::detect_and_prepare`]. The neutral
+/// format is always present; the prepared handle is present only for an OOXML
+/// package, because only OOXML has an adopter that can reuse a prepared index.
+/// A legacy OLE2, OpenDocument, RTF or iWork input is still classified and
+/// reported, with [`Self::prepared`] returning `None`.
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub struct PreparedDetection {
+    format: litchi_core::detection::FileFormat,
+    prepared: Option<crate::opc::PreparedOoxmlSource>,
+}
+
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+impl std::fmt::Debug for PreparedDetection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PreparedDetection")
+            .field("format", &self.format)
+            .field("prepared", &self.prepared.is_some())
+            .finish()
+    }
+}
+
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+impl PreparedDetection {
+    /// A classification with no reusable package.
+    fn unprepared(format: litchi_core::detection::FileFormat) -> Self {
+        Self {
+            format,
+            prepared: None,
+        }
+    }
+
+    /// The neutral classification, identical to
+    /// [`detect_file_format`](crate::detection_smart::detect_file_format).
+    #[must_use]
+    pub const fn format(&self) -> litchi_core::detection::FileFormat {
+        self.format
+    }
+
+    /// Whether an OOXML package was prepared and can be adopted without a
+    /// second container index.
+    #[must_use]
+    pub const fn is_prepared(&self) -> bool {
+        self.prepared.is_some()
+    }
+
+    /// Borrow the prepared OOXML package handle, if there is one.
+    #[must_use]
+    pub fn prepared(&self) -> Option<&crate::opc::PreparedOoxmlSource> {
+        self.prepared.as_ref()
+    }
+
+    /// Take the prepared OOXML package handle, if there is one.
+    ///
+    /// Pass it to `Document::from_prepared`, `Presentation::from_prepared`, or
+    /// `Workbook::from_prepared`.
+    #[must_use]
+    pub fn into_prepared(self) -> Option<crate::opc::PreparedOoxmlSource> {
+        self.prepared
+    }
+
+    /// Split into the neutral classification and the prepared handle.
+    #[must_use]
+    pub fn into_parts(
+        self,
+    ) -> (
+        litchi_core::detection::FileFormat,
+        Option<crate::opc::PreparedOoxmlSource>,
+    ) {
+        (self.format, self.prepared)
+    }
+}
+
+/// Classify a filesystem path and retain the OOXML package the classification
+/// built, with an explicit OPC resource policy.
+///
+/// The classification is always the one
+/// [`detect_file_format`](crate::detection_smart::detect_file_format) reports:
+/// every path that cannot produce a prepared handle — a non-ZIP input, an
+/// ordinary OpenDocument package, a ZIP that is not a valid OPC package, an
+/// OPC package with no OOXML main part, or any bounded-read failure — defers
+/// to that detector and returns the format with no handle.
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub(crate) fn detect_and_prepare_path_with_limits(
+    path: &std::path::Path,
+    limits: crate::opc::ReadLimits,
+) -> Option<PreparedDetection> {
+    use litchi_core::ReadAt;
+
+    // Every early exit reports exactly what the neutral detector reports. The
+    // prepared handle is an optimization; it never changes a classification.
+    let unprepared = || super::detect_file_format(path).map(PreparedDetection::unprepared);
+
+    let Ok(file_source) = litchi_core::FileSource::open(path) else {
+        return None;
+    };
+    let source: std::sync::Arc<dyn ReadAt> = std::sync::Arc::new(file_source);
+    let Ok(source_version) = source.version() else {
+        return unprepared();
+    };
+
+    let mut signature = [0_u8; 4];
+    let Ok(read) = source.read_at(0, &mut signature) else {
+        return unprepared();
+    };
+    if read != signature.len()
+        || !litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        )
+    {
+        return unprepared();
+    }
+
+    let Ok(input_bytes) = source.len() else {
+        return unprepared();
+    };
+    if input_bytes > limits.max_input_bytes() {
+        return unprepared();
+    }
+
+    // Keep the reader path's container precedence: a validated ordinary
+    // OpenDocument package is never probed as OPC.
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    {
+        let catalog_limits = super::catalog_probe_limits(crate::opc::ReadLimits::default());
+        match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
+            Ok(Some(_odf_format)) => {
+                match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+                    source.as_ref(),
+                    catalog_limits,
+                ) {
+                    Ok(Some(false)) => return unprepared(),
+                    Ok(_) => {},
+                    Err(_error) => return unprepared(),
+                }
+            },
+            Ok(None) => {},
+            Err(_error) => return unprepared(),
+        }
+    }
+
+    if ensure_path_source_current(source.as_ref(), source_version).is_err() {
+        return unprepared();
+    }
+
+    #[cfg(test)]
+    super::record_opc_probe();
+    let Ok(package) = crate::opc::SourceBackedPackage::from_read_at_with_limits(
+        std::sync::Arc::clone(&source),
+        limits,
+    ) else {
+        return unprepared();
+    };
+
+    let classification = match super::ooxml::try_classify_ooxml_source_backed_package(&package) {
+        // The borrowed catalog spelling is copied here so the package can
+        // move into the prepared handle.
+        Ok(Some((format, content_type))) => (format, content_type.to_owned()),
+        Ok(None) | Err(_) => {
+            drop(package);
+            return unprepared();
+        },
+    };
+
+    if ensure_path_source_current(source.as_ref(), source_version).is_err() {
+        drop(package);
+        return unprepared();
+    }
+
+    let (format, content_type) = classification;
+    let Ok(prepared) = crate::opc::PreparedOoxmlSource::new(package, &content_type) else {
+        return unprepared();
+    };
+    Some(PreparedDetection {
+        format,
+        prepared: Some(prepared),
+    })
+}
+
+/// Evidence that one detect-and-prepare plus one adopt builds the container
+/// index exactly once, where detect-then-open builds it twice.
+#[cfg(all(
+    test,
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+mod prepared_index_tests {
+    use litchi_core::detection::FileFormat;
+
+    fn fixture(relative: &str) -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data")
+            .join(relative)
+    }
+
+    /// Archive constructions recorded while running `body`.
+    fn archive_constructions(body: impl FnOnce()) -> usize {
+        crate::detection_smart::reset_opc_probe_count();
+        body();
+        crate::detection_smart::opc_probe_count()
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn docx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
+        let path = fixture("ooxml/docx/comment.docx");
+
+        let two_call = archive_constructions(|| {
+            assert_eq!(
+                crate::detection_smart::detect_file_format(&path),
+                Some(FileFormat::Docx)
+            );
+            crate::Document::open(&path).expect("open");
+        });
+
+        let single_call = archive_constructions(|| {
+            let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+            assert_eq!(detected.format(), FileFormat::Docx);
+            let prepared = detected.into_prepared().expect("prepared handle");
+            crate::Document::from_prepared(prepared).expect("adopt");
+        });
+
+        assert_eq!(
+            two_call, 2,
+            "detect-then-open must index the container twice"
+        );
+        assert_eq!(
+            single_call, 1,
+            "detect-and-prepare plus adopt must index the container once"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "pptx")]
+    fn pptx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
+        let path = fixture("ooxml/pptx/shapes.pptx");
+
+        let two_call = archive_constructions(|| {
+            assert_eq!(
+                crate::detection_smart::detect_file_format(&path),
+                Some(FileFormat::Pptx)
+            );
+            crate::Presentation::open(&path).expect("open");
+        });
+
+        let single_call = archive_constructions(|| {
+            let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+            assert_eq!(detected.format(), FileFormat::Pptx);
+            let prepared = detected.into_prepared().expect("prepared handle");
+            crate::Presentation::from_prepared(prepared).expect("adopt");
+        });
+
+        assert_eq!(
+            two_call, 2,
+            "detect-then-open must index the container twice"
+        );
+        assert_eq!(
+            single_call, 1,
+            "detect-and-prepare plus adopt must index the container once"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "xlsx")]
+    fn xlsx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
+        let path = fixture("ooxml/xlsx/styles.xlsx");
+
+        let two_call = archive_constructions(|| {
+            assert_eq!(
+                crate::detection_smart::detect_file_format(&path),
+                Some(FileFormat::Xlsx)
+            );
+            crate::sheet::Workbook::open(&path).expect("open");
+        });
+
+        let single_call = archive_constructions(|| {
+            let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+            assert_eq!(detected.format(), FileFormat::Xlsx);
+            let prepared = detected.into_prepared().expect("prepared handle");
+            crate::sheet::Workbook::from_prepared(prepared).expect("adopt");
+        });
+
+        assert_eq!(
+            two_call, 2,
+            "detect-then-open must index the container twice"
+        );
+        assert_eq!(
+            single_call, 1,
+            "detect-and-prepare plus adopt must index the container once"
+        );
+    }
+
+    /// A non-OOXML input keeps its classification and receives no handle.
+    #[test]
+    fn non_ooxml_inputs_are_still_classified_without_a_prepared_handle() {
+        let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
+        #[cfg(feature = "doc")]
+        cases.push((fixture("ole/doc/NoHeadFoot.doc"), FileFormat::Doc));
+        #[cfg(feature = "odt")]
+        cases.push((
+            fixture("odf/corpus/writer-paragraph-styles.odt"),
+            FileFormat::Odt,
+        ));
+        #[cfg(feature = "odp")]
+        cases.push((fixture("odf/corpus/impress-basic.odp"), FileFormat::Odp));
+        #[cfg(feature = "ods")]
+        cases.push((fixture("odf/corpus/calc-formulas.ods"), FileFormat::Ods));
+
+        for (path, expected) in cases {
+            let detected = crate::detection_smart::detect_and_prepare(&path)
+                .unwrap_or_else(|| panic!("{} should be classified", path.display()));
+            assert_eq!(detected.format(), expected, "{}", path.display());
+            assert!(
+                !detected.is_prepared(),
+                "{} must not carry an OOXML handle",
+                path.display()
+            );
+            assert_eq!(
+                crate::detection_smart::detect_file_format(&path),
+                Some(expected),
+                "{} must agree with the neutral detector",
+                path.display()
+            );
+        }
+    }
+
+    /// A file that is not an Office document is reported the same way by both
+    /// detectors.
+    #[test]
+    fn a_non_office_file_is_rejected_by_both_detectors() {
+        let path = fixture("images/png/lena.png");
+        assert!(crate::detection_smart::detect_file_format(&path).is_none());
+        assert!(crate::detection_smart::detect_and_prepare(&path).is_none());
+    }
+
+    /// The prepared handle refuses a source rewritten between preparation and
+    /// adoption, matching the crate's source-version contract.
+    #[test]
+    #[cfg(feature = "docx")]
+    fn a_prepared_handle_refuses_a_source_rewritten_before_adoption() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("prepared.docx");
+        let docx = std::fs::read(fixture("ooxml/docx/comment.docx")).expect("fixture");
+        std::fs::write(&path, &docx).expect("write fixture");
+
+        let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+        assert_eq!(detected.format(), FileFormat::Docx);
+        let prepared = detected.into_prepared().expect("prepared handle");
+
+        // Rewrite the file under the handle. `FileSource` derives its revision
+        // from length and modification time, so a different payload is a
+        // different revision.
+        let mut rewritten = docx.clone();
+        rewritten.extend_from_slice(b"trailing bytes that change the length");
+        std::fs::write(&path, &rewritten).expect("rewrite fixture");
+
+        let Err(error) = crate::Document::from_prepared(prepared) else {
+            panic!("adoption must refuse a source rewritten after preparation");
+        };
+        assert!(
+            matches!(error, litchi_core::Error::SourceChanged { .. }),
+            "{error:?}"
+        );
+    }
+
+    /// A prepared handle is refused by the wrong facade, and names the format
+    /// it actually carries.
+    #[test]
+    #[cfg(all(feature = "docx", feature = "pptx"))]
+    fn a_prepared_docx_handle_is_refused_by_the_presentation_opener() {
+        let path = fixture("ooxml/docx/comment.docx");
+        let prepared = crate::detection_smart::detect_and_prepare(&path)
+            .expect("detect")
+            .into_prepared()
+            .expect("prepared handle");
+        let Err(error) = crate::Presentation::from_prepared(prepared) else {
+            panic!("a DOCX handle must be refused by the presentation opener");
+        };
+        assert!(
+            matches!(
+                error,
+                litchi_core::Error::UnexpectedFormat {
+                    detected: FileFormat::Docx
+                }
+            ),
+            "{error:?}"
+        );
     }
 }
 

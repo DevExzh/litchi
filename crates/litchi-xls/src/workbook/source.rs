@@ -68,6 +68,13 @@ const GLOBALS_EXACT_PROLOGUE_RECORDS: usize = 4;
 const GLOBALS_FIRST_WINDOW_BYTES: u64 = 512;
 /// Upper bound the window fill size doubles to.
 const GLOBALS_MAX_WINDOW_BYTES: u64 = 64 * 1024;
+/// First window fill of a worksheet scan; one CFB sector.
+const WORKSHEET_FIRST_WINDOW_BYTES: u64 = 512;
+/// Upper bound the worksheet window fill size doubles to.
+const WORKSHEET_MAX_WINDOW_BYTES: u64 = 64 * 1024;
+/// Mean framed bytes per record at or below which a worksheet scan fills in
+/// windows; above it each fill covers only the bytes the current record needs.
+const WORKSHEET_DENSE_FRAME_BYTES: u64 = 1024;
 
 /// Limits for one source-backed XLS owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2063,13 +2070,38 @@ struct WorksheetFrame {
     payload_len: usize,
 }
 
+/// Windowed reader over one worksheet substream.
+///
+/// The scan keeps stream bytes `[window_start, window_start + window.len())`
+/// resident and holds the cursor at the end of that range, so one fill serves
+/// the headers and payloads of the records it covers. Every fill is clamped by
+/// `fill_bound`, which is the selected sheet's own validated end lowered by
+/// `max_worksheet_scan_bytes` measured from the sheet start, and fills start at
+/// `window_start + window.len()` and move forward only, so a byte is read from
+/// the source at most once. A skipped payload that ends past the filled end is
+/// passed with `skip_forward`, which reads nothing.
+///
+/// The cursor is retained rather than replaced by `read_stream_range`: a
+/// worksheet substream starts deep in the Workbook stream, and the cursor keeps
+/// its allocation-chain position across fills instead of walking the chain from
+/// the first sector on every call.
 struct WorksheetScan<'a> {
     cursor: SharedOleStreamCursor<'a>,
     upper_bound: u64,
+    /// Highest stream offset any fill may reach.
+    fill_bound: u64,
+    /// Stream offset of the next byte the scan consumes.
+    position: u64,
+    /// Stream offset of `window[0]`.
+    window_start: u64,
+    window: Vec<u8>,
+    /// Size of the next window fill, before clamping.
+    target: u64,
     scanned_bytes: u64,
     scanned_records: usize,
     limits: SourceBackedLimits,
     execution: Option<&'a ExecutionContext>,
+    /// Recycled buffer for payloads a caller keeps across later frames.
     scratch: Vec<u8>,
 }
 
@@ -2088,6 +2120,16 @@ impl<'a> WorksheetScan<'a> {
         Ok(Self {
             cursor,
             upper_bound,
+            // `validate_sheet_offsets` runs at open, so `upper_bound` is the
+            // selected sheet's validated end before the scan begins and the
+            // clamp is exact from the first fill.
+            fill_bound: start
+                .saturating_add(limits.max_worksheet_scan_bytes)
+                .min(upper_bound),
+            position: start,
+            window_start: start,
+            window: Vec::new(),
+            target: WORKSHEET_FIRST_WINDOW_BYTES,
             scanned_bytes: 0,
             scanned_records: 0,
             limits,
@@ -2096,9 +2138,104 @@ impl<'a> WorksheetScan<'a> {
         })
     }
 
+    /// One past the last stream offset resident in the window, which is also
+    /// the cursor's position.
+    fn filled_end(&self) -> u64 {
+        self.window_start.saturating_add(self.window.len() as u64)
+    }
+
+    /// Whether the mean framed bytes per record framed so far exceeds the
+    /// density bound.
+    ///
+    /// A sheet of large records reads ahead more bytes per window than the
+    /// window saves in reads, because most of a large record is skipped rather
+    /// than framed. The mean is recomputed for every fill, so it is its own
+    /// hysteresis.
+    fn dense_frames(&self) -> bool {
+        self.scanned_records != 0
+            && self.scanned_bytes / self.scanned_records as u64 > WORKSHEET_DENSE_FRAME_BYTES
+    }
+
+    /// End offset of one fill.
+    ///
+    /// Never below `need_end`: every check that gates `need_end` has already
+    /// run against the sheet boundary and the byte limit, so a fill that
+    /// stopped short of `need_end` would not advance and the scan would not
+    /// terminate.
+    fn fill_end(&mut self, need_end: u64, filled_end: u64) -> u64 {
+        if self.dense_frames() {
+            self.target = WORKSHEET_FIRST_WINDOW_BYTES;
+            return need_end;
+        }
+        let end = filled_end
+            .saturating_add(self.target)
+            .clamp(need_end, self.fill_bound.max(need_end));
+        self.target = self
+            .target
+            .saturating_mul(2)
+            .min(WORKSHEET_MAX_WINDOW_BYTES);
+        end
+    }
+
+    /// Ensures stream bytes `[position, need_end)` are resident.
+    ///
+    /// Bytes already framed are dropped from the front, and one read appends
+    /// the fill to the retained tail. The tail is at most one record frame,
+    /// because a fill is issued only for bytes the current frame needs.
+    fn ensure(&mut self, need_end: u64) -> Result<()> {
+        let filled_end = self.filled_end();
+        if need_end <= filled_end {
+            return Ok(());
+        }
+        let framed = usize::try_from(self.position.saturating_sub(self.window_start))
+            .unwrap_or(usize::MAX)
+            .min(self.window.len());
+        if framed != 0 {
+            self.window.drain(..framed);
+            self.window_start = self.window_start.saturating_add(framed as u64);
+        }
+        let end = self.fill_end(need_end, filled_end);
+        let extra = usize::try_from(end.saturating_sub(filled_end)).map_err(|_error| {
+            SourceBackedError::ResourceLimit {
+                resource: "worksheet window address space",
+                observed: end,
+                maximum: usize::MAX as u64,
+            }
+        })?;
+        let resident = self.window.len();
+        self.window
+            .try_reserve_exact(extra)
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: "source-backed worksheet window",
+                requested: resident.saturating_add(extra) as u64,
+            })?;
+        self.window.resize(resident + extra, 0);
+        if let Err(error) = self.cursor.read_exact(&mut self.window[resident..]) {
+            // A failed read leaves the destination undefined, so the window
+            // keeps only the bytes earlier fills published.
+            self.window.truncate(resident);
+            return Err(SourceBackedError::from(error));
+        }
+        Ok(())
+    }
+
+    /// The four header bytes at the scan position, which `ensure` has made
+    /// resident.
+    fn frame_header(&self) -> [u8; 4] {
+        let at = usize::try_from(self.position.saturating_sub(self.window_start))
+            .unwrap_or(usize::MAX)
+            .min(self.window.len());
+        [
+            self.window[at],
+            self.window[at + 1],
+            self.window[at + 2],
+            self.window[at + 3],
+        ]
+    }
+
     fn next_frame(&mut self) -> Result<WorksheetFrame> {
         self.check_execution()?;
-        let cursor_position = self.cursor.position();
+        let cursor_position = self.position;
         if cursor_position
             .checked_add(4)
             .is_none_or(|value| value > self.upper_bound)
@@ -2107,10 +2244,20 @@ impl<'a> WorksheetScan<'a> {
                 "BIFF worksheet has no complete record header before its boundary".into(),
             ));
         }
-        let mut header = [0_u8; 4];
-        self.cursor
-            .read_exact(&mut header)
-            .map_err(SourceBackedError::from)?;
+        // `max_worksheet_scan_bytes` fences the reads as well as the framing:
+        // when fewer than four bytes of budget remain the header that would
+        // prove the limit is crossed is not read, and the limit is reported
+        // against the four bytes it would have taken.
+        let header_bytes = self.scanned_bytes.saturating_add(4);
+        if header_bytes > self.limits.max_worksheet_scan_bytes {
+            return Err(SourceBackedError::ResourceLimit {
+                resource: "worksheet scan bytes",
+                observed: header_bytes,
+                maximum: self.limits.max_worksheet_scan_bytes,
+            });
+        }
+        self.ensure(cursor_position.saturating_add(4))?;
+        let header = self.frame_header();
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
         if payload_len > litchi_biff::MAX_RECORD_BYTES {
@@ -2161,41 +2308,68 @@ impl<'a> WorksheetScan<'a> {
         }
         self.scanned_records = records;
         self.scanned_bytes = bytes;
+        self.position = cursor_position.saturating_add(4);
         Ok(WorksheetFrame { kind, payload_len })
     }
 
-    fn read_payload(&mut self, frame: &WorksheetFrame) -> Result<&[u8]> {
+    /// Makes one framed payload resident and advances past it, returning where
+    /// it sits in the window.
+    fn consume_payload(&mut self, frame: &WorksheetFrame) -> Result<std::ops::Range<usize>> {
         self.check_execution()?;
-        self.scratch.clear();
-        if self.scratch.capacity() < frame.payload_len {
-            self.scratch
-                .try_reserve_exact(frame.payload_len)
-                .map_err(|_error| SourceBackedError::Allocation {
-                    resource: "source-backed worksheet payload",
-                    requested: frame.payload_len as u64,
-                })?;
-        }
-        self.scratch.resize(frame.payload_len, 0);
-        self.cursor
-            .read_exact(&mut self.scratch)
-            .map_err(SourceBackedError::from)?;
-        Ok(&self.scratch)
+        let end = self.position.saturating_add(frame.payload_len as u64);
+        self.ensure(end)?;
+        let at = usize::try_from(self.position.saturating_sub(self.window_start))
+            .unwrap_or(usize::MAX)
+            .min(self.window.len());
+        self.position = end;
+        Ok(at..at + frame.payload_len)
+    }
+
+    fn read_payload(&mut self, frame: &WorksheetFrame) -> Result<&[u8]> {
+        let payload = self.consume_payload(frame)?;
+        Ok(&self.window[payload])
     }
 
     fn take_payload(&mut self, frame: &WorksheetFrame) -> Result<Vec<u8>> {
-        self.read_payload(frame)?;
-        Ok(std::mem::take(&mut self.scratch))
+        let payload = self.consume_payload(frame)?;
+        let mut taken = std::mem::take(&mut self.scratch);
+        taken.clear();
+        taken
+            .try_reserve_exact(payload.len())
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: "source-backed worksheet payload",
+                requested: payload.len() as u64,
+            })?;
+        taken.extend_from_slice(&self.window[payload]);
+        Ok(taken)
     }
 
     fn recycle_payload(&mut self, payload: Vec<u8>) {
         self.scratch = payload;
     }
 
+    /// Advances past a payload the caller does not frame, interpret or
+    /// publish.
+    ///
+    /// No read is issued for it. Bytes a fill taken to frame earlier records
+    /// already carries are passed in the window; a payload that ends past the
+    /// filled end is passed by moving the cursor, which reads nothing, and the
+    /// window is dropped so the next fill starts after the payload.
     fn skip_payload(&mut self, frame: &WorksheetFrame) -> Result<()> {
         self.check_execution()?;
+        let end = self.position.saturating_add(frame.payload_len as u64);
+        let filled_end = self.filled_end();
+        if end <= filled_end {
+            self.position = end;
+            return Ok(());
+        }
         self.cursor
-            .skip_forward(frame.payload_len as u64)
-            .map_err(SourceBackedError::from)
+            .skip_forward(end.saturating_sub(filled_end))
+            .map_err(SourceBackedError::from)?;
+        self.window.clear();
+        self.window_start = end;
+        self.position = end;
+        Ok(())
     }
 
     fn check_execution(&self) -> Result<()> {

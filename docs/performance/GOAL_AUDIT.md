@@ -1,5 +1,54 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0568-0571: the XLS selective-read goal is met, and a recommendation is withdrawn
+
+This batch closes the other half of what change
+[0325](changes/0325-cfb-frame-transaction-rejected.md) had in scope.
+[0568](0568-xls-worksheet-window.md) takes a source-backed one-cell query from
+319 logical reads to 61, its worksheet-scan component from 266 to 8, while open
+and list stay byte-for-byte identical. With change
+[0565](0565-xls-globals-single-pass.md) before it, the goal's target for this
+path — work proportional to mandatory metadata plus accessed content — is now met
+for both the globals and the worksheet scan, and in the worksheet case with no
+over-read at all, because the sheet boundary is validated at open.
+
+[0570](0570-cfb-fat-run-batching.md) collapses contiguous container FAT runs into
+single reads, and demonstrates why a corpus can answer "how often" without
+answering "how much": across 98 real fixtures it removes 30 reads, and on one
+large synthetic container it removes 257 from a single open.
+
+On the OOXML side the batch is mostly a retraction. Change
+[0567](0567-ooxml-single-index-per-open.md) had recommended a zero-code
+documentation fix; [0569](0569-ooxml-detect-then-open-priced.md) measured it and
+**rejected** it, finding that one of the named openers does no detection at all,
+that the classification is computed and discarded so the workbook opener cannot
+tell a Word document from an image, and that the pattern is unavoidable for any
+caller dispatching across the three facade types. [0571](0571-ooxml-prepared-source.md)
+implements the fix that measurement pointed to instead, taking a detect-then-open
+sequence from two archive indexes to one and saving 35.9 to 201.7 microseconds,
+and repairs the discarded-classification defect as a separate, explicitly
+non-performance change in the same diff.
+
+Two findings in this batch are about the program's own instruments rather than
+the library. A test runner aborting at the first failing target had been hiding
+every later target, and a lint gate was already red at HEAD on crates the
+standing gate list does not cover. Both are fixed. The noise floor is now
+measured in the same window as the result it qualifies, rather than assumed:
+p50 4.10% and p99 13.70% for one binary against itself, which is what makes the
+batch's single p99 review trigger legible as quantization rather than regression.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, remote and range-source behaviour, peak RSS and allocation
+accounting, concurrency scaling, real-producer breadth, and cross-platform
+confirmation. The density gate change 0568 adds cannot fire on any input in this
+repository and its only coverage is synthetic, which is recorded as a limitation
+rather than presented as tested. A complete text extraction of the flagship XLS
+fixture remains unmeasurable through the public text API because it fails
+identically on both sides.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0565-0567: the largest remaining OLE2 gap is closed, and an OOXML hypothesis is disproved
 
 [0565](0565-xls-globals-single-pass.md) closes the gap

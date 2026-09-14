@@ -1,0 +1,2 @@
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/.claude/worktrees/agent-a4d3a0dc180312e39/crates/litchi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.70s

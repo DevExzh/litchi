@@ -1,0 +1,84 @@
+## DOCX  (test-data/ooxml/docx/Hyperlink.docx)
+  detect_file_format        -> Some(Docx)
+  Document::open            -> OK
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("invalid XLSX structure: main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordpro…] :: "Invalid format: invalid XLSX structure: main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordpr…"
+
+## PPTX  (test-data/ooxml/pptx/shapes.pptx)
+  detect_file_format        -> Some(Pptx)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> OK
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("invalid XLSX structure: main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.pres…] :: "Invalid format: invalid XLSX structure: main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.pre…"
+
+## XLSX  (test-data/ooxml/xlsx/sheet-names.xlsx)
+  detect_file_format        -> Some(Xlsx)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> OK
+  sheet::open_workbook      -> OK
+
+## XLSB  (test-data/ooxml/xlsb/hyperlink.xlsb)
+  detect_file_format        -> Some(Xlsb)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> OK
+  sheet::open_workbook      -> Err[InvalidFormat("invalid XLSX structure: main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main…] :: "Invalid format: invalid XLSX structure: main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.mai…"
+
+## DOC(ole2)  (test-data/ole/doc/NoHeadFoot.doc)
+  detect_file_format        -> Some(Doc)
+  Document::open            -> OK
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("invalid XLSX structure: main part '/theme/theme/themeManager.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocum…] :: "Invalid format: invalid XLSX structure: main part '/theme/theme/themeManager.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocu…"
+
+## PPT(ole2)  (test-data/ole/ppt/SampleShow.ppt)
+  detect_file_format        -> Some(Ppt)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> OK
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: Invalid relationship: main-document relationship is missing")] :: "Invalid format: OPC package error: Invalid relationship: main-document relationship is missing"
+
+## XLS(ole2)  (test-data/ole/xls/SimpleChart.xls)
+  detect_file_format        -> Some(Xls)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> OK
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: ZIP error: Missing end of central directory")] :: "Invalid format: OPC package error: ZIP error: Missing end of central directory"
+
+## ODT  (test-data/odf/corpus/writer-paragraph-styles.odt)
+  detect_file_format        -> Some(Odt)
+  Document::open            -> OK
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: Part not found: [Content_Types].xml")] :: "Invalid format: OPC package error: Part not found: [Content_Types].xml"
+
+## ODS  (test-data/odf/corpus/calc-formulas.ods)
+  detect_file_format        -> Some(Ods)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> Err[InvalidFormat("Detected format is not a presentation format or feature not enabled")] :: "Invalid format: Detected format is not a presentation format or feature not enabled"
+  sheet::Workbook::open     -> OK
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: Part not found: [Content_Types].xml")] :: "Invalid format: OPC package error: Part not found: [Content_Types].xml"
+
+## ODP  (test-data/odf/corpus/impress-basic.odp)
+  detect_file_format        -> Some(Odp)
+  Document::open            -> Err[InvalidFormat("Detected format is not a document format or feature not enabled")] :: "Invalid format: Detected format is not a document format or feature not enabled"
+  Presentation::open        -> OK
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: Part not found: [Content_Types].xml")] :: "Invalid format: OPC package error: Part not found: [Content_Types].xml"
+
+## PNG(non-office)  (test-data/images/png/lena.png)
+  detect_file_format        -> None
+  Document::open            -> Err[NotOfficeFile] :: "Not a valid Office file"
+  Presentation::open        -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: ZIP error: Missing end of central directory")] :: "Invalid format: OPC package error: ZIP error: Missing end of central directory"
+
+## CSV(non-office)  (test-data/textual/csv/numberformat.csv)
+  detect_file_format        -> None
+  Document::open            -> Err[NotOfficeFile] :: "Not a valid Office file"
+  Presentation::open        -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::Workbook::open     -> Err[NotOfficeFile] :: "Not a valid Office file"
+  sheet::open_workbook      -> Err[InvalidFormat("OPC package error: ZIP error: Missing end of central directory")] :: "Invalid format: OPC package error: ZIP error: Missing end of central directory"
+

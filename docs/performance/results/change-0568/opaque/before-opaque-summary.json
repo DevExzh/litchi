@@ -1,0 +1,452 @@
+{
+  "schema_version": 1,
+  "summary_kind": "litchi-perf-change-0568-opaque-corpus-before",
+  "capture": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/before/opaque-corpus",
+  "corpus_note": "the opaque bulk of xls-comments-opaque-heavy is 8 sibling CFB streams (OpaquePayloads/Payload000..007, 2 MiB each) plus OpaqueMetadata; the Workbook stream's worksheet substreams are made of small MSODRAWING/OBJ/TXO/CONTINUE/NOTE records, so this corpus does NOT exercise change 0568's 1 KiB mean-framed-bytes-per-record density gate",
+  "selectors": {
+    "xls_owned_source_open": {
+      "selector": "xls_owned_source_open",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": false,
+      "implementation": null,
+      "operation": null,
+      "samples": 60,
+      "warmup": 5,
+      "logical": {},
+      "xls_logical": {},
+      "latency_ns": {
+        "p50": 97660.5,
+        "p95": 109750.5,
+        "p99": 120762.79999999999,
+        "mean": 100184.55,
+        "min": 94180,
+        "max": 121990
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    },
+    "xls_owned_source_open_list_worksheets": {
+      "selector": "xls_owned_source_open_list_worksheets",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": false,
+      "implementation": null,
+      "operation": null,
+      "samples": 60,
+      "warmup": 5,
+      "logical": {},
+      "xls_logical": {},
+      "latency_ns": {
+        "p50": 100705.5,
+        "p95": 115327.5,
+        "p99": 116220.59999999999,
+        "mean": 102552.81666666667,
+        "min": 98291,
+        "max": 116610
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    },
+    "xls_owned_source_open_one_cell": {
+      "selector": "xls_owned_source_open_one_cell",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": false,
+      "implementation": null,
+      "operation": null,
+      "samples": 60,
+      "warmup": 5,
+      "logical": {},
+      "xls_logical": {},
+      "latency_ns": {
+        "p50": 103435.5,
+        "p95": 116832.95,
+        "p99": 121906.89999999998,
+        "mean": 103668.05,
+        "min": 94620,
+        "max": 124851
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    },
+    "xls_source_backed_open": {
+      "selector": "xls_source_backed_open",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": true,
+      "implementation": "source-backed",
+      "operation": "open",
+      "samples": 60,
+      "warmup": 5,
+      "logical": {
+        "read_calls": 272,
+        "read_bytes": 138280,
+        "ordinary_payload_read_calls": 0,
+        "ordinary_payload_read_bytes": 0,
+        "max_in_flight_reads": 1
+      },
+      "xls_logical": {
+        "source_retained_bytes": 16995840,
+        "complete_archive_materialized_bytes": 0,
+        "parsed_sheet_counts": 2,
+        "parsed_cell_counts": 0,
+        "source_version_checks": 19,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 7,
+        "workbook_global_read_bytes": 1483,
+        "selected_worksheet_read_calls": 0,
+        "selected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 1,
+        "unselected_worksheet_read_bytes": 93,
+        "opaque_payload_read_calls": 0,
+        "opaque_payload_read_bytes": 0
+      },
+      "latency_ns": {
+        "p50": 103225.5,
+        "p95": 115198.49999999999,
+        "p99": 128954.2,
+        "mean": 105774.51666666666,
+        "min": 99551,
+        "max": 129910
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    },
+    "xls_source_backed_open_list_worksheets": {
+      "selector": "xls_source_backed_open_list_worksheets",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": true,
+      "implementation": "source-backed",
+      "operation": "open+list",
+      "samples": 60,
+      "warmup": 5,
+      "logical": {
+        "read_calls": 272,
+        "read_bytes": 138280,
+        "ordinary_payload_read_calls": 0,
+        "ordinary_payload_read_bytes": 0,
+        "max_in_flight_reads": 1
+      },
+      "xls_logical": {
+        "source_retained_bytes": 16995840,
+        "complete_archive_materialized_bytes": 0,
+        "parsed_sheet_counts": 2,
+        "parsed_cell_counts": 0,
+        "source_version_checks": 18,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 7,
+        "workbook_global_read_bytes": 1483,
+        "selected_worksheet_read_calls": 0,
+        "selected_worksheet_read_bytes": 0,
+        "unselected_worksheet_read_calls": 1,
+        "unselected_worksheet_read_bytes": 93,
+        "opaque_payload_read_calls": 0,
+        "opaque_payload_read_bytes": 0
+      },
+      "latency_ns": {
+        "p50": 109355.0,
+        "p95": 119916.0,
+        "p99": 130761.68999999997,
+        "mean": 110515.35,
+        "min": 100840,
+        "max": 134130
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    },
+    "xls_source_backed_open_one_cell": {
+      "selector": "xls_source_backed_open_one_cell",
+      "corpus": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "archive_bytes": 16995840,
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+      },
+      "instrumented_source_block_present": true,
+      "implementation": "source-backed",
+      "operation": "open+one-cell",
+      "samples": 60,
+      "warmup": 5,
+      "logical": {
+        "read_calls": 300,
+        "read_bytes": 138414,
+        "ordinary_payload_read_calls": 0,
+        "ordinary_payload_read_bytes": 0,
+        "max_in_flight_reads": 1
+      },
+      "xls_logical": {
+        "source_retained_bytes": 16995840,
+        "complete_archive_materialized_bytes": 0,
+        "parsed_sheet_counts": 2,
+        "parsed_cell_counts": 1,
+        "source_version_checks": 48,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 7,
+        "workbook_global_read_bytes": 1483,
+        "selected_worksheet_read_calls": 28,
+        "selected_worksheet_read_bytes": 134,
+        "unselected_worksheet_read_calls": 1,
+        "unselected_worksheet_read_bytes": 93,
+        "opaque_payload_read_calls": 0,
+        "opaque_payload_read_bytes": 0
+      },
+      "latency_ns": {
+        "p50": 108115.5,
+        "p95": 122065.45,
+        "p99": 126534.98999999999,
+        "mean": 110307.26666666666,
+        "min": 104280,
+        "max": 127620
+      },
+      "environment": {
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "git_revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1012-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "17",
+        "storage_identifier": null
+      },
+      "isolation": {
+        "pread64_per_op": 0.0,
+        "statx_per_op": 0.0,
+        "whole_child_samples_1": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "whole_child_samples_11": {
+          "pread64": 18,
+          "statx": 52
+        },
+        "method": "one warmup plus 1 and 11 samples; the difference divided by ten isolates one operation",
+        "note": "this corpus is an in-memory Vec<u8> ReadAt, not a file, so a zero here is expected and says the selector performs no filesystem I/O at all"
+      }
+    }
+  }
+}

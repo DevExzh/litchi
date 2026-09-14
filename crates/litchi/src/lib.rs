@@ -219,6 +219,13 @@ pub mod common {
             DetectedFormat, detect_file_format, detect_file_format_from_bytes,
             detect_format_from_reader, detect_format_smart,
         };
+        #[cfg(all(
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+            any(unix, windows)
+        ))]
+        pub use crate::detection_smart::{
+            PreparedDetection, detect_and_prepare, detect_and_prepare_with_limits,
+        };
         pub use litchi_core::detection::*;
     }
 }
@@ -748,6 +755,14 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
     feature = "rtf"
 ))]
 pub use common::{detect_file_format, detect_file_format_from_bytes};
+
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub use common::detection::{
+    PreparedDetection, detect_and_prepare, detect_and_prepare_with_limits,
+};
 
 #[cfg(all(
     test,

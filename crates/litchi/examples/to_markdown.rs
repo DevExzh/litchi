@@ -36,7 +36,7 @@ use clap::{Parser, ValueEnum};
 use litchi::markdown::{
     FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
 };
-use litchi::{Document, FileFormat, Presentation, detect_file_format};
+use litchi::{Document, FileFormat, Presentation};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -278,6 +278,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// A prepared OOXML package, on the platforms that can produce one.
+#[cfg(any(unix, windows))]
+type Prepared = Option<litchi::opc::PreparedOoxmlSource>;
+#[cfg(not(any(unix, windows)))]
+type Prepared = Option<std::convert::Infallible>;
+
+/// Detect the format, retaining the package the detection indexed.
+#[cfg(any(unix, windows))]
+fn detect(input: &Path) -> Option<(FileFormat, Prepared)> {
+    litchi::detect_and_prepare(input).map(litchi::PreparedDetection::into_parts)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn detect(input: &Path) -> Option<(FileFormat, Prepared)> {
+    litchi::detect_file_format(input).map(|format| (format, None))
+}
+
+/// Open a document, adopting an already-indexed package when detection
+/// produced one. A legacy, RTF or OpenDocument input has no prepared package
+/// and takes the ordinary path.
+fn open_document(input: &Path, prepared: Prepared) -> Result<Document, Box<dyn std::error::Error>> {
+    #[cfg(any(unix, windows))]
+    if let Some(prepared) = prepared {
+        return Ok(Document::from_prepared(prepared)?);
+    }
+    #[cfg(not(any(unix, windows)))]
+    let _ = prepared;
+    Ok(Document::open(input)?)
+}
+
+/// Open a presentation, adopting an already-indexed package when detection
+/// produced one.
+fn open_presentation(
+    input: &Path,
+    prepared: Prepared,
+) -> Result<Presentation, Box<dyn std::error::Error>> {
+    #[cfg(any(unix, windows))]
+    if let Some(prepared) = prepared {
+        return Ok(Presentation::from_prepared(prepared)?);
+    }
+    #[cfg(not(any(unix, windows)))]
+    let _ = prepared;
+    Ok(Presentation::open(input)?)
+}
+
 /// Convert a single file to Markdown
 fn convert_file(
     input: &Path,
@@ -285,8 +330,9 @@ fn convert_file(
     options: &MarkdownOptions,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Detect file format
-    let format = detect_file_format(input)
+    // Detect the format and keep the OOXML package the detection built, so
+    // the open below adopts that index instead of building a second one.
+    let (format, prepared) = detect(input)
         .ok_or_else(|| format!("Could not detect file format for: {}", input.display()))?;
 
     if verbose {
@@ -297,7 +343,7 @@ fn convert_file(
     let markdown = match format {
         FileFormat::Doc | FileFormat::Docx | FileFormat::Odt | FileFormat::Rtf => {
             // Word document formats
-            let doc = Document::open(input)?;
+            let doc = open_document(input, prepared)?;
 
             if verbose {
                 println!("  Processing document...");
@@ -307,7 +353,7 @@ fn convert_file(
         },
         FileFormat::Ppt | FileFormat::Pptx | FileFormat::Odp => {
             // PowerPoint presentation formats
-            let pres = Presentation::open(input)?;
+            let pres = open_presentation(input, prepared)?;
 
             if verbose {
                 let slide_count = pres.slide_count()?;

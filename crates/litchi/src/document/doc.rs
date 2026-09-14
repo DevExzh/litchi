@@ -776,20 +776,11 @@ impl Document {
                             })
                         },
                         crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(
-                            format,
-                        ) => {
-                            let _ = format;
-                            Err(Error::InvalidFormat(
-                                "Detected format is not a document format or feature not enabled"
-                                    .to_owned(),
-                            ))
-                        },
+                            detected,
+                        ) => Err(Error::UnexpectedFormat { detected }),
                         crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
-                            format,
-                        ) => {
-                            let _ = format;
-                            Err(Error::NotOfficeFile)
-                        },
+                            detected,
+                        ) => Err(Error::UnexpectedFormat { detected }),
                         crate::detection_smart::detected::DocxSourcePathDetection::Bytes(bytes) => {
                             Self::from_bytes_with_limits(bytes, limits)
                         },
@@ -874,17 +865,13 @@ impl Document {
             crate::detection_smart::detected::DocxSourceBytesDetection::DocxError(error) => {
                 return Err(Self::map_source_docx_error(error));
             },
-            crate::detection_smart::detected::DocxSourceBytesDetection::OtherOoxml(format) => {
-                let _ = format;
-                return Err(Error::InvalidFormat(
-                    "Detected format is not a document format or feature not enabled".to_owned(),
-                ));
+            crate::detection_smart::detected::DocxSourceBytesDetection::OtherOoxml(detected) => {
+                return Err(Error::UnexpectedFormat { detected });
             },
             crate::detection_smart::detected::DocxSourceBytesDetection::DisabledOtherOoxml(
-                format,
+                detected,
             ) => {
-                let _ = format;
-                return Err(Error::NotOfficeFile);
+                return Err(Error::UnexpectedFormat { detected });
             },
             crate::detection_smart::detected::DocxSourceBytesDetection::OpcError(error) => {
                 return Err(Self::map_source_opc_error(error));
@@ -895,6 +882,37 @@ impl Document {
         let detected = crate::detection_smart::detect_format_smart_with_limits(bytes, limits)
             .ok_or(Error::NotOfficeFile)?;
         Self::from_detected(detected)
+    }
+
+    /// Open a document from a package already prepared by
+    /// [`detect_and_prepare`](crate::detection_smart::detect_and_prepare).
+    ///
+    /// The prepared package is adopted as-is: no ZIP central directory is read
+    /// and no OPC catalog is parsed a second time. This is the cheap half of
+    /// the detect-then-open pattern, which otherwise indexes the container
+    /// once to classify it and again to open it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] when the prepared package is a
+    /// different OOXML family — a PPTX or XLSX, say — naming the format that
+    /// was detected. Returns [`Error::SourceChanged`] when the file changed
+    /// between preparation and this call.
+    #[cfg(feature = "docx")]
+    pub fn from_prepared(prepared: crate::opc::PreparedOoxmlSource) -> Result<Self> {
+        let detected = crate::detection_smart::ooxml::format_for_main_content_type(
+            prepared.main_part_content_type(),
+        )
+        .ok_or(Error::NotOfficeFile)?;
+        if detected != litchi_core::detection::FileFormat::Docx {
+            return Err(Error::UnexpectedFormat { detected });
+        }
+        let package = prepared
+            .into_package()
+            .map_err(Self::map_source_opc_error)?;
+        let package = crate::docx::source_backed::Package::from_source_backed_package(package)
+            .map_err(Self::map_source_docx_error)?;
+        Self::from_source_backed_docx(package)
     }
 
     #[cfg(feature = "docx")]
@@ -989,14 +1007,15 @@ impl Document {
                     inner: DocumentImpl::Odt(doc),
                 })
             },
-            // Handle mismatched formats
+            // A recognized format that this opener does not own. Detection
+            // already classified it, so report which format it was.
             #[allow(
                 unreachable_patterns,
                 reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
             )]
-            _ => Err(Error::InvalidFormat(
-                "Detected format is not a document format or feature not enabled".to_string(),
-            )),
+            detected => Err(Error::UnexpectedFormat {
+                detected: detected.format(),
+            }),
         }
     }
 
@@ -2199,10 +2218,17 @@ mod tests {
             Ok(_) => panic!("non-document OOXML must not fallback"),
             Err(error) => error,
         };
-        #[cfg(feature = "pptx")]
-        assert!(matches!(error, Error::InvalidFormat(_)));
-        #[cfg(not(feature = "pptx"))]
-        assert!(matches!(error, Error::NotOfficeFile));
+        // Detection named the family, so the refusal names it too — whether or
+        // not this build has the PowerPoint owner compiled in.
+        assert!(
+            matches!(
+                error,
+                Error::UnexpectedFormat {
+                    detected: litchi_core::detection::FileFormat::Pptx
+                }
+            ),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -2564,8 +2590,10 @@ mod tests {
 
         let document = Document::from_bytes(minimal_docx(synthetic_section_docx_xml()))
             .expect("open bounded source-backed DOCX");
-        let mut limits = crate::docx::section::Limits::default();
-        limits.max_input_bytes = 1;
+        let limits = crate::docx::section::Limits {
+            max_input_bytes: 1,
+            ..Default::default()
+        };
         assert!(matches!(
             document.docx_section_inventory_with_limits(&limits),
             Err(Error::InvalidFormat(message)) if message.contains("limit")
@@ -3048,10 +3076,16 @@ mod tests {
             Ok(_) => panic!("a non-document OOXML package must not open as DOCX"),
             Err(error) => error,
         };
-        #[cfg(feature = "pptx")]
-        assert!(matches!(error, Error::InvalidFormat(_)));
-        #[cfg(not(feature = "pptx"))]
-        assert!(matches!(error, Error::NotOfficeFile));
+        // The precedence decision is unchanged; only the refusal is now typed.
+        assert!(
+            matches!(
+                error,
+                Error::UnexpectedFormat {
+                    detected: litchi_core::detection::FileFormat::Pptx
+                }
+            ),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -3567,7 +3601,14 @@ mod tests {
             Ok(_) => panic!("other ODF must not be ODT"),
             Err(error) => error,
         };
-        assert!(matches!(error, Error::InvalidFormat(_)));
+        #[cfg(feature = "ods")]
+        let expected = litchi_core::detection::FileFormat::Ods;
+        #[cfg(all(not(feature = "ods"), feature = "odp"))]
+        let expected = litchi_core::detection::FileFormat::Odp;
+        assert!(
+            matches!(error, Error::UnexpectedFormat { detected } if detected == expected),
+            "{error:?}"
+        );
     }
 
     #[test]

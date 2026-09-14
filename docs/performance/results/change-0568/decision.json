@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0568-xls-worksheet-window",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "per_record_reads_replaced_by_clamped_windows",
+    "open_and_list_control_held_byte_identical",
+    "counted_read_tests_fail_without_the_change",
+    "latency_attributed_by_region_not_by_selector"
+  ],
+  "accepted_evidence": {
+    "control_unchanged": {"open": [53, 53], "list": [53, 53], "note": "the full pread64 trace is identical as an ordered (size, offset) sequence"},
+    "one_cell_logical_reads": [319, 61],
+    "worksheet_scan_component": [266, 8],
+    "one_cell_syscalls": {"pread64": [319, 61], "statx": [305, 47]},
+    "flagship_scan_reads": [265, 7],
+    "byte_cost": {"flagship_one_cell": "x22.2", "small_fixture_one_cell": "x2.15"},
+    "fill_schedule": [512, 1024, 2048, 4096, 8192, 16384, 5651],
+    "latency_matrix": {
+      "children": 40, "rows": 14, "comparisons": 56,
+      "improve_both_directions": 31,
+      "adverse_both_over_5_percent": 1,
+      "attributable_to_this_change": ["xls_source_backed_open_one_cell"],
+      "attributable_to_change_0570": [
+        "xls_source_backed_open", "xls_source_backed_open_list_worksheets",
+        "xls_owned_source_open", "xls_owned_source_open_list_worksheets", "xls_owned_source_open_one_cell"
+      ],
+      "separation_basis": "on the latency corpus the CFB structural region falls 265 to 8 in all three source-backed selectors at unchanged bytes, which is change 0570; the selected-worksheet region falls 28 to 2 only in one-cell, which is this change, and is 0 to 0 for open and list",
+      "review_triggers": [
+        {"case": "xls_semantic_one_cell", "corpus": "xls-large", "statistic": "p99",
+         "percent": [6.13, 8.70], "absolute_ns": [230.0, 244.1, 250.0],
+         "note": "inside its own statistic's measured noise floor of 13.70 percent; the same cell's p50 swings +44 then -28 percent in the same run"}
+      ],
+      "noise_floor_same_binary_same_window": {"p50": 4.10, "mean": 4.60, "p95": 7.33, "p99": 13.70, "aa_triggers": 0},
+      "quiescence": "pinned core 99.67 to 100 percent idle, load1 3.21 at start drifting to 4.23, reached after waiting 340 seconds"
+    }
+  },
+  "accepted_costs": {
+    "bytes_read_rise": "x22.2 on the flagship one-cell query, x2.15 to x2.93 on a small fixture",
+    "trailing_slack": "a fill may read slack inside the selected sheet's own validated region; 249 bytes of 1,809 on one fixture",
+    "error_precedence": "within one fill a later I/O or source-version failure precedes an earlier record's framing, limit or parse error; and with fewer than four bytes of byte budget the byte resource is reported where the record resource was",
+    "peak_memory": "from one payload of at most 8,224 bytes to at most 64 KiB plus one taken payload, capped by the smaller of the window cap, the sheet span and the byte limit"
+  },
+  "known_gaps": {
+    "density_gate": "cannot fire on any input in this repository; the densest sheet in the corpus is 544.3 bytes per record against a 1,024-byte trigger, so its only coverage is synthetic. Lowering the threshold to 512 was rejected with numbers: it would put one real sheet back on the exact path.",
+    "full_text_on_the_flagship_fixture": "not measurable through the public text API; it fails with the same parse error before and after",
+    "strict_abba_checker": "accepts 4 of 10 selectors; the six refusals name the baseline leg and reproduce against change 0565's own retained and accepted reports, so they are pre-existing tool skew"
+  },
+  "withheld": ["cold cache", "physical device", "remote or range source", "peak RSS", "allocation", "concurrency scaling", "real-producer breadth", "cross platform"]
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0571-ooxml-prepared-source",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "detection_hands_its_package_to_the_opener_instead_of_discarding_it",
+    "archive_constructions_per_detect_and_open_fall_from_two_to_one",
+    "implements_the_fix_change_0569_measured_after_rejecting_the_documentation_alternative",
+    "second_independent_change_in_the_same_diff_is_an_error_model_correction_not_a_performance_fix"
+  ],
+  "accepted_evidence": {
+    "archive_constructions": {"document": [2, 1], "presentation": [2, 1], "workbook": [2, 1]},
+    "reads_on_the_package": {"document": [47, 24], "presentation": [132, 59], "workbook": [44, 25]},
+    "paired_medians_us": {
+      "document": {"two_call": 73.89, "single_call": 37.95, "saving": 35.94, "share_percent": 48.6},
+      "presentation": {"two_call": 434.80, "single_call": 233.06, "saving": 201.74, "share_percent": 46.4},
+      "workbook": {"two_call": 107.00, "single_call": 64.98, "saving": 42.02, "share_percent": 39.3},
+      "note": "3,000 iterations, warm cache, repeated in a second independent run; the shares reproduce change 0569's independent measurement closely while the absolute microseconds differ with host and fixture"
+    },
+    "repository_example": {"presentation": [1254.09, 1026.74, 227.34, 18.1], "document": [887.19, 839.26, 47.93, 5.4]},
+    "tests_added": 30
+  },
+  "accepted_costs": {
+    "non_ooxml_detection": "+4.83 microseconds for an OpenDocument text file and +1.38 for a legacy OLE2 document, because every path that cannot prepare defers to the existing detector so the classification can never diverge from it; the existing detector is untouched so no existing caller pays it"
+  },
+  "second_change_in_the_same_diff": {
+    "what": "a typed wrong-format error carrying the detected format, replacing ten sites that computed the classification and discarded it",
+    "why": "change 0569 measured that the workbook opener returned an identical unit not-an-Office-file error for a document, a legacy document, an OpenDocument text file, a presentation, an image and a text file",
+    "performance_claim": "none; reaching the error still costs a failed open"
+  },
+  "pre_existing_gate_failure_repaired": "the Clippy gate fails at HEAD for the package and facade crates on five unrelated sites; repaired here so the gate can report a result, and called out as separable. This is the second gate blind spot found in two batches.",
+  "withheld": ["cold cache", "allocation", "peak RSS", "throughput", "multi-fixture corpus", "cross platform"]
+}

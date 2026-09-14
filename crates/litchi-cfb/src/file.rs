@@ -7,10 +7,28 @@ use crate::directory_name::{DirectoryNameData, directory_name_data};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::io::{self, Read, Seek, SeekFrom};
+use std::num::NonZeroUsize;
 use zerocopy::{FromBytes, LE, U16, U32, U64};
 use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 const BITSET_WORD_BITS: usize = u64::BITS as usize;
+
+/// Upper bound, in bytes, on the scratch buffer the FAT and MiniFAT loaders
+/// use to batch physically contiguous sector reads.
+///
+/// Both loaders parse entries out of this scratch straight into their final
+/// `u32` table, so the buffer replaces the single reusable sector buffer they
+/// read into before — not an aggregate byte buffer the size of the whole
+/// table, which is the allocation those loaders were written to avoid. Peak
+/// metadata bytes therefore rise from one sector to at most this constant,
+/// independent of how large the FAT or MiniFAT is.
+///
+/// 64 KiB is 128 sectors of a 512-byte compound file and 16 of a 4096-byte
+/// one. The longest physically contiguous FAT run in the project's OLE corpus
+/// is 21 sectors, so one read covers it. A table shorter than the bound only
+/// allocates the sectors it has, which keeps the common single-FAT-sector file
+/// at its historical one-sector footprint.
+const SECTOR_BATCH_SCRATCH_BYTES: usize = 64 * 1024;
 
 /// A fallible, compact bit set for indexes originating in a compound file.
 ///
@@ -880,19 +898,29 @@ impl<R: Read + Seek> OleFile<R> {
             .ok_or_else(|| OleError::CorruptedFile("FAT entry count overflow".to_string()))?;
         let mut fat = try_vec_with_capacity(fat_entry_count, "FAT entries")?;
 
-        for &sector_id in &fat_sectors {
-            self.read_sector_into(sector_id, sector_data)?;
+        // Read the FAT one physically contiguous run at a time, through a
+        // scratch buffer bounded by `SECTOR_BATCH_SCRATCH_BYTES`. FAT sectors
+        // are named by the DIFAT rather than chained, so a run's whole extent
+        // is known before it is read and needs only one seek and one read. The
+        // entries are parsed straight out of the scratch into the final table,
+        // so no aggregate byte buffer the size of the FAT is ever held.
+        let mut scratch = self.sector_batch_scratch(&fat_sectors, "FAT sector batch buffer")?;
+        let mut pending = fat_sectors.as_slice();
+        while !pending.is_empty() {
+            let run_sectors = self.read_sector_run_into(pending, &mut scratch)?;
+            let span = run_sectors.get() * self.sector_size;
 
             // Every chunk is a complete entry, and the exact fallible
-            // reservation covers this sector's entire extension.
+            // reservation covers this run's entire extension.
             fat.extend(
-                sector_data
+                scratch[..span]
                     .as_chunks::<4>()
                     .0
                     .iter()
                     .copied()
                     .map(u32::from_le_bytes),
             );
+            pending = pending.get(run_sectors.get()..).unwrap_or_default();
         }
 
         for sector in fat_sectors {
@@ -945,18 +973,21 @@ impl<R: Read + Seek> OleFile<R> {
         // has the same byte size and occurs at the same point as the removed
         // aggregate MiniFAT byte-buffer reservation.
         let mut minifat = try_vec_with_capacity(entries_count, "MiniFAT data")?;
-        let mut sector_data = [0u8; SECTOR_SIZE_V4];
-        let sector_data = &mut sector_data[..self.sector_size];
+        let mut scratch = self.sector_batch_scratch(&sectors, "MiniFAT sector batch buffer")?;
 
-        // Parse each bounded sector directly into the final table. Keeping only
-        // one reusable bounded buffer avoids allocating and copying an
-        // aggregate byte buffer the same size as the complete MiniFAT.
-        for sector in sectors {
-            self.read_sector_into(sector, sector_data)?;
-            for chunk in sector_data.as_chunks::<4>().0.iter() {
+        // Read one physically contiguous run at a time and parse each run's
+        // entries directly into the final table. Keeping the scratch bounded
+        // avoids allocating and copying an aggregate byte buffer the same size
+        // as the complete MiniFAT.
+        let mut pending = sectors.as_slice();
+        while !pending.is_empty() {
+            let run_sectors = self.read_sector_run_into(pending, &mut scratch)?;
+            let span = run_sectors.get() * self.sector_size;
+            for chunk in scratch[..span].as_chunks::<4>().0.iter() {
                 let entry = read_u32_le(chunk, "MiniFAT entry")?;
                 try_push(&mut minifat, entry, "MiniFAT entries")?;
             }
+            pending = pending.get(run_sectors.get()..).unwrap_or_default();
         }
         self.minifat = minifat;
 
@@ -1616,6 +1647,104 @@ impl<R: Read + Seek> OleFile<R> {
         buffer.fill(0);
         self.reader.read_exact(&mut buffer[..present])?;
         Ok(())
+    }
+
+    /// Allocate the bounded scratch buffer used to batch contiguous reads of
+    /// the sector list `sectors`.
+    ///
+    /// The buffer holds a whole number of sectors: the longest physically
+    /// contiguous run the list actually contains, capped at
+    /// [`SECTOR_BATCH_SCRATCH_BYTES`]. A table whose sectors are all isolated
+    /// therefore keeps exactly the one-sector footprint the sector-at-a-time
+    /// loaders had, and only a table with long runs pays for them.
+    fn sector_batch_scratch(
+        &self,
+        sectors: &[u32],
+        resource: &'static str,
+    ) -> Result<Vec<u8>, OleError> {
+        // The successor test is the one `read_sector_run_into` uses. If the two
+        // ever disagreed the reader would only split a run into more bounded
+        // pieces, so this sizing pass cannot affect what is read.
+        let mut longest = 1usize;
+        let mut current = 1usize;
+        for pair in sectors.windows(2) {
+            if Some(pair[1]) == pair[0].checked_add(1) {
+                current += 1;
+                longest = longest.max(current);
+            } else {
+                current = 1;
+            }
+        }
+        // `sector_size` is 512 or 4096 for any file that reaches a loader, so
+        // the division is well defined; the clamp still holds the buffer at one
+        // sector for a hypothetical sector larger than the bound.
+        let batch_sectors = (SECTOR_BATCH_SCRATCH_BYTES / self.sector_size).clamp(1, longest);
+        // The product is either at most `SECTOR_BATCH_SCRATCH_BYTES` rounded
+        // down to a whole sector, or exactly one sector, so it cannot overflow.
+        try_filled_vec(batch_sectors * self.sector_size, 0u8, resource)
+    }
+
+    /// Read the longest physically contiguous prefix of `sectors` that fits in
+    /// `scratch`, and report how many sectors it covered.
+    ///
+    /// `scratch` is zero-filled across the run before the read, so a truncated
+    /// final sector keeps the zero tail [`Self::read_sector_into`] gives it:
+    /// the run is contiguous, so the per-sector present-byte counts tile the
+    /// run's byte range exactly and one clamped read reproduces them.
+    ///
+    /// Every sector of the prefix is position-checked individually, in list
+    /// order. The run stops at the first sector whose position does not
+    /// validate rather than reporting it here, so the sectors before it are
+    /// still read first and the next call reports that sector's error at the
+    /// point the sector-at-a-time loop reported it.
+    fn read_sector_run_into(
+        &mut self,
+        sectors: &[u32],
+        scratch: &mut [u8],
+    ) -> Result<NonZeroUsize, OleError> {
+        let Some(&first_sector) = sectors.first() else {
+            return Err(OleError::CorruptedFile(
+                "Batched sector read needs at least one sector".to_string(),
+            ));
+        };
+        let capacity_sectors = scratch.len() / self.sector_size;
+        if capacity_sectors == 0 {
+            return Err(OleError::CorruptedFile(format!(
+                "Batched sector read destination has length {}, expected at least {}",
+                scratch.len(),
+                self.sector_size
+            )));
+        }
+
+        // The first sector's position is the one error this call must report:
+        // without it the caller cannot make progress through the list.
+        let position = self.sector_position(first_sector)?;
+
+        // Extend the run only across strict physical successors. Real files do
+        // hold descending FAT sector lists, so nothing here may assume the list
+        // ascends; a non-successor simply ends the run.
+        let mut count = NonZeroUsize::MIN;
+        while count.get() < capacity_sectors && count.get() < sectors.len() {
+            let Some(successor) = sectors[count.get() - 1].checked_add(1) else {
+                break;
+            };
+            if sectors[count.get()] != successor
+                || self.sector_position(sectors[count.get()]).is_err()
+            {
+                break;
+            }
+            count = count.saturating_add(1);
+        }
+
+        // `count <= scratch.len() / sector_size`, so the run's span fits.
+        let span = count.get() * self.sector_size;
+        self.reader.seek(SeekFrom::Start(position))?;
+        let present = self.present_sector_bytes(position, span);
+        let run = &mut scratch[..span];
+        run.fill(0);
+        self.reader.read_exact(&mut run[..present])?;
+
+        Ok(count)
     }
 
     fn sector_position(&self, sector_id: u32) -> Result<u64, OleError> {
@@ -4066,6 +4195,388 @@ mod tests {
         let mut range = vec![0u8; full.len()];
         file.read_stream_range(&["Large"], 0, &mut range).unwrap();
         assert_eq!(range, full);
+    }
+
+    /// Build a compound-file image whose FAT occupies exactly `fat_sectors`,
+    /// together with the 512-byte header whose DIFAT array names them.
+    ///
+    /// The FAT marks its own sectors FATSECT and leaves every other entry
+    /// FREESECT, which is all `load_fat` validates about FAT contents.
+    fn fat_image(fat_sectors: &[u32], sector_size: usize) -> (Vec<u8>, [u8; 512]) {
+        assert!(
+            fat_sectors.len() <= HEADER_DIFAT_ENTRIES,
+            "this builder writes the FAT sector list into the header DIFAT only"
+        );
+        let entries_per_sector = sector_size / 4;
+        let fat_entry_count = fat_sectors.len() * entries_per_sector;
+        let highest = fat_sectors.iter().copied().max().unwrap_or(0) as usize;
+        assert!(
+            highest < fat_entry_count,
+            "a FAT sector has to be describable by the FAT it belongs to"
+        );
+        let physical_sectors = (highest + 1).max(fat_sectors.len());
+        let mut image = vec![0u8; (physical_sectors + 1) * sector_size];
+
+        let mut fat = vec![FREESECT; fat_entry_count];
+        for &sector in fat_sectors {
+            fat[sector as usize] = FATSECT;
+        }
+        for (index, entry) in fat.iter().enumerate() {
+            let holder = fat_sectors[index / entries_per_sector] as usize;
+            let offset = (holder + 1) * sector_size + (index % entries_per_sector) * 4;
+            image[offset..offset + 4].copy_from_slice(&entry.to_le_bytes());
+        }
+
+        let mut header = [0u8; 512];
+        for (index, sector) in fat_sectors.iter().enumerate() {
+            let offset = HEADER_DIFAT_OFFSET + index * 4;
+            header[offset..offset + 4].copy_from_slice(&sector.to_le_bytes());
+        }
+        (image, header)
+    }
+
+    fn table_loader(
+        image: Vec<u8>,
+        sector_size: usize,
+        physical_sectors: usize,
+    ) -> OleFile<TrackingReader> {
+        let file_size = image.len() as u64;
+        OleFile {
+            reader: TrackingReader::new(image),
+            file_size,
+            sector_size,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_sectors],
+        }
+    }
+
+    /// Load a FAT laid out in `fat_sectors`, keeping the reads it issued.
+    fn loaded_fat(fat_sectors: &[u32], sector_size: usize) -> OleFile<TrackingReader> {
+        let (image, header) = fat_image(fat_sectors, sector_size);
+        let physical_sectors = image.len() / sector_size - 1;
+        let mut file = table_loader(image, sector_size, physical_sectors);
+        file.reader.reads.clear();
+        file.load_fat(&header, fat_sectors.len() as u32, ENDOFCHAIN, 0)
+            .unwrap();
+        for &sector in fat_sectors {
+            assert_eq!(file.fat[sector as usize], FATSECT);
+        }
+        file
+    }
+
+    /// Physical read offsets and lengths for reading `fat_sectors` one sector
+    /// at a time, which is what `load_fat` issued before run batching.
+    fn unbatched_reads(sectors: &[u32], sector_size: usize) -> Vec<(u64, usize)> {
+        sectors
+            .iter()
+            .map(|&sector| ((sector as u64 + 1) * sector_size as u64, sector_size))
+            .collect()
+    }
+
+    #[test]
+    fn contiguous_fat_sectors_are_read_one_run_at_a_time() {
+        // `test-data/ole/doc/picture.doc`: 23 FAT sectors in 3 physically
+        // contiguous runs of 1, 21 and 1.
+        let picture: Vec<u32> = std::iter::once(0)
+            .chain(128..=148)
+            .chain(std::iter::once(2816))
+            .collect();
+        assert_eq!(picture.len(), 23);
+        let file = loaded_fat(&picture, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![(512, 512), (129 * 512, 21 * 512), (2817 * 512, 512),],
+            "23 FAT sectors in 3 runs must cost 3 reads"
+        );
+        assert_eq!(unbatched_reads(&picture, SECTOR_SIZE_V3).len(), 23);
+
+        // `test-data/ole/doc/testPictures.doc`: 5 FAT sectors in one run.
+        let test_pictures: Vec<u32> = (607..=611).collect();
+        let file = loaded_fat(&test_pictures, SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(608 * 512, 5 * 512)]);
+        assert_eq!(unbatched_reads(&test_pictures, SECTOR_SIZE_V3).len(), 5);
+
+        // `test-data/ole/doc/FloatingPictures.doc`: 6 FAT sectors in 3 runs,
+        // and its last two sectors descend (650 then 649), so the run walk
+        // must not assume the list ascends.
+        let floating = [573, 574, 575, 576, 650, 649];
+        let file = loaded_fat(&floating, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![(574 * 512, 4 * 512), (651 * 512, 512), (650 * 512, 512)],
+            "a descending pair stays two reads, replayed in list order"
+        );
+        assert_eq!(unbatched_reads(&floating, SECTOR_SIZE_V3).len(), 6);
+    }
+
+    #[test]
+    fn isolated_fat_sectors_still_cost_one_read_each() {
+        // Every FAT sector isolated: batching must be exactly neutral, down to
+        // the offset and length of each read.
+        for layout in [vec![1u32, 3, 5], (0..22).map(|index| index * 2).collect()] {
+            let file = loaded_fat(&layout, SECTOR_SIZE_V3);
+            assert_eq!(
+                file.reader.reads,
+                unbatched_reads(&layout, SECTOR_SIZE_V3),
+                "isolated FAT sectors must read exactly as they did before"
+            );
+        }
+
+        // A single FAT sector, the shape of most files in the corpus.
+        let file = loaded_fat(&[0], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(512, 512)]);
+        let file = loaded_fat(&[7], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(8 * 512, 512)]);
+    }
+
+    #[test]
+    fn a_fat_run_longer_than_the_scratch_is_read_in_bounded_pieces() {
+        // 4096-byte sectors put the 64 KiB scratch bound at 16 sectors, so a
+        // 17-sector run has to split into a full piece and a remainder.
+        let sectors: Vec<u32> = (0..17).collect();
+        let file = loaded_fat(&sectors, SECTOR_SIZE_V4);
+        assert_eq!(
+            file.reader.reads,
+            vec![
+                (SECTOR_SIZE_V4 as u64, SECTOR_BATCH_SCRATCH_BYTES),
+                (
+                    SECTOR_SIZE_V4 as u64 + SECTOR_BATCH_SCRATCH_BYTES as u64,
+                    SECTOR_SIZE_V4
+                ),
+            ]
+        );
+        let total: usize = file.reader.reads.iter().map(|&(_, len)| len).sum();
+        assert_eq!(total, 17 * SECTOR_SIZE_V4);
+
+        // The table is identical to the one the sector-at-a-time loop built.
+        assert_eq!(file.fat.len(), 17 * (SECTOR_SIZE_V4 / 4));
+        for (index, &entry) in file.fat.iter().enumerate() {
+            let expected = if index < 17 { FATSECT } else { FREESECT };
+            assert_eq!(entry, expected, "FAT entry {index}");
+        }
+    }
+
+    #[test]
+    fn batched_fat_reads_zero_fill_a_truncated_final_sector() {
+        // The image stops three bytes into its second FAT sector.
+        let (image, header) = fat_image(&[1, 2], SECTOR_SIZE_V3);
+        let truncated = 3 * SECTOR_SIZE_V3 + 3;
+        let mut file = table_loader(image[..truncated].to_vec(), SECTOR_SIZE_V3, 3);
+        file.reader.reads.clear();
+        file.load_fat(&header, 2, ENDOFCHAIN, 0).unwrap();
+
+        assert_eq!(
+            file.reader.reads,
+            vec![(2 * 512, 512 + 3)],
+            "the run is read once, clamped to the bytes the file actually has"
+        );
+        assert_eq!(file.fat.len(), 256);
+        assert_eq!(file.fat[0], FREESECT);
+        assert_eq!(file.fat[1], FATSECT);
+        assert_eq!(file.fat[2], FATSECT);
+        // Only three bytes of entry 128 are on disk; the tail reads as zero.
+        assert_eq!(file.fat[128], 0x00FF_FFFF);
+        assert!(file.fat[129..].iter().all(|&entry| entry == 0));
+    }
+
+    #[test]
+    fn batched_fat_reads_keep_typed_errors_and_their_order() {
+        // A FAT sector that starts at or past the end of the file keeps its
+        // own error, and the sectors before it are still read first.
+        let (image, header) = fat_image(&[1, 2], SECTOR_SIZE_V3);
+        let mut file = table_loader(image[..3 * SECTOR_SIZE_V3].to_vec(), SECTOR_SIZE_V3, 4);
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_fat(&header, 2, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "Sector 2 is outside the file"
+        ));
+        assert_eq!(
+            file.reader.reads,
+            vec![(2 * 512, 512)],
+            "the readable sector before the bad one is still read, in order"
+        );
+
+        // A FAT that does not mark one of its own sectors FATSECT.
+        let (mut image, header) = fat_image(&[1, 2, 3], SECTOR_SIZE_V3);
+        let entry_two = 2 * SECTOR_SIZE_V3 + 2 * 4;
+        image[entry_two..entry_two + 4].copy_from_slice(&FREESECT.to_le_bytes());
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        assert!(matches!(
+            file.load_fat(&header, 3, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT sector 2 is not marked FATSECT"
+        ));
+
+        // A header DIFAT whose list ends before the declared FAT count.
+        let (image, mut header) = fat_image(&[1, 2, 3], SECTOR_SIZE_V3);
+        let third = HEADER_DIFAT_OFFSET + 2 * 4;
+        header[third..third + 4].copy_from_slice(&FREESECT.to_le_bytes());
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        assert!(matches!(
+            file.load_fat(&header, 3, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT sector list ends before its declared count"
+        ));
+
+        // A declared FAT sector count larger than the physical file.
+        let (image, header) = fat_image(&[1], SECTOR_SIZE_V3);
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 1);
+        assert!(matches!(
+            file.load_fat(&header, 2, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "Declared FAT sector count exceeds the physical file"
+        ));
+    }
+
+    /// Load a MiniFAT stored in `chain`, keeping the reads it issued.
+    fn loaded_minifat(chain: &[u32], sector_size: usize) -> OleFile<TrackingReader> {
+        let highest = chain.iter().copied().max().unwrap_or(0) as usize;
+        let physical_sectors = highest + 1;
+        let image = vec![0u8; (physical_sectors + 1) * sector_size];
+        let mut fat = vec![FREESECT; physical_sectors];
+        for pair in chain.windows(2) {
+            fat[pair[0] as usize] = pair[1];
+        }
+        if let Some(&last) = chain.last() {
+            fat[last as usize] = ENDOFCHAIN;
+        }
+
+        let mut file = table_loader(image, sector_size, physical_sectors);
+        file.fat = fat;
+        file.reader.reads.clear();
+        file.load_minifat(chain[0], chain.len() as u32).unwrap();
+        file
+    }
+
+    #[test]
+    fn contiguous_minifat_sectors_are_read_one_run_at_a_time() {
+        // Contiguous chain: one read instead of four.
+        let file = loaded_minifat(&[1, 2, 3, 4], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(2 * 512, 4 * 512)]);
+        assert_eq!(file.minifat.len(), 4 * (SECTOR_SIZE_V3 / 4));
+
+        // Fragmented chain: unchanged, one read per isolated sector. This is
+        // every MiniFAT in the surveyed corpus, which has no file with more
+        // than one MiniFAT sector.
+        let fragmented = [1, 3, 5];
+        let file = loaded_minifat(&fragmented, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            unbatched_reads(&fragmented, SECTOR_SIZE_V3)
+        );
+        let file = loaded_minifat(&[2], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(3 * 512, 512)]);
+    }
+
+    #[test]
+    fn a_minifat_run_longer_than_the_scratch_is_read_in_bounded_pieces() {
+        // 512-byte sectors put the bound at 128 sectors, so a 129-sector run
+        // splits. The MiniFAT chain has no 109-entry header limit, so this
+        // exercises the multi-piece path at the other sector size.
+        let chain: Vec<u32> = (0..129).collect();
+        let file = loaded_minifat(&chain, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![
+                (512, SECTOR_BATCH_SCRATCH_BYTES),
+                (512 + SECTOR_BATCH_SCRATCH_BYTES as u64, 512),
+            ]
+        );
+        assert_eq!(file.minifat.len(), 129 * (SECTOR_SIZE_V3 / 4));
+        assert!(file.minifat.iter().all(|&entry| entry == 0));
+    }
+
+    #[test]
+    fn batched_minifat_reads_keep_typed_errors_and_their_order() {
+        // A MiniFAT sector past the end of the file keeps its own error, after
+        // the readable sector ahead of it has been read.
+        let image = vec![0u8; 3 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        file.fat = vec![FREESECT, 2, ENDOFCHAIN, FREESECT];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 2),
+            Err(OleError::CorruptedFile(message))
+                if message == "Sector 2 is outside the file"
+        ));
+        assert_eq!(file.reader.reads, vec![(2 * 512, 512)]);
+
+        // A chain shorter than its declared sector count still fails in
+        // `collect_sector_chain_exact`, before any sector is read.
+        let image = vec![0u8; 4 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 3);
+        file.fat = vec![FREESECT, ENDOFCHAIN, FREESECT];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 2),
+            Err(OleError::CorruptedFile(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+
+        // A chain that revisits a sector is rejected before any read, so the
+        // batching walk never sees a repeated sector.
+        let image = vec![0u8; 4 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 3);
+        file.fat = vec![FREESECT, 2, 1];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 3),
+            Err(OleError::CorruptedFile(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+    }
+
+    #[test]
+    fn the_sector_batch_scratch_is_bounded_by_the_longest_run_it_will_hold() {
+        let file = table_loader(vec![0u8; 2 * SECTOR_SIZE_V3], SECTOR_SIZE_V3, 1);
+        let scratch =
+            |sectors: &[u32]| file.sector_batch_scratch(sectors, "scratch").unwrap().len();
+
+        // An empty or single-sector table, and a table whose sectors are all
+        // isolated, keep the one-sector footprint of the unbatched loaders.
+        assert_eq!(scratch(&[]), 512);
+        assert_eq!(scratch(&[7]), 512);
+        assert_eq!(scratch(&[1, 3, 5]), 512);
+        assert_eq!(
+            scratch(&(0..22).map(|index| index * 2).collect::<Vec<u32>>()),
+            512
+        );
+        // A descending pair is not a run.
+        assert_eq!(scratch(&[650, 649]), 512);
+
+        // Only the longest run is paid for, not the whole table. This is
+        // `picture.doc`: 23 FAT sectors whose longest run is 21.
+        let picture: Vec<u32> = std::iter::once(0)
+            .chain(128..=148)
+            .chain(std::iter::once(2816))
+            .collect();
+        assert_eq!(scratch(&picture), 21 * 512);
+
+        // A run longer than the bound stops at the bound.
+        assert_eq!(
+            scratch(&(0..1_000).collect::<Vec<u32>>()),
+            SECTOR_BATCH_SCRATCH_BYTES
+        );
+
+        // The bound holds at the other sector size too.
+        let file = table_loader(vec![0u8; 2 * SECTOR_SIZE_V4], SECTOR_SIZE_V4, 1);
+        let scratch =
+            |sectors: &[u32]| file.sector_batch_scratch(sectors, "scratch").unwrap().len();
+        assert_eq!(scratch(&[3]), SECTOR_SIZE_V4);
+        assert_eq!(
+            scratch(&(0..1_000).collect::<Vec<u32>>()),
+            SECTOR_BATCH_SCRATCH_BYTES
+        );
     }
 
     #[test]

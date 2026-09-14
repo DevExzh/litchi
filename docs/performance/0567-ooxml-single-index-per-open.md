@@ -179,6 +179,19 @@ detect internally and already classify a non-matching OOXML family, so
 documentation telling callers not to pre-call `detect_file_format` captures the
 same saving with no production change and no risk.
 
+> **Corrected by change [0569](0569-ooxml-detect-then-open-priced.md).** Three
+> claims in the paragraph above are wrong. `litchi::sheet::open_workbook`
+> performs no detection at all and fails on three formats `Workbook::open`
+> handles. The classification is computed and then *discarded* at ten call
+> sites, so no facade error names the detected format, and `Workbook::open`
+> reports an identical unit `NotOfficeFile` for a Word document, a legacy
+> document, an ODF file, a PNG and a CSV. And the advice is not riskless: there
+> is no unified opener, so a caller dispatching across the three facade types
+> must pre-detect, and this repository's own flagship example would have no
+> correct rewrite under it. Change 0569 also measures the PPTX saving at 219.7
+> microseconds against the 202.4 projected below, and identifies the 65.51
+> microsecond XLSX open below as `open_workbook` rather than `Workbook::open`.
+
 ## Limitations
 
 Warm cache, one host, single-fixture medians per format. No cold-cache,

@@ -308,3 +308,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Transient git worktrees created for isolated agent runs.
+.claude/worktrees/

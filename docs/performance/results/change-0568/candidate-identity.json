@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-staged-binary-identity",
+  "role": "candidate (change 0568 windowed worksheet scan AND change 0570 CFB FAT run batching, both applied)",
+  "change_id": "0568-xls-worksheet-window",
+  "revision": "bde4b8f8b14dde852ddc1f37fd3ed356416fdb72",
+  "worktree": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree",
+  "worktree_dirty": false,
+  "worktree_canonical_path": "/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree",
+  "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "build": {
+    "target_dir": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-candidate",
+    "cwd_for_both_commands": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree/tools/perf-baseline",
+    "commands": [
+      "CARGO_TARGET_DIR=/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-candidate cargo build --release --locked --offline --manifest-path /tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline",
+      "CARGO_TARGET_DIR=/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-candidate cargo build --release --locked --offline --manifest-path /tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree/tools/perf-baseline/Cargo.toml --features xls-source-attribution --bin xls_source_attribution"
+    ],
+    "note": "litchi-perf-baseline is src/main.rs, the auto-discovered default bin, with no required-features; xls_source_attribution declares required-features [\"xls-source-attribution\"], which enables litchi/xls."
+  },
+  "binaries": {
+    "litchi-perf-baseline": {
+      "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/candidate/litchi-perf-baseline",
+      "bytes": 60178408,
+      "sha256": "19a3aa329b08f60eba60cc0c77d512428d7f3e605302d8b07a76f96fdb175c24",
+      "mode_bits": 509,
+      "built_from": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-candidate/release/litchi-perf-baseline"
+    },
+    "xls_source_attribution": {
+      "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/candidate/xls_source_attribution",
+      "bytes": 8971920,
+      "sha256": "1229f287a6ecf761c3b28d62ec7e39fc56f163ed80a8d640446f585e50801184",
+      "mode_bits": 509,
+      "built_from": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/target-candidate/release/xls_source_attribution"
+    }
+  },
+  "staged_utc": "2026-09-14T03:18:08Z",
+  "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "toolchain": {
+    "channel": "1.95.0",
+    "source": "rust-toolchain.toml at the worktree root, resolved by cargo from the manifest directory upward",
+    "verified": true,
+    "verification": {
+      "rustup_show_active_toolchain_in_manifest_dir": "1.95.0-x86_64-unknown-linux-gnu (overridden by '/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/candidate-tree/rust-toolchain.toml')",
+      "rustc_version_in_manifest_dir": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "cargo_version_in_manifest_dir": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+      "rustup_default_elsewhere_NOT_USED": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "embedded_rustc_source_path_prefix": "/rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/"
+    },
+    "why_this_matters": "tools/perf_abba_summary.py requires every environment field except git_revision to match across legs, rustc_version included. Running rustc --version from a directory rust-toolchain.toml does not govern reports the rustup default and is wrong; change 0565 had to correct exactly this."
+  }
+}

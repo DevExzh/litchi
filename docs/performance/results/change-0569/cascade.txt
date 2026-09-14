@@ -1,0 +1,5 @@
+iters=2000
+
+DOCX         detect-then-open    87.13 us (p25   86.75 p75   87.64)   try-each-facade    44.63 us (p25   44.39 p75   44.89)   cascade is  -42.50 us ( -48.8%)
+PPTX         detect-then-open   479.94 us (p25  474.78 p75  483.24)   try-each-facade   472.35 us (p25  467.04 p75  475.72)   cascade is   -7.59 us (  -1.6%)
+XLSX         detect-then-open   126.26 us (p25  125.65 p75  127.12)   try-each-facade   175.81 us (p25  175.08 p75  176.99)   cascade is  +49.55 us ( +39.2%)

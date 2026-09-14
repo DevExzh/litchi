@@ -138,51 +138,119 @@ fn detect_ooxml_format_from_catalog(catalog: &crate::opc::PackageCatalog) -> Opt
     detect_ooxml_format_from_content_types(catalog.part_content_types())
 }
 
+/// One OOXML main-part family, independent of the polyglot precedence applied
+/// when a catalog declares more than one.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-#[derive(Default)]
-struct OoxmlContentTypeMarkers {
-    word: bool,
-    powerpoint: bool,
-    excel_binary: bool,
-    excel_xml: bool,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OoxmlFamily {
+    Word,
+    PowerPoint,
+    ExcelBinary,
+    ExcelXml,
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-impl OoxmlContentTypeMarkers {
-    fn observe(&mut self, content_type: &str) {
-        use crate::opc::constants::content_type as ct;
+impl OoxmlFamily {
+    const fn format(self) -> FileFormat {
+        match self {
+            Self::Word => FileFormat::Docx,
+            Self::PowerPoint => FileFormat::Pptx,
+            Self::ExcelBinary => FileFormat::Xlsb,
+            Self::ExcelXml => FileFormat::Xlsx,
+        }
+    }
+}
 
-        self.word |= content_type.eq_ignore_ascii_case(ct::WML_DOCUMENT_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::WML_TEMPLATE_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::WML_DOCUMENT_MACRO_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::WML_TEMPLATE_MACRO_MAIN);
-        self.powerpoint |= content_type.eq_ignore_ascii_case(ct::PML_PRESENTATION_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::PML_SLIDESHOW_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::PML_TEMPLATE_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::PML_PRES_MACRO_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::PML_SLIDESHOW_MACRO_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::PML_TEMPLATE_MACRO_MAIN);
-        self.excel_binary |= content_type.eq_ignore_ascii_case(ct::XLSB_BIN);
-        self.excel_xml |= content_type.eq_ignore_ascii_case(ct::SML_SHEET_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::SML_TEMPLATE_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::SML_SHEET_MACRO_MAIN)
-            || content_type.eq_ignore_ascii_case(ct::SML_TEMPLATE_MACRO_MAIN);
+/// Classify one validated main-part content type into its OOXML family.
+///
+/// This is the single content-type table the coordinator owns under ADR 0010.
+/// Both the forward catalog scan and the reverse lookup used by the
+/// prepared-source adopters read it, so a prepared handle can never disagree
+/// with the classification that produced it.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn ooxml_family_for_content_type(content_type: &str) -> Option<OoxmlFamily> {
+    use crate::opc::constants::content_type as ct;
+
+    if content_type.eq_ignore_ascii_case(ct::WML_DOCUMENT_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::WML_TEMPLATE_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::WML_DOCUMENT_MACRO_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::WML_TEMPLATE_MACRO_MAIN)
+    {
+        return Some(OoxmlFamily::Word);
+    }
+    if content_type.eq_ignore_ascii_case(ct::PML_PRESENTATION_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::PML_SLIDESHOW_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::PML_TEMPLATE_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::PML_PRES_MACRO_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::PML_SLIDESHOW_MACRO_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::PML_TEMPLATE_MACRO_MAIN)
+    {
+        return Some(OoxmlFamily::PowerPoint);
+    }
+    if content_type.eq_ignore_ascii_case(ct::XLSB_BIN) {
+        return Some(OoxmlFamily::ExcelBinary);
+    }
+    if content_type.eq_ignore_ascii_case(ct::SML_SHEET_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::SML_TEMPLATE_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::SML_SHEET_MACRO_MAIN)
+        || content_type.eq_ignore_ascii_case(ct::SML_TEMPLATE_MACRO_MAIN)
+    {
+        return Some(OoxmlFamily::ExcelXml);
+    }
+    None
+}
+
+/// Map a validated OOXML main-part content type to the neutral classification.
+///
+/// Returns `None` for a content type that is not an OOXML main part.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[must_use]
+pub fn format_for_main_content_type(content_type: &str) -> Option<FileFormat> {
+    ooxml_family_for_content_type(content_type).map(OoxmlFamily::format)
+}
+
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[derive(Default)]
+struct OoxmlContentTypeMarkers<'a> {
+    word: Option<&'a str>,
+    powerpoint: Option<&'a str>,
+    excel_binary: Option<&'a str>,
+    excel_xml: Option<&'a str>,
+}
+
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+impl<'a> OoxmlContentTypeMarkers<'a> {
+    fn observe(&mut self, content_type: &'a str) {
+        let slot = match ooxml_family_for_content_type(content_type) {
+            Some(OoxmlFamily::Word) => &mut self.word,
+            Some(OoxmlFamily::PowerPoint) => &mut self.powerpoint,
+            Some(OoxmlFamily::ExcelBinary) => &mut self.excel_binary,
+            Some(OoxmlFamily::ExcelXml) => &mut self.excel_xml,
+            None => return,
+        };
+        let _ = slot.get_or_insert(content_type);
+    }
+
+    /// The winning family and the exact declared content type that selected it.
+    fn classification(self) -> Option<(FileFormat, &'a str)> {
+        // Keep the established precedence when a producer supplies a polyglot
+        // catalog carrying more than one family marker.
+        let (family, content_type) = if let Some(content_type) = self.word {
+            (OoxmlFamily::Word, content_type)
+        } else if let Some(content_type) = self.powerpoint {
+            (OoxmlFamily::PowerPoint, content_type)
+        } else if let Some(content_type) = self.excel_binary {
+            (OoxmlFamily::ExcelBinary, content_type)
+        } else if let Some(content_type) = self.excel_xml {
+            (OoxmlFamily::ExcelXml, content_type)
+        } else {
+            return None;
+        };
+        Some((family.format(), content_type))
     }
 
     fn format(self) -> Option<FileFormat> {
-        // Keep the established precedence when a producer supplies a polyglot
-        // catalog carrying more than one family marker.
-        if self.word {
-            Some(FileFormat::Docx)
-        } else if self.powerpoint {
-            Some(FileFormat::Pptx)
-        } else if self.excel_binary {
-            Some(FileFormat::Xlsb)
-        } else if self.excel_xml {
-            Some(FileFormat::Xlsx)
-        } else {
-            None
-        }
+        self.classification().map(|(format, _content_type)| format)
     }
 }
 
@@ -215,6 +283,19 @@ fn check_source_classification_progress(
 pub fn try_detect_ooxml_format_from_source_backed_package(
     package: &litchi_opc::SourceBackedPackage,
 ) -> crate::opc::Result<Option<FileFormat>> {
+    Ok(try_classify_ooxml_source_backed_package(package)?.map(|(format, _content_type)| format))
+}
+
+/// Classify a source-backed OOXML catalog, keeping the exact main-part content
+/// type that selected the family.
+///
+/// The returned content type borrows the package's already parsed catalog, so
+/// this repeats neither archive nor XML work. It is what a coordinator retains
+/// in an opaque prepared source.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn try_classify_ooxml_source_backed_package(
+    package: &litchi_opc::SourceBackedPackage,
+) -> crate::opc::Result<Option<(FileFormat, &str)>> {
     check_source_classification_progress(package)?;
     let mut markers = OoxmlContentTypeMarkers::default();
     for (index, content_type) in package
@@ -228,5 +309,5 @@ pub fn try_detect_ooxml_format_from_source_backed_package(
         markers.observe(content_type);
     }
     check_source_classification_progress(package)?;
-    Ok(markers.format())
+    Ok(markers.classification())
 }

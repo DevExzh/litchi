@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "plan_kind": "litchi-perf-change-plan",
+  "change_id": "0568-xls-worksheet-window",
+  "revision": "2b294d928b9741e5ce03bdfdda1dcbc42eb99af2",
+  "created_utc": "2026-09-14T02:41:27Z",
+  "scope": {
+    "priority": "OLE2 and OOXML remain the active priority; ODF deferred; iWork excluded.",
+    "production_crates": [
+      "litchi-xls"
+    ],
+    "baseline_stage": "change 0565 applied; the design is frozen in docs/performance/0566-xls-worksheet-window-design.md"
+  },
+  "hypothesis": {
+    "statement": "WorksheetScan reads one four-byte header per record and one read per consumed payload through a stream cursor, so change 0564 measured 266 positional reads beyond the open for a one-cell query: 177 headers, 88 payloads and one shared-string fetch.",
+    "mechanism": "Replace the per-record scratch buffer with a retained window buffer filled by one cursor read per fill, sized 512 bytes doubling to a 64 KiB cap. Unlike change 0565's globals scan, the upper bound is exact before the scan begins because validate_sheet_offsets runs at open, so every fill is clamped to the selected sheet's own validated region and there is no spill-and-truncate. A skipped payload that extends past the filled end is passed by seeking, not by reading.",
+    "density_gate": "Before each fill, if the mean framed bytes per record exceeds 1 KiB the fill is exact and the window target resets. Without it a sheet of large opaque records inverts the trade: a simulated 200-record opaque sheet goes from 824 bytes read to 1,613,496.",
+    "predicted_effect": "one-cell scan reads fall from 266 to about 8 and a 16-sheet text scan from 5,277 to about 778, at roughly 22 and 17 times the bytes; source observations fall with the reads; open and list are unchanged, which is the control."
+  },
+  "accepted_contract_changes": [
+    "A skipped payload is never framed, interpreted or published, and no read begins at an offset inside one; when it extends past the filled end the scan advances past the remainder without reading it. Bytes of a skipped payload inside a window already filled to frame earlier records are read, bounded by the window ceiling and confined to the selected sheet's validated region.",
+    "An oversized record is refused on its header alone; no read is issued for its payload and no window grows to cover it.",
+    "max_worksheet_scan_bytes becomes a true read fence: no byte at or past sheet.start plus the limit is read. This is strictly tighter than today's limit-plus-four. When fewer than four bytes of budget remain the reported observed value becomes scanned_bytes plus four rather than scanned_bytes plus the frame length.",
+    "Source observations fall from one per read to one per fill; the query-level bracket is unchanged.",
+    "Within one fill, an I/O or SourceChanged failure at a later offset is reported before a framing, limit or parse error of an earlier record.",
+    "Cancellation keeps every existing check site, so the CPU interval between checks stays at one record; only the I/O interval grows to one fill, for which materialize_eager's documented 64 KiB interval on the same owner is precedent."
+  ],
+  "acceptance": {
+    "primary_gate": "counted-read tests must show reads disjoint and inside the selected sheet's validated region, no read issued for a skipped or oversized payload, no byte read at or past the byte limit, and the density fallback; each must fail without the change.",
+    "secondary_gate": "per-selector pread64 and statx isolated by differencing strace -f -c at 1 and 11 samples; open and list must be unchanged, which is the control proving the delta is the scan.",
+    "byte_gate": "logical bytes read per selector recorded before and after, with the increase stated explicitly rather than omitted.",
+    "opaque_gate": "re-run on the comments-opaque-heavy corpus; reads must fall or hold and bytes must not exceed today plus one window per sheet, or the density gate is unvalidated.",
+    "latency_gate": "paired A1/B1/B2/A2 p50 over the ten XLS selectors, warmup 5 and 60 samples per child, CPU pinned and ASLR disabled; cells adverse in both directions by more than 5% reported explicitly, and nanosecond-scale cells reported as below clock resolution.",
+    "correctness_gate": "full litchi-xls suite, clippy and rustdoc with warnings denied, no-default-features, fmt, and the wider OLE2 and facade suites with --no-fail-fast before commit."
+  },
+  "cpu": {
+    "pinned_cpu": 17,
+    "aslr": "disabled with setarch -R for the selector matrix"
+  },
+  "noise_floor": "change 0565 measured this host's A/A drift at +1.7% to +3.2% p50 and +11.0% p99 with one binary against itself at 20 samples; tail movements below roughly 10% carry no information unless both directions agree.",
+  "status": "frozen-before-capture",
+  "performance_claim": "none-until-measured"
+}

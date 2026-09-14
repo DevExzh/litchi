@@ -701,19 +701,12 @@ impl Presentation {
                 crate::detection_smart::detected::PptxSourcePathDetection::Ppt(package) => {
                     Self::from_native_ppt_package(package)
                 },
-                crate::detection_smart::detected::PptxSourcePathDetection::OtherOoxml(format) => {
-                    let _ = format;
-                    Err(Error::InvalidFormat(
-                        "Detected format is not a presentation format or feature not enabled"
-                            .to_owned(),
-                    ))
+                crate::detection_smart::detected::PptxSourcePathDetection::OtherOoxml(detected) => {
+                    Err(Error::UnexpectedFormat { detected })
                 },
                 crate::detection_smart::detected::PptxSourcePathDetection::DisabledOtherOoxml(
-                    format,
-                ) => {
-                    let _ = format;
-                    Err(Error::NotOfficeFile)
-                },
+                    detected,
+                ) => Err(Error::UnexpectedFormat { detected }),
                 crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes) => {
                     Self::from_bytes_with_limits(bytes, limits)
                 },
@@ -832,19 +825,14 @@ impl Presentation {
                     error,
                 ) => return Err(Self::map_source_opc_error(error)),
                 crate::detection_smart::detected::PresentationSourceBytesDetection::OtherOoxml(
-                    format,
+                    detected,
                 ) => {
-                    let _ = format;
-                    return Err(Error::InvalidFormat(
-                        "Detected format is not a presentation format or feature not enabled"
-                            .to_owned(),
-                    ));
+                    return Err(Error::UnexpectedFormat { detected });
                 },
                 crate::detection_smart::detected::PresentationSourceBytesDetection::DisabledOtherOoxml(
-                    format,
+                    detected,
                 ) => {
-                    let _ = format;
-                    return Err(Error::NotOfficeFile);
+                    return Err(Error::UnexpectedFormat { detected });
                 },
                 crate::detection_smart::detected::PresentationSourceBytesDetection::Fallback(
                     bytes,
@@ -854,6 +842,36 @@ impl Presentation {
         let detected = crate::detection_smart::detect_format_smart_with_limits(bytes, limits)
             .ok_or(Error::NotOfficeFile)?;
         Self::from_detected(detected)
+    }
+
+    /// Open a presentation from a package already prepared by
+    /// [`detect_and_prepare`](crate::detection_smart::detect_and_prepare).
+    ///
+    /// The prepared package is adopted as-is: no ZIP central directory is read
+    /// and no OPC catalog is parsed a second time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] when the prepared package is a
+    /// different OOXML family, naming the format that was detected. Returns
+    /// [`Error::SourceChanged`] when the file changed between preparation and
+    /// this call.
+    #[cfg(feature = "pptx")]
+    pub fn from_prepared(prepared: crate::opc::PreparedOoxmlSource) -> Result<Self> {
+        let detected = crate::detection_smart::ooxml::format_for_main_content_type(
+            prepared.main_part_content_type(),
+        )
+        .ok_or(Error::NotOfficeFile)?;
+        if detected != litchi_core::detection::FileFormat::Pptx {
+            return Err(Error::UnexpectedFormat { detected });
+        }
+        let package = prepared
+            .into_package()
+            .map_err(Self::map_source_opc_error)?;
+        let presentation =
+            crate::pptx::SourceBackedPresentation::from_source_backed_package(package)
+                .map_err(map_pptx_catalog_error)?;
+        Self::from_source_backed_pptx(presentation)
     }
 
     #[cfg(feature = "pptx")]
@@ -949,14 +967,15 @@ impl Presentation {
                     cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
                 })
             },
-            // Handle mismatched formats
+            // A recognized format that this opener does not own. Detection
+            // already classified it, so report which format it was.
             #[allow(
                 unreachable_patterns,
                 reason = "match arms are feature-gated; the fallback is unreachable when every format feature is enabled"
             )]
-            _ => Err(Error::InvalidFormat(
-                "Detected format is not a presentation format or feature not enabled".to_string(),
-            )),
+            detected => Err(Error::UnexpectedFormat {
+                detected: detected.format(),
+            }),
         }
     }
 

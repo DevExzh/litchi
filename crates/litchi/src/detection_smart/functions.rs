@@ -7,6 +7,11 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+use super::detected::PreparedDetection;
 use super::ole2;
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 use super::ooxml;
@@ -45,6 +50,70 @@ use litchi_odf_common::detect as odf;
 pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
     let mut file = File::open(path).ok()?;
     detect_format_from_reader(&mut file)
+}
+
+/// Detect a file format and retain the OOXML package the detection built.
+///
+/// [`detect_file_format`] throws away the container index it needed to
+/// classify an OOXML package, so a caller that detects and then opens indexes
+/// the same ZIP twice. This entry point returns the same neutral
+/// classification **and**, for an OOXML package, an opaque handle to the
+/// already-validated package. Pass that handle to `Document::from_prepared`,
+/// `Presentation::from_prepared`, or `Workbook::from_prepared` and the open
+/// reuses the existing index instead of building a second one.
+///
+/// # Returns
+///
+/// * `Some(PreparedDetection)` when a supported format is detected. The format
+///   is always reported; [`PreparedDetection::prepared`] carries a handle only
+///   for an OOXML package. A legacy OLE2 file, an OpenDocument package, RTF and
+///   iWork are classified with no handle, because they have no OOXML adopter
+///   to hand a prepared OPC package to.
+/// * `None` when the format is not recognized or the file cannot be read —
+///   exactly when [`detect_file_format`] returns `None`.
+///
+/// The classification never differs from [`detect_file_format`]: any input
+/// that cannot be prepared falls back to that detector.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use litchi::common::detection::{FileFormat, detect_and_prepare};
+/// use litchi::Document;
+///
+/// if let Some(detected) = detect_and_prepare("document.docx") {
+///     if detected.format() == FileFormat::Docx
+///         && let Some(prepared) = detected.into_prepared()
+///     {
+///         let document = Document::from_prepared(prepared)?;
+///         println!("{}", document.text()?);
+///     }
+/// }
+/// # Ok::<(), litchi::common::Error>(())
+/// ```
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> {
+    detect_and_prepare_with_limits(path, crate::opc::ReadLimits::default())
+}
+
+/// Detect a file format and retain the OOXML package, with an explicit OPC
+/// resource policy.
+///
+/// See [`detect_and_prepare`]. The policy bounds the OPC probe only; an input
+/// that exceeds it is still classified through [`detect_file_format`], with no
+/// prepared handle.
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
+    path: P,
+    limits: crate::opc::ReadLimits,
+) -> Option<PreparedDetection> {
+    super::detected::detect_and_prepare_path_with_limits(path.as_ref(), limits)
 }
 
 /// Detect file format from a byte slice.

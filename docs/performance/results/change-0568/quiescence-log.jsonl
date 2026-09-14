@@ -1,0 +1,17 @@
+{"utc":"2026-09-14T03:19:06Z","elapsed_s":0,"cpu17_idle_percent":89.18,"load1":57.83,"load5":27.38,"load15":18.88,"quiet":0}
+{"utc":"2026-09-14T03:19:31Z","elapsed_s":25,"cpu17_idle_percent":98.39,"load1":39.57,"load5":25.52,"load15":18.49,"quiet":0}
+{"utc":"2026-09-14T03:19:56Z","elapsed_s":50,"cpu17_idle_percent":99.00,"load1":26.54,"load5":23.58,"load15":18.04,"quiet":0}
+{"utc":"2026-09-14T03:20:21Z","elapsed_s":75,"cpu17_idle_percent":99.60,"load1":19.07,"load5":22.07,"load15":17.68,"quiet":0}
+{"utc":"2026-09-14T03:20:46Z","elapsed_s":100,"cpu17_idle_percent":98.80,"load1":12.97,"load5":20.39,"load15":17.24,"quiet":0}
+{"utc":"2026-09-14T03:21:11Z","elapsed_s":125,"cpu17_idle_percent":47.49,"load1":8.61,"load5":18.77,"load15":16.79,"quiet":0}
+{"utc":"2026-09-14T03:21:36Z","elapsed_s":150,"cpu17_idle_percent":99.00,"load1":6.01,"load5":17.34,"load15":16.37,"quiet":0}
+{"utc":"2026-09-14T03:22:01Z","elapsed_s":175,"cpu17_idle_percent":84.40,"load1":4.37,"load5":16.04,"load15":15.97,"quiet":0}
+{"utc":"2026-09-14T03:22:26Z","elapsed_s":200,"cpu17_idle_percent":97.20,"load1":3.19,"load5":14.83,"load15":15.57,"quiet":1}
+{"utc":"2026-09-14T03:25:12Z","elapsed_s":0,"phase":"wait2","cpu17_idle_percent":99.40,"load1":21.49,"load5":22.09,"load15":18.36,"quiet":0}
+{"utc":"2026-09-14T03:25:32Z","elapsed_s":20,"phase":"wait2","cpu17_idle_percent":99.60,"load1":15.67,"load5":20.73,"load15":17.99,"quiet":0}
+{"utc":"2026-09-14T03:25:52Z","elapsed_s":40,"phase":"wait2","cpu17_idle_percent":99.80,"load1":11.51,"load5":19.45,"load15":17.63,"quiet":0}
+{"utc":"2026-09-14T03:26:12Z","elapsed_s":60,"phase":"wait2","cpu17_idle_percent":99.40,"load1":8.52,"load5":18.25,"load15":17.28,"quiet":0}
+{"utc":"2026-09-14T03:26:32Z","elapsed_s":80,"phase":"wait2","cpu17_idle_percent":99.60,"load1":6.39,"load5":17.13,"load15":16.93,"quiet":0}
+{"utc":"2026-09-14T03:26:52Z","elapsed_s":100,"phase":"wait2","cpu17_idle_percent":99.80,"load1":5.00,"load5":16.12,"load15":16.60,"quiet":0}
+{"utc":"2026-09-14T03:27:12Z","elapsed_s":120,"phase":"wait2","cpu17_idle_percent":99.40,"load1":4.00,"load5":15.17,"load15":16.28,"quiet":0}
+{"utc":"2026-09-14T03:27:32Z","elapsed_s":140,"phase":"wait2","cpu17_idle_percent":99.60,"load1":3.21,"load5":14.27,"load15":15.95,"quiet":1}

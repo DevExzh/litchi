@@ -1,5 +1,23 @@
 # Performance program phase report
 
+## 0568-0571: the XLS worksheet scan, CFB run batching, and one OOXML index per open
+
+[0568](0568-xls-worksheet-window.md) windows the source-backed XLS worksheet
+scan. A one-cell query falls from 319 reads to 61 with open and list unchanged
+byte-for-byte, at 22 times the bytes. [0570](0570-cfb-fat-run-batching.md) reads
+contiguous CFB FAT runs in one call: 493 reads to 463 across the real corpus with
+bytes identical, and 265 to 8 on a large synthetic container.
+[0569](0569-ooxml-detect-then-open-priced.md) prices the detect-then-open saving
+and rejects change 0567's documentation recommendation, correcting one of its
+figures upward. [0571](0571-ooxml-prepared-source.md) implements what that
+measurement pointed to: one archive index per detect-and-open, saving 35.9 to
+201.7 microseconds, plus a typed wrong-format error that stops ten sites
+discarding the classification.
+
+Two of these batches found a gate blind spot rather than a bottleneck: a test
+runner that aborted at the first failing target and hid every later one, and a
+lint gate already red at HEAD on crates the standing list does not cover.
+
 ## 0567: one OOXML open builds one archive index, and two corrections
 
 [0567](0567-ooxml-single-index-per-open.md) is attribution only and disproves a

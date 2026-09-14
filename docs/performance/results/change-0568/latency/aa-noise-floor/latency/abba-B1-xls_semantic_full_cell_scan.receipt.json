@@ -1,0 +1,33 @@
+{
+  "name": "abba-B1-xls_semantic_full_cell_scan",
+  "leg": "B1",
+  "stage": "candidate",
+  "selector": "xls_semantic_full_cell_scan",
+  "binary": "/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/baseline/litchi-perf-baseline",
+  "cwd": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/baseline-tree",
+  "returncode": 0,
+  "command": [
+    "setarch",
+    "x86_64",
+    "-R",
+    "taskset",
+    "-c",
+    "17",
+    "/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/bin/baseline/litchi-perf-baseline",
+    "--warmup",
+    "5",
+    "--samples",
+    "60",
+    "--case",
+    "xls_semantic_full_cell_scan",
+    "--json",
+    "/home/zhuhe/code/litchi-temp-retained/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/after/aa-noise-floor/latency/abba-B1-xls_semantic_full_cell_scan.json"
+  ],
+  "env": {
+    "TMPDIR": "/tmp/claude-1001/-home-zhuhe-code-litchi/4b20edf7-6b1c-40a9-9e79-3ca6a15219f0/scratchpad/measure-0568/tmp",
+    "RAYON_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1"
+  },
+  "started_utc": "2026-09-14T03:28:27.357314226Z",
+  "finished_utc": "2026-09-14T03:28:28.188832698Z"
+}
