@@ -1,0 +1,48 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0615",
+  "title": "The execution context bounds one session at a time, and the workspace runs three",
+  "decision": "design retained, proposed ADR 0031 drafted for human review, no production change",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "item CORE-3 of change 0587 names the gap from the source; this record measures it and finds the mechanism is not pool duplication but that ExecutionLimits::workers is a per-session Copy value while Budget is the only shared part of an ExecutionContext, so the missing budgets must be hierarchical Resource dimensions rather than more policy fields",
+    "the design amends the execution paragraph of accepted ADR 0005, so docs/GOAL.md line 80 applies: the conflict is recorded and a separate proposed ADR is drafted for human review rather than implemented",
+    "no end-to-end scenario admits even one of the three sessions today, so completing the execution context is a prerequisite for work that does not yet exist and no speedup is available to claim",
+    "the retained scaling evidence across changes 0009, 0088, 0405, 0498 and 0499 is that width helps only for few-and-large independent work, hurts for many-and-small, and that every apparent scheduler win has been withdrawn or fenced by its own record; the admission gates in section 7 are written against that evidence"
+  ],
+  "accepted_evidence": {
+    "capability_matrix": "the seven docs/GOAL.md Workstream F capabilities against litchi_core::ExecutionLimits, ExecutionContext and Budget at 1e4198321, with the file and line of each present capability and the absence of the other three verified by grep",
+    "parallel_site_census": "the three production parallel sessions, with every other rayon, thread::scope, spawn_scoped and thread::spawn under crates/ verified to be test code; zero callers of read_parts_ordered, bulk_read and OpenSession outside litchi-opc, litchi-cfb, their own tests, one example and the harness",
+    "coexistence_counts": "live OS threads from /proc/self/task at each stage and sampled from inside a worker's own read_at, plus simultaneous ReadAt::read_at calls, at workers 1, 2, 4 and 8, five repeats per width; every thread count identical across all five repeats",
+    "retained_scaling": "changes 0009 (widths 1/2/4/8/12, speedup, efficiency and Amdahl serial fraction for OPC and CFB few-large and many-small), 0498 (six corpus/source rows at serial and batch 1/4/8), 0499 (worker reuse deltas and the residual parallel-versus-serial gap), 0088 (no accepted speedup across 62 cells) and 0240 and 0405 (what the harness may and may not say about parallelism)",
+    "cost_pricing": "589 Limits::new call sites across 234 files under crates/ and 22 under tools/, RESOURCE_COUNT 6, and 14 match sites naming Resource::Depth as an arm, which is why proposed ADR 0031 makes the three new dimensions additive rather than positional"
+  },
+  "accepted_costs": {
+    "instrument": "the 500 microsecond fixed per-read delay is a deterministic test instrument that widens the observation window for concurrent reads; it models no production storage, scheduler, allocator or decompression latency, in the same role change 0088's fixed 10 ms source delay plays",
+    "synthetic_corpora": "the probe uses an in-memory four-member OPC archive and a four-stream CFB file, one MiB each; it measures the structure of the three sessions, not any real document workload",
+    "single_host_single_platform": "counts taken on one Linux host reading /proc/self/task, pinned with taskset -c 10 while eight agents built concurrently; nothing here says what a macOS or Windows runtime adapter would report",
+    "process_concurrency_is_a_lower_bound": "the process-wide concurrent-read figure is the largest overlap two independently scheduled sessions happened to achieve in a run, not a proof of the maximum reachable; it reached the arithmetic sum of the per-session maxima in three of five repeats at widths 4 and 8",
+    "retained_not_remeasured": "every scaling figure in section 4 comes from changes 0009, 0498 and 0499, taken on different hosts, corpora and tree states; their own out-of-model caveats are reproduced rather than dropped"
+  },
+  "known_gaps": {
+    "no_timing": "no timing leg, no A/B or A/A pair, no allocation or RSS profile, no callgrind run and no harness capture was taken in this batch",
+    "no_consumer": "no format crate or facade path reaches any of the three sessions, so there is no end-to-end scenario against which the design could be measured; item CORE-4 / SAVE-6 is the most likely first real consumer and needs its own frozen design",
+    "profile_values": "proposed ADR 0031 requires finite Workers, IoConcurrency and CpuTasks values for Profile::Server, Profile::Desktop and Profile::TrustedBatch, and deliberately leaves the three numbers to the reviewer",
+    "unimplemented_free_win": "gate G1, making ParallelReadSession build its pool lazily as SharedOleBulkRead already does, needs no ADR and is not implemented here either; this batch's scope is documentation plus the probe"
+  },
+  "withheld": [
+    "any speedup, regression, latency, tail, peak-RSS, allocation, cold-cache, physical-device, range-source, scaling, contention, lock-wait, cross-platform or real-producer result",
+    "any authority for proposed ADR 0031: it is not accepted, is absent from the accepted table in docs/adr/README.md, and no code may cite it until a human accepts it"
+  ],
+  "provenance": {
+    "git_revision": "1e41983213dc378c13774ed7038c51faf231977f",
+    "base_commit": "1e4198321",
+    "branch": "perf/0615-execution-context-completeness-adr-draft",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0 (59807616e 2026-04-14)",
+    "probe_binary_sha256": "6e59079909acef25f0739b8e003c4e9f90991afeb38c9d93975dbe6836b58a6c",
+    "note": "the probe is a separate Cargo project with path dependencies on this worktree's crates, built with CARGO_TARGET_DIR outside the repository; its working copy and target directory were deleted after the runs and its source is retained verbatim in probe/"
+  }
+}

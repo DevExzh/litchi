@@ -1,0 +1,52 @@
+# gates.txt — change 0615 (documentation and the retained probe only)
+# worktree /home/zhuhe/code/litchi-worktrees/0615
+# branch   perf/0615-execution-context-completeness-adr-draft
+# base     1e41983213dc378c13774ed7038c51faf231977f (change 0606)
+# No file under crates/ or tools/ was modified, so no per-crate clippy, test
+# or doc gate applies; the workspace-wide gates below are run instead.
+
+$ cargo fmt --all --check
+exit=0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit=0
+
+$ python3 tools/check_report_claim_classification.py --registry docs/performance/report-claim-classification-v1.json --repo-root .
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+$ python3 tools/non_iwork_gate.py verify
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit=0
+
+$ (retained probe) cargo fmt --check
+no formatting diff
+exit=0
+
+$ (retained probe) cargo clippy --release --all-targets
+    Checking probe0615 v0.1.0 (/home/zhuhe/code/litchi-worktrees/0615-probe)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.11s
+exit=0
+  (re-run after `touch src/main.rs` so the check is not served from cache; no
+   warning is emitted. The probe is a standalone crate and does not inherit the
+   workspace's deny-level lints, so its clean run is weaker evidence than a
+   workspace crate's would be.)
+
+$ python3 - (relative-link resolution over the four new documents; log-sections.md bodies resolve against docs/performance/, their merge target)
+checked 30 relative links across 4 files
+OK: every relative link resolves
+exit=0
+
+$ git status --porcelain
+?? docs/adr/0031-execution-context-budgets.md
+?? docs/performance/0615-execution-context-completeness-design.md
+?? docs/performance/results/change-0615/
+exit=0
+
+$ git diff --stat HEAD -- crates/ tools/   # empty: no production or harness file touched
+(no output above = nothing under crates/ or tools/ changed)
+exit=0

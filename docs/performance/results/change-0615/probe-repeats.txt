@@ -1,0 +1,22 @@
+# probe 0615: five repeats per width, 500 us instrument, taskset -c 10
+# columns: width  run  threads_after_zip_session_new  threads_after_cfb_bulk_read  opc_threads_at_batch_peak  joint_threads_at_opc_read_peak  cfb_max_conc_read  opc_max_conc_read  joint_process_max_conc_read
+1 1 1 1 1 4 1 1 2
+1 2 1 1 1 4 1 1 2
+1 3 1 1 1 4 1 1 2
+1 4 1 1 1 4 1 1 2
+1 5 1 1 1 4 1 1 2
+2 1 3 5 7 10 2 2 4
+2 2 3 5 7 10 2 2 4
+2 3 3 5 7 10 2 2 4
+2 4 3 5 7 10 2 2 4
+2 5 3 5 7 10 2 2 4
+4 1 5 9 13 16 4 4 7
+4 2 5 9 13 16 4 4 8
+4 3 5 9 13 16 4 4 8
+4 4 5 9 13 16 4 4 8
+4 5 5 9 13 16 4 4 7
+8 1 9 17 21 24 4 4 8
+8 2 9 17 21 24 4 4 7
+8 3 9 17 21 24 4 4 7
+8 4 9 17 21 24 4 4 8
+8 5 9 17 21 24 4 4 8

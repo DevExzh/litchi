@@ -1,0 +1,15 @@
+[package]
+name = "probe0615"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0615/crates/litchi-core" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0615/crates/litchi-cfb" }
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0615/crates/litchi-opc" }
+soapberry-zip = { path = "/home/zhuhe/code/litchi-worktrees/0615/crates/soapberry-zip" }
+
+[profile.release]
+debug = 1
