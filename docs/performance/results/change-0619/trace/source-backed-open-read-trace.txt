@@ -1,0 +1,59 @@
+running 1 test
+0619-layout archive_bytes=16995840
+0619-layout workbook_stream_bytes=80946
+0619-layout cfb_structural runs=267 bytes=136704 first=Some(0..512) last=Some(16861184..16861696)
+0619-layout workbook_global runs=3 bytes=1483 first=Some(512..1024) last=Some(1536..1995)
+0619-layout selected_worksheet runs=3 bytes=614 first=Some(80844..80896) last=Some(81408..81458)
+0619-layout unselected_worksheets runs=155 bytes=78849 first=Some(1995..2048) last=Some(80384..80844)
+0619-read offset=0 request=512 count=512 end=512 cfb=512 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16861696 request=512 count=512 end=16862208 cfb=512 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16862208 request=512 count=512 end=16862720 cfb=512 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16862720 request=65536 count=65536 end=16928256 cfb=65536 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16928256 request=65536 count=65536 end=16993792 cfb=65536 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16993792 request=2048 count=2048 end=16995840 cfb=2048 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16859648 request=1536 count=1536 end=16861184 cfb=1536 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=16861184 request=512 count=512 end=16861696 cfb=512 globals=0 selected=0 unselected=0 opaque=0
+0619-read offset=512 request=4 count=4 end=516 cfb=0 globals=4 selected=0 unselected=0 opaque=0
+0619-read offset=516 request=20 count=20 end=536 cfb=0 globals=20 selected=0 unselected=0 opaque=0
+0619-read offset=536 request=6 count=6 end=542 cfb=0 globals=6 selected=0 unselected=0 opaque=0
+0619-read offset=542 request=6 count=6 end=548 cfb=0 globals=6 selected=0 unselected=0 opaque=0
+0619-read offset=548 request=4 count=4 end=552 cfb=0 globals=4 selected=0 unselected=0 opaque=0
+0619-read offset=552 request=512 count=512 end=1064 cfb=0 globals=512 selected=0 unselected=0 opaque=0
+0619-read offset=1064 request=1024 count=1024 end=2088 cfb=0 globals=931 selected=0 unselected=93 opaque=0
+0619-open worksheet_count=2 cfb=136704 globals=1483 selected=0 unselected=93 opaque=0 read_calls=15 read_bytes=138280
+test tests::zzz_0619_trace_source_backed_open_reads ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 509 filtered out; finished in 0.27s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
