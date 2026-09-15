@@ -1,0 +1,32 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0615",
+  "retained_in_repository": [
+    "docs/adr/0031-execution-context-budgets.md (proposed, awaiting human review; deliberately NOT added to the accepted table in docs/adr/README.md, which is unmodified)",
+    "docs/performance/0615-execution-context-completeness-design.md",
+    "docs/performance/results/change-0615/ (probe source and Cargo.toml, four per-width raw outputs with the instrument, the no-instrument control leg, the five-repeat table, gates.txt, README.md, log-sections.md, decision.json, cleanup.json)"
+  ],
+  "removed_after_the_packet_was_assembled": [
+    "/home/zhuhe/code/litchi-worktrees/0615-probe (56 KiB: the probe working copy, src/main.rs plus Cargo.toml). Its main.rs is retained byte-for-byte as probe/main.rs and its Cargo.toml as probe/Cargo.toml, so nothing is lost.",
+    "intermediate probe outputs superseded by a later binary: two early single-leg captures (probe-threads-pinned.txt, probe-concurrency-delay500.txt) taken before the process-wide counter, the worker-count argument and the settle sample existed. Every retained output in the packet comes from one binary, sha256 6e59079909acef25f0739b8e003c4e9f90991afeb38c9d93975dbe6836b58a6c.",
+    "the scratch link-checker and gate-runner scripts under /tmp (linkcheck0615.py, gates0615.sh); the link checker's exact source is quoted in gates.txt's invocation line and the gate commands are recorded verbatim there",
+    "the session scratch directory scratchpad/agents/0615 (created, never exceeded a few kilobytes; no worktree, target directory or fixture copy was ever placed on the RAM-backed /tmp)"
+  ],
+  "build_directories_removed": [
+    "/home/zhuhe/code/litchi-worktrees/targets/0615-probe (424 MiB, the probe's release build with debug = 1; CARGO_TARGET_DIR was deliberately pointed outside the repository and outside /tmp)",
+    "/home/zhuhe/code/litchi-worktrees/0615/target — not created: this batch built no workspace crate. The only cargo invocations against the worktree were metadata and tree checks (non_iwork_gate.py verify) and cargo fmt --all --check."
+  ],
+  "worktree": "/home/zhuhe/code/litchi-worktrees/0615 (7.0 GiB) removed after the commit; the branch perf/0615-execution-context-completeness-adr-draft is kept",
+  "shared_resources_left_untouched": [
+    "/home/zhuhe/code/litchi (the shared working copy; never built, edited or tested in)",
+    "/home/zhuhe/code/litchi-worktrees/before-1e4198321 (the shared read-only base checkout; no before leg was needed for a documentation batch and none was built)",
+    "docs/performance/HOTSPOTS.md, GOAL_AUDIT.md, REPORT.md, ADR_COMPLIANCE.md, CRUD_COVERAGE.md and docs/adr/README.md, all unmodified; the four log paragraphs are in log-sections.md for the coordinator to merge"
+  ],
+  "notes": [
+    "no crate under crates/ and no file under tools/ was modified, so no per-crate clippy, test or doc gate applies; gates.txt records the workspace-wide gates run instead, plus the retained probe's own fmt and clippy.",
+    "the probe's first clippy run reported one needless_range_loop and cargo fmt reported six diffs; both were fixed, the binary was rebuilt, and every retained output was re-captured with the clean binary. gates.txt shows the post-fix runs."
+  ],
+  "revision": "1e41983213dc378c13774ed7038c51faf231977f",
+  "revision_note": "the base revision; this file is committed with the batch, so the removals it lists are performed immediately after the commit"
+}
