@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0607 — the PPTX slide regeneration is unreachable, and the authored save's whale is the deflate encoder
+
+Change 0587's item SAVE-3 ranked `materialize_presentation`'s rebuild of every
+slide under the scenario "PPTX opened-document update/save". Measured, that
+scenario does not exist: `Package::mutable_pres` is assigned `Some(..)` in
+exactly one place, `Package::new()`, and every byte ingress funnels through
+`from_opc_package_with_provenance`, which assigns `None`; all 78 `.pptx`
+fixtures under `test-data` and both litchi-authored decks are refused by
+`presentation_mut` with the same typed `UnsafeEdit`. The route that does serve
+opened decks, `opened::patch::apply`, already applies a per-part delta and
+renumbers nothing, and an unedited opened save is already exact-source
+passthrough, byte-identical on 78 of 78. The one reachable route is an authored
+deck materialized more than once, where SAVE-3's cost model is wrong by
+construction: with no source archive the publication plan has no `Copy` action,
+so all 161 members of a 50-slide deck are serialized into the manifest, audited
+and deflated on every save whatever the model does. The whole materialization is
+3,665,367 Ir = 2.28% of a 161,032,882 Ir edit-and-save, and 10.00% (50 slides)
+to 11.18% (200 slides) of its wall-clock p50 against +0.43% and +0.06% p50 A/A
+floors. The same profile re-points the real cost: `DeflateEncoder::new` runs 161
+times per authored save at 444,764 Ir each, 44.5% of the save's instructions —
+survey item §2.4 / SAVE-6 in `crates/soapberry-zip/src/office.rs`, which change
+0476's `OwnedDeflateState` reuse does not cover. SAVE-3 should be re-ranked as
+an authored-path item, below SAVE-6. No production change and no speedup is
+claimed. [Design, gates and falsification](0607-pptx-authored-slide-regeneration-design.md);
+[evidence](results/change-0607/README.md).
+
 ## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
 
 Takes change 0587 item XLS-3 (rank 18), whose two halves the survey separated,

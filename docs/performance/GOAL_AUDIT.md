@@ -1,5 +1,29 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0607 — PPTX opened-document CRUD has one route, and the example that takes the other is broken
+
+Record: [0607](0607-pptx-authored-slide-regeneration-design.md).
+
+The audit's standing P1 row "finish source-backed CRUD adoption across formats"
+gains a measured boundary on PPTX. There are two writer surfaces in
+`litchi-pptx`: the mutable `MutablePresentation`, reachable only from
+`Package::new()`, and the `opened::Transaction` capture-and-patch route,
+reachable only from an opened package. They are mutually exclusive by
+construction, and the census confirms it on the whole corpus: 78 of 78 `.pptx`
+fixtures open and 78 of 78 refuse `presentation_mut`, while an unedited save of
+each is byte-identical to its source. Opened-document PPTX CRUD is therefore
+entirely `opened/`'s (changes 0590 and 0598), and the mutable writer is an
+authoring surface only. One in-tree consumer has not noticed:
+`crates/litchi/examples/office_crud_demo.rs:289-290` performs its PPTX UPDATE
+step as `Package::open` followed by `presentation_mut`, which cannot succeed, so
+the CRUD demonstration fails at that step. Reported, not fixed: the fix is to
+port the step to `opened_presentation_transaction`, which belongs to the
+`opened/` owner. Nothing in the repository materializes an authored presentation
+more than once, so the authored-save opportunity this record freezes has no
+caller and no harness selector to be measured against, and that is its admission
+gate. `performance_claim: none`; `claim_authorized: false`. OLE2/OOXML remain
+active; ODF is deferred until completion and iWork excluded.
+
 ## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
 
 GOAL step 1 (eliminate unnecessary work) in its purest form: the work removed is

@@ -530,6 +530,14 @@ relationship ids, a change in the mutable model rather than the writer. Size
 modelled as N slides times serialize, audit, encoder init and deflate versus 1.
 Records: none (0475/0478 cover the streaming writer; 0158 the source-backed
 route). Risk medium-high; frozen design; joint with the DOCX/PPTX area.
+**Resolved by change 0607:** the scenario does not exist for opened decks —
+`materialize_presentation` is reachable only from `Package::new()`, and all 78
+fixtures refuse `presentation_mut` with a typed `UnsafeEdit`; an unedited opened
+save is already exact-source passthrough on 78 of 78. On the authored path the
+regeneration is 2.28% of instructions and 10-11% of wall time, and the dominant
+cost there is a fresh `DeflateEncoder` per member in the streaming archive
+writer (161 constructions, 44.5% of the save's instructions), which re-ranks
+SAVE-3 below SAVE-4/SAVE-6.
 
 **SAVE-4. Fresh deflate state per regenerated member** (step 2). 0476's reuse
 covers the owned writer only; the preservation writer constructs a new encoder

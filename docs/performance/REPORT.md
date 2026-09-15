@@ -1,5 +1,28 @@
 # Performance program phase report
 
+## 0607 — the authored PPTX save, measured end to end for the first time
+
+No record had profiled an eager PPTX save. On an authored 50-slide deck (161
+members, 91,537 bytes) a callgrind isolation pair at N=1 and N=6 puts one
+edit-and-save at 161,032,882 Ir, of which `PackageWriter::to_bytes` is 97.8%,
+`PhysPkgWriter::write` 89.7%, a fresh `DeflateEncoder` per member 44.5% (161
+constructions at 444,764 Ir), the deflate itself 27.2%,
+`PublicationPlan::from_package` 7.9%, `verify_authored` 6.9% (161 calls) and the
+presentation materialization 2.20%. Four paired legs in A1 B1 B2 A2 order, 30
+samples each after three warmups, pinned to CPU 27, put the materialization at
+326.2 µs of a 3,261.0 µs p50 at 50 slides and 1,098.4 µs of a 9,827.6 µs p50 at
+200, against A/A floors of +0.43% and +0.06% p50 — five times its instruction
+share, because callgrind counts the deflate encoder's state zeroing per byte.
+Two byte oracles bound any future change: re-materializing an unchanged model
+reproduces the previous archive byte for byte, at 3 and at 50 slides, and a
+one-slide edit already leaves 160 of 161 members byte-identical, changing only
+`ppt/slides/slide1.xml`. The relationship renumbering the survey worried about
+is already a no-op, because `Relationships::get_or_add` returns an existing id
+for an unchanged type and target and `next_r_id` fills the lowest gap. No
+production code changed and no real producer file was measured, because none can
+reach this path. See [Change 0607](0607-pptx-authored-slide-regeneration-design.md);
+`performance_claim: none`.
+
 ## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
 
 Three files changed in `litchi-xls` and the standalone attribution harness,

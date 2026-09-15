@@ -1,0 +1,21 @@
+# Callgrind isolation pairs, change 0607, before checkout 6c4c1469b, taskset -c 27
+# probe0607 sha256 c5bfebc68e2bc7326937df30702ab7ac67eac6a90f109b7f6add1459cea42458
+# <case> 50 <samples>: an authored 50-slide deck (161 output members, 91,537 bytes)
+#   resave  = samples x (set_title on slide 0 through the mutable model, then to_bytes)
+#   nopsave = samples x (to_bytes with a clean model: flush_presentation returns at once)
+
+resave   samples=1  I refs: 322,712,510
+resave   samples=6  I refs: 1,127,876,919
+nopsave  samples=1  I refs: 319,095,997
+nopsave  samples=6  I refs: 1,105,933,571
+
+per-iteration (difference over 5 samples):
+  resave  (edit + to_bytes) = (1,127,876,919 - 322,712,510) / 5 = 161,032,882 Ir
+  nopsave (to_bytes only)   = (1,105,933,571 - 319,095,997) / 5 = 157,367,515 Ir
+  difference (the whole materialization plus one set_title)
+                            = 3,665,367 Ir = 2.28% of the edit-and-save
+
+cross-check from the same profile's call graph (resave 50 6):
+  Package::to_bytes  6 loop calls  966,279,696 Ir -> 161,046,616 each
+  Package::to_bytes  7 calls total 1,126,491,820 Ir -> 160,927,403 mean
+  Package::flush_presentation 7 calls 24,818,282 Ir -> 3,545,469 each = 2.20%

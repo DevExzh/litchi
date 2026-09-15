@@ -1,0 +1,12 @@
+# Single-leg scaling, change 0607, probe0607 sha256 c5bfebc6..., taskset -c 27
+# resave  = edit one title through the mutable model, then to_bytes
+# nopsave = to_bytes with a clean model
+# 5 runs per point, 60 iterations each; the median of the 5 is reported
+
+slides	members	resave_us	nopsave_us	delta_us	delta_pct
+1	39	1085.1	1076.1	9.0	0.83%
+10	61	1458.1	1429.9	28.1	1.93%
+25	99	2186.8	2033.3	153.5	7.02%
+50	161	3260.1	2934.2	325.9	10.00%
+100	287	5465.7	4939.2	526.4	9.63%
+200	537	9891.5	8723.1	1168.4	11.81%

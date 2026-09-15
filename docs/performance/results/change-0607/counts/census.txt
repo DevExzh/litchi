@@ -1,0 +1,30 @@
+=== slides=1 ===
+slides	1
+notes_parts	0
+slides_modified	1
+slides_unmodified	0
+slide_parts_removed_and_regenerated_per_save	1
+notes_parts_removed_and_regenerated_per_save	0
+slide_xml_bytes_generated_per_save	2144
+first_save_bytes	29628
+second_save_bytes	29629
+=== slides=10 ===
+slides	10
+notes_parts	2
+slides_modified	1
+slides_unmodified	9
+slide_parts_removed_and_regenerated_per_save	10
+notes_parts_removed_and_regenerated_per_save	2
+slide_xml_bytes_generated_per_save	21440
+first_save_bytes	40776
+second_save_bytes	40777
+=== slides=50 ===
+slides	50
+notes_parts	12
+slides_modified	1
+slides_unmodified	49
+slide_parts_removed_and_regenerated_per_save	50
+notes_parts_removed_and_regenerated_per_save	12
+slide_xml_bytes_generated_per_save	107200
+first_save_bytes	91537
+second_save_bytes	91538

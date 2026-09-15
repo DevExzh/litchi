@@ -1,0 +1,8 @@
+first_bytes	91537
+second_bytes	91538
+identical	false
+first_difference_at	Some(32112)
+members 161 161 same order and names: True
+members with differing content: 1
+   ppt/slides/slide1.xml 2144 -> 2144
+members byte-identical: 160
