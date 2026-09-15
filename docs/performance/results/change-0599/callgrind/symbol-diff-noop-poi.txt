@@ -1,0 +1,21 @@
+### noop_transaction_commit_save, testVarious.xlsb, 15 samples, after minus before
+ delta Ir (after-before)          before          after  symbol
+             -71,907,399     173,423,727    101,516,328  ???:litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice
+             -48,362,376     117,066,272     68,703,896  ./malloc/./malloc/malloc.c:realloc
+             -45,037,760     109,033,386     63,995,626  ???:alloc::raw_vec::RawVecInner<A>::finish_grow
+             -35,336,132      87,009,440     51,673,308  ???:quick_xml::events::attributes::IterState::next
+             -26,081,604      62,902,692     36,821,088  ???:litchi_ooxml_common::mce::codec::esc
+             -24,539,636      59,337,498     34,797,862  ???:__rustc::__rdl_realloc
+             -24,305,147      64,491,427     40,186,280  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+              -6,982,155      16,900,723      9,918,568  ???:quick_xml::name::NamespaceResolver::resolve_prefix
+              -5,713,101      14,239,150      8,526,049  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe
+              -5,062,016      16,007,823     10,945,807  ./malloc/./malloc/malloc.c:_int_realloc
+              -4,947,204      11,932,860      6,985,656  ???:quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+              -4,512,242      11,565,525      7,053,283  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+              -4,201,533      10,355,596      6,154,063  ???:quick_xml::events::attributes::IterState::check_for_duplicates
+              -3,987,180       9,808,860      5,821,680  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+...
+                  16,320               0         16,320  ???:xml_minifier::audit::package::is_xml_media_type
+                  17,212               0         17,212  ./malloc/./malloc/malloc.c:_int_memalign
+                  23,792       3,662,253      3,686,045  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0
+                  47,940               0         47,940  ???:0x00000000050bf680

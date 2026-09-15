@@ -1,5 +1,39 @@
 # Performance program phase report
 
+## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
+
+Change 0599 makes an XLSB cell-value publication parse its candidate workbook
+once. `Workbook::apply_cell_values` previously cloned its package before knowing
+whether anything would change and re-derived the complete eager `Workbook`
+afterwards in every case, and the inner
+`cell_values::workbook::apply_with_external_link_limits` separately cloned twice
+more and built a throwaway parse purely to run `validate_dependencies` against
+it. The publication boundary is now a crate-private `apply_retaining_parse` that
+takes `&OpcPackage`, answers an exact no-op from the stored bytes without
+cloning or parsing anything, and otherwise hands back the validated candidate as
+`Applied::Published` for the caller to install. `apply` and
+`apply_with_external_link_limits` keep their signatures, their `&mut OpcPackage`
+publication contract and their error identity, so the two in-crate callers in
+`cell_values/root.rs` are untouched. Validation is unchanged and still runs
+exactly once: `require_worksheet`, the patch application against the stored
+bytes, the complete candidate reparse that is the whole-workbook readback, the
+candidate worksheet-URI lookup and its `WorksheetNotFound` refusal, the typed
+worksheet decode, and `validate_dependencies` over every committed cell's style,
+font, fill, border, number format, shared-string index and rich-string run fonts.
+A 17-artifact, 35-worksheet differential between the two legs — worksheet
+catalogs, per-worksheet snapshot and cell digests, an exact no-op and a real
+scalar edit per worksheet with published and saved digests and a readback, and a
+refused publication per artifact — is **byte-identical**, and `xlsb_crud`'s own
+gates are `true` in all 192 observations, with the changed-member list empty for
+every no-op and exactly one worksheet part for every edit. Measured on
+`testVarious.xlsb`: instructions per commit −43.94% (no-op) and −30.84% (one
+cell), paired p50 −46.43% and −31.40%; on `cond_format.xlsb` −9.69% and −9.69%.
+The two synthetic fixtures' deltas lie inside this window's A/A floor and carry
+no timing statement. `performance_claim: none`; no speedup, regression, RSS,
+allocation, cold-cache or cross-platform claim follows. See
+[Change 0599](0599-xlsb-commit-single-parse.md);
+[evidence](results/change-0599/README.md).
+
 ## 0593 — pristine-member proof reuse and a buffered atomic tempfile
 
 `crates/litchi-opc` now carries the canonical `.rels` serialization captured at

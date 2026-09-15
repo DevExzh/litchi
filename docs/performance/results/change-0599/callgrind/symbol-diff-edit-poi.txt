@@ -1,0 +1,21 @@
+### edit_one_existing_scalar_save, testVarious.xlsb, 15 samples, after minus before
+ delta Ir (after-before)          before          after  symbol
+             -71,907,399     241,101,279    169,193,880  ???:litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice
+             -48,373,738     162,800,173    114,426,435  ./malloc/./malloc/malloc.c:realloc
+             -45,037,760     151,643,447    106,605,687  ???:alloc::raw_vec::RawVecInner<A>::finish_grow
+             -35,336,132     120,830,934     85,494,802  ???:quick_xml::events::attributes::IterState::next
+             -26,081,604      87,450,084     61,368,480  ???:litchi_ooxml_common::mce::codec::esc
+             -24,539,636      82,511,704     57,972,068  ???:__rustc::__rdl_realloc
+             -24,232,648      87,013,498     62,780,850  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+              -6,982,155      23,469,763     16,487,608  ???:quick_xml::name::NamespaceResolver::resolve_prefix
+              -6,209,199      21,483,164     15,273,965  ./malloc/./malloc/malloc.c:_int_realloc
+              -5,741,506      20,233,604     14,492,098  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe
+              -4,947,204      16,589,052     11,641,848  ???:quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with
+              -4,849,986      17,410,135     12,560,149  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+              -4,512,242      16,110,520     11,598,278  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+              -4,201,533      14,422,420     10,220,887  ???:quick_xml::events::attributes::IterState::check_for_duplicates
+...
+                  16,416               0         16,416  ???:smallvec::SmallVec<A>::push
+                  16,752               0         16,752  ???:litchi_opc::content_type::ContentTypeMap::add_default
+                  17,458               0         17,458  ./malloc/./malloc/malloc.c:_int_memalign
+                  78,672               0         78,672  ???:0x00000000050bf680

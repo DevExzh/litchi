@@ -1,0 +1,208 @@
+tdf108017_calcProtection.xlsb	worksheet_names	["ProtectedSheet"]
+tdf108017_calcProtection.xlsb	worksheet_count	1
+tdf108017_calcProtection.xlsb	save.baseline	9c18ee4e966af214c8c249824661c8dd633987dfba128091f867964f424309f2
+tdf108017_calcProtection.xlsb	sheet0.snapshot	src=79e385a79fa19e5aab6558819bf5ec4ba077c5d5c4d8e7da76192ee0588bbda0 n=5 cells=80489a01925539b3149c33c3d75c748e695f9b935fc6837a1e04c8aba156c22e
+tdf108017_calcProtection.xlsb	sheet0.noop.patch_empty	true
+tdf108017_calcProtection.xlsb	sheet0.noop.published	src=79e385a79fa19e5aab6558819bf5ec4ba077c5d5c4d8e7da76192ee0588bbda0 save=9c18ee4e966af214c8c249824661c8dd633987dfba128091f867964f424309f2 names=["ProtectedSheet"] shared=1 xfs=3
+tdf108017_calcProtection.xlsb	sheet0.edit	no editable scalar
+tdf108017_calcProtection.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 3)) unchanged=true
+51519.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3"]
+51519.xlsb	worksheet_count	3
+51519.xlsb	save.baseline	53ebff181db309ae9b602780591836515678db7590aeb59942f9c3348fe61192
+51519.xlsb	sheet0.snapshot	src=4578990abae26a701fb8aaffada962247f21fa640e3b62fe5377afc728b6fd80 n=72 cells=42a8261c7c924f81c782b01c380cc80de92ddbc0d8a7666ebc7b8b62fcecd057
+51519.xlsb	sheet1.snapshot	src=59e39771dbe96158ed637d3efc807eb684b19c86a7c01ef084f0e9b222147e64 n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+51519.xlsb	sheet2.snapshot	src=59e39771dbe96158ed637d3efc807eb684b19c86a7c01ef084f0e9b222147e64 n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+51519.xlsb	sheet0.noop.patch_empty	true
+51519.xlsb	sheet0.noop.published	src=4578990abae26a701fb8aaffada962247f21fa640e3b62fe5377afc728b6fd80 save=53ebff181db309ae9b602780591836515678db7590aeb59942f9c3348fe61192 names=["Sheet1", "Sheet2", "Sheet3"] shared=49 xfs=1
+51519.xlsb	sheet1.noop.patch_empty	true
+51519.xlsb	sheet1.noop.published	src=59e39771dbe96158ed637d3efc807eb684b19c86a7c01ef084f0e9b222147e64 save=53ebff181db309ae9b602780591836515678db7590aeb59942f9c3348fe61192 names=["Sheet1", "Sheet2", "Sheet3"] shared=49 xfs=1
+51519.xlsb	sheet2.noop.patch_empty	true
+51519.xlsb	sheet2.noop.published	src=59e39771dbe96158ed637d3efc807eb684b19c86a7c01ef084f0e9b222147e64 save=53ebff181db309ae9b602780591836515678db7590aeb59942f9c3348fe61192 names=["Sheet1", "Sheet2", "Sheet3"] shared=49 xfs=1
+51519.xlsb	sheet0.edit	at=(1,0) src=bd8ed51ef901eeb83c52c25e3a34b41bb36989170be0b4227c25c84232d607bf save=92a9db465e30e85125ca731d669caa04c882b8e8d6273ddb5af6d647b1bc969f readback=RkNumber(2.0) names=["Sheet1", "Sheet2", "Sheet3"] shared=49 xfs=1
+51519.xlsb	sheet1.edit	no editable scalar
+51519.xlsb	sheet2.edit	no editable scalar
+51519.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+62815.xlsb	worksheet_names	["RkNumber"]
+62815.xlsb	worksheet_count	1
+62815.xlsb	save.baseline	2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565
+62815.xlsb	sheet0.snapshot	src=36b8508664b4ff1c1b2f231559df2e30e72cbc068938932c6590b6a26d79889f n=282 cells=0882b634bfb17b29697b6118ee198e1d47df49e32c5e8a865068cce4cb6f1a17
+62815.xlsb	sheet0.noop.patch_empty	true
+62815.xlsb	sheet0.noop.published	src=36b8508664b4ff1c1b2f231559df2e30e72cbc068938932c6590b6a26d79889f save=2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565 names=["RkNumber"] shared=0 xfs=7
+62815.xlsb	sheet0.edit	at=(0,0) src=ddf6a216f1a9dc8de7af2224e906b2efa10efb85c313a60543e14b4d8ea50835 save=18136b2090c7033222c5d0d277dc42df411074f84473254ffa1913c6c7c03ef8 readback=RkNumber(1.0) names=["RkNumber"] shared=0 xfs=7
+62815.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 7)) unchanged=true
+Simple.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3"]
+Simple.xlsb	worksheet_count	3
+Simple.xlsb	save.baseline	41b0c82bfa682f968d69e05e23137232d6c89ea4f24439786f0b779be319929b
+Simple.xlsb	sheet0.snapshot	src=e148fc90718320d1dd2bafa3ebed8c3c39509462a5ca521069210f963cd61078 n=1 cells=1d37218f2c4a1374a5572215ebbee7f97cc6fbacb6f0fd0a8ae6e3174a1012c7
+Simple.xlsb	sheet1.snapshot	src=9e3d6a6d789fe1fa227b896853e372c26581dd0b36519483b5b835b41823466c n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Simple.xlsb	sheet2.snapshot	src=9e3d6a6d789fe1fa227b896853e372c26581dd0b36519483b5b835b41823466c n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+Simple.xlsb	sheet0.noop.patch_empty	true
+Simple.xlsb	sheet0.noop.published	src=e148fc90718320d1dd2bafa3ebed8c3c39509462a5ca521069210f963cd61078 save=41b0c82bfa682f968d69e05e23137232d6c89ea4f24439786f0b779be319929b names=["Sheet1", "Sheet2", "Sheet3"] shared=1 xfs=1
+Simple.xlsb	sheet1.noop.patch_empty	true
+Simple.xlsb	sheet1.noop.published	src=9e3d6a6d789fe1fa227b896853e372c26581dd0b36519483b5b835b41823466c save=41b0c82bfa682f968d69e05e23137232d6c89ea4f24439786f0b779be319929b names=["Sheet1", "Sheet2", "Sheet3"] shared=1 xfs=1
+Simple.xlsb	sheet2.noop.patch_empty	true
+Simple.xlsb	sheet2.noop.published	src=9e3d6a6d789fe1fa227b896853e372c26581dd0b36519483b5b835b41823466c save=41b0c82bfa682f968d69e05e23137232d6c89ea4f24439786f0b779be319929b names=["Sheet1", "Sheet2", "Sheet3"] shared=1 xfs=1
+Simple.xlsb	sheet0.edit	no editable scalar
+Simple.xlsb	sheet1.edit	no editable scalar
+Simple.xlsb	sheet2.edit	no editable scalar
+Simple.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+bug66682.xlsb	worksheet_names	["test2"]
+bug66682.xlsb	worksheet_count	1
+bug66682.xlsb	save.baseline	490f0430a6bd44bdf697c7a41a898bce632ce2b775797c3b8c1517764c0900b3
+bug66682.xlsb	sheet0.snapshot	src=7046d79b2fb35620a1a8051eb0464d740b51ddbd5e0d54ae962e62b4a9439c40 n=30 cells=30a64f3ac11880a11325d4bcbca4ea92894cca37c3f334c73f9f0b36c759f14f
+bug66682.xlsb	sheet0.noop.patch_empty	true
+bug66682.xlsb	sheet0.noop.published	src=7046d79b2fb35620a1a8051eb0464d740b51ddbd5e0d54ae962e62b4a9439c40 save=490f0430a6bd44bdf697c7a41a898bce632ce2b775797c3b8c1517764c0900b3 names=["test2"] shared=5 xfs=2
+bug66682.xlsb	sheet0.edit	at=(1,0) src=b5a563efb9c7474a47b64d0a717b4a1128ebcce91c0c2aaab8b090f24c5392d0 save=38021efa232b4948fef6e45014c1eef015ea07b69fe0424ebd7af89b6ed6b861 readback=RkNumber(2.0) names=["test2"] shared=5 xfs=2
+bug66682.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 2)) unchanged=true
+comments.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3"]
+comments.xlsb	worksheet_count	3
+comments.xlsb	save.baseline	d22daaebbc2a18d29cc3d6f1bb257cad1d880a32311a7def0b288f795b6340d6
+comments.xlsb	sheet0.snapshot	src=bdf6691a74a20bafc9a7aa4536837c9bf26b8bc638d562584f0fe5e90746a50e n=4 cells=2f025f2af2898bca7ecfe0e9dfe82b9d6fb1a2aa73ee4fce49842a4635ca796d
+comments.xlsb	sheet1.snapshot	src=5273c63df91994847fc1b980aeea617fe1eee1d6e2a7e73e3c6cc483333547da n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+comments.xlsb	sheet2.snapshot	src=5273c63df91994847fc1b980aeea617fe1eee1d6e2a7e73e3c6cc483333547da n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+comments.xlsb	sheet0.noop.patch_empty	true
+comments.xlsb	sheet0.noop.published	src=bdf6691a74a20bafc9a7aa4536837c9bf26b8bc638d562584f0fe5e90746a50e save=d22daaebbc2a18d29cc3d6f1bb257cad1d880a32311a7def0b288f795b6340d6 names=["Sheet1", "Sheet2", "Sheet3"] shared=3 xfs=1
+comments.xlsb	sheet1.noop.patch_empty	true
+comments.xlsb	sheet1.noop.published	src=5273c63df91994847fc1b980aeea617fe1eee1d6e2a7e73e3c6cc483333547da save=d22daaebbc2a18d29cc3d6f1bb257cad1d880a32311a7def0b288f795b6340d6 names=["Sheet1", "Sheet2", "Sheet3"] shared=3 xfs=1
+comments.xlsb	sheet2.noop.patch_empty	true
+comments.xlsb	sheet2.noop.published	src=5273c63df91994847fc1b980aeea617fe1eee1d6e2a7e73e3c6cc483333547da save=d22daaebbc2a18d29cc3d6f1bb257cad1d880a32311a7def0b288f795b6340d6 names=["Sheet1", "Sheet2", "Sheet3"] shared=3 xfs=1
+comments.xlsb	sheet0.edit	no editable scalar
+comments.xlsb	sheet1.edit	no editable scalar
+comments.xlsb	sheet2.edit	no editable scalar
+comments.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+cond_format.xlsb	worksheet_names	["Sheet1"]
+cond_format.xlsb	worksheet_count	1
+cond_format.xlsb	save.baseline	801eeac381ebf3e3df0adeaf15020b63ebe9ea8d8326203d0bdf9043147dfc86
+cond_format.xlsb	sheet0.snapshot	src=5de1bb59723a1f006df4258bc74c4e23dac6598ee2b3bc6054d8575ee08e175c n=16 cells=df69fa74a373c81dfacd03131e4c5ad81929b7f12de200ee6992f587bcd9c366
+cond_format.xlsb	sheet0.noop.patch_empty	true
+cond_format.xlsb	sheet0.noop.published	src=5de1bb59723a1f006df4258bc74c4e23dac6598ee2b3bc6054d8575ee08e175c save=801eeac381ebf3e3df0adeaf15020b63ebe9ea8d8326203d0bdf9043147dfc86 names=["Sheet1"] shared=0 xfs=1
+cond_format.xlsb	sheet0.edit	at=(2,4) src=d7365db88cff7545ffc141f2ff4f48ae59848facc5c01c8c36e331a6de01cb0a save=cb80b3733c29f896236fd87b11439e7294e6e94d394bf267fb053c4456fa7b76 readback=RkNumber(2.0) names=["Sheet1"] shared=0 xfs=1
+cond_format.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+date.xlsb	worksheet_names	["Sheet1"]
+date.xlsb	worksheet_count	1
+date.xlsb	save.baseline	fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09
+date.xlsb	sheet0.snapshot	src=5ec1ff676090b4dd130db4ad191065df3cc64178888c38892ab6ec70dfbf7790 n=1 cells=7cff616dde7bb65a214f418d3de8470ba436bcd715ad87dd892e8239767bd4be
+date.xlsb	sheet0.noop.patch_empty	true
+date.xlsb	sheet0.noop.published	src=5ec1ff676090b4dd130db4ad191065df3cc64178888c38892ab6ec70dfbf7790 save=fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09 names=["Sheet1"] shared=0 xfs=2
+date.xlsb	sheet0.edit	at=(0,0) src=3ee69d42bbe2ea697decb762ebebd3a38dab319e7b01c1e0e478a4b4a5256887 save=51d28b103b92c0c8219252e4901e312496c2246ce90ce5bd60e61c869b5c0fb3 readback=RkNumber(1.0) names=["Sheet1"] shared=0 xfs=2
+date.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 2)) unchanged=true
+hyperlink.xlsb	worksheet_names	["Sheet1"]
+hyperlink.xlsb	worksheet_count	1
+hyperlink.xlsb	save.baseline	6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724
+hyperlink.xlsb	sheet0.snapshot	src=25b0aa92ccb75697fc48c86df4f9c87eae5b3043d24810978919af8d3bc9ce8c n=1 cells=41ed0a4c8d1d1de76f0ef585933208e5b53c742208f6649f8a00f4ae658cba98
+hyperlink.xlsb	sheet0.noop.patch_empty	true
+hyperlink.xlsb	sheet0.noop.published	src=25b0aa92ccb75697fc48c86df4f9c87eae5b3043d24810978919af8d3bc9ce8c save=6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724 names=["Sheet1"] shared=1 xfs=2
+hyperlink.xlsb	sheet0.edit	no editable scalar
+hyperlink.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 2)) unchanged=true
+pivot-cache-ac-prefixed.xlsb	worksheet_names	["Sheet1", "Pivot Table_Sheet1_1"]
+pivot-cache-ac-prefixed.xlsb	worksheet_count	2
+pivot-cache-ac-prefixed.xlsb	save.baseline	343dba333fd1aa9fa8c4a28d4b948ec90a14b3adab29d34079f42adfe340d761
+pivot-cache-ac-prefixed.xlsb	sheet0.snapshot	src=1f4e1a0f9da00e0e1df831e19d41e6cb679919d7c74f3032e99f4399a091e8d2 n=57 cells=081a81d54aa665ee21dcce0864c7713364267e05c1096689232c04e602e433d3
+pivot-cache-ac-prefixed.xlsb	sheet1.snapshot	src=ba0f581d6a2c360b36eb8ff2a60a397d1b21243ed161fc710284ce0e407c9790 n=41 cells=cc95901e4f776443ac0a5a5a02cb11a45246f9e7a2317cb285cfaef0b64897a1
+pivot-cache-ac-prefixed.xlsb	sheet0.noop.patch_empty	true
+pivot-cache-ac-prefixed.xlsb	sheet0.noop.published	src=1f4e1a0f9da00e0e1df831e19d41e6cb679919d7c74f3032e99f4399a091e8d2 save=343dba333fd1aa9fa8c4a28d4b948ec90a14b3adab29d34079f42adfe340d761 names=["Sheet1", "Pivot Table_Sheet1_1"] shared=15 xfs=5
+pivot-cache-ac-prefixed.xlsb	sheet1.noop.patch_empty	true
+pivot-cache-ac-prefixed.xlsb	sheet1.noop.published	src=ba0f581d6a2c360b36eb8ff2a60a397d1b21243ed161fc710284ce0e407c9790 save=343dba333fd1aa9fa8c4a28d4b948ec90a14b3adab29d34079f42adfe340d761 names=["Sheet1", "Pivot Table_Sheet1_1"] shared=15 xfs=5
+pivot-cache-ac-prefixed.xlsb	sheet0.edit	at=(6,10) src=fe6d528cbd2dbcef9910fabec486143e6987ab7f22fb59b4751ce10925d10a03 save=41575693dbb9952d9f4267bfa652b7feaa4fcb93fb9385fa26c3b6af3467bbf7 readback=RkNumber(2.0) names=["Sheet1", "Pivot Table_Sheet1_1"] shared=15 xfs=5
+pivot-cache-ac-prefixed.xlsb	sheet1.edit	at=(2,1) src=e1ed273494fd0caa5a76c4b85db5c1eb51025ddb1ba18cad545920c367c93d4c save=d7e0e0102ff9aa13ce8dae3cda5409336daa29c0c998e8e1f591388e18e47168 readback=RkNumber(1.0) names=["Sheet1", "Pivot Table_Sheet1_1"] shared=15 xfs=5
+pivot-cache-ac-prefixed.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 5)) unchanged=true
+sample.xlsb	worksheet_names	["Sheet1", "rich test", "Sheet3"]
+sample.xlsb	worksheet_count	3
+sample.xlsb	save.baseline	8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b
+sample.xlsb	sheet0.snapshot	src=9ae292133dad4907b55bc0506d559919f5969e1aa7a4cc59677d333f28be93ad n=20 cells=9aa2024b166ebd7b085fe0cb5a5625f52d11916434960927ba05169d41f69f79
+sample.xlsb	sheet1.snapshot	src=1ec68db87569db54002020fab3e0d77873a6f1392ba28362b40d5a8d0591d885 n=9 cells=2138e019c2c938a4afcfacaa6a610a6416a191ee841c7970ebe5df0a2cb14619
+sample.xlsb	sheet2.snapshot	src=ba3209b3994c4a74457859efd68a9fc9fc17287a87f7eb0d92bac32332419a4c n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+sample.xlsb	sheet0.noop.patch_empty	true
+sample.xlsb	sheet0.noop.published	src=9ae292133dad4907b55bc0506d559919f5969e1aa7a4cc59677d333f28be93ad save=8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b names=["Sheet1", "rich test", "Sheet3"] shared=15 xfs=3
+sample.xlsb	sheet1.noop.patch_empty	true
+sample.xlsb	sheet1.noop.published	src=1ec68db87569db54002020fab3e0d77873a6f1392ba28362b40d5a8d0591d885 save=8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b names=["Sheet1", "rich test", "Sheet3"] shared=15 xfs=3
+sample.xlsb	sheet2.noop.patch_empty	true
+sample.xlsb	sheet2.noop.published	src=ba3209b3994c4a74457859efd68a9fc9fc17287a87f7eb0d92bac32332419a4c save=8cf995ace93f9d0e3bf34b6bdb1355ff46db2d418f6f3fb7943fdc4ca1db4d1b names=["Sheet1", "rich test", "Sheet3"] shared=15 xfs=3
+sample.xlsb	sheet0.edit	at=(0,1) src=98dcfb6ffea28cca04b61a7afdfc513c14d8ba6ab04f9cc57ffad2f026f41b6f save=0cfad9d994bb58647f09da38e5c0c1b132fb69c492d4bfd1ffa851721ba14b8e readback=RkNumber(1.0) names=["Sheet1", "rich test", "Sheet3"] shared=15 xfs=3
+sample.xlsb	sheet1.edit	no editable scalar
+sample.xlsb	sheet2.edit	no editable scalar
+sample.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 3)) unchanged=true
+universal-content.xlsb	worksheet_names	["Sheet1", "Sheet2"]
+universal-content.xlsb	worksheet_count	2
+universal-content.xlsb	save.baseline	3d425c433c4f0688d4d2f2c84bbcfc25494641d0d38cbe96d6a954d820536170
+universal-content.xlsb	sheet0.snapshot	src=5b42b8836b4e598d4f5843be9ab99c593bcf90fe71a7c242657f3bcbcb3324ab n=12 cells=8556acd46f4d32896d1d0fa153ad0cb9d7f1c924676f7c93148c7bb5ebee1294
+universal-content.xlsb	sheet1.snapshot	src=ebcb2b9816877cf5cd33c60b06eeeb3cf4b5e6f786bb400d02939ed68adbc59a n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+universal-content.xlsb	sheet0.noop.patch_empty	true
+universal-content.xlsb	sheet0.noop.published	src=5b42b8836b4e598d4f5843be9ab99c593bcf90fe71a7c242657f3bcbcb3324ab save=3d425c433c4f0688d4d2f2c84bbcfc25494641d0d38cbe96d6a954d820536170 names=["Sheet1", "Sheet2"] shared=2 xfs=2
+universal-content.xlsb	sheet1.noop.patch_empty	true
+universal-content.xlsb	sheet1.noop.published	src=ebcb2b9816877cf5cd33c60b06eeeb3cf4b5e6f786bb400d02939ed68adbc59a save=3d425c433c4f0688d4d2f2c84bbcfc25494641d0d38cbe96d6a954d820536170 names=["Sheet1", "Sheet2"] shared=2 xfs=2
+universal-content.xlsb	sheet0.edit	at=(0,0) src=b8230bdd691c1965f91d87407ccca77b61f3354a4c9ed395471225259fbd5310 save=44daf7fc89e2aae011b6684f136add506094f4a4d5fb27af8303ae3eb581fd22 readback=RkNumber(2.0) names=["Sheet1", "Sheet2"] shared=2 xfs=2
+universal-content.xlsb	sheet1.edit	no editable scalar
+universal-content.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 2)) unchanged=true
+62815.xlsb	worksheet_names	["RkNumber"]
+62815.xlsb	worksheet_count	1
+62815.xlsb	save.baseline	2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565
+62815.xlsb	sheet0.snapshot	src=36b8508664b4ff1c1b2f231559df2e30e72cbc068938932c6590b6a26d79889f n=282 cells=0882b634bfb17b29697b6118ee198e1d47df49e32c5e8a865068cce4cb6f1a17
+62815.xlsb	sheet0.noop.patch_empty	true
+62815.xlsb	sheet0.noop.published	src=36b8508664b4ff1c1b2f231559df2e30e72cbc068938932c6590b6a26d79889f save=2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565 names=["RkNumber"] shared=0 xfs=7
+62815.xlsb	sheet0.edit	at=(0,0) src=ddf6a216f1a9dc8de7af2224e906b2efa10efb85c313a60543e14b4d8ea50835 save=18136b2090c7033222c5d0d277dc42df411074f84473254ffa1913c6c7c03ef8 readback=RkNumber(1.0) names=["RkNumber"] shared=0 xfs=7
+62815.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 7)) unchanged=true
+WithTextBox.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3"]
+WithTextBox.xlsb	worksheet_count	3
+WithTextBox.xlsb	save.baseline	019fcd1672d45d557fcc4e2de334c8685a49c07c132075a3618c83db832f08b4
+WithTextBox.xlsb	sheet0.snapshot	src=b571e010197c63d8451914524d1226dc91f63e87d306c4175d32a772a383f808 n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+WithTextBox.xlsb	sheet1.snapshot	src=c137391db3be3aa96b67a2fee9a201b941c7493dd39c6727dd80a05e00ec5b7d n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+WithTextBox.xlsb	sheet2.snapshot	src=c137391db3be3aa96b67a2fee9a201b941c7493dd39c6727dd80a05e00ec5b7d n=0 cells=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+WithTextBox.xlsb	sheet0.noop.patch_empty	true
+WithTextBox.xlsb	sheet0.noop.published	src=b571e010197c63d8451914524d1226dc91f63e87d306c4175d32a772a383f808 save=019fcd1672d45d557fcc4e2de334c8685a49c07c132075a3618c83db832f08b4 names=["Sheet1", "Sheet2", "Sheet3"] shared=0 xfs=1
+WithTextBox.xlsb	sheet1.noop.patch_empty	true
+WithTextBox.xlsb	sheet1.noop.published	src=c137391db3be3aa96b67a2fee9a201b941c7493dd39c6727dd80a05e00ec5b7d save=019fcd1672d45d557fcc4e2de334c8685a49c07c132075a3618c83db832f08b4 names=["Sheet1", "Sheet2", "Sheet3"] shared=0 xfs=1
+WithTextBox.xlsb	sheet2.noop.patch_empty	true
+WithTextBox.xlsb	sheet2.noop.published	src=c137391db3be3aa96b67a2fee9a201b941c7493dd39c6727dd80a05e00ec5b7d save=019fcd1672d45d557fcc4e2de334c8685a49c07c132075a3618c83db832f08b4 names=["Sheet1", "Sheet2", "Sheet3"] shared=0 xfs=1
+WithTextBox.xlsb	sheet0.edit	no editable scalar
+WithTextBox.xlsb	sheet1.edit	no editable scalar
+WithTextBox.xlsb	sheet2.edit	no editable scalar
+WithTextBox.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+testVarious.xlsb	worksheet_names	["mySheet1"]
+testVarious.xlsb	worksheet_count	1
+testVarious.xlsb	save.baseline	8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc
+testVarious.xlsb	sheet0.snapshot	src=b84588d12299468572453d85600cd959404ca2884a2ec9d44e5019485b549d13 n=48 cells=6fa7d2121c0af25414d0eee227db5f0b2cbbd22e40fc21f5baaaeb9f4e685a2a
+testVarious.xlsb	sheet0.noop.patch_empty	true
+testVarious.xlsb	sheet0.noop.published	src=b84588d12299468572453d85600cd959404ca2884a2ec9d44e5019485b549d13 save=8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc names=["mySheet1"] shared=30 xfs=7
+testVarious.xlsb	sheet0.edit	at=(1,1) src=1e042155c6ca438c8592f12c16ae2b4489f2976a4b5eb6657b9d149d699ec9dd save=831dc474ffb22336e1fdaadf3b189a5e7f549725398eed5b897021d1400a885c readback=RkNumber(1.0) names=["mySheet1"] shared=30 xfs=7
+testVarious.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 7)) unchanged=true
+synthetic-4x2000x12.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3", "Sheet4"]
+synthetic-4x2000x12.xlsb	worksheet_count	4
+synthetic-4x2000x12.xlsb	save.baseline	05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57
+synthetic-4x2000x12.xlsb	sheet0.snapshot	src=0f141ff61eba0b615f7fd6c36695ba3c551182b3a63373eb6289310d25921786 n=22500 cells=a8da479bd6f4f3ca29dcb992c8ab9dba7805a2d95ff9c37041255ef1539da952
+synthetic-4x2000x12.xlsb	sheet1.snapshot	src=3bb26cfefb2badeeed11ccbc1f02709afec92cecfb876a33a606d93849ef2392 n=22500 cells=35b3ae633e6d2f3cabf5bbefeb4d2682e38bc1a60eda143cc1cf9d29defc6bdb
+synthetic-4x2000x12.xlsb	sheet2.snapshot	src=ccb2bdb001bfd89117e5c65c95ba04dbf9800073478373e7315d6d30a3ed8f53 n=22500 cells=8fb344ecc953c41f1cee401706fa47686eaae91ab853f31263186cf2d07d4453
+synthetic-4x2000x12.xlsb	sheet3.snapshot	src=2dea51ce9bbe491a0e7708aec6048b839ef51b2a62f231c88d90cc9aaab491b2 n=22500 cells=ba15433dd7416b0f030c738323bdd25fa1bf21d22b1ad74943be0fdfe51f5892
+synthetic-4x2000x12.xlsb	sheet0.noop.patch_empty	true
+synthetic-4x2000x12.xlsb	sheet0.noop.published	src=0f141ff61eba0b615f7fd6c36695ba3c551182b3a63373eb6289310d25921786 save=05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet1.noop.patch_empty	true
+synthetic-4x2000x12.xlsb	sheet1.noop.published	src=3bb26cfefb2badeeed11ccbc1f02709afec92cecfb876a33a606d93849ef2392 save=05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet2.noop.patch_empty	true
+synthetic-4x2000x12.xlsb	sheet2.noop.published	src=ccb2bdb001bfd89117e5c65c95ba04dbf9800073478373e7315d6d30a3ed8f53 save=05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet3.noop.patch_empty	true
+synthetic-4x2000x12.xlsb	sheet3.noop.published	src=2dea51ce9bbe491a0e7708aec6048b839ef51b2a62f231c88d90cc9aaab491b2 save=05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet0.edit	at=(0,0) src=623d025e764e9416d82a6ffba3b984a38a27b99cdbaf5497aa24e14e326a18cc save=e98f7c7645092123f9489b3b527d5323bc824ad70952a7229e583ff0c7292e6f readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet1.edit	at=(0,0) src=ccd1f0d5699a54a0e3d15b21ca6435faf4f62382c797e76ed15f98b544aa5a7f save=d51548dd75a68b7382e6720def9d11402b347af2142370c2423da48fd856fa5b readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet2.edit	at=(0,0) src=d6d230752946ca07f317f075485a8262b561e3571b80ce6f337850c4e13ee41b save=15cfa0b4edee432398112ebe52b467252e6aaa1ad844986163833278a9dd8bea readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	sheet3.edit	at=(0,0) src=9fc3eb61d5a6003039f64f6cfcb105c3ec82d5fef8cf190df58d90de89252997 save=b78f3b7b4862ff4c6dc63c052c67bd61981bb3f57d187e14600b79fbd65d986e readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x2000x12.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true
+synthetic-4x500x8.xlsb	worksheet_names	["Sheet1", "Sheet2", "Sheet3", "Sheet4"]
+synthetic-4x500x8.xlsb	worksheet_count	4
+synthetic-4x500x8.xlsb	save.baseline	001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41
+synthetic-4x500x8.xlsb	sheet0.snapshot	src=f0f580f333ddcc1c876ed62db5d28eba86a4c1ce738149f345bc0bd03922b489 n=3750 cells=91ceeb63c9d95c02a0d30db110792d640a7b50ee6118d663413deec133a53084
+synthetic-4x500x8.xlsb	sheet1.snapshot	src=be4e4231fcf35c3ded319720871a4e1fdb5b03c52997960fb5ed45ef77857669 n=3750 cells=5fd9e052686d2f358e791a732a920308a7cb2305ff8f1cc000b9bb1ebe2cd7a0
+synthetic-4x500x8.xlsb	sheet2.snapshot	src=86bbd7e9966c07b527b1b95cccffff38684d8d262a2383b8974b73ee06d80417 n=3750 cells=7d8714d2957f2bfaf279e344fb4f04338ae61b98e145244ca73b000ce4b570ac
+synthetic-4x500x8.xlsb	sheet3.snapshot	src=b11c9bc0a94e161836f835fa118317fd27becbd88549eba72cc49842574b50ec n=3750 cells=2075b4d781a5f9ac5fc6a7f50f02685b275c2aec51225ca92e08a3ba9bcb615e
+synthetic-4x500x8.xlsb	sheet0.noop.patch_empty	true
+synthetic-4x500x8.xlsb	sheet0.noop.published	src=f0f580f333ddcc1c876ed62db5d28eba86a4c1ce738149f345bc0bd03922b489 save=001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet1.noop.patch_empty	true
+synthetic-4x500x8.xlsb	sheet1.noop.published	src=be4e4231fcf35c3ded319720871a4e1fdb5b03c52997960fb5ed45ef77857669 save=001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet2.noop.patch_empty	true
+synthetic-4x500x8.xlsb	sheet2.noop.published	src=86bbd7e9966c07b527b1b95cccffff38684d8d262a2383b8974b73ee06d80417 save=001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet3.noop.patch_empty	true
+synthetic-4x500x8.xlsb	sheet3.noop.published	src=b11c9bc0a94e161836f835fa118317fd27becbd88549eba72cc49842574b50ec save=001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41 names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet0.edit	at=(0,0) src=b621edc4dcf472e270b1773b80da7c36f4de1fde2aa4343b005914fdbc8aee5c save=6d451372732e74ac90cf25ea14597d9a5755a85c2ccd3e8e257e62d8f9b9506c readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet1.edit	at=(0,0) src=edea006e39b02d69e7db6c0df81f9cdb4f4b7f4b44eeac5f98952d3c35ae2ea8 save=db0f4f87b615828e4171a8affcf510ce4c8e1776c7be783cae924b060bd8c086 readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet2.edit	at=(0,0) src=72410e9d644fcda4e3b9e1a0ee59ef582a3a49d114bb50c59959fd58d024cde8 save=6149c68da085946bf210aaf545b952cbe09310cbf987764032e3c027387928fd readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	sheet3.edit	at=(0,0) src=3151a52e1738d731a11b16e81c7209d3fcb620a39c67d8480078426955fc77a2 save=448c968b9e6acc294558721c4d17661485ffb4c6aed7391f25a06412842c464a readback=Number(1.0) names=["Sheet1", "Sheet2", "Sheet3", "Sheet4"] shared=0 xfs=1
+synthetic-4x500x8.xlsb	refusal	Err(Unrecognized Cell iStyleRef: 16777215 (cell XF count 1)) unchanged=true

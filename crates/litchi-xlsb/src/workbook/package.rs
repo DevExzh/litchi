@@ -127,8 +127,16 @@ impl Workbook {
             .edit())
     }
 
-    /// Apply an exact-source cell-value commit and refresh this workbook's
-    /// typed sheet cache only after whole-workbook readback succeeds.
+    /// Apply an exact-source cell-value commit and republish this workbook
+    /// from the candidate parse that whole-workbook readback validated.
+    ///
+    /// An exact no-op commit publishes nothing. Its patch reproduces the
+    /// stored worksheet bytes, so the candidate would be this workbook's own
+    /// package and the readback would re-derive the state this workbook
+    /// already holds; the commit's snapshot is returned unchanged instead.
+    /// Every other commit is parsed and validated as a complete candidate
+    /// workbook first, and only a candidate that passes every check replaces
+    /// this one, so a refusal leaves the published workbook untouched.
     ///
     /// # Errors
     ///
@@ -140,16 +148,19 @@ impl Workbook {
         commit: &cell_values::Commit,
     ) -> Result<cell_values::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        let mut candidate = self.package.clone();
-        let snapshot = cell_values::workbook::apply_with_external_link_limits(
-            &mut candidate,
+        let applied = cell_values::workbook::apply_retaining_parse(
+            &self.package,
             &uri,
             commit,
             self.external_link_limits,
         )?;
-        *self =
-            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
-        Ok(snapshot)
+        match applied {
+            cell_values::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
+            cell_values::workbook::Applied::Published { snapshot, workbook } => {
+                *self = *workbook;
+                Ok(snapshot)
+            },
+        }
     }
 
     /// Read editable cell values from a worksheet selected by exact name.
@@ -362,6 +373,15 @@ impl Workbook {
     /// Get the underlying OPC package.
     pub fn opc_package(&self) -> &OpcPackage {
         &self.package
+    }
+
+    /// Consume this workbook and return the OPC package it publishes.
+    ///
+    /// This is the seam that lets a validated candidate parse be unwrapped
+    /// back into a package for callers that own a package rather than a
+    /// workbook.
+    pub(crate) fn into_opc_package(self) -> OpcPackage {
+        self.package
     }
 
     /// Get mutable OPC access for XLSB-internal package adapters.

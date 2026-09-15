@@ -1,0 +1,9 @@
+leg          case                                          fixture              Ir@5          Ir@15          Ir/op
+before       noop_transaction_commit_save                  poi            1180425718     1703513735       52308801
+after        noop_transaction_commit_save                  poi            1014816419     1308075265       29325884
+before       edit_one_existing_scalar_save                 poi            1333646524     2116794659       78314813
+after        edit_one_existing_scalar_save                 poi            1169775414     1711398558       54162314
+before       noop_transaction_commit_save                  syn            3134043878     5022138854      188809497
+after        noop_transaction_commit_save                  syn            3038674224     4794087966      175541374
+before       edit_one_existing_scalar_save                 syn            4260672741     7836245696      357557295
+after        edit_one_existing_scalar_save                 syn            4158578408     7593671278      343509287

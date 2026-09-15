@@ -32,6 +32,11 @@ path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]
 
 [[bin]]
+name = "xlsb_synthetic_fixture"
+path = "src/bin/xlsb_synthetic_fixture.rs"
+required-features = ["xlsb-crud"]
+
+[[bin]]
 name = "xls_source_attribution"
 path = "src/bin/xls_source_attribution.rs"
 required-features = ["xls-source-attribution"]

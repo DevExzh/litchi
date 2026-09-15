@@ -63,18 +63,69 @@ pub fn apply_with_external_link_limits(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
+    let applied = apply_retaining_parse(package, worksheet, commit, external_link_limits)?;
+    match applied {
+        Applied::Unchanged(snapshot) => Ok(snapshot),
+        Applied::Published { snapshot, workbook } => {
+            *package = workbook.into_opc_package();
+            Ok(snapshot)
+        },
+    }
+}
+
+/// The outcome of one validated cell-value publication.
+///
+/// Validating a candidate requires parsing it as a complete XLSB workbook.
+/// This type hands that parse back instead of dropping it, so a caller that
+/// owns a [`crate::Workbook`] publishes the parse it already paid for rather
+/// than reparsing the same candidate bytes a second time. A caller that owns
+/// only an [`OpcPackage`] takes the package back out of it.
+pub(crate) enum Applied {
+    /// The patch reproduced the stored worksheet bytes exactly, so there is no
+    /// candidate: nothing was cloned, nothing was parsed, and the caller's
+    /// package is already the published package.
+    Unchanged(Snapshot),
+    /// The patch changed the worksheet and the candidate passed every check.
+    Published {
+        /// The published snapshot, identical to the committed one.
+        snapshot: Snapshot,
+        /// The validated candidate workbook. Its package carries the updated
+        /// worksheet part and no signatures. Boxed because a parsed workbook
+        /// is far larger than a snapshot.
+        workbook: Box<crate::Workbook>,
+    },
+}
+
+/// Apply one source-checked cell-value commit and hand the validated candidate
+/// parse back to the caller without publishing it.
+///
+/// Nothing the caller owns is touched: every refusal below leaves the caller's
+/// package, and any workbook parsed from it, exactly as they were. An exact
+/// no-op is answered from the stored bytes, without cloning the package or
+/// parsing a candidate at all.
+///
+/// # Errors
+///
+/// Returns an error for a stale patch, a non-worksheet target, or a candidate
+/// that fails complete XLSB workbook validation.
+pub(crate) fn apply_retaining_parse(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
     if updated.as_slice() == part.blob() {
-        return Ok(commit.snapshot().clone());
+        return Ok(Applied::Unchanged(commit.snapshot().clone()));
     }
 
     let mut candidate = package.clone();
-    candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
+    candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
     let parsed = crate::Workbook::from_opc_package_with_external_link_limits(
-        candidate.clone(),
+        candidate,
         external_link_limits,
     )?;
     let worksheet_index = (0..parsed.worksheet_count())
@@ -90,8 +141,10 @@ pub fn apply_with_external_link_limits(
         })?;
     let _ = parsed.worksheet(worksheet_index)?;
     validate_dependencies(commit.snapshot(), &parsed)?;
-    *package = candidate;
-    Ok(commit.snapshot().clone())
+    Ok(Applied::Published {
+        snapshot: commit.snapshot().clone(),
+        workbook: Box::new(parsed),
+    })
 }
 
 fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Result<()> {

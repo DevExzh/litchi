@@ -1,0 +1,57 @@
+# Gates for change 0599, run in the worktree at perf/0599-xlsb-commit-single-parse.
+# Base 08d968f8e. Host: AMD EPYC 9R45, rustc 1.95.0. Tails only.
+
+$ cargo fmt --all --check      # workspace
+exit=0 (no output above means no diff)
+
+$ cargo clippy -p litchi-xlsb --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+
+$ cargo test -p litchi-xlsb
+running 573 tests  ->  test result: ok. 573 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+running 8 tests  ->  test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 7 tests  ->  test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 5 tests  ->  test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests  ->  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 5 tests  ->  test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 20 tests  ->  test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests  ->  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test  ->  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 8 tests  ->  test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 8 tests  ->  test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 40 tests  ->  test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+running 2 tests  ->  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 9 tests  ->  test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+running 31 tests  ->  test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 17 tests  ->  test result: ok. 6 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests  ->  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+$ cargo doc -p litchi-xlsb --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+   Generated /home/zhuhe/code/litchi-worktrees/0599/target/doc/litchi_xlsb/index.html
+
+$ cargo fmt --all --check      # tools/perf-baseline
+exit=0 (no output above means no diff)
+
+$ cargo clippy --features xlsb-crud --bins    # tools/perf-baseline
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.36s
+
+$ 17-artifact XLSB differential: diff before.tsv after.tsv
+empty diff; 208 lines each, 17 artifact paths, 35 worksheets
+
+$ xlsb_crud own gates, 6 legs x 4 fixtures x 8 cases
+
+exact_noop_patch                                   None     168 observations
+exact_noop_patch                                   True      24 observations
+malformed_input_refused                            True     192 observations
+output_matches_across_samples                      None     120 observations
+output_matches_across_samples                      True      72 observations
+representative_output_reopen_ok                    None     120 observations
+representative_output_reopen_ok                    True      72 observations
+semantic_readback_ok                               True     192 observations
+sparse_iteration_without_rectangular_expansion     True     192 observations
+tight_cell_limits_refused                          True     192 observations
+tight_limits_refused                               True     192 observations
+unchanged_parts_ok                                 None     120 observations
+unchanged_parts_ok                                 True      72 observations
+
