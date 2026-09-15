@@ -1,0 +1,5 @@
+54016  facade-file  open       per-sample statx=36.0 newfstatat=0.0 pread64=42.0 openat=1.0
+54016  file-source  open       per-sample statx=30.0 newfstatat=0.0 pread64=40.0 openat=1.0
+54016  file-source  full-text  per-sample statx=89794.0 newfstatat=0.0 pread64=16145.0 openat=1.0
+cfs    facade-file  open       per-sample statx=40.0 newfstatat=0.0 pread64=55.0 openat=1.0
+cfs    file-source  open       per-sample statx=34.0 newfstatat=0.0 pread64=53.0 openat=1.0

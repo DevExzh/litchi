@@ -1,0 +1,87 @@
+{
+  "schema_version": 2,
+  "revision": "unknown",
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "revision": "unknown"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0621-after/release/xls_source_attribution",
+    "bytes": 9077464,
+    "sha256": "ed87751de0343e830d657b091969a676476de284514cf26492438047d3a182ec"
+  },
+  "input": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0621/test-data/ole/xls/SimpleMultiCell.xls",
+    "bytes": 13824,
+    "sha256": "f8f04c014b7503e62fa52c3b194dfaf010140a36298764d07dd9d1837ab1d037"
+  },
+  "mode": "file-source",
+  "operation": "full-text",
+  "counter_scope": "FileSource ReadAt wrapper over a staged immutable file; len/version/read calls are counted; warm page-cache and no physical-I/O counter",
+  "limitation": "the staged fixture is immutable and warm-cache; this measures logical FileSource calls, not physical I/O",
+  "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+  "process_scope": "samples share one benchmark process; invoke once per retained sample for fresh-child evidence",
+  "input_scope": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+  "warmups": 1,
+  "samples": 1,
+  "worksheet_index": 1,
+  "row": 1,
+  "column": 0,
+  "all_cells_strategy": "scan",
+  "per_cell_limit": 64,
+  "semantic_oracle": {
+    "source_implementation_projection": {
+      "worksheet_count": 3,
+      "worksheet_names": [
+        "Sheet1",
+        "Sheet2",
+        "Sheet3"
+      ],
+      "selected_cell": null,
+      "outcome": "text:48:e6901ef32a48793a80139d15c016a1452dde984fa240d0fb9faa47257d151618"
+    },
+    "eager_implementation_projection": {
+      "worksheet_count": 3,
+      "worksheet_names": [
+        "Sheet1",
+        "Sheet2",
+        "Sheet3"
+      ],
+      "selected_cell": null,
+      "outcome": null
+    },
+    "scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "elapsed_samples_ns": [
+    28780
+  ],
+  "records": [
+    {
+      "elapsed_ns": 28780,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:48:e6901ef32a48793a80139d15c016a1452dde984fa240d0fb9faa47257d151618",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 14,
+        "read_bytes": 4410,
+        "version_calls": 49,
+        "len_calls": 1,
+        "read_ns": 2130,
+        "version_ns": 9730,
+        "len_ns": 180,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    }
+  ]
+}

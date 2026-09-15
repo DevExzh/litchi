@@ -1,0 +1,1136 @@
+{
+  "schema_version": 2,
+  "revision": "unknown",
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "revision": "unknown"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0621-after/release/xls_source_attribution",
+    "bytes": 9077464,
+    "sha256": "ed87751de0343e830d657b091969a676476de284514cf26492438047d3a182ec"
+  },
+  "input": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0621/test-data/poi/test-data/spreadsheet/54016.xls",
+    "bytes": 984576,
+    "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+  },
+  "mode": "file-source",
+  "operation": "full-text",
+  "counter_scope": "FileSource ReadAt wrapper over a staged immutable file; len/version/read calls are counted; warm page-cache and no physical-I/O counter",
+  "limitation": "the staged fixture is immutable and warm-cache; this measures logical FileSource calls, not physical I/O",
+  "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+  "process_scope": "samples share one benchmark process; invoke once per retained sample for fresh-child evidence",
+  "input_scope": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+  "warmups": 3,
+  "samples": 40,
+  "worksheet_index": 1,
+  "row": 1,
+  "column": 0,
+  "all_cells_strategy": "scan",
+  "per_cell_limit": 64,
+  "semantic_oracle": {
+    "source_implementation_projection": {
+      "worksheet_count": 1,
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "selected_cell": null,
+      "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0"
+    },
+    "eager_implementation_projection": {
+      "worksheet_count": 1,
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "selected_cell": null,
+      "outcome": null
+    },
+    "scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "elapsed_samples_ns": [
+    36172280,
+    35455265,
+    35463346,
+    35246985,
+    34722121,
+    36040789,
+    36728023,
+    36278340,
+    37959880,
+    37775658,
+    37286146,
+    36325930,
+    35423035,
+    35103414,
+    35995538,
+    34888812,
+    34597041,
+    35004103,
+    35640217,
+    35676477,
+    34395060,
+    35206444,
+    35121604,
+    35409825,
+    35715117,
+    35338524,
+    34534210,
+    35289935,
+    35715197,
+    34129208,
+    35615987,
+    34175019,
+    33916107,
+    33269793,
+    34343810,
+    35292525,
+    34445750,
+    36978264,
+    36391361,
+    38413042
+  ],
+  "records": [
+    {
+      "elapsed_ns": 36172280,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2708199,
+        "version_ns": 7396605,
+        "len_ns": 320,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35455265,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2701533,
+        "version_ns": 7349787,
+        "len_ns": 270,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35463346,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2707988,
+        "version_ns": 7352575,
+        "len_ns": 270,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35246985,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2719714,
+        "version_ns": 7377751,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34722121,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2709225,
+        "version_ns": 7354924,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36040789,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2671155,
+        "version_ns": 7383802,
+        "len_ns": 320,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36728023,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2718013,
+        "version_ns": 7380719,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36278340,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2706367,
+        "version_ns": 7400639,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 37959880,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2771459,
+        "version_ns": 7394295,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 37775658,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2762113,
+        "version_ns": 7374526,
+        "len_ns": 310,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 37286146,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2691401,
+        "version_ns": 7389818,
+        "len_ns": 300,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36325930,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2742598,
+        "version_ns": 7384393,
+        "len_ns": 300,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35423035,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2690413,
+        "version_ns": 7367292,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35103414,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2658589,
+        "version_ns": 7374796,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35995538,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2690364,
+        "version_ns": 7392623,
+        "len_ns": 300,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34888812,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2668700,
+        "version_ns": 7364372,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34597041,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2644067,
+        "version_ns": 7370631,
+        "len_ns": 270,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35004103,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2660555,
+        "version_ns": 7434410,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35640217,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2762930,
+        "version_ns": 7364001,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35676477,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2660017,
+        "version_ns": 7366457,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34395060,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2656179,
+        "version_ns": 7361108,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35206444,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2673903,
+        "version_ns": 7344331,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35121604,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2670649,
+        "version_ns": 7375764,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35409825,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2683976,
+        "version_ns": 7352619,
+        "len_ns": 400,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35715117,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2660672,
+        "version_ns": 7379381,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35338524,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2706188,
+        "version_ns": 7378608,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34534210,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2691590,
+        "version_ns": 7339855,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35289935,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2684450,
+        "version_ns": 7364012,
+        "len_ns": 430,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35715197,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2683928,
+        "version_ns": 7353877,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34129208,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2742150,
+        "version_ns": 7351229,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35615987,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2771358,
+        "version_ns": 7366869,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34175019,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2748624,
+        "version_ns": 7348763,
+        "len_ns": 280,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 33916107,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2737896,
+        "version_ns": 7342900,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 33269793,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2757761,
+        "version_ns": 7335095,
+        "len_ns": 320,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34343810,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2765948,
+        "version_ns": 7357851,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 35292525,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2782830,
+        "version_ns": 7399256,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 34445750,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2766958,
+        "version_ns": 7343315,
+        "len_ns": 290,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36978264,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2768988,
+        "version_ns": 7370013,
+        "len_ns": 360,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 36391361,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2689739,
+        "version_ns": 7365903,
+        "len_ns": 300,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    },
+    {
+      "elapsed_ns": 38413042,
+      "observation": {
+        "kind": "full-text",
+        "worksheet_count": null,
+        "worksheet_names": null,
+        "cell": null,
+        "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+        "cells_reported": null
+      },
+      "metrics": {
+        "read_calls": 16145,
+        "read_bytes": 1256139,
+        "version_calls": 36503,
+        "len_calls": 1,
+        "read_ns": 2790266,
+        "version_ns": 7387715,
+        "len_ns": 270,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      },
+      "source_version_stable": true,
+      "eager_phases": null
+    }
+  ]
+}

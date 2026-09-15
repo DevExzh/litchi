@@ -1,0 +1,3 @@
+before 54016  file-source  open       Ir_per_sample=5,099,495  (s1=728,378,652 s6=753,876,127)
+before 54016  file-source  full-text  Ir_per_sample=426,888,900  (s1=1,951,382,597 s6=4,085,827,096)
+before 54016  facade-file  open       Ir_per_sample=5,084,091  (s1=728,380,999 s6=753,801,455)

@@ -1,0 +1,4 @@
+cells compared: 218 (199 reached the reader; the rest are typed refusals)
+identical outcome (projection digest or exact typed refusal): 218
+identical read_calls and read_bytes: 218
+observations over the corpus: 230,619 -> 91,611 (-60.28%)

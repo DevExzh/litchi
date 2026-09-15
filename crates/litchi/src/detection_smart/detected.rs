@@ -842,10 +842,20 @@ pub(crate) fn detect_workbook_source_path_with_limits(
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
     let source_version = source.version()?;
     let source_length = source.len()?;
-    ensure_path_source_current(source.as_ref(), source_version)?;
 
+    // The signature read is bracketed by the capture above and the fence
+    // below, which is also the fence the length is compared under, because
+    // every branch that rejects `source_length` runs after it. A leading fence
+    // of its own would re-prove what the capture proves; the promotion on the
+    // failure path is what it was actually load-bearing for, so that stays.
     let mut signature = [0_u8; 4];
-    let read = source.read_at(0, &mut signature)?;
+    let read = match source.read_at(0, &mut signature) {
+        Ok(read) => read,
+        Err(error) => {
+            ensure_path_source_current(source.as_ref(), source_version)?;
+            return Err(Box::new(error));
+        },
+    };
     ensure_path_source_current(source.as_ref(), source_version)?;
     let zip_magic = read == signature.len()
         && litchi_core::detection::simd_utils::signature_matches(
@@ -862,27 +872,35 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         }));
     }
 
+    // Each probe below fences the source *when it reads it*, rather than
+    // unconditionally after the branch. On an input without ZIP magic -- every
+    // OLE2 workbook -- neither probe consumes a source byte, so an
+    // unconditional fence here would only re-prove what the fence after the
+    // signature read already proved. When a probe does read, its fence is
+    // exactly where it was, so the bracket around those reads is unchanged.
     #[cfg(feature = "ods")]
     let is_ods = if zip_magic {
-        litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
-            == Some(litchi_core::detection::FileFormat::Ods)
+        let probed = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
+        ensure_path_source_current(source.as_ref(), source_version)?;
+        probed == Some(litchi_core::detection::FileFormat::Ods)
     } else {
         false
     };
     #[cfg(not(feature = "ods"))]
     let is_ods = false;
-    ensure_path_source_current(source.as_ref(), source_version)?;
 
     #[cfg(all(
         feature = "ods",
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     let ordinary_ods = if is_ods {
-        litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+        let probed = litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
             source.as_ref(),
             litchi_odf_common::detect::CatalogProbeLimits::default()
                 .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
-        )? == Some(false)
+        )?;
+        ensure_path_source_current(source.as_ref(), source_version)?;
+        probed == Some(false)
     } else {
         false
     };
@@ -901,7 +919,6 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
     ))]
     let ordinary_ods = false;
-    ensure_path_source_current(source.as_ref(), source_version)?;
 
     let ooxml_candidate = zip_magic || ooxml_extension;
     let max_input_bytes = if ordinary_ods {

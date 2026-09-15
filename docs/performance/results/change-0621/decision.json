@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0621",
+  "title": "The XLS text projection observes the source once per read, not four times per shared string",
+  "decision": "retained",
+  "code_state": "crates/litchi-cfb (one function plus one new private helper), crates/litchi-xls (four functions), crates/litchi (one function); ten observation sites stop observing on the paths that succeed, five of them relocated onto the error branch or into the probe where they were load-bearing",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "a full text projection of 54016.xls took 89,789 source observations, of which 48,187 were three per shared string and 5,096 were one per emitted row; per-site backtrace attribution shows both groups sat between in-memory steps or between a read and that read's own trailing fence, so neither proved anything the reader's own fences did not",
+    "change 0558 already reduced the CFB reader to one observation after every read, and that fence is what makes a mid-operation truncation surface as SourceChanged; it is kept everywhere and is the floor of the open count",
+    "every removed observation that outranked another error is relocated rather than deleted, so the CFB open's limit and length branches, the facade's read-failure branch and the shared-string resolver's four failure branches all keep change 0317's precedence",
+    "SourceCheckedTextSink's two observations per written object are both kept and the analysis says why: the trailing one detects a mutation spanning the caller's write, and the leading one is what stops the stream, because the trailing one only records its failure and returns Ok",
+    "0587 item CORE-2 is falsified on its own terms: the open falls 25 to 22 observations and cannot reach the 'about 10' the survey set, because 18 of the 22 are structural and 16 of those are the trailing fences of the 16 globals fills",
+    "0587 item XLS-4's fence half is confirmed and the survey modelled it accurately: it predicted at least 48,165 fstat plus one per row, which is 53,261 for this fixture against a measured 53,283; what the survey lacked is the denominator, since the whole projection takes 89,794 statx"
+  ],
+  "accepted_evidence": {
+    "per_site_attribution": "every ReadAt::version() call on the open, one-cell, whole-sheet-walk and full-text paths of 54016.xls, bucketed by the litchi frames of its backtrace with file and line, on both legs; produced by a scratch probe whose source is retained",
+    "counts": "xls_source_attribution logical observations, read calls, read bytes and projection digests for ten fixture/mode/operation cells on both legs, in file-source and owned-readat modes",
+    "syscalls": "strace -f -c whole-child statx and pread64 for five fixture/mode/operation cells on both legs, one and eleven samples differenced",
+    "instructions": "callgrind isolation pairs at one and six samples for three cells on both legs",
+    "timing": "four cases, 60 samples (40 for the text projection) after 3 warm-ups, fresh child per leg, ASLR disabled, order A1 B1 B2 A2 with two further before legs in the same window for the A/A floor, both directions reported",
+    "differential": "all 109 .xls fixtures under test-data/, full text and whole-sheet walk, 218 cells: identical projection digests or character-identical typed refusals and identical read_calls and read_bytes on every one",
+    "negative_control": "the removed observations put back by a retained script; the three counted-invariant tests fail with the stated wrong numbers and the six preservation tests pass on both legs"
+  },
+  "accepted_costs": {
+    "reverted_mutation_sampling": "fewer observations sample FileSource's revision latch less often, so a mutation made and fully reverted between two observations is less likely to be seen; FileVersionPolicy documents this and change 0558 accepted it for the same reason",
+    "error_precedence_on_one_branch": "in SharedOleFile::open_source_with_limits the caller-limit construction now runs before the first comparison that can see a mutation, so an invalid caller ceiling racing a mutation reports the limit error where the mutation was reported before; that error is source-independent and deterministic",
+    "partial_output_boundary": "on the streaming write_text_to path the refusal for a mutation landing inside a row now surfaces at the row's first sink write rather than at the row loop head; no byte is emitted between those two points",
+    "open_instructions": "the two opens are +0.22% and +0.30% in instructions, because valgrind does not simulate the syscall and what is left is code placement",
+    "host": "warm page cache, one host, seven other agents active on other cores, no proven quiescence"
+  },
+  "known_gaps": {
+    "not_changed": "query_cell's leading fence and its out-of-range twin, and the open's trailing fence, are analysed as removable and deliberately left; the facade's PPT route (detect_presentation_source_path, eight fences) is read and not changed",
+    "not_attributed": "the facade-file statx counts are whole-child; the release binary carries no symbols for strace -k to resolve them per site",
+    "not_measured": "no cold-cache, physical-device, remote or range-source, peak-RSS, allocation, concurrency-scaling or cross-platform result; the count claim's relevance on a network filesystem is modelled, not measured, because this host has no real range source",
+    "out_of_scope": "0587 XLS-4's other two parts, the declared-rectangle walk and the three hash operations per SourceTextSheet::insert; folding SequentialTextWriter's two write calls per row into one, which would halve the largest remaining site on the text path"
+  },
+  "withheld": [
+    "any registered speedup or resource claim, any cold-cache, physical-device, range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "1e41983213dc378c13774ed7038c51faf231977f",
+    "branch": "perf/0621-xls-open-fence-count",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "16",
+    "note": "both legs built --release --locked; the before leg from the shared read-only checkout of the base commit with its own CARGO_TARGET_DIR"
+  }
+}

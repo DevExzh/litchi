@@ -1,0 +1,12 @@
+[package]
+name = "xls-observation-sites"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/before-1e4198321/crates/litchi-core" }
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/before-1e4198321/crates/litchi-xls" }
+
+[profile.release]
+debug = 2
