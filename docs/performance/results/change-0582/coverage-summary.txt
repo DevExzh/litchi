@@ -1,0 +1,10 @@
+change 0582 strict-layout coverage probe
+(instrumented copy of the after tree; counters on strict_layout_for and
+ on prove_target_scoped_strict_layout; both limit profiles summed)
+
+family         inputs  reached  proof-entries   proof-builds
+crafted            45       44           7776           6412
+mutations       22307    14901        3590520        2997630
+seeds               7        7            304            228
+testdata          516      516         218736         164052
+TOTAL           22875    15468        3817336        3168322

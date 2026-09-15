@@ -1,0 +1,56 @@
+change 0582 corpus fingerprint
+rng_seed 0x05820580
+files 22875
+bytes 334625602
+family crafted    45
+family mutations  22307
+family seeds      7
+family testdata   516
+manifest_sha256 e7d00d510ad44a93fef73ec3ed03cc020479e2d5c74711fe8da6993c43ff171b
+
+crafted archives (name sha256 bytes):
+  adjacent-exact.zip                           770b21d95172b0461b236cf9096b2487d641430116f8bfbb0352a6951034f29c 258
+  adjacent-gap-one.zip                         c6f5f044196b80c9baf3031434fde1eec4f44faf6894353932b76551691768e0 259
+  adjacent-overlap-one.zip                     b18e79daf2cf771d3253be2044b12a39ac9738b5f0419b569411c4a817e2a004 258
+  deflate-overlap.zip                          a5835221e4f0a31f0d6f528ed6e3587e4b9a541f36e79efb783480999fcb6d5d 2433
+  deflate-pair.zip                             02b1028d7d547d8291e608b6aa7aca630e4fbc679db6f7fc78b7234ca76e3b0b 240
+  descriptor-boundary-signed.zip               d4905834a6afa95609763747b14530d9a7a8159d80ef2e3e1c7f616b0f6def82 290
+  descriptor-boundary-unsigned.zip             17a1ac773e83454fccf91bb1ed72c15b2a4d6e8a6de60370b9baae2503fca771 282
+  descriptor-boundary-zip64.zip                69aa19575757453223e15e47692b11e8edf2528f364117c6fc0fafe35882d0a4 306
+  descriptor-gapless-signed.zip                ad166d284624250d7feb97a30f3284c146236b33a92c37d15fcd37f59af627aa 416
+  descriptor-gapless-unsigned.zip              4937602dda3886c0ea686051ffec8b426032c77de3b1948df97e3a22db08df8a 404
+  descriptor-gapless-zip64.zip                 64b784782a57475cf9a13f28361c53449a5fc20a3e0ad3101e9dabe0658567fb 440
+  descriptor-overlap-signed.zip                186be19bd639e721b56e7a8ab09b760e960c8471face536d8a795ad845763f56 292
+  descriptor-overlap-unsigned.zip              441d416d0c4d1aecd4a3bb7d3d519f635436d1f1664361e3da05bbfeed0a13d4 288
+  descriptor-overlap-zip64.zip                 a632e9335561422f5277ca7ecf7ab2dd7eb16a161f29d7b97c7f5f9eeab76380 300
+  directory-record-overlap.zip                 fa7e927d231d382ce474b1cc3c2f0b93feccc5d1587aaf07c1b923dd20cc71dd 840
+  duplicate-local-offsets.zip                  3fb4bce8206656e933bb9832cb30af5c14131d9ecd49d0be275c785d1c5137a5 181
+  empty-archive.zip                            8739c76e681f900923b900c9df0ef75cf421d39cabb54650c4b9ad19b6a76d85 22
+  many-tiny-one-reaching.zip                   4ca89019da1cfab0c19f42a5629a62016e1f946340dd01c64a6d351e4a4ec842 19222
+  many-tiny.zip                                2021109b483fc3e8f83675b5867c82c4bdd5e26708abd189d8bb9ac157d8a0bb 19222
+  neighbour-bad-signature.zip                  f3ee3f4d4fc6f92fb01bf6894440cb66e81be5b0f8af4c712f3d5b0e141e70df 244
+  neighbour-crc-mismatch.zip                   be0246706d439fe90f73e95f42df9df15e015ac51d63e8a4883580235f47577f 244
+  neighbour-encrypted-flag.zip                 ca4706b9388cb2ac28aa0c770abadee7983fbbd3e3789e0363434ad6811ed3cc 244
+  neighbour-flags-mismatch.zip                 d6b8e5d6069a1e8c67e59e68127e27496db572d13bd017a930875bce3aa3871f 244
+  neighbour-local-csize-smuggles-deflate.zip   feeed67c46499c2d14ecb7e5760e88e6c2680be684d1901cec23b91d4d80e698 594
+  neighbour-local-csize-smuggles.zip           e096548240bb70d84e12e627bb4d57a0a81a00472049394beeed65e522c74946 388
+  neighbour-local-csize-understates.zip        ff9ee6776750d00198b98f17e7bcc0398f99f3a4fbf0a6673360539bbe64dd73 388
+  neighbour-local-extra-inflated.zip           c30b21a3c83022c087fe3ac35deeed6a88c7424d129a6771150aed682e3f57ef 1212
+  neighbour-local-usize-smuggles.zip           ab70423d4bfa83f534acdda99c8f402fec32906e28f368ed4f0a791f4e1e0bf1 388
+  neighbour-method-mismatch.zip                172b84059f4797e501e48b4bea992cce5aa101155bf092e588a43a2e8c1d9331 244
+  neighbour-name-mismatch.zip                  a61b5715f377ad6f64d630965de8ced17090c98436534d79bc230ec81431da15 248
+  neighbour-size-mismatch.zip                  8b369034daafca3c058ae6e93754ec1b5072fd3b9660c1caf3050d1ac28696e3 244
+  offset-into-payload.zip                      e55e9909858064ff8a0d8ccdc8eedd6f0f4badd7f5cd6f644fed55084a73ab51 292
+  overlap-swallow-next.zip                     45e51967fa981ba719676f300adacb3de0c19965e436fe0c3c2ab81f9162d008 1705
+  overlap-swallow-two.zip                      ac6e72215368d40ab577bd4db7e343bdce514611fde13b2e4bf09ca0468f3b2d 17356
+  predecessor-csize-reaches.zip                ba3459efc7ac6c03d9dcf9826968495b312df263ef8766e87a8a1cb89377dc5a 6204
+  predecessor-inflated-local-name.zip          956a636c77535125b7f468acd8a0fc348f7d0e618ff5b4010eef0d17883fedb2 65845
+  predecessor-span-into-directory.zip          e58d00b4bfcd0f38a65f34c3278e6b5e9456d35ad1752162aac37b286da01b05 8382
+  predecessor-window-inside.zip                aa04d877220495e7bd25e761da3ad70f2c83d67f36d85e2570fed793ccbe6692 131204
+  predecessor-window-outside.zip               0669242b6692fb6d99ab6d26f6790761c25e2d68068620a4f9bfb94ebc33cf92 140204
+  prefix-bytes.zip                             67aec719276b587ba8b75fc3c2fe9b8c27c9e9b4be080455dfc0d27ec6d372bc 186
+  single-member.zip                            41c14e5b7ded33a6c0160848c79b8eb4e9b26747b35379ad23d59bd01c0d6e10 122
+  span-into-central-directory.zip              ef9b496597e81eef13fdcbfb92083abe28153214ea038a584f4cd57cfd6aed65 488
+  window-max-residual-clear.zip                7fd352ec1835f2546273f099c30994fae0692965184eafe2cf2166f08209759f 131344
+  window-max-residual-reaches.zip              551ebd7f98f9db42f7ab41bbc12dcdf36a6fdc91c0da26590ecaf375cff96f14 131304
+  witness-0575.zip                             357d160528441f8b5dad0c2a22a5ba233c2daeb57b3be47f5ba7133764585586 4405

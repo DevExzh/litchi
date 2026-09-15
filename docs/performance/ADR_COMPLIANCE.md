@@ -1,5 +1,133 @@
 # Performance optimization ADR-compliance matrix
 
+## 0583: a malicious-input defence restored, under rule 12
+
+[0583](0583-zip-local-size-span-bound.md) exists to satisfy `docs/GOAL.md` rule
+12 — "a faster implementation must not weaken zip-bomb, XML, graph, allocation,
+or integer-overflow protections" — after change 0582 measured a case where change
+0580 did weaken one. A predecessor whose local header declares a larger payload
+than its central record could cover a target that then became readable. The fix
+takes the larger of the two sizes, so it moves strictly back toward the
+pre-0580 behaviour: it can refuse more and never admit more, which is why it
+required no re-approval of the semantic delta.
+
+No public type, signature or crate dependency changes, so ADRs 0002, 0010, 0011
+and 0024 are untouched. ADR 0006's validation contract is strengthened rather
+than relaxed, and the error vocabulary is unchanged — no identity added, removed
+or renamed. ADR 0005's "Cache behavior is semantically invisible" is the
+constraint that shaped the implementation: a first version applied the maximum to
+the descriptor branch as well and produced 244 order-independence oracle
+failures, because a descriptor-bearing record can memoise a span end derived from
+disagreeing sizes. A verdict that depends on read order is exactly what ADR 0005
+forbids, so that version was discarded rather than tuned.
+
+## 0582: a required gate that cannot run, and what was done instead
+
+[0582](0582-zip-strict-scope-differential-fuzz.md) modifies no code. It is
+recorded here because `docs/GOAL.md`'s verification list names existing fuzz
+targets as a gate, and `parse_zip` **cannot run on this host** — no `cargo-fuzz`,
+no nightly toolchain. That gate is therefore **not satisfied** and is recorded as
+outstanding rather than waived or quietly dropped.
+
+What replaces it is a deterministic differential harness, and the record is
+required to state that this is a partial substitute and not an equivalence:
+libFuzzer's coverage feedback, mutation engine, sanitizers and RSS/timeout
+detection are all absent from it. Against that, it drives every member through
+every entry point that reaches the changed code, in both directions and under two
+limit profiles, where the real fuzz target reaches it through one API for one
+member per input.
+
+Its finding about ADR compliance is procedural rather than technical. Change 0575
+asked for approval of a semantic change by illustrating it with one adversarial
+witness, and change 0580 repeated that framing. The measured class is thirty
+times larger. Nothing in either record's analysis was contradicted, but this
+program's approval flow depends on a semantic change being stated and measured as
+a **class** before approval is sought, not illustrated by its most legible
+instance. Both records now carry that correction, and the owner re-approved on the
+corrected delta.
+
+## 0581: an incidental retention that an API contract, not an ADR, pins in place
+
+[0581](0581-opc-package-retention.md) is design only and changes no code. It
+verifies change 0578's 254x figure, corrects its attribution — the publish region
+is flat in payload size on both paths and the whole of 0578's difference is
+`OpcPackage::open`'s retention — and prices that retention at between 2.00x and
+11.19x the archive, the upper figure on a real XML-heavy XLSX. The publish is not
+constant in general: it is linear in member count, which the record discloses
+rather than folds into the headline.
+
+The compliance result is a split, and it is the reason nothing is implemented.
+The **source archive** half is contract-required: ADR 0005's 2026-08-21 OPC
+exact-source amendment states that "the owning package or source-backed object
+must retain its exact source artifact and an unrevoked exact-source
+authorization", and `package.rs:1171` plus `pkgwriter.rs:936` implement exactly
+that, including the typed capability refusal the amendment requires. That half is
+not a candidate.
+
+The **decoded part blobs** half is governed by nothing. ADR 0005's lazy-state
+rule says semantic payloads "load lazily into thread-safe weighted caches", this
+matrix already records in its 0574 section that "no accepted ADR requires eager
+decoding",
+and its "OPC source-backed reader ingress" row records the equivalent
+reduction already accepted for `SourceBackedPackage` with no ADR exception requested. Eager decoding is therefore
+**incidental on ADR grounds** — and still not removable, because it is held behind
+the public infallible borrowing accessor `Part::blob(&self) -> &[u8]` with 950
+production call sites across seven crates. Deferring it would relocate the
+`ReadResource::PartBytes` and `ReadResource::TotalPartBytes` refusals that
+`pkgreader.rs:916` raises fallibly at open into an accessor with no error channel,
+which ADR 0005's limit-reporting rule and the decision hierarchy's panic-free
+clause both forbid.
+
+No ADR is weakened, none is invoked as permission, and no proposed ADR is drafted.
+Following this file's own rule in its 0575 section, the absence of an ADR basis for
+eager decoding is recorded as an absence of documented rationale rather than as
+permission, and both candidate designs carry explicit admission gates requiring
+human review before either is attempted.
+
+## 0580: an undocumented invariant narrowed under an explicit decision, not an exception
+
+[0580](0580-zip-target-scoped-strict-layout.md) is the only change in this
+program so far that **narrows a refusal**, so its ADR position deserves stating
+precisely.
+
+No accepted ADR is weakened, because change 0575 established that **no accepted
+ADR governs the archive-wide strict-layout proof at all**: none mentions ZIP
+overlap, ambiguous archives, duplicate local-header offsets or a strict layout;
+both commits introducing it have empty message bodies; there is no threat model;
+and the ordinary read path already bypassed it. `docs/GOAL.md` forbids
+reinterpreting an accepted ADR to enable an optimization. It does not require
+preserving an undocumented behaviour indefinitely, and this change was made under
+an explicit, recorded decision by the project owner rather than by inference.
+
+ADR 0005's "Cache behavior is semantically invisible" is the constraint that
+disqualified change 0575's rival incremental candidate, and this change is built
+to satisfy it: a member's verdict is a function of the archive bytes alone, never
+of what the reader read earlier, pinned by a test that reads members in several
+orders and asserts identical verdicts. The memo therefore affects **cost only**,
+which ADR 0005 permits to vary — and the record discloses that cost honestly,
+including a reverse-order case that is more expensive than before.
+
+ADR 0006's preservation and validation contract is respected at the target: the
+member being read keeps its full local-versus-central method, flags, name, size,
+CRC, ZIP64 framing and descriptor validation, unchanged in content and order.
+What is no longer checked is enumerated explicitly in the record rather than
+described in general terms. Distinct local-header offsets remain enforced
+archive-wide at zero I/O. Two error identities are removed as genuinely
+unreachable and are named.
+
+ADRs 0002, 0010, 0011 and 0024 are untouched: no public type, signature or crate
+dependency changes, and the work stays inside the crate that owns the ZIP
+grammar. One path is deliberately **not** narrowed —
+`ArchiveReader::read_stored_borrowed` publishes a borrowed slice into caller
+hands under a contract change 0575 did not analyse, so it keeps its archive-wide
+proof and both its overlap tests pass unchanged.
+
+One required gate is **not** satisfied: `docs/GOAL.md`'s verification list names
+existing fuzz targets, and `parse_zip` could not be run for want of `cargo-fuzz`
+and a nightly toolchain. That is recorded as outstanding, and a deterministic
+differential harness is pursued separately as a partial substitute rather than as
+a claim of equivalence.
+
 ## 0579: no ADR weakened; a new public value whose misuse is a compile error
 
 [0579](0579-cfb-resumable-chain-walk.md) makes the CFB allocation-chain prefix

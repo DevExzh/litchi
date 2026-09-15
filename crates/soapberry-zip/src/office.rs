@@ -541,46 +541,298 @@ struct IndexedLayoutEntry {
     name: IndexedLayoutName,
 }
 
-#[derive(Debug)]
-struct StrictLayoutProof {
-    spans: Vec<crate::StrictEntryLayout>,
-    by_local_header: HashMap<u64, usize>,
+/// The bytes of one fixed ZIP local file header.
+const STRICT_FIXED_LOCAL_HEADER_BYTES: u64 = 30;
+
+/// The largest offset one central record's declared local span can reach,
+/// using resident central metadata and no positional read.
+///
+/// See [`crate::MAX_LOCAL_SPAN_RESIDUAL`] for why both halves of the local
+/// variable region are counted.
+fn zero_io_max_span_end(entry: &crate::ZipArchiveEntryWayfinder) -> u64 {
+    zero_io_min_span_end(entry).saturating_add(crate::MAX_LOCAL_SPAN_RESIDUAL)
 }
 
-impl StrictLayoutProof {
-    fn entry(
-        &self,
-        wayfinder: crate::ZipArchiveEntryWayfinder,
-    ) -> Result<crate::StrictEntryLayout, Error> {
-        let index = self
-            .by_local_header
-            .get(&wayfinder.local_header_offset())
-            .copied()
-            .ok_or_else(|| {
-                Error::from(ErrorKind::InvalidInput {
-                    msg: "strict layout proof has no target local header".to_string(),
-                })
-            })?;
-        let layout = self.spans.get(index).copied().ok_or_else(|| {
-            Error::from(ErrorKind::InvalidInput {
-                msg: "strict layout proof target index is invalid".to_string(),
+/// The smallest offset one central record's declared local span can reach,
+/// using resident central metadata and no positional read.
+///
+/// A local variable region and a data descriptor can only push a span end
+/// further out, so a record whose payload alone already runs past an offset
+/// overlaps it whatever its local header says.
+fn zero_io_min_span_end(entry: &crate::ZipArchiveEntryWayfinder) -> u64 {
+    entry
+        .local_header_offset()
+        .saturating_add(STRICT_FIXED_LOCAL_HEADER_BYTES)
+        .saturating_add(entry.compressed_size_hint())
+}
+
+fn strict_overlap_error() -> Error {
+    Error::from(ErrorKind::InvalidInput {
+        msg: "strict streaming refuses overlapping ZIP local spans".to_string(),
+    })
+}
+
+fn strict_layout_index_error() -> Error {
+    Error::from(ErrorKind::InvalidInput {
+        msg: "strict layout proof target index is invalid".to_string(),
+    })
+}
+
+/// What one reader has already established about its own physical layout.
+///
+/// Successes only. A proof that fails leaves the memo exactly as it was, so a
+/// read that failed for cancellation, a budget error or a transient source
+/// error retries in full, and no error is ever cached.
+///
+/// The memo never decides a verdict. Every entry it holds is a fact about the
+/// archive's bytes, so a target's accept-or-refuse outcome is the same whether
+/// the memo is empty or full; the memo only removes repeated work.
+#[derive(Debug, Default)]
+struct StrictLayoutMemo {
+    /// Fully validated target layouts, keyed by local-header offset.
+    targets: HashMap<u64, crate::StrictEntryLayout>,
+    /// Where each already-probed record's declared local span ends, keyed by
+    /// local-header offset.
+    bounds: HashMap<u64, crate::LocalSpanBound>,
+    /// Prefix maximum of every record's zero-I/O span upper bound over the
+    /// offset-sorted layout. A pure function of the central directory, built
+    /// once, and used only to stop the predecessor scan early. Its presence
+    /// also records that the distinct-offset check has already passed.
+    prefix_max: Vec<u64>,
+}
+
+impl StrictLayoutMemo {
+    fn is_empty(&self) -> bool {
+        self.targets.is_empty() && self.bounds.is_empty() && self.prefix_max.is_empty()
+    }
+
+    fn merge(&mut self, proven: StrictLayoutProven) -> Result<(), Error> {
+        if let Some(prefix_max) = proven.prefix_max {
+            self.prefix_max = prefix_max;
+        }
+        let layout = proven.layout;
+        self.targets.try_reserve(1).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "strict layout target memo",
+                source,
             })
         })?;
-        if layout.local_header_offset != wayfinder.local_header_offset() {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "strict layout proof target offset does not match central metadata"
-                    .to_string(),
-            }));
+        self.targets.insert(layout.local_header_offset, layout);
+        self.bounds
+            .try_reserve(proven.learned.len().saturating_add(1))
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "strict layout span memo",
+                    source,
+                })
+            })?;
+        for (offset, bound) in proven.learned {
+            self.bounds.insert(offset, bound);
         }
-        Ok(layout)
+        self.bounds.insert(
+            layout.local_header_offset,
+            crate::LocalSpanBound::Exact(layout.span_end),
+        );
+        Ok(())
     }
+}
+
+/// The facts one target-scoped proof established, ready to merge.
+#[derive(Debug)]
+struct StrictLayoutProven {
+    layout: crate::StrictEntryLayout,
+    learned: Vec<(u64, crate::LocalSpanBound)>,
+    prefix_max: Option<Vec<u64>>,
+}
+
+/// Prove that no other central record's declared local span intersects the
+/// target's.
+///
+/// `layout_len` and the three accessors describe one reader's physical layout,
+/// sorted by local-header offset and including directory records. The proof
+/// establishes, in this order:
+///
+/// 1. **Distinct local-header offsets**, over every record. A record's
+///    local-header offset is copied verbatim from its central record, so this
+///    is a pure central-directory property and costs no read.
+/// 2. **The target's own layout**, in full and unchanged: method, flags, name,
+///    local and central sizes, CRC, data span, data-descriptor resolution and
+///    the per-entry refusal of a span that reaches into the central directory.
+/// 3. **Successors**, at no cost. A record that starts after the target cannot
+///    reach backwards, so the only question is whether the target's own span
+///    runs into it, and the answer is already resident metadata.
+/// 4. **Predecessors**, pruned by a zero-I/O central-directory bracket, and
+///    otherwise settled by one 30-byte read of that record's fixed local
+///    header.
+///
+/// The verdict is a function of the archive bytes and the target alone. It
+/// does not depend on what this reader read earlier, which is what an accepted
+/// ADR 0005 requires of anything a cache participates in.
+fn prove_target_scoped_strict_layout<Wayfinder, Validate, Bound, Resolve>(
+    layout_len: usize,
+    wayfinder_at: Wayfinder,
+    validate_at: Validate,
+    bound_at: Bound,
+    resolve_at: Resolve,
+    target: crate::ZipArchiveEntryWayfinder,
+    memo: &StrictLayoutMemo,
+) -> Result<StrictLayoutProven, Error>
+where
+    Wayfinder: Fn(usize) -> Option<crate::ZipArchiveEntryWayfinder>,
+    Validate: Fn(usize) -> Result<crate::StrictEntryLayout, Error>,
+    Bound: Fn(usize) -> Result<crate::LocalSpanBound, Error>,
+    Resolve: Fn(usize, crate::LocalSpanBound) -> Result<u64, Error>,
+{
+    let target_offset = target.local_header_offset();
+
+    // (1) Distinct local-header offsets, and the prefix maximum that bounds
+    // the predecessor scan.  Both are pure central-directory facts, so one
+    // pass establishes them for every later read of this reader.
+    let built_prefix_max = if memo.prefix_max.len() == layout_len {
+        None
+    } else {
+        let mut prefix_max = Vec::new();
+        prefix_max.try_reserve_exact(layout_len).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "strict layout span bracket",
+                source,
+            })
+        })?;
+        let mut running = 0_u64;
+        let mut previous_offset = None;
+        for position in 0..layout_len {
+            let entry = wayfinder_at(position).ok_or_else(strict_layout_index_error)?;
+            let offset = entry.local_header_offset();
+            if previous_offset == Some(offset) {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict streaming refuses duplicate ZIP local spans".to_string(),
+                }));
+            }
+            previous_offset = Some(offset);
+            running = running.max(zero_io_max_span_end(&entry));
+            prefix_max.push(running);
+        }
+        Some(prefix_max)
+    };
+    let prefix_max: &[u64] = built_prefix_max
+        .as_deref()
+        .unwrap_or(memo.prefix_max.as_slice());
+
+    // Offsets are sorted and now known distinct, so the target has exactly one
+    // position.
+    let target_position = {
+        let mut low = 0_usize;
+        let mut high = layout_len;
+        let mut found = None;
+        while low < high {
+            let middle = low + (high - low) / 2;
+            let offset = wayfinder_at(middle)
+                .ok_or_else(strict_layout_index_error)?
+                .local_header_offset();
+            match offset.cmp(&target_offset) {
+                std::cmp::Ordering::Less => low = middle + 1,
+                std::cmp::Ordering::Greater => high = middle,
+                std::cmp::Ordering::Equal => {
+                    found = Some(middle);
+                    break;
+                },
+            }
+        }
+        found.ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "strict layout proof has no target local header".to_string(),
+            })
+        })?
+    };
+
+    // (2) The target's own layout, unchanged.
+    let layout = validate_at(target_position)?;
+    if layout.local_header_offset != target_offset {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "strict layout proof target offset does not match central metadata".to_string(),
+        }));
+    }
+
+    // (3) Successors, at zero I/O.  The layout is sorted and the offsets are
+    // distinct, so the immediately following record has the smallest offset of
+    // any later record; if it is not already past the target's exact span end,
+    // the two spans intersect.
+    if let Some(next) = wayfinder_at(target_position.saturating_add(1)) {
+        if next.local_header_offset() < layout.span_end {
+            return Err(strict_overlap_error());
+        }
+    }
+
+    // (4) Predecessors.
+    let mut learned: Vec<(u64, crate::LocalSpanBound)> = Vec::new();
+    for position in (0..target_position).rev() {
+        if prefix_max
+            .get(position)
+            .is_some_and(|reach| *reach <= target_offset)
+        {
+            // No record at or before this position can reach the target.
+            break;
+        }
+        let entry = wayfinder_at(position).ok_or_else(strict_layout_index_error)?;
+        let offset = entry.local_header_offset();
+        if zero_io_max_span_end(&entry) <= target_offset {
+            // Proven disjoint from resident metadata alone.
+            continue;
+        }
+        if zero_io_min_span_end(&entry) > target_offset {
+            // Refuted from resident metadata alone: this record's payload
+            // already runs past the target's local header.
+            return Err(strict_overlap_error());
+        }
+        let bound = match memo.bounds.get(&offset).copied() {
+            Some(bound) => bound,
+            None => {
+                let bound = bound_at(position)?;
+                learned.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "strict layout neighbour spans",
+                        source,
+                    })
+                })?;
+                learned.push((offset, bound));
+                bound
+            },
+        };
+        if bound.min_span_end() > target_offset {
+            return Err(strict_overlap_error());
+        }
+        if bound.max_span_end() > target_offset {
+            // The record declares a data descriptor whose encoded width is the
+            // only thing left deciding the verdict.  Settle it exactly: a
+            // bound that simply reserved the widest descriptor would refuse
+            // every gapless descriptor-bearing archive, where a record's
+            // payload ends exactly one descriptor before the next record.
+            let span_end = resolve_at(position, bound)?;
+            learned.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "strict layout neighbour spans",
+                    source,
+                })
+            })?;
+            learned.push((offset, crate::LocalSpanBound::Exact(span_end)));
+            if span_end > target_offset {
+                return Err(strict_overlap_error());
+            }
+        }
+    }
+
+    Ok(StrictLayoutProven {
+        layout,
+        learned,
+        prefix_max: built_prefix_max,
+    })
 }
 
 #[derive(Debug)]
 enum StrictLayoutCacheState {
     Empty,
     Building { owner: std::thread::ThreadId },
-    Ready(StrictLayoutProof),
+    Ready(StrictLayoutMemo),
 }
 
 struct StrictLayoutCache {
@@ -655,25 +907,43 @@ impl Drop for StrictLayoutBuildGuard<'_> {
     }
 }
 
-fn strict_layout_for_cached<Build>(
+/// Prove one target's strict layout, reusing whatever this reader already
+/// established.
+///
+/// The memo is taken out of the cache for the duration of one proof, so the
+/// existing single-flight contract is unchanged: a second thread waits, and a
+/// source that re-enters its own archive on the proving thread still reports a
+/// re-entrancy error instead of deadlocking. Only successes are merged back.
+fn strict_layout_for_cached<Prove>(
     cache: &StrictLayoutCache,
     target: crate::ZipArchiveEntryWayfinder,
-    build: Build,
+    prove: Prove,
 ) -> Result<crate::StrictEntryLayout, Error>
 where
-    Build: FnOnce() -> Result<StrictLayoutProof, Error>,
+    Prove: FnOnce(&StrictLayoutMemo) -> Result<StrictLayoutProven, Error>,
 {
     let owner = std::thread::current().id();
-    loop {
+    let target_offset = target.local_header_offset();
+    let mut memo = loop {
         let mut state = lock_strict_layout_state(cache);
-        match &*state {
-            StrictLayoutCacheState::Ready(proof) => return proof.entry(target),
+        match &mut *state {
+            StrictLayoutCacheState::Ready(memo) => {
+                if let Some(layout) = memo.targets.get(&target_offset).copied() {
+                    return Ok(layout);
+                }
+                let taken = std::mem::take(memo);
+                *state = StrictLayoutCacheState::Building { owner };
+                #[cfg(test)]
+                cache.build_count.fetch_add(1, Ordering::AcqRel);
+                drop(state);
+                break taken;
+            },
             StrictLayoutCacheState::Empty => {
                 *state = StrictLayoutCacheState::Building { owner };
                 #[cfg(test)]
                 cache.build_count.fetch_add(1, Ordering::AcqRel);
                 drop(state);
-                break;
+                break StrictLayoutMemo::default();
             },
             StrictLayoutCacheState::Building {
                 owner: building_owner,
@@ -690,32 +960,39 @@ where
                 drop(state);
             },
         }
-    }
+    };
 
     let mut build_guard = StrictLayoutBuildGuard::new(cache, owner);
-    let result = build();
-    let mut state = lock_strict_layout_state(cache);
-    let outcome = match result {
-        Ok(proof) => {
-            *state = StrictLayoutCacheState::Ready(proof);
-            cache.wake.notify_all();
-            match &*state {
-                StrictLayoutCacheState::Ready(proof) => proof.entry(target),
-                StrictLayoutCacheState::Empty | StrictLayoutCacheState::Building { .. } => {
-                    Err(Error::from(ErrorKind::InvalidInput {
-                        msg: "strict layout proof publication failed".to_string(),
-                    }))
-                },
-            }
+    let outcome = match prove(&memo) {
+        Ok(proven) => {
+            let layout = proven.layout;
+            // A merge failure is an allocation failure and keeps its identity;
+            // every fact already merged stays true either way.
+            let merged = memo.merge(proven);
+            publish_strict_layout_memo(cache, memo);
+            merged.map(|()| layout)
         },
         Err(error) => {
-            *state = StrictLayoutCacheState::Empty;
-            cache.wake.notify_all();
+            publish_strict_layout_memo(cache, memo);
             Err(error)
         },
     };
     build_guard.active = false;
     outcome
+}
+
+/// Return the memo to the cache and wake anyone waiting on it.
+///
+/// A memo that learned nothing is published as `Empty`, so a reader whose
+/// first read failed is indistinguishable from one that has never been read.
+fn publish_strict_layout_memo(cache: &StrictLayoutCache, memo: StrictLayoutMemo) {
+    let mut state = lock_strict_layout_state(cache);
+    *state = if memo.is_empty() {
+        StrictLayoutCacheState::Empty
+    } else {
+        StrictLayoutCacheState::Ready(memo)
+    };
+    cache.wake.notify_all();
 }
 
 /// Opaque identifier for one non-directory member in an [`IndexedArchive`].
@@ -2503,81 +2780,54 @@ impl<'data> ArchiveReader<'data> {
         Ok(())
     }
 
+    /// Prove that the bytes one member declares are not claimed by any other
+    /// record of this archive.
+    ///
+    /// The slice-backed reader pays no positional read, so the neighbour probe
+    /// here is a 30-byte parse rather than a read; the acceptance contract is
+    /// deliberately identical to the source-backed reader's.
     fn build_strict_layout_proof(
         &self,
         target: crate::ZipArchiveEntryWayfinder,
-    ) -> Result<StrictLayoutProof, Error> {
+        memo: &StrictLayoutMemo,
+    ) -> Result<StrictLayoutProven, Error> {
         self.archive.validate_borrowed_layout()?;
-        let mut spans = Vec::new();
-        spans
-            .try_reserve_exact(self.layout.len())
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "archive reader strict layout proof",
-                    source,
-                })
-            })?;
-        let mut by_local_header = HashMap::new();
-        by_local_header
-            .try_reserve(self.layout.len())
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "archive reader strict layout map",
-                    source,
-                })
-            })?;
-        let mut previous_end = None;
-        for layout_entry in &self.layout {
-            let span = self
-                .archive
-                .validate_strict_entry_layout(layout_entry.wayfinder, &layout_entry.central_name)?;
-            if previous_end.is_some_and(|previous_end| span.local_header_offset < previous_end) {
-                return Err(Error::from(ErrorKind::InvalidInput {
-                    msg: "strict streaming refuses overlapping ZIP local spans".to_string(),
-                }));
-            }
-            spans.try_reserve(1).map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "archive reader strict layout proof",
-                    source,
-                })
-            })?;
-            by_local_header.try_reserve(1).map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "archive reader strict layout map",
-                    source,
-                })
-            })?;
-            if by_local_header
-                .insert(span.local_header_offset, spans.len())
-                .is_some()
-            {
-                return Err(Error::from(ErrorKind::InvalidInput {
-                    msg: "strict streaming refuses duplicate ZIP local spans".to_string(),
-                }));
-            }
-            spans.push(span);
-            previous_end = Some(span.span_end);
-        }
-        if previous_end.is_some_and(|previous_end| previous_end > self.archive.directory_offset()) {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "strict streaming local span extends into the central directory".to_string(),
-            }));
-        }
-        let proof = StrictLayoutProof {
-            spans,
-            by_local_header,
-        };
-        proof.entry(target)?;
-        Ok(proof)
+        prove_target_scoped_strict_layout(
+            self.layout.len(),
+            |position| self.layout.get(position).map(|entry| entry.wayfinder),
+            |position| {
+                let entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                self.archive
+                    .validate_strict_entry_layout(entry.wayfinder, &entry.central_name)
+            },
+            |position| {
+                let entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                self.archive.local_span_bound(entry.wayfinder)
+            },
+            |position, bound| {
+                let entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                self.archive.resolve_span_end(entry.wayfinder, bound)
+            },
+            target,
+            memo,
+        )
     }
 
     fn strict_layout_for(
         &self,
         target: crate::ZipArchiveEntryWayfinder,
     ) -> Result<crate::StrictEntryLayout, Error> {
-        strict_layout_for_cached(&self.strict_layout_cache, target, || {
-            self.build_strict_layout_proof(target)
+        strict_layout_for_cached(&self.strict_layout_cache, target, |memo| {
+            self.build_strict_layout_proof(target, memo)
         })
     }
 
@@ -3579,109 +3829,93 @@ where
         Ok(self.indexed_entry(entry_id)?.info.compression_method == CompressionMethod::Store)
     }
 
+    /// The central name one layout position validates against.
+    fn strict_layout_central_name(&self, position: usize) -> Result<&[u8], Error> {
+        let layout_entry = self
+            .layout
+            .get(position)
+            .ok_or_else(strict_layout_index_error)?;
+        Ok(match &layout_entry.name {
+            IndexedLayoutName::Entry(entry_id) => {
+                &self
+                    .entries
+                    .get(entry_id.0)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "indexed strict layout references an unknown entry".to_string(),
+                        })
+                    })?
+                    .info
+                    .central_name
+            },
+            IndexedLayoutName::Directory(name) => name,
+        })
+    }
+
+    /// Where the member after `position` begins, or the central directory for
+    /// the last one.
+    ///
+    /// This is a read bound for the prover's speculative local-header read and
+    /// nothing else.  The target's span is still checked against its
+    /// successor's offset below, so a window that stops short of a variable
+    /// region only costs one more read; it never changes a verdict.
+    fn strict_layout_read_bound(&self, position: usize) -> u64 {
+        position
+            .checked_add(1)
+            .and_then(|next| self.layout.get(next))
+            .map_or_else(
+                || self.archive.directory_offset(),
+                |next| next.wayfinder.local_header_offset(),
+            )
+    }
+
+    /// Prove that the bytes one member declares are not claimed by any other
+    /// record of this archive.
     fn build_strict_layout_proof(
         &self,
         target: crate::ZipArchiveEntryWayfinder,
-    ) -> Result<StrictLayoutProof, Error> {
-        let mut spans = Vec::new();
-        spans
-            .try_reserve_exact(self.layout.len())
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive strict layout proof",
-                    source,
-                })
-            })?;
-        let mut by_local_header = HashMap::new();
-        by_local_header
-            .try_reserve(self.layout.len())
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive strict layout map",
-                    source,
-                })
-            })?;
-        let mut previous_end = None;
-        for (position, layout_entry) in self.layout.iter().enumerate() {
-            let central_name = match &layout_entry.name {
-                IndexedLayoutName::Entry(entry_id) => {
-                    &self
-                        .entries
-                        .get(entry_id.0)
-                        .ok_or_else(|| {
-                            Error::from(ErrorKind::InvalidInput {
-                                msg: "indexed strict layout references an unknown entry"
-                                    .to_string(),
-                            })
-                        })?
-                        .info
-                        .central_name
-                },
-                IndexedLayoutName::Directory(name) => name,
-            };
-            // Where the following member begins, or the central directory for
-            // the last one.  This is a read bound for the prover's speculative
-            // local-header read; the non-overlap proof below is what actually
-            // validates the order.
-            let next_local_header_offset = position
-                .checked_add(1)
-                .and_then(|next| self.layout.get(next))
-                .map_or_else(
-                    || self.archive.directory_offset(),
-                    |next| next.wayfinder.local_header_offset(),
-                );
-            let span = self.archive.validate_strict_entry_layout(
-                layout_entry.wayfinder,
-                central_name,
-                next_local_header_offset,
-            )?;
-            if previous_end.is_some_and(|previous_end| span.local_header_offset < previous_end) {
-                return Err(Error::from(ErrorKind::InvalidInput {
-                    msg: "strict streaming refuses overlapping ZIP local spans".to_string(),
-                }));
-            }
-            spans.try_reserve(1).map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive strict layout proof",
-                    source,
-                })
-            })?;
-            by_local_header.try_reserve(1).map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive strict layout map",
-                    source,
-                })
-            })?;
-            if by_local_header
-                .insert(span.local_header_offset, spans.len())
-                .is_some()
-            {
-                return Err(Error::from(ErrorKind::InvalidInput {
-                    msg: "strict streaming refuses duplicate ZIP local spans".to_string(),
-                }));
-            }
-            spans.push(span);
-            previous_end = Some(span.span_end);
-        }
-        if previous_end.is_some_and(|previous_end| previous_end > self.archive.directory_offset()) {
-            return Err(Error::from(ErrorKind::InvalidInput {
-                msg: "strict streaming local span extends into the central directory".to_string(),
-            }));
-        }
-        let proof = StrictLayoutProof {
-            spans,
-            by_local_header,
-        };
-        proof.entry(target)?;
-        Ok(proof)
+        memo: &StrictLayoutMemo,
+    ) -> Result<StrictLayoutProven, Error> {
+        prove_target_scoped_strict_layout(
+            self.layout.len(),
+            |position| self.layout.get(position).map(|entry| entry.wayfinder),
+            |position| {
+                let layout_entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                let central_name = self.strict_layout_central_name(position)?;
+                self.archive.validate_strict_entry_layout(
+                    layout_entry.wayfinder,
+                    central_name,
+                    self.strict_layout_read_bound(position),
+                )
+            },
+            |position| {
+                let layout_entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                self.archive.local_span_bound(layout_entry.wayfinder)
+            },
+            |position, bound| {
+                let layout_entry = self
+                    .layout
+                    .get(position)
+                    .ok_or_else(strict_layout_index_error)?;
+                self.archive.resolve_span_end(layout_entry.wayfinder, bound)
+            },
+            target,
+            memo,
+        )
     }
 
     fn strict_layout_for(
         &self,
         target: crate::ZipArchiveEntryWayfinder,
     ) -> Result<crate::StrictEntryLayout, Error> {
-        strict_layout_for_cached(&self.strict_layout_cache, target, || {
-            self.build_strict_layout_proof(target)
+        strict_layout_for_cached(&self.strict_layout_cache, target, |memo| {
+            self.build_strict_layout_proof(target, memo)
         })
     }
 
@@ -12861,6 +13095,1046 @@ mod tests {
             assert_eq!(join.join().unwrap(), b"abc");
         }
         assert_eq!(indexed.strict_layout_cache.build_count(), 1);
+    }
+
+    // ---------------------------------------------------------------------
+    // Change 0580: target-scoped strict layout proof.
+    //
+    // The fixtures below are the ones no existing test builds: a record whose
+    // *local* variable region is inflated so its declared span swallows other
+    // records.  Local name length and local extra length are the two span
+    // inputs the central directory never carries, so they are the only way to
+    // build an overlap that a central-directory-only analysis cannot see.
+    // ---------------------------------------------------------------------
+
+    /// One member of a layout-scope fixture.
+    struct ScopedMember {
+        name: Vec<u8>,
+        payload: Vec<u8>,
+        /// The `file_name_length` the *local* header declares. A value larger
+        /// than `name.len()` extends the declared local span without changing
+        /// any byte the central directory carries.
+        local_name_len: u16,
+        /// The `extra_field_length` the *local* header declares.
+        local_extra_len: u16,
+        /// The `compressed_size` the *local* header declares, when it is to
+        /// differ from the central record's. This is change 0583's input: the
+        /// two records describe one physical payload region, and only the
+        /// local one is what a streaming reader follows.
+        local_compressed_size: Option<u32>,
+        /// The `uncompressed_size` the *local* header declares, when it is to
+        /// differ from the central record's.
+        local_uncompressed_size: Option<u32>,
+        /// The general-purpose bit flags the *local* header declares, when they
+        /// are to differ from the central record's. Bit 3 is the one that
+        /// matters here: it decides whether a reader following local headers
+        /// believes this record's sizes or looks for a data descriptor.
+        local_flags: Option<u16>,
+        /// The CRC the *local* header declares, when it is to differ from what
+        /// the descriptor setting would write.
+        local_crc: Option<u32>,
+        /// Filler bytes written between the payload and the data descriptor, so
+        /// the descriptor does not sit where the central payload length places
+        /// it.
+        descriptor_gap: usize,
+        /// Where this member's local record is written. `None` appends it
+        /// after everything written so far.
+        at: Option<usize>,
+        /// `Some(signed)` writes this member with general-purpose bit 3 set,
+        /// zeroed local sizes and CRC, and a trailing data descriptor.
+        descriptor: Option<bool>,
+    }
+
+    impl ScopedMember {
+        fn new(name: &[u8], payload: &[u8]) -> Self {
+            Self {
+                name: name.to_vec(),
+                payload: payload.to_vec(),
+                local_name_len: u16::try_from(name.len()).unwrap(),
+                local_extra_len: 0,
+                local_compressed_size: None,
+                local_uncompressed_size: None,
+                local_flags: None,
+                local_crc: None,
+                descriptor_gap: 0,
+                at: None,
+                descriptor: None,
+            }
+        }
+
+        fn local_compressed_size(mut self, size: u32) -> Self {
+            self.local_compressed_size = Some(size);
+            self
+        }
+
+        fn local_uncompressed_size(mut self, size: u32) -> Self {
+            self.local_uncompressed_size = Some(size);
+            self
+        }
+
+        fn local_flags(mut self, flags: u16) -> Self {
+            self.local_flags = Some(flags);
+            self
+        }
+
+        fn local_crc(mut self, crc: u32) -> Self {
+            self.local_crc = Some(crc);
+            self
+        }
+
+        fn descriptor_gap(mut self, gap: usize) -> Self {
+            self.descriptor_gap = gap;
+            self
+        }
+
+        fn descriptor(mut self, signed: bool) -> Self {
+            self.descriptor = Some(signed);
+            self
+        }
+
+        fn flags(&self) -> u16 {
+            if self.descriptor.is_some() { 0x08 } else { 0 }
+        }
+
+        fn local_name_len(mut self, len: u16) -> Self {
+            self.local_name_len = len;
+            self
+        }
+
+        fn local_extra_len(mut self, len: u16) -> Self {
+            self.local_extra_len = len;
+            self
+        }
+
+        fn at(mut self, offset: usize) -> Self {
+            self.at = Some(offset);
+            self
+        }
+
+        fn local_record(&self) -> Vec<u8> {
+            let size = u32::try_from(self.payload.len()).unwrap();
+            let mut record = Vec::new();
+            push_u32(&mut record, 0x0403_4b50);
+            push_u16(&mut record, 20);
+            push_u16(
+                &mut record,
+                self.local_flags.unwrap_or_else(|| self.flags()),
+            );
+            push_u16(&mut record, 0);
+            push_u16(&mut record, 0);
+            push_u16(&mut record, 0);
+            let declared = if self.descriptor.is_some() { 0 } else { size };
+            push_u32(
+                &mut record,
+                self.local_crc.unwrap_or(if self.descriptor.is_some() {
+                    0
+                } else {
+                    crate::crc32(&self.payload)
+                }),
+            );
+            push_u32(&mut record, self.local_compressed_size.unwrap_or(declared));
+            push_u32(
+                &mut record,
+                self.local_uncompressed_size.unwrap_or(declared),
+            );
+            push_u16(&mut record, self.local_name_len);
+            push_u16(&mut record, self.local_extra_len);
+            let variable = usize::from(self.local_name_len) + usize::from(self.local_extra_len);
+            let mut region = vec![0u8; variable];
+            let copied = self.name.len().min(variable);
+            region[..copied].copy_from_slice(&self.name[..copied]);
+            record.extend_from_slice(&region);
+            record.extend_from_slice(&self.payload);
+            if let Some(signed) = self.descriptor {
+                record.extend_from_slice(&vec![0u8; self.descriptor_gap]);
+                if signed {
+                    push_u32(&mut record, 0x0807_4b50);
+                }
+                push_u32(&mut record, crate::crc32(&self.payload));
+                push_u32(&mut record, size);
+                push_u32(&mut record, size);
+            }
+            record
+        }
+    }
+
+    /// Assemble an archive whose members may be written at explicit offsets,
+    /// so one member's declared local span can physically contain another's
+    /// complete local record.
+    fn scoped_fixture(members: &[ScopedMember]) -> Vec<u8> {
+        let mut archive: Vec<u8> = Vec::new();
+        let mut offsets = Vec::new();
+        for member in members {
+            let record = member.local_record();
+            let offset = member.at.unwrap_or(archive.len());
+            let end = offset + record.len();
+            if archive.len() < end {
+                archive.resize(end, 0);
+            }
+            archive[offset..end].copy_from_slice(&record);
+            offsets.push(offset);
+        }
+
+        let central_directory_offset = u32::try_from(archive.len()).unwrap();
+        let mut central_directory = Vec::new();
+        for (member, offset) in members.iter().zip(&offsets) {
+            let size = u32::try_from(member.payload.len()).unwrap();
+            push_u32(&mut central_directory, 0x0201_4b50);
+            push_u16(&mut central_directory, 20);
+            push_u16(&mut central_directory, 20);
+            push_u16(&mut central_directory, member.flags());
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u32(&mut central_directory, crate::crc32(&member.payload));
+            push_u32(&mut central_directory, size);
+            push_u32(&mut central_directory, size);
+            push_u16(
+                &mut central_directory,
+                u16::try_from(member.name.len()).unwrap(),
+            );
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u32(&mut central_directory, 0);
+            push_u32(&mut central_directory, u32::try_from(*offset).unwrap());
+            central_directory.extend_from_slice(&member.name);
+        }
+        let central_directory_size = u32::try_from(central_directory.len()).unwrap();
+        archive.extend_from_slice(&central_directory);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        let count = u16::try_from(members.len()).unwrap();
+        push_u16(&mut archive, count);
+        push_u16(&mut archive, count);
+        push_u32(&mut archive, central_directory_size);
+        push_u32(&mut archive, central_directory_offset);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    /// Change 0575's adversarial witness, byte for byte.
+    ///
+    /// `docs/performance/results/change-0575/overlap_witness.py` builds the
+    /// same 4,405-byte archive. `A.bin`'s local extra field is 4,096 bytes, so
+    /// A's declared local span `[0, 4163)` physically contains `B.bin`'s entire
+    /// local record at offset 2,048. A's *central* record declares an extra
+    /// length of 0, so no central-directory-only analysis can see the overlap.
+    /// `C.bin` begins exactly where A's span ends and overlaps nothing.
+    fn overlap_witness_archive() -> Vec<u8> {
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"A.bin", &[b'A'; 32]).local_extra_len(4096),
+            ScopedMember::new(b"B.bin", &[b'B'; 32]).at(2048),
+            ScopedMember::new(b"C.bin", &[b'C'; 32]).at(4163),
+        ]);
+        // The same unknown extra-field header the Python witness writes, so
+        // the two archives are byte-identical.  `0xFACE` is not a defined
+        // extra-field id, so every conforming reader skips it.
+        let mut bytes = bytes;
+        bytes[35..37].copy_from_slice(&0xFACE_u16.to_le_bytes());
+        bytes[37..39].copy_from_slice(&4092_u16.to_le_bytes());
+        assert_eq!(bytes.len(), 4405, "witness archive size is pinned to 0575");
+        bytes
+    }
+
+    fn scoped_indexed_read(bytes: &[u8], name: &str) -> Result<Vec<u8>, Error> {
+        let length = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader_with_limits(
+            std::io::Cursor::new(bytes.to_vec()),
+            length,
+            ArchiveLimits::UNBOUNDED,
+        )?;
+        let entry_id = indexed
+            .entry_id(name)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(name.to_string())))?;
+        let mut sink = Vec::new();
+        indexed.read_entry_to(entry_id, &mut sink)?;
+        Ok(sink)
+    }
+
+    fn scoped_borrowed_read(bytes: &[u8], name: &str) -> Result<Vec<u8>, Error> {
+        let reader = ArchiveReader::new(bytes)?;
+        let mut sink = Vec::new();
+        reader.read_to(name, &mut sink)?;
+        Ok(sink)
+    }
+
+    fn scoped_invalid_input_message(error: &Error) -> String {
+        match error.kind() {
+            ErrorKind::InvalidInput { msg } => msg.clone(),
+            other => panic!("expected InvalidInput, found {other:?}"),
+        }
+    }
+
+    #[derive(Debug)]
+    struct ScopedCountingReaderAt {
+        bytes: Vec<u8>,
+        reads: Mutex<Vec<(u64, usize)>>,
+    }
+
+    impl ScopedCountingReaderAt {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                reads: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn clear(&self) {
+            self.reads.lock().unwrap().clear();
+        }
+
+        fn calls(&self) -> usize {
+            self.reads.lock().unwrap().len()
+        }
+    }
+
+    impl ReaderAt for ScopedCountingReaderAt {
+        fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+            let start = usize::try_from(offset).unwrap_or(self.bytes.len());
+            let count = if start >= self.bytes.len() {
+                0
+            } else {
+                let count = buf.len().min(self.bytes.len() - start);
+                buf[..count].copy_from_slice(&self.bytes[start..start + count]);
+                count
+            };
+            self.reads.lock().unwrap().push((offset, count));
+            Ok(count)
+        }
+    }
+
+    /// Positional reads the strict-layout proof alone issues for one target.
+    fn scoped_strict_layout_reads(bytes: &[u8], name: &str) -> usize {
+        let length = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader_with_limits(
+            ScopedCountingReaderAt::new(bytes.to_vec()),
+            length,
+            ArchiveLimits::UNBOUNDED,
+        )
+        .expect("fixture indexes");
+        let entry_id = indexed.entry_id(name).expect("member is present");
+        let wayfinder = indexed
+            .indexed_entry(entry_id)
+            .expect("entry id resolves")
+            .info
+            .wayfinder;
+        indexed.archive.get_ref().clear();
+        indexed
+            .strict_layout_for(wayfinder)
+            .expect("target proves its own layout");
+        indexed.archive.get_ref().calls()
+    }
+
+    #[test]
+    fn target_scoped_layout_refuses_both_overlapping_members_and_admits_the_third() {
+        let bytes = overlap_witness_archive();
+
+        // A and B overlap each other: A's declared local span contains B's
+        // entire local record.  Reading either one is refused from its own
+        // side of the overlap, exactly as the archive-wide proof refused them.
+        for name in ["A.bin", "B.bin"] {
+            for error in [
+                scoped_indexed_read(&bytes, name).unwrap_err(),
+                scoped_borrowed_read(&bytes, name).unwrap_err(),
+            ] {
+                assert_eq!(
+                    scoped_invalid_input_message(&error),
+                    "strict streaming refuses overlapping ZIP local spans",
+                    "{name} participates in the overlap and must stay refused",
+                );
+            }
+        }
+
+        // C overlaps nothing.  This is the whole semantic delta of change
+        // 0580: the archive-wide proof refused this read because two members
+        // C does not touch overlap each other.
+        assert_eq!(
+            scoped_indexed_read(&bytes, "C.bin").unwrap(),
+            vec![b'C'; 32]
+        );
+        assert_eq!(
+            scoped_borrowed_read(&bytes, "C.bin").unwrap(),
+            vec![b'C'; 32]
+        );
+    }
+
+    #[test]
+    fn a_distant_predecessor_that_reaches_the_target_is_still_refused() {
+        // `first.bin` declares a 16 KiB local extra field, so its span runs to
+        // offset 16,425 and contains three later members' complete local
+        // records.  The central directory declares no local extra field for
+        // it, so its zero-I/O bracket is `[0, 43)` at minimum: only
+        // `first.bin`'s own 30-byte local header reveals the reach.
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"first.bin", b"first payload").local_extra_len(16 * 1024),
+            ScopedMember::new(b"second.bin", b"second").at(4096),
+            ScopedMember::new(b"third.bin", b"third").at(8192),
+            ScopedMember::new(b"fourth.bin", b"fourth").at(12288),
+        ]);
+
+        for name in ["second.bin", "third.bin", "fourth.bin"] {
+            let error = scoped_indexed_read(&bytes, name).unwrap_err();
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses overlapping ZIP local spans",
+                "{name} lies inside first.bin's declared local span",
+            );
+            let error = scoped_borrowed_read(&bytes, name).unwrap_err();
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses overlapping ZIP local spans",
+            );
+        }
+    }
+
+    #[test]
+    fn a_predecessor_reaching_past_the_central_name_length_bracket_is_still_refused() {
+        // The residual window has to count *both* halves of the local variable
+        // region.  Here `first.bin` declares a 100-byte local name and a
+        // 65,535-byte local extra field, so its declared span ends at 65,697.
+        // A bracket that assumed the local name length equals the 9-byte
+        // central name length would stop at 65,630 + 24 and prune this record,
+        // admitting a read of bytes it claims.
+        let target_offset = 65_640;
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"first.bin", &[b'f'; 32])
+                .local_name_len(100)
+                .local_extra_len(u16::MAX),
+            ScopedMember::new(b"target.bin", b"target").at(target_offset),
+        ]);
+        // The reach is real: first.bin's declared span end is past the target.
+        assert!(30 + 100 + usize::from(u16::MAX) + 32 > target_offset);
+        // And it is past where a central-name-length bracket would stop.
+        assert!(target_offset > 30 + "first.bin".len() + 32 + 65_535 + 24);
+
+        let error = scoped_indexed_read(&bytes, "target.bin").unwrap_err();
+        assert_eq!(
+            scoped_invalid_input_message(&error),
+            "strict streaming refuses overlapping ZIP local spans",
+        );
+        let error = scoped_borrowed_read(&bytes, "target.bin").unwrap_err();
+        assert_eq!(
+            scoped_invalid_input_message(&error),
+            "strict streaming refuses overlapping ZIP local spans",
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // Change 0583: a neighbour's payload length is the larger of its local
+    // and central declarations.
+    //
+    // Change 0580 bounds a neighbour's span with the local variable-region
+    // length — which it reads — and the *central* payload length, which it
+    // does not cross-check against the local header's own `compressed_size`.
+    // Change 0582's finding 2 showed that a local header declaring a longer
+    // payload than its central record hides bytes a streaming reader assigns
+    // to it, and lets another member be read out of them.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused() {
+        // Change 0582's `crafted/neighbour-local-csize-smuggles.zip`, rebuilt.
+        // `pred.bin` carries a 16-byte payload in its central record and
+        // declares a 100,000-byte payload in its local header.  A reader that
+        // trusts local headers places its payload at [38, 100038), which
+        // contains `target.bin`'s entire local record; a reader that trusts
+        // the central directory places it at [38, 54), which does not.
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &[b'p'; 16]).local_compressed_size(100_000),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
+        ]);
+        // Central metadata alone cannot see the reach: pred's central payload
+        // ends at 54, far short of the target.
+        assert!(30 + "pred.bin".len() + 16 < 200);
+        // Only the two bytes at offset 18..22 of pred's local header do.
+        assert_eq!(30 + "pred.bin".len() + 100_000, 100_038);
+
+        for error in [
+            scoped_indexed_read(&bytes, "target.bin").unwrap_err(),
+            scoped_borrowed_read(&bytes, "target.bin").unwrap_err(),
+        ] {
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses overlapping ZIP local spans",
+                "target.bin lies inside the payload pred.bin's local header claims",
+            );
+        }
+    }
+
+    #[test]
+    fn a_descriptor_bearing_predecessors_payload_end_is_not_moved() {
+        // A declared data descriptor's payload end is not only a refusal
+        // threshold: it is the offset the descriptor is *read* at.  Moving it
+        // does not make the bound larger, it makes it different, and a
+        // descriptor parsed somewhere else can match where the true one did
+        // not — so a maximum applied to this branch can turn a refusal into an
+        // acceptance.  The maximum is therefore confined to the exact branch.
+        //
+        // `pred.bin`'s central record declares a descriptor; its *local*
+        // header does not, and declares a payload four bytes longer than the
+        // central one.  Four filler bytes sit between the payload and the real
+        // 12-byte descriptor, so the descriptor is exactly where the inflated
+        // local length would place it and exactly not where the central length
+        // does.  `target.bin` begins two bytes past the real span end.
+        let payload = [b'p'; 16];
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &payload)
+                .descriptor(false)
+                .descriptor_gap(4)
+                .local_flags(0)
+                .local_crc(crate::crc32(&payload))
+                .local_compressed_size(20)
+                .local_uncompressed_size(20),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(72),
+        ]);
+        // 30 + 8 + 16 = 54 is where the central length puts the payload end;
+        // 54..58 is filler and the real unsigned descriptor starts at 58,
+        // which is 30 + 8 + 20, where the inflated local length points.
+        assert_eq!(30 + "pred.bin".len() + payload.len(), 54);
+        assert_eq!(&bytes[54..58], &[0u8; 4]);
+        assert_eq!(&bytes[58..62], &crate::crc32(&payload).to_le_bytes());
+        assert_eq!(&bytes[62..66], &16_u32.to_le_bytes());
+        assert_eq!(&bytes[66..70], &16_u32.to_le_bytes());
+
+        // Resolving at 54 finds filler, not a descriptor, so the neighbour
+        // cannot be bounded and the read is refused.  Resolving at 58 would
+        // find a valid descriptor ending at 70, two bytes clear of the target,
+        // and the read would succeed.
+        assert!(scoped_indexed_read(&bytes, "target.bin").is_err());
+        assert!(scoped_borrowed_read(&bytes, "target.bin").is_err());
+    }
+
+    #[test]
+    fn a_descriptor_bearing_predecessors_local_size_is_not_a_span_length() {
+        // The same inflated local size with general-purpose bit 3 set in both
+        // records.  Bit 3 means the true sizes are in the trailing data
+        // descriptor and these fields are placeholders, so a reader following
+        // local headers scans for the descriptor instead of trusting this
+        // field: inflating it moves no boundary.
+        //
+        // It is also what keeps a verdict independent of read order.  Full
+        // validation skips the local-versus-central size comparison for a
+        // descriptor-bearing record, so `pred.bin` validates as a target and
+        // its exact span end is memoised as its neighbour bound.  A maximum
+        // applied here would disagree with that memo, and this archive would
+        // accept or refuse `target.bin` depending on which member was read
+        // first.
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &[b'p'; 16])
+                .descriptor(false)
+                .local_compressed_size(100_000),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
+        ]);
+
+        // A fresh reader that has read nothing else.
+        assert_eq!(
+            scoped_indexed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+        assert_eq!(
+            scoped_borrowed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+
+        // And a reader that has already proven `pred.bin`'s own layout, which
+        // is the order that populates the memo.
+        let length = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader_with_limits(
+            std::io::Cursor::new(bytes.clone()),
+            length,
+            ArchiveLimits::UNBOUNDED,
+        )
+        .unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        for name in ["pred.bin", "target.bin"] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut sink = Vec::new();
+            indexed.read_entry_to(entry_id, &mut sink).unwrap();
+            assert_eq!(sink.len(), 16, "{name} reads its own 16 bytes");
+            let mut sink = Vec::new();
+            reader.read_to(name, &mut sink).unwrap();
+            assert_eq!(sink.len(), 16);
+        }
+    }
+
+    #[test]
+    fn a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound() {
+        // The maximum runs in both directions, and this pins the direction the
+        // central record wins.  `pred.bin` carries a 100-byte central payload
+        // and declares 16 locally.  The target sits at 134, which is:
+        //
+        //   * past `30 + central = 130`, so the zero-I/O bracket does not
+        //     refuse it and the local header really is read;
+        //   * past `30 + 8 + 16 = 54`, the span end the *local* claim gives,
+        //     so a bound that took the local value would accept;
+        //   * inside `30 + 8 + 100 = 138`, the span end the central claim
+        //     gives, so the maximum refuses.
+        let central_payload = [b'p'; 100];
+        let local_claim = 16_usize;
+        let target_offset = 134_usize;
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &central_payload)
+                .local_compressed_size(u32::try_from(local_claim).unwrap()),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(target_offset),
+        ]);
+        let fixed = 30 + "pred.bin".len();
+        assert!(
+            30 + central_payload.len() <= target_offset,
+            "the zero-I/O bracket must not settle this",
+        );
+        assert!(
+            fixed + local_claim < target_offset,
+            "the local claim clears the target",
+        );
+        assert!(
+            fixed + central_payload.len() > target_offset,
+            "the central claim does not",
+        );
+
+        for error in [
+            scoped_indexed_read(&bytes, "target.bin").unwrap_err(),
+            scoped_borrowed_read(&bytes, "target.bin").unwrap_err(),
+        ] {
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses overlapping ZIP local spans",
+            );
+        }
+    }
+
+    #[test]
+    fn a_local_zip64_size_sentinel_is_not_a_neighbour_span_length() {
+        // `u32::MAX` in a local `compressed_size` is the ZIP64 sentinel, not a
+        // length: the real value lives in a ZIP64 extra field inside the
+        // variable region, which the neighbour probe deliberately does not
+        // read.  A maximum that took the sentinel literally would reserve
+        // 4 GiB for every ZIP64 member and refuse valid archives, so the
+        // sentinel falls back to the central length — exactly the bound
+        // change 0580 computed.
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &[b'p'; 32]).local_compressed_size(u32::MAX),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
+        ]);
+        // Taken literally the sentinel would place pred's span end 4 GiB past
+        // the target.
+        assert!(u64::from(u32::MAX) > 200);
+
+        assert_eq!(
+            scoped_indexed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+        assert_eq!(
+            scoped_borrowed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+    }
+
+    #[test]
+    fn a_predecessor_local_uncompressed_size_does_not_move_the_payload() {
+        // `uncompressed_size` never describes an on-disk region — the payload
+        // that separates one local record from the next is `compressed_size`
+        // bytes long whatever the member inflates to — so an inflated local
+        // value cannot move where any reader places a payload.  Change 0582's
+        // `neighbour-local-usize-smuggles` is an ordinary change-0580
+        // local-versus-central relaxation, and is deliberately not given the
+        // compressed-size treatment.
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"pred.bin", &[b'p'; 16]).local_uncompressed_size(100_000),
+            ScopedMember::new(b"target.bin", &[b't'; 16]).at(200),
+        ]);
+
+        assert_eq!(
+            scoped_indexed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+        assert_eq!(
+            scoped_borrowed_read(&bytes, "target.bin").unwrap(),
+            vec![b't'; 16]
+        );
+    }
+
+    #[test]
+    fn a_verdict_does_not_depend_on_what_the_reader_read_before() {
+        let bytes = overlap_witness_archive();
+        let expected = [("A.bin", false), ("B.bin", false), ("C.bin", true)];
+        let orders: [[&str; 3]; 6] = [
+            ["A.bin", "B.bin", "C.bin"],
+            ["A.bin", "C.bin", "B.bin"],
+            ["B.bin", "A.bin", "C.bin"],
+            ["B.bin", "C.bin", "A.bin"],
+            ["C.bin", "A.bin", "B.bin"],
+            ["C.bin", "B.bin", "A.bin"],
+        ];
+
+        for order in orders {
+            // One reader, reading the three members in this order.
+            let length = bytes.len() as u64;
+            let indexed = IndexedArchive::from_reader_with_limits(
+                std::io::Cursor::new(bytes.clone()),
+                length,
+                ArchiveLimits::UNBOUNDED,
+            )
+            .unwrap();
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let mut seen = Vec::new();
+            for name in order {
+                let entry_id = indexed.entry_id(name).unwrap();
+                let mut sink = Vec::new();
+                let indexed_ok = indexed.read_entry_to(entry_id, &mut sink).is_ok();
+                let mut sink = Vec::new();
+                let borrowed_ok = reader.read_to(name, &mut sink).is_ok();
+                assert_eq!(
+                    indexed_ok, borrowed_ok,
+                    "both readers share one acceptance contract for {name}",
+                );
+                seen.push((name, indexed_ok));
+            }
+            seen.sort_by_key(|(name, _)| *name);
+            assert_eq!(seen, expected.to_vec(), "order {order:?} changed a verdict",);
+
+            // And the same three members, each on a reader that has read
+            // nothing else.
+            for (name, accepted) in expected {
+                assert_eq!(
+                    scoped_indexed_read(&bytes, name).is_ok(),
+                    accepted,
+                    "a fresh reader disagrees about {name}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn duplicate_local_header_offsets_are_refused_on_the_strict_path() {
+        // Two central records that declare the same local-header offset.  The
+        // archive-wide proof reported this as an overlap; it is a pure
+        // central-directory property, decidable with no read at all, and it
+        // keeps its own refusal.
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let second = central + central_record_len(&bytes, central);
+        bytes[second + 42..second + 46].copy_from_slice(&0u32.to_le_bytes());
+
+        for name in ["first.bin", "second.bin"] {
+            let error = scoped_indexed_read(&bytes, name).unwrap_err();
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses duplicate ZIP local spans",
+            );
+            let error = scoped_borrowed_read(&bytes, name).unwrap_err();
+            assert_eq!(
+                scoped_invalid_input_message(&error),
+                "strict streaming refuses duplicate ZIP local spans",
+            );
+        }
+    }
+
+    #[test]
+    fn a_descriptor_bearing_predecessor_is_resolved_exactly_not_conservatively() {
+        // A data descriptor's encoded width is 12, 16, 20 or 24 bytes and is
+        // not decidable from a fixed local header.  In a gapless archive the
+        // predecessor's payload ends exactly one descriptor before the target,
+        // so a bound that simply reserved the widest descriptor would refuse
+        // every gapless descriptor-bearing archive.  The proof resolves the
+        // width exactly instead.
+        for signed in [false, true] {
+            let bytes = scoped_fixture(&[
+                ScopedMember::new(b"first.bin", b"descriptor payload").descriptor(signed),
+                ScopedMember::new(b"target.bin", b"target"),
+                ScopedMember::new(b"last.bin", b"last").descriptor(signed),
+            ]);
+            assert_eq!(
+                scoped_indexed_read(&bytes, "target.bin").unwrap(),
+                b"target".to_vec(),
+                "a descriptor-bearing predecessor must not be treated as 24 bytes wide",
+            );
+            assert_eq!(
+                scoped_indexed_read(&bytes, "first.bin").unwrap(),
+                b"descriptor payload".to_vec(),
+            );
+            assert_eq!(
+                scoped_indexed_read(&bytes, "last.bin").unwrap(),
+                b"last".to_vec(),
+            );
+            assert_eq!(
+                scoped_borrowed_read(&bytes, "target.bin").unwrap(),
+                b"target".to_vec(),
+            );
+            assert_eq!(
+                scoped_borrowed_read(&bytes, "last.bin").unwrap(),
+                b"last".to_vec(),
+            );
+        }
+    }
+
+    #[test]
+    fn a_predecessor_outside_the_residual_window_costs_no_read() {
+        // Six tiny members, then one whose payload is larger than the residual
+        // window, then the target.  Every member before the large one is
+        // pruned by resident central metadata alone.
+        let filler = vec![0xA5u8; 140_000];
+        let mut members: Vec<ScopedMember> = (0..6)
+            .map(|index| ScopedMember::new(format!("tiny{index}.bin").as_bytes(), b"tiny"))
+            .collect();
+        members.push(ScopedMember::new(b"large.bin", &filler));
+        members.push(ScopedMember::new(b"target.bin", b"target"));
+        let bytes = scoped_fixture(&members);
+
+        // One read for the target's own layout, one 30-byte probe for the
+        // large member.  The six tiny members are outside the window.
+        assert_eq!(scoped_strict_layout_reads(&bytes, "target.bin"), 2);
+        assert_eq!(
+            scoped_indexed_read(&bytes, "target.bin").unwrap(),
+            b"target".to_vec(),
+        );
+        // Every member still reads, and the first one needs no predecessor at
+        // all.
+        assert_eq!(scoped_strict_layout_reads(&bytes, "tiny0.bin"), 1);
+    }
+
+    #[test]
+    fn opening_and_listing_issues_no_strict_layout_read() {
+        let bytes = scoped_fixture(&[
+            ScopedMember::new(b"first.bin", b"first"),
+            ScopedMember::new(b"second.bin", b"second"),
+            ScopedMember::new(b"third.bin", b"third"),
+        ]);
+        let length = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader_with_limits(
+            ScopedCountingReaderAt::new(bytes),
+            length,
+            ArchiveLimits::UNBOUNDED,
+        )
+        .unwrap();
+        indexed.archive.get_ref().clear();
+        assert_eq!(indexed.file_names().count(), 3);
+        assert_eq!(indexed.archive.get_ref().calls(), 0);
+        // The materializing read family does not reach the proof either.
+        let entry_id = indexed.entry_id("second.bin").unwrap();
+        assert_eq!(indexed.read_entry(entry_id).unwrap(), b"second".to_vec());
+        assert!(!indexed.strict_layout_cache.is_ready());
+    }
+
+    #[test]
+    fn reading_every_member_converges_on_the_archive_wide_verdict() {
+        // Convergence: for each of these archives, the target-scoped verdict
+        // of every member equals the archive-wide verdict, and no member's
+        // local header is read twice when members are read in physical order.
+        let large = vec![0x5Au8; 140_000];
+        let spread: Vec<ScopedMember> = vec![
+            ScopedMember::new(b"head.bin", b"head"),
+            ScopedMember::new(b"large.bin", &large),
+            ScopedMember::new(b"tail.bin", b"tail"),
+        ];
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("stored.bin", b"stored payload")
+            .unwrap();
+        writer
+            .write_deflated("deflated.bin", b"deflated payload")
+            .unwrap();
+        writer.write_stored("empty.bin", b"").unwrap();
+        let mixed = writer.finish_to_bytes().unwrap();
+
+        let archives: Vec<(&str, Vec<u8>)> = vec![
+            (
+                "gapless",
+                scoped_fixture(&[
+                    ScopedMember::new(b"a.bin", b"aaaa"),
+                    ScopedMember::new(b"b.bin", b"bbbb"),
+                    ScopedMember::new(b"c.bin", b"cccc"),
+                ]),
+            ),
+            ("spread", scoped_fixture(&spread)),
+            ("store_and_deflate", mixed),
+            (
+                "descriptor",
+                scoped_fixture(&[
+                    ScopedMember::new(b"first.bin", b"first payload").descriptor(false),
+                    ScopedMember::new(b"second.bin", b"second payload").descriptor(false),
+                    ScopedMember::new(b"third.bin", b"third payload"),
+                ]),
+            ),
+            (
+                "descriptor_signed",
+                scoped_fixture(&[
+                    ScopedMember::new(b"first.bin", b"first payload").descriptor(true),
+                    ScopedMember::new(b"second.bin", b"second payload").descriptor(true),
+                ]),
+            ),
+            ("overlap_witness", overlap_witness_archive()),
+        ];
+
+        for (label, bytes) in archives {
+            let length = bytes.len() as u64;
+            let indexed = IndexedArchive::from_reader_with_limits(
+                std::io::Cursor::new(bytes.clone()),
+                length,
+                ArchiveLimits::UNBOUNDED,
+            )
+            .unwrap();
+            let targets: Vec<_> = indexed.layout.iter().map(|entry| entry.wayfinder).collect();
+
+            // The archive-wide verdict, computed here from the same per-entry
+            // validator the proof uses: every record's layout must prove, and
+            // adjacent spans must not overlap.
+            let mut archive_wide_ok = true;
+            let mut previous_end: Option<u64> = None;
+            for position in 0..indexed.layout.len() {
+                let central_name = indexed.strict_layout_central_name(position).unwrap();
+                let wayfinder = indexed.layout[position].wayfinder;
+                match indexed.archive.validate_strict_entry_layout(
+                    wayfinder,
+                    central_name,
+                    indexed.strict_layout_read_bound(position),
+                ) {
+                    Ok(span) => {
+                        if previous_end.is_some_and(|end| span.local_header_offset < end) {
+                            archive_wide_ok = false;
+                            break;
+                        }
+                        previous_end = Some(span.span_end);
+                    },
+                    Err(_) => {
+                        archive_wide_ok = false;
+                        break;
+                    },
+                }
+            }
+
+            let scoped: Vec<bool> = targets
+                .iter()
+                .map(|target| indexed.strict_layout_for(*target).is_ok())
+                .collect();
+            if archive_wide_ok {
+                assert!(
+                    scoped.iter().all(|accepted| *accepted),
+                    "{label}: an archive-wide accept must stay accepted member by member",
+                );
+            } else {
+                assert!(
+                    scoped.iter().any(|accepted| !*accepted),
+                    "{label}: an archive-wide refusal must refuse at least one member",
+                );
+            }
+
+            // Reading every member in physical order costs exactly what the
+            // archive-wide proof cost: no record's local header is read twice,
+            // because a validated target is its own exact span bound for the
+            // members that follow it.
+            if archive_wide_ok {
+                let scoped = {
+                    let indexed = IndexedArchive::from_reader_with_limits(
+                        ScopedCountingReaderAt::new(bytes.clone()),
+                        length,
+                        ArchiveLimits::UNBOUNDED,
+                    )
+                    .unwrap();
+                    let targets: Vec<_> =
+                        indexed.layout.iter().map(|entry| entry.wayfinder).collect();
+                    indexed.archive.get_ref().clear();
+                    for target in targets {
+                        indexed.strict_layout_for(target).unwrap();
+                    }
+                    indexed.archive.get_ref().calls()
+                };
+                let archive_wide = {
+                    let indexed = IndexedArchive::from_reader_with_limits(
+                        ScopedCountingReaderAt::new(bytes.clone()),
+                        length,
+                        ArchiveLimits::UNBOUNDED,
+                    )
+                    .unwrap();
+                    indexed.archive.get_ref().clear();
+                    for position in 0..indexed.layout.len() {
+                        let central_name = indexed.strict_layout_central_name(position).unwrap();
+                        indexed
+                            .archive
+                            .validate_strict_entry_layout(
+                                indexed.layout[position].wayfinder,
+                                central_name,
+                                indexed.strict_layout_read_bound(position),
+                            )
+                            .unwrap();
+                    }
+                    indexed.archive.get_ref().calls()
+                };
+                assert_eq!(
+                    scoped,
+                    archive_wide,
+                    "{label}: reading every member must cost what one \
+                     archive-wide proof cost ({} members)",
+                    targets.len(),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn zip64_and_descriptor_members_keep_their_target_scoped_proof() {
+        // A ZIP64 member with a data descriptor, written by the crate's own
+        // writer, still proves its layout through the target-scoped path, on
+        // both readers, for Store and Deflate.
+        let payload = vec![0x42u8; 4096];
+        for deflate in [false, true] {
+            let mut writer = StreamingArchiveWriter::new();
+            writer.write_stored("first.bin", b"first").unwrap();
+            if deflate {
+                writer.write_deflated("member.bin", &payload).unwrap();
+            } else {
+                writer.write_stored("member.bin", &payload).unwrap();
+            }
+            writer.write_stored("last.bin", b"last").unwrap();
+            let bytes = writer.finish_to_bytes().unwrap();
+
+            assert_eq!(scoped_indexed_read(&bytes, "member.bin").unwrap(), payload);
+            assert_eq!(scoped_borrowed_read(&bytes, "member.bin").unwrap(), payload);
+            assert_eq!(scoped_indexed_read(&bytes, "first.bin").unwrap(), b"first");
+            assert_eq!(scoped_indexed_read(&bytes, "last.bin").unwrap(), b"last");
+        }
+
+        for signature in [false, true] {
+            let bytes = stored_descriptor_fixture(b"descriptor payload", signature);
+            assert_eq!(
+                scoped_indexed_read(&bytes, "stored.bin").unwrap(),
+                b"descriptor payload".to_vec(),
+            );
+            assert_eq!(
+                scoped_borrowed_read(&bytes, "stored.bin").unwrap(),
+                b"descriptor payload".to_vec(),
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_proof_memoises_nothing_and_the_next_read_retries() {
+        let bytes = overlap_witness_archive();
+        let length = bytes.len() as u64;
+        let indexed = IndexedArchive::from_reader_with_limits(
+            std::io::Cursor::new(bytes.clone()),
+            length,
+            ArchiveLimits::UNBOUNDED,
+        )
+        .unwrap();
+
+        let refused = indexed.entry_id("A.bin").unwrap();
+        let mut sink = Vec::new();
+        assert!(indexed.read_entry_to(refused, &mut sink).is_err());
+        // A refusal for one member neither poisons nor primes the reader.
+        let mut sink = Vec::new();
+        assert!(indexed.read_entry_to(refused, &mut sink).is_err());
+        let admitted = indexed.entry_id("C.bin").unwrap();
+        let mut sink = Vec::new();
+        indexed.read_entry_to(admitted, &mut sink).unwrap();
+        assert_eq!(sink, vec![b'C'; 32]);
     }
 
     #[test]

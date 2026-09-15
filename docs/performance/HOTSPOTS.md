@@ -1,5 +1,193 @@
 # Performance hotspot inventory
 
+## Change 0583: a neighbour's span bound now trusts whichever size is larger
+
+The [0583 record](0583-zip-local-size-span-bound.md) closes the one soundness
+hole change 0582's differential harness found in change 0580. When bounding a
+*neighbour's* span, `local_span_bound_from_fixed` took the variable-region length
+from the neighbour's local header — so an inflated local name or extra field was
+caught — but took the **payload** length from the central record, never comparing
+it against the local header's own `compressed_size`, a field already decoded in
+the same function and read two lines below for the ZIP64 sentinel. A predecessor
+declaring local `compressed_size = 100000` against a central `16` therefore had
+its span placed where the central directory says, not where a streaming reader
+would place it, and a target it covers became readable: **480 decoded bytes
+returned** in the Deflate witness where the pre-0580 build refused. The fix takes
+the **larger** of the two sizes, which costs no I/O and can only ever refuse more.
+
+| | 0580 | 0580 + 0583 |
+| --- | ---: | ---: |
+| class B — refuse→accept, pre-change refusal not overlap | 1,094,221 | **1,061,765** |
+| class A — refuse→accept, overlap (the approved class) | 37,176 | 37,160 |
+| class E — refuse→refuse, different identity | 351,525 | 383,981 |
+| panics, either side | 0 | **0** |
+| order-independence / memo-stability failures | 0 | **0** |
+
+**32,472 verdicts that change 0580 made readable are refused again, and none that
+it refused become readable.** Corpus convergence is untouched — 168 fixtures,
+4,089 members, 4,385 reads, 517,371 bytes, 4,089 accepted, `diff` empty against
+change 0580's retained captures — and the error vocabulary is unchanged, with no
+identity added, removed or renamed.
+
+**Two corrections came out of building it, and the second is the interesting
+one.** Applying the maximum everywhere produced **244 order-independence oracle
+failures**, because a descriptor-bearing record can validate with disagreeing
+sizes and memoise its span end. Keying on the local bit-3 flag passed every
+oracle — and a review pass then found that version carried a genuine regression
+anyway: `LocalSpanBound::Descriptor`'s `payload_end` is the offset at which the
+descriptor is *read*, not a threshold, so moving it is **not monotone**, and a
+shifted read can find a descriptor that matches where the true one did not,
+turning a refusal into an acceptance. **Change 0582's 22,875-input corpus did not
+find that** — it needs a local-versus-central bit-3 disagreement together with a
+descriptor displaced by under twelve bytes — and it was found by reading the code.
+The maximum is therefore applied only to the exact branch, and the witness is a
+test. The uncompressed-size field is deliberately left untreated, because it never
+delimits an on-disk region and so cannot move a payload boundary; that is pinned
+by a test and a mutant. One of six new tests fails against the pre-fix tree; the
+other five are regression guards and each was priced against a mutant, so no test
+is vacuous. `performance_claim: none`.
+
+## Change 0582: differential-fuzzing a narrowed refusal, and measuring its real extent
+
+The [0582 record](0582-zip-strict-scope-differential-fuzz.md) exists because
+change 0580 narrows a refusal and `docs/GOAL.md` requires existing fuzz targets to
+run, while this host has neither `cargo-fuzz` nor a nightly toolchain. The
+retained artifact from the last fuzz run turns out to be the **compiled binary**,
+not a corpus, and the 98 corpus files were never kept — only seven seeds — so a
+deterministic differential harness was built instead: 22,875 inputs and
+334,625,602 bytes from a fixed seed, regenerating byte-identically, driven through
+the whole `parse_zip` body against two builds that differ only in change 0580's
+two files.
+
+**2,692,431 member verdicts compared. Zero panics on either side, zero
+order-independence failures, zero accept→refuse, zero accept→accept-with-different-bytes,
+and no soundness counterexample of the overlap kind.** 15,468 inputs (67.6%)
+actually entered the strict-layout proof, measured with an instrumented third
+build rather than assumed — the record is explicit that inputs which never reach
+the changed code are not evidence about it. All 516 real archives and all seven
+seeds entered, and **none of them diverged in any class**.
+
+Its headline finding is about the program's own approval flow rather than the
+library: **the delta put to the project owner for approval was 3.3% of the delta
+that shipped.** The approval rested on a single overlap witness; the measured
+change spans twelve refusal identities, adding sizes, flags, CRC, method, names,
+ZIP64 framing, `Eof`, a missing local signature and disk-start metadata. Changes
+0575 and 0580 both asserted the witness was exhaustive, and both now carry the
+correction. The second finding is the parser-differential change 0583 fixes. The
+record states plainly that a deterministic differential harness is **not** a
+substitute for coverage-guided fuzzing, and that `parse_zip` remains outstanding.
+`performance_claim: none`.
+
+## Change 0581: the eager OPC package's cost is the open, and the documented door is the expensive one
+
+The [0581 record](0581-opc-package-retention.md) takes up the figure change 0578
+called "the largest measured opportunity this investigation found" and corrects
+its attribution. 0578 measured one region spanning open and save and blamed
+`pkgwriter.rs:197`'s `ZipArchive::from_slice(source)`. Splitting the region shows
+the **publish is flat at 514,544 peak bytes and 448 allocations across a
+2,048-fold growth in the media member**, that `from_slice` takes a borrow rather
+than a copy, and that `A open retained + A save peak` reproduces 0578's total
+exactly at all five of its points. The cost is residency established by
+`OpcPackage::open`, not work done by `PackageWriter`. That flatness is in payload
+*size* only: on the member-count axis the same publish region grows 73.7-fold to
+7,003,258 bytes at 8,000 members while the source-backed publish stays at 88,841,
+a smaller finding the record carries in its own table rather than in the
+headline.
+
+The retention is consistent with `archive + the sum of every decompressed part
+payload` — an inference from the ratios, since the probe never measures that sum
+directly. It converges on 2.00x the archive for synthetic incompressible media and
+reaches **11.19x on `no_drawing_patriarch.xlsx`**, which is neither the smallest
+archive nor the largest retention in the corpus but has by far the largest
+inflation, because compressible XML inflates on decode. The "254x"
+headline is therefore one point on an unbounded curve: 2.2x at 64 KiB, 254x at
+64 MiB, **506x at 128 MiB**, because the source-backed path's retention does not
+move at all. Against member *count* the ratio plateaus near 12x, since the
+physical index is a cost both paths pay.
+
+This confirms the standing `docs/GOAL.md:327-331` hypotheses that "Ordinary
+`OpcPackage` opening may decompress and retain every admitted Part", and supplies
+the price that `HOTSPOTS.md`'s existing note "`OpcPackage` retains every inflated
+Part" lacked.
+
+The entry-point finding is the one that matters for ranking it: DOCX, XLSX, PPTX
+and XLSB all reach the eager path from their documented `Package::open` … `save`,
+and all six of the guide's open-then-save examples are that path (its other five
+`.save(` sites are create-then-save, which pay none of this retention).
+Nothing is implemented, because the retention sits behind the public infallible
+`Part::blob(&self) -> &[u8]` and deferring it would move typed limit refusals out
+of `open()`. Two candidates are recorded with predicted effect — lazy decode with
+the archive still owned, 3.58x across the real corpus; full source-backed routing,
+63.4x — and with admission gates. All 19 fixtures measured produced byte-identical
+output from the two paths.
+
+## Change 0580: a ZIP strict-layout proof scoped to the member being read
+
+The [0580 record](0580-zip-target-scoped-strict-layout.md) implements candidate
+(b) of change 0575, approved by the project owner after change 0572 supplied the
+range-source measurement 0575 had gated it on. Reading member *X* now requires
+*X*'s own full local layout to validate and no other record's declared local span
+to intersect *X*'s span, instead of requiring every record in the archive to
+validate and no two to overlap. Both provers — slice-backed and source-backed —
+share one implementation, so there is one acceptance contract.
+
+| fixture | scenario | pre-0573 | post-0573 | after |
+| --- | --- | ---: | ---: | ---: |
+| `sheet-names.xlsx` (13) | one member | 26 | 13 | **8** |
+| `ConditionalFormattingSamples.xlsx` (132) | one member | 264 | 132 | **20** |
+| | one-cell closure | 264 | 132 | **59** |
+| `shapes.pptx` (48) | one member | 96 | 48 | **15** |
+| all three | open and list | 0 | 0 | **0** |
+
+**The semantic delta is that every local-versus-central consistency check on
+every record the caller does not read is dropped.** Change 0575's 4,405-byte
+overlap witness reproduces exactly — both overlapping members stay refused from
+either side, and only the member that overlaps nothing becomes readable — but
+change 0582 measured that the overlap case is **3.3%** of the change. The delta
+spans **twelve refusal identities**: 37,176 overlap verdicts against 1,094,221
+from sizes, flags, CRC, method, names, ZIP64 framing, `Eof`, a missing local
+signature and disk-start metadata. Change 0580's draft, and change 0575 before
+it, both asserted the witness was the whole change; it is not, and both records
+now carry the correction. **No archive in `test-data/` changes behaviour at
+all** — 516 real containers and 7 seeds, zero divergences of any class — so the
+delta lives entirely in malformed input. Distinct local-header offsets stay
+archive-wide at zero I/O. `ArchiveReader::read_stored_borrowed` keeps its
+archive-wide proof untouched, because it publishes a borrowed slice into caller
+hands under a contract change 0575 never analysed.
+
+**Three of change 0575's twelve read predictions are falsified, for two
+independent reasons, and the first is a soundness defect in the design itself.**
+0575 derived its 65,559-byte residual window from "the strict path forces the
+local name length to equal the central one" — true of the record being read,
+false of a predecessor that candidate (b) never validates. Both `u16` halves of a
+predecessor's variable region are unknown, so the sound residual is
+`2 × 65535 + 24 = 131,094`. The implementing change built the archive the narrow
+window wrongly admits and kept it refused. Doubling the window can only refuse
+more, never admit more, so the delta is unchanged — but the 132-member fixture
+goes from a predicted 4 reads to a measured 20. Second, 0575's cost model counts
+a set union where the implementation memoises per record, so a record probed as a
+neighbour and later read as a target costs two reads.
+
+**A regression is disclosed rather than worked around.** Reading every member in
+reverse physical order costs up to **2n−1** reads where the archive-wide proof
+cost n — 13 to 25, 132 to 263, 48 to 95, 65 to 323, with bytes up 15% to 57% —
+because a record probed as a 30-byte neighbour and later read as a target is read
+twice. Verdicts are unaffected and a test pins that. This falsifies change 0575's
+claim that candidate (b) "is never more expensive than today"; the fix, retaining
+each probe's full header window, was costed and deliberately not taken.
+
+**Corpus convergence is exact**: over all 168 OOXML fixtures and 4,089 members,
+reading every member gives 4,385 reads, 517,371 bytes and 4,089 accepted on both
+sides, with per-fixture accept and refuse strings byte-identical. Eleven tests
+were added and **six fail against the pre-change tree**. Two error identities are
+removed as unreachable, one of which change 0575 had already proven dead. One
+deviation from the design was taken in the safe direction: reserving the widest
+descriptor for a neighbour would refuse every gapless descriptor-bearing archive,
+so the width is resolved exactly, with one further read, and only when it decides
+the verdict. The `parse_zip` fuzz target **could not be run** — this host has
+neither `cargo-fuzz` nor a nightly toolchain — and that gate is recorded as
+outstanding rather than claimed. `performance_claim: none`.
+
 ## Change 0579: the CFB chain walk was quadratic in fills, and instructions mis-ranked it
 
 The [0579 record](0579-cfb-resumable-chain-walk.md) implements opportunity 3 of

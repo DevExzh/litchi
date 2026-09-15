@@ -1,0 +1,31 @@
+{
+ "moved_verdicts_total": 32472,
+ "moved_per_api": {
+  "I.precompressed": 8118,
+  "I.read_entry_to": 8118,
+  "I.verified_reader": 8118,
+  "R.read_to": 8118
+ },
+ "moved_per_family": {
+  "crafted": 24,
+  "mutations": 32448
+ },
+ "transitions_base_0580_fixed": {
+  "err->ok->err": 32472
+ },
+ "pre_change_reason_of_moved": {
+  "crafted | InvalidSize { expected: N, actual: N }": 24,
+  "mutations | InvalidSize { expected: N, actual: N }": 32000,
+  "mutations | borrowed access refuses nonzero disk-start metadata": 8,
+  "mutations | local ZIPN size framing requires version N or newer": 24,
+  "mutations | stored local and central compression methods differ": 32,
+  "mutations | stored local and central flags differ": 34,
+  "mutations | stored local and central names differ": 34,
+  "mutations | strict local and central compression methods differ": 96,
+  "mutations | strict local and central flags differ": 102,
+  "mutations | strict local and central names differ": 102,
+  "mutations | strict streaming refuses overlapping ZIP local spans": 16
+ },
+ "fix_made_something_readable_that_0580_refused": [],
+ "fix_made_something_readable_count": 0
+}

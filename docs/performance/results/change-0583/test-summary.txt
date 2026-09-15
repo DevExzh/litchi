@@ -1,0 +1,15 @@
+# change 0583: full test suites for the six crates on the reachable path.
+# Tree: git archive 93a610ded + the working tree's soapberry-zip archive.rs and office.rs
+#       (change 0580 + change 0583), with its own CARGO_TARGET_DIR.
+# rustc 1.95.0, -j 8, one cargo process at a time.
+# Aggregated over every lib, integration and doc test binary of each crate.
+
+soapberry-zip: passed=587 failed=0 ignored=2
+litchi-opc: passed=664 failed=0 ignored=1
+litchi-ooxml-common: passed=255 failed=0 ignored=0
+litchi-xlsx: passed=1294 failed=0 ignored=0
+litchi-docx: passed=1449 failed=0 ignored=31
+litchi-pptx: passed=854 failed=0 ignored=2
+
+# cargo fmt -p soapberry-zip -- --check                          clean
+# cargo clippy -p soapberry-zip --all-targets -- -D warnings     clean

@@ -1,5 +1,106 @@
 # Performance program phase report
 
+## 0577-0583: a refusal narrowed under review, and three hypotheses refuted
+
+Seven records. Two production changes, two refutations, two designs and one
+correctness gate. Four of the seven set out to implement something and did not,
+which is the shape of the batch rather than a failure of it.
+
+[0579](0579-cfb-resumable-chain-walk.md) makes the CFB stream read resume its
+allocation-chain walk instead of restarting at the stream's first sector on every
+call. Chain steps per flagship open fall 5,796 to 2,099, instructions 11.44%,
+cycles 8.34%, flagship p50 8.5% against a floor of 0.94% measured in the same
+window. Reads and bytes are identical across 126 fixtures, with the two corpus
+logs byte-identical. The mechanism that landed is **not** the one change 0574
+commissioned: a retained cursor removes more chain links and fewer instructions
+and is **slower**, because four `Result`-returning methods per sector against one
+flat loop drops IPC from 3.629 to 3.230. The rejected implementation is retained
+with its source. Change 0574 had ranked this work by instruction share and was
+wrong in both directions — 4.5 microseconds predicted against 6.8 measured on one
+fixture, "worth nothing" against 5.1% on another — because the removed work is a
+dependent-load pointer chase, cheap in instructions and expensive in cycles.
+
+[0580](0580-zip-target-scoped-strict-layout.md) implements change 0575's
+target-scoped strict-layout proof, approved by the project owner. Reading one
+member of a 132-member workbook falls from 264 positional reads before change
+0573, to 132 after it, to **20**. It falsifies three of change 0575's twelve
+predictions, and the first falsification is a **soundness defect in the design**:
+0575 derived its residual window from a property true of the record being read
+and false of a predecessor the new proof never validates, so the sound bound is
+twice what it specified. Correcting it can only refuse more, so the semantic
+delta is unaffected, but the headline read count moves from a predicted 4 to a
+measured 20. A regression is disclosed rather than worked around: reading every
+member in reverse physical order costs up to 2n−1 reads where the archive-wide
+proof cost n.
+
+[0582](0582-zip-strict-scope-differential-fuzz.md) is the gate that change 0580
+could not run. `docs/GOAL.md` requires existing fuzz targets, and this host has
+neither `cargo-fuzz` nor a nightly toolchain; the retained artifact from the last
+fuzz run is the compiled binary rather than a corpus. A deterministic differential
+harness of 22,875 inputs was built instead, and it compared 2,692,431 member
+verdicts across two builds: **zero panics, zero order-independence failures, zero
+accept-to-refuse, and no soundness counterexample of the overlap kind.** All 516
+real archives and all seven seeds diverge in no class at all.
+
+It returned two findings. The first is about this program's approval flow rather
+than the library: **the delta put to the owner for approval was 3.3% of the delta
+that shipped.** The approval rested on one adversarial overlap witness; the
+measured change spans twelve refusal identities, dropping every
+local-versus-central consistency check on every record the caller does not read.
+Changes 0575 and 0580 both asserted the witness was exhaustive. Both now carry
+the correction, and the owner re-approved on the corrected, measured delta. The
+lesson is written into 0575 because it is reusable: an adversarial example shows
+that a delta exists and is not evidence about its extent, so a semantic change
+must be stated and measured as a class **before** approval is sought. The harness
+that produced the class ran after implementation; running it first would have
+cost nothing.
+
+The second finding is a real hole, and [0583](0583-zip-local-size-span-bound.md)
+closes it. A neighbour's span took its variable-region length from the local
+header but its payload length from the central record, so a predecessor declaring
+a local `compressed_size` of 100000 against a central 16 was placed where the
+central directory says rather than where a streaming reader would place it, and a
+target it covers became readable — 480 decoded bytes returned where the
+pre-change build refused. Taking the larger of the two sizes costs no I/O and can
+only refuse more. It returns 32,472 verdicts to refusal and makes none newly
+readable, leaves corpus convergence and the error vocabulary untouched, and
+needed no re-approval because it moves strictly back toward the old behaviour.
+
+Building that fix produced the batch's sharpest lesson about tooling. A first
+version applied the maximum to the descriptor branch too and produced 244
+order-independence oracle failures. A second version passed every oracle — and a
+review pass found it still carried a regression, because the descriptor branch's
+bound is the offset a descriptor is *read at* rather than a threshold, so moving
+it is not monotone and a shifted read can find a descriptor that matches where
+the true one did not. **The 22,875-input corpus did not find that.** It was found
+by reading the code.
+
+The two refutations are worth as much as the implementations.
+[0578](0578-zip-passthrough-is-already-bounded.md) set out to prove that
+compressed-entry passthrough copies whole members into memory and found the
+materializing entry point has **no production caller at all** and is unreachable
+from outside its crate, while the real path holds peak flat at 12,971 bytes from
+a 64 KiB member to a 64 MiB one and at 1,916 bytes for a 4.06 GiB member. Nothing
+was implemented. [0577](0577-ooxml-open-relationship-parts.md) set out to make the
+OOXML open stop reading every relationship part and proved it cannot be done: a
+malformed relationship part the caller never names fails the open, and the same
+untyped member opens as junk or refuses outright depending only on whether a deep
+relationship names it — a verdict with no later point to move to. It designed the
+cost reduction instead, 89 open requests to 10, blocked on a read-side accessor
+that does not yet exist.
+
+[0581](0581-opc-package-retention.md) follows 0578's refutation to what it found
+on the way past: two save paths emit byte-identical output while differing 254
+times in peak memory, and **the ordinary documented open-then-save path in every
+OOXML format is the expensive one**. None is feature-gated or marked legacy, and
+the project's own API guide mentions the bounded path once, for reads. It is a
+design record; nothing is landed.
+
+Three records in this batch ran adversarial audits of their own drafts, and all
+three found real defects — including one record whose own retained fixture
+refuted a claim in its prose, and one whose headline was undercut by a table it
+had already printed.
+
 ## 0572-0576: the OOXML range source priced, and the OLE2 open stops decoding
 
 Five records. Two production changes, one attribution, one survey and one design,

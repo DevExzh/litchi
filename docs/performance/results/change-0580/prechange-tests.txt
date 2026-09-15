@@ -1,0 +1,30 @@
+test office::tests::a_descriptor_bearing_predecessor_is_resolved_exactly_not_conservatively ... ok
+test office::tests::a_distant_predecessor_that_reaches_the_target_is_still_refused ... ok
+test office::tests::a_failed_proof_memoises_nothing_and_the_next_read_retries ... FAILED
+test office::tests::a_predecessor_outside_the_residual_window_costs_no_read ... FAILED
+test office::tests::a_predecessor_reaching_past_the_central_name_length_bracket_is_still_refused ... FAILED
+test office::tests::a_verdict_does_not_depend_on_what_the_reader_read_before ... FAILED
+test office::tests::duplicate_local_header_offsets_are_refused_on_the_strict_path ... FAILED
+test office::tests::opening_and_listing_issues_no_strict_layout_read ... ok
+test office::tests::reading_every_member_converges_on_the_archive_wide_verdict ... ok
+test office::tests::target_scoped_layout_refuses_both_overlapping_members_and_admits_the_third ... FAILED
+test office::tests::zip64_and_descriptor_members_keep_their_target_scoped_proof ... ok
+
+--- why each failure is a failure against the pre-change code ---
+thread 'office::tests::a_failed_proof_memoises_nothing_and_the_next_read_retries' (4190338) panicked at crates/soapberry-zip/src/office.rs:13630:52:
+called `Result::unwrap()` on an `Err` value: Error { inner: ErrorInner { kind: InvalidInput { msg: "strict streaming refuses overlapping ZIP local spans" }, eocd_offset: None } }
+thread 'office::tests::a_predecessor_outside_the_residual_window_costs_no_read' (4190339) panicked at crates/soapberry-zip/src/office.rs:13386:9:
+assertion `left == right` failed
+  left: 8
+thread 'office::tests::a_predecessor_reaching_past_the_central_name_length_bracket_is_still_refused' (4190340) panicked at crates/soapberry-zip/src/office.rs:13242:9:
+assertion `left == right` failed
+  left: "strict local and central names differ"
+thread 'office::tests::a_verdict_does_not_depend_on_what_the_reader_read_before' (4190341) panicked at crates/soapberry-zip/src/office.rs:13290:13:
+assertion `left == right` failed: order ["A.bin", "B.bin", "C.bin"] changed a verdict
+  left: [("A.bin", false), ("B.bin", false), ("C.bin", false)]
+thread 'office::tests::duplicate_local_header_offsets_are_refused_on_the_strict_path' (4190387) panicked at crates/soapberry-zip/src/office.rs:13321:13:
+assertion `left == right` failed
+  left: "strict local and central names differ"
+thread 'office::tests::target_scoped_layout_refuses_both_overlapping_members_and_admits_the_third' (4190545) panicked at crates/soapberry-zip/src/office.rs:13183:50:
+called `Result::unwrap()` on an `Err` value: Error { inner: ErrorInner { kind: InvalidInput { msg: "strict streaming refuses overlapping ZIP local spans" }, eocd_offset: None } }
+

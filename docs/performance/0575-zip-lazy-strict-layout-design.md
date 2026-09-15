@@ -683,3 +683,144 @@ name mismatch. This design does not touch that path and makes no claim about it.
 The design is sequenced after change 0573. It reuses that change's single-read
 header, and its per-record memo replaces the whole-proof single flight rather
 than composing with it.
+
+## Disposition
+
+**Candidate (b) was approved by the project owner and implemented as change
+[0580](0580-zip-target-scoped-strict-layout.md)**, on both
+`IndexedArchive<R: ReaderAt>` and `ArchiveReader<'data>`, as this record
+recommended. The owner's reasoning on the record: the archive-wide proof has no
+documented rationale — both introducing commits have empty message bodies, no
+accepted ADR mentions it, there is no threat model — and the ordinary `read()`
+path already bypasses it entirely, so today's strictness is already
+inconsistent. The narrowed refusal still refuses every member that actually
+overlaps. Candidate (c) was not implemented, as this record required.
+
+The admission gate was satisfied by change
+[0572](0572-ooxml-range-source-attribution.md), which measured the proof on a
+caller-supplied range source before the change was written.
+
+This record is otherwise unedited. Everything below is the outcome; nothing
+above was rewritten to match it.
+
+### The predictions
+
+Nine of the twelve frozen read predictions are **confirmed**, three are
+**falsified**, for two independent reasons. Both are reproduced by
+`results/change-0580/residual_window.py`.
+
+| fixture | scenario | predicted here | measured by 0580 |
+| --- | --- | ---: | ---: |
+| `sheet-names.xlsx` | open, list / one member / closure / all 13 | 0 / 8 / 11 / 13 | **0 / 8 / 11 / 13** |
+| `ConditionalFormattingSamples.xlsx` | open, list / one member / closure / all 132 | 0 / **4** / **14** / 132 | 0 / **20** / **59** / 132 |
+| `shapes.pptx` | open, list / one member / closure / all 48 | 0 / 15 / **15** / 48 | 0 / 15 / **16** / 48 |
+
+**1. The residual window in §"What the central directory alone can prove" is not
+sound for candidate (b).** That section derives `max_end_i = min_end_i + 65535 +
+24` from "The strict path forces `local_name_len == central_name_len` (a
+differing local name is refused outright)". That holds for the record being
+*read*. It does not hold for a predecessor, which candidate (b) deliberately
+never validates: a predecessor may declare a local `file_name_length` its
+central record does not carry, and both halves of the local variable region are
+`u16`. The sound residual is `2*65535 + 24 = 131,094` bytes, not 65,559.
+
+Change 0580 constructs the archive the narrower window admits — a predecessor
+with a 9-byte central name, a local `file_name_length` of 100 and a 65,535-byte
+local extra field, whose declared span reaches a member 65,640 bytes away that
+the 65,559-byte bracket prunes — and keeps it refused. The correction doubles
+the window; it can only refuse more, never admit more, so the semantic delta
+this record specified is unchanged. It costs reads, and that is where the 132-
+record fixture's prediction breaks: it is the only one of the three large enough
+for the window size to matter at all.
+
+**2. The cost table counts a union where the implementation memoises per
+record.** §"Candidates" computes a scenario's cost as the union of the records
+each target touches. A record first probed as a 30-byte neighbour and then read
+as a target needs its full local header, which is a second read of the same
+record, so the union under-counts by exactly that number. On `shapes.pptx`'s
+one-slide closure, `ppt/slides/_rels/slide1.xml.rels` is probed while proving
+`ppt/_rels/presentation.xml.rels` and read afterwards: 15 becomes 16. Modelling
+the memo in read order reproduces all six measured scenario figures exactly.
+
+The byte predictions fare better: `sheet-names.xlsx`'s 264 / 1,742 / 2,478 are
+all three exact, `shapes.pptx`'s 471 and 4,748 are exact and its 1,888 measured
+as 1,918 (the same ordering effect, one extra 30-byte probe), and
+`ConditionalFormattingSamples.xlsx`'s 10,740 is exact with its other two
+falsified alongside the read counts.
+
+Of the four predictions stated independently of the counts, three are confirmed
+outright — open and list stay at zero strict-layout reads, the materializing
+`read`/`read_entry` family stays at zero, and the witness is refused for `A.bin`
+and `B.bin` and accepted for `C.bin` with every named overlap test keeping its
+verdict and its `ErrorKind::InvalidInput`. The fourth is **split**: reading every
+member converges on exactly the change-0573 count in physical order — verified
+over 168 fixtures and 4,089 members, with byte-for-byte identical per-member
+verdicts — but not in reverse order, where a record probed before it is read is
+read twice. That also falsifies §"The property that is worth choosing" item 3,
+"It is never more expensive than today": reverse-order traversal costs up to
+2n−1 reads. Verdicts are unaffected; cost is.
+
+### What else changed against this record's design
+
+- **A neighbour's data descriptor is resolved exactly, not reserved.**
+  §"The property that is worth choosing" says a predecessor "needs only its
+  30-byte fixed local header, because `name_len + extra_len` plus the central
+  `compressed_size` plus `MAX_DATA_DESCRIPTOR_SIZE` bounds its span from above",
+  and "No second read for the variable part, no descriptor read". Bounding from
+  above is sound but too coarse to use as a verdict: in a gapless archive a
+  descriptor-bearing predecessor's payload ends exactly one descriptor before
+  the next record, so reserving the widest 24-byte form refuses **every**
+  gapless descriptor-bearing archive — three of the six fixtures change 0580
+  measured, and 148 members of the OOXML corpus. Change 0580 therefore settles
+  the width with one further read, and only when the reserved range is what
+  decides the verdict.
+- **The concurrency change was not taken.** §"Retention and concurrency"
+  promises that under (b) "disjoint members proceed independently". Change 0580
+  keeps the whole-proof single flight, so that the re-entrancy error, the
+  `is_ready`/`build_count` hooks and the two existing concurrency tests survive
+  verbatim. Two threads reading different members still serialise.
+- **`ArchiveReader::read_stored_borrowed` was left archive-wide.** This record's
+  §"Which existing tests survive" lists `borrowed_store_refuses_an_overlapping_non_target_span`
+  and `borrowed_store_refuses_overlapping_local_spans`, which reach
+  `validate_borrowed_spans` rather than `build_strict_layout_proof`. That
+  function publishes a borrowed slice into caller hands under a contract this
+  record does not analyse, so change 0580 left it alone; both tests pass
+  unchanged.
+- **Falsification criterion 5 is partly realised.** The worst single target on
+  `shapes.pptx` still reaches all 47 predecessors, and the sound bracket raises
+  the worst target on `ConditionalFormattingSamples.xlsx` from 39 to 43 of 131.
+  The scenario-level figures the criterion was about remain well below *n*.
+
+### The delta this record framed was measured, and the framing was wrong
+
+This record's §"The semantic difference, in bytes" presents the behavioural
+change through a single 4,405-byte overlap witness and reduces it to one table
+row. That framing carried into change 0580's draft, and through it into the
+approval request put to the project owner.
+
+Change [0582](0582-zip-strict-scope-differential-fuzz.md) differential-fuzzed the
+implementation over 22,875 inputs and 2,692,431 member verdicts and measured what
+the delta actually is: **twelve refusal identities, not one.** The overlap row is
+37,176 verdicts; a further 1,094,221 come from every *other* local-versus-central
+consistency check on a record the caller does not read — sizes, flags, CRC,
+method, names, ZIP64 framing, `Eof`, a missing local signature and disk-start
+metadata. **The row this record chose to illustrate the change is 3.3% of it.**
+
+Nothing in this record's *analysis* was contradicted: its candidate table and its
+enumeration of what (b) stops checking are both accurate, and change 0580's own
+"what is no longer checked" list is correct. What was wrong was electing a single
+vivid witness as the representative of the change and then asserting it was
+exhaustive. An adversarial example is good for showing that a delta **exists**;
+it is not evidence about the delta's **extent**, and this record used it as
+though it were.
+
+The lesson is recorded because this program's approval flow depends on it: a
+design that asks a human to approve a semantic change must state the change as a
+**class**, and measure the class, before the approval is requested — not
+illustrate it with the most legible instance. Change 0582's differential harness
+is what produced the class, and it ran *after* implementation. Ordering it before
+the approval would have cost nothing and framed the decision correctly.
+
+The owner re-approved on the corrected, measured delta once change 0582 reported
+it. Change 0580 carries the same correction at its own §"The semantic difference,
+in bytes".
