@@ -1,0 +1,114 @@
+{
+ "before/flagship": {
+  "whole_open_ir": 2537912.365,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range": 5796.0
+  },
+  "chain_calls_total": 5796.0
+ },
+ "after/flagship": {
+  "whole_open_ir": 2380010.505,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range_hinted": 2099.0
+  },
+  "chain_calls_total": 2099.0
+ },
+ "before/cv": {
+  "whole_open_ir": 922966.4,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range": 456.0
+  },
+  "chain_calls_total": 456.0
+ },
+ "after/cv": {
+  "whole_open_ir": 915765.16,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range_hinted": 336.0
+  },
+  "chain_calls_total": 336.0
+ },
+ "before/54016": {
+  "whole_open_ir": 7313414.44,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range": 1995.0
+  },
+  "chain_calls_total": 1995.0
+ },
+ "after/54016": {
+  "whole_open_ir": 7239616.14,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range_hinted": 1110.0
+  },
+  "chain_calls_total": 1110.0
+ },
+ "before/mini-colours": {
+  "whole_open_ir": 157982.525,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range": 81.0
+  },
+  "chain_calls_total": 81.0
+ },
+ "after/mini-colours": {
+  "whole_open_ir": 157670.485,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted": 73.0
+  },
+  "chain_calls_total": 73.0
+ },
+ "before/mini-checkboxes": {
+  "whole_open_ir": 216535.21,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range": 70.0
+  },
+  "chain_calls_total": 70.0
+ },
+ "after/mini-checkboxes": {
+  "whole_open_ir": 216840.185,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted": 62.0
+  },
+  "chain_calls_total": 62.0
+ },
+ "before/mini-extstyles": {
+  "whole_open_ir": 124595.65,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range": 32.0
+  },
+  "chain_calls_total": 32.0
+ },
+ "after/mini-extstyles": {
+  "whole_open_ir": 123857.78,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted": 32.0
+  },
+  "chain_calls_total": 32.0
+ },
+ "before/small-simple": {
+  "whole_open_ir": 138366.62,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range": 4.0
+  },
+  "chain_calls_total": 4.0
+ },
+ "after/small-simple": {
+  "whole_open_ir": 138435.235,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range_hinted": 4.0
+  },
+  "chain_calls_total": 4.0
+ },
+ "before/mid-images": {
+  "whole_open_ir": 341032.525,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range": 429.0
+  },
+  "chain_calls_total": 429.0
+ },
+ "after/mid-images": {
+  "whole_open_ir": 335111.815,
+  "chain_calls": {
+   "litchi_cfb::shared::SharedOleFile::read_stream_range_hinted": 297.0
+  },
+  "chain_calls_total": 297.0
+ }
+}

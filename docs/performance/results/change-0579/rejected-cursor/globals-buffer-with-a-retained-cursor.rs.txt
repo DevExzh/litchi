@@ -19,9 +19,7 @@ use crate::records::{
 };
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
-use litchi_cfb::{
-    OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint,
-};
+use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::sheet::Cell as CellTrait;
@@ -1516,14 +1514,13 @@ fn select_workbook_stream(
 /// one source-version observation.
 ///
 /// The allocation-chain position is retained across fills in a
-/// [`StreamChainHint`]. `read_stream_range` walks the FAT from the stream's
-/// **first** sector on every call, so a scan that fills forward in `n` windows
-/// walks the prefix `n` times; one hint walks each chain link once for the
-/// whole scan. The hint is three integers and a stream identity — it is not an
-/// index of the chain — so retaining it allocates nothing and costs no memory
-/// proportional to the stream. Everything else about the read, including which
-/// physical runs it issues and where it fences the retained source, is
-/// unchanged: `read_stream_range` is the same function with a fresh hint.
+/// [`SharedOleStreamCursor`], the same primitive the worksheet scan already
+/// uses. `read_stream_range` resolves the directory entry and walks the FAT
+/// from the stream's **first** sector on every call, so a scan that fills
+/// forward in `n` windows walks the prefix `n` times; the cursor walks each
+/// chain link once for the whole scan. The cursor is two integers, one chain
+/// state and one borrow — it is not an index of the chain — so retaining it
+/// adds no allocation and no memory proportional to the stream.
 struct GlobalsBuffer<'a> {
     cfb: &'a SharedOleFile,
     refs: &'a [&'a str],
@@ -1531,9 +1528,9 @@ struct GlobalsBuffer<'a> {
     max_global_bytes: u64,
     bytes: Vec<u8>,
     filled: u64,
-    /// Allocation-chain position for the next fill. Empty before the first
-    /// fill; a hint that does not apply to a fill is ignored by the reader.
-    chain: StreamChainHint<'a>,
+    /// Allocation-chain position for the next fill, at `filled` whenever it is
+    /// present. Absent before the first fill and after a failed one.
+    cursor: Option<SharedOleStreamCursor<'a>>,
     /// Size of the next window fill, before clamping.
     window: u64,
     /// Smallest `lbPlyPos` seen in a `BoundSheet8` payload framed *so far*.
@@ -1556,7 +1553,7 @@ impl<'a> GlobalsBuffer<'a> {
             max_global_bytes,
             bytes: Vec::new(),
             filled: 0,
-            chain: cfb.chain_hint(),
+            cursor: None,
             window: GLOBALS_FIRST_WINDOW_BYTES,
             min_sheet_start: None,
             sheet_clamp_active: true,
@@ -1634,15 +1631,51 @@ impl<'a> GlobalsBuffer<'a> {
                 requested: finish as u64,
             })?;
         self.bytes.resize(finish, 0);
-        let cfb: &'a SharedOleFile = self.cfb;
-        cfb.read_stream_range_hinted(
-            self.refs,
-            self.filled,
-            &mut self.bytes[start..finish],
-            &mut self.chain,
-        )
-        .map_err(SourceBackedError::from)?;
+        self.fill_from_cursor(start, finish)?;
         self.filled = end;
+        Ok(())
+    }
+
+    /// Reads stream bytes `[filled, filled + finish - start)` into
+    /// `bytes[start..finish]` through the retained chain cursor.
+    ///
+    /// Monotonicity is checked, not assumed. A cursor at or **behind** the
+    /// fill offset is moved forward from where it already is; a cursor
+    /// **ahead** of it cannot serve the fill, because a CFB allocation chain
+    /// is singly linked and forward-only, so it is discarded and the chain is
+    /// walked again from the stream's first sector. That fallback is exactly
+    /// what `read_stream_range` did on every call, so it is the pre-change
+    /// cost rather than a new one. This scan fills forward only — `ensure`
+    /// returns early for `need <= filled` and every fill starts at `filled` —
+    /// so the cursor is in practice always exactly at the offset and neither
+    /// branch below moves it; they exist so that no future caller can make a
+    /// retained cursor publish bytes from the wrong chain position.
+    ///
+    /// The cursor is not a cache of source bytes and holds nothing that a
+    /// source mutation can invalidate: it indexes the immutable validated
+    /// allocation tables captured when the file was opened, and
+    /// `SharedOleStreamCursor::read_exact` fences the retained source after
+    /// every payload read exactly as `read_stream_range` did.
+    ///
+    /// A failed fill drops the cursor instead of retaining it, so a later fill
+    /// cannot inherit a position from an operation that did not complete.
+    fn fill_from_cursor(&mut self, start: usize, finish: usize) -> Result<()> {
+        let cfb: &'a SharedOleFile = self.cfb;
+        let refs: &'a [&'a str] = self.refs;
+        let offset = self.filled;
+        let mut cursor = match self.cursor.take() {
+            Some(cursor) if cursor.position() <= offset => cursor,
+            _ => cfb
+                .stream_cursor_at(refs, offset)
+                .map_err(SourceBackedError::from)?,
+        };
+        if cursor.position() < offset {
+            cursor.skip_to(offset).map_err(SourceBackedError::from)?;
+        }
+        cursor
+            .read_exact(&mut self.bytes[start..finish])
+            .map_err(SourceBackedError::from)?;
+        self.cursor = Some(cursor);
         Ok(())
     }
 
@@ -3268,22 +3301,15 @@ mod tests {
     }
 
     /// The fill schedule below is issued twice over the same file: once
-    /// through `GlobalsBuffer`, which carries one chain hint across all of its
-    /// fills, and once through plain `SharedOleFile::read_stream_range`, which
-    /// walks the chain from the stream's first sector on every call. The two
-    /// legs must be indistinguishable from outside the reader.
-    const FILL_SCHEDULE: [(u64, bool); 7] = [
-        (4, true),
-        (24, true),
-        (60, true),
-        (512, false),
-        (4_096, false),
-        (12_000, false),
-        (30_000, false),
-    ];
+    /// through `GlobalsBuffer`, which keeps one allocation-chain cursor, and
+    /// once through `SharedOleFile::read_stream_range`, which walks the chain
+    /// from the stream's first sector on every call. The two legs must be
+    /// indistinguishable from outside the reader.
+    const FILL_SCHEDULE: [(u64, bool); 7] =
+        [(4, true), (24, true), (60, true), (512, false), (4_096, false), (12_000, false), (30_000, false)];
 
     #[test]
-    fn the_globals_scan_reads_identically_with_and_without_its_chain_hint() {
+    fn the_globals_scan_keeps_one_chain_cursor_across_fills() {
         let bytes = ole_fixture("SimpleWithImages-mac.xls");
         let source = Arc::new(RecordingSource::new(bytes));
         let cfb = SharedOleFile::open(erased(&source)).unwrap();
@@ -3298,35 +3324,38 @@ mod tests {
         let _ = source.take();
         for (need, exact) in FILL_SCHEDULE {
             globals.ensure(need, exact).unwrap();
+            // The mechanism: after every fill exactly one cursor is retained,
+            // and it sits exactly at the filled end, ready to serve the next
+            // fill without re-walking the chain.
+            let cursor = globals
+                .cursor
+                .as_ref()
+                .expect("a fill must retain its chain cursor");
+            assert_eq!(cursor.position(), globals.filled);
         }
-        let (hinted_ranges, hinted_versions) = source.take();
-        let hinted_bytes = globals.bytes.clone();
+        let (cursor_ranges, cursor_versions) = source.take();
+        let cursor_bytes = globals.bytes.clone();
         let filled = globals.filled;
 
-        let plain_source = Arc::new(RecordingSource::new(source.bytes.clone()));
-        let plain_cfb = SharedOleFile::open(erased(&plain_source)).unwrap();
-        let mut plain_bytes = vec![0u8; usize::try_from(filled).unwrap()];
-        let _ = plain_source.take();
+        let range_source = Arc::new(RecordingSource::new(source.bytes.clone()));
+        let range_cfb = SharedOleFile::open(erased(&range_source)).unwrap();
+        let mut range_bytes = vec![0u8; usize::try_from(filled).unwrap()];
+        let _ = range_source.take();
+        let mut offset = 0u64;
         for (start, end) in fill_extents(&globals_extents(stream_len)) {
-            let (start, end) = (
-                usize::try_from(start).unwrap(),
-                usize::try_from(end).unwrap(),
-            );
-            plain_cfb
-                .read_stream_range(&refs, start as u64, &mut plain_bytes[start..end])
+            let (start, end) = (usize::try_from(start).unwrap(), usize::try_from(end).unwrap());
+            range_cfb
+                .read_stream_range(&refs, offset, &mut range_bytes[start..end])
                 .unwrap();
+            offset = end as u64;
         }
-        let (plain_ranges, plain_versions) = plain_source.take();
+        let (range_ranges, range_versions) = range_source.take();
 
-        assert_eq!(hinted_bytes, plain_bytes, "payload bytes differ");
-        assert_eq!(hinted_ranges, plain_ranges, "positional reads differ");
+        assert_eq!(cursor_bytes, range_bytes, "payload bytes differ");
+        assert_eq!(cursor_ranges, range_ranges, "positional reads differ");
         assert_eq!(
-            hinted_versions, plain_versions,
+            cursor_versions, range_versions,
             "source-version observations differ"
-        );
-        assert!(
-            hinted_ranges.len() >= FILL_SCHEDULE.len(),
-            "the schedule must actually reach the source"
         );
     }
 
@@ -3344,9 +3373,7 @@ mod tests {
             let end = if exact {
                 need
             } else {
-                let end = need
-                    .max(filled.saturating_add(window))
-                    .min(stream_len.max(need));
+                let end = need.max(filled.saturating_add(window)).min(stream_len.max(need));
                 window = window.saturating_mul(2).min(GLOBALS_MAX_WINDOW_BYTES);
                 end
             };
@@ -3364,6 +3391,54 @@ mod tests {
             start = end;
         }
         extents
+    }
+
+    #[test]
+    fn a_globals_cursor_behind_the_fill_is_moved_forward_rather_than_restarted() {
+        let bytes = ole_fixture("SimpleWithImages-mac.xls");
+        let source = Arc::new(RecordingSource::new(bytes));
+        let cfb = SharedOleFile::open(erased(&source)).unwrap();
+        let stream_len = cfb.stream_len(&["Workbook"]).unwrap();
+        let refs = ["Workbook"];
+        let mut globals = GlobalsBuffer::new(&cfb, &refs, stream_len, u64::MAX);
+        globals.ensure(4_096, false).unwrap();
+
+        // Rewind the cursor behind the buffer without touching `filled`, the
+        // shape `fill_from_cursor` must serve by moving forward. The bytes it
+        // then reads must still be the stream's bytes at `filled`.
+        globals.cursor = Some(cfb.stream_cursor_at(&refs, 0).unwrap());
+        let filled = globals.filled;
+        globals.ensure(filled + 600, true).unwrap();
+
+        let mut expected = vec![0u8; 600];
+        cfb.read_stream_range(&refs, filled, &mut expected).unwrap();
+        let start = usize::try_from(filled).unwrap();
+        assert_eq!(&globals.bytes[start..start + 600], &expected[..]);
+        assert_eq!(globals.cursor.unwrap().position(), filled + 600);
+    }
+
+    #[test]
+    fn a_globals_cursor_ahead_of_the_fill_is_discarded_rather_than_trusted() {
+        let bytes = ole_fixture("SimpleWithImages-mac.xls");
+        let source = Arc::new(RecordingSource::new(bytes));
+        let cfb = SharedOleFile::open(erased(&source)).unwrap();
+        let stream_len = cfb.stream_len(&["Workbook"]).unwrap();
+        let refs = ["Workbook"];
+        let mut globals = GlobalsBuffer::new(&cfb, &refs, stream_len, u64::MAX);
+        globals.ensure(4_096, false).unwrap();
+        let filled = globals.filled;
+
+        // A cursor past the fill cannot serve it. Serving the fill from where
+        // that cursor happens to sit would publish bytes from the wrong stream
+        // offset, which is the one failure this change must make impossible.
+        globals.cursor = Some(cfb.stream_cursor_at(&refs, filled + 4_096).unwrap());
+        globals.ensure(filled + 600, true).unwrap();
+
+        let mut expected = vec![0u8; 600];
+        cfb.read_stream_range(&refs, filled, &mut expected).unwrap();
+        let start = usize::try_from(filled).unwrap();
+        assert_eq!(&globals.bytes[start..start + 600], &expected[..]);
+        assert_eq!(globals.cursor.unwrap().position(), filled + 600);
     }
 
     #[test]

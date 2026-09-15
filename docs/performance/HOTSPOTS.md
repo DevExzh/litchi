@@ -1,5 +1,107 @@
 # Performance hotspot inventory
 
+## Change 0579: the CFB chain walk was quadratic in fills, and instructions mis-ranked it
+
+The [0579 record](0579-cfb-resumable-chain-walk.md) implements opportunity 3 of
+change 0574 — but not the way that record proposed, and the difference is the
+finding. `SharedOleFile::read_stream_range` reaches a stream offset by walking
+the allocation chain from the stream's **first** sector on every call, so the XLS
+globals scan's 20 forward fills walked **5,796** FAT links per open of
+`ConditionalFormattingSamples.xls`, reproducing 0574's independently captured
+figure exactly. The walk is now resumable through a `Copy` `StreamChainHint`
+bound by borrow to its reader, and `read_stream_range` is literally
+`read_stream_range_hinted` with a fresh hint, so there is one implementation of
+the read, its bounds, its refusals and its source-version fence. Chain links fall
+to **2,099**, instructions per open **−11.44%**, cycles **−8.34%**, and the paired
+median **−8.5%** in two windows in both directions against a same-binary floor of
+**0.94%** — with reads, read bytes, source-version observations, the exact
+positional read ranges and the refusal texts **identical over all 126 XLS
+fixtures**.
+
+**The mechanism 0574 named was built first and rejected.** A retained
+`SharedOleStreamCursor` removes *more* chain links (1,076, because a cursor's read
+loop is the walk) and *fewer* instructions, and it **adds cycles** — IPC 3.629 to
+3.230 — because a cursor advances through four `Result`-returning methods per
+sector where `read_stream_range` has one flat loop. It regressed the flagship by
+**+3.2% to +3.9%** at p50 in both directions. The general lesson for this
+inventory: 0574 ranked this opportunity by *instruction share* and predicted
+~4.5 µs on the flagship and "worth nothing" elsewhere. The removed work is a
+dependent-load pointer chase, cheap in instructions and expensive in cycles, so
+the real result is 6.8 µs on the flagship and **−5.2%** on `54016.xls`, which 0574
+sized at 0.26%. Instruction share under-ranks serial memory-latency work and
+over-ranks it for code that trades flat loops for state machines.
+`performance_claim: none`.
+
+## Change 0578: ZIP passthrough is already bounded, and the hypothesis is refuted
+
+The [0578 record](0578-zip-passthrough-is-already-bounded.md) **refutes** this
+program's own reading of `docs/GOAL.md`'s "without unnecessary decompression or
+logical-byte copies" clause on the ZIP save path. The suspicion was that
+`write_precompressed_file*`, which takes a fully materialized `&[u8]`, forces an
+unchanged member to be copied whole into memory. Two facts kill it. That family
+**has no production callers at all** — a scripted census finds 4 in-crate test
+sites, 3 integration test sites, and zero production ones, and the token its
+payload would come from is `pub(crate)`, so an out-of-crate caller cannot reach it
+even in principle. And the real path never materializes: an unchanged member is
+planned as a range descriptor, not bytes, and emitted through one 64 KiB **stack**
+buffer allocated once per write rather than once per member.
+
+| case | peak retained bytes |
+| --- | ---: |
+| member 64 KiB through 64 MiB | **flat at 12,971**, 53 allocations at every size |
+| `ArtisticEffectSample.pptx`, 882,682 B stored member | **33,583** — 26× smaller than the member |
+| one **4.06 GiB** stored member past the ZIP64 boundary | **1,916**, 15 allocations |
+| end-to-end source-backed save, media 64 KiB to 64 MiB | **flat at 532,626**, 1,167 allocations |
+
+No test fails against the pre-change code because no code changed, and the
+invariant is **already asserted**: an existing ZIP64 promotion test runs the copy
+path at the `u32::MAX` boundary over a multi-gigabyte sparse source and asserts
+the sink retains under a megabyte, under the comment that it must not retain the
+payload. Nothing was implemented, deliberately — adding a streaming entry point
+with no caller to a path that is already bounded would have been complexity for a
+measurement that had already come back negative. What the refutation found
+instead is the batch's most valuable lead: `PackageWriter` and
+`SourceBackedPackage` emit **byte-identical output** while differing **254×** in
+peak, 135,268,336 against 532,626 bytes at 64 MiB media. That is pursued
+separately. `performance_claim: none`.
+
+## Change 0577: the OOXML open's relationship reads are mandatory, and scattered only in order
+
+The [0577 record](0577-ooxml-open-relationship-parts.md) takes up the one figure
+change 0572 priced and left open: the **open**, which reads `[Content_Types].xml`,
+`_rels/.rels`, every `*/_rels/*.rels` part in the package and the format's main
+part. Re-capturing 0572's matrix at HEAD through 0572's own probe and classifier
+shows the open is **unchanged request for request on all eleven fixtures** while
+change 0573 halved the proof around it, so its share rose: **89 of 222** requests
+on the 132-member workbook (was 89 of 354) and **95.9% and 96.6%** of the two
+largest PPTX scenarios. Seven synthetic packages establish behaviourally, in both
+ingress modes and agreeing error for error, that these reads are **eager and
+load-bearing**: a malformed relationship part the caller never names fails the
+open, including one belonging to an orphan part; and the *same* untyped member
+opens as tolerated junk or refuses with `ContentTypeNotFound` depending only on
+whether a deep relationship names it — a verdict with **no later point to move
+to**. Deferral is therefore refused against accepted **ADR 0005** ("relationship/
+catalog" is on the mandatory-at-open side; "Cache behavior is semantically
+invisible") and **ADR 0006** ("Fatal safety failures stop opening immediately"),
+the same ground on which change 0575 rejected its own candidate (c). Across
+**167 fixtures and 1,237 relationship parts**, 1,070 are read by the graph walk
+whose key set gates part admission and **0** by the post-classification fallback
+loop — and deferring even that one would move a fatal parse failure past the
+open, as a purpose-built fixture measures. What
+is left is a **coalescing** problem, not a laziness one: the structural members
+are not scattered, the traversal order is. They sit in **7 byte-contiguous runs**
+covering **2.6%** of the 655 KB file, and one bounded read per run is modelled at
+**89 requests to 10** for 1.15x the bytes — against 39 requests at 3.56x the
+whole file for the best read-ahead window, whose open phase alone asks for
+2,329,180 bytes to this design's 26,796. The model is fitted to deflated
+structural members, where it reproduces both the measured open request count and
+the measured structural read bytes exactly on all eleven measured fixtures; extrapolated over
+all **167** OOXML fixtures it is **3,665 open requests to 969**, a 64% median
+per-fixture reduction for a 55% median byte increase, with **no fixture
+regressing in requests** and none of the 468 runs reaching the 64 KiB clamp. Not implemented: it
+needs one read-side local-span accessor on `IndexedArchive`, which does not exist
+and lives outside the change's scope. `performance_claim: none`.
+
 ## Change 0576: index the shared-string table without decoding it
 
 The [0576 record](0576-xls-sst-scan-without-materialization.md) implements

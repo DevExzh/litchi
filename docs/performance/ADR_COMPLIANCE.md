@@ -1,5 +1,97 @@
 # Performance optimization ADR-compliance matrix
 
+## 0579: no ADR weakened; a new public value whose misuse is a compile error
+
+[0579](0579-cfb-resumable-chain-walk.md) makes the CFB allocation-chain prefix
+walk resumable. It edits no open-time path, so ADR 0006's container validation —
+cycle detection, ownership and overlap claims, declared-length and truncation
+rules — is untouched, and the links a hint lets a walk skip are links that same
+hint already traversed through `next_chain_sector` and its marker, index and
+early-termination checks. Every refusal keeps its text and its position, which is
+structural rather than asserted: `read_stream_range` is now
+`read_stream_range_hinted` with a fresh hint, so there is exactly one loop, one
+set of bound checks and one source-version fence on both paths.
+
+ADR 0005 governs the new surface. The hint is a **position**, not a cache: it
+holds no source bytes, allocates nothing, and its size is independent of the
+stream, so no bounded-resource budget moves. Freshness is unaffected because the
+FAT and MiniFAT tables it indexes are captured and validated at open and are
+immutable for the reader's life, and every hinted read still fences the retained
+source exactly as an unhinted one does.
+
+The one risk worth recording is that a public resumable position could, if
+misused, place a read at a chain offset belonging to some other stream or file.
+That is closed by construction rather than by documentation: `StreamChainHint<'a>`
+**borrows** the `SharedOleFile` it came from and is obtainable only from that
+reader's `chain_hint()`, so it cannot outlive its reader, cannot be constructed
+without one, and is discarded on a pointer comparison if offered to another;
+it further requires the directory entry SID, the allocation table and the
+stream's first sector to match, and refuses to move a read backwards. A discarded
+hint costs exactly what an unhinted read costs. ADRs 0001, 0002, 0003, 0010, 0011
+and 0024 are untouched: no ownership boundary, dependency edge, snapshot
+contract or archive type moves, no `unsafe` is added, and no error type changes.
+
+## 0578: nothing changed, and one entry point found unreachable
+
+[0578](0578-zip-passthrough-is-already-bounded.md) modifies no code, so no ADR is
+engaged by a change. Two boundary facts are worth recording anyway, because both
+bear on ADR 0005's bounded-memory and streaming rules.
+
+The `write_precompressed_file*` family, which would materialize a whole member,
+is **unreachable from outside `soapberry-zip`**: it has no production caller and
+the precompressed token that would feed it is `pub(crate)`. ADR 0005's
+bounded-memory contract is therefore not at risk through that surface, and the
+record says so rather than leaving a materializing signature to look like a live
+hazard.
+
+The production save path satisfies ADR 0005 by construction: an unchanged member
+is carried as a range descriptor and emitted through one bounded stack buffer per
+write, so peak retention is independent of member size — measured flat across a
+thousandfold range and at 1,916 bytes for a 4.06 GiB member. Sequential non-seek
+output is preserved, and the existing typed partial-output failure is untouched.
+
+One retention that **does** scale with a member is recorded and not fixed here:
+the precompressed token retains twice the member, its only production caller is
+cross-document part copy, and the retention is explicitly budget-reserved, so
+unwinding it would mean dismantling a security contract rather than removing an
+oversight. That is stated as a limitation, not absorbed silently.
+
+## 0577: two recorded conflicts, and a design blocked on a missing primitive
+
+[0577](0577-ooxml-open-relationship-parts.md) is design only and changes no code.
+It carries its own four-candidate ADR matrix; three results belong here.
+
+**Deferring the OOXML relationship walk is rejected against accepted ADR 0005 and
+ADR 0006.** ADR 0005's open sentence names "relationship/catalog" validation on
+the mandatory-at-open side and reserves laziness for "semantic payloads", and its
+decision text states that "Cache behavior is semantically invisible". The record
+measures why that is decisive rather than merely textual: an untyped ZIP member
+is admitted as tolerated archive junk or refused with `ContentTypeNotFound`
+depending on whether any reachable part anywhere in the package names it as a
+relationship target, so the verdict belongs to the package and **has no later
+point to move to**. ADR 0006's "Fatal safety failures stop opening immediately"
+is breached the same way. Per `docs/GOAL.md` the conflict is recorded and not
+implemented, and **no proposed ADR is drafted**, because the cost can be attacked
+without it.
+
+**Deferring only the post-classification orphan fallback loop is also rejected
+against ADR 0006**, and this one corrects a distinction the record's first draft
+drew too sharply. That loop's result cannot reach the *admission* decision, which
+has already run — but a purpose-built fixture measures a malformed relationship
+part reachable only through it failing the open today, so deferring it would move
+a fatal parse failure past the open. It is in any case worth nothing: across 167
+OOXML fixtures and 1,237 relationship parts the loop fires **zero** times.
+
+**The recommended candidate requests no ADR exception and is not implemented.** A
+run-coalesced structural prefetch keeps every check in its position and identity
+and reorders only the fetch, so the open's verdict stays a pure function of the
+package's bytes; its one accepted delta is intra-run error precedence, the same
+change changes 0565, 0566 and 0568 recorded. It is blocked on a read-side
+local-span accessor that `soapberry_zip::office::IndexedArchive` does not expose —
+an ownership-respecting addition to the ZIP grammar owner under ADRs 0010 and
+0011, not a boundary crossing, but outside this change's scope and therefore left
+unbuilt rather than reached for through a save-side facility.
+
 ## 0576: no ADR weakened; one refusal deliberately kept where it was
 
 [0576](0576-xls-sst-scan-without-materialization.md) changes how the XLS

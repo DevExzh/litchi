@@ -1,0 +1,15 @@
+[package]
+name = "zip-passthrough-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+soapberry-zip = { path = "<worktree of 32d25e08806d93f792ffd4954d83acc9db9c5301>/crates/soapberry-zip" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+debug = false
+
+[workspace]

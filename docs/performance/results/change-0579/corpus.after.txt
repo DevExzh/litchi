@@ -1,0 +1,127 @@
+CORPUS libreoffice-core/chart2/qa/extras/data/xls/chart.xls ok reads=11 bytes=4136 versions=15 digest=99f7ee09939e8d91
+CORPUS libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls ok reads=20 bytes=21032 versions=18 digest=1ba25c5cea797f41
+CORPUS libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls ok reads=12 bytes=6184 versions=16 digest=b0bd5222a3021973
+CORPUS libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls ok reads=13 bytes=13022 versions=18 digest=37981cb565077354
+CORPUS libreoffice-core/sc/qa/unit/data/xls/cellformat.xls ok reads=13 bytes=11993 versions=17 digest=b196a5b7abecad42
+CORPUS libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls ok reads=11 bytes=3208 versions=16 digest=6738b35254662aa1
+CORPUS libreoffice-core/sc/qa/unit/data/xls/external-ref.xls ok reads=11 bytes=4136 versions=15 digest=b1ec6bc60ebe6473
+CORPUS libreoffice-core/sc/qa/unit/data/xls/formats.xls ok reads=12 bytes=6184 versions=16 digest=a12eb8920c08291f
+CORPUS libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls ok reads=17 bytes=20857 versions=19 digest=fdbeea5efdab0411
+CORPUS libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls ok reads=26 bytes=30641 versions=19 digest=1d18455567937845
+CORPUS libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls ok reads=17 bytes=19082 versions=19 digest=843f66370922cdcf
+CORPUS libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls ok reads=16 bytes=19140 versions=19 digest=43cd946814e5e70f
+CORPUS libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls ok reads=12 bytes=4648 versions=15 digest=2a8512666146d251
+CORPUS libreoffice-core/sc/qa/unit/data/xls/validation.xls ok reads=13 bytes=17280 versions=18 digest=c665a6ecc5d8e218
+CORPUS office-interop/libreoffice-resaved/tdf78897-litchi.xls ok reads=12 bytes=6184 versions=16 digest=b0bd5222a3021973
+CORPUS office-interop/litchi-changed/tdf78897-litchi.xls ok reads=12 bytes=6184 versions=16 digest=483675824da59337
+CORPUS ole/xls/ComplexFunctionTestCaseData.xls ok reads=13 bytes=17448 versions=18 digest=3b2301cac7bbb999
+CORPUS ole/xls/ConditionalFormattingSamples copy.xls ok reads=53 bytes=565201 versions=28 digest=3d14872bc89e8774
+CORPUS ole/xls/ConditionalFormattingSamples.xls ok reads=53 bytes=565201 versions=28 digest=3d14872bc89e8774
+CORPUS ole/xls/DateFormats.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS ole/xls/DateTimeToNumberTestCases.xls ok reads=13 bytes=17448 versions=18 digest=41ef170759f96299
+CORPUS ole/xls/FormulaEvalTestData.xls ok reads=23 bytes=38137 versions=19 digest=43db9be6b84a788d
+CORPUS ole/xls/FormulaRefs.xls ok reads=15 bytes=16182 versions=18 digest=4e5ea4265cbe5e4c
+CORPUS ole/xls/FormulaSheetRange.xls ok reads=11 bytes=3381 versions=16 digest=ded4dd1d48d57147
+CORPUS ole/xls/HyperlinksOnManySheets.xls ok reads=11 bytes=3399 versions=16 digest=4cfe5e46fd112f99
+CORPUS ole/xls/Simple.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleChart.xls ok reads=11 bytes=3158 versions=16 digest=357998ec67885393
+CORPUS ole/xls/SimpleMacro.xls ok reads=19 bytes=17750 versions=18 digest=b246706e84eccb30
+CORPUS ole/xls/SimpleMultiCell.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleScatterChart.xls ok reads=13 bytes=17448 versions=18 digest=2879c35292869a55
+CORPUS ole/xls/SimpleWithAutofilter copy.xls ok reads=11 bytes=3200 versions=16 digest=2e143d4cb8be61d9
+CORPUS ole/xls/SimpleWithAutofilter.xls ok reads=11 bytes=3200 versions=16 digest=2e143d4cb8be61d9
+CORPUS ole/xls/SimpleWithChoose copy.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithChoose.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithColours copy.xls ok reads=12 bytes=5225 versions=16 digest=e0d9ddb66f9f8bd6
+CORPUS ole/xls/SimpleWithColours.xls ok reads=12 bytes=5225 versions=16 digest=e0d9ddb66f9f8bd6
+CORPUS ole/xls/SimpleWithComments copy.xls ok reads=11 bytes=3177 versions=16 digest=2796cd6aa76024a0
+CORPUS ole/xls/SimpleWithComments.xls ok reads=11 bytes=3177 versions=16 digest=2796cd6aa76024a0
+CORPUS ole/xls/SimpleWithDataFormat copy.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithDataFormat.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithFormula copy.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithFormula.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithImages copy.xls ok reads=14 bytes=38102 versions=19 digest=8449c5b9c29275ec
+CORPUS ole/xls/SimpleWithImages-mac copy.xls ok reads=20 bytes=88524 versions=21 digest=07a61faf049ff72e
+CORPUS ole/xls/SimpleWithImages-mac.xls ok reads=20 bytes=88524 versions=21 digest=07a61faf049ff72e
+CORPUS ole/xls/SimpleWithImages.xls ok reads=14 bytes=38102 versions=19 digest=8449c5b9c29275ec
+CORPUS ole/xls/SimpleWithPageBreaks copy.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS ole/xls/SimpleWithPageBreaks.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS ole/xls/SimpleWithPrintArea copy.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS ole/xls/SimpleWithPrintArea.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS ole/xls/SimpleWithSkip copy.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithSkip.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS ole/xls/SimpleWithStyling copy.xls ok reads=11 bytes=3122 versions=16 digest=3b0f1d10db7adc4b
+CORPUS ole/xls/SimpleWithStyling.xls ok reads=11 bytes=3122 versions=16 digest=3b0f1d10db7adc4b
+CORPUS ole/xls/SingleLetterRanges.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS ole/xls/WeekNumFunctionTestCaseData.xls ok reads=13 bytes=17448 versions=18 digest=21c42cf04665e755
+CORPUS ole/xls/WeekNumFunctionTestCaseData2013.xls ok reads=14 bytes=18893 versions=19 digest=a90f14fe35ba873f
+CORPUS ole/xls/WithChart.xls ok reads=15 bytes=18472 versions=18 digest=48e6d9ebe0cd4df3
+CORPUS ole/xls/WithCheckBoxes.xls ok reads=17 bytes=7073 versions=16 digest=7e0449c467477b57
+CORPUS ole/xls/WithConditionalFormatting.xls ok reads=13 bytes=17283 versions=18 digest=efc0fa02204b9677
+CORPUS ole/xls/WithCustomViews.xls ok reads=16 bytes=110242 versions=21 digest=4dbd2ebb5edf6650
+CORPUS ole/xls/WithEmbeddedObjects.xls ok reads=32 bytes=32386 versions=19 digest=c00671046024ba09
+CORPUS ole/xls/WithExtendedStyles.xls ok reads=11 bytes=4136 versions=15 digest=eb3b41bf9f41667f
+CORPUS ole/xls/WithFormattedGraphTitle.xls ok reads=11 bytes=3242 versions=16 digest=474590bd047b997f
+CORPUS ole/xls/WithHyperlink.xls ok reads=11 bytes=3147 versions=16 digest=44e53c9e1b27fd02
+CORPUS ole/xls/WithThreeCharts.xls ok reads=15 bytes=18472 versions=18 digest=09cc92a9860bfaf7
+CORPUS ole/xls/WithTwoCharts.xls ok reads=15 bytes=18472 versions=18 digest=48ff751b2466324f
+CORPUS ole/xls/WithTwoHyperLinks.xls ok reads=11 bytes=3198 versions=16 digest=f01eaf3aa2dfcd97
+CORPUS ole/xls/empty.xls ok reads=15 bytes=18472 versions=18 digest=759cf08b097d22f7
+CORPUS ole/xls/password.xls refused reads=7 bytes=2584 versions=9 digest=ce9e967be722d55d error=encrypted XLS FILEPASS is unsupported by source-backed reads
+CORPUS poi/test-data/hpsf/TestUnicode.xls ok reads=11 bytes=3624 versions=15 digest=81b53abe872dd9ad
+CORPUS poi/test-data/spreadsheet/15228.xls ok reads=39 bytes=42520 versions=19 digest=de04941d1bdc5a31
+CORPUS poi/test-data/spreadsheet/1900DateWindowing.xls refused reads=2 bytes=1024 versions=3 digest=2db61463f0067093 error=source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+CORPUS poi/test-data/spreadsheet/1904DateWindowing.xls refused reads=2 bytes=1024 versions=3 digest=2db61463f0067093 error=source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+CORPUS poi/test-data/spreadsheet/24207.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS poi/test-data/spreadsheet/29942.xls ok reads=17 bytes=31424 versions=19 digest=8f216f8f8cd0632d
+CORPUS poi/test-data/spreadsheet/35897-type4.xls refused reads=7 bytes=2584 versions=9 digest=f498d7ba23976f19 error=encrypted XLS FILEPASS is unsupported by source-backed reads
+CORPUS poi/test-data/spreadsheet/41139.xls ok reads=13 bytes=9471 versions=18 digest=05fbc1de84f73e16
+CORPUS poi/test-data/spreadsheet/44010-TwoCharts.xls ok reads=15 bytes=10792 versions=17 digest=a1d151af4d6c83db
+CORPUS poi/test-data/spreadsheet/45365-2.xls ok reads=18 bytes=33523 versions=19 digest=a4b9e1c80fe0268d
+CORPUS poi/test-data/spreadsheet/45365.xls ok reads=15 bytes=18472 versions=18 digest=b25134b85d735ff7
+CORPUS poi/test-data/spreadsheet/45492.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS poi/test-data/spreadsheet/45761.xls ok reads=15 bytes=5672 versions=15 digest=3ef92417104b5d6f
+CORPUS poi/test-data/spreadsheet/46136-NoWarnings.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS poi/test-data/spreadsheet/48968.xls ok reads=15 bytes=18472 versions=18 digest=f5a6307458255585
+CORPUS poi/test-data/spreadsheet/50939.xls ok reads=28 bytes=81716 versions=21 digest=5d21a644ec9fa179
+CORPUS poi/test-data/spreadsheet/53109.xls ok reads=15 bytes=18209 versions=18 digest=03e76772336707e4
+CORPUS poi/test-data/spreadsheet/54016.xls ok reads=40 bytes=317171 versions=24 digest=3aa54688e5180853
+CORPUS poi/test-data/spreadsheet/55341_CellStyleBorder.xls ok reads=14 bytes=17960 versions=18 digest=0cf12c3c69ddf039
+CORPUS poi/test-data/spreadsheet/57456.xls refused reads=14 bytes=17762 versions=18 digest=255ff4682f3cf175 error=source XLS parse error: Invalid data: SST total count is smaller than its unique count
+CORPUS poi/test-data/spreadsheet/59858.xls ok reads=69 bytes=792728 versions=31 digest=a9aa599cc4c702c3
+CORPUS poi/test-data/spreadsheet/ConditionalFormattingSamples.xls ok reads=53 bytes=565201 versions=28 digest=3d14872bc89e8774
+CORPUS poi/test-data/spreadsheet/DBCSHeader.xls ok reads=11 bytes=3624 versions=15 digest=f96de55b00dfa5c1
+CORPUS poi/test-data/spreadsheet/DateFormats.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS poi/test-data/spreadsheet/DrawingAndComments.xls ok reads=13 bytes=17448 versions=18 digest=17558ff7f8d75f91
+CORPUS poi/test-data/spreadsheet/Formatting.xls ok reads=15 bytes=17246 versions=18 digest=cb9ed0924eceedf8
+CORPUS poi/test-data/spreadsheet/HyperlinksOnManySheets.xls ok reads=11 bytes=3399 versions=16 digest=4cfe5e46fd112f99
+CORPUS poi/test-data/spreadsheet/MRExtraLines.xls ok reads=15 bytes=18472 versions=18 digest=16175b8bd33f3f53
+CORPUS poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls ok reads=13 bytes=17448 versions=18 digest=f112d09e37648499
+CORPUS poi/test-data/spreadsheet/SharedFormulaTest.xls refused reads=15 bytes=14035 versions=17 digest=3c4ffdd7ee0079f8 error=source XLS parse error: Invalid record 0x087C: XFCRC declares 72 XF records but 62 were parsed
+CORPUS poi/test-data/spreadsheet/ShrinkToFit.xls ok reads=13 bytes=16469 versions=18 digest=991cfb302256b528
+CORPUS poi/test-data/spreadsheet/Simple.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS poi/test-data/spreadsheet/SimpleMacro.xls ok reads=19 bytes=17750 versions=18 digest=b246706e84eccb30
+CORPUS poi/test-data/spreadsheet/SimpleScatterChart.xls ok reads=13 bytes=17448 versions=18 digest=2879c35292869a55
+CORPUS poi/test-data/spreadsheet/SimpleWithColours.xls ok reads=12 bytes=5225 versions=16 digest=e0d9ddb66f9f8bd6
+CORPUS poi/test-data/spreadsheet/SimpleWithComments.xls ok reads=11 bytes=3177 versions=16 digest=2796cd6aa76024a0
+CORPUS poi/test-data/spreadsheet/SimpleWithPageBreaks.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS poi/test-data/spreadsheet/SimpleWithPrintArea.xls ok reads=10 bytes=3624 versions=15 digest=a8565b2e2baf4877
+CORPUS poi/test-data/spreadsheet/TwoSheetsOneHidden.xls ok reads=11 bytes=3127 versions=16 digest=97ff722bfc48baae
+CORPUS poi/test-data/spreadsheet/UncalcedRecord.xls ok reads=11 bytes=5672 versions=16 digest=1c0d72b293fffd1f
+CORPUS poi/test-data/spreadsheet/WithConditionalFormatting.xls ok reads=13 bytes=17283 versions=18 digest=efc0fa02204b9677
+CORPUS poi/test-data/spreadsheet/WithTwoHyperLinks.xls ok reads=11 bytes=3198 versions=16 digest=f01eaf3aa2dfcd97
+CORPUS poi/test-data/spreadsheet/XRefCalc.xls ok reads=15 bytes=17714 versions=18 digest=98a11b53bf0dbe52
+CORPUS poi/test-data/spreadsheet/colwidth.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS poi/test-data/spreadsheet/comments.xls ok reads=11 bytes=5160 versions=16 digest=b6805a7805968b95
+CORPUS poi/test-data/spreadsheet/duprich1.xls ok reads=11 bytes=5160 versions=16 digest=18a9280c0ad25e95
+CORPUS poi/test-data/spreadsheet/duprich2.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS poi/test-data/spreadsheet/dvEmpty.xls ok reads=15 bytes=14948 versions=18 digest=d1a8d6410f683aab
+CORPUS poi/test-data/spreadsheet/externalFunctionExample.xls ok reads=15 bytes=15505 versions=18 digest=4445d2b9e64f8188
+CORPUS poi/test-data/spreadsheet/external_name.xls ok reads=20 bytes=26287 versions=19 digest=f4023b14c76bcebd
+CORPUS poi/test-data/spreadsheet/named-cell-in-formula-test.xls ok reads=12 bytes=4648 versions=15 digest=cac7fed53f5442ff
+CORPUS poi/test-data/spreadsheet/named-cell-test.xls ok reads=12 bytes=4648 versions=15 digest=4b365d0fddd1e7f9
+CORPUS poi/test-data/spreadsheet/namedinput.xls ok reads=10 bytes=3112 versions=15 digest=d43c320590d3dab1
+CORPUS poi/test-data/spreadsheet/testNames.xls ok reads=19 bytes=18596 versions=18 digest=ba5d83c4bd7e765b
+CORPUS poi/test-data/spreadsheet/unicodeNameRecord.xls ok reads=11 bytes=5160 versions=16 digest=2fd73308fcc08dd9
+CORPUS poi/test-data/spreadsheet/xor-encryption-abc.xls refused reads=6 bytes=2072 versions=9 digest=b0076090f6038459 error=encrypted XLS FILEPASS is unsupported by source-backed reads
+CORPUSTOTAL files=126 opened=119 reads=1858 bytes=4419376
