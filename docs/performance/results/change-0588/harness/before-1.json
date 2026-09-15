@@ -1,0 +1,1869 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0588-before-harness/release/litchi-perf-baseline",
+    "binary_sha256": "0bf9d22f468a58c1a2754b8c8ef2c46ec00b7879fb87038d4c4b38dd6b409c9b",
+    "binary_bytes": 60112744,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "8",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_open_owned",
+      "xlsx_first_cell",
+      "xlsx_full_cell_scan",
+      "xlsx_narrow_column_range_scan"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_open_owned",
+        "corpus_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_first_cell",
+        "corpus_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_full_cell_scan",
+        "corpus_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_narrow_column_range_scan",
+        "corpus_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_open_owned",
+        "corpus_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_first_cell",
+        "corpus_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_full_cell_scan",
+        "corpus_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_narrow_column_range_scan",
+        "corpus_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_open_owned",
+        "corpus_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_first_cell",
+        "corpus_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_full_cell_scan",
+        "corpus_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_narrow_column_range_scan",
+        "corpus_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_open_owned",
+      "corpus": {
+        "name": "xlsx-tiny",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 192,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 768,
+        "archive_bytes": 3561,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 8,
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          50980,
+          51070,
+          51371,
+          51380,
+          51511,
+          51550,
+          51590,
+          51620,
+          51670,
+          51800,
+          51830,
+          51831,
+          51911,
+          51981,
+          52060,
+          52070,
+          52241,
+          52460,
+          52640,
+          52721,
+          52820,
+          53000,
+          53010,
+          53110,
+          53450,
+          53490,
+          53500,
+          55680,
+          59960,
+          65980
+        ],
+        "sample_order": [
+          24,
+          29,
+          15,
+          23,
+          26,
+          28,
+          21,
+          17,
+          25,
+          14,
+          16,
+          19,
+          5,
+          22,
+          20,
+          4,
+          12,
+          6,
+          3,
+          8,
+          13,
+          11,
+          10,
+          9,
+          2,
+          1,
+          7,
+          27,
+          18,
+          0
+        ],
+        "min": 50980,
+        "p50": 52065,
+        "p95": 59960,
+        "p99": 65980,
+        "max": 65980,
+        "mean": 53009.566666666666,
+        "standard_deviation": 2977.6557625470887,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 51897.81657513399,
+          "upper": 54121.31675819934
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_first_cell",
+      "corpus": {
+        "name": "xlsx-tiny",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 192,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 768,
+        "archive_bytes": 3561,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 8,
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          35490,
+          35640,
+          35700,
+          35780,
+          35781,
+          35810,
+          35880,
+          35931,
+          35990,
+          35990,
+          36000,
+          36090,
+          36120,
+          36130,
+          36231,
+          36240,
+          36250,
+          36250,
+          36270,
+          36270,
+          36271,
+          36560,
+          36630,
+          36671,
+          36750,
+          36750,
+          36840,
+          37141,
+          42480,
+          43350
+        ],
+        "sample_order": [
+          13,
+          28,
+          18,
+          15,
+          29,
+          24,
+          17,
+          27,
+          9,
+          12,
+          25,
+          5,
+          8,
+          21,
+          4,
+          23,
+          7,
+          20,
+          10,
+          19,
+          6,
+          16,
+          26,
+          0,
+          1,
+          3,
+          14,
+          2,
+          22,
+          11
+        ],
+        "min": 35490,
+        "p50": 36235,
+        "p95": 42480,
+        "p99": 43350,
+        "max": 43350,
+        "mean": 36642.86666666667,
+        "standard_deviation": 1752.1801146066541,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 35988.66532234157,
+          "upper": 37297.06801099177
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "corpus": {
+        "name": "xlsx-tiny",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 192,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 768,
+        "archive_bytes": 3561,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 8,
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          36080,
+          36130,
+          36160,
+          36170,
+          36190,
+          36190,
+          36190,
+          36241,
+          36280,
+          36300,
+          36350,
+          36371,
+          36410,
+          36540,
+          36541,
+          36580,
+          36610,
+          36631,
+          36631,
+          36670,
+          36690,
+          36720,
+          36760,
+          36781,
+          36820,
+          36910,
+          40050,
+          43060,
+          43641,
+          44120
+        ],
+        "sample_order": [
+          16,
+          1,
+          19,
+          7,
+          9,
+          10,
+          28,
+          27,
+          26,
+          18,
+          14,
+          29,
+          3,
+          15,
+          4,
+          24,
+          21,
+          2,
+          25,
+          23,
+          12,
+          8,
+          13,
+          6,
+          20,
+          17,
+          5,
+          11,
+          0,
+          22
+        ],
+        "min": 36080,
+        "p50": 36560,
+        "p95": 43641,
+        "p99": 44120,
+        "max": 44120,
+        "mean": 37293.90000000001,
+        "standard_deviation": 2254.508515137517,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 36452.14720923372,
+          "upper": 38135.6527907663
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "name": "xlsx-tiny",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 192,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 768,
+        "archive_bytes": 3561,
+        "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 8,
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          100,
+          100,
+          100,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110,
+          110
+        ],
+        "sample_order": [
+          14,
+          20,
+          26,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          15,
+          16,
+          17,
+          18,
+          19,
+          21,
+          22,
+          23,
+          24,
+          25,
+          27,
+          28,
+          29
+        ],
+        "min": 100,
+        "p50": 110,
+        "p95": 110,
+        "p99": 110,
+        "max": 110,
+        "mean": 109.0,
+        "standard_deviation": 3.051285766293647,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 107.86075910028379,
+          "upper": 110.13924089971621
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_open_owned",
+      "corpus": {
+        "name": "xlsx-medium",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 16384,
+        "archive_bytes": 15254,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          102851,
+          102881,
+          102920,
+          103321,
+          103400,
+          103490,
+          103510,
+          103570,
+          103571,
+          103711,
+          103730,
+          103761,
+          103821,
+          103831,
+          103881,
+          103881,
+          104160,
+          104211,
+          104360,
+          104840,
+          105031,
+          105090,
+          105291,
+          105600,
+          105711,
+          106191,
+          106351,
+          110410,
+          111411,
+          115200
+        ],
+        "sample_order": [
+          28,
+          20,
+          29,
+          11,
+          13,
+          24,
+          26,
+          17,
+          21,
+          25,
+          19,
+          16,
+          23,
+          27,
+          14,
+          18,
+          15,
+          7,
+          10,
+          8,
+          9,
+          6,
+          4,
+          1,
+          5,
+          2,
+          0,
+          22,
+          12,
+          3
+        ],
+        "min": 102851,
+        "p50": 103881,
+        "p95": 111411,
+        "p99": 115200,
+        "max": 115200,
+        "mean": 104999.56666666668,
+        "standard_deviation": 2740.794569958247,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 103976.25206719234,
+          "upper": 106022.88126614102
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_first_cell",
+      "corpus": {
+        "name": "xlsx-medium",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 16384,
+        "archive_bytes": 15254,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          469172,
+          470062,
+          470662,
+          470943,
+          471212,
+          471362,
+          471402,
+          471553,
+          471732,
+          472242,
+          472483,
+          472573,
+          472632,
+          473122,
+          474393,
+          475523,
+          476163,
+          477822,
+          477922,
+          478163,
+          478473,
+          478562,
+          478622,
+          478932,
+          478963,
+          479033,
+          479702,
+          479893,
+          480172,
+          481603
+        ],
+        "sample_order": [
+          16,
+          29,
+          4,
+          24,
+          14,
+          3,
+          28,
+          11,
+          23,
+          9,
+          1,
+          18,
+          21,
+          8,
+          13,
+          19,
+          26,
+          22,
+          17,
+          5,
+          6,
+          15,
+          10,
+          27,
+          25,
+          0,
+          2,
+          12,
+          20,
+          7
+        ],
+        "min": 469172,
+        "p50": 474958,
+        "p95": 480172,
+        "p99": 481603,
+        "max": 481603,
+        "mean": 475169.7666666666,
+        "standard_deviation": 3782.992262868061,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 473757.3327488811,
+          "upper": 476582.20058445213
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "corpus": {
+        "name": "xlsx-medium",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 16384,
+        "archive_bytes": 15254,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          477203,
+          477853,
+          478192,
+          478782,
+          479033,
+          479233,
+          479282,
+          479432,
+          479462,
+          479533,
+          479733,
+          479922,
+          480612,
+          481113,
+          482162,
+          483382,
+          483972,
+          484243,
+          485193,
+          485523,
+          486003,
+          486302,
+          486522,
+          486923,
+          486982,
+          487093,
+          487223,
+          487593,
+          487663,
+          487993
+        ],
+        "sample_order": [
+          23,
+          25,
+          1,
+          20,
+          28,
+          15,
+          16,
+          5,
+          21,
+          3,
+          8,
+          10,
+          11,
+          18,
+          26,
+          6,
+          0,
+          13,
+          2,
+          24,
+          29,
+          27,
+          22,
+          14,
+          7,
+          17,
+          4,
+          19,
+          12,
+          9
+        ],
+        "min": 477203,
+        "p50": 482772,
+        "p95": 487663,
+        "p99": 487993,
+        "max": 487993,
+        "mean": 482805.2333333333,
+        "standard_deviation": 3670.6539085144636,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 481434.7425364774,
+          "upper": 484175.72413018916
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "name": "xlsx-medium",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 4096,
+        "archive_member_count": 9,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 16384,
+        "archive_bytes": 15254,
+        "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          420,
+          430,
+          430,
+          430,
+          430,
+          430,
+          430,
+          430,
+          430,
+          430,
+          440,
+          440,
+          440,
+          450,
+          480,
+          490,
+          500,
+          580
+        ],
+        "sample_order": [
+          1,
+          3,
+          9,
+          10,
+          11,
+          12,
+          13,
+          18,
+          20,
+          22,
+          24,
+          28,
+          29,
+          0,
+          5,
+          8,
+          14,
+          15,
+          19,
+          23,
+          25,
+          27,
+          7,
+          16,
+          17,
+          4,
+          26,
+          6,
+          2,
+          21
+        ],
+        "min": 420,
+        "p50": 430,
+        "p95": 500,
+        "p99": 580,
+        "max": 580,
+        "mean": 438.33333333333326,
+        "standard_deviation": 33.945527696218164,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 425.65928820089204,
+          "upper": 451.0073784657745
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_open_owned",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1340717,
+          1340767,
+          1341217,
+          1343067,
+          1343348,
+          1343847,
+          1344197,
+          1344267,
+          1345037,
+          1345627,
+          1346347,
+          1346737,
+          1347648,
+          1347717,
+          1348627,
+          1348677,
+          1348807,
+          1349057,
+          1349757,
+          1350237,
+          1350287,
+          1350477,
+          1352118,
+          1352888,
+          1354417,
+          1354457,
+          1356338,
+          1358437,
+          1363188,
+          1365607
+        ],
+        "sample_order": [
+          21,
+          11,
+          14,
+          19,
+          22,
+          24,
+          17,
+          8,
+          25,
+          7,
+          15,
+          18,
+          16,
+          27,
+          13,
+          29,
+          23,
+          26,
+          12,
+          3,
+          20,
+          9,
+          10,
+          28,
+          6,
+          4,
+          5,
+          2,
+          1,
+          0
+        ],
+        "min": 1340717,
+        "p50": 1348652,
+        "p95": 1363188,
+        "p99": 1365607,
+        "max": 1365607,
+        "mean": 1349130.5333333332,
+        "standard_deviation": 6126.597614209552,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1346843.0810549157,
+          "upper": 1351417.9856117507
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_first_cell",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          30171180,
+          30236750,
+          30241710,
+          30268841,
+          30276071,
+          30290470,
+          30290970,
+          30291061,
+          30317530,
+          30339820,
+          30347511,
+          30361841,
+          30369801,
+          30377761,
+          30384641,
+          30396261,
+          30409362,
+          30423841,
+          30448491,
+          30457152,
+          30478152,
+          30512652,
+          30523832,
+          30533422,
+          30592202,
+          30617362,
+          30669403,
+          30683453,
+          30700303,
+          30713443
+        ],
+        "sample_order": [
+          14,
+          15,
+          17,
+          16,
+          13,
+          12,
+          11,
+          4,
+          10,
+          9,
+          3,
+          5,
+          24,
+          8,
+          26,
+          28,
+          29,
+          19,
+          7,
+          18,
+          21,
+          2,
+          0,
+          6,
+          22,
+          23,
+          27,
+          20,
+          25,
+          1
+        ],
+        "min": 30171180,
+        "p50": 30390451,
+        "p95": 30700303,
+        "p99": 30713443,
+        "max": 30713443,
+        "mean": 30424176.300000004,
+        "standard_deviation": 150273.4744262856,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 30368069.562931966,
+          "upper": 30480283.037068043
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_full_cell_scan",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          30641373,
+          30651883,
+          30652183,
+          30660572,
+          30660792,
+          30667722,
+          30677903,
+          30678923,
+          30689022,
+          30690173,
+          30690602,
+          30715432,
+          30738833,
+          30745093,
+          30760552,
+          30805463,
+          30819663,
+          30831134,
+          30840893,
+          30875464,
+          30881693,
+          30894003,
+          30931194,
+          30952764,
+          30975014,
+          30991584,
+          31000194,
+          31009064,
+          31065835,
+          31205325
+        ],
+        "sample_order": [
+          17,
+          15,
+          11,
+          12,
+          24,
+          14,
+          23,
+          22,
+          20,
+          18,
+          19,
+          13,
+          1,
+          10,
+          3,
+          16,
+          2,
+          9,
+          28,
+          5,
+          29,
+          25,
+          0,
+          7,
+          8,
+          6,
+          27,
+          21,
+          26,
+          4
+        ],
+        "min": 30641373,
+        "p50": 30783007,
+        "p95": 31065835,
+        "p99": 31205325,
+        "max": 31205325,
+        "mean": 30813344.833333336,
+        "standard_deviation": 149964.43242938508,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 30757353.48148634,
+          "upper": 30869336.185180333
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "xlsx_narrow_column_range_scan",
+      "corpus": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          11550,
+          11660,
+          11680,
+          11700,
+          11710,
+          11720,
+          11740,
+          11740,
+          11750,
+          11790,
+          11820,
+          11831,
+          11850,
+          11850,
+          11870,
+          11870,
+          11930,
+          11930,
+          11930,
+          11950,
+          11951,
+          11960,
+          11970,
+          11990,
+          12050,
+          12090,
+          12110,
+          12990,
+          13020,
+          18531
+        ],
+        "sample_order": [
+          22,
+          12,
+          16,
+          23,
+          21,
+          24,
+          13,
+          25,
+          29,
+          3,
+          5,
+          4,
+          1,
+          18,
+          14,
+          19,
+          11,
+          17,
+          20,
+          0,
+          6,
+          27,
+          7,
+          28,
+          2,
+          9,
+          15,
+          26,
+          10,
+          8
+        ],
+        "min": 11550,
+        "p50": 11870,
+        "p95": 13020,
+        "p99": 18531,
+        "max": 18531,
+        "mean": 12151.099999999999,
+        "standard_deviation": 1246.9132467126922,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 11685.54722066182,
+          "upper": 12616.652779338177
+        }
+      },
+      "sink": null
+    }
+  ]
+}

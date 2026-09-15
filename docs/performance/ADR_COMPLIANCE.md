@@ -1,5 +1,51 @@
 # Performance optimization ADR-compliance matrix
 
+## 0588: nothing published, nothing relocated, and two publication paths reported rather than changed
+
+[0588](0588-mce-codec-namespace-emission.md) changes allocation strategy inside
+the private MCE writer of the crate that owns markup-compatibility
+preprocessing. No public type, signature, export or crate dependency changes —
+`Name`, `Capabilities`, `Limits`, `Report` and `Output` are untouched — so ADRs
+0002, 0003, 0010, 0011 and 0024 are not engaged, and the change is invisible
+above `litchi-ooxml-common`.
+
+ADR 0006 governs the substance, and the change is byte-identical against it:
+every check keeps its position, its identity and its ordering; duplicate
+attribute detection, value decoding and normalization, DTD/PI rejection, custom
+entity rejection and `MustUnderstand` all run where they ran; and the new
+`expand_parts` reproduces `xml_name::codec::parse` exactly, including its
+`invalid QName: invalid XML QName '<value>'` message, so no input changes
+category. The output bound is unchanged to the byte: `BoundedOutput::reserve`
+still refuses on written length before reserving, and the geometric target is
+`min(2 * capacity, max).max(len)`, which never asks the allocator for more than
+the limit already admits. Every reservation stays fallible and maps to
+`Error::Allocation` with the same `resource` strings; no `unsafe` is added.
+ADR 0005 is untouched: no read, positional source or mandatory validation moves.
+
+Two boundary facts are **recorded, not worked around**. First, the codec's
+processed stream is published by two writers —
+`litchi-pptx`'s `presentation_properties::metadata::guides::codec::rewrite_source`
+(the whole `presentation.xml` on a changed guides edit; its no-op path
+deliberately skips the helper, so an exact no-op stays exact) and `litchi-xlsb`'s
+`cell_values::drawing_transfer` (an anchor fragment cut from the processed source
+drawing part). Whether a read-side transform's output belongs in a published part
+is a contract question this record raises and does not answer. Second, an element
+unwrapped by `mc:ProcessContent` cannot declare a prefixed namespace
+(`NonConformant("unbound prefix xmlns")`) because the unwrap check expands every
+attribute name including `xmlns:z`. That refusal is pre-existing at the base
+revision; it is now pinned by a test so the borrowed resolver cannot move it, and
+it is deliberately not fixed, because fixing it would move when a refusal
+happens.
+
+A third boundary fact is recorded for correctness rather than compliance:
+`litchi-docx`'s `Paragraph::extensions()` already refuses
+(`InvalidFormat("Word extension XML must have one [112] root")`) on a
+`word/document.xml` that carries no markup-compatibility namespace, because the
+codec then borrows the input unchanged and the sliced `w:p` span was never
+namespace self-contained. Measured on the one such fixture of 62 against the
+untouched base checkout. It belongs to `litchi-docx`, not to this crate, and is
+reported here rather than fixed.
+
 ## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
 
 Record: [0596](0596-doc-eager-open-terms.md).

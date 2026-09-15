@@ -10,7 +10,7 @@ use std::{borrow::Cow, collections::HashSet, str, sync::Arc};
 use super::model::{
     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
 };
-use crate::xml_name::{self, QualifiedName};
+use crate::xml_name;
 
 type R<T> = Result<T, Error>;
 
@@ -185,6 +185,17 @@ pub(crate) fn reserve_exact<T>(
 ) -> R<()> {
     values
         .try_reserve_exact(additional)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+/// Reserve with the standard amortized growth policy.
+///
+/// The per-element buffers below grow one entry at a time, so an exact
+/// reservation reallocates on every push; they take the geometric policy while
+/// the fixed-size reservations above keep their exact one.
+fn reserve_amortized<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> R<()> {
+    values
+        .try_reserve(additional)
         .map_err(|source| Error::Allocation { resource, source })
 }
 
@@ -493,8 +504,20 @@ impl BoundedOutput {
             return Err(limit("output bytes"));
         }
         if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
+            // Grow geometrically so a document that outgrows the input-sized
+            // hint costs a logarithmic number of reallocations instead of one
+            // per written run, and clamp the request to the configured output
+            // bound so the reservation never asks for more than the limit
+            // already admits.
+            let target = self
+                .bytes
+                .capacity()
+                .saturating_mul(2)
+                .min(self.max)
+                .max(len);
+            let grow = target.saturating_sub(self.bytes.len());
             self.bytes
-                .try_reserve_exact(additional)
+                .try_reserve_exact(grow)
                 .map_err(|source| Error::Allocation {
                     resource: "MCE output",
                     source,
@@ -522,6 +545,13 @@ struct Frame {
     ctx: Ctx,
     mode: Mode,
     active: bool,
+}
+
+/// One source attribute: its qualified name borrowed from the event and its
+/// normalized value borrowed unless quick-xml had to unescape or normalize it.
+struct Attr<'a> {
+    key: &'a str,
+    value: Cow<'a, str>,
 }
 /// # Errors
 ///
@@ -653,59 +683,59 @@ fn start(
     if st.len() >= lim.max_depth {
         return Err(limit("depth"));
     }
-    let q = str::from_utf8(e.name().as_ref()).map_err(xerr)?.to_string();
+    let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
     let mut raw = Vec::new();
     for a in e.attributes().with_checks(true) {
         let a = a.map_err(xerr)?;
-        reserve_exact(&mut raw, 1, "MCE attributes")?;
-        raw.push((
-            str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),
-            a.decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
-                .map_err(xerr)?
-                .into_owned(),
-        ));
+        reserve_amortized(&mut raw, 1, "MCE attributes")?;
+        raw.push(Attr {
+            key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,
+            value: a
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+                .map_err(xerr)?,
+        });
     }
     let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
     let mut local_namespaces = Vec::new();
-    for (a, v) in &raw {
-        if a == "xmlns" {
-            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
-            local_namespaces.push((String::new(), v.clone()));
-        } else if let Some(p) = a.strip_prefix("xmlns:") {
-            if !xml_name::is_ncname(p) || v.is_empty() {
+    for a in &raw {
+        if a.key == "xmlns" {
+            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((String::new(), a.value.as_ref().to_owned()));
+        } else if let Some(p) = a.key.strip_prefix("xmlns:") {
+            if !xml_name::is_ncname(p) || a.value.is_empty() {
                 return Err(bad("invalid namespace"));
             }
-            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
-            local_namespaces.push((p.into(), v.clone()));
+            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((p.into(), a.value.as_ref().to_owned()));
         }
     }
     c.ns = c.ns.with_local(local_namespaces, lim)?;
-    let name = expand(&q, &c.ns, true)?;
+    let name = expand(q, &c.ns, true)?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {
+        if parent_active {
+            write_start(out, q, &c, &raw, caps, false, rep)?;
+        }
         let f = Frame {
-            ctx: c.clone(),
-            mode: Mode::Emit(q.clone()),
+            ctx: c,
+            mode: Mode::Emit(q.to_owned()),
             active: parent_active,
         };
-        if parent_active {
-            write_start(out, &q, &c, &raw, caps, false, rep)?;
-        }
         return close(st, f, empty, out);
     }
 
     let mut directives = Vec::new();
     let mut tokens = 0usize;
-    for (a, v) in &raw {
-        if a == "xmlns" || a.starts_with("xmlns:") {
+    for a in &raw {
+        if a.key == "xmlns" || a.key.starts_with("xmlns:") {
             continue;
         }
-        let n = expand(a, &c.ns, false)?;
-        if n.namespace != NAMESPACE {
+        let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
+        if namespace != NAMESPACE {
             continue;
         }
         if !matches!(
-            n.local_name.as_str(),
+            local,
             "Ignorable"
                 | "ProcessContent"
                 | "PreserveElements"
@@ -715,17 +745,17 @@ fn start(
             return Err(bad("unknown MCE attribute"));
         }
         tokens = tokens
-            .checked_add(v.split_whitespace().count())
+            .checked_add(a.value.split_whitespace().count())
             .ok_or_else(|| limit("directive tokens"))?;
         if tokens > lim.max_directive_tokens {
             return Err(limit("directive tokens"));
         }
-        reserve_exact(&mut directives, 1, "MCE directives")?;
-        directives.push((n.local_name, v.as_str()));
+        reserve_amortized(&mut directives, 1, "MCE directives")?;
+        directives.push((local, a.value.as_ref()));
     }
 
     let mut local_ign = HashSet::new();
-    if let Some((_, value)) = directives.iter().find(|(name, _)| name == "Ignorable") {
+    if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
         let mut seen = HashSet::new();
         for prefix in value.split_whitespace() {
             if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
@@ -763,7 +793,7 @@ fn start(
     let mut local_preserve_elements = HashSet::new();
     let mut local_preserve_attributes = HashSet::new();
     for (name, value) in &directives {
-        match name.as_str() {
+        match *name {
             "Ignorable" => {},
             "ProcessContent" => {
                 for token in value.split_whitespace() {
@@ -956,13 +986,11 @@ fn start(
     } else if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
         if c.preserves_element(&name) {
             rep.preserved_elements += 1;
-            Mode::Emit(q.clone())
+            Mode::Emit(q.to_owned())
         } else if c.processes(&name) {
-            for (a, _) in &raw {
-                let n = expand(a, &c.ns, false)?;
-                if n.namespace == XML_NS
-                    && matches!(n.local_name.as_str(), "base" | "lang" | "space")
-                {
+            for a in &raw {
+                let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
+                if namespace == XML_NS && matches!(local, "base" | "lang" | "space") {
                     return Err(bad("xml context attribute on unwrapped element"));
                 }
             }
@@ -974,10 +1002,10 @@ fn start(
             Mode::Skip
         }
     } else {
-        Mode::Emit(q.clone())
+        Mode::Emit(q.to_owned())
     };
     if matches!(mode, Mode::Emit(_)) && active {
-        write_start(out, &q, &c, &raw, caps, true, rep)?;
+        write_start(out, q, &c, &raw, caps, true, rep)?;
     }
     if st.is_empty() {
         if *root {
@@ -1009,7 +1037,7 @@ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) ->
             Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
         }
     } else {
-        reserve_exact(st, 1, "MCE element stack")?;
+        reserve_amortized(st, 1, "MCE element stack")?;
         st.push(f);
     }
     Ok(())
@@ -1026,14 +1054,14 @@ fn limit(s: &str) -> Error {
 fn xerr(e: impl std::fmt::Display) -> Error {
     Error::Xml(e.to_string())
 }
-fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
+fn attr<'a>(r: &'a [Attr<'_>], n: &str) -> R<Option<&'a str>> {
     let mut v = None;
-    for (a, x) in r {
-        if a == n {
+    for a in r {
+        if a.key == n {
             if v.is_some() {
                 return Err(bad("duplicate attribute"));
             }
-            v = Some(x.as_str());
+            v = Some(a.value.as_ref());
         }
     }
     Ok(v)
@@ -1047,16 +1075,16 @@ enum AlternateKind {
 }
 
 fn validate_alternate_attributes(
-    raw: &[(String, String)],
+    raw: &[Attr<'_>],
     ctx: &Ctx,
     caps: &Capabilities,
     kind: AlternateKind,
 ) -> R<()> {
-    for (qualified, _) in raw {
-        if qualified == "xmlns" || qualified.starts_with("xmlns:") {
+    for attribute in raw {
+        if attribute.key == "xmlns" || attribute.key.starts_with("xmlns:") {
             continue;
         }
-        let name = expand(qualified, &ctx.ns, false)?;
+        let name = expand(attribute.key, &ctx.ns, false)?;
         if name.namespace.is_empty() {
             if matches!(kind, AlternateKind::Choice) && name.local_name == "Requires" {
                 continue;
@@ -1080,25 +1108,37 @@ fn validate_alternate_attributes(
     Ok(())
 }
 fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
-    let qualified =
-        QualifiedName::try_from(q).map_err(|error| bad(format!("invalid QName: {error}")))?;
-    let p = qualified.prefix().unwrap_or_default();
-    let l = qualified.local();
+    let (namespace, local) = expand_parts(q, ns, element)?;
+    Ok(Name {
+        namespace: namespace.to_owned(),
+        local_name: local.into(),
+    })
+}
+
+/// Resolve one qualified name against the in-scope declarations without
+/// materializing an owned [`Name`].
+///
+/// The lexical rule and the error identity are those of
+/// `xml_name::QualifiedName`, whose `parse` reports `InvalidQualifiedName` for
+/// every lexical failure and reconstructs the same `prefix:local` split; this
+/// borrows that split from the caller's bytes instead of allocating it.
+fn expand_parts<'q, 'n>(q: &'q str, ns: &'n Namespaces, element: bool) -> R<(&'n str, &'q str)> {
+    if !xml_name::is_qualified_name(q) {
+        let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
+        return Err(bad(format!("invalid QName: {error}")));
+    }
+    let (p, l) = q.split_once(':').unwrap_or(("", q));
     let n = if p.is_empty() {
         if element {
-            ns.get("").unwrap_or_default().to_owned()
+            ns.get("").unwrap_or_default()
         } else {
-            String::new()
+            ""
         }
     } else {
         ns.get(p)
-            .map(str::to_owned)
             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
     };
-    Ok(Name {
-        namespace: n,
-        local_name: l.into(),
-    })
+    Ok((n, l))
 }
 fn pattern_namespace(pattern: &NamePattern) -> &str {
     match pattern {
@@ -1147,13 +1187,18 @@ fn write_start(
     o: &mut BoundedOutput,
     q: &str,
     ctx: &Ctx,
-    raw: &[(String, String)],
+    raw: &[Attr<'_>],
     caps: &Capabilities,
     filter: bool,
     rep: &mut Report,
 ) -> R<()> {
     o.push(b'<')?;
     o.extend_from_slice(q.as_bytes())?;
+    // Every in-scope binding is re-declared on every emitted start tag, so any
+    // element span of the output is namespace self-contained. Consumers slice
+    // inner spans out of this buffer and parse them standalone, so the
+    // redundancy is load-bearing, not incidental; see
+    // `namespace_emission_contract_tests`.
     ctx.ns.for_each_effective(|p, u| {
         o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
         if !p.is_empty() {
@@ -1163,20 +1208,25 @@ fn write_start(
         esc(o, u)?;
         o.push(b'\"')
     })?;
-    for (a, v) in raw {
-        if a == "xmlns" || a.starts_with("xmlns:") {
+    for a in raw {
+        if a.key == "xmlns" || a.key.starts_with("xmlns:") {
             continue;
         }
-        let n = expand(a, &ctx.ns, false)?;
-        if filter && n.namespace == NAMESPACE {
+        let (namespace, local) = expand_parts(a.key, &ctx.ns, false)?;
+        if filter && namespace == NAMESPACE {
             rep.ignored_attributes += 1;
             continue;
         }
         if filter
-            && !n.namespace.is_empty()
-            && ctx.is_ignorable(&n.namespace)
-            && !caps.understands(&n.namespace)
+            && !namespace.is_empty()
+            && ctx.is_ignorable(namespace)
+            && !caps.understands(namespace)
         {
+            // Only a preservation decision needs the owned expanded name.
+            let n = Name {
+                namespace: namespace.to_owned(),
+                local_name: local.into(),
+            };
             if ctx.preserves_attribute(&n) {
                 rep.preserved_attributes += 1;
             } else {
@@ -1185,9 +1235,9 @@ fn write_start(
             }
         }
         o.push(b' ')?;
-        o.extend_from_slice(a.as_bytes())?;
+        o.extend_from_slice(a.key.as_bytes())?;
         o.extend_from_slice(b"=\"")?;
-        esc(o, v)?;
+        esc(o, &a.value)?;
         o.push(b'\"')?;
     }
     o.push(b'>')?;

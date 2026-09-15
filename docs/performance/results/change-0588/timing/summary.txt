@@ -1,0 +1,24 @@
+== eager-control
+  before                           n=80   p50=   4588813 mean=   4581253 p95=   4670224 p99=   4699993
+  after                            n=80   p50=   4340112 mean=   4347537 p95=   4401072 p99=   4425053
+  after vs before p50: -5.42%   before vs after p50: +5.73%
+  floor A (before)                 n=80   p50=   4597223 mean=   4597798 p95=   4611763 p99=   4625904
+  floor B (before)                 n=80   p50=   4637863 mean=   4645838 p95=   4706064 p99=   4776934
+  A/A floor p50: +0.88%   p99: +3.26%
+
+== eager-real
+  before                           n=80   p50=  44359061 mean=  44496653 p95=  45731257 p99=  45875619
+  after                            n=80   p50=  24892964 mean=  24903592 p95=  25223065 p99=  25317236
+  after vs before p50: -43.88%   before vs after p50: +78.20%
+  floor A (before)                 n=80   p50=  45021364 mean=  44922970 p95=  45511116 p99=  45677807
+  floor B (before)                 n=80   p50=  44608572 mean=  44756787 p95=  45503846 p99=  45851828
+  A/A floor p50: -0.92%   p99: +0.38%
+
+== source-real
+  before                           n=80   p50=  55166004 mean=  55142929 p95=  55825508 p99=  55943828
+  after                            n=80   p50=  35921038 mean=  36506738 p95=  37178785 p99=  50282371
+  after vs before p50: -34.89%   before vs after p50: +53.58%
+  floor A (before)                 n=80   p50=  55032764 mean=  55056513 p95=  56124939 p99=  56418401
+  floor B (before)                 n=80   p50=  54982854 mean=  55144649 p95=  56670452 p99=  56873283
+  A/A floor p50: -0.09%   p99: +0.81%
+

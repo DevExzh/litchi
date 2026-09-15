@@ -1964,3 +1964,284 @@ mod streaming_0361_raw_recovery_tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod namespace_emission_contract_tests {
+    //! Change 0588 pins what the MCE writer's namespace emission guarantees.
+    //!
+    //! `write_start` re-declares every in-scope binding on every emitted start
+    //! tag. That makes any element span of the processed buffer namespace
+    //! self-contained, and consumers slice inner spans out of it and parse them
+    //! standalone, so the redundancy is part of the contract rather than an
+    //! accident of the writer. These tests fix that property, the refusal
+    //! identities of the borrowed name resolver, and the exact output bound, so
+    //! a future writer that emits fewer declarations has to confront them.
+
+    use super::super::model::{Capabilities, Error, Limits, NAMESPACE};
+    use super::process_markup_compatibility;
+    use quick_xml::events::Event;
+    use quick_xml::name::ResolveResult;
+
+    const MC: &str = NAMESPACE;
+
+    fn run(xml: &str) -> String {
+        run_with(xml, &Capabilities::new(), &Limits::default())
+            .expect("markup compatibility preprocessing must succeed")
+    }
+
+    fn run_with(xml: &str, caps: &Capabilities, limits: &Limits) -> Result<String, Error> {
+        let output = process_markup_compatibility(xml.as_bytes(), caps, limits)?;
+        Ok(String::from_utf8(output.xml.into_owned()).expect("MCE output must remain UTF-8"))
+    }
+
+    fn show(resolved: &ResolveResult<'_>) -> String {
+        match resolved {
+            ResolveResult::Unbound => String::new(),
+            ResolveResult::Bound(namespace) => {
+                format!("{{{}}}", String::from_utf8_lossy(namespace.as_ref()))
+            },
+            ResolveResult::Unknown(prefix) => {
+                format!("!unbound:{}!", String::from_utf8_lossy(prefix))
+            },
+        }
+    }
+
+    /// Project XML onto what a namespace-aware consumer sees: resolved
+    /// (namespace, local) for every element and attribute with its normalized
+    /// value, with namespace declarations themselves excluded.
+    fn resolved(xml: &[u8]) -> Vec<String> {
+        let mut reader = quick_xml::NsReader::from_reader(xml);
+        reader.config_mut().trim_text(false);
+        let mut buffer = Vec::new();
+        let mut names = Vec::new();
+        loop {
+            let event = reader
+                .read_event_into(&mut buffer)
+                .expect("MCE output must stay well formed");
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element) => {
+                    let (namespace, local) = reader.resolver().resolve_element(element.name());
+                    names.push(format!(
+                        "<{}{}",
+                        show(&namespace),
+                        String::from_utf8_lossy(local.as_ref())
+                    ));
+                    let mut attributes = Vec::new();
+                    for attribute in element.attributes() {
+                        let attribute = attribute.expect("attribute");
+                        let key = attribute.key;
+                        if key.as_ref() == b"xmlns" || key.as_ref().starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        let (namespace, local) = reader.resolver().resolve_attribute(key);
+                        let value = attribute
+                            .decoded_and_normalized_value(
+                                quick_xml::XmlVersion::Explicit1_0,
+                                reader.decoder(),
+                            )
+                            .expect("attribute value");
+                        attributes.push(format!(
+                            "@{}{}={value}",
+                            show(&namespace),
+                            String::from_utf8_lossy(local.as_ref())
+                        ));
+                    }
+                    attributes.sort();
+                    names.extend(attributes);
+                },
+                Event::Text(ref text) => {
+                    let decoded = text.decode().expect("text").into_owned();
+                    if !decoded.trim().is_empty() {
+                        names.push(format!("#{decoded}"));
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+        }
+        names
+    }
+
+    /// Every inner element span of `xml`, as `(start, end)` byte offsets, in the
+    /// shape consumers use when they slice a view out of the processed buffer.
+    fn element_spans(xml: &[u8]) -> Vec<(usize, usize)> {
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        let mut open: Vec<usize> = Vec::new();
+        let mut spans = Vec::new();
+        loop {
+            let start = usize::try_from(reader.buffer_position()).expect("position");
+            let event = reader.read_event().expect("processed XML must parse");
+            let end = usize::try_from(reader.buffer_position()).expect("position");
+            match event {
+                Event::Start(_) => open.push(start),
+                Event::Empty(_) => spans.push((start, end)),
+                Event::End(_) => {
+                    let opened = open.pop().expect("balanced end tag");
+                    spans.push((opened, end));
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        spans
+    }
+
+    /// Whether every element and attribute name in one standalone fragment
+    /// resolves to a namespace (or is deliberately unprefixed).
+    fn fragment_is_self_contained(fragment: &[u8]) -> bool {
+        let mut reader = quick_xml::NsReader::from_reader(fragment);
+        reader.config_mut().trim_text(false);
+        let mut buffer = Vec::new();
+        loop {
+            let event = match reader.read_event_into(&mut buffer) {
+                Ok(event) => event,
+                Err(_) => return false,
+            };
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element) => {
+                    if matches!(
+                        reader.resolver().resolve_element(element.name()).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        return false;
+                    }
+                    for attribute in element.attributes() {
+                        let Ok(attribute) = attribute else {
+                            return false;
+                        };
+                        if attribute.key.as_ref() == b"xmlns"
+                            || attribute.key.as_ref().starts_with(b"xmlns:")
+                        {
+                            continue;
+                        }
+                        if matches!(
+                            reader.resolver().resolve_attribute(attribute.key).0,
+                            ResolveResult::Unknown(_)
+                        ) {
+                            return false;
+                        }
+                    }
+                },
+                Event::Eof => return true,
+                _ => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    #[test]
+    fn every_element_span_of_the_output_is_namespace_self_contained() {
+        // The shape litchi-docx slices: a prefix bound once on the root and
+        // used by descendants several levels down.
+        let xml = format!(
+            r#"<w:document xmlns:mc="{MC}" xmlns:w="urn:w" xmlns:w14="urn:w14" mc:Ignorable="q" xmlns:q="urn:q"><w:body><w:p w14:paraId="1"><w:r><w:t>text</w:t></w:r></w:p><w:tbl><w:tr w14:textId="2"><w:tc/></w:tr></w:tbl></w:body></w:document>"#
+        );
+        let output = run(&xml);
+        let spans = element_spans(output.as_bytes());
+        assert_eq!(spans.len(), 8);
+        for (start, end) in spans {
+            let fragment = output
+                .as_bytes()
+                .get(start..end)
+                .expect("element span is inside the output");
+            assert!(
+                fragment_is_self_contained(fragment),
+                "sliced span stopped resolving: {}",
+                String::from_utf8_lossy(fragment)
+            );
+        }
+    }
+
+    #[test]
+    fn the_xml_prefix_is_never_redeclared_in_the_output() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:xml="http://www.w3.org/XML/1998/namespace"><a xml:space="preserve"> </a></r>"#
+        );
+        let output = run(&xml);
+        assert!(!output.contains("xmlns:xml"));
+        assert!(output.contains(r#"xml:space="preserve""#));
+    }
+
+    #[test]
+    fn borrowed_attribute_values_still_round_trip_through_normalization() {
+        let xml = format!(
+            "<r xmlns:mc=\"{MC}\"><a p=\"&amp;\" q=\"x&#9;y\" r=\"A&#66;\" s=\"x\ty\" t=\"plain\"/></r>"
+        );
+        let output = run(&xml);
+        assert_eq!(resolved(output.as_bytes()), resolved(xml.as_bytes()));
+        assert!(output.contains(r#"p="&amp;""#));
+        assert!(output.contains(r#"r="AB""#));
+    }
+
+    #[test]
+    fn the_borrowed_name_resolver_keeps_every_refusal_identity() {
+        let invalid = format!(r#"<r xmlns:mc="{MC}"><a b:c:d="1"/></r>"#);
+        assert!(matches!(
+            run_with(&invalid, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message))
+                if message == "invalid QName: invalid XML QName 'b:c:d'"
+        ));
+
+        let unbound = format!(r#"<r xmlns:mc="{MC}"><a missing:value="1"/></r>"#);
+        assert!(matches!(
+            run_with(&unbound, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message)) if message == "unbound prefix missing"
+        ));
+
+        let unbound_element = format!(r#"<r xmlns:mc="{MC}"><missing:a/></r>"#);
+        assert!(matches!(
+            run_with(&unbound_element, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message)) if message == "unbound prefix missing"
+        ));
+    }
+
+    #[test]
+    fn process_content_still_refuses_a_wrapper_that_binds_a_prefix() {
+        // Unchanged from the base revision: the unwrap check expands every
+        // attribute name and `xmlns:z` has no bound prefix. Pinned here so the
+        // borrowed resolver cannot move the refusal.
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap xmlns:z="urn:z"><one z:flag="1"/></x:wrap></r>"#
+        );
+        assert!(matches!(
+            run_with(&xml, &Capabilities::new(), &Limits::default()),
+            Err(Error::NonConformant(message)) if message == "unbound prefix xmlns"
+        ));
+    }
+
+    #[test]
+    fn amortized_output_growth_keeps_the_bound_exact() {
+        // The writer now grows the output buffer geometrically. The bound is on
+        // written bytes, not capacity, so the exact admitted length must not
+        // move by one byte in either direction.
+        let mut xml = format!(r#"<r xmlns:mc="{MC}" xmlns:n="urn:namespace-number-0">"#);
+        for _ in 0..64 {
+            xml.push_str("<cell n:a=\"1\"/>");
+        }
+        xml.push_str("</r>");
+
+        let exact = run(&xml).len();
+        assert!(exact > xml.len(), "the writer expands this shape");
+        let at_bound = Limits {
+            max_output_bytes: exact,
+            ..Limits::default()
+        };
+        assert_eq!(
+            run_with(&xml, &Capabilities::new(), &at_bound)
+                .expect("the exact output length is admitted")
+                .len(),
+            exact
+        );
+        let under_bound = Limits {
+            max_output_bytes: exact.saturating_sub(1),
+            ..Limits::default()
+        };
+        assert!(matches!(
+            run_with(&xml, &Capabilities::new(), &under_bound),
+            Err(Error::LimitExceeded(message)) if message == "output bytes"
+        ));
+    }
+}

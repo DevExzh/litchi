@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/cg-before/source-control.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 44929375
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe source /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/control.xlsx H680 (PID 832786, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+222,591,457 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+9,203,856 ( 4.13%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+7,439,709 ( 3.34%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+7,235,734 ( 3.25%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+5,349,568 ( 2.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::next [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+4,169,198 ( 1.87%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+4,125,953 ( 1.85%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+3,578,801 ( 1.61%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+3,493,880 ( 1.57%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/pattern.rs:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+3,130,077 ( 1.41%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,755,555 ( 1.24%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:<litchi_ooxml_common::mce::stream::Processor>::start::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}> [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,500,320 ( 1.12%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:<litchi_ooxml_common::mce::stream::PrefixReader as std::io::BufRead>::fill_buf [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,430,882 ( 1.09%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:<litchi_ooxml_common::mce::stream::EventMeter as std::io::BufRead>::fill_buf [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,373,702 ( 1.07%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,352,438 ( 1.06%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:litchi_ooxml_common::mce::stream::clone_bounded_name_part [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,253,265 ( 1.01%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+2,232,040 ( 1.00%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_alloc
+2,173,458 ( 0.98%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:<litchi_ooxml_common::mce::stream::EventMeter as std::io::BufRead>::consume [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,114,538 ( 0.95%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/stream.rs:<litchi_ooxml_common::mce::stream::Processor>::parse_element [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+2,100,639 ( 0.94%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_ncname [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+1,914,752 ( 0.86%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]

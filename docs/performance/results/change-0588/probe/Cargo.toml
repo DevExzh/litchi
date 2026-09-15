@@ -1,0 +1,15 @@
+[package]
+name = "xmlprobe"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-xlsx" }
+litchi-ooxml-common = { path = "/home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common" }
+
+quick-xml = "0.41"
+
+[profile.release]
+debug = 1

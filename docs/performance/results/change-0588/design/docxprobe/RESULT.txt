@@ -1,0 +1,24 @@
+Change 0588 — the self-containment dependency is already conditional.
+
+Built against the UNTOUCHED base checkout
+/home/zhuhe/code/litchi-worktrees/before-08d968f8e (commit 08d968f8e), so these
+results describe the base revision, not this change.
+
+Census of test-data: 61 of 62 .docx fixtures contain the MCE namespace string in
+word/document.xml; 1 does not.
+
+$ docxprobe test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx
+ERR	invalid DOCX format: Word extension XML must have one [112] root
+
+$ docxprobe test-data/ooxml/docx/testComment.docx
+OK	Some(Id(1396380550))
+
+$ docxprobe test-data/poi/test-data/document/testComment.docx
+OK	Some(Id(1396380550))
+
+Reading: when word/document.xml contains no MCE namespace the codec returns the
+input borrowed, the w:p span Paragraph::extensions() slices comes from the
+original bytes, and xmlns:w is not on it. The public API therefore already
+refuses on such a document with the identical error the withdrawn
+namespace-emission rewrite produces everywhere. The rewrite universalizes a
+pre-existing latent defect rather than creating a new one.

@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/cg-before/mce-control-r1.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 1238302
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe mce /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/control-sheet1.xml 1 (PID 832269, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                 
+--------------------------------------------------------------------------------
+5,012,484 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+2,718,802 (54.24%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  970,995 (19.37%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  582,600 (11.62%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  194,204 ( 3.87%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  194,199 ( 3.87%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/index.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+   48,912 ( 0.98%)  ./stdio-common/./stdio-common/vfscanf-internal.c:__vfscanf_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   41,151 ( 0.82%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   29,216 ( 0.58%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object_no_relro
+   25,144 ( 0.50%)  ./stdlib/../stdlib/strtol_l.c:____strtoul_l_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   20,332 ( 0.41%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   16,299 ( 0.33%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   15,110 ( 0.30%)  ./elf/./elf/do-rel.h:_dl_relocate_object_no_relro
+   14,931 ( 0.30%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+   12,385 ( 0.25%)  ./elf/./elf/dl-tunables.c:__GI___tunables_init [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   10,158 ( 0.20%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   10,001 ( 0.20%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-avx2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    8,543 ( 0.17%)  ./elf/./elf/dl-version.c:_dl_check_map_versions [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    5,227 ( 0.10%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/hash/sip.rs:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+    4,623 ( 0.09%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,324 ( 0.09%)  ./libio/./libio/genops.c:_IO_sputbackc [/usr/lib/x86_64-linux-gnu/libc.so.6]

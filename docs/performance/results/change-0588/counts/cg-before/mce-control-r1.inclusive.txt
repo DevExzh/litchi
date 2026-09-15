@@ -1,0 +1,10 @@
+5,012,484 (100.0%)  PROGRAM TOTALS
+4,660,836 (92.98%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+3,689,797 (73.61%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  582,600 (11.62%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  194,204 ( 3.87%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  194,199 ( 3.87%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/index.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 8 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+ .               let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+ 8 ( 0.00%)      process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
+4,660,836 (92.98%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility (1x)

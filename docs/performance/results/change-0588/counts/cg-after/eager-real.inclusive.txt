@@ -1,0 +1,40 @@
+497,483,936 (100.0%)  PROGRAM TOTALS
+308,582,854 (62.03%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+291,594,888 (58.61%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+257,790,637 (51.82%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+235,107,046 (47.26%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+177,728,062 (35.73%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+153,226,010 (30.80%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 61,354,398 (12.33%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 56,504,166 (11.36%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+ 29,497,498 ( 5.93%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 26,546,198 ( 5.34%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 24,440,720 ( 4.91%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 17,185,873 ( 3.45%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 15,310,378 ( 3.08%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 14,606,433 ( 2.94%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner
+ 12,675,828 ( 2.55%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 12,560,692 ( 2.52%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 12,263,216 ( 2.47%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,248,264 ( 2.46%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 11,468,672 ( 2.31%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+ 11,468,672 ( 2.31%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+  8,601,504 ( 1.73%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc
+  7,189,230 ( 1.45%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+  6,124,132 ( 1.23%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mut_ptr.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+115,136 ( 0.02%)          self.read_event_impl(buf)
+12,560,692 ( 2.52%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> (28,784x)
+    342 ( 0.00%)      fn read_event_impl<'i, B>(&mut self, buf: B) -> Result<Event<'i>>
+174,552 ( 0.04%)          let event = self.reader.read_event_impl(buf);
+228,977 ( 0.05%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> (254x)
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+    513 ( 0.00%)          let event = self.read_event_impl(())?;
+ 28,327 ( 0.01%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::read_event_impl::<()> (18x)
+      .                               String::from_utf8_lossy(name)
+      .           macro_rules! read_event_impl {
+869,235 ( 0.17%)      fn read_event_impl<'i, B>(&mut self, mut buf: B) -> Result<Event<'i>, Error>
+      .                   read_event_impl!(self, buf, self.reader, read_until_close)
+184 ( 0.00%)              let Ok(name) = std::str::from_utf8(raw_name) else {
+2,700 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+222,054 ( 0.04%)          __rust_alloc(layout.size(), layout.alignment())

@@ -1,5 +1,52 @@
 # Performance hotspot inventory
 
+## 0588 — the MCE codec's per-attribute allocations, and why its namespace emission cannot move yet
+
+Survey item XML-1 (rank 1 of change [0587](0587-remaining-opportunity-survey.md))
+is priced, and its **byte-identical** subset is implemented. `start` allocated
+two `String`s per attribute and an owned `xml_name::QualifiedName` plus an owned
+`Name` per attribute on three paths; `BoundedOutput::reserve` grew by
+`try_reserve_exact(additional)`, so a rewritten part reallocated once per written
+run — 2,954,106 `__rust_realloc` calls and 30.46% of the codec's instructions on
+the survey's worksheet. Attributes are now borrowed from the event with
+quick-xml's `Cow`, a new `expand_parts` resolves a qualified name into borrowed
+halves with the identical lexical check and the identical error identity, the
+writer materializes an owned `Name` only in the rare preservation branch, and the
+output buffer grows geometrically **clamped to `max_output_bytes`**. The MCE
+codec on a real Excel worksheet falls **723.6 M to 305.1 M Ir per call
+(-57.84%)**, the public eager open plus one cell **1,037.8 M to 497.5 M
+(-52.08%)** and the source-backed read of the same cell **1,075.3 M to 654.1 M
+(-39.17%)**; paired timing gives p50 **-43.88%** and **-34.89%** on those two
+public reads against an A/A floor of p50 -0.92%/-0.09% and p99 +0.38%/+0.81% in
+the same window. The codec's borrowed fast path and four existing XLSX selectors
+on the marker-free harness corpora move less than the floor. Output bytes are
+**identical**, proven over 6,964 real fixture parts and 30,000 mutants.
+**XML-1's headline — emit only an element's own declarations — is implemented,
+measured and withdrawn.** It is worth a further -79.9% of the codec's remaining
+instructions (305.1 M to 61.4 M; the worksheet's output falls 3,540,261 to
+194,508 bytes and the eager open to 156.0 M Ir), but the redundant declarations
+are load-bearing: every element span of the processed buffer is namespace
+self-contained, and `litchi-docx` slices inner `w:p` and `w:tbl` byte ranges out
+of it and parses them standalone, so the rewrite breaks every
+`Paragraph::extensions()` read on a real Word document. Two writers also publish
+the processed stream (`litchi-pptx` guides `rewrite_source`, `litchi-xlsb`
+`drawing_transfer`). A sweep of all **133** production call sites of the five
+codec entry points outside iWork and ODF sorts the exposure into one hard case,
+a partial tier behind a single-dominant-prefix fallback, and a publish tier of
+public accessors that hand out processed slices verbatim; five sites already
+re-inject declarations correctly and are the template for a fix. **And the
+property is already conditional**: the codec borrows the input unchanged when a
+part carries no MCE namespace, and a probe against the untouched base shows
+`Paragraph::extensions()` **already refusing** with the identical error on the
+one `test-data` `.docx` (of 62) whose `document.xml` has no MCE namespace. The
+rewrite universalizes a pre-existing `litchi-docx` defect rather than creating
+one, which is the strongest argument that the fix belongs in the slicing
+consumers, not in the writer.
+`performance_claim: none`.
+[Change and limitations](0588-mce-codec-namespace-emission.md);
+[evidence](results/change-0588/README.md). OLE2/OOXML remain active; ODF is
+deferred until completion and iWork excluded.
+
 ## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
 
 **DOC eager open, the three size-independent terms (items DOC-2, DOC-3 and DOC-4

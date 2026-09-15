@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/cg-before/mce-real-r1.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 155609109
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe mce /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0588/real-sheet1.xml 1 (PID 831528, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+841,801,055 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+256,433,850 (30.46%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 74,942,534 ( 8.90%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 65,266,705 ( 7.75%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 54,812,448 ( 6.51%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 52,079,576 ( 6.19%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 41,395,704 ( 4.92%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_realloc
+ 27,790,487 ( 3.30%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 26,685,162 ( 3.17%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<alloc::raw_vec::RawVecInner>::finish_grow
+ 23,654,688 ( 2.81%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/alloc.rs:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 15,131,910 ( 1.80%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 14,844,186 ( 1.76%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/alloc.rs:<alloc::raw_vec::RawVecInner>::finish_grow
+ 12,105,528 ( 1.44%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,105,528 ( 1.44%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 11,859,227 ( 1.41%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/intrinsics/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow
+ 11,388,512 ( 1.35%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 11,335,532 ( 1.35%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+ 11,335,532 ( 1.35%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+  8,501,649 ( 1.01%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc
+  6,264,914 ( 0.74%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  6,052,764 ( 0.72%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mut_ptr.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
