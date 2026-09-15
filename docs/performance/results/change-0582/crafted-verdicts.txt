@@ -1,0 +1,1168 @@
+change 0582: before/after verdicts for the 45 crafted witnesses
+before = committed 93a610ded; after = the same tree with change 0580's two files overlaid
+profile = the parse_zip fuzz target's own ArchiveLimits
+
+
+crafted/adjacent-exact.zip
+     I.read_entry_to  a.bin                        accept (32 bytes)                                          accept (32 bytes)
+     I.read_entry_to  b.bin                        accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        a.bin                        accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        b.bin                        accept (32 bytes)                                          accept (32 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/adjacent-gap-one.zip
+     I.read_entry_to  a.bin                        accept (32 bytes)                                          accept (32 bytes)
+     I.read_entry_to  b.bin                        accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        a.bin                        accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        b.bin                        accept (32 bytes)                                          accept (32 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/adjacent-overlap-one.zip
+     I.read_entry_to  a.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  b.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        a.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        b.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/deflate-overlap.zip
+     I.read_entry_to  a.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  b.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  c.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans accept (832 bytes)
+     R.read_to        a.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        b.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        c.txt                        REFUSE: strict streaming refuses overlapping ZIP local spans accept (832 bytes)
+     indexed.open     -                            accept (3 bytes)                                           accept (3 bytes)
+     slice.open       -                            accept (3 bytes)                                           accept (3 bytes)
+
+crafted/deflate-pair.zip
+     I.read_entry_to  a.txt                        accept (768 bytes)                                         accept (768 bytes)
+     I.read_entry_to  b.txt                        accept (896 bytes)                                         accept (896 bytes)
+     R.read_to        a.txt                        accept (768 bytes)                                         accept (768 bytes)
+     R.read_to        b.txt                        accept (896 bytes)                                         accept (896 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-boundary-signed.zip
+     I.read_entry_to  pred.bin                     accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  target.bin                   accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        pred.bin                     accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        target.bin                   accept (24 bytes)                                          accept (24 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-boundary-unsigned.zip
+     I.read_entry_to  pred.bin                     accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  target.bin                   accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        pred.bin                     accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        target.bin                   accept (24 bytes)                                          accept (24 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-boundary-zip64.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-gapless-signed.zip
+     I.read_entry_to  one.bin                      accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  three.bin                    accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  two.bin                      accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        one.bin                      accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        three.bin                    accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        two.bin                      accept (24 bytes)                                          accept (24 bytes)
+     indexed.open     -                            accept (3 bytes)                                           accept (3 bytes)
+     slice.open       -                            accept (3 bytes)                                           accept (3 bytes)
+
+crafted/descriptor-gapless-unsigned.zip
+     I.read_entry_to  one.bin                      accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  three.bin                    accept (24 bytes)                                          accept (24 bytes)
+     I.read_entry_to  two.bin                      accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        one.bin                      accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        three.bin                    accept (24 bytes)                                          accept (24 bytes)
+     R.read_to        two.bin                      accept (24 bytes)                                          accept (24 bytes)
+     indexed.open     -                            accept (3 bytes)                                           accept (3 bytes)
+     slice.open       -                            accept (3 bytes)                                           accept (3 bytes)
+
+crafted/descriptor-gapless-zip64.zip
+     I.read_entry_to  one.bin                      REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     I.read_entry_to  three.bin                    REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     I.read_entry_to  two.bin                      REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        one.bin                      REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        three.bin                    REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        two.bin                      REFUSE: err(InvalidSize { expected: 24, actual: 0 })       REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     indexed.open     -                            accept (3 bytes)                                           accept (3 bytes)
+     slice.open       -                            accept (3 bytes)                                           accept (3 bytes)
+
+crafted/descriptor-overlap-signed.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> I.read_entry_to  target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> R.read_to        target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-overlap-unsigned.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> I.read_entry_to  target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> R.read_to        target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/descriptor-overlap-zip64.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> I.read_entry_to  target.bin                   REFUSE: err(Eof)                                           REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     R.read_to        pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> R.read_to        target.bin                   REFUSE: err(Eof)                                           REFUSE: err(InvalidSize { expected: 24, actual: 0 })
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/directory-record-overlap.zip
+     I.read_entry_to  dir/file.bin                 REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  other.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     R.read_to        dir/file.bin                 REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        other.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/duplicate-local-offsets.zip
+  -> I.read_entry_to  one.bin                      REFUSE: strict local and central names differ              REFUSE: strict streaming refuses duplicate ZIP local spans
+  -> I.read_entry_to  two.bin                      REFUSE: strict local and central names differ              REFUSE: strict streaming refuses duplicate ZIP local spans
+  -> R.read_to        one.bin                      REFUSE: stored local and central names differ              REFUSE: strict streaming refuses duplicate ZIP local spans
+  -> R.read_to        two.bin                      REFUSE: stored local and central names differ              REFUSE: strict streaming refuses duplicate ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/empty-archive.zip
+     indexed.open     -                            accept (0 bytes)                                           accept (0 bytes)
+     slice.open       -                            accept (0 bytes)                                           accept (0 bytes)
+
+crafted/many-tiny-one-reaching.zip
+     I.read_entry_to  m000.bin                     REFUSE: err(InvalidSize { expected: 4, actual: 4096 })     REFUSE: err(InvalidSize { expected: 4, actual: 4096 })
+  -> I.read_entry_to  m001.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m002.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m003.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m004.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m005.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m006.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m007.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m008.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m009.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m010.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m011.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m012.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m013.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m014.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m015.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m016.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m017.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m018.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m019.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m020.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m021.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m022.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m023.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m024.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m025.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m026.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m027.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m028.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m029.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m030.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m031.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m032.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m033.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m034.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m035.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m036.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m037.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m038.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m039.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m040.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m041.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m042.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m043.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m044.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m045.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m046.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m047.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m048.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m049.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m050.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m051.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m052.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m053.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m054.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m055.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m056.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m057.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m058.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m059.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m060.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m061.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m062.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m063.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m064.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m065.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m066.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m067.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m068.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m069.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m070.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m071.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m072.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m073.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m074.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m075.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m076.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m077.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m078.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m079.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m080.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m081.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m082.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m083.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m084.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m085.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m086.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m087.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m088.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m089.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m090.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m091.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m092.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m093.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m094.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m095.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m096.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m097.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m098.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  m099.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m100.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m101.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m102.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m103.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m104.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m105.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m106.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m107.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m108.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m109.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m110.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m111.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m112.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m113.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m114.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m115.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m116.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m117.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m118.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m119.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m120.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m121.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m122.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m123.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m124.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m125.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m126.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m127.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m128.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m129.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m130.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m131.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m132.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m133.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m134.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m135.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m136.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m137.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m138.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m139.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m140.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m141.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m142.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m143.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m144.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m145.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m146.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m147.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m148.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m149.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m150.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m151.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m152.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m153.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m154.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m155.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m156.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m157.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m158.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m159.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m160.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m161.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m162.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m163.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m164.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m165.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m166.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m167.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m168.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m169.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m170.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m171.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m172.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m173.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m174.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m175.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m176.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m177.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m178.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m179.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m180.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m181.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m182.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m183.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m184.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m185.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m186.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m187.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m188.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m189.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m190.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m191.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m192.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m193.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m194.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m195.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m196.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m197.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m198.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> I.read_entry_to  m199.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+     R.read_to        m000.bin                     REFUSE: err(InvalidSize { expected: 4, actual: 4096 })     REFUSE: err(InvalidSize { expected: 4, actual: 4096 })
+  -> R.read_to        m001.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m002.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m003.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m004.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m005.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m006.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m007.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m008.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m009.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m010.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m011.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m012.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m013.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m014.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m015.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m016.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m017.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m018.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m019.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m020.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m021.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m022.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m023.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m024.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m025.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m026.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m027.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m028.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m029.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m030.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m031.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m032.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m033.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m034.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m035.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m036.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m037.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m038.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m039.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m040.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m041.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m042.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m043.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m044.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m045.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m046.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m047.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m048.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m049.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m050.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m051.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m052.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m053.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m054.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m055.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m056.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m057.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m058.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m059.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m060.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m061.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m062.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m063.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m064.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m065.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m066.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m067.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m068.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m069.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m070.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m071.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m072.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m073.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m074.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m075.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m076.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m077.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m078.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m079.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m080.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m081.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m082.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m083.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m084.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m085.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m086.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m087.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m088.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m089.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m090.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m091.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m092.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m093.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m094.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m095.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m096.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m097.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m098.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        m099.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m100.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m101.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m102.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m103.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m104.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m105.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m106.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m107.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m108.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m109.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m110.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m111.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m112.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m113.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m114.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m115.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m116.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m117.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m118.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m119.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m120.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m121.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m122.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m123.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m124.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m125.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m126.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m127.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m128.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m129.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m130.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m131.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m132.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m133.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m134.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m135.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m136.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m137.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m138.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m139.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m140.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m141.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m142.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m143.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m144.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m145.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m146.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m147.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m148.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m149.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m150.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m151.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m152.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m153.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m154.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m155.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m156.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m157.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m158.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m159.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m160.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m161.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m162.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m163.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m164.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m165.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m166.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m167.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m168.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m169.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m170.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m171.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m172.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m173.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m174.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m175.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m176.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m177.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m178.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m179.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m180.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m181.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m182.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m183.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m184.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m185.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m186.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m187.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m188.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m189.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m190.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m191.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m192.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m193.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m194.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m195.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m196.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m197.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m198.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+  -> R.read_to        m199.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 4 })     accept (4 bytes)
+     indexed.open     -                            accept (200 bytes)                                         accept (200 bytes)
+     slice.open       -                            accept (200 bytes)                                         accept (200 bytes)
+
+crafted/many-tiny.zip
+     I.read_entry_to  m000.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m001.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m002.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m003.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m004.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m005.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m006.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m007.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m008.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m009.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m010.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m011.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m012.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m013.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m014.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m015.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m016.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m017.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m018.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m019.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m020.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m021.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m022.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m023.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m024.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m025.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m026.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m027.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m028.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m029.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m030.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m031.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m032.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m033.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m034.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m035.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m036.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m037.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m038.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m039.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m040.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m041.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m042.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m043.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m044.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m045.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m046.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m047.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m048.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m049.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m050.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m051.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m052.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m053.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m054.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m055.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m056.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m057.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m058.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m059.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m060.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m061.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m062.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m063.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m064.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m065.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m066.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m067.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m068.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m069.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m070.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m071.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m072.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m073.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m074.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m075.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m076.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m077.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m078.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m079.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m080.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m081.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m082.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m083.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m084.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m085.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m086.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m087.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m088.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m089.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m090.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m091.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m092.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m093.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m094.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m095.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m096.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m097.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m098.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m099.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m100.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m101.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m102.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m103.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m104.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m105.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m106.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m107.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m108.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m109.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m110.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m111.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m112.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m113.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m114.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m115.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m116.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m117.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m118.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m119.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m120.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m121.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m122.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m123.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m124.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m125.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m126.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m127.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m128.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m129.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m130.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m131.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m132.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m133.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m134.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m135.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m136.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m137.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m138.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m139.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m140.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m141.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m142.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m143.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m144.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m145.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m146.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m147.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m148.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m149.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m150.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m151.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m152.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m153.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m154.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m155.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m156.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m157.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m158.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m159.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m160.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m161.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m162.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m163.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m164.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m165.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m166.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m167.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m168.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m169.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m170.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m171.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m172.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m173.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m174.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m175.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m176.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m177.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m178.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m179.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m180.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m181.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m182.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m183.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m184.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m185.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m186.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m187.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m188.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m189.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m190.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m191.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m192.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m193.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m194.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m195.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m196.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m197.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m198.bin                     accept (4 bytes)                                           accept (4 bytes)
+     I.read_entry_to  m199.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m000.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m001.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m002.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m003.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m004.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m005.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m006.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m007.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m008.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m009.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m010.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m011.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m012.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m013.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m014.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m015.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m016.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m017.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m018.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m019.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m020.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m021.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m022.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m023.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m024.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m025.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m026.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m027.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m028.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m029.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m030.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m031.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m032.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m033.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m034.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m035.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m036.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m037.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m038.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m039.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m040.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m041.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m042.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m043.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m044.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m045.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m046.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m047.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m048.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m049.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m050.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m051.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m052.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m053.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m054.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m055.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m056.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m057.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m058.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m059.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m060.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m061.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m062.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m063.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m064.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m065.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m066.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m067.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m068.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m069.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m070.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m071.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m072.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m073.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m074.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m075.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m076.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m077.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m078.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m079.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m080.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m081.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m082.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m083.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m084.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m085.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m086.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m087.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m088.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m089.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m090.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m091.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m092.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m093.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m094.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m095.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m096.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m097.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m098.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m099.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m100.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m101.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m102.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m103.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m104.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m105.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m106.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m107.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m108.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m109.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m110.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m111.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m112.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m113.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m114.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m115.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m116.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m117.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m118.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m119.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m120.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m121.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m122.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m123.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m124.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m125.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m126.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m127.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m128.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m129.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m130.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m131.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m132.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m133.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m134.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m135.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m136.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m137.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m138.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m139.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m140.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m141.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m142.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m143.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m144.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m145.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m146.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m147.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m148.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m149.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m150.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m151.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m152.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m153.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m154.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m155.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m156.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m157.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m158.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m159.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m160.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m161.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m162.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m163.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m164.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m165.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m166.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m167.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m168.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m169.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m170.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m171.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m172.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m173.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m174.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m175.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m176.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m177.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m178.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m179.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m180.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m181.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m182.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m183.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m184.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m185.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m186.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m187.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m188.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m189.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m190.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m191.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m192.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m193.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m194.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m195.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m196.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m197.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m198.bin                     accept (4 bytes)                                           accept (4 bytes)
+     R.read_to        m199.bin                     accept (4 bytes)                                           accept (4 bytes)
+     indexed.open     -                            accept (200 bytes)                                         accept (200 bytes)
+     slice.open       -                            accept (200 bytes)                                         accept (200 bytes)
+
+crafted/neighbour-bad-signature.zip
+     I.read_entry_to  alpha.bin                    REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 }) REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 })
+     I.read_entry_to  target.bin                   REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 }) REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 })
+     R.read_to        alpha.bin                    REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 }) REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 })
+     R.read_to        target.bin                   REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 }) REFUSE: err(InvalidSignature { expected: 67324752, actual: 84101968 })
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-crc-mismatch.zip
+     I.read_entry_to  alpha.bin                    REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 }) REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 }) accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 }) REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidChecksum { expected: 3486935253, actual: 3735928559 }) accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-encrypted-flag.zip
+     I.read_entry_to  alpha.bin                    REFUSE: borrowed access refuses encrypted Store entries    REFUSE: borrowed access refuses encrypted Store entries
+     I.read_entry_to  target.bin                   accept (16 bytes)                                          accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: borrowed access refuses encrypted Store entries    REFUSE: borrowed access refuses encrypted Store entries
+     R.read_to        target.bin                   accept (16 bytes)                                          accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-flags-mismatch.zip
+     I.read_entry_to  alpha.bin                    REFUSE: strict local and central flags differ              REFUSE: strict local and central flags differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central flags differ              accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: stored local and central flags differ              REFUSE: stored local and central flags differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central flags differ              accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-local-csize-smuggles-deflate.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 8, actual: 100000 })   REFUSE: err(InvalidSize { expected: 8, actual: 100000 })
+  -> I.read_entry_to  target.txt                   REFUSE: err(InvalidSize { expected: 8, actual: 100000 })   accept (480 bytes)
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 8, actual: 100000 })   REFUSE: err(InvalidSize { expected: 8, actual: 100000 })
+  -> R.read_to        target.txt                   REFUSE: err(InvalidSize { expected: 8, actual: 100000 })   accept (480 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-local-csize-smuggles.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  REFUSE: err(InvalidSize { expected: 16, actual: 100000 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  accept (16 bytes)
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  REFUSE: err(InvalidSize { expected: 16, actual: 100000 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-local-csize-understates.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 4096 })    REFUSE: err(InvalidSize { expected: 16, actual: 4096 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 4096, actual: 16 })    REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 4096 })    REFUSE: err(InvalidSize { expected: 16, actual: 4096 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 4096, actual: 16 })    REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-local-extra-inflated.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> I.read_entry_to  target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> R.read_to        target.bin                   REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-local-usize-smuggles.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  REFUSE: err(InvalidSize { expected: 16, actual: 100000 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  accept (16 bytes)
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  REFUSE: err(InvalidSize { expected: 16, actual: 100000 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 100000 })  accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-method-mismatch.zip
+     I.read_entry_to  alpha.bin                    REFUSE: strict local and central compression methods differ REFUSE: strict local and central compression methods differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central compression methods differ accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: stored local and central compression methods differ REFUSE: stored local and central compression methods differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central compression methods differ accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-name-mismatch.zip
+     I.read_entry_to  alpha.bin                    REFUSE: strict local and central names differ              REFUSE: strict local and central names differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central names differ              accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: stored local and central names differ              REFUSE: stored local and central names differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central names differ              accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/neighbour-size-mismatch.zip
+     I.read_entry_to  alpha.bin                    REFUSE: err(InvalidSize { expected: 16, actual: 999 })     REFUSE: err(InvalidSize { expected: 16, actual: 999 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 999 })     accept (16 bytes)
+     R.read_to        alpha.bin                    REFUSE: err(InvalidSize { expected: 16, actual: 999 })     REFUSE: err(InvalidSize { expected: 16, actual: 999 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 16, actual: 999 })     accept (16 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/offset-into-payload.zip
+     I.read_entry_to  host.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> I.read_entry_to  parasite.bin                 REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        host.bin                     REFUSE: err(Eof)                                           REFUSE: err(Eof)
+  -> R.read_to        parasite.bin                 REFUSE: err(Eof)                                           REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/overlap-swallow-next.zip
+  -> I.read_entry_to  after.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+  -> I.read_entry_to  first.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     I.read_entry_to  swallowed.bin                REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  swallower.bin                REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        after.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+  -> R.read_to        first.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     R.read_to        swallowed.bin                REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        swallower.bin                REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (4 bytes)                                           accept (4 bytes)
+     slice.open       -                            accept (4 bytes)                                           accept (4 bytes)
+
+crafted/overlap-swallow-two.zip
+     I.read_entry_to  big.bin                      REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  clear.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     I.read_entry_to  victim1.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  victim2.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  victim3.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        big.bin                      REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        clear.bin                    REFUSE: strict streaming refuses overlapping ZIP local spans accept (16 bytes)
+     R.read_to        victim1.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        victim2.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        victim3.bin                  REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (5 bytes)                                           accept (5 bytes)
+     slice.open       -                            accept (5 bytes)                                           accept (5 bytes)
+
+crafted/predecessor-csize-reaches.zip
+     I.read_entry_to  pred.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 8192 })  REFUSE: err(InvalidSize { expected: 4096, actual: 8192 })
+  -> I.read_entry_to  target.bin                   REFUSE: err(InvalidSize { expected: 8192, actual: 4096 })  REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: err(InvalidSize { expected: 4096, actual: 8192 })  REFUSE: err(InvalidSize { expected: 4096, actual: 8192 })
+  -> R.read_to        target.bin                   REFUSE: err(InvalidSize { expected: 8192, actual: 4096 })  REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/predecessor-inflated-local-name.zip
+     I.read_entry_to  short.bin                    REFUSE: strict local and central names differ              REFUSE: strict local and central names differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central names differ              REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        short.bin                    REFUSE: stored local and central names differ              REFUSE: stored local and central names differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central names differ              REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/predecessor-span-into-directory.zip
+  -> I.read_entry_to  later.bin                    REFUSE: err(InvalidSize { expected: 4096, actual: 16 })    accept (16 bytes)
+     I.read_entry_to  reaching.bin                 REFUSE: err(InvalidSize { expected: 16, actual: 4096 })    REFUSE: err(InvalidSize { expected: 16, actual: 4096 })
+  -> R.read_to        later.bin                    REFUSE: err(InvalidSize { expected: 4096, actual: 16 })    accept (16 bytes)
+     R.read_to        reaching.bin                 REFUSE: err(InvalidSize { expected: 16, actual: 4096 })    REFUSE: err(InvalidSize { expected: 16, actual: 4096 })
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/predecessor-window-inside.zip
+     I.read_entry_to  pred.bin                     accept (32 bytes)                                          accept (32 bytes)
+     I.read_entry_to  target.bin                   accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        pred.bin                     accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        target.bin                   accept (32 bytes)                                          accept (32 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/predecessor-window-outside.zip
+     I.read_entry_to  pred.bin                     accept (32 bytes)                                          accept (32 bytes)
+     I.read_entry_to  target.bin                   accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        pred.bin                     accept (32 bytes)                                          accept (32 bytes)
+     R.read_to        target.bin                   accept (32 bytes)                                          accept (32 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/prefix-bytes.zip
+     I.read_entry_to  only.bin                     accept (8 bytes)                                           accept (8 bytes)
+     R.read_to        only.bin                     accept (8 bytes)                                           accept (8 bytes)
+     indexed.open     -                            accept (1 bytes)                                           accept (1 bytes)
+     slice.open       -                            accept (1 bytes)                                           accept (1 bytes)
+
+crafted/single-member.zip
+     I.read_entry_to  only.bin                     accept (8 bytes)                                           accept (8 bytes)
+     R.read_to        only.bin                     accept (8 bytes)                                           accept (8 bytes)
+     indexed.open     -                            accept (1 bytes)                                           accept (1 bytes)
+     slice.open       -                            accept (1 bytes)                                           accept (1 bytes)
+
+crafted/span-into-central-directory.zip
+  -> I.read_entry_to  a.bin                        REFUSE: err(InvalidSize { expected: 400, actual: 16 })     accept (16 bytes)
+     I.read_entry_to  last.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 400 })     REFUSE: err(InvalidSize { expected: 16, actual: 400 })
+  -> R.read_to        a.bin                        REFUSE: err(InvalidSize { expected: 400, actual: 16 })     accept (16 bytes)
+     R.read_to        last.bin                     REFUSE: err(InvalidSize { expected: 16, actual: 400 })     REFUSE: err(InvalidSize { expected: 16, actual: 400 })
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/window-max-residual-clear.zip
+     I.read_entry_to  pred.bin                     REFUSE: strict local and central names differ              REFUSE: strict local and central names differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central names differ              accept (32 bytes)
+     R.read_to        pred.bin                     REFUSE: stored local and central names differ              REFUSE: stored local and central names differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central names differ              accept (32 bytes)
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/window-max-residual-reaches.zip
+     I.read_entry_to  pred.bin                     REFUSE: strict local and central names differ              REFUSE: strict local and central names differ
+  -> I.read_entry_to  target.bin                   REFUSE: strict local and central names differ              REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        pred.bin                     REFUSE: stored local and central names differ              REFUSE: stored local and central names differ
+  -> R.read_to        target.bin                   REFUSE: stored local and central names differ              REFUSE: strict streaming refuses overlapping ZIP local spans
+     indexed.open     -                            accept (2 bytes)                                           accept (2 bytes)
+     slice.open       -                            accept (2 bytes)                                           accept (2 bytes)
+
+crafted/witness-0575.zip
+     I.read_entry_to  A.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     I.read_entry_to  B.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> I.read_entry_to  C.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans accept (32 bytes)
+     R.read_to        A.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+     R.read_to        B.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans REFUSE: strict streaming refuses overlapping ZIP local spans
+  -> R.read_to        C.bin                        REFUSE: strict streaming refuses overlapping ZIP local spans accept (32 bytes)
+     indexed.open     -                            accept (3 bytes)                                           accept (3 bytes)
+     slice.open       -                            accept (3 bytes)                                           accept (3 bytes)

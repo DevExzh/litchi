@@ -1,0 +1,37 @@
+== test-data/ooxml/xlsx/sheet-names.xlsx  (13 records, 9425 bytes)
+   0575 (one u16, central name length)    one member           1 members ->    8 records touched
+   0575 (one u16, central name length)    one-cell closure     6 members ->   11 records touched
+   0575 (one u16, central name length)    worst target        12 predecessors
+   0575 (one u16, central name length)    one member            8 reads once the per-record memo is modelled
+   0575 (one u16, central name length)    one-cell closure     11 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one member           1 members ->    8 records touched
+   0580 (two u16, no name assumption)     one-cell closure     6 members ->   11 records touched
+   0580 (two u16, no name assumption)     worst target        12 predecessors
+   0580 (two u16, no name assumption)     one member            8 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one-cell closure     11 reads once the per-record memo is modelled
+
+== test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx  (132 records, 654688 bytes)
+   0575 (one u16, central name length)    one member           1 members ->    4 records touched
+   0575 (one u16, central name length)    one-cell closure     7 members ->   14 records touched
+   0575 (one u16, central name length)    worst target        39 predecessors
+   0575 (one u16, central name length)    one member            4 reads once the per-record memo is modelled
+   0575 (one u16, central name length)    one-cell closure     14 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one member           1 members ->   20 records touched
+   0580 (two u16, no name assumption)     one-cell closure     7 members ->   59 records touched
+   0580 (two u16, no name assumption)     worst target        43 predecessors
+   0580 (two u16, no name assumption)     one member           20 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one-cell closure     59 reads once the per-record memo is modelled
+
+== test-data/ooxml/pptx/shapes.pptx  (48 records, 68822 bytes)
+   0575 (one u16, central name length)    one member           1 members ->   15 records touched
+   0575 (one u16, central name length)    one-slide closure    6 members ->   15 records touched
+   0575 (one u16, central name length)    worst target        47 predecessors
+   0575 (one u16, central name length)    one member           15 reads once the per-record memo is modelled
+   0575 (one u16, central name length)    one-slide closure    16 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one member           1 members ->   15 records touched
+   0580 (two u16, no name assumption)     one-slide closure    6 members ->   15 records touched
+   0580 (two u16, no name assumption)     worst target        47 predecessors
+   0580 (two u16, no name assumption)     one member           15 reads once the per-record memo is modelled
+   0580 (two u16, no name assumption)     one-slide closure    16 reads once the per-record memo is modelled
+
+wrote docs/performance/results/change-0580/residual-window.json

@@ -1,0 +1,14 @@
+[package]
+name = "opc-save-peak-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-opc = { path = "<worktree of 32d25e08806d93f792ffd4954d83acc9db9c5301>/crates/litchi-opc" }
+litchi-core = { path = "<worktree of 32d25e08806d93f792ffd4954d83acc9db9c5301>/crates/litchi-core" }
+
+[profile.release]
+debug = false
+
+[workspace]

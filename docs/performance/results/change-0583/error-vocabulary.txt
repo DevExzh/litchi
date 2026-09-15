@@ -1,0 +1,37 @@
+# change 0583: the InvalidInput error vocabulary of all three builds.
+# One uniform extraction over each full differential report:
+#   grep -ohP 'msg: "[^"]*"' <report> \
+#     | sed -E 's/(names|method|reason|resource): [^"]*"/\1: <payload>"/' | sort -u
+# The sed collapses the name/method/reason payloads so this is about identities.
+#
+# before (93a610ded): 20   0580: 21   0580+0583: 21
+
+## identities present in the 0580+0583 build
+msg: "EOCD entry count exceeds declared central-directory capacity"
+msg: "archive contains duplicate normalized directory names: <payload>"
+msg: "archive contains duplicate normalized file names: <payload>"
+msg: "borrowed access cannot prove non-overlapping ZIP spans"
+msg: "borrowed access refuses encrypted Store entries"
+msg: "borrowed access refuses encrypted entries"
+msg: "borrowed access refuses nonzero disk-start metadata"
+msg: "captured compressed payload could not be decoded: deflate decompression error: invalid code lengths set"
+msg: "captured compressed payload could not be decoded: deflate decompression error: invalid stored block lengths"
+msg: "central directory contains more records than EOCD declares"
+msg: "central header is missing its required ZIP64 extra field"
+msg: "local ZIP64 size framing requires version 45 or newer"
+msg: "multi-disk ZIP archives are not supported"
+msg: "stored local and central compression methods differ"
+msg: "stored local and central flags differ"
+msg: "stored local and central names differ"
+msg: "strict local and central compression methods differ"
+msg: "strict local and central flags differ"
+msg: "strict local and central names differ"
+msg: "strict streaming refuses duplicate ZIP local spans"
+msg: "strict streaming refuses overlapping ZIP local spans"
+
+## diff before -> 0580
+19a20
+> msg: "strict streaming refuses duplicate ZIP local spans"
+
+## diff 0580 -> 0580+0583
+(empty: change 0583 adds and removes no identity)

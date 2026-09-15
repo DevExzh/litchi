@@ -1,5 +1,72 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0577-0583: the OOXML selective-read goal is met, and the approval flow is corrected
+
+This batch closes the OOXML half of the goal's definition-of-done clause that
+change 0572 showed was violated. "Selective reads perform work proportional to
+mandatory metadata plus accessed content" was breached on the OOXML side in a way
+the clause does not name: the work was proportional to the archive's **member
+count**, paid in positional requests before the first payload byte. Change 0573
+halved it and [0580](0580-zip-target-scoped-strict-layout.md) takes a single-member
+read of a 132-member workbook from 264 requests to **20**. The strict-layout proof
+is no longer the dominant term of a selective OOXML read.
+
+That result required narrowing a refusal, and how that decision was reached is
+the part of this batch the goal's evidence rules bear on most directly. Change
+0575 established that the invariant had **no ADR basis, no threat model and no
+commit rationale**, and the project owner approved narrowing it. Change
+[0582](0582-zip-strict-scope-differential-fuzz.md) then measured the delta and
+found the approval had been sought on **3.3%** of it: the request was framed
+around one adversarial overlap witness, while the change drops every
+local-versus-central consistency check on every record the caller does not read.
+The owner re-approved on the corrected, measured delta. No accepted ADR was
+weakened at any point, and the one rival design that would have breached ADR 0005
+was recorded and declined rather than implemented.
+
+The goal's rule 12 held on its own terms. Change 0582's harness found one genuine
+weakening of a malformed-input defence, and [0583](0583-zip-local-size-span-bound.md)
+closed it in the same batch, returning 32,472 verdicts to refusal while making
+none newly readable.
+
+One required gate is **not** satisfied and is recorded as outstanding rather than
+waived: `docs/GOAL.md`'s verification list names existing fuzz targets, and
+`parse_zip` cannot run on this host for want of `cargo-fuzz` and a nightly
+toolchain. The deterministic differential harness built in its place covers the
+changed surface more exhaustively than the fuzz target does per input, but has no
+coverage feedback, no mutation engine and no sanitizers, and the record says so.
+It also proved its own limits: a regression it did not find was found by reading
+the code.
+
+On the OLE2 side [0579](0579-cfb-resumable-chain-walk.md) continues the
+instruction-side work change 0574 opened, and corrects the method that ranked it.
+Instruction share mis-ranked this opportunity in both directions, because the
+removed work is a dependent-load pointer chase; the rejected candidate removes
+more instructions and is slower. Future OLE2 rankings in this program should
+price cycles, not instructions, where a pointer chase is involved.
+
+Three goal items advance without code. [0577](0577-ooxml-open-relationship-parts.md)
+establishes that the OOXML open's relationship reads are **mandatory**, not
+incidental, so the remaining 89-request open cost is a cost to be reduced rather
+than eliminated, and designs that reduction to 10.
+[0578](0578-zip-passthrough-is-already-bounded.md) refutes the standing suspicion
+against the "unchanged media without logical-byte copies" clause: the ZIP save
+path already satisfies it, flat at 12,971 bytes across a thousandfold range of
+member sizes. [0581](0581-opc-package-retention.md) finds what the goal's bounded
+-memory clause actually implicates — **the ordinary documented open-then-save path
+in every OOXML format is the eager one**, differing 254-fold in peak from the
+bounded path while emitting byte-identical output.
+
+Still required by the goal and unchanged by this batch: coverage-guided fuzzing on
+this host, cold-cache and physical-device distributions, real range sources rather
+than a simulated transport, peak RSS for read paths, concurrency scaling,
+real-producer breadth, and cross-platform confirmation. Change 0580's reverse-order
+regression, up to 2n−1 reads, is recorded and unaddressed. Change 0577's designed
+coalescing is blocked on a read-side accessor that does not exist. Change 0581's
+candidates are unimplemented by design.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0572-0576: the range-source gap is closed, and the OLE2 open stops being I/O
 
 The previous batch's audit listed "remote and range-source behaviour" among the

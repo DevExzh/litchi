@@ -1,0 +1,64 @@
+# change 0583: mutation matrix for the six new tests.
+#
+# Each mutant is a one-hunk edit of the fixed archive.rs, applied by mutate.py
+# (retained beside this file).  A test that no mutant kills pins nothing.
+#
+#   prefix            change 0580's code: the central payload length in both branches
+#   max-everywhere    the intermediate that applied the maximum to the Descriptor branch too
+#   local-only        take the local payload length instead of the maximum
+#   sentinel-literal  treat a local 0xFFFFFFFF as a length rather than the ZIP64 sentinel
+#   usize-max         extend the maximum to the uncompressed size as well
+
+=== mutant: prefix ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... FAILED
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+  test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+
+=== mutant: max-everywhere ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... FAILED
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... FAILED
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+  test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+
+=== mutant: local-only ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... FAILED
+  test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+
+=== mutant: sentinel-literal ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... FAILED
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+  test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+
+=== mutant: usize-max ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... FAILED
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+  test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+
+=== unmutated (the shipped fix) ===
+  test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+  test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+  test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+  test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... ok
+  test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+  test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s

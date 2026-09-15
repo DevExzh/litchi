@@ -1,0 +1,24 @@
+# change 0583: the six new tests run against the PRE-FIX tree.
+#
+# Tree: git archive 93a610ded + change 0580's archive.rs
+#       (sha256 df9ed280e21112cbd99fd5bb373f50b676c7d592e0b15117ecff6e89bc673b27)
+#       + change 0583's office.rs, which carries the tests but no production change.
+# The whole production fix lives in archive.rs, so this isolates exactly what the
+# tests prove.  mutation-matrix.txt prices all six against five mutants.
+
+running 6 tests
+test office::tests::a_descriptor_bearing_predecessors_local_size_is_not_a_span_length ... ok
+test office::tests::a_descriptor_bearing_predecessors_payload_end_is_not_moved ... ok
+test office::tests::a_local_zip64_size_sentinel_is_not_a_neighbour_span_length ... ok
+test office::tests::a_predecessor_local_uncompressed_size_does_not_move_the_payload ... ok
+test office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused ... FAILED
+test office::tests::a_predecessor_whose_local_compressed_size_understates_keeps_the_central_bound ... ok
+failures:
+---- office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused stdout ----
+thread 'office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused' (164041) panicked at crates/soapberry-zip/src/office.rs:13556:55:
+called `Result::unwrap_err()` on an `Ok` value: [116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116, 116]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+failures:
+    office::tests::a_predecessor_whose_local_compressed_size_reaches_the_target_is_refused
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 465 filtered out; finished in 0.00s
+error: test failed, to rerun pass `-p soapberry-zip --lib`

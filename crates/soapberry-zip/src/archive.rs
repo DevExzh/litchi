@@ -64,6 +64,34 @@ const STRICT_LOCAL_HEADER_WINDOW: usize = 640;
 /// until that member's local header has been parsed.
 const MAX_DATA_DESCRIPTOR_SIZE: u64 = 24;
 
+/// The widest local variable region a ZIP local file header can declare.
+///
+/// `file_name_length` and `extra_field_length` are both `u16`, so the region
+/// between a fixed local header and its payload is at most this many bytes.
+/// Neither half is carried by the central directory, so neither is knowable
+/// without reading the record's own local header.
+const MAX_LOCAL_VARIABLE_REGION: u64 = 2 * u16::MAX as u64;
+
+/// How far past `local_header_offset + 30 + central compressed size` one
+/// central record's declared local span can reach, using central metadata
+/// alone and no positional read.
+///
+/// A record's declared span end is
+/// `local_header_offset + 30 + variable_length + compressed_size + descriptor`.
+/// The central directory carries `local_header_offset` and `compressed_size`
+/// verbatim; `variable_length` and `descriptor` are the two unknowns, bounded
+/// by [`MAX_LOCAL_VARIABLE_REGION`] and [`MAX_DATA_DESCRIPTOR_SIZE`].
+///
+/// Both halves of `variable_length` are counted. The strict path forces a
+/// record's *own* local name to equal its central name, which pins its local
+/// name length, but that equality is a conclusion of validating that record,
+/// not a fact about a record nobody is reading. A neighbour whose local
+/// `file_name_length` is inflated declares a span that reaches this far even
+/// though its central name is short, so a bound that assumed the central name
+/// length would prune a record that can reach the target.
+pub(crate) const MAX_LOCAL_SPAN_RESIDUAL: u64 =
+    MAX_LOCAL_VARIABLE_REGION + MAX_DATA_DESCRIPTOR_SIZE;
+
 /// Represents a Zip archive that operates on an in-memory data.
 ///
 /// A [`ZipSliceArchive`] is more efficient and easier to use than a [`ZipArchive`],
@@ -304,6 +332,63 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
         })
     }
 
+    /// Bound one neighbouring record's declared local span with no read.
+    ///
+    /// Only the 30-byte fixed local header is parsed. The record's name,
+    /// sizes, CRC, flags, method and descriptor contents are deliberately not
+    /// checked: this answers where the record claims to end, which is all a
+    /// target-scoped proof needs from a record the caller is not reading.
+    pub(crate) fn local_span_bound(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+    ) -> Result<LocalSpanBound, Error> {
+        let header_offset =
+            usize::try_from(entry.local_header_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+        let fixed = self
+            .data
+            .get(header_offset..)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        local_span_bound_from_fixed(fixed, &entry)
+    }
+
+    /// Settle a declared data descriptor's encoded width, with no read.
+    ///
+    /// This is the one thing a neighbour's fixed local header cannot decide on
+    /// its own. Resolving it does compare the descriptor against the central
+    /// record, because that comparison is how the encoding is disambiguated;
+    /// no other check is applied to a record the caller is not reading.
+    pub(crate) fn resolve_span_end(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        bound: LocalSpanBound,
+    ) -> Result<u64, Error> {
+        let (payload_end, local_zip64_sentinel) = match bound {
+            LocalSpanBound::Exact(end) => return Ok(end),
+            LocalSpanBound::Descriptor {
+                payload_end,
+                local_zip64_sentinel,
+            } => (payload_end, local_zip64_sentinel),
+        };
+        let central_directory_offset = usize::try_from(self.eocd.directory_offset())
+            .map_err(|_| Error::from(ErrorKind::Eof))?;
+        let start = usize::try_from(payload_end).map_err(|_| Error::from(ErrorKind::Eof))?;
+        let descriptor_data = self
+            .data
+            .get(start..central_directory_offset)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let descriptor = DataDescriptor::parse_complete_with_width(
+            descriptor_data,
+            &entry,
+            self.eocd.is_zip64(),
+            LocalSpanBound::descriptor_width_hint(local_zip64_sentinel, &entry),
+        )?;
+        payload_end
+            .checked_add(
+                u64::try_from(descriptor.encoded_size).map_err(|_| Error::from(ErrorKind::Eof))?,
+            )
+            .ok_or_else(|| Error::from(ErrorKind::Eof))
+    }
+
     pub(crate) fn strict_payload(&self, layout: StrictEntryLayout) -> Result<&'data [u8], Error> {
         let start =
             usize::try_from(layout.data_start_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
@@ -424,6 +509,154 @@ struct LocalEntrySizeFraming {
     has_zip64_sentinel: bool,
     zero_placeholders: bool,
     descriptor_width: Option<DescriptorWidth>,
+}
+
+/// What one record's own fixed local header plus its central compressed size
+/// say about where that record's declared local span ends.
+///
+/// This is the neighbour half of a target-scoped layout proof: it answers
+/// "can this record's span reach the offset I am reading?" without validating
+/// the record's name, sizes, CRC or descriptor contents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LocalSpanBound {
+    /// The record declares no data descriptor, so its span ends exactly here.
+    Exact(u64),
+    /// The record declares a data descriptor. Its encoded width is 12, 16, 20
+    /// or 24 bytes and is not decidable from the fixed local header, so the
+    /// span ends somewhere in `payload_end ..= payload_end + 24`.
+    ///
+    /// `local_zip64_sentinel` is the `u32::MAX` size marker read out of that
+    /// fixed header; it is the same input `resolve_local_entry_size_framing`
+    /// turns into a descriptor width, carried here so the width can be settled
+    /// without re-reading the header.
+    Descriptor {
+        payload_end: u64,
+        local_zip64_sentinel: bool,
+    },
+}
+
+impl LocalSpanBound {
+    /// The smallest offset at which this record's span can end.
+    pub(crate) fn min_span_end(self) -> u64 {
+        match self {
+            Self::Exact(end)
+            | Self::Descriptor {
+                payload_end: end, ..
+            } => end,
+        }
+    }
+
+    /// The largest offset at which this record's span can end.
+    pub(crate) fn max_span_end(self) -> u64 {
+        match self {
+            Self::Exact(end) => end,
+            Self::Descriptor { payload_end, .. } => {
+                payload_end.saturating_add(MAX_DATA_DESCRIPTOR_SIZE)
+            },
+        }
+    }
+
+    /// The width hint a declared descriptor resolves with.
+    ///
+    /// This is the same expression `resolve_local_entry_size_framing` uses, so
+    /// a span settled here is the span the full per-entry proof computes.
+    fn descriptor_width_hint(
+        local_zip64_sentinel: bool,
+        entry: &ZipArchiveEntryWayfinder,
+    ) -> Option<DescriptorWidth> {
+        if local_zip64_sentinel || entry.zip64_sizes {
+            Some(DescriptorWidth::Zip64)
+        } else {
+            None
+        }
+    }
+}
+
+/// The payload length one neighbouring record's *exact* span bound must
+/// reserve, from its fixed local header and its central record.
+///
+/// Both records declare a payload length for the same physical region, and a
+/// record the caller is not reading is never made to reconcile them. This bound
+/// takes the **larger** of the two: a reader that follows local headers — which
+/// a streaming reader must, because it has no central directory in hand —
+/// places this record's payload at the local length, and a bound that used only
+/// the central length would leave the bytes between the two lengths unclaimed
+/// and readable as another member.
+///
+/// Taking the maximum can only move a span end further out, so it can only
+/// refuse more. It costs no read: `compressed_size` is decoded from the same
+/// 30 bytes the caller already has in hand.
+///
+/// **This is only ever applied to an [`LocalSpanBound::Exact`] bound.** A record
+/// whose central record declares a data descriptor is bounded by
+/// [`LocalSpanBound::Descriptor`], whose payload end is not only a threshold: it
+/// is the offset [`LocalSpanBound`]'s resolver reads the descriptor at. Moving it
+/// would read a descriptor somewhere else, and a descriptor parsed at a
+/// different offset is not a larger bound — it is a different one, which can
+/// match where the true one did not. That branch therefore keeps the central
+/// length, unchanged, and is the caller's responsibility to route.
+///
+/// `u32::MAX` is not a length either: it is the ZIP64 size sentinel, and the
+/// real value lives in a ZIP64 extra field inside the variable region, which
+/// this probe deliberately does not read. Reserving 4 GiB for it would refuse
+/// every valid ZIP64 member, so it falls back to the central length — exactly
+/// the bound this probe computed before, so it weakens nothing.
+///
+/// The fallbacks also keep the bound consistent with what full validation
+/// computes for the same record, which is what makes a verdict independent of
+/// read order. A record that validates as a *target* has its exact span end
+/// memoised as its neighbour bound, so the two must agree.
+/// `validate_reader_entry_layout_with_name_policy` refuses a target whose local
+/// and central flags differ, and forces a non-descriptor target's local and
+/// central sizes to agree (resolving the ZIP64 sentinel through the extra field
+/// first). So every record that can reach the memo has a maximum equal to its
+/// central length.
+fn neighbour_payload_length(
+    file_header: &ZipLocalFileHeaderFixed,
+    entry: &ZipArchiveEntryWayfinder,
+) -> u64 {
+    if file_header.compressed_size == u32::MAX {
+        return entry.compressed_size;
+    }
+    entry
+        .compressed_size
+        .max(u64::from(file_header.compressed_size))
+}
+
+/// Derive one record's span bound from its 30-byte fixed local header.
+///
+/// The fixed header carries both variable-region lengths, so the only open term
+/// is the payload. A record with no declared data descriptor gets an exact span
+/// end built from the larger of its two declared payload lengths (see
+/// [`neighbour_payload_length`]). A record that declares one keeps the central
+/// payload length: that value is where the descriptor is read from, not merely a
+/// threshold, so it must stay where the record's own framing puts it.
+fn local_span_bound_from_fixed(
+    fixed: &[u8],
+    entry: &ZipArchiveEntryWayfinder,
+) -> Result<LocalSpanBound, Error> {
+    let file_header = ZipLocalFileHeaderFixed::parse(fixed)?;
+    let variable_length =
+        u64::try_from(file_header.variable_length()).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let variable_end = entry
+        .local_header_offset
+        .checked_add(ZipLocalFileHeaderFixed::SIZE as u64)
+        .and_then(|offset| offset.checked_add(variable_length))
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if entry.has_data_descriptor {
+        let payload_end = variable_end
+            .checked_add(entry.compressed_size)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        return Ok(LocalSpanBound::Descriptor {
+            payload_end,
+            local_zip64_sentinel: file_header.compressed_size == u32::MAX
+                || file_header.uncompressed_size == u32::MAX,
+        });
+    }
+    let payload_end = variable_end
+        .checked_add(neighbour_payload_length(&file_header, entry))
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    Ok(LocalSpanBound::Exact(payload_end))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1704,6 +1937,56 @@ where
             next_local_header_offset,
             self.eocd.is_zip64(),
         )
+    }
+
+    /// Bound one neighbouring record's declared local span with a single
+    /// 30-byte positional read.
+    ///
+    /// This is the neighbour probe of a target-scoped layout proof. It reads
+    /// the fixed local header and nothing else: no variable region, no data
+    /// descriptor, and no payload byte. A record the caller is not reading is
+    /// never name-, size-, CRC- or method-checked here.
+    pub(crate) fn local_span_bound(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+    ) -> Result<LocalSpanBound, Error> {
+        let mut fixed = [0u8; ZipLocalFileHeaderFixed::SIZE];
+        self.reader
+            .read_exact_at(&mut fixed, entry.local_header_offset)?;
+        local_span_bound_from_fixed(&fixed, &entry)
+    }
+
+    /// Settle a declared data descriptor's encoded width with one read.
+    ///
+    /// This is the one thing a neighbour's fixed local header cannot decide on
+    /// its own. Resolving it does compare the descriptor against the central
+    /// record, because that comparison is how the encoding is disambiguated;
+    /// no other check is applied to a record the caller is not reading.
+    pub(crate) fn resolve_span_end(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        bound: LocalSpanBound,
+    ) -> Result<u64, Error> {
+        let (payload_end, local_zip64_sentinel) = match bound {
+            LocalSpanBound::Exact(end) => return Ok(end),
+            LocalSpanBound::Descriptor {
+                payload_end,
+                local_zip64_sentinel,
+            } => (payload_end, local_zip64_sentinel),
+        };
+        let descriptor = DataDescriptor::parse_complete_at(
+            &self.reader,
+            payload_end,
+            self.eocd.directory_offset(),
+            &entry,
+            self.eocd.is_zip64(),
+            LocalSpanBound::descriptor_width_hint(local_zip64_sentinel, &entry),
+        )?;
+        payload_end
+            .checked_add(
+                u64::try_from(descriptor.encoded_size).map_err(|_| Error::from(ErrorKind::Eof))?,
+            )
+            .ok_or_else(|| Error::from(ErrorKind::Eof))
     }
 
     /// Validate one source entry for raw preservation.

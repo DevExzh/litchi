@@ -1,0 +1,107 @@
+# change 0583: the three residual witnesses change 0583 does NOT close.
+# Built by residual_witness.py; driven by change 0582's harness.
+# All three are residuals of change 0580: the pre-change build refuses every
+# member, and change 0583 leaves each exactly where change 0580 put it.
+# archive <TAB> profile api member <TAB> before(93a610ded) <TAB> 0580+0583
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.precompressed pred.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	err-archive(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.precompressed target.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.read_entry_to pred.bin	err(InvalidInput { msg: "strict local and central flags differ" })	err(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.read_entry_to target.bin	err(InvalidInput { msg: "strict local and central flags differ" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.read_entry_to.memo_stable true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.read_entry_to.order_independent true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.verified_reader pred.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	err-archive(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz I.verified_reader target.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_stored_borrowed pred.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_stored_borrowed target.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_to pred.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_to target.bin	err(InvalidInput { msg: "stored local and central flags differ" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_to.memo_stable true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz R.read_to.order_independent true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz indexed.open ok(len=2)		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	fuzz slice.open ok(len=2)		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.precompressed pred.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	err-archive(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.precompressed target.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.read_entry_to pred.bin	err(InvalidInput { msg: "strict local and central flags differ" })	err(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.read_entry_to target.bin	err(InvalidInput { msg: "strict local and central flags differ" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.read_entry_to.memo_stable true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.read_entry_to.order_independent true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.verified_reader pred.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	err-archive(InvalidInput { msg: "strict local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide I.verified_reader target.bin	err-archive(InvalidInput { msg: "strict local and central flags differ" })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_stored_borrowed pred.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_stored_borrowed target.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_to pred.bin	err(InvalidInput { msg: "stored local and central flags differ" })	err(InvalidInput { msg: "stored local and central flags differ" })
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_to target.bin	err(InvalidInput { msg: "stored local and central flags differ" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_to.memo_stable true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide R.read_to.order_independent true		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide indexed.open ok(len=2)		
+crafted/residual-descriptor-flag-disagreement.zip len=388 sha=acb4710e	wide slice.open ok(len=2)		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.precompressed pred.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	err-archive(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.precompressed target.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.read_entry_to pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.read_entry_to target.bin	err(InvalidSize { expected: 16, actual: 300000 })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.read_entry_to.memo_stable true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.read_entry_to.order_independent true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.verified_reader pred.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	err-archive(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz I.verified_reader target.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_stored_borrowed pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_stored_borrowed target.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_to pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_to target.bin	err(InvalidSize { expected: 16, actual: 300000 })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_to.memo_stable true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz R.read_to.order_independent true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz indexed.open ok(len=2)		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	fuzz slice.open ok(len=2)		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.precompressed pred.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	err-archive(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.precompressed target.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.read_entry_to pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.read_entry_to target.bin	err(InvalidSize { expected: 16, actual: 300000 })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.read_entry_to.memo_stable true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.read_entry_to.order_independent true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.verified_reader pred.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	err-archive(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide I.verified_reader target.bin	err-archive(InvalidSize { expected: 16, actual: 300000 })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_stored_borrowed pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_stored_borrowed target.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_to pred.bin	err(InvalidSize { expected: 16, actual: 300000 })	err(InvalidSize { expected: 16, actual: 300000 })
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_to target.bin	err(InvalidSize { expected: 16, actual: 300000 })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_to.memo_stable true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide R.read_to.order_independent true		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide indexed.open ok(len=2)		
+crafted/residual-prune-distant-csize.zip len=200188 sha=d853b399	wide slice.open ok(len=2)		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.precompressed pred.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.precompressed target.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.read_entry_to pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.read_entry_to target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.read_entry_to.memo_stable true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.read_entry_to.order_independent true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.verified_reader pred.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz I.verified_reader target.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_stored_borrowed pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_stored_borrowed target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_to pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_to target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_to.memo_stable true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz R.read_to.order_independent true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz indexed.open ok(len=2)		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	fuzz slice.open ok(len=2)		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.precompressed pred.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.precompressed target.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(csize=16 usize=16 crc=aa88ae4d decoded=16)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.preservation_index err(UnsupportedPreservation	{ reason: "invalid local member framing" })	{ reason: "invalid local member framing" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.read_entry_to pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.read_entry_to target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.read_entry_to.memo_stable true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.read_entry_to.order_independent true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.verified_reader pred.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide I.verified_reader target.bin	err-archive(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_stored_borrowed pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_stored_borrowed target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_to pred.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_to target.bin	err(InvalidInput { msg: "local ZIP64 size framing requires version 45 or newer" })	ok(count=16 len=16 fnv=17e41d4477b86ca5 head=aa88ae4d)
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_to.memo_stable true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide R.read_to.order_independent true		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide indexed.open ok(len=2)		
+crafted/residual-zip64-sentinel-csize.zip len=388 sha=59d4c036	wide slice.open ok(len=2)		

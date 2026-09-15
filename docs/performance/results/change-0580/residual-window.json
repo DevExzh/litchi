@@ -1,0 +1,369 @@
+[
+ {
+  "fixture": "test-data/ooxml/xlsx/sheet-names.xlsx",
+  "records": 13,
+  "bytes": 9425,
+  "brackets": {
+   "0575 (one u16, central name length)": {
+    "one member": {
+     "members": 1,
+     "records touched": 8,
+     "per target": {
+      "xl/worksheets/sheet1.xml": 7
+     },
+     "ordered reads": 8,
+     "ordered per target": [
+      [
+       "xl/worksheets/sheet1.xml",
+       8
+      ]
+     ]
+    },
+    "one-cell closure": {
+     "members": 6,
+     "records touched": 11,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "xl/_rels/workbook.xml.rels": 2,
+      "xl/workbook.xml": 3,
+      "xl/worksheets/sheet1.xml": 7,
+      "xl/styles.xml": 10
+     },
+     "ordered reads": 11,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "xl/_rels/workbook.xml.rels",
+       1
+      ],
+      [
+       "xl/workbook.xml",
+       1
+      ],
+      [
+       "xl/worksheets/sheet1.xml",
+       4
+      ],
+      [
+       "xl/styles.xml",
+       3
+      ]
+     ]
+    },
+    "worst single-target residual": 12
+   },
+   "0580 (two u16, no name assumption)": {
+    "one member": {
+     "members": 1,
+     "records touched": 8,
+     "per target": {
+      "xl/worksheets/sheet1.xml": 7
+     },
+     "ordered reads": 8,
+     "ordered per target": [
+      [
+       "xl/worksheets/sheet1.xml",
+       8
+      ]
+     ]
+    },
+    "one-cell closure": {
+     "members": 6,
+     "records touched": 11,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "xl/_rels/workbook.xml.rels": 2,
+      "xl/workbook.xml": 3,
+      "xl/worksheets/sheet1.xml": 7,
+      "xl/styles.xml": 10
+     },
+     "ordered reads": 11,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "xl/_rels/workbook.xml.rels",
+       1
+      ],
+      [
+       "xl/workbook.xml",
+       1
+      ],
+      [
+       "xl/worksheets/sheet1.xml",
+       4
+      ],
+      [
+       "xl/styles.xml",
+       3
+      ]
+     ]
+    },
+    "worst single-target residual": 12
+   }
+  }
+ },
+ {
+  "fixture": "test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx",
+  "records": 132,
+  "bytes": 654688,
+  "brackets": {
+   "0575 (one u16, central name length)": {
+    "one member": {
+     "members": 1,
+     "records touched": 4,
+     "per target": {
+      "xl/worksheets/sheet1.xml": 3
+     },
+     "ordered reads": 4,
+     "ordered per target": [
+      [
+       "xl/worksheets/sheet1.xml",
+       4
+      ]
+     ]
+    },
+    "one-cell closure": {
+     "members": 7,
+     "records touched": 14,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "xl/_rels/workbook.xml.rels": 2,
+      "xl/workbook.xml": 3,
+      "xl/worksheets/sheet1.xml": 3,
+      "xl/sharedStrings.xml": 4,
+      "xl/styles.xml": 5
+     },
+     "ordered reads": 14,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "xl/_rels/workbook.xml.rels",
+       1
+      ],
+      [
+       "xl/workbook.xml",
+       1
+      ],
+      [
+       "xl/worksheets/sheet1.xml",
+       4
+      ],
+      [
+       "xl/sharedStrings.xml",
+       5
+      ],
+      [
+       "xl/styles.xml",
+       1
+      ]
+     ]
+    },
+    "worst single-target residual": 39
+   },
+   "0580 (two u16, no name assumption)": {
+    "one member": {
+     "members": 1,
+     "records touched": 20,
+     "per target": {
+      "xl/worksheets/sheet1.xml": 19
+     },
+     "ordered reads": 20,
+     "ordered per target": [
+      [
+       "xl/worksheets/sheet1.xml",
+       20
+      ]
+     ]
+    },
+    "one-cell closure": {
+     "members": 7,
+     "records touched": 59,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "xl/_rels/workbook.xml.rels": 2,
+      "xl/workbook.xml": 3,
+      "xl/worksheets/sheet1.xml": 19,
+      "xl/sharedStrings.xml": 37,
+      "xl/styles.xml": 38
+     },
+     "ordered reads": 59,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "xl/_rels/workbook.xml.rels",
+       1
+      ],
+      [
+       "xl/workbook.xml",
+       1
+      ],
+      [
+       "xl/worksheets/sheet1.xml",
+       16
+      ],
+      [
+       "xl/sharedStrings.xml",
+       38
+      ],
+      [
+       "xl/styles.xml",
+       1
+      ]
+     ]
+    },
+    "worst single-target residual": 43
+   }
+  }
+ },
+ {
+  "fixture": "test-data/ooxml/pptx/shapes.pptx",
+  "records": 48,
+  "bytes": 68822,
+  "brackets": {
+   "0575 (one u16, central name length)": {
+    "one member": {
+     "members": 1,
+     "records touched": 15,
+     "per target": {
+      "ppt/slides/slide1.xml": 14
+     },
+     "ordered reads": 15,
+     "ordered per target": [
+      [
+       "ppt/slides/slide1.xml",
+       15
+      ]
+     ]
+    },
+    "one-slide closure": {
+     "members": 6,
+     "records touched": 15,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "ppt/_rels/presentation.xml.rels": 8,
+      "ppt/presentation.xml": 9,
+      "ppt/slides/_rels/slide1.xml.rels": 2,
+      "ppt/slides/slide1.xml": 14
+     },
+     "ordered reads": 16,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "ppt/_rels/presentation.xml.rels",
+       7
+      ],
+      [
+       "ppt/presentation.xml",
+       1
+      ],
+      [
+       "ppt/slides/_rels/slide1.xml.rels",
+       1
+      ],
+      [
+       "ppt/slides/slide1.xml",
+       5
+      ]
+     ]
+    },
+    "worst single-target residual": 47
+   },
+   "0580 (two u16, no name assumption)": {
+    "one member": {
+     "members": 1,
+     "records touched": 15,
+     "per target": {
+      "ppt/slides/slide1.xml": 14
+     },
+     "ordered reads": 15,
+     "ordered per target": [
+      [
+       "ppt/slides/slide1.xml",
+       15
+      ]
+     ]
+    },
+    "one-slide closure": {
+     "members": 6,
+     "records touched": 15,
+     "per target": {
+      "[Content_Types].xml": 0,
+      "_rels/.rels": 1,
+      "ppt/_rels/presentation.xml.rels": 8,
+      "ppt/presentation.xml": 9,
+      "ppt/slides/_rels/slide1.xml.rels": 2,
+      "ppt/slides/slide1.xml": 14
+     },
+     "ordered reads": 16,
+     "ordered per target": [
+      [
+       "[Content_Types].xml",
+       1
+      ],
+      [
+       "_rels/.rels",
+       1
+      ],
+      [
+       "ppt/_rels/presentation.xml.rels",
+       7
+      ],
+      [
+       "ppt/presentation.xml",
+       1
+      ],
+      [
+       "ppt/slides/_rels/slide1.xml.rels",
+       1
+      ],
+      [
+       "ppt/slides/slide1.xml",
+       5
+      ]
+     ]
+    },
+    "worst single-target residual": 47
+   }
+  }
+ }
+]
