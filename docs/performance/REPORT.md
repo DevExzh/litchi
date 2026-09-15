@@ -1,5 +1,25 @@
 # Performance program phase report
 
+## 0602 — XLSX value-editor admission, sized on derived real-producer fixtures
+
+Four real fixtures were derived onto the value editor's admission surface by two
+retained scripts that open the relationship gates and project `workbook.xml` and
+each worksheet onto the element and attribute allow-lists while leaving
+`<sheetData>` byte-untouched, so the producer's row and cell geometry survives.
+Callgrind isolation pairs at N=1 and N=4 with `--separate-callers=1` put one
+plan-and-commit operation at 20.9M, 95.4M, 463.9M and 4,110M instructions for 11,
+217, 4,108 and 75,770 cells; planning is 47.9–87.5% of that and the complete
+worksheet parse 32.3–74.8%. A row-creating `insert` disables change 0525's
+reduced readback in-tree, so the same pairs measure the complete candidate parse
+directly at 41.7%, 70.5%, 85.3% and 32.9% of the commit that pays it. Paired
+A1/B1/B2/A2 latency legs agree: the readback saves 15.4%, 28.2%, 42.3% and 22.1%
+of a plan and commit at p50, against an A/A floor measured in the same window of
+under 2% on three fixtures and 4.03% on the largest, whose latency numbers are
+reported but not relied on. No production code changed and no real producer file
+was measured as shipped; the cell geometry is the producer's, the package is not.
+See [Change 0602](0602-xlsx-real-producer-admission-design.md);
+`performance_claim: none`.
+
 ## 0588 — a 52% read with no byte changed, and a 92% one that cannot land yet
 
 Retained, partially implemented. The MCE codec's per-attribute `String` pairs,

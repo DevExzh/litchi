@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0602",
+  "title": "The XLSX value editor admits no real producer file, so change 0525's readback gate is not the blocker",
+  "decision": "design retained, no production change",
+  "code_state": "no file under crates/ was modified by this batch; git diff f22f93935 -- crates/ is empty",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's item XLSX-2 names stored_entry_is_supported and the worksheet-relationship refusal as the blockers for real-producer files; measured here, all 95 real fixtures are refused at the first of the eight gates found here, the package-root relationship allow-list, two gates before the first XLSX-2 names, and stored_entry_is_supported refuses none of them",
+    "all four clauses of stored_entry_is_supported are unreachable from cell_values: a t=\"s\" cell with a <v> fails the planning parse because every parse in the module passes || Ok(None), <r> is outside the worksheet element allow-list, and cm and vm are outside the <c> attribute allow-list; one synthetic twin per clause demonstrates each refusal",
+    "the mechanism change 0525 removes is large and was measured directly rather than modelled: a row-creating insert takes the complete-candidate parse in-tree, and the paired isolation profiles put that parse at 32.9 to 85.3 percent of the commit that pays it, so XLSX-2's falsification condition of under 10 percent is not met",
+    "the publication audit applies xml_minifier::audit::verify_authored to the ORIGINAL bytes of every replaced part, and 94 of the 95 real fixtures' workbook.xml and first worksheet are non-compact, so admitting real producers to the editor is worth nothing until that contract changes; this confirms the item change 0587 listed as to verify rather than a confirmed defect",
+    "the design widens the value editor's admission surface rather than its readback gate, which moves where refusals happen for a large class of inputs and therefore stops at a frozen design record"
+  ],
+  "accepted_evidence": {
+    "admission_census": "SourceBackedEditor::open plus snapshot on all 95 real fixtures, typed refusals captured verbatim; 93 refuse at validate_package_relationships, 2 fail earlier in the read door",
+    "admission_ladder": "structural reimplementation of the first five gates over the raw packages, validated against the editor's own verdict for G1 on 93 of 95; first refusal G1 95, would-refuse G1 95 G2 77 G3 45 G4 64 G5 0",
+    "gate_twins": "seven minimal synthetic packages, each differing from an admitted baseline by exactly one feature, showing that every clause of stored_entry_is_supported is refused upstream and that numeric and plain-inline baselines run a complete plan, commit and publication cycle",
+    "instruction_attribution": "callgrind isolation pairs at N=1 and N=4 with --separate-callers=1, for a set and an insert on four derived real-producer fixtures, differenced to inclusive Ir per plan-and-commit operation",
+    "latency": "paired A1/B1/B2/A2 set/insert legs, 5 warmup and 40 samples per leg (30 on the largest), pinned to CPU 18, with four further identical set legs per fixture giving the A/A floor in the same window",
+    "publication_audit": "xml_minifier::audit::verify_authored over the workbook and first worksheet of all 95 fixtures; 94 of each non-compact, 93 of each with FormattingWhitespace",
+    "fixture_derivation": "two scripted passes retained in the packet, opening the relationship gates and then projecting onto the element and attribute allow-lists while leaving <sheetData> byte-untouched"
+  },
+  "accepted_costs": {
+    "derived_fixtures": "no real producer file was measured as shipped; every timing and instruction figure is from a fixture whose package envelope was stripped to the admission surface, keeping the producer's cell geometry and losing everything the editor refuses",
+    "insert_proxy": "the disabled-readback leg is a row-creating insert, which also writes a new row, so its latency delta is an upper bound on the readback's own share; the instruction attribution is the tighter figure",
+    "floor": "the A/A floor is inside 2% at p50 on three fixtures but reached 4.03% on no_drawing_patriarch, whose 260 ms operation picks up host noise from the seven other agents; its latency numbers are reported, not relied on",
+    "ladder_validation": "G2 through G5 of the ladder are structural counts, not editor verdicts, because no real file reaches them",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte so the rewrite's copy share is an upper bound. No SHA-256 runs on this path"
+  },
+  "known_gaps": {
+    "harness": "no XLSX corpus carries a shared-string part, a worksheet relationship, an out-of-sheetData child or non-compact XML; the record specifies the generator shape that would be needed",
+    "prerequisite": "the publication original-bytes compactness contract is on litchi-opc and needs its own record with change 0528's review; it gates everything in this design",
+    "not_measured": "publication cost on an admitted producer file, allocation counts, peak RSS, cold cache, range sources, concurrency, and every platform other than this host"
+  },
+  "withheld": [
+    "any speedup, regression, resource or real-producer-as-shipped result",
+    "any claim that the design is implementable as scoped: D0 needs a litchi-opc record, D1 through D4 need the producer corpus, the differential oracle and the gates the record lists"
+  ],
+  "provenance": {
+    "base_commit": "f22f9393598da39272f2185d2dac3d36c4b61d23",
+    "branch": "perf/0602-xlsx-real-producer-admission-design",
+    "probe_binary_sha256": "84de9731098472ca0ae3e6acfc558b5c2bdb71e0323234b94d837b57c854a448",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "18",
+    "note": "all measurements were taken in a detached worktree with a CARGO_TARGET_DIR outside it; the shared working copy was neither built in nor modified"
+  }
+}

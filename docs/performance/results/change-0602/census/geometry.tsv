@@ -1,0 +1,5 @@
+fixture	orig_sheet_bytes	orig_cells	orig_shared_string_cells	orig_worksheet_rels	proj_sheet_bytes	proj_cells	proj_rows	part
+FormatConditionTests	2272	11	10	0	2031	11	4	xl/worksheets/sheet1.xml
+dataValidationTableRange	24756	217	55	1	23112	217	47	xl/worksheets/sheet1.xml
+sheet-state-show	91187	4108	76	0	88576	4108	36	xl/worksheets/sheet1.xml
+no_drawing_patriarch	3382556	75770	66935	1	6562914	75770	7577	xl/worksheets/sheet1.xml
