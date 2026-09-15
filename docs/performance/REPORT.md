@@ -1,5 +1,22 @@
 # Performance program phase report
 
+## 0613 — the original-bytes publication audit, priced and its memo declined
+
+Source-backed XLSX publication audits two XML Parts per save, each twice — once
+as the immutable original and once as the authored replacement — for eight
+`verify_authored` calls per harness iteration. Splitting the two halves by call
+site prices the original at 51,844,180 Ir per iteration, 27.59% of publication,
+and the replacement at 27.60%. The memo that would reuse the original verdict
+across publications was built, gated and reverted: every publication entry point
+takes `self` by value, so no second publication from one package exists, and the
+call count is unchanged at eight in both legs. Six timing legs ordered
+A1 B1 B2 A2 A3 A4, 30 samples each on a pinned CPU, put the candidate inside the
+A/A floor on both corpus shapes in both directions, with one output SHA-256 per
+shape across all six legs. This is instruction attribution and a declined
+mechanism, not a latency, allocation, RSS or cold-cache result, and the shares
+are measured only on litchi-written corpora, where the original audit accepts.
+See [Change 0613](0613-opc-original-audit-memo.md); `performance_claim: none`.
+
 ## 0624 — where a parallel deflate section would sit, and what it would have to prove
 
 No production code changed. The design names one boundary and rejects the other

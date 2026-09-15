@@ -1,0 +1,17 @@
+Isolation pair: --warmup 0 --samples 1 against --warmup 0 --samples 3.
+One harness iteration of xlsx_source_backed_cell_values_one_edit_save
+publishes two corpus shapes (medium, dense-sparse), so one iteration is
+two source-backed publications. Per-iteration = (n3 - n1) / 2.
+
+scope                                               before Ir         after Ir          delta   delta %
+whole case iteration                          3,159,369,076.5  3,159,733,758.0     +364,681.5  +0.0115%
+publication (write_topology_to_stream)          188,320,847.5    187,896,532.0     -424,315.5  -0.2253%
+both audits                                     103,695,957.0    103,696,710.5         +753.5  +0.0007%
+  original audit only (after leg)                           -     51,844,180.0
+  replacement audit only (after leg)                        -     51,852,530.5
+
+original audit / publication  = 27.5919%
+replacement audit / publication = 27.5963%
+both audits / publication, after  = 55.1882%
+both audits / publication, before = 55.0635%
+(change 0528 measured 56.2257% for both audits on its own corpora.)

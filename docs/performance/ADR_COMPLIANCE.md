@@ -1,5 +1,25 @@
 # Performance optimization ADR-compliance matrix
 
+## 0613 — the original-bytes publication audit, priced and its memo declined
+
+Nothing under `crates/` changes, so no accepted ADR boundary moves. The retained
+candidate patch was written to the same boundaries and is recorded here for the
+door that might adopt it: both publication audits stay (change 0528), the
+replacement is audited in full every time, the original audit keeps its auditor,
+its `Limits::default()`, its call site and its `OpcError::XmlPublication { part,
+source }` construction so a refusal surfaces at the same point with the same
+identity and message, the memo never observes a replacement payload, freshness
+is unchanged because `ensure_current` refuses `OpcError::SourceChanged` before
+the memo is reached, the retained set is bounded by one entry per admitted Part
+with an allocation failure degrading to a fresh audit rather than to a
+publication failure, and no archive type, raw lock or executor reaches the
+public surface. What change 0602 calls D0 — that the audit of *original* bytes
+refuses 94 of 95 real producer packages — is untouched; this change does not
+move where a refusal happens. The two doors that would make the memo reachable
+are both contract changes and are named as requiring their own records. No
+`unsafe` is added, no limit weakened and no malformed-input defence relaxed. See
+[Change 0613](0613-opc-original-audit-memo.md); `performance_claim: none`.
+
 ## 0624 — a design that adds no dependency edge, no visible executor and no ceiling
 
 No production file was modified, so nothing in the accepted ADR set moves; what

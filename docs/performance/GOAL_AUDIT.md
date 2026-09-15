@@ -1,5 +1,25 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0613 — the original-bytes publication audit, priced and its memo declined
+
+Item XLSX-3 of the 0587 queue is answered for its memo half and closed without a
+production change. The audit of the original bytes of a replaced Part is
+measured at 27.59% of source-backed XLSX publication instructions (0587 modelled
+"at most about 28%"), so the opportunity is real, but the mechanism proposed for
+it is not reachable: publication consumes its package, so a memo held inside
+`SourceBackedPackage` has no second reader, and measurement confirms zero hits.
+Reaching it requires either a non-consuming publication door or a caller-owned
+cross-lineage memo with a digest key — both contract changes needing their own
+records — and both sit behind change 0602's D0, which this change does not
+touch. The P1 row "Finish source-backed CRUD adoption across formats" is
+unaffected; the P0 publication-intersection rows gain one priced owner. 737
+`litchi-opc`/`xml-minifier` tests and 3,629 `litchi-xlsx`/`litchi-docx`/
+`litchi-pptx` tests pass on the retained candidate patch; the committed tree
+changes no file under `crates/`. `performance_claim: none`. OLE2/OOXML
+optimization remains active; ODF is deferred until completion and iWork
+excluded. [Change and limitations](0613-opc-original-audit-memo.md);
+[evidence](results/change-0613/README.md).
+
 ## 0624 — the audit's parallelism row now has a size, and its threshold has a correction
 
 Design only; no production file was modified, so every limit, refusal, audit and
