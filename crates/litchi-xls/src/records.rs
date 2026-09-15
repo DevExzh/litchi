@@ -629,6 +629,23 @@ struct SstCursor<'a> {
     segments: &'a [&'a [u8]],
     segment_index: usize,
     offset: usize,
+    /// Summed length of every segment before `segment_index`.
+    ///
+    /// [`SstCursor::logical_position`] used to recompute this sum on every
+    /// call, which made indexing one shared string cost a walk over every
+    /// segment behind it. It is maintained instead by
+    /// [`SstCursor::advance_segment`] and restored by [`SstCursor::seek`], and
+    /// a debug assertion in `logical_position` recomputes the old sum and
+    /// compares, so every test run proves the two agree.
+    logical_base: usize,
+}
+
+/// A cursor position that [`SstCursor::seek`] can restore exactly.
+#[derive(Clone, Copy)]
+struct SstPosition {
+    segment_index: usize,
+    offset: usize,
+    logical_base: usize,
 }
 
 impl<'a> SstCursor<'a> {
@@ -637,7 +654,37 @@ impl<'a> SstCursor<'a> {
             segments,
             segment_index: 0,
             offset: 0,
+            logical_base: 0,
         }
+    }
+
+    fn position(&self) -> SstPosition {
+        SstPosition {
+            segment_index: self.segment_index,
+            offset: self.offset,
+            logical_base: self.logical_base,
+        }
+    }
+
+    fn seek(&mut self, at: SstPosition) {
+        self.segment_index = at.segment_index;
+        self.offset = at.offset;
+        self.logical_base = at.logical_base;
+    }
+
+    /// Takes `N` bytes when they are all resident in the current segment.
+    ///
+    /// The header fields of a shared string are two or four bytes and almost
+    /// always lie inside one `SST` or `Continue` payload. Reading them through
+    /// [`SstCursor::read_exact`] cost a `copy_from_slice` call per field; this
+    /// is one fixed-width load, and the continuation-crossing case still falls
+    /// through to `read_exact`, which owns the only implementation of it.
+    #[inline]
+    fn take_resident<const N: usize>(&mut self) -> Option<[u8; N]> {
+        let end = self.offset.checked_add(N)?;
+        let bytes = <[u8; N]>::try_from(self.current().get(self.offset..end)?).ok()?;
+        self.offset = end;
+        Some(bytes)
     }
 
     fn current(&self) -> &'a [u8] {
@@ -674,6 +721,10 @@ impl<'a> SstCursor<'a> {
     }
 
     fn advance_segment(&mut self, context: &str) -> Result<()> {
+        // The segment being left is `segment_index`; past the last segment
+        // `current()` is empty and adds nothing, which is what the summed form
+        // did when `take` ran past the end.
+        self.logical_base = self.logical_base.saturating_add(self.current().len());
         self.segment_index += 1;
         self.offset = 0;
         if self.segment_index >= self.segments.len() {
@@ -692,12 +743,18 @@ impl<'a> SstCursor<'a> {
     }
 
     fn read_u16_continued(&mut self, context: &str) -> Result<u16> {
+        if let Some(bytes) = self.take_resident::<2>() {
+            return Ok(u16::from_le_bytes(bytes));
+        }
         let mut bytes = [0; 2];
         self.read_exact(&mut bytes, context)?;
         Ok(u16::from_le_bytes(bytes))
     }
 
     fn read_u32_continued(&mut self, context: &str) -> Result<u32> {
+        if let Some(bytes) = self.take_resident::<4>() {
+            return Ok(u32::from_le_bytes(bytes));
+        }
         let mut bytes = [0; 4];
         self.read_exact(&mut bytes, context)?;
         Ok(u32::from_le_bytes(bytes))
@@ -808,7 +865,7 @@ impl<'a> SstCursor<'a> {
     /// same span, so that the refusal is produced by `String::from_utf16`
     /// itself and its message is byte-identical to the materializing path's.
     fn measure_characters(&mut self, count: u16, high_byte: bool) -> Result<()> {
-        let restart = (self.segment_index, self.offset);
+        let restart = self.position();
         let mut sink = SurrogatePairing::default();
         self.walk_characters(count, high_byte, &mut sink)?;
         if sink.is_well_formed() {
@@ -816,23 +873,37 @@ impl<'a> SstCursor<'a> {
         }
         // Cold path only: the walk above has already proven this string is
         // malformed, so the cost of walking it a second time does not matter.
-        self.segment_index = restart.0;
-        self.offset = restart.1;
+        self.seek(restart);
         self.read_characters(count, high_byte).map(|_| ())
     }
 
+    /// Retains every formatting run, for the eager `SharedStringTable`.
     fn read_formatting_runs(
         &mut self,
         count: u16,
         character_count: u16,
         string_index: usize,
     ) -> Result<Vec<SharedStringFormatRun>> {
-        let mut runs = Vec::new();
-        runs.try_reserve_exact(count as usize).map_err(|error| {
-            Error::InvalidData(format!(
-                "cannot allocate shared string formatting runs: {error}"
-            ))
-        })?;
+        self.walk_formatting_runs(count, character_count, string_index)
+    }
+
+    /// Walks `count` formatting runs, validating each one, and hands the ones
+    /// inside the text to `S`.
+    ///
+    /// This is the only implementation of formatting-run validation. The eager
+    /// table instantiates it with `Vec<SharedStringFormatRun>`; the
+    /// source-backed shared-string walk, which discards what it returns,
+    /// instantiates it with [`MeasuredRuns`] and allocates nothing per string.
+    ///
+    /// The reservation is part of the sink, so the measure sink also drops the
+    /// refusal that guarded it: see [`MeasuredRuns`].
+    fn walk_formatting_runs<S: FormatRunSink>(
+        &mut self,
+        count: u16,
+        character_count: u16,
+        string_index: usize,
+    ) -> Result<S> {
+        let mut runs = S::with_capacity(count)?;
         let mut previous = None;
         for _ in 0..count {
             let character_index = self.read_u16_continued("shared string formatting run")?;
@@ -1018,13 +1089,27 @@ impl From<Error> for SharedStringScanError {
 }
 
 impl<'a> SstCursor<'a> {
+    /// The cursor's offset in the concatenation of every segment, which is what
+    /// a [`SharedStringEntryLocation`] records.
+    ///
+    /// The summed form this replaces walked every segment behind the cursor on
+    /// every call, and the SST scan calls it twice per shared string, so
+    /// indexing an SST spread over `s` `Continue` records cost O(strings × s).
+    /// The debug assertion recomputes that sum, so every debug test run — the
+    /// corpus differential included — proves the maintained base still equals
+    /// it. It also means the O(1) form is an optimization of release builds
+    /// only; a debug build still pays the walk, on purpose.
     fn logical_position(&self) -> usize {
-        self.segments
-            .iter()
-            .take(self.segment_index)
-            .map(|segment| segment.len())
-            .sum::<usize>()
-            .saturating_add(self.offset)
+        debug_assert_eq!(
+            self.logical_base,
+            self.segments
+                .iter()
+                .take(self.segment_index)
+                .map(|segment| segment.len())
+                .sum::<usize>(),
+            "SST cursor logical base drifted from the segments behind it"
+        );
+        self.logical_base.saturating_add(self.offset)
     }
 }
 
@@ -1051,6 +1136,56 @@ impl SharedStringText for MeasuredText {
     fn consume(cursor: &mut SstCursor<'_>, count: u16, high_byte: bool) -> Result<Self> {
         cursor.measure_characters(count, high_byte).map(|()| Self)
     }
+}
+
+/// What a formatting-run walk does with the runs it validates.
+///
+/// Every run is read and checked the same way whichever sink is used; the sink
+/// decides only whether the runs inside the text are retained.
+trait FormatRunSink: Sized {
+    /// Reserves room for at most `count` runs, or refuses.
+    fn with_capacity(count: u16) -> Result<Self>;
+
+    /// Accepts one validated run that falls inside the string's text.
+    fn push(&mut self, run: SharedStringFormatRun);
+}
+
+impl FormatRunSink for Vec<SharedStringFormatRun> {
+    fn with_capacity(count: u16) -> Result<Self> {
+        let mut runs = Self::new();
+        runs.try_reserve_exact(count as usize).map_err(|error| {
+            Error::InvalidData(format!(
+                "cannot allocate shared string formatting runs: {error}"
+            ))
+        })?;
+        Ok(runs)
+    }
+
+    fn push(&mut self, run: SharedStringFormatRun) {
+        // The inherent `Vec::push`, spelled so that it cannot be read as the
+        // trait method being defined here.
+        Vec::push(self, run);
+    }
+}
+
+/// The measure-only mode: the runs are validated in the same order and nothing
+/// is retained, so no allocation is attempted per shared string.
+///
+/// Dropping the allocation drops the refusal that guarded it. Under an
+/// allocator that cannot hand out `count * 4` bytes (at most 256 KiB), the
+/// `Vec` sink refuses with `cannot allocate shared string formatting runs`
+/// *before* reading a run; this sink walks the runs instead, so such a string
+/// either succeeds or is refused by whichever run check it actually fails. That
+/// is the one place where the two sinks are not interchangeable, and it needs
+/// an exhausted allocator to reach: nothing about the input decides it.
+struct MeasuredRuns;
+
+impl FormatRunSink for MeasuredRuns {
+    fn with_capacity(_count: u16) -> Result<Self> {
+        Ok(Self)
+    }
+
+    fn push(&mut self, _run: SharedStringFormatRun) {}
 }
 
 /// Parses one shared string, returning its text.
@@ -1103,8 +1238,12 @@ fn walk_one_shared_string<T: SharedStringText>(
 
     let value = T::consume(cursor, character_count, flags & 0x01 != 0)
         .map_err(SharedStringScanError::Biff)?;
+    // Both instantiations discard the runs, so both walk them without the
+    // per-string `Vec`: the checks, their order and their messages are the
+    // eager table's. What differs is the retention and, with it, the
+    // reservation's own refusal -- see `MeasuredRuns`.
     cursor
-        .read_formatting_runs(run_count, character_count, string_index)
+        .walk_formatting_runs::<MeasuredRuns>(run_count, character_count, string_index)
         .map_err(SharedStringScanError::Biff)?;
     if flags & 0x04 != 0 {
         let extension = cursor
@@ -1666,6 +1805,36 @@ mod sst_measure_tests {
         assert_eq!(scan_payloads(&[payload]), "ok [(8, 11), (11, 16)]");
     }
 
+    /// The fixed-width reads take a resident fast path when the field lies
+    /// inside one record, and fall through to `read_exact` when it does not.
+    /// A formatting run is the only shared-string field that can straddle a
+    /// `Continue` boundary — `ensure_current` keeps the header, the rich-text
+    /// count and the extension length inside one record — so it is the only
+    /// place where the fall-through, and `advance_segment`'s maintenance of the
+    /// cursor's logical base, can be exercised from the scan.
+    ///
+    /// The second string exists to prove the base is still right *after* the
+    /// crossing: its `start` has to be the first string's `end`, and both have
+    /// to be offsets into the concatenation of the two records.
+    #[test]
+    fn a_formatting_run_split_across_a_continue_record_still_indexes_exactly() {
+        let mut first = sst_header(2, 2);
+        first.extend_from_slice(&2u16.to_le_bytes());
+        first.push(0x08); // rich text, compressed characters
+        first.extend_from_slice(&1u16.to_le_bytes());
+        first.extend_from_slice(b"AB");
+        first.push(1); // first byte of the run's character_index
+        assert_eq!(first.len(), 16);
+
+        let mut second = vec![0, 9, 0]; // its second byte, then font_index 9
+        second.extend_from_slice(&2u16.to_le_bytes());
+        second.push(0x00);
+        second.extend_from_slice(b"CD");
+        assert_eq!(second.len(), 8);
+
+        assert_eq!(scan_payloads(&[first, second]), "ok [(8, 19), (19, 24)]");
+    }
+
     fn test_data_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
     }
@@ -1822,6 +1991,101 @@ mod sst_measure_tests {
         assert!(
             indexed >= 100,
             "expected the corpus to index at least 100 SSTs, indexed {indexed}"
+        );
+    }
+
+    /// FNV-1a over a byte string. Not cryptographic; it only has to notice a
+    /// moved offset, and the per-fixture lines the test prints say which one.
+    fn fnv1a(bytes: &[u8]) -> u64 {
+        let mut hash = 0xcbf2_9ce4_8422_2325u64;
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        hash
+    }
+
+    /// The SST index over the whole corpus, pinned to the value it had before
+    /// change 0595 rewrote the walk.
+    ///
+    /// `every_sst_fixture_indexes_identically_both_ways` proves the two
+    /// instantiations of the walk agree with *each other*; it cannot see a
+    /// change that moves both. This pins the index itself: every segment
+    /// locator and every entry boundary of every fixture, digested per fixture
+    /// and then over the corpus. A failure prints the per-fixture digests, so
+    /// the fixture that moved is named.
+    ///
+    /// `CORPUS_DIGEST` is a property of `test-data`, so adding or removing an
+    /// XLS fixture changes it legitimately; rerun with `--nocapture` and read
+    /// the per-fixture lines before accepting a new value.
+    #[test]
+    fn the_sst_index_over_the_corpus_is_pinned() {
+        const CORPUS_DIGEST: u64 = 0x9cb1_4f5d_aa02_eebc;
+
+        let root = test_data_root();
+        let mut fixtures = Vec::new();
+        collect_xls_fixtures(&root, &mut fixtures);
+        assert!(
+            fixtures.len() > 100,
+            "the XLS corpus should be present, found {}",
+            fixtures.len()
+        );
+
+        let mut lines = Vec::new();
+        for fixture in &fixtures {
+            let relative = fixture
+                .strip_prefix(&root)
+                .unwrap_or(fixture)
+                .to_string_lossy()
+                .into_owned();
+            let Ok(bytes) = std::fs::read(fixture) else {
+                continue;
+            };
+            let Ok(stream) = workbook_stream(bytes) else {
+                continue;
+            };
+            let Some((begin, end)) = locate_sst(&stream) else {
+                continue;
+            };
+            let Ok(records) =
+                Records::new(&stream[begin..end]).collect::<Result<Vec<RecordRef<'_>>, _>>()
+            else {
+                continue;
+            };
+            let result = scan_shared_string_records(&records);
+            let detail = match &result {
+                Ok(scan) => {
+                    let mut detail = String::new();
+                    for segment in &scan.segments {
+                        detail.push_str(&format!(
+                            "s {} {} {}\n",
+                            segment.source_offset, segment.logical_offset, segment.len
+                        ));
+                    }
+                    for entry in &scan.entries {
+                        detail.push_str(&format!("e {} {}\n", entry.start, entry.end));
+                    }
+                    format!(
+                        "segments={} entries={} body={:016x}",
+                        scan.segments.len(),
+                        scan.entries.len(),
+                        fnv1a(detail.as_bytes())
+                    )
+                },
+                Err(_) => format!("refused={}", describe(&result)),
+            };
+            lines.push(format!("{relative}: {detail}"));
+        }
+
+        let corpus = lines.join("\n");
+        let digest = fnv1a(corpus.as_bytes());
+        println!("sst-index: fixtures={} digest={digest:#018x}", lines.len());
+        for line in &lines {
+            println!("sst-index: {line}");
+        }
+        assert_eq!(
+            digest, CORPUS_DIGEST,
+            "the SST index over the corpus moved; rerun with --nocapture and compare the per-fixture lines"
         );
     }
 }

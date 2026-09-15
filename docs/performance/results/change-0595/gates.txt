@@ -1,0 +1,36 @@
+# Gates for change 0595, run in /home/zhuhe/code/litchi-worktrees/0595 on branch
+# perf/0595-xls-frame-loop-and-sst-walk (base 08d968f8e). Tail of each gate.
+# litchi-xls is the only crate this change touches. Run against the final tree,
+# after a forced rebuild, so no stale test binary can skip a test.
+
+=== cargo fmt --all --check ===
+(no output above: clean)
+
+=== cargo clippy -p litchi-xls --all-targets ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+
+=== cargo test -p litchi-xls ===
+72 test binaries: 1382 passed, 0 failed, 1 ignored
+the three corpus and boundary gates this record cites, in full:
+running 3 tests
+test records::sst_measure_tests::a_formatting_run_split_across_a_continue_record_still_indexes_exactly ... ok
+test records::sst_measure_tests::the_sst_index_over_the_corpus_is_pinned ... ok
+test records::sst_measure_tests::every_sst_fixture_indexes_identically_both_ways ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1045 filtered out; finished in 0.04s
+
+
+=== cargo doc -p litchi-xls --no-deps ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+   Generated /home/zhuhe/code/litchi-worktrees/0595/target/doc/litchi_xls/index.html
+
+=== corpus differential (change 0576's oracle), counts only ===
+sst-differential: fixtures=126 with_sst=121 indexed=117 refused=4 entries=17434
+sst-differential: without an SST = 3
+sst-differential: refused ole/xls/password.xls: invalid SST counts must be non-negative signed integers
+sst-differential: refused poi/test-data/spreadsheet/35897-type4.xls: invalid SST counts must be non-negative signed integers
+sst-differential: refused poi/test-data/spreadsheet/57456.xls: invalid SST total count is smaller than its unique count
+sst-differential: refused poi/test-data/spreadsheet/xor-encryption-abc.xls: invalid SST counts must be non-negative signed integers
+
+=== the pinned SST index digest ===
+sst-index: fixtures=121 digest=0x9cb14f5daa02eebc

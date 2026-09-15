@@ -668,15 +668,21 @@ impl SourceTextSheet {
             .map(retained_text_bytes)
             .unwrap_or(0);
         let new_bytes = retained_text_bytes(&value);
-        let retained = self
+        // `let ... else` rather than `ok_or`: the limit value is built only on
+        // the path that returns it. `ok_or` builds it, and drops it again, on
+        // every cell of every text extraction, and clippy's
+        // `unnecessary_lazy_evaluations` rejects the `ok_or_else` spelling.
+        let Some(retained) = self
             .retained_text_bytes
             .checked_sub(old_bytes)
             .and_then(|bytes| bytes.checked_add(new_bytes))
-            .ok_or(SourceBackedError::ResourceLimit {
+        else {
+            return Err(SourceBackedError::ResourceLimit {
                 resource: "text bytes",
                 observed: u64::MAX,
                 maximum: limits.max_text_bytes,
-            })?;
+            });
+        };
         if retained > limits.max_text_bytes {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "text bytes",
@@ -687,15 +693,13 @@ impl SourceTextSheet {
 
         let is_new = !self.cells.contains_key(&(row, column));
         if is_new {
-            let observed =
-                self.cells
-                    .len()
-                    .checked_add(1)
-                    .ok_or(SourceBackedError::ResourceLimit {
-                        resource: "text cells",
-                        observed: u64::MAX,
-                        maximum: limits.max_text_cells as u64,
-                    })?;
+            let Some(observed) = self.cells.len().checked_add(1) else {
+                return Err(SourceBackedError::ResourceLimit {
+                    resource: "text cells",
+                    observed: u64::MAX,
+                    maximum: limits.max_text_cells as u64,
+                });
+            };
             if observed > limits.max_text_cells {
                 return Err(SourceBackedError::ResourceLimit {
                     resource: "text cells",
@@ -1751,13 +1755,14 @@ fn parse_globals(
                 "BIFF global record exceeds Workbook stream".into(),
             ));
         }
-        record_count = record_count.checked_add(1).ok_or({
-            SourceBackedError::ResourceLimit {
+        let Some(next_count) = record_count.checked_add(1) else {
+            return Err(SourceBackedError::ResourceLimit {
                 resource: "global records",
                 observed: u64::MAX,
                 maximum: limits.max_global_records as u64,
-            }
-        })?;
+            });
+        };
+        record_count = next_count;
         if record_count > limits.max_global_records {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "global records",
@@ -2205,14 +2210,26 @@ impl<'a> WorksheetScan<'a> {
 
     /// Ensures stream bytes `[position, need_end)` are resident.
     ///
+    /// Every frame and every payload of a sheet whose records sit inside the
+    /// current fill takes the resident test and nothing else, so the test is
+    /// inlined into the frame loop and only the fill is a call returning a
+    /// 48-byte `Result` through memory.
+    #[inline]
+    fn ensure(&mut self, need_end: u64) -> Result<()> {
+        if need_end <= self.filled_end() {
+            return Ok(());
+        }
+        self.fill(need_end)
+    }
+
+    /// Reads until stream bytes `[position, need_end)` are resident.
+    ///
     /// Bytes already framed are dropped from the front, and one read appends
     /// the fill to the retained tail. The tail is at most one record frame,
     /// because a fill is issued only for bytes the current frame needs.
-    fn ensure(&mut self, need_end: u64) -> Result<()> {
+    #[inline(never)]
+    fn fill(&mut self, need_end: u64) -> Result<()> {
         let filled_end = self.filled_end();
-        if need_end <= filled_end {
-            return Ok(());
-        }
         let framed = usize::try_from(self.position.saturating_sub(self.window_start))
             .unwrap_or(usize::MAX)
             .min(self.window.len());
@@ -2247,16 +2264,18 @@ impl<'a> WorksheetScan<'a> {
 
     /// The four header bytes at the scan position, which `ensure` has made
     /// resident.
+    ///
+    /// One range index in place of four element indexes: `at` is clamped to the
+    /// window length, so `at + 4` cannot overflow, and the range panics under
+    /// exactly the condition the four element indexes panicked under,
+    /// `at + 4 > window.len()`. Only the panic message differs, and `ensure`
+    /// makes that state unreachable.
     fn frame_header(&self) -> [u8; 4] {
         let at = usize::try_from(self.position.saturating_sub(self.window_start))
             .unwrap_or(usize::MAX)
             .min(self.window.len());
-        [
-            self.window[at],
-            self.window[at + 1],
-            self.window[at + 2],
-            self.window[at + 3],
-        ]
+        let header = &self.window[at..at + 4];
+        [header[0], header[1], header[2], header[3]]
     }
 
     fn next_frame(&mut self) -> Result<WorksheetFrame> {
@@ -2304,13 +2323,13 @@ impl<'a> WorksheetScan<'a> {
                 "BIFF worksheet record exceeds its BoundSheet boundary".into(),
             ));
         }
-        let records = self.scanned_records.checked_add(1).ok_or({
-            SourceBackedError::ResourceLimit {
+        let Some(records) = self.scanned_records.checked_add(1) else {
+            return Err(SourceBackedError::ResourceLimit {
                 resource: "worksheet scan records",
                 observed: u64::MAX,
                 maximum: self.limits.max_worksheet_scan_records as u64,
-            }
-        })?;
+            });
+        };
         if records > self.limits.max_worksheet_scan_records {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "worksheet scan records",
@@ -2318,13 +2337,13 @@ impl<'a> WorksheetScan<'a> {
                 maximum: self.limits.max_worksheet_scan_records as u64,
             });
         }
-        let bytes = self.scanned_bytes.checked_add(frame_len).ok_or({
-            SourceBackedError::ResourceLimit {
+        let Some(bytes) = self.scanned_bytes.checked_add(frame_len) else {
+            return Err(SourceBackedError::ResourceLimit {
                 resource: "worksheet scan bytes",
                 observed: u64::MAX,
                 maximum: self.limits.max_worksheet_scan_bytes,
-            }
-        })?;
+            });
+        };
         if bytes > self.limits.max_worksheet_scan_bytes {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "worksheet scan bytes",
@@ -2398,10 +2417,17 @@ impl<'a> WorksheetScan<'a> {
         Ok(())
     }
 
+    /// Honours the caller's cooperative cancellation, twice per framed record.
+    ///
+    /// Most callers pass no execution context, and that case is a null test
+    /// which is inlined into the frame loop rather than a call returning a
+    /// 48-byte `Result` through memory.
+    #[inline]
     fn check_execution(&self) -> Result<()> {
-        self.execution.map_or(Ok(()), |context| {
-            context.check().map_err(SourceBackedError::from)
-        })
+        match self.execution {
+            None => Ok(()),
+            Some(context) => context.check().map_err(SourceBackedError::from),
+        }
     }
 }
 

@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0595",
+  "title": "A leaner XLS frame loop and a cheaper eager SST walk",
+  "decision": "retained",
+  "code_state": "crates/litchi-xls/src/records.rs and crates/litchi-xls/src/workbook/source.rs; no other file under crates/ was modified",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": [
+    "change 0587 item XLS-1 (rank 9), which is change 0584 candidate 2, proposed and never landed",
+    "change 0587 item XLS-2b (rank 17), the cheap sibling of lazy SST indexing"
+  ],
+  "reason_codes": [
+    "every logical counter and every semantic projection is identical across the legs in all 18 counter cells, so the change removes CPU work only",
+    "the SST index is byte-identical over 121 fixtures against a digest captured on the untouched base commit before any production edit, and change 0576's corpus differential still compares 17,434 entries and 4 identical refusals",
+    "callgrind isolation pairs, native perf stat cycles and paired A1 B1 B2 A2 medians agree in direction on every one of the 36 timing cells; the six 54016 cells agree between directions to within 0.9 percentage points and are 5.6 to 7.7 times the measured floor",
+    "drop_in_place<SourceBackedError> and SstCursor::read_exact fall to exactly zero on all three fixtures, which is the precise mechanism both items predicted",
+    "no refusal moves on any input the corpus can express, no output byte changes, no fence moves and no typed limit is relocated, so no frozen design record is required"
+  ],
+  "accepted_evidence": {
+    "deterministic_counts": "reads, read bytes, source version observations, len observations and seeks for 3 fixtures x 2 in-memory source modes x open/list/one-cell, before and after, with a per-sample invariance assertion inside the fold",
+    "corpus_oracle": "the_sst_index_over_the_corpus_is_pinned digests every SST segment locator and entry boundary over 121 fixtures; the constant was captured on the base commit before any edit and the after leg reproduces it, with both full listings and their empty diff retained",
+    "differential": "change 0576's every_sst_fixture_indexes_identically_both_ways, unchanged: 126 fixtures, 117 indexed identically by both instantiations over 17,434 entries, 4 refused identically with identical messages",
+    "instruction_profiles": "callgrind isolation pairs for open and one-cell on all three fixtures, per-symbol self cost, with the before leg reproducing change 0584's independent profile to within 0.045% on the opens",
+    "hardware_counters": "perf stat cycles, instructions, branches, branch misses and task-clock, isolated by the same differencing, taken natively because change 0579 showed instruction share mis-ranks pointer-chase work",
+    "paired_timing": "A1 B1 B2 A2, 500 samples per round after 50 warmups, 18 cells per round, both directions reported, with the same-binary floor measured in the same window",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-xls --all-targets, cargo test -p litchi-xls (1,382 passed, 0 failed, 1 pre-existing ignored doctest), cargo doc -p litchi-xls --no-deps",
+    "adversarial_test": "a_formatting_run_split_across_a_continue_record_still_indexes_exactly puts a formatting run's character_index across a Continue boundary with a second string after it, which is the only shared-string field that can straddle a record boundary and therefore the only place the scan exercises the read_exact fall-through and advance_segment's maintenance of the cursor's logical base; it was run against the untouched base commit as well and produces the same entry offsets",
+    "independent_review": "an independent correctness review of the diff was asked to falsify the identity claim on each of the seven edits; it cleared six, including a 134-case exhaustive differential of the old and new fixed-width reads over eleven segment shapes and every reachable start position, and found the formatting-run reservation's error-identity consequence, which is now recorded"
+  },
+  "accepted_costs": {
+    "quiescence": "host quiescence is not established; eight measurement agents shared the machine and the load average was 44.41 to 40.45 across the capture window on 32 cores, which is why the noise floor is measured in the same window rather than assumed",
+    "flagship_not_separable": "ConditionalFormattingSamples.xls moves -0.59% to -3.90% at p50 against a measured floor of -2.64% to +3.06%, so no wall-clock speedup is claimed for it; its instruction and cycle counts do fall and are deterministic",
+    "inliner_artifact": "CellAlignment::parse was outlined from parse_xf and MeasuredText::consume grew, together giving back about 1.0% of the 54016 open; neither is in either item's mechanism and both are reported rather than netted away",
+    "removed_allocation_refusal": "the source-backed shared-string walk no longer attempts try_reserve_exact for formatting runs, so it no longer produces that allocation refusal; the reservation guarded a Vec the walk discarded, at most 256 KiB, and the eager SharedStringTable still takes it. Second consequence, named by the independent review: the reservation ran before the first run byte, so on a string whose runs are also malformed the allocation message used to win and now the run check that the bytes actually fail wins instead. Reachable only under an allocator that refuses 256 KiB; no input decides it and the pinned corpus index shows an identical refusal set over the 121 fixtures with an SST",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte so every memcpy share is an upper bound",
+    "means_are_unreliable": "at load 44 a 100-microsecond operation collects host artifacts: the a1 round of the 54016 owned-readat open has a p99 of 3,279,370 ns against a p95 of 268,252 (one sample) and the a1 round of the flagship file-source one-cell has a mean 20.1% above its median, both on the BEFORE leg in this window; p50 and p95 are stable across rounds on every cell and the per-round table is retained",
+    "debug_build_cost": "logical_position is O(1) in release only: the debug_assert_eq! recomputes the old summed form on every call in a debug build, on purpose, so that every test run checks the invariant",
+    "noisiest_cell": "WithCustomViews file-source one-cell carries both extremes of the floor (-2.64% and +3.06%) and is the only cell whose two directions disagree by more than 2.4 percentage points; it is the least trustworthy row in the timing table and is reported as such"
+  },
+  "known_gaps": {
+    "selectors": "xls_source_attribution has no XLS full-text or all-cells selector, so the two edited sites in SourceTextSheet::insert are modelled rather than measured; no eager-owner selector was run although the eager SST path shares the changed fixed-width reads",
+    "sources": "every XLS source in this harness is in memory, so a from_path workbook's per-observation fstat cost is invisible",
+    "not_attempted": "lazy SST indexing (XLS-2) still needs its own frozen design record because it moves when a malformed SST is refused; the retained sheet index and whole-sheet iterator (XLS-3) still need one; the window zero-fill remains blocked by GOAL rule 10"
+  },
+  "withheld": [
+    "any cold-cache, physical-device, range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result",
+    "any wall-clock speedup claim for ConditionalFormattingSamples.xls",
+    "any claim about XLS full text, all cells, or the eager owner"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0595-xls-frame-loop-and-sst-walk",
+    "before_binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+    "after_binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0, perf 7.0.14",
+    "pinning": "CPU 15, setarch x86_64 -R, RAYON_NUM_THREADS=1"
+  }
+}

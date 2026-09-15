@@ -1,0 +1,195 @@
+================================================================================================
+1. Logical counters per operation (the control: no I/O moved)
+================================================================================================
+fixture    mode          op          reads   read bytes  version  len  seek  identical
+flagship   owned-readat  open           53       565201       29    1     0  yes / oracle yes
+flagship   owned-readat  list           53       565201       29    1     0  yes / oracle yes
+flagship   owned-readat  one-cell       61       603115       42    1     0  yes / oracle yes
+flagship   file-source   open           53       565201       29    1     0  yes / oracle yes
+flagship   file-source   list           53       565201       29    1     0  yes / oracle yes
+flagship   file-source   one-cell       61       603115       42    1     0  yes / oracle yes
+cv         owned-readat  open           16       110242       22    1     0  yes / oracle yes
+cv         owned-readat  list           16       110242       22    1     0  yes / oracle yes
+cv         owned-readat  one-cell       17       110656       25    1     0  yes / oracle yes
+cv         file-source   open           16       110242       22    1     0  yes / oracle yes
+cv         file-source   list           16       110242       22    1     0  yes / oracle yes
+cv         file-source   one-cell       17       110656       25    1     0  yes / oracle yes
+54016      owned-readat  open           40       317171       25    1     0  yes / oracle yes
+54016      owned-readat  list           40       317171       25    1     0  yes / oracle yes
+54016      owned-readat  one-cell       65       932993       43    1     0  yes / oracle yes
+54016      file-source   open           40       317171       25    1     0  yes / oracle yes
+54016      file-source   list           40       317171       25    1     0  yes / oracle yes
+54016      file-source   one-cell       65       932993       43    1     0  yes / oracle yes
+
+every counter and every oracle projection identical: True
+
+================================================================================================
+2. Instructions per operation, callgrind isolation pairs
+================================================================================================
+fixture    op             before Ir       after Ir      delta
+flagship   open           2,378,029      2,327,817     -2.11%
+flagship   one-cell       2,625,686      2,550,722     -2.86%
+cv         open             915,766        807,974    -11.77%
+cv         one-cell         937,854        827,140    -11.81%
+54016      open           7,240,329      5,375,911    -25.75%
+54016      one-cell      24,676,105     18,602,879    -24.61%
+
+================================================================================================
+3. Where the instructions went, self Ir per operation (movers only)
+================================================================================================
+
+-- flagship/open   2,378,029 -> 2,327,817 Ir
+          25,596 ->             0        -25,596  read_exact
+           9,476 ->             0         -9,476  read_formatting_runs
+           8,073 ->             0         -8,073  SourceBackedError>
+         681,678 ->       675,582         -6,096  __memcpy_avx_unaligned_erms
+          31,484 ->        25,738         -5,746  parse_xf
+          87,160 ->        81,556         -5,604  from_shared_ole_file_with_limits
+               0 ->         6,624         +6,624  walk_formatting_runs
+               0 ->         9,520         +9,520  parse
+
+-- flagship/one-cell   2,625,686 -> 2,550,722 Ir
+          25,675 ->             0        -25,675  read_exact
+          12,675 ->             0        -12,675  SourceBackedError>
+           9,506 ->             0         -9,506  read_formatting_runs
+           7,329 ->             0         -7,329  ensure
+          19,824 ->        13,161         -6,663  next_frame
+         709,920 ->       704,115         -5,805  __memcpy_avx_unaligned_erms
+          31,484 ->        25,738         -5,746  parse_xf
+          87,159 ->        81,555         -5,604  from_shared_ole_file_with_limits
+               0 ->         6,645         +6,645  walk_formatting_runs
+               0 ->         9,520         +9,520  parse
+
+-- cv/open   915,766 -> 807,974 Ir
+          46,294 ->             0        -46,294  read_exact
+          51,442 ->        14,948        -36,494  scan_shared_string_records
+          16,315 ->             0        -16,315  read_formatting_runs
+         231,882 ->       221,302        -10,580  __memcpy_avx_unaligned_erms
+          51,011 ->        45,281         -5,730  walk_one_shared_string
+          19,692 ->        16,216         -3,476  parse_xf
+           2,834 ->             0         -2,834  SourceBackedError>
+          73,007 ->        75,431         +2,424  consume
+               0 ->         5,824         +5,824  parse
+               0 ->        11,279        +11,279  walk_formatting_runs
+
+-- cv/one-cell   937,854 -> 827,140 Ir
+          46,294 ->             0        -46,294  read_exact
+          51,442 ->        14,948        -36,494  scan_shared_string_records
+          16,315 ->             0        -16,315  read_formatting_runs
+         232,063 ->       221,476        -10,588  __memcpy_avx_unaligned_erms
+          51,011 ->        45,281         -5,730  walk_one_shared_string
+           3,692 ->             0         -3,692  SourceBackedError>
+          19,692 ->        16,216         -3,476  parse_xf
+          73,007 ->        75,431         +2,424  consume
+               0 ->         5,824         +5,824  parse
+               0 ->        11,279        +11,279  walk_formatting_runs
+
+-- 54016/open   7,240,329 -> 5,375,911 Ir
+       1,164,269 ->       238,178       -926,091  scan_shared_string_records
+         624,100 ->             0       -624,100  read_exact
+         236,890 ->             0       -236,890  read_formatting_runs
+       1,258,410 ->     1,109,969       -148,441  __memcpy_avx_unaligned_erms
+         836,795 ->       742,217        -94,578  walk_one_shared_string
+         297,066 ->       237,737        -59,329  parse_xf
+          44,473 ->             0        -44,473  SourceBackedError>
+         463,320 ->       432,586        -30,734  from_shared_ole_file_with_limits
+         719,535 ->       759,098        +39,563  consume
+               0 ->        95,480        +95,480  parse
+               0 ->       165,818       +165,818  walk_formatting_runs
+
+-- 54016/one-cell   24,676,105 -> 18,602,879 Ir
+       1,758,790 ->             0     -1,758,790  ensure
+       4,248,048 ->     2,806,836     -1,441,212  next_frame
+       1,030,627 ->             0     -1,030,627  SourceBackedError>
+       1,164,269 ->       238,178       -926,091  scan_shared_string_records
+         624,100 ->             0       -624,100  read_exact
+         236,890 ->             0       -236,890  read_formatting_runs
+       1,913,201 ->     1,771,026       -142,175  __memcpy_avx_unaligned_erms
+         836,795 ->       742,217        -94,578  walk_one_shared_string
+         297,066 ->       237,737        -59,329  parse_xf
+               0 ->        95,480        +95,480  parse
+               0 ->       165,818       +165,818  walk_formatting_runs
+
+================================================================================================
+4. Hardware counters per operation, perf stat isolation pairs
+================================================================================================
+fixture    op            cycles B     cycles A    d cyc       instr B       instr A    d ins  IPC B  IPC A   miss B   miss A
+flagship   open           353,412      347,574   -1.65%     1,230,743     1,178,817   -4.22%   3.48   3.39      733      731
+flagship   one-cell       417,411      388,127   -7.02%     1,415,492     1,339,032   -5.40%   3.39   3.45      870      621
+cv         open           150,383      129,779  -13.70%       623,327       512,591  -17.77%   4.14   3.95      240      195
+cv         one-cell       155,652      133,185  -14.43%       644,364       531,679  -17.49%   4.14   3.99      234      173
+54016      open         1,165,313      869,124  -25.42%     5,920,803     4,031,763  -31.91%   5.08   4.64      664      393
+54016      one-cell     4,522,126    3,688,400  -18.44%    22,140,591    16,049,833  -27.51%   4.90   4.35    4,589    2,276
+
+Native counters, so rep movsb is one instruction and SHA-256 uses the
+hardware extension; the callgrind table above counts neither that way.
+Both legs ran in the same window on a shared host: see quiescence.log.
+
+================================================================================================
+5. Wall clock, A1 B1 B2 A2, nanoseconds
+================================================================================================
+fixture    mode          op            A p50     B p50     dir1     dir2     A/A     B/B    B mean     B p95     B p99
+54016      file-source   list         270054    207086  -23.57%  -23.06%  -0.54%   0.11%    208971    214706    220112
+54016      file-source   one-cell    1040404    857538  -17.79%  -17.36%  -0.89%  -0.37%    857036    863596    866540
+54016      file-source   open         265194    212219  -19.92%  -20.03%  -0.22%  -0.36%    211528    219476    220691
+54016      owned-readat  list         253821    198706  -22.13%  -21.29%  -1.29%  -0.23%    198720    206112    207821
+54016      owned-readat  one-cell    1011306    832605  -18.08%  -17.26%  -0.79%   0.19%    832365    837920    841185
+54016      owned-readat  open         253317    193739  -23.79%  -23.24%  -0.70%   0.01%    195892    201666    206466
+cv         file-source   list          40556     36595   -9.43%  -10.10%   0.22%  -0.52%     36950     38396     44770
+cv         file-source   one-cell      41322     37662  -11.41%   -6.23%  -2.64%   3.06%     38093     41285     45920
+cv         file-source   open          39973     35598  -11.94%   -9.96%   0.71%   2.98%     36094     39425     44095
+cv         owned-readat  list          32523     28435  -13.02%  -12.11%  -1.00%   0.04%     28674     29316     35135
+cv         owned-readat  one-cell      32440     28700  -12.69%  -10.35%  -1.16%   1.48%     28914     29260     35765
+cv         owned-readat  open          31410     27585  -12.15%  -12.21%   0.25%   0.18%     27942     30095     35026
+flagship   file-source   list          95041     92040   -3.44%   -2.87%  -1.19%  -0.61%     93059    100031    104090
+flagship   file-source   one-cell     107233    106258   -1.23%   -0.59%  -0.58%   0.06%    107080    113700    115996
+flagship   file-source   open          93228     90248   -2.49%   -3.90%   0.78%  -0.67%     91130     98026     99665
+flagship   owned-readat  list          75308     73616   -2.74%   -1.76%  -0.36%   0.64%     77431     81000     85650
+flagship   owned-readat  one-cell      85452     83968   -1.51%   -1.97%  -1.03%  -1.50%     84788     91616     96161
+flagship   owned-readat  open          74565     72896   -1.93%   -2.54%   0.39%  -0.23%     73524     79700     81920
+
+A p50 and B p50 are the mean of the two rounds of that leg.
+dir1 = b1 against a1, dir2 = b2 against a2: negative is faster after.
+A/A = a2 against a1 and B/B = b2 against b1 are the same binary against
+itself across the window, and are the measured floor.
+
+================================================================================================
+6. Tails per round, nanoseconds (owned-readat), so one noisy round is visible
+================================================================================================
+fixture    op        round      n        p50       mean        p95        p99
+54016      list      a1       500     255466     272572     267011     293302
+54016      list      b1       500     198936     198951     206172     207901
+54016      list      b2       500     198476     198489     206052     207741
+54016      list      a2       500     252176     254519     262961     266962
+54016      one-cell  a1       500    1015341    1016238    1024656    1029966
+54016      one-cell  b1       500     831795     831563     836945     840355
+54016      one-cell  b2       500     833415     833167     838895     842015
+54016      one-cell  a2       500    1007271    1008321    1016396    1027906
+54016      open      a1       500     254207     301329     268252    3279370
+54016      open      b1       500     193726     195893     201631     206881
+54016      open      b2       500     193751     195891     201701     206051
+54016      open      a2       500     252426     254282     259681     264672
+cv         list      a1       500      32686      36161      33771      41601
+cv         list      b1       500      28430      28622      29260      34810
+cv         list      b2       500      28440      28726      29371      35460
+cv         list      a2       500      32360      32598      33070      38950
+cv         one-cell  a1       500      32630      39096      33751      39611
+cv         one-cell  b1       500      28490      28738      29110      35880
+cv         one-cell  b2       500      28911      29090      29410      35650
+cv         one-cell  a2       500      32250      32519      32860      38650
+cv         open      a1       500      31370      31778      32180      38180
+cv         open      b1       500      27560      27787      27950      34541
+cv         open      b2       500      27610      28098      32240      35510
+cv         open      a2       500      31450      31710      32060      38620
+flagship   list      a1       500      75446      76920      83350      89780
+flagship   list      b1       500      73380      80213      80761      83230
+flagship   list      b2       500      73851      74650      81240      88070
+flagship   list      a2       500      75170      76058      82270      92630
+flagship   one-cell  a1       500      85895      97700      94740     114231
+flagship   one-cell  b1       500      84601      85296      92650      99531
+flagship   one-cell  b2       500      83336      84281      90581      92791
+flagship   one-cell  a2       500      85010      85834      92071      95151
+flagship   open      a1       500      74420      81470      82161      84940
+flagship   open      b1       500      72981      73550      79641      82090
+flagship   open      b2       500      72811      73499      79760      81751
+flagship   open      a2       500      74710      75431      81711      83641

@@ -1,0 +1,3 @@
+# diff <(tail -n +4 sst-index-before.txt) <(tail -n +4 sst-index-after.txt)
+# (empty: the SST index is identical across the change)
+SST INDEX IDENTICAL: no difference over 121 fixtures

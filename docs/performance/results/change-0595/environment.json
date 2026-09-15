@@ -1,0 +1,68 @@
+{
+  "change_id": "0595",
+  "fixtures": {
+    "54016": {
+      "path": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+      "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+    },
+    "cv": {
+      "path": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+      "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64"
+    },
+    "flagship": {
+      "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+      "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+    }
+  },
+  "harness": {
+    "binary": "tools/perf-baseline --features xls-source-attribution --bin xls_source_attribution",
+    "modes": [
+      "owned-readat",
+      "file-source"
+    ],
+    "operations": [
+      "open",
+      "list",
+      "one-cell"
+    ],
+    "scope": "every XLS source in this harness is in memory, so no from_path fstat cost is visible",
+    "worksheet_index": "1 for the flagship and WithCustomViews; 0 for 54016.xls, which has one worksheet"
+  },
+  "host": {
+    "aslr": "disabled for every measured child (setarch x86_64 -R)",
+    "cores": 32,
+    "cpu": "AMD EPYC 9R45",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "memory_gib": 123,
+    "pinned_cpu": 15,
+    "quiescence": "not established; eight measurement agents shared this host. The load average was 44.41 when the counter window opened and 40.45 when the timing window closed, on 32 cores. That is why the noise floor is measured in the same window rather than assumed.",
+    "threads_per_core": 1
+  },
+  "legs": {
+    "after": {
+      "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+      "binary": "release/xls_source_attribution",
+      "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+      "cargo_target_dir": "tools/perf-baseline/target (the worktree's own)",
+      "files_that_differ": [
+        "crates/litchi-xls/src/records.rs",
+        "crates/litchi-xls/src/workbook/source.rs"
+      ],
+      "source": "/home/zhuhe/code/litchi-worktrees/0595, branch perf/0595-xls-frame-loop-and-sst-walk"
+    },
+    "before": {
+      "binary": "release/xls_source_attribution",
+      "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+      "cargo_target_dir": "/home/zhuhe/code/litchi-worktrees/targets/0595-before",
+      "commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+      "source": "/home/zhuhe/code/litchi-worktrees/before-08d968f8e (shared read-only detached checkout of the base)"
+    }
+  },
+  "schema": "litchi-perf-change-environment",
+  "toolchain": {
+    "perf": "7.0.14",
+    "profile": "--release --locked, identical flags in both legs",
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "valgrind": "3.26.0"
+  }
+}

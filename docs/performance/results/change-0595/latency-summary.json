@@ -1,0 +1,660 @@
+{
+  "rounds": {
+    "a1": {
+      "54016|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 272450.016,
+        "n": 500,
+        "p50": 270792.0,
+        "p95": 277952,
+        "p99": 279422,
+        "warmups": 50
+      },
+      "54016|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 1045758.304,
+        "n": 500,
+        "p50": 1045076.0,
+        "p95": 1054037,
+        "p99": 1059387,
+        "warmups": 50
+      },
+      "54016|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 275574.048,
+        "n": 500,
+        "p50": 265486.5,
+        "p95": 273401,
+        "p99": 282982,
+        "warmups": 50
+      },
+      "54016|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 272571.972,
+        "n": 500,
+        "p50": 255466.0,
+        "p95": 267011,
+        "p99": 293302,
+        "warmups": 50
+      },
+      "54016|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 1016237.6,
+        "n": 500,
+        "p50": 1015341.0,
+        "p95": 1024656,
+        "p99": 1029966,
+        "warmups": 50
+      },
+      "54016|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 301329.204,
+        "n": 500,
+        "p50": 254207.0,
+        "p95": 268252,
+        "p99": 3279370,
+        "warmups": 50
+      },
+      "cv|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 40969.518,
+        "n": 500,
+        "p50": 40511.0,
+        "p95": 43851,
+        "p99": 48580,
+        "warmups": 50
+      },
+      "cv|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 42534.608,
+        "n": 500,
+        "p50": 41875.0,
+        "p95": 45010,
+        "p99": 50720,
+        "warmups": 50
+      },
+      "cv|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 40313.61,
+        "n": 500,
+        "p50": 39831.0,
+        "p95": 42651,
+        "p99": 48370,
+        "warmups": 50
+      },
+      "cv|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 36160.662,
+        "n": 500,
+        "p50": 32685.5,
+        "p95": 33771,
+        "p99": 41601,
+        "warmups": 50
+      },
+      "cv|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 39096.056,
+        "n": 500,
+        "p50": 32630.0,
+        "p95": 33751,
+        "p99": 39611,
+        "warmups": 50
+      },
+      "cv|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 31777.952,
+        "n": 500,
+        "p50": 31370.5,
+        "p95": 32180,
+        "p99": 38180,
+        "warmups": 50
+      },
+      "flagship|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 111270.468,
+        "n": 500,
+        "p50": 95610.5,
+        "p95": 117491,
+        "p99": 259652,
+        "warmups": 50
+      },
+      "flagship|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 129117.644,
+        "n": 500,
+        "p50": 107545.5,
+        "p95": 116091,
+        "p99": 136901,
+        "warmups": 50
+      },
+      "flagship|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 94084.912,
+        "n": 500,
+        "p50": 92865.5,
+        "p95": 100480,
+        "p99": 103111,
+        "warmups": 50
+      },
+      "flagship|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 76920.218,
+        "n": 500,
+        "p50": 75445.5,
+        "p95": 83350,
+        "p99": 89780,
+        "warmups": 50
+      },
+      "flagship|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 97699.99,
+        "n": 500,
+        "p50": 85895.0,
+        "p95": 94740,
+        "p99": 114231,
+        "warmups": 50
+      },
+      "flagship|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 81469.906,
+        "n": 500,
+        "p50": 74420.5,
+        "p95": 82161,
+        "p99": 84940,
+        "warmups": 50
+      }
+    },
+    "a2": {
+      "54016|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 271295.326,
+        "n": 500,
+        "p50": 269317.0,
+        "p95": 276631,
+        "p99": 279372,
+        "warmups": 50
+      },
+      "54016|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 1036635.992,
+        "n": 500,
+        "p50": 1035731.5,
+        "p95": 1043337,
+        "p99": 1050047,
+        "warmups": 50
+      },
+      "54016|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 266552.196,
+        "n": 500,
+        "p50": 264901.5,
+        "p95": 272051,
+        "p99": 273191,
+        "warmups": 50
+      },
+      "54016|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 254519.322,
+        "n": 500,
+        "p50": 252176.0,
+        "p95": 262961,
+        "p99": 266962,
+        "warmups": 50
+      },
+      "54016|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 1008320.85,
+        "n": 500,
+        "p50": 1007271.0,
+        "p95": 1016396,
+        "p99": 1027906,
+        "warmups": 50
+      },
+      "54016|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 254282.234,
+        "n": 500,
+        "p50": 252426.5,
+        "p95": 259681,
+        "p99": 264672,
+        "warmups": 50
+      },
+      "cv|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 40977.808,
+        "n": 500,
+        "p50": 40600.0,
+        "p95": 44211,
+        "p99": 49440,
+        "warmups": 50
+      },
+      "cv|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 41267.188,
+        "n": 500,
+        "p50": 40770.0,
+        "p95": 45770,
+        "p99": 49060,
+        "warmups": 50
+      },
+      "cv|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 40545.22,
+        "n": 500,
+        "p50": 40115.5,
+        "p95": 42360,
+        "p99": 47560,
+        "warmups": 50
+      },
+      "cv|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 32598.24,
+        "n": 500,
+        "p50": 32360.0,
+        "p95": 33070,
+        "p99": 38950,
+        "warmups": 50
+      },
+      "cv|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 32518.518,
+        "n": 500,
+        "p50": 32250.0,
+        "p95": 32860,
+        "p99": 38650,
+        "warmups": 50
+      },
+      "cv|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 31710.29,
+        "n": 500,
+        "p50": 31450.0,
+        "p95": 32060,
+        "p99": 38620,
+        "warmups": 50
+      },
+      "flagship|file-source|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 95278.034,
+        "n": 500,
+        "p50": 94471.0,
+        "p95": 101821,
+        "p99": 102861,
+        "warmups": 50
+      },
+      "flagship|file-source|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 107814.982,
+        "n": 500,
+        "p50": 106921.0,
+        "p95": 114261,
+        "p99": 115731,
+        "warmups": 50
+      },
+      "flagship|file-source|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 94347.272,
+        "n": 500,
+        "p50": 93591.0,
+        "p95": 100700,
+        "p99": 101760,
+        "warmups": 50
+      },
+      "flagship|owned-readat|list": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 76058.162,
+        "n": 500,
+        "p50": 75170.5,
+        "p95": 82270,
+        "p99": 92630,
+        "warmups": 50
+      },
+      "flagship|owned-readat|one-cell": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 85833.634,
+        "n": 500,
+        "p50": 85010.0,
+        "p95": 92071,
+        "p99": 95151,
+        "warmups": 50
+      },
+      "flagship|owned-readat|open": {
+        "binary_sha256": "f83468d766af62fbacbecde8d235532e18adc22a823dffdbf0f72c5a02ef8ef0",
+        "mean": 75431.04,
+        "n": 500,
+        "p50": 74710.0,
+        "p95": 81711,
+        "p99": 83641,
+        "warmups": 50
+      }
+    },
+    "b1": {
+      "54016|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 208835.932,
+        "n": 500,
+        "p50": 206971.5,
+        "p95": 214191,
+        "p99": 220251,
+        "warmups": 50
+      },
+      "54016|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 858815.51,
+        "n": 500,
+        "p50": 859140.0,
+        "p95": 864906,
+        "p99": 867515,
+        "warmups": 50
+      },
+      "54016|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 211945.476,
+        "n": 500,
+        "p50": 212606.5,
+        "p95": 219771,
+        "p99": 220961,
+        "warmups": 50
+      },
+      "54016|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 198950.56,
+        "n": 500,
+        "p50": 198936.5,
+        "p95": 206172,
+        "p99": 207901,
+        "warmups": 50
+      },
+      "54016|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 831562.532,
+        "n": 500,
+        "p50": 831795.0,
+        "p95": 836945,
+        "p99": 840355,
+        "warmups": 50
+      },
+      "54016|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 195893.064,
+        "n": 500,
+        "p50": 193726.5,
+        "p95": 201631,
+        "p99": 206881,
+        "warmups": 50
+      },
+      "cv|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 37016.934,
+        "n": 500,
+        "p50": 36690.0,
+        "p95": 37631,
+        "p99": 45321,
+        "warmups": 50
+      },
+      "cv|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 37510.046,
+        "n": 500,
+        "p50": 37095.0,
+        "p95": 41010,
+        "p99": 45390,
+        "warmups": 50
+      },
+      "cv|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 35458.916,
+        "n": 500,
+        "p50": 35075.5,
+        "p95": 36410,
+        "p99": 42400,
+        "warmups": 50
+      },
+      "cv|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 28622.354,
+        "n": 500,
+        "p50": 28430.0,
+        "p95": 29260,
+        "p99": 34810,
+        "warmups": 50
+      },
+      "cv|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 28737.676,
+        "n": 500,
+        "p50": 28490.0,
+        "p95": 29110,
+        "p99": 35880,
+        "warmups": 50
+      },
+      "cv|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 27786.566,
+        "n": 500,
+        "p50": 27560.0,
+        "p95": 27950,
+        "p99": 34541,
+        "warmups": 50
+      },
+      "flagship|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 93484.2,
+        "n": 500,
+        "p50": 92320.0,
+        "p95": 100281,
+        "p99": 107040,
+        "warmups": 50
+      },
+      "flagship|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 107335.916,
+        "n": 500,
+        "p50": 106225.5,
+        "p95": 113991,
+        "p99": 117301,
+        "warmups": 50
+      },
+      "flagship|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 91406.214,
+        "n": 500,
+        "p50": 90550.0,
+        "p95": 98240,
+        "p99": 99810,
+        "warmups": 50
+      },
+      "flagship|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 80213.418,
+        "n": 500,
+        "p50": 73380.5,
+        "p95": 80761,
+        "p99": 83230,
+        "warmups": 50
+      },
+      "flagship|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 85295.696,
+        "n": 500,
+        "p50": 84601.0,
+        "p95": 92650,
+        "p99": 99531,
+        "warmups": 50
+      },
+      "flagship|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 73549.916,
+        "n": 500,
+        "p50": 72981.0,
+        "p95": 79641,
+        "p99": 82090,
+        "warmups": 50
+      }
+    },
+    "b2": {
+      "54016|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 209106.868,
+        "n": 500,
+        "p50": 207201.0,
+        "p95": 215221,
+        "p99": 219972,
+        "warmups": 50
+      },
+      "54016|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 855257.148,
+        "n": 500,
+        "p50": 855935.0,
+        "p95": 862285,
+        "p99": 865565,
+        "warmups": 50
+      },
+      "54016|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 211109.918,
+        "n": 500,
+        "p50": 211831.5,
+        "p95": 219181,
+        "p99": 220421,
+        "warmups": 50
+      },
+      "54016|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 198489.334,
+        "n": 500,
+        "p50": 198476.5,
+        "p95": 206052,
+        "p99": 207741,
+        "warmups": 50
+      },
+      "54016|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 833167.094,
+        "n": 500,
+        "p50": 833415.0,
+        "p95": 838895,
+        "p99": 842015,
+        "warmups": 50
+      },
+      "54016|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 195891.46,
+        "n": 500,
+        "p50": 193751.0,
+        "p95": 201701,
+        "p99": 206051,
+        "warmups": 50
+      },
+      "cv|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 36882.246,
+        "n": 500,
+        "p50": 36500.0,
+        "p95": 39161,
+        "p99": 44220,
+        "warmups": 50
+      },
+      "cv|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 38675.908,
+        "n": 500,
+        "p50": 38230.0,
+        "p95": 41560,
+        "p99": 46450,
+        "warmups": 50
+      },
+      "cv|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 36729.76,
+        "n": 500,
+        "p50": 36120.5,
+        "p95": 42440,
+        "p99": 45790,
+        "warmups": 50
+      },
+      "cv|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 28725.836,
+        "n": 500,
+        "p50": 28440.0,
+        "p95": 29371,
+        "p99": 35460,
+        "warmups": 50
+      },
+      "cv|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 29090.296,
+        "n": 500,
+        "p50": 28911.0,
+        "p95": 29410,
+        "p99": 35650,
+        "warmups": 50
+      },
+      "cv|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 28097.688,
+        "n": 500,
+        "p50": 27610.5,
+        "p95": 32240,
+        "p99": 35510,
+        "warmups": 50
+      },
+      "flagship|file-source|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 92634.7,
+        "n": 500,
+        "p50": 91761.0,
+        "p95": 99781,
+        "p99": 101141,
+        "warmups": 50
+      },
+      "flagship|file-source|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 106824.182,
+        "n": 500,
+        "p50": 106290.5,
+        "p95": 113410,
+        "p99": 114691,
+        "warmups": 50
+      },
+      "flagship|file-source|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 90854.654,
+        "n": 500,
+        "p50": 89945.5,
+        "p95": 97811,
+        "p99": 99520,
+        "warmups": 50
+      },
+      "flagship|owned-readat|list": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 74649.552,
+        "n": 500,
+        "p50": 73851.0,
+        "p95": 81240,
+        "p99": 88070,
+        "warmups": 50
+      },
+      "flagship|owned-readat|one-cell": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 84281.234,
+        "n": 500,
+        "p50": 83336.0,
+        "p95": 90581,
+        "p99": 92791,
+        "warmups": 50
+      },
+      "flagship|owned-readat|open": {
+        "binary_sha256": "e8ddd41cba8fb82c5f01106558271e04266cfff0db56eeb0cd0e55f21c450aee",
+        "mean": 73498.782,
+        "n": 500,
+        "p50": 72811.0,
+        "p95": 79760,
+        "p99": 81751,
+        "warmups": 50
+      }
+    }
+  }
+}

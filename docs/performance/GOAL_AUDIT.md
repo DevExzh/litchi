@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0595 — retained lean XLS frame loop and cheaper eager SST walk
+
+Closes two rows of change 0587's ranked queue by GOAL step 1 (eliminate
+unnecessary work) and step 3 (unnecessary allocation and copying), with no step
+skipped: no layout change, no algorithm substitution beyond replacing an O(n)
+re-summation with a maintained running total, no parallelism and no SIMD. The
+decision rules are satisfied in order — before measurements captured on a
+read-only detached checkout of the base, hypothesis and mechanism stated per
+site, smallest coherent change, correctness/preservation/adversarial evidence,
+after measurements with identical setup. Evidence tiers: **measured** for the 18
+logical-counter cells, the six callgrind isolation pairs, the six `perf stat`
+pairs and the 72 timing rounds; **modelled** for the two `SourceTextSheet::insert`
+sites, which sit on the text-extraction path that `xls_source_attribution`
+still has no selector for — change 0587's recorded measurement blocker, now
+blocking a second batch. The audit row "apply layout, cache, or SIMD tuning only
+from measured hot loops" is untouched. The standing instruction to price
+pointer-chase work in cycles is honoured: native cycles fall 25.42% and 18.44%
+on the `54016` open and one-cell against callgrind's 25.75% and 24.61%, and IPC
+falls on five of the six cells because what was removed was the most
+superscalar-friendly work in the loop. Host quiescence is not established — the
+load average was 44.41 to 40.45 on 32 cores — so the noise floor is measured in
+the same window (−2.64% to +3.06% at p50 over 36 same-binary comparisons)
+rather than assumed.
+OLE2/OOXML optimization remains active; ODF is
+deferred until completion and iWork excluded. [Change and
+limitations](0595-xls-frame-loop-and-sst-walk.md); [retained
+evidence](results/change-0595/README.md).
+
 ## 0592: the first item off the 0587 queue, and what the harness could not see
 
 `docs/GOAL.md`'s optimization order puts "eliminate unnecessary work" first, and

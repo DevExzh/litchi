@@ -1,5 +1,34 @@
 # Performance program phase report
 
+## 0595 — retained lean XLS frame loop and cheaper eager SST walk
+
+Two files changed in `litchi-xls`, seven edits, `performance_claim: none`.
+Paired A1 B1 B2 A2 medians over 500 samples per round: `54016.xls` open −23.79%
+/ −23.24%, list −22.13% / −21.29%, one-cell −18.08% / −17.26% (`owned-readat`),
+and −19.92% / −20.03%, −23.57% / −23.06%, −17.79% / −17.36% (`file-source`), all
+six cells agreeing between directions to within 0.9 percentage points;
+`WithCustomViews.xls` between −6.23% and −13.02%, its `file-source` one-cell
+being the noisiest row in the table and carrying both extremes of the floor;
+`ConditionalFormattingSamples.xls` between −0.59% and −3.90%, which is inside
+the measured ±3.1% floor and is reported as not separable. Tails move with the
+medians (`54016` owned one-cell p99 1,029,966 → 840,355 ns on adjacent rounds);
+two host artifacts, both on the *before* leg in this window, are named rather
+than smoothed. Two regressions are reported rather than netted
+into a mean: an inlining artifact
+outside either mechanism (`CellAlignment::parse` outlined from `parse_xf`) plus
+`MeasuredText::consume`, together about 1.0% of the `54016` open. Controls: all
+18 logical-counter cells and all 18 semantic projections identical between the
+legs, the three open rows reproducing changes 0565, 0574 and 0576 exactly, and
+the before instruction profile reproducing change 0584 to within 0.045% on the
+opens. Gates: `cargo fmt --all --check`, `cargo clippy -p litchi-xls
+--all-targets`, `cargo test -p litchi-xls` (1,382 passed, 0 failed, 1
+pre-existing ignored doctest) and `cargo doc -p litchi-xls --no-deps`, all
+clean. No cold-cache, physical-device, range-source, RSS, allocation-profile,
+concurrency-scaling, real-producer or cross-platform result is claimed.
+OLE2/OOXML optimization remains active; ODF is deferred until completion and
+iWork excluded. [Change and limitations](0595-xls-frame-loop-and-sst-walk.md);
+[retained evidence](results/change-0595/README.md).
+
 ## 0592: one cache, built when it is used
 
 The first implementation off the 0587 queue, and the smallest: `litchi-docx`
