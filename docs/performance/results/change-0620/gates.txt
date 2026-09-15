@@ -1,0 +1,66 @@
+=== cargo fmt --all --check ===
+exit=0
+
+=== cargo clippy -p litchi-xls --all-targets ===
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-core)
+    Checking ppv-lite86 v0.2.21
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-odraw)
+    Checking rand_chacha v0.3.1
+    Checking rand v0.8.8
+    Checking num-bigint-dig v0.8.6
+    Checking rsa v0.9.10
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.05s
+
+=== cargo test -p litchi-xls ===
+test result: ok. 1051 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.64s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+... (72 test binaries; full log not retained)
+TOTAL: 72 binaries, 1393 passed, 0 failed, 1 ignored
+(1051 of these are the litchi-xls library unit tests, which include the
+ three cases this change adds under cell_values::tests.)
+
+=== cargo doc -p litchi-xls --no-deps ===
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-crypto)
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.33s
+   Generated /home/zhuhe/code/litchi-worktrees/0620/target/doc/litchi_xls/index.html
+
+=== corpus differential oracle (corpus_oracle.py) ===
+fixtures 126, opened 93, refused at open 33
+rows per run 591 (297 typed refusals, 294 publishing)
+rows compared in total 3546
+oracle 1, refusal-text mismatches: 0
+oracle 2, non-digest field mismatches: 0
+oracle 3, digest mismatches over 587 reproducible rows: 0
+          rows excluded as not reproducible within one binary: 4
+            number-generic   test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls
+            string-generic   test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls
+            number-generic   test-data/poi/test-data/spreadsheet/59858.xls
+            string-generic   test-data/poi/test-data/spreadsheet/59858.xls
+
+=== pre-existing nondeterminism, reproduced on the untouched before checkout ===
+Per-process nondeterminism of the generic Transaction::commit output
+16 runs of each leg over the two affected fixtures.
+
+59858.xls                            noop-generic           distinct digests before=1 after=1  sets EQUAL
+      e5b4513f628fc16088b79ef6ad019d479706111fd11da7fe41f93bd0458da43f   before=True after=True
+59858.xls                            number-generic         distinct digests before=16 after=16  sets DIFFER
+      01465ecc2cce58952ac42dcbe80f4608038b96d380690ea836b169a6560be7c6   before=False after=True
+      03811537ece3453b837b1d3e375ea2cc8c0e052d1910b8536f75ce7fb9af5449   before=False after=True
+      0689020854f3fca9b1e94ad876dd4d4f519f03b3d9117c5692ba3989e2f847f3   before=False after=True
+      0b2a5665875572f0891f9edd7766e669e0650fb28edaa6fe1b59e48206b39ff3   before=True after=False
+      15b6225760562a93091ac2b331d997bc60658d2989ab0824ddab63c0ccd5679f   before=True after=False
+      1b687dc38b83ace5477c80a2ff7980ed6c18af265bc1f6bf73c06e8c4c2277ca   before=True after=False
+... (full digest sets in nondeterminism-summary.txt)

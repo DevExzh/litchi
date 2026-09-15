@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0620",
+  "title": "An XLS source-backed numeric save parses the whole workbook three more times, and one of the three was already parsed at open",
+  "decision": "attribution retained; one value-identical reuse implemented; the readback-owner replacement frozen as not admissible as proposed",
+  "code_state": "crates/litchi-xls/src/cell_values/mod.rs (one function body) and crates/litchi-xls/src/cell_values/tests.rs (three tests added); no other crate touched",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "survey_item": "XLS-9 (rank 31) of change 0587",
+  "reason_codes": [
+    "0587 sized XLS-9 as unknown because no attribution of the XLS edit-and-save path existed; this record supplies it, with callgrind isolation pairs split by call site (--separate-callers=2), native perf stat cycles, per-operation allocation and peak-live-byte counts, and a 126-fixture admission census",
+    "the attribution answers 0587's falsification test in the negative: Workbook::new is 54.7% of a plan-only commit on 54016.xls, not under 15%",
+    "commit_source_backed_numeric re-parsed the source snapshot's own immutable bytes to answer three policy questions that Snapshot::from_package_editor had already answered over the same bytes under the same limits and recorded in SourcePolicyFacts; commit 237309eea introduced those facts for exactly this purpose and converted only the plan-only sibling",
+    "the reuse is value-identical: the two live verdicts return character-identical refusal strings and the third (public worksheet coverage) is unreachable because a snapshot whose coverage failed cannot be constructed",
+    "the survey's proposed replacement of the candidate readback's owner is not admissible as specified: require_public_worksheet_coverage asserts a property of the eager parser's success, and SourceBackedWorkbook assigns its worksheet index unconditionally from the BoundSheet8 dt byte without reading a worksheet byte, so it is always true"
+  ],
+  "accepted_evidence": {
+    "attribution": "callgrind --separate-callers=2 isolation pairs over six operations on three real fixtures, both legs; per-call-site inclusive Ir per operation; the four complete Workbook::new parses of one open-edit-save are 52.1% of the operation on 54016.xls",
+    "deterministic_counts": "per-operation allocation calls, allocated bytes and peak live bytes from a counting global allocator armed for one measured iteration; 54016.xls source-backed commit: 201,886 -> 161,751 allocations, 93,192,484 -> 76,204,234 allocated bytes, 39,572,027 -> 26,082,823 peak live bytes",
+    "instructions_and_cycles": "callgrind 1,053,779,059 -> 906,199,478 Ir/op (-14.00%) and native perf stat 228,627,848 -> 171,248,047 cycles/op (-25.10%) on 54016/number-source-backed; the chain Workbook::new'commit_source_backed'main is 137,061,668 Ir before and 0 after",
+    "paired_timing": "A1 B1 B2 A2 on real fixtures through the retained probe: 54016 commit p50 -32.11% / -33.66%, cv -26.76% / -26.19%, p95 and p99 within a point of p50 in both directions; A/A floor within +/-2% at p50, unchanged controls up to +5.3%",
+    "corpus_differential": "126 .xls fixtures (93 opened by the editor, 33 refused at open), 591 file/operation rows per run, three runs per leg, 3,546 rows compared: 0 refusal-text mismatches, 0 mismatches on every reported field except the artifact digest, and 0 digest mismatches over the 587 rows whose digest is reproducible; 4 rows excluded because the generic commit's CFB directory order is not reproducible within one binary",
+    "registered_selectors": "twelve cases A1 B1 B2 A2; every output_sha256 identical across all four rounds (Number f8f37064..., RK/MulRK ddf5d5b8..., the digests change 0138 recorded)",
+    "unit_tests": "three added cases pin the reuse to the recorded facts, the exact protection refusal strings, and refusal identity between the two source-backed publication entry points",
+    "design_equivalence": "per-check analysis of whether SourceBackedWorkbook can answer the four candidate-readback checks, with the ~40 eager per-sheet failure modes that make require_public_worksheet_coverage a property of the parser rather than of the bytes"
+  },
+  "accepted_costs": {
+    "callgrind_sha256": "callgrind runs SHA-256 in software because valgrind masks the SHA CPUID bit, so every fingerprint share is about five times its native share; the native cycle saving (-25.1%) therefore exceeds the callgrind instruction saving (-14.0%)",
+    "control_band": "the measured same-binary A/A floor is within +/-2% at p50, but unchanged controls move up to +5.3% between the two binaries because code layout differs; the honest control band is about +/-5% at p50",
+    "registered_selectors_blind": "the registered XLS numeric corpora have a Workbook stream that is 0.48% (Number) and 0.82% (RK/MulRK) of the archive, against 78.9-94.2% on real fixtures, so they cannot resolve work proportional to the Workbook stream; the Number case disagrees with itself between directions",
+    "probe_scope": "the paired timing uses a scratch probe retained in this packet, not a registered selector, because no registered selector drives the XLS edit path on a real fixture",
+    "warm_in_memory": "warm page cache, in-memory sources, one CPU, one process per round; no cold-cache, RSS, physical-I/O or producer measurement"
+  },
+  "known_gaps": {
+    "target_parsed_twice": "commit_source_backed still parses the materialized target twice (Snapshot::from_bytes and verify_source_backed_numeric_target), 137,426,515 Ir for the second; not removed because the coverage check there uses the source's sheet list and the proof that the two lists agree runs afterwards",
+    "open_frames_twice": "Snapshot::from_bytes frames the Workbook stream once for the offset inventory (12.5% of the open) and again inside Workbook::new (82.1%); fusing them is the largest remaining item and is a different change",
+    "readback_owner": "the frozen design lists five admission gates; none is met today",
+    "cfb_storage_order": "a pre-existing per-process nondeterminism in the generic commit's published CFB directory order, reproduced sixteen times on the untouched before checkout (4 of 591 rows, two fixtures), located at crates/litchi-cfb/src/writer/core.rs:977; reported, not fixed"
+  },
+  "withheld": [
+    "any registered performance claim",
+    "any cold-cache, physical-device, range-source, peak-RSS, concurrency or cross-platform result",
+    "any claim for Transaction::commit, the eager path, sheet_visibility, comments, or any crate other than litchi-xls",
+    "any claim that the attribution shares hold on a workbook with a different record mix"
+  ],
+  "provenance": {
+    "base_commit": "1e4198321",
+    "branch": "perf/0620-xls-edit-save-attribution",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "before_checkout": "/home/zhuhe/code/litchi-worktrees/before-1e4198321 (shared read-only detached checkout of the base)",
+    "cpu_pinning": "taskset -c 14 under setarch -R, RAYON_NUM_THREADS=1",
+    "binaries": {
+      "litchi-perf-baseline before": "0af006afa55262ee4b43179060d5e2ed78c0ecb8b66fc2286d9be97cd34859dc",
+      "litchi-perf-baseline after": "35291f3925aa583ef4339e9eecd061b37a38e47aa03e0b3be15b8121e2521aae",
+      "xls_edit_probe before": "a7130b304b47a4674db9be9a4af5f088facf8194ce1e6989d8894da20f3f3eb6",
+      "xls_edit_probe after": "bc7c2501e96a1ac133395cff5095bb370caff6f59f8078e8ada4ac6fa60cb3f4"
+    }
+  }
+}

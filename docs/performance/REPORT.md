@@ -1,5 +1,48 @@
 # Performance program phase report
 
+## 0620 — the XLS edit-and-save path attributed; one duplicate source parse removed; the readback-owner swap frozen as inadmissible
+
+Two files changed in `litchi-xls` — one function body and three tests —
+`performance_claim: none`. The changed scenario is `commit_source_backed` on a
+fixed-width numeric edit: commit p50 **35,940,283 → 24,400,164 ns** on
+`54016.xls` (−32.11% forward, −33.66% reverse, p95 −31.85%/−31.28%, p99
+−31.82%/−31.49%) and **3,336,644 → 2,443,878 ns** on `WithCustomViews.xls`
+(−26.76%/−26.19%), against a same-binary A/A floor of +1.70% and −0.20%.
+Deterministic counters on `54016.xls`: allocation calls 201,886 → 161,751
+(−19.88%), allocated bytes 93,192,484 → 76,204,234 (−18.23%), peak live bytes
+39,572,027 → 26,082,823 (**−34.09%**); native cycles 228,627,848 → 171,248,047
+(−25.10%). Controls: every counter of `open`, `number-plan`, `number-generic`,
+`string-generic` and `noop-generic` is identical on both legs on all five
+fixtures; instruction counts on those controls move −0.29% to +0.50%; their
+commit p50s move −0.17% to +5.27%, inside the ±5% band the `open`-phase drift
+establishes. **No comparison exceeds the +5% review trigger** except the
+sub-microsecond `noop-generic` commit (210-615 ns), whose floors are as large as
+its deltas and which is reported without evidential weight. The **registered
+selectors cannot resolve the change and are reported saying so**:
+`xls_numeric_source_backed_number_edit_save` gives −4.40% forward and −0.88%
+reverse against a 6% eager-control drift, and the RK/MulRK case −2.66%/−2.74%,
+because those corpora's Workbook stream is 0.48% and 0.82% of the archive while
+the removed work is proportional to the Workbook stream. Correctness: 126
+fixtures × five publication paths × three runs per leg — 591 rows per run and
+3,546 rows compared, **0 refusal-text mismatches, 0 mismatches on every reported
+field except the artifact digest, and 0 digest mismatches** on the 587 rows whose
+digest is reproducible; all twelve registered selector cases keep their `output_sha256` across all
+four rounds, including the Number `f8f37064…` and RK/MulRK `ddf5d5b8…` digests
+change 0138 recorded. Gates: `cargo fmt --all --check`, `cargo clippy -p
+litchi-xls --all-targets`, `cargo test -p litchi-xls` (72 binaries, 1,393 passed,
+0 failed, 1 pre-existing ignored doctest) and `cargo doc -p litchi-xls --no-deps`,
+all clean. **A pre-existing defect is reported, not fixed**: the generic
+`Transaction::commit` publishes a CFB whose storage directory entry order comes
+from a `HashSet` iteration (`litchi-cfb/src/writer/core.rs:977`), so two fixtures
+publish different bytes on every process — reproduced three times on the
+untouched before checkout, 4 of 591 rows on two fixtures, 250 differing bytes out
+of 1,103,360, all inside UTF-16LE directory names. No cold-cache, physical-device,
+range-source, RSS, concurrency-scaling, real-producer or cross-platform result is
+claimed. OLE2/OOXML optimization remains active; ODF is deferred until completion
+and iWork excluded. [Change and
+limitations](0620-xls-edit-save-attribution.md); [retained
+evidence](results/change-0620/README.md).
+
 ## 0600 — one fewer observation per cold Part read, a bounded monitored-read scope, and an allocation-free member lookup
 
 Three mechanisms. `lookup_member_name` now returns a `Cow` and borrows the

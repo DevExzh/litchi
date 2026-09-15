@@ -1,5 +1,57 @@
 # Performance optimization ADR-compliance matrix
 
+## 0620 — the XLS edit-and-save path attributed; one duplicate source parse removed; the readback-owner swap frozen as inadmissible
+
+ADR 0003's publication rule — "public format editors publish only after their
+staged CRUD operation and typed readback succeed", with "the complete package
+reopened under the retained limits" — is the governing text, and this change is
+deliberately on the other side of it: what was removed is a re-validation of the
+**source**, not of the candidate. The candidate readback is untouched, still runs
+twice over the materialized target (`Snapshot::from_bytes` and
+`verify_source_backed_numeric_target`), and still carries
+`require_public_worksheet_coverage`, `require_unprotected_workbook`,
+`require_macro_free_workbook`, `carry_fixed_numeric_inventory` and
+`verify_public_numeric_readback` unchanged; change 0016's standing instruction
+("target a different source of whole-workbook work, not remove either retained
+validation layer") is the instruction followed. ADR 0006's validation contract is
+satisfied by construction: the reused verdicts were produced by the same
+`Workbook::new` over the same sealed `Arc<[u8]>` under the same default `Limits`
+and `CompatibilityProfile::Strict`, `Inner` is constructed at exactly three sites
+of which two compute the facts from the workbook they validate and the third is a
+pure retag, and the two reachable refusals return character-identical strings
+("protected or shared workbooks…", "protected worksheets…", "macro-bearing XLS
+sources…"). The third verdict is unreachable: `SourcePolicyFacts::from_workbook`
+propagates the coverage error with `?` before constructing the struct, so a
+snapshot whose coverage failed does not exist, and the corresponding `require()`
+branch is a dead defensive branch — exactly as it already is on the plan-only
+path. Order and reachability are preserved; the only behavioural movement is that
+a protected or macro-bearing source now refuses *sooner*, without first parsing
+itself. No new `unsafe`, no weakened limit or malformed-input defence, no hidden
+global Rayon pool, no ambient I/O, no public type or API change; source lineage,
+overlay fingerprints, same-length splice validation, the artifact-length check,
+the exact `Patch` and inverse, and the exact no-op fast path are all untouched.
+**The frozen design is where the ADRs bite and is why nothing else was built**:
+moving the candidate readback's owner from the eager `Workbook` to
+`SourceBackedWorkbook` would need a proposed ADR, because ADR 0003 names the
+complete reopen, and because `require_public_worksheet_coverage` cannot be
+carried across — it asserts that the *eager parser's* per-sheet projection
+succeeded, a fact set at one line (`workbook/package.rs:210`) and defeated by
+roughly forty distinct per-sheet failures the loop swallows at `package.rs:217`,
+whereas the lazy owner sets the same field unconditionally from the BoundSheet8
+`dt` byte at `workbook/source.rs:2093` without reading a worksheet byte. The two
+owners also disagree in the other direction (the eager parser slices each sheet
+to the end of the whole stream with no upper bound and never validates the BOF
+substream type; the lazy owner bounds each sheet, validates the BOF, and refuses
+`FilePass` unconditionally), and their worksheet index numbering diverges the
+moment any sheet fails eagerly. Five admission gates are recorded. Separately,
+ADR 0006's "serialization is deterministic unless a `Clock`, actor identity, or
+cryptographic RNG is explicitly supplied" is **reported as deviated** on the
+generic XLS commit path, at `litchi-cfb/src/writer/core.rs:977`, pre-existing and
+out of this change's scope. OLE2/OOXML optimization remains active; ODF is
+deferred until completion and iWork excluded. [Change and
+limitations](0620-xls-edit-save-attribution.md); [retained
+evidence](results/change-0620/README.md).
+
 ## Change 0600 compliance update
 
 Change 0600 removes one source observation from the cold OPC Part load, bounds

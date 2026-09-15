@@ -1,0 +1,40 @@
+Corpus differential, change 0620
+Every .xls in the repository, five publication paths, three runs per leg.
+
+fixtures                                               126
+  opened by cell_values::Snapshot::from_bytes          93
+  refused at open                                      33
+rows (fixture x operation) per run                     591
+  typed refusals                                       297
+  rows that published bytes                            294
+rows compared in total (3 runs x 2 legs)               3546
+
+ORACLE 1 - refusal identity, every row
+  before-vs-after refusal-text mismatches              0
+
+ORACLE 2 - every field except the artifact digest, every row
+  (published length, changed cells, touched streams, splice count,
+   replacement bytes, changed spans, target Workbook length, is_noop,
+   patch before/after lengths, patch emptiness, inverse digest)
+  before-vs-after mismatches                           0
+
+ORACLE 3 - artifact digest
+  rows excluded as not reproducible within one binary   4
+      number-generic   pivottable_dates_grouping.xls
+      string-generic   pivottable_dates_grouping.xls
+      number-generic   59858.xls
+      string-generic   59858.xls
+  rows compared                                        587
+  before-vs-after digest mismatches                    0
+
+  (the 3-run sweep alone caught 3 of the 4 unstable rows;
+   the exclusion list comes from 16 runs per leg over the two affected
+   fixtures, retained as nondeterminism-{before,after}.jsonl. On
+   pivottable_dates_grouping.xls each generic operation draws from the
+   same 3-element digest set on both legs; on 59858.xls 16 runs give 16
+   distinct digests per leg, so the set cannot be enumerated.)
+
+  Every excluded row is on the generic Transaction::commit path, which
+  re-renders the CFB directory. The source-backed and plan-only paths
+  splice source bytes in place and are reproducible on every fixture:
+  all 3 x 2 runs of every number-plan and number-source-backed row agree.

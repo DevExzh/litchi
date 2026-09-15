@@ -1,0 +1,17 @@
+[package]
+name = "xls-edit-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xls_edit_probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/0620/crates/litchi-xls" }
+
+[profile.release]
+debug = 1

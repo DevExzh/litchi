@@ -719,6 +719,83 @@ fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
 }
 
 #[test]
+fn source_backed_numeric_publication_consumes_cached_source_policy_facts() {
+    for fact in 0..3 {
+        let mut source = Snapshot::from_bytes(package()).unwrap();
+        assert!(source.inner.source_policy.public_worksheet_coverage);
+        assert_eq!(
+            source.inner.source_policy.protection,
+            SourceProtectionPolicy::Unprotected
+        );
+        assert!(source.inner.source_policy.macro_free_workbook);
+        let inner = Arc::get_mut(&mut source.inner).unwrap();
+        match fact {
+            0 => inner.source_policy.public_worksheet_coverage = false,
+            1 => {
+                inner.source_policy.protection = SourceProtectionPolicy::WorkbookOrShared;
+            },
+            2 => inner.source_policy.macro_free_workbook = false,
+            _ => unreachable!(),
+        }
+
+        let mut edit = source.edit();
+        edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+            .unwrap();
+        assert!(edit.commit_source_backed().is_err());
+    }
+}
+
+/// The two source-backed publication entry points read the same source policy,
+/// so a refused source must produce the same typed refusal text through both.
+#[test]
+fn source_backed_numeric_publication_and_plan_refuse_sources_identically() {
+    for bytes in [
+        protected_package(false),
+        protected_package(true),
+        macro_package(),
+        empty_macro_storage_package(),
+    ] {
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        let reference = Reference::new(3, 2).unwrap();
+
+        let mut publication = source.edit();
+        publication
+            .set_number("Sheet1".into(), reference, 9.25)
+            .unwrap();
+        let publication = publication.commit_source_backed().unwrap_err().to_string();
+
+        let mut plan = source.edit();
+        plan.set_number("Sheet1".into(), reference, 9.25).unwrap();
+        let plan = plan.commit_source_backed_plan().unwrap_err().to_string();
+
+        assert_eq!(publication, plan);
+    }
+}
+
+#[test]
+fn source_backed_numeric_publication_preserves_protection_refusal_reasons() {
+    for (worksheet, expected) in [
+        (
+            false,
+            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+        ),
+        (
+            true,
+            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+        ),
+    ] {
+        let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
+        let mut edit = source.edit();
+        edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 4.5)
+            .unwrap();
+        assert_eq!(
+            edit.commit_source_backed().unwrap_err().to_string(),
+            expected
+        );
+    }
+}
+
+#[test]
 fn source_backed_numeric_plan_preserves_protection_refusal_reasons() {
     for (worksheet, expected) in [
         (

@@ -1,0 +1,38 @@
+Admission census, cell_values editor, 126 .xls fixtures
+
+    40  number-generic: published
+    53  number-generic: refused
+    35  number-plan: published
+    58  number-plan: refused
+    35  number-source-backed: published
+    58  number-source-backed: refused
+    93  opened
+    33  refused at open
+    51  string-generic: published
+    42  string-generic: refused
+
+refusal texts at Snapshot::from_bytes:
+    14  Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader
+     6  Unsafe edit refused: worksheet at tab position 1 was not published by the complete XLS reader
+     3  Unsafe edit refused: worksheet at tab position 6 was not published by the complete XLS reader
+     3  Workbook password is required
+     2  CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+     1  Invalid data: Font name has 0 characters; expected 1..=31
+     1  Unsafe edit refused: worksheet at tab position 8 was not published by the complete XLS reader
+     1  Invalid data: Font family 108 is invalid; expected 0..=5
+     1  Invalid data: SST total count is smaller than its unique count
+     1  Invalid record 0x087C: XFCRC declares 72 XF records but 62 were parsed
+
+refusal texts for number-source-backed (on fixtures that opened):
+    53  no editable numeric cell
+     4  Unsafe edit refused: macro-bearing XLS sources are not eligible for source-backed numeric edits
+     1  Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits
+
+fixtures over 100 KB that admit number-source-backed:
+      166912 refused   test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls
+      178176 refused   test-data/ole/xls/FormulaEvalTestData.xls
+      165888 PUBLISHES test-data/ole/xls/WithCustomViews.xls
+      179712 refused   test-data/ole/xls/WithEmbeddedObjects.xls
+      167424 PUBLISHES test-data/poi/test-data/spreadsheet/45365-2.xls
+      984576 PUBLISHES test-data/poi/test-data/spreadsheet/54016.xls
+     1103360 refused   test-data/poi/test-data/spreadsheet/59858.xls

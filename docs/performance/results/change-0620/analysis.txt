@@ -1,0 +1,283 @@
+# Change 0620 attribution tables
+#
+# Callgrind: per-operation inclusive Ir, isolation pairs differenced and
+# divided by the extra operations, --separate-callers=2 so each call site
+# of a repeated function is its own row. One 'operation' is one whole
+# open + stage + commit + publish of the named scenario, including the
+# probe's own per-iteration copy of the fixture bytes.
+# Callgrind runs SHA-256 in software, so every `sha2` row is an upper
+# bound; the perf table below is the native counterpart.
+
+================ 54016 ================
+
+-- open: 167,311,992 -> 166,819,776 Ir/op (-0.29%)
+     162,436,656  97.09%  ->   161,944,440   <Snapshot>::from_bytes
+     158,263,765  94.59%  ->   157,771,548   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     137,421,818  82.14%  ->   137,429,156   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     137,261,233  82.04%  ->   137,268,570   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     120,526,281  72.04%  ->   120,533,650   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      61,209,276  36.58%  ->    61,209,276   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      39,641,023  23.69%  ->    39,641,023   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- number-plan: 525,020,551 -> 524,570,766 Ir/op (-0.09%)
+     250,629,394  47.74%  ->   250,670,158   <Transaction>::commit_source_backed_plan
+     250,461,555  47.71%  ->   250,502,309   <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>'<Transaction>::commit_source_backed_plan'xls_edit_probe::main
+     250,449,804  47.70%  ->   250,490,558   cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>'<Transaction>::commit_source_backed_plan
+     162,292,531  30.91%  ->   161,801,981   <Snapshot>::from_bytes
+     158,120,806  30.12%  ->   157,630,257   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     145,735,249  27.76%  ->   145,776,004   verify_source_backed_numeric_plan_target'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>
+     137,136,071  26.12%  ->   137,145,075   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     137,118,729  26.12%  ->   137,126,093   Workbook::new'verify_source_backed_numeric_plan_target'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>
+     136,974,541  26.09%  ->   136,983,545   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     136,951,783  26.09%  ->   136,959,148   Workbook::parse_workbook'Workbook::new'verify_source_backed_numeric_plan_target
+     120,235,785  22.90%  ->   120,244,838   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+     120,214,847  22.90%  ->   120,222,216   Workbook>>::parse_worksheet_records_with_compatibility'Workbook::parse_workbook'Workbook::new
+     104,496,391  19.90%  ->   104,496,391   cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>
+     103,621,837  19.74%  ->   103,621,837   <cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+     103,621,820  19.74%  ->   103,621,820   <cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>'xls_edit_probe::main
+     102,527,204  19.53%  ->   102,527,204   sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+     102,527,000  19.53%  ->   102,527,000   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>
+     102,522,446  19.53%  ->   102,522,446   sha2::sha256::compress256'cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>
+     102,522,428  19.53%  ->   102,522,428   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'cfb::overlay::fingerprints
+      78,960,346  15.04%  ->    78,960,346   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+      61,052,009  11.63%  ->    61,052,009   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      61,044,843  11.63%  ->    61,044,843   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook::parse_workbook
+
+-- number-source-backed: 1,053,779,059 -> 906,199,478 Ir/op (-14.00%)
+     775,712,141  73.61%  ->   628,473,315   <Transaction>::commit_source_backed
+     481,513,174  45.69%  ->   360,630,451   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+     274,343,185  26.03%  ->   274,165,327   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     274,020,745  26.00%  ->   273,843,473   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     244,506,481  23.20%  ->   183,116,960   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+     205,044,856  19.46%  ->   205,044,856   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'cfb::overlay::fingerprints
+     162,364,929  15.41%  ->   161,168,128   <Snapshot>::from_bytes'<Transaction>::commit_source_backed'xls_edit_probe::main
+     161,997,188  15.37%  ->   161,687,338   <Snapshot>::from_bytes
+     158,233,469  15.02%  ->   118,412,201   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+     158,191,791  15.01%  ->   156,995,188   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'<Transaction>::commit_source_backed
+     157,824,050  14.98%  ->   157,514,033   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     152,487,225  14.47%  ->   152,175,629   verify_source_backed_numeric_target'<Transaction>::commit_source_backed'xls_edit_probe::main
+     137,426,515  13.04%  ->   137,091,693   Workbook>::new'verify_source_backed_numeric_target'<Transaction>::commit_source_backed
+     137,262,698  13.03%  ->   136,927,811   Workbook>::parse_workbook'Workbook>::new'verify_source_backed_numeric_target
+     137,061,668  13.01%  ->             0   Workbook>::new'<Transaction>::commit_source_backed'xls_edit_probe::main
+     136,900,125  12.99%  ->             0   Workbook>::parse_workbook'Workbook>::new'<Transaction>::commit_source_backed
+
+-- number-generic: 345,125,462 -> 344,657,596 Ir/op (-0.14%)
+     240,470,974  69.68%  ->   240,469,146   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+     172,327,731  49.93%  ->   172,359,352   <Transaction>::commit
+     162,276,360  47.02%  ->   161,776,873   <Snapshot>::from_bytes
+     158,103,742  45.81%  ->   157,604,255   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     154,266,180  44.70%  ->   154,297,768   <Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit'xls_edit_probe::main
+     137,201,682  39.75%  ->   137,199,880   Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit
+     137,066,150  39.71%  ->   137,066,217   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     137,027,010  39.70%  ->   137,025,208   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor
+     136,904,964  39.67%  ->   136,905,031   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     122,098,901  35.38%  ->   122,098,901   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      78,962,395  22.88%  ->    78,962,395   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- string-generic: 358,341,422 -> 357,345,827 Ir/op (-0.28%)
+     273,948,023  76.45%  ->   273,951,552   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     240,636,630  67.15%  ->   240,640,134   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+     180,305,483  50.32%  ->   179,805,937   <Transaction>::commit
+     162,237,357  45.27%  ->   161,737,827   <Snapshot>::from_package_editor'<Transaction>::commit'xls_edit_probe::main
+     162,184,559  45.26%  ->   161,688,511   <Snapshot>::from_bytes
+     158,010,469  44.09%  ->   157,514,420   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     137,260,317  38.30%  ->   137,260,340   Workbook>::new'<Snapshot>::from_package_editor'<Transaction>::commit
+     137,023,161  38.24%  ->   137,026,667   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     122,194,556  34.10%  ->   122,194,556   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      79,058,050  22.06%  ->    79,058,050   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- noop-generic: 170,855,242 -> 170,351,988 Ir/op (-0.29%)
+     162,391,006  95.05%  ->   161,887,751   <Snapshot>::from_bytes
+     158,217,603  92.60%  ->   157,714,349   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+     137,346,536  80.39%  ->   137,342,835   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+     137,185,562  80.29%  ->   137,181,862   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+     120,478,119  70.51%  ->   120,474,395   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      61,182,648  35.81%  ->    61,182,648   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      39,614,395  23.19%  ->    39,614,395   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+================ cv ================
+
+-- open: 15,370,722 -> 15,356,128 Ir/op (-0.09%)
+      14,948,599  97.25%  ->    14,934,070   <Snapshot>::from_bytes
+      14,218,372  92.50%  ->    14,204,441   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      12,567,502  81.76%  ->    12,562,571   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      12,508,149  81.38%  ->    12,503,246   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+       8,684,255  56.50%  ->     8,679,367   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+       4,226,230  27.50%  ->     4,225,897   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       3,126,789  20.34%  ->     3,127,103   <records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook'Workbook>::new
+       3,126,512  20.34%  ->     3,126,826   <records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook
+       2,999,215  19.51%  ->     2,999,245   <records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records
+       2,806,835  18.26%  ->     2,806,502   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+       2,760,359  17.96%  ->     2,760,503   <alloc::string::String>::from_utf16'<records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments
+
+-- number-plan: 64,072,271 -> 64,058,051 Ir/op (-0.02%)
+      31,027,577  48.43%  ->    31,029,598   <Transaction>::commit_source_backed_plan
+      30,966,939  48.33%  ->    30,968,968   <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>'<Transaction>::commit_source_backed_plan'xls_edit_probe::main
+      30,959,461  48.32%  ->    30,961,475   cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>'<Transaction>::commit_source_backed_plan
+      17,613,040  27.49%  ->    17,613,020   cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>
+      17,527,254  27.36%  ->    17,528,110   <cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+      17,527,237  27.36%  ->    17,528,093   <cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>'xls_edit_probe::main
+      17,280,120  26.97%  ->    17,280,120   sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+      17,280,072  26.97%  ->    17,280,072   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>
+      17,276,558  26.96%  ->    17,276,558   sha2::sha256::compress256'cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>
+      17,276,540  26.96%  ->    17,276,540   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'cfb::overlay::fingerprints
+      14,872,558  23.21%  ->    14,855,517   <Snapshot>::from_bytes
+      14,143,127  22.07%  ->    14,125,913   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      13,264,647  20.70%  ->    13,266,750   verify_source_backed_numeric_plan_target'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner::<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>
+      12,563,379  19.61%  ->    12,563,030   Workbook::new'verify_source_backed_numeric_plan_target'cfb::overlay::finish_overlay_plan_with_owner::<litchi_core::source::SourceVersion, error::Error, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<litchi_core::source::SourceVersion, error::Error, commit_source_backed_numeric_plan::{closure#3}>::{closure#13}, commit_source_backed_numeric_plan::{closure#3}>
+      12,531,304  19.56%  ->    12,530,321   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      12,503,776  19.52%  ->    12,503,545   Workbook::parse_workbook'Workbook::new'verify_source_backed_numeric_plan_target
+      12,472,685  19.47%  ->    12,472,017   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+       8,678,530  13.54%  ->     8,676,455   Workbook>>::parse_worksheet_records_with_compatibility'Workbook::parse_workbook'Workbook::new
+       8,659,942  13.52%  ->     8,657,332   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+
+-- number-source-backed: 128,816,213 -> 115,336,872 Ir/op (-10.46%)
+      95,364,136  74.03%  ->    81,970,939   <Transaction>::commit_source_backed
+      34,707,912  26.94%  ->    25,989,697   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      34,553,080  26.82%  ->    34,553,080   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'cfb::overlay::fingerprints
+      25,127,267  19.51%  ->    25,059,628   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      25,010,013  19.42%  ->    24,942,729   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      17,701,096  13.74%  ->    17,700,663   <ole::source_backed_overlay::SourceBackedOverlayPublisher>::plan_splices'<Transaction>::commit_source_backed'xls_edit_probe::main
+      17,701,093  13.74%  ->    17,700,660   <cfb::shared::SharedOleFile>::plan_same_length_stream_splices'<ole::source_backed_overlay::SourceBackedOverlayPublisher>::plan_splices'<Transaction>::commit_source_backed
+      17,694,601  13.74%  ->    17,694,177   cfb::overlay::finish_overlay_plan_with_owner::<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>::{closure#13}, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices'<ole::source_backed_overlay::SourceBackedOverlayPublisher>::plan_splices
+      17,679,564  13.72%  ->    17,679,722   materialize_numeric_plan'<Transaction>::commit_source_backed'xls_edit_probe::main
+      17,679,185  13.72%  ->    17,679,334   <cfb::overlay::ValidatedOverlayPlan>::write_validated::<Vec<u8>>'materialize_numeric_plan'<Transaction>::commit_source_backed
+      17,613,485  13.67%  ->    17,613,556   <cfb::overlay::ValidatedOverlayPlan>::composed_source'<Transaction>::commit_source_backed'xls_edit_probe::main
+      17,613,158  13.67%  ->    17,613,229   cfb::overlay::fingerprints'<cfb::overlay::ValidatedOverlayPlan>::composed_source'<Transaction>::commit_source_backed
+      17,612,990  13.67%  ->    17,613,036   cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>::{closure#13}, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>'<cfb::shared::SharedOleFile>::plan_same_length_stream_splices
+      17,555,120  13.63%  ->    17,531,069   <cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+      17,555,103  13.63%  ->    17,531,052   <cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>'xls_edit_probe::main
+      17,280,120  13.41%  ->    17,280,120   sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<Vec<u8>>'materialize_numeric_plan
+      17,280,120  13.41%  ->    17,280,120   sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>'<cfb::overlay::ValidatedOverlayPlan>::write_to::<xls_edit_probe::CountingSink>
+      17,280,072  13.41%  ->    17,280,072   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<Vec<u8>>
+      17,280,072  13.41%  ->    17,280,072   sha2::sha256::soft::unroll::compress'sha2::sha256::compress256'<cfb::overlay::ValidatedOverlayPlan>::write_validated::<xls_edit_probe::CountingSink>
+      17,276,558  13.41%  ->    17,276,558   sha2::sha256::compress256'cfb::overlay::fingerprints'<cfb::overlay::ValidatedOverlayPlan>::composed_source
+      17,276,558  13.41%  ->    17,276,558   sha2::sha256::compress256'cfb::overlay::fingerprints'cfb::overlay::finish_overlay_plan_with_owner::<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices_with_owner<(), cfb::overlay::OverlayError, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>::{closure#13}, <cfb::shared::SharedOleFile>::plan_same_length_stream_splices::{closure#0}>
+      16,839,723  13.07%  ->    12,617,166   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      15,001,014  11.65%  ->    14,903,264   <Snapshot>::from_bytes'<Transaction>::commit_source_backed'xls_edit_probe::main
+      14,918,887  11.58%  ->    14,878,313   <Snapshot>::from_bytes
+      14,270,360  11.08%  ->    14,173,958   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'<Transaction>::commit_source_backed
+      14,189,316  11.02%  ->    14,148,502   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      13,793,784  10.71%  ->    13,768,302   verify_source_backed_numeric_target'<Transaction>::commit_source_backed'xls_edit_probe::main
+
+-- number-generic: 32,422,831 -> 32,315,609 Ir/op (-0.33%)
+      17,343,182  53.49%  ->    17,339,867   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      16,709,044  51.53%  ->    16,643,388   <Transaction>::commit
+      14,875,450  45.88%  ->    14,835,001   <Snapshot>::from_bytes
+      14,155,176  43.66%  ->    14,157,573   <Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit'xls_edit_probe::main
+      14,145,666  43.63%  ->    14,105,243   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      12,602,269  38.87%  ->    12,602,039   Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit
+      12,541,950  38.68%  ->    12,541,402   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor
+      12,523,001  38.62%  ->    12,520,221   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      12,464,685  38.44%  ->    12,461,800   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+       8,421,446  25.97%  ->     8,420,154   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,264,841  19.32%  ->     6,265,997   <records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook'Workbook>::new
+       6,264,287  19.32%  ->     6,265,443   <records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook
+       6,006,238  18.52%  ->     6,006,547   <records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records
+       5,582,656  17.22%  ->     5,581,364   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+       5,523,102  17.03%  ->     5,521,680   <alloc::string::String>::from_utf16'<records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments
+
+-- string-generic: 33,107,930 -> 33,271,929 Ir/op (+0.50%)
+      25,012,537  75.55%  ->    25,001,933   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      17,352,073  52.41%  ->    17,343,816   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      17,139,196  51.77%  ->    17,294,587   <Transaction>::commit
+      14,890,925  44.98%  ->    14,898,585   <Snapshot>::from_bytes
+      14,607,666  44.12%  ->    14,746,146   <Snapshot>::from_package_editor'<Transaction>::commit'xls_edit_probe::main
+      14,160,970  42.77%  ->    14,168,947   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      12,600,140  38.06%  ->    12,595,410   Workbook>::new'<Snapshot>::from_package_editor'<Transaction>::commit
+      12,529,511  37.84%  ->    12,523,454   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+       8,432,440  25.47%  ->     8,430,691   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,262,817  18.92%  ->     6,259,872   <records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook'Workbook>::new
+       6,262,263  18.91%  ->     6,259,318   <records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook
+       6,004,551  18.14%  ->     6,001,782   <records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records
+       5,593,650  16.90%  ->     5,591,901   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+       5,521,210  16.68%  ->     5,519,719   <alloc::string::String>::from_utf16'<records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments
+
+-- noop-generic: 15,565,323 -> 15,550,604 Ir/op (-0.09%)
+      14,939,134  95.98%  ->    14,924,112   <Snapshot>::from_bytes
+      14,209,148  91.29%  ->    14,193,914   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      12,555,091  80.66%  ->    12,555,646   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      12,496,324  80.28%  ->    12,496,625   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+       8,676,865  55.74%  ->     8,679,083   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+       4,226,185  27.15%  ->     4,229,744   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       3,122,932  20.06%  ->     3,120,568   <records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook'Workbook>::new
+       3,122,655  20.06%  ->     3,120,291   <records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records'Workbook>::parse_workbook
+       2,994,851  19.24%  ->     2,992,911   <records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments'<records::SharedStringTable>::parse_from_records
+       2,806,790  18.03%  ->     2,810,349   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+       2,756,831  17.71%  ->     2,755,598   <alloc::string::String>::from_utf16'<records::SstCursor>::read_characters'<records::SharedStringTable>::parse_segments
+
+================ formula ================
+
+-- open: 30,525,247 -> 30,469,263 Ir/op (-0.18%)
+      29,712,279  97.34%  ->    29,656,296   <Snapshot>::from_bytes
+      28,707,873  94.05%  ->    28,651,890   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      24,464,199  80.14%  ->    24,462,178   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      24,290,836  79.58%  ->    24,288,815   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      21,881,885  71.68%  ->    21,879,813   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+       8,390,333  27.49%  ->     8,388,321   <cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,392,280  20.94%  ->     6,392,280   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,263,260  20.52%  ->     6,263,260   formula::render_formula'<cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility
+       5,319,801  17.43%  ->     5,319,801   <formula::FormulaDecoder>::decode'formula::render_formula'<cell::Cell>::from_record_with_formula_context
+       4,241,165  13.89%  ->     4,241,165   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- number-generic: 64,002,988 -> 63,967,465 Ir/op (-0.06%)
+      43,763,306  68.38%  ->    43,763,707   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      32,260,542  50.40%  ->    32,299,445   <Transaction>::commit
+      29,989,931  46.86%  ->    29,914,266   <Snapshot>::from_bytes
+      28,984,459  45.29%  ->    28,909,982   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      28,210,857  44.08%  ->    28,243,635   <Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit'xls_edit_probe::main
+      24,458,771  38.22%  ->    24,462,131   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      24,456,566  38.21%  ->    24,459,075   Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor'<Transaction>::commit
+      24,285,689  37.94%  ->    24,287,656   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_fixed_numeric_package_editor
+      24,285,233  37.94%  ->    24,288,583   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      16,787,775  26.23%  ->    16,789,144   <cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      12,779,079  19.97%  ->    12,777,867   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      12,524,359  19.57%  ->    12,525,330   formula::render_formula'<cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility
+      10,637,144  16.62%  ->    10,638,434   <formula::FormulaDecoder>::decode'formula::render_formula'<cell::Cell>::from_record_with_formula_context
+       8,476,849  13.24%  ->     8,475,637   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- string-generic: 66,539,824 -> 66,428,288 Ir/op (-0.17%)
+      48,581,264  73.01%  ->    48,584,823   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      43,772,232  65.78%  ->    43,775,854   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+      33,883,646  50.92%  ->    33,817,669   <Transaction>::commit
+      30,054,405  45.17%  ->    30,007,568   <Snapshot>::from_bytes
+      29,886,143  44.91%  ->    29,822,655   <Snapshot>::from_package_editor'<Transaction>::commit'xls_edit_probe::main
+      29,048,210  43.66%  ->    29,002,144   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      24,472,207  36.78%  ->    24,467,900   Workbook>::new'<Snapshot>::from_package_editor'<Transaction>::commit
+      24,456,610  36.75%  ->    24,464,555   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      16,787,077  25.23%  ->    16,789,159   <cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      12,786,726  19.22%  ->    12,788,744   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+      12,529,055  18.83%  ->    12,530,498   formula::render_formula'<cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility
+      10,641,179  15.99%  ->    10,642,202   <formula::FormulaDecoder>::decode'formula::render_formula'<cell::Cell>::from_record_with_formula_context
+       8,484,496  12.75%  ->     8,486,514   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+-- noop-generic: 31,101,399 -> 31,045,229 Ir/op (-0.18%)
+      29,710,416  95.53%  ->    29,654,247   <Snapshot>::from_bytes
+      28,705,309  92.30%  ->    28,649,139   <Snapshot>::from_package_editor'<Snapshot>::from_bytes'xls_edit_probe::main
+      24,462,449  78.65%  ->    24,460,238   Workbook>::new'<Snapshot>::from_package_editor'<Snapshot>::from_bytes
+      24,289,261  78.10%  ->    24,287,050   Workbook>::parse_workbook'Workbook>::new'<Snapshot>::from_package_editor
+      21,881,713  70.36%  ->    21,879,507   Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook'Workbook>::new
+       8,390,215  26.98%  ->     8,388,114   <cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,392,086  20.55%  ->     6,392,086   workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility'Workbook>::parse_workbook
+       6,262,772  20.14%  ->     6,262,772   formula::render_formula'<cell::Cell>::from_record_with_formula_context'Workbook>>::parse_worksheet_records_with_compatibility
+       5,319,714  17.10%  ->     5,319,714   <formula::FormulaDecoder>::decode'formula::render_formula'<cell::Cell>::from_record_with_formula_context
+       4,240,971  13.64%  ->     4,240,971   <worksheet::Worksheet>::add_cell'workbook::codec::semantic::worksheet::add_cell'Workbook>>::parse_worksheet_records_with_compatibility
+
+================ native perf stat, same isolation method ================
+scenario                           cycles before    cycles after    delta    instr before     instr after    delta
+54016/noop-generic                    48,804,191      49,025,241    0.45%     159,186,072     158,677,081   -0.32%
+54016/number-generic                 100,108,111     102,524,162    2.41%     311,541,242     311,076,796   -0.15%
+54016/number-plan                    101,580,947     102,971,745    1.37%     310,143,787     309,679,136   -0.15%
+54016/number-source-backed           228,627,848     171,248,047  -25.10%     625,940,966     484,563,358  -22.59%
+54016/open                            48,376,435      48,467,675    0.19%     155,538,990     155,020,439   -0.33%
+54016/string-generic                 101,419,486     105,203,143    3.73%     322,812,550     321,803,704   -0.31%
+cv/noop-generic                        4,744,812       4,521,926   -4.70%      14,369,775      13,865,350   -3.51%
+cv/number-generic                      9,590,800       9,898,567    3.21%      28,427,575      28,598,587    0.60%
+cv/number-plan                        10,120,044      10,425,887    3.02%      28,631,727      28,841,406    0.73%
+cv/number-source-backed               20,812,677      16,521,723  -20.62%      57,733,826      44,775,228  -22.45%
+cv/open                                4,419,106       4,497,633    1.78%      13,759,862      13,757,949   -0.01%
+cv/string-generic                      9,809,991       9,969,543    1.63%      29,023,815      29,157,423    0.46%
+formula/noop-generic                  10,171,245      10,282,228    1.09%      30,056,337      30,003,784   -0.17%
+formula/number-generic                20,342,891      20,819,805    2.34%      59,214,538      59,755,105    0.91%
+formula/open                          10,012,413      10,100,046    0.88%      29,451,651      29,397,363   -0.18%
+formula/string-generic                20,876,173      21,324,618    2.15%      61,298,267      61,513,497    0.35%
