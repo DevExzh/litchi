@@ -1,0 +1,32 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/pptx_activex_relationship_order_determinism.rs (target/debug/deps/pptx_activex_relationship_order_determinism-d38879f60d669daa)
+
+running 4 tests
+test a_genuinely_different_package_is_still_refused ... ok
+test a_matching_patch_is_accepted_against_every_build_of_the_same_package ... FAILED
+test single_relationship_graphs_keep_their_revision_and_accept_their_patch ... ok
+test snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed ... FAILED
+
+failures:
+
+---- a_matching_patch_is_accepted_against_every_build_of_the_same_package stdout ----
+
+thread 'a_matching_patch_is_accepted_against_every_build_of_the_same_package' (3649461) panicked at crates/litchi-pptx/tests/pptx_activex_relationship_order_determinism.rs:194:13:
+attempt 0: a patch captured from one build of the package was refused against an identical build: invalid PresentationML: ActiveX control patch source is stale
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed stdout ----
+
+thread 'snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed' (3649463) panicked at crates/litchi-pptx/tests/pptx_activex_relationship_order_determinism.rs:182:5:
+assertion `left == right` failed: the same control graph produced 2 distinct public revisions: {8992939072292297219, 17722918605690345713}
+  left: 2
+ right: 1
+
+
+failures:
+    a_matching_patch_is_accepted_against_every_build_of_the_same_package
+    snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+error: test failed, to rerun pass `-p litchi-pptx --test pptx_activex_relationship_order_determinism`

@@ -1,0 +1,101 @@
+# Gates for change 0631
+
+Run in /home/zhuhe/code/litchi-worktrees/0631 on branch
+perf/0631-ooxml-relationship-order-verdict-sites, base commit 732cf44ae.
+rustc 1.95.0, cargo 1.95.0. Workspace lints are deny; rustdoc lints are deny.
+
+## cargo fmt --all --check
+exit=0
+
+## cargo clippy -p litchi-xlsx --all-targets
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.63s
+exit=0
+
+## cargo doc -p litchi-xlsx --no-deps
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.67s
+   Generated /home/zhuhe/code/litchi-worktrees/0631/target/doc/litchi_xlsx/index.html
+exit=0
+
+## cargo test -p litchi-xlsx --no-fail-fast
+test binaries: 60; FAILED result lines: 0
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.18s; merged doctests compilation took 0.18s
+exit=0
+
+## cargo clippy -p litchi-pptx --all-targets
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.66s
+exit=0
+
+## cargo doc -p litchi-pptx --no-deps
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.97s
+   Generated /home/zhuhe/code/litchi-worktrees/0631/target/doc/litchi_pptx/index.html
+exit=0
+
+## cargo test -p litchi-pptx --no-fail-fast
+test binaries: 77; FAILED result lines: 0
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.36s; merged doctests compilation took 0.32s
+exit=0
+
+## cargo clippy -p litchi-docx --all-targets
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.32s
+exit=0
+
+## cargo doc -p litchi-docx --no-deps
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.19s
+   Generated /home/zhuhe/code/litchi-worktrees/0631/target/doc/litchi_docx/index.html
+exit=0
+
+## cargo test -p litchi-docx --no-fail-fast
+test binaries: 52; FAILED result lines: 0
+test crates/litchi-docx/src/field/model/base.rs - field::model::base::Field::field_type (line 100) ... ok
+
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.72s; merged doctests compilation took 0.71s
+exit=0
+
+## Differential and corpus checks cited by the record
+
+corpus_verdicts over 321 OOXML fixtures, 8 repeats each:
+
+  before:
+    files=321 repeats=8 opc_opened=319 opc_published=312 opc_open_refused=2 opc_save_refused=7
+    XLSX probed=180 verdict_unstable=0 message_unstable=176
+    PPTX probed=78 verdict_unstable=0 message_unstable=0
+    DOCX probed=63 verdict_unstable=1 message_unstable=1
+  after:
+    files=321 repeats=8 opc_opened=319 opc_published=312 opc_open_refused=2 opc_save_refused=7
+    XLSX probed=180 verdict_unstable=0 message_unstable=175
+    PPTX probed=78 verdict_unstable=0 message_unstable=0
+    DOCX probed=63 verdict_unstable=0 message_unstable=0
+
+  verdict-column diff (fields 1,2,3,5), before vs after: 12 lines: one fixture line plus two summary lines
+
+callgrind isolation pairs, N = 1 and N = 11, pinned to CPU 24:
+    before-docx-11.txt:==3762560== I   refs:      589,095,391
+    after-xlsx-1.txt:==3821259== I   refs:      8,561,613
+    before-xlsx-11.txt:==3759248== I   refs:      59,812,223
+    before-docx-1.txt:==3761996== I   refs:      53,680,782
+    after-xlsx-11.txt:==3821279== I   refs:      59,828,965
+    after-docx-11.txt:==3822924== I   refs:      588,687,170
+    after-pptx-1.txt:==3821323== I   refs:      12,354,369
+    after-pptx-11.txt:==3821520== I   refs:      132,878,618
+    after-docx-1.txt:==3822370== I   refs:      53,589,530
+    before-xlsx-1.txt:==3758579== I   refs:      8,559,592
+    before-pptx-11.txt:==3760948== I   refs:      132,793,276
+    before-pptx-1.txt:==3760383== I   refs:      12,351,191

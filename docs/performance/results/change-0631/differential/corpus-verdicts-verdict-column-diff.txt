@@ -1,0 +1,12 @@
+630c630
+< poi/test-data/xmldsign/hello-world-signed-twice.docx	DOCX	verdicts=2	applied changed=false noop=true | apply:Invalid
+---
+> poi/test-data/xmldsign/hello-world-signed-twice.docx	DOCX	verdicts=1	applied changed=false noop=true
+645c645
+< XLSX probed=180 verdict_unstable=0 message_unstable=176
+---
+> XLSX probed=180 verdict_unstable=0 message_unstable=175
+647c647
+< DOCX probed=63 verdict_unstable=1 message_unstable=1
+---
+> DOCX probed=63 verdict_unstable=0 message_unstable=0

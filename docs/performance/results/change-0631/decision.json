@@ -1,0 +1,55 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0631",
+  "title": "Relationship hash order decided three OOXML outcomes a caller can see - an XLSX patch conflict on an exact no-op, a public PPTX snapshot revision, and the DOCX signature staleness token",
+  "decision": "retained as a correctness fix; no optimization proposed, no claim registered",
+  "code_state": "three files under crates/ modified (crates/litchi-xlsx/src/cell_values/snapshot.rs, crates/litchi-pptx/src/presentation/embedded/controls/slide/package.rs, crates/litchi-docx/src/content_control/package.rs; 85 insertions, 28 deletions); three test files added with ten tests",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the three sites change 0628 verified and reported but did not fix are the three where relationship hash order reached a verdict or a public value rather than only a diagnostic message, and this change fixes exactly those three",
+    "XLSX: capture_auxiliary and capture_auxiliary_source built the styles-and-theme PartState array from a HashMap walk and SourceState::same_owner compares two such arrays with slice ==, so on the ordinary two-relationship shape an exact no-op value-only patch captured against one load was refused against another load of the same bytes as Error::PatchConflict",
+    "PPTX: relationship_states ended in a bare .collect(); load_binary's array is folded into the public Snapshot::revision() through fingerprint and compared by value in same_source, and install_patch and ensure_binary_part compare a rebuilt unsorted array with != against a target that Snapshot::from_parts had already sorted",
+    "DOCX: signature_token sorts its part names but emitted each relationship record straight from a HashMap walk, so the returned Arc<[u8]> staleness token differed byte-for-byte between loads whenever the root or a signature part owned two relationships, and require_current refused an exact no-op as stale",
+    "ADR 0006 requires deterministic serialization unless a Clock, actor identity or cryptographic RNG is supplied, and none of the three paths is supplied any of the three; ADR 0003 requires a source-checked patch to conflict on a real overlap rather than on a hash seed",
+    "every fix sorts on rId byte order, the key Relationships::to_xml emits the .rels member in and the key capture_relationships and transaction::sorted_relationships already impose on their neighbouring arrays, so each rule reads as the relationships in the order the published .rels member lists them",
+    "the sort key is the HashMap's own unique key, so the order is total, a collection with zero or one match keeps exactly its old behaviour, and no relationship value, refusal variant or published byte changes"
+  ],
+  "accepted_evidence": {
+    "determinism_tests": "ten tests in three new files, 128 in-process repeats per determinism assertion; 6 pass and 4 fail before the fixes, 10 pass after; three of the ten are negative controls that pass on both legs",
+    "pptx_site_staging": "the PPTX site's three independently reachable uses were separated by sorting one call site at a time: unfixed gives two distinct public revisions and 'ActiveX control patch source is stale'; sorting load_binary's array alone stabilises the revision and exposes 'ActiveX binary part relationships are stale'; sorting ensure_binary_part's too exposes 'ActiveX descriptor relationship lifecycle does not match the patch target'; sorting inside relationship_states passes all four tests",
+    "corpus_verdict_differential": "corpus_verdicts over 321 OOXML fixtures with 8 repeats each, both legs: XLSX 180 probed 0 unstable both legs, PPTX 78 probed 0 unstable both legs, DOCX 63 probed 1 unstable before and 0 after; the one is poi/test-data/xmldsign/hello-world-signed-twice.docx, and the verdict-column diff is exactly that fixture line plus the two summary lines counting it",
+    "published_bytes_differential": "the same probe opens and republishes every fixture through litchi-opc: opc_opened=319 opc_published=312 opc_open_refused=2 opc_save_refused=7 on both legs, and all 312 SHA-256 digests identical",
+    "crate_suites_both_legs": "cargo test -p <crate> --no-fail-fast on both legs, reduced to one line per test binary and diffed: 189 binaries across the three crates, 3 lines differ, all three the new determinism binaries",
+    "instruction_counts": "callgrind isolation pairs at N=1 and N=11 on open_edit_save_iters, one fixture per crate: XLSX 5,125,263.1 to 5,126,735.2 (+0.029%), PPTX 12,044,208.5 to 12,052,424.9 (+0.068%), DOCX 53,541,460.9 to 53,509,764.0 (-0.059%)",
+    "layout_noise_floor": "three independent release builds of identical XLSX probe code gave N=11 totals of 59,817,541, 59,833,970 and 59,828,965, a 16,429 Ir spread or about plus or minus 1,600 per round, so the XLSX and PPTX deltas are at or under the layout floor",
+    "symbol_attribution": "callgrind_annotate --threshold=99.5 differences over 11 rounds: XLSX new work is SmallVec::extend +2,806 and insertion_sort_shift_left +880 against RawVecInner::try_reserve -2,156 and Vec::into_boxed_slice -1,188; PPTX new work is insertion_sort_shift_left +3,224 (about 293 Ir per round) with memcpy and malloc drift around it and a +/-444,543 validate_text symbol-attribution artifact; DOCX is work removed, named by core::slice::ascii -291,024, is_signature_relationship -54,538, root_signature_relationship -43,362, PackURI::from_rel_ref -29,106 and PackURI::new -22,616",
+    "gates": "cargo fmt --all --check plus cargo clippy --all-targets, cargo doc --no-deps and cargo test --no-fail-fast for each of litchi-xlsx, litchi-pptx and litchi-docx: ten gates, all exit 0, no pre-existing failure encountered on either leg"
+  },
+  "accepted_costs": {
+    "xlsx_sorting_cost": "+1,472.1 instructions per open+edit+save on the synthetic closure (+0.029%), at or under this measurement's 16,429 Ir layout floor; the helper allocates nothing because SmallVec's two inline slots are exact by the validated bound",
+    "pptx_sorting_cost": "+8,216.4 instructions per round (+0.068%) of which about 293 per round is the sort itself; the rest is memcpy alignment and allocator arena drift from recompiling the crate",
+    "docx_allocation_on_signed_path": "sorted_relationships allocates one Vec<&Relationship> per ordered collection, reserved with try_reserve_exact on the collection's own length and therefore bounded by the same ReadLimits; the unsigned path is guarded and allocates nothing",
+    "pptx_revision_values_change": "the public Revision changes value for an ActiveX binary part owning two or more relationships, which is exactly the case where it previously had no single value; graphs whose captured arrays held at most one relationship keep byte-identical fingerprints",
+    "single_host": "one host, one CPU, eight agents building and testing concurrently throughout"
+  },
+  "known_gaps": {
+    "corpus_does_not_reach_two_sites": "no XLSX fixture in this repository is admissible to the value-only closure, because every real workbook carries core-properties and extended-properties package relationships that validate_package_relationships refuses; and the single PPTX fixture carrying ActiveX controls has no part owning two relationships. Their proof is the new tests and the crate suites, not the corpus, and nothing is claimed about how common either shape is in the wild",
+    "message_ordering_still_open": "validate_package_relationships and its peers still name whichever offending relationship they meet first; the error variant is stable and only the diagnostic string varies. The corpus probe measures it at 173 to 176 of 180 XLSX fixtures on both legs so it is a recorded quantity rather than a surprise. The XLSX auxiliary walk is the one place this change happens to make deterministic, because it orders the relationships themselves",
+    "wider_0628_audit_still_open": "the remaining order-sensitive observable sites 0628 reported - public list-order variation in PPTX chart::related, slide_master_relationships, comments::collect_slides, modern_comments and tracks::codec and in XLSX pivot, chart, shapes and slicer loaders; the positional pairing hazard in litchi-docx smartart.rs; the ambiguous find selections in PPTX theme-override and XLSX connections::remove_from_package; and the message-only tail including the two PPTX copy planners whose public refusal discriminant flips - are not touched here",
+    "one_fix_is_broader_than_one_site": "sorting inside PPTX relationship_states also orders the two uses Snapshot::from_parts already sorted; that is an idempotent no-op by construction, not a measured claim about those paths"
+  },
+  "withheld": [
+    "any speedup, regression, latency, allocation-profile, peak-RSS, cold-cache, concurrency-scaling or cross-platform result",
+    "any claim that the DOCX instruction reduction generalises beyond the one fixture it was measured on",
+    "any claim about the frequency of the two- or more-relationship shapes in real documents"
+  ],
+  "provenance": {
+    "base_commit": "732cf44ae",
+    "branch": "perf/0631-ooxml-relationship-order-verdict-sites",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "cpu_affinity": "every measured process pinned to CPU 24 with taskset",
+    "note": "both legs are the same worktree with the three changed source files reverted or applied; the added test files are present on both legs, and probe binary SHA-256 for both legs are in README.md"
+  }
+}

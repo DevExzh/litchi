@@ -1,0 +1,22 @@
+     Running tests/signature_token_relationship_order.rs (target/debug/deps/signature_token_relationship_order-58bb21b33f59daeb)
+
+running 3 tests
+test a_genuinely_different_signature_graph_is_still_refused ... ok
+test exact_noop_is_accepted_against_every_build_of_the_same_signed_package ... FAILED
+test single_signature_packages_keep_accepting_their_noop ... ok
+
+failures:
+
+---- exact_noop_is_accepted_against_every_build_of_the_same_signed_package stdout ----
+
+thread 'exact_noop_is_accepted_against_every_build_of_the_same_signed_package' (3656194) panicked at crates/litchi-docx/tests/signature_token_relationship_order.rs:131:13:
+attempt 0: an exact no-op was refused against an identical build of the same signed package: invalid DOCX data: package signature topology is stale
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    exact_noop_is_accepted_against_every_build_of_the_same_signed_package
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+error: test failed, to rerun pass `-p litchi-docx --test signature_token_relationship_order`

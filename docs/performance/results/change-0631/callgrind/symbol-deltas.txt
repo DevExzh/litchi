@@ -1,0 +1,51 @@
+After-minus-before self cost per symbol, N = 11 rounds, callgrind_annotate --threshold=99.5.
+Positive means the after leg executed more instructions in that symbol.
+
+===== xlsx =====
+      16,742  PROGRAM TOTALS
+      12,040  ./malloc/./malloc/malloc.c:_int_malloc
+       2,806  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+      -2,156  ???:alloc::raw_vec::RawVecInner<A>::try_reserve
+       2,005  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+      -1,188  ???:alloc::vec::Vec<T,A>::into_boxed_slice
+       1,133  ???:litchi_xlsx::cell_values::validation::validate_xml
+         880  ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left
+        -880  ???:litchi_xlsx::cell_values::validation::validate_element
+         795  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0
+         539  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+         514  ./malloc/./malloc/malloc.c:_int_free_maybe_trim
+        -512  ???:litchi_xlsx::cell_values::snapshot::capture_auxiliary_source
+         510  ./malloc/./malloc/malloc.c:_int_free_chunk
+
+===== pptx =====
+     444,543  ???:litchi_pptx::presentation::embedded::ole::slide::validation::validate_text
+    -444,543  ???:litchi_pptx::presentation::embedded::controls::slide::validation::validate_text
+      85,342  PROGRAM TOTALS
+      67,336  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+       9,369  ./malloc/./malloc/malloc.c:_int_malloc
+      -3,762  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0
+       3,224  ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left
+       2,502  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+       1,402  ./malloc/./malloc/malloc.c:realloc
+       1,101  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe
+        -882  ./malloc/./malloc/malloc.c:__libc_malloc2
+        -730  ???:litchi_opc::members::PartNameIndex::insert
+         676  ./malloc/./malloc/malloc.c:_int_free_maybe_trim
+         580  ./malloc/./malloc/malloc.c:_int_memalign
+
+===== docx =====
+    -408,221  PROGRAM TOTALS
+    -291,024  ???:core::slice::ascii::<impl
+     122,546  ./malloc/./malloc/malloc.c:_int_malloc
+     109,353  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+     -59,004  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     -54,538  ???:litchi_docx::content_control::package::is_signature_relationship
+     -43,362  ???:litchi_docx::content_control::package::root_signature_relationship
+     -35,816  ???:core::slice::memchr::memchr_aligned
+     -29,106  ???:litchi_opc::packuri::PackURI::from_rel_ref
+     -22,616  ???:litchi_opc::packuri::PackURI::new
+     -21,648  ???:litchi_opc::packuri::PackURI::validate_percent_encoding
+      18,949  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0
+     -18,700  ???:core::iter::traits::iterator::Iterator::try_fold
+      14,804  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+

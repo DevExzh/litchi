@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/relationship_order_verdict_determinism.rs (target/debug/deps/relationship_order_verdict_determinism-0d7bb2ecc95d45e0)
+
+running 3 tests
+test a_genuinely_different_workbook_is_still_refused ... ok
+test exact_noop_patch_is_accepted_against_every_reload_of_the_same_workbook ... FAILED
+test single_auxiliary_relationship_keeps_accepting_its_noop_patch ... ok
+
+failures:
+
+---- exact_noop_patch_is_accepted_against_every_reload_of_the_same_workbook stdout ----
+
+thread 'exact_noop_patch_is_accepted_against_every_reload_of_the_same_workbook' (3647612) panicked at crates/litchi-xlsx/tests/relationship_order_verdict_determinism.rs:139:13:
+attempt 0: an exact no-op patch was refused against a reload of the same bytes: patch conflict in '/xl/worksheets/sheet1.xml': target content differs from the expected state
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    exact_noop_patch_is_accepted_against_every_reload_of_the_same_workbook
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `-p litchi-xlsx --test relationship_order_verdict_determinism`

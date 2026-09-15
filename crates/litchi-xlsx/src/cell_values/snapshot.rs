@@ -10,6 +10,7 @@ use litchi_opc::{
     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
 use litchi_sheet::{Cell as Address, Rect};
+use smallvec::SmallVec;
 
 use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Value};
 use crate::error::{EditBlock, Error, Result, allocation, invalid};
@@ -1976,6 +1977,35 @@ fn validate_package_relationships(relationships: &Relationships) -> Result<()> {
     Ok(())
 }
 
+/// The workbook's styles and theme relationships in rId byte order.
+///
+/// `Relationships::iter` walks a `HashMap`, so the visit order is seeded per
+/// collection. `capture_auxiliary` and `capture_auxiliary_source` build the
+/// captured `PartState` array from this walk, and `SourceState::same_owner`
+/// compares two such arrays with slice `==`, so on the ordinary shape — one
+/// styles relationship and one theme relationship — a patch captured against
+/// one load was refused against another load of the same bytes. Sorting by rId
+/// is the key `capture_relationships` already uses for every other captured
+/// relationship array in this file, and the key `Relationships::to_xml` emits
+/// in, so the captured array becomes a function of the workbook.
+///
+/// `validate_workbook_relationships` runs before every caller and admits at
+/// most one styles and at most one theme relationship, so the two inline slots
+/// are exact and the ordering costs no allocation.
+fn auxiliary_relationships(relationships: &Relationships) -> SmallVec<[&Relationship; 2]> {
+    let mut selected: SmallVec<[&Relationship; 2]> = relationships
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::STYLES | rt::STRICT_STYLES | rt::THEME
+            )
+        })
+        .collect();
+    selected.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+    selected
+}
+
 fn capture_auxiliary_source(
     package: &SourceBackedPackage,
     workbook: &litchi_opc::PartView<'_>,
@@ -1985,12 +2015,7 @@ fn capture_auxiliary_source(
     auxiliary
         .try_reserve_exact(2)
         .map_err(|source| allocation("value-only auxiliary closure", source))?;
-    for relationship in workbook.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            rt::STYLES | rt::STRICT_STYLES | rt::THEME
-        )
-    }) {
+    for relationship in auxiliary_relationships(workbook.rels()) {
         package.check_execution()?;
         let part = package.part(&relationship.target_partname()?)?;
         if !part.rels().is_empty() {
@@ -2026,12 +2051,7 @@ fn capture_auxiliary(package: &OpcPackage, workbook: &dyn Part) -> Result<(u32, 
     auxiliary
         .try_reserve_exact(2)
         .map_err(|source| allocation("value-only auxiliary closure", source))?;
-    for relationship in workbook.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            rt::STYLES | rt::STRICT_STYLES | rt::THEME
-        )
-    }) {
+    for relationship in auxiliary_relationships(workbook.rels()) {
         let part = package.get_part(&relationship.target_partname()?)?;
         if !part.rels().is_empty() {
             return Err(invalid(

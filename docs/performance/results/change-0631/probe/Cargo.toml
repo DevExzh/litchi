@@ -1,0 +1,26 @@
+[package]
+name = "ooxml-relationship-order-verdict-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-core" }
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-opc" }
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-xlsx" }
+litchi-pptx = { path = "/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-pptx" }
+litchi-docx = { path = "/home/zhuhe/code/litchi-worktrees/0631/crates/litchi-docx" }
+sha2 = "0.10"
+
+[[bin]]
+name = "corpus_verdicts"
+path = "src/corpus_verdicts.rs"
+
+[[bin]]
+name = "open_edit_save_iters"
+path = "src/open_edit_save_iters.rs"
+
+[profile.release]
+debug = false
+
+[workspace]
