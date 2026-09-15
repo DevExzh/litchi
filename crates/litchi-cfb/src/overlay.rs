@@ -177,10 +177,14 @@ impl OverlaySourceMode {
 /// Content-free shape of the complete validated overlay operation.
 ///
 /// Counts and logical bytes are derived from the sealed source mode, source
-/// length, and the fixed CFB fingerprint/publication policies. They describe
-/// pass contracts rather than runtime observations, allocator activity, or
-/// operating-system syscall counts. A fingerprint pass hashes both source and
-/// composed-target bytes, so its logical byte count is twice the source length.
+/// length, whether the plan is an exact no-op, and the fixed CFB
+/// fingerprint/publication policies. They describe pass contracts rather than
+/// runtime observations, allocator activity, or operating-system syscall
+/// counts. A fingerprint pass of an effective plan hashes both source and
+/// composed-target bytes, so its logical byte count is twice the source
+/// length. A no-op plan composes the source, so one digest is both identities
+/// and the same pass hashes the source length once. Pass and chunk counts,
+/// and therefore complete source reads, are identical either way.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OverlayOperationShape {
     /// Stable explanation of the logical-counter boundary.
@@ -269,7 +273,7 @@ pub struct OverlayOperationShape {
 }
 
 impl OverlayOperationShape {
-    fn new(source_mode: OverlaySourceMode, source_bytes: u64) -> Self {
+    fn new(source_mode: OverlaySourceMode, source_bytes: u64, is_noop: bool) -> Self {
         let planning_fingerprint_scans = match source_mode {
             OverlaySourceMode::GenericReadAt => 2,
             OverlaySourceMode::OwnedImmutableArc => 1,
@@ -280,7 +284,7 @@ impl OverlayOperationShape {
         };
         let fingerprint_chunks = source_bytes.div_ceil(FINGERPRINT_CHUNK_BYTES_U64);
         let publication_chunks = source_bytes.div_ceil(PUBLICATION_CHUNK_BYTES as u64);
-        let fingerprint_bytes = source_bytes.saturating_mul(2);
+        let fingerprint_bytes = source_bytes.saturating_mul(if is_noop { 1 } else { 2 });
         let pass_bytes = |scans: u64| fingerprint_bytes.saturating_mul(scans);
         let pass_chunks = |scans: u64, chunks: u64| chunks.saturating_mul(scans);
         Self {
@@ -786,6 +790,7 @@ impl ValidatedOverlayPlan {
                 OverlaySourceMode::GenericReadAt
             },
             self.source.length,
+            self.spans.is_empty(),
         )
     }
 
@@ -917,7 +922,10 @@ impl ValidatedOverlayPlan {
     ) -> Result<PublishReport, OverlayError> {
         let mut buffer = publication_buffer()?;
         let mut source_hasher = Sha256::new();
-        let mut target_hasher = Sha256::new();
+        // A no-op plan emits the source bytes unchanged, so the emitted-target
+        // digest is the emitted-source digest. Hash the emission once and
+        // check it against both retained identities, in the same order.
+        let mut target_hasher = (!self.spans.is_empty()).then(Sha256::new);
         let mut offset = 0_u64;
         let mut accepted = 0_u64;
 
@@ -927,8 +935,10 @@ impl ValidatedOverlayPlan {
                 return Err(with_progress(error, accepted, self.source.length, false));
             }
             source_hasher.update(&buffer[..count]);
-            apply_spans(&mut buffer[..count], offset, &self.spans)?;
-            target_hasher.update(&buffer[..count]);
+            if let Some(target_hasher) = target_hasher.as_mut() {
+                apply_spans(&mut buffer[..count], offset, &self.spans)?;
+                target_hasher.update(&buffer[..count]);
+            }
             if let Err(failure) = write_all_checked(writer, &buffer[..count], &mut accepted) {
                 return Err(with_progress(
                     OverlayError::Io(failure.error),
@@ -954,7 +964,9 @@ impl ValidatedOverlayPlan {
                 false,
             ));
         }
-        let observed_target = ArtifactFingerprint(target_hasher.finalize().into());
+        let observed_target = target_hasher.map_or(observed_source, |hasher| {
+            ArtifactFingerprint(hasher.finalize().into())
+        });
         if observed_target != self.target_fingerprint {
             return Err(with_progress(
                 OverlayError::TargetFingerprintChanged {
@@ -1317,6 +1329,19 @@ fn validate_composed_artifact(
     source.ensure_length()
 }
 
+/// Computes the complete source and composed-target artifact digests.
+///
+/// The number of complete source reads is unchanged by the span list: this
+/// function always reads every byte exactly once, and every caller that needs
+/// a read-twice-compare defence still calls it twice.
+///
+/// Only the *digest* work depends on the spans. With no span, the overlay is
+/// the identity — `apply_spans` cannot touch a byte — so the target hasher
+/// would consume exactly the bytes the source hasher already consumed and
+/// finalize to the same digest. That second pass is therefore value-identical
+/// to the first and is elided; the source digest is returned for both. An
+/// exact byte no-op reaches this branch through the same empty span list, so
+/// a no-op plan also fingerprints its artifact once rather than twice.
 fn fingerprints(
     source: &SourceSnapshot,
     spans: &[PhysicalSpan],
@@ -1324,23 +1349,26 @@ fn fingerprints(
     source.ensure_length()?;
     let mut buffer = fingerprint_buffer(source.length)?;
     let mut source_hasher = Sha256::new();
-    let mut target_hasher = Sha256::new();
+    let mut target_hasher = (!spans.is_empty()).then(Sha256::new);
     let mut offset = 0_u64;
     while offset < source.length {
         let count = chunk_len(source.length, offset, buffer.len())?;
         source.read_exact(offset, &mut buffer[..count])?;
         source_hasher.update(&buffer[..count]);
-        apply_spans(&mut buffer[..count], offset, spans)?;
-        target_hasher.update(&buffer[..count]);
+        if let Some(target_hasher) = target_hasher.as_mut() {
+            apply_spans(&mut buffer[..count], offset, spans)?;
+            target_hasher.update(&buffer[..count]);
+        }
         offset = offset
             .checked_add(count as u64)
             .ok_or_else(|| unavailable("fingerprint offset overflow"))?;
     }
     source.ensure_length()?;
-    Ok((
-        ArtifactFingerprint(source_hasher.finalize().into()),
-        ArtifactFingerprint(target_hasher.finalize().into()),
-    ))
+    let source_fingerprint = ArtifactFingerprint(source_hasher.finalize().into());
+    let target_fingerprint = target_hasher.map_or(source_fingerprint, |hasher| {
+        ArtifactFingerprint(hasher.finalize().into())
+    });
+    Ok((source_fingerprint, target_fingerprint))
 }
 
 pub(crate) fn path_refs(path: &[String]) -> Result<Vec<&str>, OverlayError> {

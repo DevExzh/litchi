@@ -1,0 +1,11 @@
+==856208== Callgrind, a call-graph generating cache profiler
+==856208== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==856208== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==856208== Command: /home/zhuhe/code/litchi-worktrees/targets/0589-before/release/snapfence_probe profile ppt-textedit-open /home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt 0 60
+==856208== 
+==856208== For interactive control, run 'callgrind_control -h'.
+==856208== 
+==856208== Events    : Ir
+==856208== Collected : 4870359761
+==856208== 
+==856208== I   refs:      4,870,359,761

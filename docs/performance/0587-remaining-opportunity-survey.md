@@ -102,7 +102,10 @@ timings, are the usable metric on the small real fixtures that exist.
 hid it.** A source-backed DOC or PPT snapshot open hashes the entire artifact
 with SHA-256 between two and six times — a PPT text-edit snapshot open costs
 13.4× the *complete eager presentation parse* of the same file in native cycles
-(DOC-1), which is also why change 0586 measured exactly zero. A PPTX
+(DOC-1). Change 0589 later corrected a reading this record first made here:
+0586's zero was structural, no chain link removed on any fixture, and hashing
+did not mask it; what DOC-1 explains is why no read hint on that path could have
+registered in latency. A PPTX
 opened-document transaction hashes the complete package four times per
 lifecycle, 34.9% of the profiled instructions (PPTX-1), and a cross-package slide
 copy spends 85% of its instructions serializing and hashing the source,
@@ -1156,8 +1159,10 @@ presentation parse* of the same file. Callgrind runs the software SHA-256 while
 the host has SHA-NI, so the record prices this in cycles: native `perf stat` puts
 the PPT text-edit open at 3.31 M cycles per operation against 0.25 M for the eager
 open (13.4×), and on the two DOC fixtures both readers accept the snapshot open
-costs 2.5× and 6.5× the eager open (`doc-ppt/perf-stat-native.txt`). This is why
-change 0586 measured exactly zero: a read hint cannot register against 41 M
+costs 2.5× and 6.5× the eager open (`doc-ppt/perf-stat-native.txt`). Change 0586's
+zero was structural (it counted chain links and removed none), so hashing did
+not mask it, as change 0589 corrects; what this term does explain is that no
+read hint on the snapshot path could have registered in latency against 41 M
 instructions of hashing. Records: 0100/0105/0119 designed the complete-artifact
 fingerprint, 0143 coalesced its reads, 0165 made the owned editor's fingerprint
 lazy; none prices the CPU cost. Constraints: this is a redesign of the ADR 0006

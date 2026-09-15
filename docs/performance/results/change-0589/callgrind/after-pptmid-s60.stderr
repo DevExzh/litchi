@@ -1,0 +1,11 @@
+==1044112== Callgrind, a call-graph generating cache profiler
+==1044112== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1044112== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1044112== Command: /home/zhuhe/code/litchi-worktrees/0589/target/release/snapfence_probe profile ppt-textedit-open /home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt 0 60
+==1044112== 
+==1044112== For interactive control, run 'callgrind_control -h'.
+==1044112== 
+==1044112== Events    : Ir
+==1044112== Collected : 2464497684
+==1044112== 
+==1044112== I   refs:      2,464,497,684

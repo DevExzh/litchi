@@ -1,0 +1,11 @@
+==855293== Callgrind, a call-graph generating cache profiler
+==855293== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==855293== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==855293== Command: /home/zhuhe/code/litchi-worktrees/targets/0589-before/release/snapfence_probe profile ppt-textedit-open /home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt 0 10
+==855293== 
+==855293== For interactive control, run 'callgrind_control -h'.
+==855293== 
+==855293== Events    : Ir
+==855293== Collected : 811997573
+==855293== 
+==855293== I   refs:      811,997,573

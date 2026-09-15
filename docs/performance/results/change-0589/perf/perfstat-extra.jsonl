@@ -1,0 +1,11 @@
+{"leg": "before", "mode": "doc-snapshot-resolve", "file": "documentProperties.doc", "low": 100, "high": 600, "cycles_per_op": 1020525.8, "instructions_per_op": 1850018.8}
+{"leg": "after", "mode": "doc-snapshot-resolve", "file": "documentProperties.doc", "low": 100, "high": 600, "cycles_per_op": 734297.1, "instructions_per_op": 1492066.4}
+{"leg": "before", "mode": "doc-snapshot-resolve", "file": "lists-margins.doc", "low": 100, "high": 600, "cycles_per_op": 1080634.9, "instructions_per_op": 1937899.3}
+{"leg": "after", "mode": "doc-snapshot-resolve", "file": "lists-margins.doc", "low": 100, "high": 600, "cycles_per_op": 768780.7, "instructions_per_op": 1548970.1}
+{"leg": "before", "mode": "doc-snapshot-resolve", "file": "duplicate-style-names.doc", "low": 100, "high": 600, "cycles_per_op": 4222439.4, "instructions_per_op": 5917805.7}
+{"leg": "after", "mode": "doc-snapshot-resolve", "file": "duplicate-style-names.doc", "low": 100, "high": 600, "cycles_per_op": 2374367.7, "instructions_per_op": 3594342.7}
+{"leg": "before", "mode": "doc-snapshot-resolve", "file": "picture.doc", "low": 20, "high": 120, "cycles_per_op": -4028.4, "instructions_per_op": 792.7}
+{"leg": "after", "mode": "doc-snapshot-resolve", "file": "picture.doc", "low": 20, "high": 120, "cycles_per_op": 2910.8, "instructions_per_op": 339.0}
+{"leg": "after", "mode": "cfb-index-open", "file": "documentProperties.doc", "low": 500, "high": 2500, "cycles_per_op": 23023.2, "instructions_per_op": 71522.7}
+{"leg": "after", "mode": "cfb-index-open", "file": "duplicate-style-names.doc", "low": 500, "high": 2500, "cycles_per_op": 24341.4, "instructions_per_op": 77645.8}
+{"leg": "after", "mode": "cfb-index-open", "file": "picture.doc", "low": 100, "high": 600, "cycles_per_op": 51326.3, "instructions_per_op": 240231.4}

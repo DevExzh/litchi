@@ -1,5 +1,38 @@
 # Performance hotspot inventory
 
+## 0589 — DOC and PPT source-backed opens: half the SHA-256 work removed
+
+Survey item DOC-1 (rank 2 of change 0587) is priced and its value-identical
+subset is implemented. `overlay::fingerprints` and `write_validated` drove two
+SHA-256 hashers over one complete source read; with an empty span list
+`apply_spans` cannot write a byte, so the target hasher consumed exactly the
+bytes the source hasher consumed and finalized to the same digest. That covers
+every DOC identity pass, both `ensure_current` passes, the whole PPT text-edit
+snapshot open, and every exact byte no-op publication. Hash passes per open fall
+from **12.00 to 6.00** for the generic DOC open and **4.00 to 2.00** for the PPT
+text-edit open, counted exactly from callgrind's constant software-SHA cost of
+52.07 Ir per artifact byte. Native `perf stat` isolation pairs on all 38 admitted
+fixtures give cycles **median −36.6%** (range −48.0% to −25.5%) and instructions
+median −29.0%, every fixture improving; paired timing gives p50 −48.1% on
+`picture.doc`, −43.4% on `duplicate-style-names.doc`, −48.1% on
+`cryptoapi-proc2356.ppt` and −47.9% on `45543.ppt`, against an A/A floor of
+p50 ±0.1% and p99 ≤ 2.5% in the same window. Complete source reads are
+**unchanged byte for byte**: the change removes hashing, not reading. The
+remaining DOC-1 items are the open's third identity pass (predicted: 2 of the
+6 surviving SHA-256 passes and 2 of the 6 complete reads) and the duplicate CFB
+index parse (measured at 23,023–51,326 cycles, 6.7%–0.27% of the post-change
+open); both are read-twice-compare defences whose removal would change when a
+typed refusal happens, so both are designed and left in place. Change 0587
+explained change 0586's zero by this hashing term; that reading needs a
+correction, because 0586's zero was **structural** — the DOC paragraph hint
+removed 0 of 3,991 chain links on 8 of 8 fixtures, so there was nothing for the
+hashing to mask. What this change does is shrink the denominator: the hashing
+share of a native DOC or PPT open falls from 51.0%–95.9% of cycles to
+34.3%–92.2%, so a future attempt at those paths has roughly twice the
+attributable headroom it had.
+[Change 0589](0589-ole2-snapshot-fingerprint-passes.md);
+[evidence](results/change-0589/README.md); `performance_claim: none`.
+
 ## Change 0587: what remains, surveyed across the whole OLE2 and OOXML data path
 
 The [0587 record](0587-remaining-opportunity-survey.md) replaces the ranked

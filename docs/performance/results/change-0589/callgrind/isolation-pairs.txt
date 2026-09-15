@@ -1,0 +1,34 @@
+# Callgrind isolation pairs, change 0589
+
+Method: profile N and N+M opens of the same operation in one process and
+difference the totals, then divide by M. --cache-sim=no --branch-sim=no,
+pinned to CPU 9. Callgrind masks the SHA CPUID bit, so sha2 runs its
+software backend here: these counts price SHA-256 about five times its
+native cycle share and are a SECONDARY count. The primary result is the
+native perf stat under perf/.
+
+The software backend's cost is a constant Ir per artifact byte, which
+turns the sha2 column into an exact hash-pass count: 52.07 Ir/byte per
+complete SHA-256 pass, measured from the PPT leg (4 passes before).
+
+leg     stem     samples   bytes                                 total Ir/op       sha2 Ir/op   passes
+before   docpic   s5/s25   1448448    picture.doc                       912,550,812      904,959,312    12.00
+before   docdup   s10/s60   64512      duplicate-style-names.doc          41,106,009       40,344,816    12.01
+before   pptmid   s10/s60   385024     45543.ppt                          81,167,244       80,194,896     4.00
+after   docpic   s5/s25   1448448    picture.doc                       460,069,709      452,479,656     6.00
+after   docdup   s10/s60   64512      duplicate-style-names.doc          20,932,549       20,172,408     6.01
+after   pptmid   s10/s60   385024     45543.ppt                          41,069,470       40,097,448     2.00
+
+The 'passes' column is sha2 Ir/op / artifact bytes / 52.07, i.e. the
+number of complete SHA-256 passes over the artifact per operation.
+Before: 12 for the DOC generic open (3 identity calls x 2 fingerprint
+scans x 2 hashers), 4 for the PPT text-edit open (1 x 2 x 2).
+After:  6 and 2. Complete source reads are unchanged (counts/).
+
+The before totals reproduce change 0587's survey figures exactly:
+  picture.doc 912,551,293 Ir/op (0587) vs 912,550,812 here
+  duplicate-style-names.doc 41,107,039 vs 41,106,009
+  45543.ppt 81,168,004 vs 81,167,244
+(0587 used s10/s110 and s10/s60; this record uses the pairs above.)
+
+The .out files were deleted after extraction; the per-run stderr is kept.

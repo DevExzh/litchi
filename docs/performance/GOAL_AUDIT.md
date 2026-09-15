@@ -1,5 +1,24 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0589: an empty overlay hashes the artifact once, not twice — DOC and PPT source-backed opens lose half their SHA-256 work
+
+Record: [0589](0589-ole2-snapshot-fingerprint-passes.md).
+
+| priority | item | what it needs |
+| --- | --- | --- |
+| P1 (progressed) | Source-backed CRUD adoption: price the identity fence | Change 0589 closes the DOC/PPT half. The complete-artifact fingerprint designed by 0100/0105/0119 and read-coalesced by 0143 was never priced in CPU; it is now, and its value-identical duplicate is gone. What remains open is the **write** side: the commit and save paths gain the same halving on a no-op publication and are covered only by unit tests, because no `perf-baseline` selector opens a source-backed DOC or PPT path at all. Registering such a selector is the prerequisite for any further DOC-1 work, and for any attributable measurement of the DOC read path now that hashing no longer dominates its profile. |
+
+Supporting note for the audit body: change 0589 demonstrates the measurement
+discipline GOAL step 1 asks for — the saving is proven to be *unnecessary work*
+rather than relocated work, because the deterministic read counts (`read_calls`,
+`read_bytes`, `len_calls`, `version_calls` per operation) are byte-for-byte
+identical between the two legs on all 38 fixtures, while the hash-pass count
+halves. No allocation, RSS, syscall, cold-cache, physical-device or range-source
+measurement was taken, so those rows of the Phase-1 baseline are untouched. The
+largest fixture either measured path admits is 1.45 MB, so DIFAT-scale behaviour
+remains unmeasured, and the host has SHA-NI, so a host without it would see a
+larger relative saving that was not measured.
+
 ## 0587: the survey the goal asks for, taken after 586 changes
 
 `docs/GOAL.md`'s DELIVERABLES section requires `HOTSPOTS.md` to carry "ranked

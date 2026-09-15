@@ -1,5 +1,35 @@
 # Performance optimization ADR-compliance matrix
 
+## 0589 — the source-identity fence, priced and left intact
+
+ADR 0006's source-identity fence and ADR 0005's `SourceChanged` contract are
+unchanged. The record opens with a frozen classification of every complete-
+artifact hash pass on the DOC and PPT source-backed path: identity capture
+(P1, P5, P10), read-twice-compare pairs (P2, P6/P7, P8/P9), staging-window
+brackets (P3), the emission proof (P4), the commit fence (P11), the composed-CFB
+reopen (I3), and the ordering-critical second index parse (I2). Only P0 — the
+second hasher when the span list is empty — is removed, because `apply_spans`
+over an empty slice cannot write a byte and the two digests were equal by
+construction. Error identity is preserved: the source comparison still precedes
+the target comparison in `write_validated`, so a divergence still yields
+`SourceFingerprintChanged` rather than `TargetFingerprintChanged`. ADR 0003's
+rule that fingerprints are diagnostic and that exact byte equality authorizes
+application is untouched; the 87-artifact differential shows every retained
+digest and every published artifact is unchanged. New tests sweep **every read
+ordinal** of a DOC open, a DOC readback and a PPT open with a stable-token
+mutation and assert the exact number of typed refusals, so a lost fence point
+fails a test rather than silently shrinking a count. The one public surface
+touched is the content-free `OverlayOperationShape`, whose documented "logical
+bytes hashed" now reports `source_bytes` once for a no-op plan; `is_noop()` was
+already public, so no new information is exposed, and pass and chunk counts are
+unchanged. No `unsafe`, no weakened limit or malformed-input defence, no new
+dependency, no new public item, no ambient I/O, no Rayon pool, and no archive
+type, lock or executor leaked. Change 0582's differential harness does not reach
+this code (it is a `soapberry-zip` strict-layout harness); an equivalent
+fingerprint differential was built and retained instead.
+[Change 0589](0589-ole2-snapshot-fingerprint-passes.md);
+`performance_claim: none`.
+
 ## 0587: survey only, with the compliance matrix filled in advance
 
 [0587](0587-remaining-opportunity-survey.md) modifies nothing under `crates/`

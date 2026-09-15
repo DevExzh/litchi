@@ -1,0 +1,44 @@
+
+doc-snapshot-open picture.doc (1,448,448 B)
+  leg           n     p50 us    mean us     p95 us     p99 us
+  before       80     8267.5     8270.6     8295.2     8324.1
+  after        80     4291.6     4292.9     4306.1     4331.7
+  after vs before p50  :   -48.1%   before vs after:   +92.6%
+  after vs before mean :   -48.1%   before vs after:   +92.7%
+  after vs before p95  :   -48.1%   before vs after:   +92.6%
+  after vs before p99  :   -48.0%   before vs after:   +92.2%
+  A/A floor p50  :    +0.1%
+  A/A floor p99  :    +0.7%
+
+doc-snapshot-open duplicate-style-names.doc (64,512 B)
+  leg           n     p50 us    mean us     p95 us     p99 us
+  before      120      411.6      412.6      416.7      432.0
+  after       120      232.8      234.5      239.2      254.9
+  after vs before p50  :   -43.4%   before vs after:   +76.8%
+  after vs before mean :   -43.2%   before vs after:   +75.9%
+  after vs before p95  :   -42.6%   before vs after:   +74.2%
+  after vs before p99  :   -41.0%   before vs after:   +69.4%
+  A/A floor p50  :    -0.1%
+  A/A floor p99  :    +2.2%
+
+ppt-textedit-open cryptoapi-proc2356.ppt (1,341,952 B)
+  leg           n     p50 us    mean us     p95 us     p99 us
+  before       80     2555.7     2556.2     2562.5     2566.4
+  after        80     1326.8     1327.4     1333.8     1336.0
+  after vs before p50  :   -48.1%   before vs after:   +92.6%
+  after vs before mean :   -48.1%   before vs after:   +92.6%
+  after vs before p95  :   -47.9%   before vs after:   +92.1%
+  after vs before p99  :   -47.9%   before vs after:   +92.1%
+  A/A floor p50  :    -0.1%
+  A/A floor p99  :    -1.8%
+
+ppt-textedit-open 45543.ppt (385,024 B)
+  leg           n     p50 us    mean us     p95 us     p99 us
+  before      120      738.4      738.1      742.5      746.6
+  after       120      384.4      385.8      391.1      410.9
+  after vs before p50  :   -47.9%   before vs after:   +92.1%
+  after vs before mean :   -47.7%   before vs after:   +91.3%
+  after vs before p95  :   -47.3%   before vs after:   +89.9%
+  after vs before p99  :   -45.0%   before vs after:   +81.7%
+  A/A floor p50  :    +0.0%
+  A/A floor p99  :    +2.5%

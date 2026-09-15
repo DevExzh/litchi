@@ -1,0 +1,46 @@
+Derived native SHA-256 cost and hashing share (SHA-NI active).
+Passes removed per open: 6 for doc-snapshot-open, 2 for ppt-textedit-open.
+
+mode               fixture                              bytes  cyc/byte/pass  ins/byte/pass  hash % cyc before    after
+doc-snapshot-open  noheadfoot-litchi.doc                10240          2.058          2.598              52.8%    35.9%
+doc-snapshot-open  documentProperties.doc                9728          2.081          2.602              52.1%    35.2%
+doc-snapshot-open  duplicate-style-names.doc            64512          2.050          2.571              86.1%    75.7%
+doc-snapshot-open  endingnote.doc                        9728          2.095          2.617              52.3%    35.4%
+doc-snapshot-open  footnote.doc                          9728          2.048          2.599              51.3%    34.5%
+doc-snapshot-open  lists-margins.doc                    10752          2.082          2.632              54.4%    37.3%
+doc-snapshot-open  picture.doc                        1448448          2.034          2.565              95.9%    92.2%
+doc-snapshot-open  table-merged-cells.doc               17408          2.076          2.585              66.0%    49.3%
+ppt-textedit-open  45543-transition-litchi.ppt         842240          2.042          2.566              95.6%    91.6%
+ppt-textedit-open  45543-transition-litchi.ppt         397312          2.037          2.566              95.4%    91.2%
+ppt-textedit-open  SampleShow.ppt                      125440          2.045          2.569              91.0%    83.5%
+ppt-textedit-open  empty.ppt                            10240          2.083          2.602              52.2%    35.4%
+ppt-textedit-open  empty_textbox.ppt                    11776          2.036          2.596              55.2%    38.1%
+ppt-textedit-open  ppt_with_png.ppt                     39424          2.044          2.573              79.2%    65.5%
+ppt-textedit-open  text-margins.ppt                     44032          2.046          2.573              81.2%    68.3%
+ppt-textedit-open  text_shapes.ppt                      11264          2.074          2.603              54.9%    37.8%
+ppt-textedit-open  empty.ppt                            10240          2.114          2.597              52.6%    35.7%
+ppt-textedit-open  41246-1.ppt                         275456          2.033          2.567              94.0%    88.7%
+ppt-textedit-open  45543.ppt                           385024          2.034          2.566              95.3%    91.0%
+ppt-textedit-open  54880_chinese.ppt                   103936          2.044          2.574              89.5%    81.0%
+ppt-textedit-open  Password_Protected-56-hello.ppt      10752          2.064          2.600              53.7%    36.7%
+ppt-textedit-open  Password_Protected-hello.ppt         10752          2.115          2.604              54.7%    37.7%
+ppt-textedit-open  Password_Protected-np-hello.ppt      10752          2.085          2.601              54.0%    37.0%
+ppt-textedit-open  WithComments.ppt                     10752          2.115          2.593              54.6%    37.5%
+ppt-textedit-open  WithLinks.ppt                        20992          2.041          2.581              67.4%    50.8%
+ppt-textedit-open  basic_test_ppt_file.ppt              15360          2.062          2.588              62.1%    45.0%
+ppt-textedit-open  bug58144-headers-footers-2003.pp     11776          2.050          2.592              55.5%    38.4%
+ppt-textedit-open  bug58144-headers-footers-2007.pp    142848          2.039          2.568              91.4%    84.1%
+ppt-textedit-open  cryptoapi-proc2356.ppt             1341952          2.029          2.561              95.5%    91.4%
+ppt-textedit-open  datetime.ppt                        114176          2.039          2.565              89.9%    81.6%
+ppt-textedit-open  headers_footers.ppt                  12800          2.049          2.591              57.4%    40.2%
+ppt-textedit-open  headers_footers_2007.ppt            169472          2.039          2.567              93.2%    87.3%
+ppt-textedit-open  incorrect_slide_order.ppt             9728          2.051          2.613              51.0%    34.3%
+ppt-textedit-open  ole2-embedding-2003.ppt              40448          2.050          2.574              79.5%    65.9%
+ppt-textedit-open  ppt_with_embeded.ppt                180736          2.046          2.569              93.5%    87.8%
+ppt-textedit-open  sound.ppt                            43520          2.064          2.578              81.0%    68.0%
+ppt-textedit-open  testPPT_oleWorkbook.ppt              98304          2.038          2.567              88.7%    79.7%
+ppt-textedit-open  text-margins.ppt                     44032          2.043          2.574              80.8%    67.8%
+
+cycles per byte per SHA-256 pass: median 2.048 (n=38)
+instructions per byte per pass  : median 2.579
+callgrind software backend      : 52.07 Ir/byte -> 20.2x the native instruction cost
