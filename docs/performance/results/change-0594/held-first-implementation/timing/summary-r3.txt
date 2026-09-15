@@ -1,0 +1,11 @@
+case/cache/shape                                           stat             A1           B1           B2           A2  A1->B1 %  A2->B2 %    A/A %
+docx_file_source_open/cold-requested/media-rich            p50          289011       297006       292126       289581     -2.77     -0.88     0.20
+docx_file_source_open/cold-requested/media-rich            mean         289777       298042       295042       322070     -2.85      8.39    11.14
+docx_file_source_open/cold-requested/media-rich            p95          305092       314862       319972       314821     -3.20     -1.64     3.19
+docx_file_source_open/cold-requested/media-rich            p99          328402       319192       344272      2111520      2.80     83.70   542.97
+docx_file_source_open/cold-requested/media-rich            n                60           60           60           60
+docx_file_source_open/warm/media-rich                      p50          289831       297681       293806       292561     -2.71     -0.43     0.94
+docx_file_source_open/warm/media-rich                      mean         291350       299273       295743       293285     -2.72     -0.84     0.66
+docx_file_source_open/warm/media-rich                      p95          308522       320372       314611       308042     -3.84     -2.13     0.16
+docx_file_source_open/warm/media-rich                      p99          328262       327722       336652       336492      0.16     -0.05     2.51
+docx_file_source_open/warm/media-rich                      n                60           60           60           60

@@ -1,5 +1,23 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0594 — one Deflate decoder per OOXML open, above a measured threshold
+
+`docs/GOAL.md` puts unnecessary allocation ahead of layout, algorithms and
+parallelism, and requires every claim to be scoped to scenario, corpus, machine,
+build and metric. This change removes allocation without touching I/O, limits,
+error identity or output bytes — positional requests, requested bytes,
+`version()` calls, `syscr` and `rchar` are identical on every measured phase —
+and it is scoped by a threshold rather than by assertion, because the measurement
+found a regime where the trade loses. The bounded-resource cost is measured, not
+argued: one retained 80,320-byte workspace, worth +15 minor page faults per
+fresh-process open of a 132-member workbook and −2 on a 445-member PPTX, against
+3.29 MB of allocation and zero-fill removed. The audit's standing instruction to
+price pointer-chase work in cycles is what caught the first implementation:
+instructions fell and cycles did not. `performance_claim: none` and no
+claim-registry entry. The P1 row "finish source-backed CRUD adoption across
+formats" is unchanged. [Change and limitations](0594-zip-session-reuse-per-open.md);
+[evidence](results/change-0594/README.md).
+
 ## 0604 — a `docs/GOAL.md` rule-10 blocker resolved on paper, and closed on measurement
 
 Record: [0604](0604-cfb-append-reads-design.md).

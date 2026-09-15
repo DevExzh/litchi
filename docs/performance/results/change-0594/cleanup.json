@@ -1,0 +1,48 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0594",
+  "removed": [
+    {
+      "path": "$SCRATCH/agents/0594/probe-before, probe-after, openprobe-before, openprobe-after",
+      "what": "the per-leg copies of the two measurement probes, whose only difference from the retained sources is the absolute path dependencies",
+      "why": "the retained probe/ and attribution/openprobe/ carry the identical source; each leg is reproducible by rewriting those paths"
+    },
+    {
+      "path": "$SCRATCH/agents/0594/cg.*.out, cgd.*.out",
+      "what": "raw callgrind profile data for both legs and both isolation pairs",
+      "why": "the annotated tables are retained under callgrind/ and attribution/; the raw files are large and regenerable"
+    },
+    {
+      "path": "docs/performance/results/change-0594/timing/abba-r1-*.json, abba-r2-*.json",
+      "what": "the two three-case harness ABBA runs of the HELD first implementation, 5.9 MB of raw report",
+      "why": "their paired tables are retained as held-first-implementation/timing/summary-r{1,2}.txt, the focused r3 run's raw reports are retained in full, and the held regression is now carried by the interleaved child measurements whose raw JSONL is retained under attribution/"
+    },
+    {
+      "path": "$SCRATCH/agents/0594/*.log, build-*.log, child-r1-*.jsonl, inter-i2-*.jsonl, inter-p1-*.jsonl, inter-p2-*.jsonl",
+      "what": "build logs and the intermediate interleaved runs taken against the scan-based first threshold",
+      "why": "superseded by the retained runs against the committed implementation; the scan attempt's cost is stated in the record from its perf isolation pair"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0594-before, 0594-after, 0594-probe-before, 0594-probe-after, 0594-op-before, 0594-op-after",
+      "what": "six build directories",
+      "why": "build output; the binary SHA-256s are retained in binary-sha256.txt and inside every timing report"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0594-fixtures",
+      "what": "the two harness corpora extracted for the attribution (16.8 MB DOCX, 17.0 MB PPTX)",
+      "why": "generated deterministically by the harness; their SHA-256s are recorded in decision.json and in every timing report's corpus block, so they are reproducible rather than retained"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0594",
+      "what": "the candidate git worktree, including its own target/",
+      "why": "removed after the branch was committed; the branch perf/0594-zip-session-reuse-per-open is kept"
+    }
+  ],
+  "kept": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/before-08d968f8e",
+      "why": "the shared read-only before checkout, owned by the batch, not by this change"
+    }
+  ]
+}

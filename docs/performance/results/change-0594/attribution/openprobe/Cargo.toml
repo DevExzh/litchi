@@ -1,0 +1,13 @@
+[package]
+name = "open-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-opc = { path = "/home/zhuhe/code/litchi/crates/litchi-opc" }
+
+[profile.release]
+debug = 1
+
+[workspace]

@@ -1227,6 +1227,27 @@ where
         }
     }
 
+    /// Read and verify one member by name, reusing this session's decoder.
+    ///
+    /// Name admission is the archive's own: the same normalization, the same
+    /// explicit-directory rejection, and the same
+    /// [`FileNotFound`](ErrorKind::FileNotFound) identity as
+    /// [`IndexedArchive::read`].
+    pub fn read(&mut self, name: &str) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and verify one member by name while recording actual payload work.
+    pub fn read_with_accounting(
+        &mut self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
+        let entry_id = self.archive.entry_id_for_name(name)?;
+        self.read_entry_with_accounting(entry_id, accounting)
+    }
+
     /// Read and verify one member by its stable opaque entry ID.
     ///
     /// Deflate decoder state is reused only within this session. Store
@@ -3937,14 +3958,22 @@ where
         name: &str,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<Vec<u8>, Error> {
+        let entry_id = self.entry_id_for_name(name)?;
+        self.read_entry_with_accounting(entry_id, accounting)
+    }
+
+    /// Resolve one member name to its stable opaque entry ID.
+    ///
+    /// This is the single admission step shared by the one-shot reads and by
+    /// [`IndexedReadSession`], so name normalization, the explicit-directory
+    /// rejection, and the `FileNotFound` identity cannot drift between them.
+    fn entry_id_for_name(&self, name: &str) -> Result<EntryId, Error> {
         let lookup = lookup_member_name(name)?;
-        let entry_id = self
-            .index
+        self.index
             .get(&lookup.name)
             .filter(|_| !lookup.explicit_directory)
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
-        self.read_entry_with_accounting(entry_id, accounting)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
     }
 
     /// Run a callback against one verified indexed member without retaining
@@ -9899,6 +9928,79 @@ mod tests {
             assert_eq!(decoded, payload);
             assert_eq!(decoded, expected_payload);
             assert_eq!(accounting, expected_accounting);
+        }
+    }
+
+    #[test]
+    fn indexed_read_session_reads_by_name_exactly_as_the_one_shot_read() {
+        const VALID: &[u8] = b"valid payload read after a refused member";
+        let stored = b"stored payload that bypasses the decoder";
+        let deflated = b"deflated payload that resets the decoder";
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", stored).unwrap();
+        writer
+            .write_deflated_sized("bad-crc.bin", b"payload with a bad CRC")
+            .unwrap();
+        writer
+            .write_deflated_sized("deflated.bin", deflated)
+            .unwrap();
+        writer.write_deflated_sized("valid.bin", VALID).unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let central = central_header_offset_for_name(&bytes, b"bad-crc.bin");
+        let crc = u32::from_le_bytes(bytes[central + 16..central + 20].try_into().unwrap());
+        bytes[central + 16..central + 20].copy_from_slice(&(crc ^ 1).to_le_bytes());
+        let archive = indexed_archive(bytes);
+
+        let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+        assert_eq!(
+            names,
+            ["stored.bin", "bad-crc.bin", "deflated.bin", "valid.bin"]
+        );
+
+        // One session reads every member in turn. Payload bytes, payload
+        // accounting and the refusal identity are the one-shot read's.
+        let mut session = archive.read_session();
+        for name in &names {
+            let mut one_shot_accounting = ZipOperationAccounting::default();
+            let one_shot = archive.read_with_accounting(name, &mut one_shot_accounting);
+            let mut session_accounting = ZipOperationAccounting::default();
+            let through_session = session.read_with_accounting(name, &mut session_accounting);
+            match (one_shot, through_session) {
+                (Ok(expected), Ok(actual)) => {
+                    assert_eq!(actual, expected, "member {name}");
+                    assert_eq!(session_accounting, one_shot_accounting, "member {name}");
+                },
+                (Err(expected), Err(actual)) => {
+                    assert_eq!(actual.to_string(), expected.to_string(), "member {name}");
+                },
+                (expected, actual) => {
+                    panic!("member {name} diverged: {expected:?} then {actual:?}")
+                },
+            }
+        }
+
+        // The refused member left no state behind: every later read through
+        // the same session still decodes, in any order.
+        assert_eq!(session.read("deflated.bin").unwrap(), deflated);
+        assert_eq!(session.read("valid.bin").unwrap(), VALID);
+        assert_eq!(session.read("stored.bin").unwrap(), stored);
+        assert_materialized_checksum_error(session.read("bad-crc.bin").unwrap_err());
+        assert_eq!(session.read("valid.bin").unwrap(), VALID);
+
+        // Name admission is the archive's, including the explicit-directory
+        // rejection and the `FileNotFound` identity.
+        for absent in ["absent.bin", "deflated.bin/", "stored.bin\\"] {
+            let expected = archive.read(absent).unwrap_err();
+            assert!(
+                matches!(expected.kind(), ErrorKind::FileNotFound(_)),
+                "{absent}"
+            );
+            assert_eq!(
+                session.read(absent).unwrap_err().to_string(),
+                expected.to_string(),
+                "{absent}"
+            );
         }
     }
 

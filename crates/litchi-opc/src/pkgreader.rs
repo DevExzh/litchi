@@ -40,6 +40,16 @@ pub(crate) trait ArchiveAccess {
         name: &str,
     ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error>;
 
+    /// Tell the accessor how many relationship members this package carries,
+    /// before any structural read has run.
+    ///
+    /// [`PackageReader::source_catalog`] already counts them for the
+    /// `RelationshipParts` limit, so this hands an existing number to the
+    /// accessor rather than computing a new one. A positional archive uses it
+    /// to decide whether keeping one read session is worth the workspace it
+    /// retains; every other implementation ignores it.
+    fn note_relationship_member_count(&self, _relationship_members: usize) {}
+
     /// Return a shared materialization when this archive has a validated,
     /// reusable decompression path. Positional archives intentionally retain
     /// the default `None` so their structural reads stay caller-owned.
@@ -149,6 +159,117 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
         // Positional sources may be remote, mutable, or backed by a file. A
         // borrowed payload would not have a sound lifetime, so they always
         // use the owned read path.
+        Ok(None)
+    }
+}
+
+/// Relationship members a package must carry before a structural admission
+/// pass keeps one Deflate decoder instead of building one per member.
+///
+/// **The rule.** Keep the session only when it will avoid at least this many
+/// decoder constructions, so that the one workspace it retains is repaid at
+/// least sixteenfold in workspace it does not allocate and does not zero.
+///
+/// **Why a rule is needed.** The trade has a fixed side. Keeping the decoder
+/// raises the open's heap high-water by one workspace — 80,320 bytes, zlib-rs
+/// inflate state plus flate2's 32 KiB `BufReader` — for the length of the pass,
+/// where the old code handed those pages back between members. That is
+/// immaterial when the open allocates megabytes and material when it does not.
+/// Measured on one host for change 0594: a 445-member PPTX opened in a fresh
+/// process is 2.20% faster at p50 and takes one extra minor page fault, while a
+/// 20-member DOCX carrying three relationship members is 1.08% slower and takes
+/// eight. Relationship members are counted rather than archive members because
+/// they are exactly the members the session would serve: the pass reads
+/// `[Content_Types].xml` once and then one `.rels` per relationship-bearing
+/// part.
+///
+/// The value is a scoped measurement, not a constant of nature; it is stated
+/// here so that a different allocator, platform or corpus can re-derive it.
+pub(crate) const SESSION_MEMBER_THRESHOLD: usize = 16;
+
+/// One indexed archive plus the sequential read session that its structural
+/// admission reads share.
+///
+/// Structural admission reads `[Content_Types].xml` and one `.rels` member per
+/// visited part, one after another, on a single thread. Giving that pass one
+/// [`IndexedReadSession`](soapberry_zip::office::IndexedReadSession) lets the
+/// pass reset a single Deflate decoder between members instead of building one
+/// per member. Nothing else about a read changes: name admission, the local
+/// header, CRC, declared-size and data-descriptor checks, the limits and every
+/// error identity are the archive's own, because the session performs exactly
+/// the read the one-shot entry point performs — and a package below
+/// [`SESSION_MEMBER_THRESHOLD`] keeps no session at all, so it takes the
+/// one-shot path it always took.
+///
+/// The wrapper is an operation-scoped stack value. It is never stored in a
+/// package, so the retained decoder workspace lives only for the length of the
+/// admission pass, and its `RefCell` never crosses a thread.
+pub(crate) struct SessionedArchive<'archive, R: soapberry_zip::ReaderAt> {
+    archive: &'archive soapberry_zip::office::IndexedArchive<R>,
+    session: RefCell<Option<soapberry_zip::office::IndexedReadSession<'archive, R>>>,
+}
+
+impl<'archive, R: soapberry_zip::ReaderAt> SessionedArchive<'archive, R> {
+    /// Borrow one indexed archive for a single structural admission pass.
+    ///
+    /// No session exists yet. The pass installs one through
+    /// [`ArchiveAccess::note_relationship_member_count`] if, and only if, the
+    /// count it already computed reaches [`SESSION_MEMBER_THRESHOLD`], so a
+    /// package below the threshold neither keeps a workspace nor pays anything
+    /// to find that out.
+    pub(crate) fn new(archive: &'archive soapberry_zip::office::IndexedArchive<R>) -> Self {
+        Self {
+            archive,
+            session: RefCell::new(None),
+        }
+    }
+}
+
+impl<R: soapberry_zip::ReaderAt> ArchiveAccess for SessionedArchive<'_, R> {
+    fn len(&self) -> usize {
+        self.archive.len()
+    }
+
+    fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.archive.file_names())
+    }
+
+    fn metadata(
+        &self,
+        name: &str,
+    ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error> {
+        self.archive.metadata(name)
+    }
+
+    fn note_relationship_member_count(&self, relationship_members: usize) {
+        if relationship_members < SESSION_MEMBER_THRESHOLD {
+            return;
+        }
+        if let Ok(mut slot) = self.session.try_borrow_mut() {
+            slot.get_or_insert_with(|| self.archive.read_session());
+        }
+    }
+
+    fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
+        match self.session.try_borrow_mut() {
+            Ok(mut slot) => match slot.as_mut() {
+                Some(session) => session.read(name),
+                None => self.archive.read(name),
+            },
+            // Structural admission is sequential and never re-enters a read,
+            // so the slot is always free here. Reading through the archive
+            // when it is not keeps that property a performance assumption
+            // rather than a panic; the two paths return the same value.
+            Err(_) => self.archive.read(name),
+        }
+    }
+
+    fn read_stored_borrowed<'a>(
+        &'a self,
+        _name: &str,
+    ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error> {
+        // Same reasoning as the plain positional archive: a borrowed payload
+        // would not have a sound lifetime over a mutable or remote source.
         Ok(None)
     }
 }
@@ -310,7 +431,8 @@ pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
             limits.zip_limits(),
         )
         .map_err(OpcError::from)?;
-        let source = PackageReader::source_catalog(&archive, limits)?;
+        // One sequential structural admission pass, one reset Deflate decoder.
+        let source = PackageReader::source_catalog(&SessionedArchive::new(&archive), limits)?;
         Ok(PackageCatalog { source })
     })();
 
@@ -1206,6 +1328,9 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
+        // The count above is exactly the number of `.rels` members this pass
+        // will read; hand it to the accessor before the first read.
+        archive.note_relationship_member_count(relationship_part_count);
         let mut ledger = RelationshipLedger::default();
         let content_types_member = Self::locate_content_types_member(archive)?;
         let content_types_metadata = archive.metadata(content_types_member)?;
@@ -1264,6 +1389,9 @@ impl PackageReader {
                 limits.max_relationship_parts() as u64,
             )
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        // The count above is exactly the number of `.rels` members this pass
+        // will read; hand it to the accessor before the first read.
+        archive.note_relationship_member_count(relationship_part_count);
         let mut ledger = RelationshipLedger::default();
         let content_types_member = Self::locate_content_types_member(archive)
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
@@ -2632,5 +2760,247 @@ mod tests {
         let serialized = crate::PackageWriter::to_bytes(&package).unwrap();
         let reloaded = crate::OpcPackage::from_bytes(&serialized).unwrap();
         assert_eq!(targets(&reloaded), original_targets);
+    }
+
+    /// Every OOXML package in the repository corpus, member by member,
+    /// through the session-bearing structural accessor and through the
+    /// archive's own one-shot read.
+    fn ooxml_corpus() -> Vec<std::path::PathBuf> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ooxml");
+        let mut stack = vec![root];
+        let mut fixtures = Vec::new();
+        while let Some(directory) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                let package = path
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| {
+                        matches!(
+                            extension.to_ascii_lowercase().as_str(),
+                            "docx"
+                                | "docm"
+                                | "dotx"
+                                | "xlsx"
+                                | "xlsm"
+                                | "xlsb"
+                                | "xltx"
+                                | "pptx"
+                                | "pptm"
+                                | "potx"
+                                | "ppsx"
+                                | "thmx"
+                        )
+                    });
+                if package {
+                    fixtures.push(path);
+                }
+            }
+        }
+        fixtures.sort();
+        fixtures
+    }
+
+    /// One `[Content_Types].xml` plus `count` relationship members, so that the
+    /// threshold's counting rule is exercised with a non-relationship member
+    /// present that must not be counted.
+    fn archive_with_relationship_members(count: usize) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated(CONTENT_TYPES_MEMBER, b"<Types/>")
+            .unwrap();
+        for index in 0..count {
+            writer
+                .write_deflated(
+                    &format!("part{index}/_rels/part{index}.xml.rels"),
+                    b"<Relationships/>",
+                )
+                .unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn a_session_is_kept_only_for_packages_above_the_member_threshold() {
+        for (relationship_members, kept) in [
+            (0usize, false),
+            (1, false),
+            (SESSION_MEMBER_THRESHOLD - 1, false),
+            (SESSION_MEMBER_THRESHOLD, true),
+            (SESSION_MEMBER_THRESHOLD + 4, true),
+        ] {
+            let bytes = archive_with_relationship_members(relationship_members);
+            let length = bytes.len() as u64;
+            let archive =
+                soapberry_zip::office::IndexedArchive::from_reader(Cursor::new(bytes), length)
+                    .unwrap();
+            // The content-types member is present and is not a relationship
+            // member, so it must not count towards the threshold.
+            assert_eq!(archive.len(), relationship_members + 1);
+            let sessioned = SessionedArchive::new(&archive);
+            assert!(
+                sessioned.session.borrow().is_none(),
+                "no session exists before the pass reports its count"
+            );
+            let counted = archive
+                .file_names()
+                .filter(|member_name| PackageReader::is_relationship_member(member_name))
+                .count();
+            assert_eq!(counted, relationship_members);
+            ArchiveAccess::note_relationship_member_count(&sessioned, counted);
+            assert_eq!(
+                sessioned.session.borrow().is_some(),
+                kept,
+                "{relationship_members} relationship members"
+            );
+
+            // Whichever side of the threshold the package falls, the bytes are
+            // the archive's own.
+            let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+            for name in &names {
+                assert_eq!(
+                    ArchiveAccess::read(&sessioned, name).unwrap(),
+                    soapberry_zip::office::IndexedArchive::read(&archive, name).unwrap(),
+                    "{relationship_members} relationship members, member {name}"
+                );
+            }
+            assert_eq!(
+                ArchiveAccess::read(&sessioned, "absent.bin")
+                    .unwrap_err()
+                    .to_string(),
+                soapberry_zip::office::IndexedArchive::read(&archive, "absent.bin")
+                    .unwrap_err()
+                    .to_string()
+            );
+        }
+    }
+
+    #[test]
+    fn sessioned_structural_reads_match_one_shot_reads_across_the_ooxml_corpus() {
+        let fixtures = ooxml_corpus();
+        assert!(
+            fixtures.len() >= 100,
+            "expected the OOXML corpus, found {} packages",
+            fixtures.len()
+        );
+        let mut packages = 0usize;
+        let mut members = 0usize;
+        let mut with_session = 0usize;
+        let mut without_session = 0usize;
+        for path in fixtures {
+            let bytes = std::fs::read(&path).unwrap();
+            let length = bytes.len() as u64;
+            let Ok(archive) =
+                soapberry_zip::office::IndexedArchive::from_reader(Cursor::new(bytes), length)
+            else {
+                // A fixture that does not index at all refuses identically on
+                // both paths, because neither has been reached yet.
+                continue;
+            };
+            let sessioned = SessionedArchive::new(&archive);
+            // Drive the same hook `source_catalog` drives, with the same count.
+            ArchiveAccess::note_relationship_member_count(
+                &sessioned,
+                archive
+                    .file_names()
+                    .filter(|member_name| PackageReader::is_relationship_member(member_name))
+                    .count(),
+            );
+            if sessioned.session.borrow().is_some() {
+                with_session += 1;
+            } else {
+                without_session += 1;
+            }
+            packages += 1;
+
+            let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+            assert_eq!(ArchiveAccess::len(&sessioned), archive.len());
+            assert_eq!(
+                sessioned.file_names().collect::<Vec<_>>(),
+                names.iter().map(String::as_str).collect::<Vec<_>>()
+            );
+
+            for name in &names {
+                let expected_metadata =
+                    soapberry_zip::office::IndexedArchive::metadata(&archive, name);
+                let actual_metadata = ArchiveAccess::metadata(&sessioned, name);
+                assert_eq!(
+                    format!("{actual_metadata:?}"),
+                    format!("{expected_metadata:?}"),
+                    "{} metadata for {name}",
+                    path.display()
+                );
+                assert!(
+                    ArchiveAccess::read_stored_borrowed(&sessioned, name)
+                        .unwrap()
+                        .is_none()
+                );
+
+                let expected = soapberry_zip::office::IndexedArchive::read(&archive, name);
+                let actual = ArchiveAccess::read(&sessioned, name);
+                match (expected, actual) {
+                    (Ok(expected), Ok(actual)) => {
+                        assert_eq!(actual, expected, "{} member {name}", path.display());
+                    },
+                    (Err(expected), Err(actual)) => {
+                        assert_eq!(
+                            actual.to_string(),
+                            expected.to_string(),
+                            "{} member {name}",
+                            path.display()
+                        );
+                    },
+                    (expected, actual) => panic!(
+                        "{} member {name} diverged: {expected:?} then {actual:?}",
+                        path.display()
+                    ),
+                }
+                members += 1;
+            }
+
+            // A name that is not a member keeps the archive's own refusal, and
+            // the session that saw it still reads the first member afterwards.
+            let absent = "no-such-structural-member.bin";
+            assert_eq!(
+                ArchiveAccess::read(&sessioned, absent)
+                    .unwrap_err()
+                    .to_string(),
+                soapberry_zip::office::IndexedArchive::read(&archive, absent)
+                    .unwrap_err()
+                    .to_string(),
+                "{}",
+                path.display()
+            );
+            if let Some(first) = names.first() {
+                assert_eq!(
+                    format!("{:?}", ArchiveAccess::read(&sessioned, first)),
+                    format!(
+                        "{:?}",
+                        soapberry_zip::office::IndexedArchive::read(&archive, first)
+                    ),
+                    "{} member {first} after a refusal",
+                    path.display()
+                );
+            }
+        }
+        assert!(
+            packages >= 100 && members >= 1_000,
+            "corpus too small: {packages} packages, {members} members"
+        );
+        // Both sides of the threshold are covered by the differential, so the
+        // kept-session path and the one-shot path are each proven on real
+        // packages rather than only on the synthetic threshold fixture.
+        assert!(
+            with_session > 0 && without_session > 0,
+            "corpus exercises only one side of the threshold: \
+             {with_session} with a session, {without_session} without"
+        );
     }
 }

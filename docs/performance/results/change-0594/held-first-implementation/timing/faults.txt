@@ -1,0 +1,11 @@
+Minor (reclaiming a frame) page faults for ONE open in a fresh process
+(`/usr/bin/time -v`, probe with PROBE_PHASES=time PROBE_SAMPLES=1
+PROBE_WARMUP=0, taskset -c 14, 15 runs per leg).
+
+fixture: test-data/ooxml/docx/comment.docx (10 members, 3 structural reads)
+BEFORE: 155 155 156 155 155 156 156 155 155 157 158 155 157 154 158
+AFTER:  156 155 155 158 157 154 156 156 155 154 153 155 156 156 157
+
+fixture: test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx (132 members, 42 structural reads)
+BEFORE: 387 389 388 388 387 387 386 391 388 389 389 388 390 389 389
+AFTER:  403 403 401 404 404 405 402 403 402 406 404 404 405 403 403
