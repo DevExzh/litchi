@@ -1,0 +1,55 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0607",
+  "title": "No opened deck can reach the PPTX slide regeneration, and on the path that can there is nothing pristine to copy",
+  "decision": "design retained, no production change: 0587 item SAVE-3 is measured, its scenario and its cost model are falsified, the value-identical design is frozen with seven admission gates, and the work is left unadmitted for want of any caller",
+  "code_state": "no file under crates/ was modified by this change; only docs/performance/",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "SAVE-3's scenario is 'PPTX opened-document update/save', but Package::mutable_pres is assigned Some(..) in exactly one place, Package::new(), and every byte ingress funnels through from_opc_package_with_provenance which assigns None; all 78 .pptx fixtures under test-data and both litchi-authored decks are refused by presentation_mut with the same typed UnsafeEdit, so materialize_presentation is unreachable from any opened package",
+    "the route that does serve opened decks, opened::patch::apply, already applies a per-part delta that keeps every untouched part's name, content type, relationships and blob Arc and renumbers nothing, which is the behaviour SAVE-3 asks for; changes 0590 and 0598 own it",
+    "an opened deck's unedited save is already an exact-source passthrough: 78 of 78 fixtures save byte-identical to their source, so there is no unchanged-slide regeneration to remove there",
+    "SAVE-3's cost model, 'N slides x (serialize + audit + zlib init + deflate) versus 1', is wrong by construction on the one reachable path: an authored package has no source archive, so PublicationPlan has no Copy action for any member and all 161 members of the 50-slide deck are serialized into the manifest, audited and deflated on every save whatever the model does; only the serialize term and the part churn are recoverable",
+    "the measured size of the whole materialization is 3,665,367 Ir = 2.28% of a 161,032,882 Ir authored edit-and-save, and 10.00% (50 slides) to 11.18% (200 slides) of its wall-clock p50, on a route no example, test or harness selector takes: every in-tree PPTX consumer either authors and saves once or opens and reads",
+    "an implementation is value-identical and the oracle already holds: re-materializing an unchanged model reproduces the previous archive byte for byte, and a one-slide edit already publishes 160 of its 161 members byte-identical, because Relationships::get_or_add returns an existing id for an unchanged type and target and next_r_id fills the lowest gap",
+    "the profile re-points the real cost of an authored PPTX save at DeflateEncoder::new, 161 constructions per save at 444,764 Ir each = 44.5% of the save's instructions, which is survey item 2.4 / SAVE-6 in crates/soapberry-zip/src/office.rs and outside this brief's scope"
+  ],
+  "accepted_evidence": {
+    "admission_census": "Package::open followed by presentation_mut over all 78 .pptx under test-data (78 opened, 78 refused, one error text) and over two litchi-authored decks (2 of 2 refused)",
+    "passthrough_census": "from_vec followed by an unedited to_bytes over the same 78 fixtures: 78 exact, 0 differing, 0 refused",
+    "deterministic_counts": "per materialization on an authored 50-slide deck: 50 slide parts and 12 notes parts removed and rebuilt, 50 slide XML bodies serialized totalling 107,200 bytes of which 105,056 belong to the 49 unmodified slides, 50 presentation relationships removed and re-added",
+    "isolation_pair": "callgrind at --samples 1 and 6 differenced over five, both cases: resave 161,032,882 Ir per iteration, nopsave 157,367,515, difference 3,665,367 = 2.28%; cross-checked by the same profile's call graph, flush_presentation 24,818,282 Ir over 7 calls = 3,545,469 each = 2.20% of the 160,927,403 Ir mean Package::to_bytes",
+    "symbol_accounting": "callgrind_annotate inclusive for the whole save and auto-annotated source for flush_presentation and materialize_presentation with per-callee Ir and call counts, so the materialization is attributed to the line",
+    "paired_timing": "four legs in A1 B1 B2 A2 order, 30 measured samples after 3 warmups each, taskset -c 27, at 50 and 200 slides, with the A/A and B/B floors from the repeated legs in the same window",
+    "byte_oracles": "re-materializing an unchanged model reproduces the archive byte for byte at 3 and at 50 slides (161 members, same names and order); a one-slide edit leaves 160 of 161 members byte-identical and changes only ppt/slides/slide1.xml",
+    "correctness": "cargo fmt --all --check, cargo clippy -p litchi-pptx --all-targets and cargo doc -p litchi-pptx --no-deps all clean; cargo test -p litchi-pptx: 76 binaries, 860 tests, 0 failed"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep stosb per byte, and the deflate encoder's state zeroing is most of its 44.5% instruction share, so the materialization's wall-clock share (10-11%) is five times its instruction share (2.20%)",
+    "synthetic_corpus": "the measured deck is generated by the probe (a title and three text boxes per slide, notes on every fourth); there is and can be no real-producer measurement of this path",
+    "no_after_leg": "no implementation was built, so the statement that an implementation would recover about 2.5 M of the 3.55 M Ir per materialization is modelled from the instruction split, not measured",
+    "feature_coverage": "the automatic-fonts feature was not built or measured; flush_presentation clones the mutable model partly to serve embed_fonts_for_presentation and an implementation would have to keep that path working",
+    "host_load": "the first measurement pass ran while other agents of this wave were building on the other 31 cores; the retained paired legs were taken in a quiet window and the in-window A/A and B/B floors are the only statement about that"
+  },
+  "known_gaps": {
+    "no_caller": "nothing in the repository materializes an authored presentation more than once, so the design cannot be measured against anything but a probe. A harness selector for an authored PPTX save, or an in-tree caller that interleaves model edits with typed package edits, is the admission gate for the work",
+    "crud_demo_defect": "crates/litchi/examples/office_crud_demo.rs:289-290 performs the PPTX UPDATE step as Package::open followed by presentation_mut, which cannot succeed; the example's PPTX demonstration fails there. Not fixed here, because the fix is to port the step to opened_presentation_transaction, which belongs to the opened/ owner",
+    "deflate_encoder_per_member": "DeflateEncoder::new runs 161 times per authored save at 444,764 Ir each, 44.5% of the save's instructions. Change 0476's OwnedDeflateState reuse covers crates/soapberry-zip/src/writer.rs only; StreamingArchiveWriter::write_deflated_with_accounting in office.rs still constructs a fresh encoder per member. Outside this brief's scope; survey item 2.4 / SAVE-6 should be re-ranked with this size",
+    "relate_to_quadratic": "Relationships::get_or_add scans every relationship of the collection and next_r_id collects and sorts every used number, so adding N slide relationships to one part is quadratic: 3,127,990 Ir for 350 calls on the presentation part, 8,937 each. Inside litchi-opc, outside this brief's scope, and any change to the allocation order would change output bytes",
+    "measurement": "no allocation, RSS, cold-cache, concurrency or cross-platform measurement was taken, and no perf stat cycle counting was run beside the callgrind profile"
+  },
+  "withheld": [
+    "any registered speedup, regression, RSS, allocation, cold-cache, real-producer or cross-platform result",
+    "any claim about what an implementation would save, because none was built"
+  ],
+  "provenance": {
+    "base_commit": "6c4c1469beda47c2d44b502024a8dc680af35bfe",
+    "branch": "perf/0607-pptx-eager-save-slide-regeneration",
+    "probe_binary_sha256": "c5bfebc68e2bc7326937df30702ab7ac67eac6a90f109b7f6add1459cea42458",
+    "after_binary_sha256": null,
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "pinning": "taskset -c 27 for every measured process"
+  }
+}

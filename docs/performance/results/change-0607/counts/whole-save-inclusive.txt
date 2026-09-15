@@ -1,0 +1,14 @@
+1,126,491,820 (99.88%)  codec.rs:<litchi_pptx::package::model::Package>::to_bytes
+1,101,673,335 (97.68%)  pkgwriter.rs:<litchi_opc::pkgwriter::PackageWriter>::to_bytes
+1,010,007,568 (89.55%)  phys_pkg.rs:<litchi_opc::phys_pkg::PhysPkgWriter>::write
+  501,249,266 (44.44%)  write.rs:<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>>::new
+  500,796,518 (44.40%)  deflate.rs:zlib_rs::deflate::init
+  306,624,597 (27.19%)  deflate.rs:zlib_rs::deflate::deflate
+   89,504,526 ( 7.94%)  pkgwriter.rs:<litchi_opc::pkgwriter::PublicationPlan>::from_package
+   77,549,988 ( 6.88%)  audit.rs:xml_minifier::audit::verify_authored
+   24,818,282 ( 2.20%)  codec.rs:<litchi_pptx::package::model::Package>::flush_presentation
+    9,362,228 ( 0.83%)  slide.rs:<litchi_pptx::writer::slide::MutableSlide>::generate_slide_xml_with
+160,212,124 (14.20%)  => codec.rs:<litchi_pptx::package::model::Package>::to_bytes (1x)
+966,279,696 (85.67%)  => codec.rs:<litchi_pptx::package::model::Package>::to_bytes (6x)
+89,504,526 ( 7.94%)  => pkgwriter.rs:<litchi_opc::pkgwriter::PublicationPlan>::from_package (7x)
+1,101,673,335 (97.68%)  => pkgwriter.rs:<litchi_opc::pkgwriter::PackageWriter>::to_bytes (7x)

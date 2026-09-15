@@ -1,0 +1,69 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0607",
+  "scratch_root": "/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0607",
+  "removed": [
+    {
+      "what": "cg/{before,final}-{resave,nopsave}-{1,6}.out",
+      "count": 8,
+      "bytes_each": "0.3-1.5 MB",
+      "why": "raw callgrind profiles; every number this record cites was extracted into counts/whole-save-inclusive.txt and counts/flush-presentation-breakdown.txt before deletion, and the four run logs behind the isolation pair are retained as counts/cg-*.stderr"
+    },
+    {
+      "what": "cg/{before,final}-resave-6-{incl,self}.txt (the full callgrind_annotate output, 1-6 MB each)",
+      "count": 4,
+      "why": "the record quotes only the lines for the save's own symbols and for flush_presentation's callees; both extracts are retained under counts/"
+    },
+    {
+      "what": "cg/before-* (the first measurement pass, taken with an earlier build of the probe)",
+      "why": "superseded; every retained number was re-taken with the single probe binary whose sha256 README.md records, and the two passes agree to within 0.05%"
+    },
+    {
+      "what": "the first timing pass (timing-50/, timing-200/ from the earlier build, taken while this wave's other agents were building)",
+      "why": "superseded by the quiet-window legs retained under timing/; the earlier pass had A/A floors of +3.00% and -1.45% p50 against the retained pass's +0.43% and +0.06%"
+    },
+    {
+      "what": "oracle/{save1,save2,edit-before,edit-after}.pptx (31-92 KB each)",
+      "why": "probe-generated authored decks; the oracles' verdicts and the per-member diff are retained as text, and the probe regenerates them deterministically"
+    },
+    {
+      "what": "build-after.log, gate-{fmt,test,clippy,doc}.txt, gates-done, timing.log, timing-done",
+      "why": "build and gate transcripts; gates.txt retains the tail of every gate this record cites"
+    },
+    {
+      "what": "admission.tsv, admission-authored.txt, opened-save.tsv, census-before.txt, scaling-before.txt, scaling-final.txt, timing.sh, stats.py",
+      "why": "copied into the packet under admission/, counts/ and timing/ before deletion"
+    },
+    {
+      "what": "the whole scratch directory (8.3 MB), after the packet was assembled",
+      "why": "session scratchpad on a 62 GiB RAM-backed tmpfs shared with the other agents of this wave"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/0607 (git worktree, about 18 GiB including its own 11 GiB cargo target from the gate runs)",
+      "why": "removed with `git worktree remove --force` after the commit; the branch perf/0607-pptx-eager-save-slide-regeneration is kept"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/0607-probe (the probe cargo project, 56 KB)",
+      "why": "its source and manifest are retained verbatim in the packet under probe/"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/targets/0607-probe-before (about 645 MB)",
+      "why": "the probe's CARGO_TARGET_DIR against the read-only before checkout; the binary's sha256 is recorded in README.md and decision.json"
+    }
+  ],
+  "kept": [
+    {
+      "what": "docs/performance/results/change-0607/ (about 220 KB)",
+      "why": "the evidence this record cites: the probe, the three censuses, the counts and callgrind extracts, the two byte oracles, the timing script and per-sample data, the gates, the decision record and the log paragraphs"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/before-6c4c1469b",
+      "why": "the shared read-only before checkout; owned by the coordinator, not this agent"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/before-6c4c1469b/Cargo.lock",
+      "why": "copied there from the working copy because the repository gitignores Cargo.lock and --locked refuses to create one; identical to the working copy's, gitignored, and left in place so a concurrent agent's build is not disturbed"
+    }
+  ]
+}

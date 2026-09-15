@@ -1,5 +1,36 @@
 # Performance optimization ADR-compliance matrix
 
+## 0607 — preserving an unmodified slide is the more correct behaviour, under seven gates
+
+The frozen design keeps unmodified slides' parts in place instead of deleting
+and rebuilding them, and ADR 0006's preservation default argues for it: not
+rewriting a member whose value has not changed is what preservation means, and
+the measurement shows the rewrite already reproduces the member byte for byte,
+so nothing a consumer observes moves. ADR 0005 is not relaxed. No limit moves
+and no refusal moves: the fast path performs a strict subset of the fallible
+calls today's path performs, and every one it skips is skipped only after a
+pointer-identity proof — `Arc::ptr_eq` between the live part's `blob_arc()` and
+the `Arc` the last materialization installed — that the value it would have
+produced is already in the graph. This is change 0593's direction of proof: a
+match proves "unchanged", a mismatch proves nothing and costs the existing path,
+and `OpcPackage::clone` clones the `Arc` rather than the bytes, so the proof
+survives the rollback snapshots `flush_presentation` and `edit_raw` take. Steady
+state grows by one pointer pair per slide, not a second copy of the deck. Seven
+gates, all evaluated before any mutation, keep the fast path from inheriting an
+out-of-band graph edit: the presentation's own `modified` flag must be clear
+(which also refuses every first save and closes the `duplicate_slide` clone
+hazard), the slide and notes parts must be exactly the recorded set with the
+recorded content types and `Arc`s, their relationship triples must be exactly
+the recorded ones, and the presentation part's slide relationships must be
+exactly the recorded id-and-target pairs. A document with gaps or non-canonical
+slide names cannot arise on this path, because only this function ever creates a
+slide part; if one is introduced out of band the gates refuse and today's
+renaming path runs unchanged. `verify_authored` still runs over all 161 members
+of every authored save, because an authored package has no provenance that could
+exempt one. No ADR is amended and no ADR clarification is proposed.
+[Change 0607](0607-pptx-authored-slide-regeneration-design.md);
+`performance_claim: none`.
+
 ## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
 
 ADR 0005 is the governing record and part (1) is the rare case that leaves it

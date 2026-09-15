@@ -1,0 +1,196 @@
+   56 ( 0.00%)      pub(super) fn flush_presentation(&mut self) -> Result<()> {
+   49 ( 0.00%)          let Some(presentation) = self.mutable_pres.clone() else {
+   14 ( 0.00%)          let before = self.opc.clone();
+2,300,286 ( 0.20%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage as core::clone::Clone>::clone (7x)
+   14 ( 0.00%)                      presentation.mark_clean();
+13,020 ( 0.00%)  => crates/litchi-pptx/src/writer/presentation.rs:<litchi_pptx::writer::presentation::MutablePresentation>::mark_clean (7x)
+   14 ( 0.00%)                  Ok(())
+   77 ( 0.00%)      }
+1,899,123 ( 0.17%)  => std/core/src/ptr/mod.rs:core::ptr::drop_glue::<litchi_opc::package::OpcPackage> (7x)
+   21 ( 0.00%)          let designer = presentation.preflight_designer()?;
+163,914 ( 0.01%)  => crates/litchi-pptx/src/writer/presentation.rs:<litchi_pptx::writer::presentation::MutablePresentation>::preflight_designer (7x)
+   42 ( 0.00%)          let presentation_name = pack_uri(PRESENTATION_PART)?;
+   14 ( 0.00%)              let part = self.opc.get_part(&presentation_name)?;
+2,149 ( 0.00%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::get_part (7x)
+   14 ( 0.00%)              part.rels()
+   14 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::rels (7x)
+   14 ( 0.00%)              let part = self.opc.get_part_mut(&presentation_name)?;
+6,020 ( 0.00%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::get_part_mut (7x)
+  656 ( 0.00%)              for relationship_id in old_slide_relationships {
+2,700 ( 0.00%)                  part.rels_mut().remove(&relationship_id);
+236,776 ( 0.02%)  => std/core/src/ptr/mod.rs:core::ptr::drop_glue::<core::option::Option<litchi_opc::rel::Relationship>> (300x)
+150,913 ( 0.01%)  => crates/litchi-opc/src/rel.rs:<litchi_opc::rel::Relationships>::remove (300x)
+  600 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::rels_mut (300x)
+   14 ( 0.00%)              .iter_parts()
+  112 ( 0.00%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::iter_parts (7x)
+1,038 ( 0.00%)              .filter(|part| part.partname().as_str().starts_with("/ppt/slides/"))
+1,038 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::partname (519x)
+  606 ( 0.00%)              .map(|part| part.partname().clone())
+  600 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::partname (300x)
+1,849 ( 0.00%)          for part in old_slides {
+  900 ( 0.00%)              self.opc.remove_part(&part);
+955,444 ( 0.08%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::remove_part (300x)
+   14 ( 0.00%)              .iter_parts()
+  112 ( 0.00%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::iter_parts (7x)
+  438 ( 0.00%)              .filter(|part| part.partname().as_str().starts_with("/ppt/notesSlides/"))
+  438 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::partname (219x)
+  150 ( 0.00%)              .map(|part| part.partname().clone())
+  144 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::partname (72x)
+  481 ( 0.00%)          for part in old_notes_slides {
+  216 ( 0.00%)              self.opc.remove_part(&part);
+297,813 ( 0.03%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::remove_part (72x)
+1,400 ( 0.00%)              let target = format!("slides/slide{}.xml", index.saturating_add(1));
+1,400 ( 0.00%)                  .get_part_mut(&presentation_name)?
+289,284 ( 0.03%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::get_part_mut (350x)
+1,400 ( 0.00%)                  .relate_to(&target, rt::SLIDE);
+3,127,990 ( 0.28%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::relate_to (350x)
+1,400 ( 0.00%)              let slide_name = pack_uri(&format!("/ppt/{target}"))?;
+1,750 ( 0.00%)              let mut slide_part = BlobPart::new(
+274,270 ( 0.02%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart>::new (350x)
+1,400 ( 0.00%)                  slide_name,
+2,800 ( 0.00%)                  slide.generate_slide_xml_with(prepared)?.into_bytes(),
+9,362,228 ( 0.83%)  => crates/litchi-pptx/src/writer/slide.rs:<litchi_pptx::writer::slide::MutableSlide>::generate_slide_xml_with (350x)
+3,500 ( 0.00%)              slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
+947,079 ( 0.08%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::relate_to (350x)
+  350 ( 0.00%)              if slide.has_notes() {
+  420 ( 0.00%)                  slide_part.relate_to(
+202,658 ( 0.02%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::relate_to (84x)
+  420 ( 0.00%)                      &format!("../notesSlides/notesSlide{}.xml", index + 1),
+2,800 ( 0.00%)              self.opc.add_part(Box::new(slide_part));
+297,907 ( 0.03%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::add_part (350x)
+10,500 ( 0.00%)  => ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (350x)
+  504 ( 0.00%)                      pack_uri(&format!("/ppt/notesSlides/notesSlide{}.xml", index + 1))?;
+  504 ( 0.00%)                  let mut notes_part = BlobPart::new(
+75,783 ( 0.01%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart>::new (84x)
+  336 ( 0.00%)                      notes_name,
+  168 ( 0.00%)                      crate::notes::write_text(text)?,
+  924 ( 0.00%)                  notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
+227,970 ( 0.02%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::relate_to (84x)
+  672 ( 0.00%)                  notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
+190,240 ( 0.02%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::relate_to (84x)
+  672 ( 0.00%)                  self.opc.add_part(Box::new(notes_part));
+77,345 ( 0.01%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::add_part (84x)
+2,520 ( 0.00%)  => ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (84x)
+    7 ( 0.00%)              presentation.generate_presentation_xml_with_designer(&relationship_ids, &designer)?;
+183,905 ( 0.02%)  => crates/litchi-pptx/src/writer/presentation.rs:<litchi_pptx::writer::presentation::MutablePresentation>::generate_presentation_xml_with_designer (7x)
+   14 ( 0.00%)              .get_part_mut(&presentation_name)?
+5,032 ( 0.00%)  => crates/litchi-opc/src/package.rs:<litchi_opc::package::OpcPackage>::get_part_mut (7x)
+   35 ( 0.00%)              .set_blob(xml.into_bytes());
+  511 ( 0.00%)  => crates/litchi-opc/src/part.rs:<litchi_opc::part::BlobPart as litchi_opc::part::Part>::set_blob (7x)
+   42 ( 0.00%)      }
+63,076 ( 0.01%)  => std/core/src/ptr/mod.rs:core::ptr::drop_glue::<litchi_pptx::writer::presentation::PreparedDesigner> (7x)
+43,369 ( 0.00%)  => std/core/src/ptr/mod.rs:core::ptr::drop_glue::<alloc::vec::Vec<alloc::string::String>> (7x)
+1,403 ( 0.00%)      PackURI::new(value).map_err(Error::Uri)
+1,212,381 ( 0.11%)  => crates/litchi-opc/src/packuri.rs:<litchi_opc::packuri::PackURI>::new::<&str> (441x)
+
+1,793 ( 0.00%)  <counts for unidentified lines in crates/litchi-pptx/src/package/codec.rs>
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.8/src/deflate/pending.rs
+--------------------------------------------------------------------------------
+Ir               
+
+-- line 11 ----------------------------------------
+  1,127 ( 0.00%)          self.pending = 0;
+  2,254 ( 0.00%)      pub fn pending(&self) -> &[u8] {
+ 40,572 ( 0.00%)          let slice = &self.buf.as_slice()[self.out..][..self.pending];
+  6,762 ( 0.00%)      }
+324,205 ( 0.03%)          self.buf.len() - (self.out + self.pending)
+  3,381 ( 0.00%)          self.out = self.out.wrapping_add(number_of_bytes);
+  3,381 ( 0.00%)          self.pending -= number_of_bytes;
+  3,381 ( 0.00%)          if self.pending == 0 {
+  3,381 ( 0.00%)              self.out = 0;
+-- line 56 ----------------------------------------
+-- line 60 ----------------------------------------
+134,344 ( 0.01%)              self.remaining() >= buf.len(),
+134,344 ( 0.01%)          self.pending += buf.len();
+-- line 85 ----------------------------------------
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: std/core/src/convert/num.rs
+--------------------------------------------------------------------------------
+Ir              
+
+-- line 64 ----------------------------------------
+97,503 ( 0.01%)                  small as Self
+-- line 80 ----------------------------------------
+-- line 283 ----------------------------------------
+ 2,854 ( 0.00%)                  if u > (Self::MAX as $source) {
+-- line 299 ----------------------------------------
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: crates/soapberry-zip/src/extra_fields.rs
+--------------------------------------------------------------------------------
+Ir              
+
+-- line 213 ----------------------------------------
+20,286 ( 0.00%)      pub fn write_extra_fields(&self, writer: &mut impl Write, filter: Header) -> Result<(), Error> {
+ 7,889 ( 0.00%)          if filter == Header::LOCAL && self.local_size == 0 {
+ 2,254 ( 0.00%)          } else if filter == Header::CENTRAL && self.central_size == 0 {
+18,032 ( 0.00%)      }
+-- line 243 ----------------------------------------
+-- line 253 ----------------------------------------
+ 4,508 ( 0.00%)              data: [default_val; N],
+-- line 269 ----------------------------------------
+
+ 4,508 ( 0.00%)  <counts for unidentified lines in crates/soapberry-zip/src/extra_fields.rs>
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: std/core/src/ops/range.rs
+--------------------------------------------------------------------------------
+Ir                 
+
+-- line 555 ----------------------------------------
+3,755,688 ( 0.33%)          self.exhausted || !(self.start <= self.end)
+-- line 571 ----------------------------------------
+-- line 865 ----------------------------------------
+  105,916 ( 0.01%)          (match self.start_bound() {
+-- line 881 ----------------------------------------
+
+  359,075 ( 0.03%)  <counts for unidentified lines in std/core/src/ops/range.rs>
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: crates/soapberry-zip/src/time.rs
+--------------------------------------------------------------------------------
+Ir             
+
+
+6,762 ( 0.00%)  <counts for unidentified lines in crates/soapberry-zip/src/time.rs>
+
+--------------------------------------------------------------------------------
+-- Auto-annotated source: /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs
+--------------------------------------------------------------------------------
+Ir               
+
+-- line 255 ----------------------------------------
+732,753 ( 0.06%)              break match $self.state.state {
+-- line 271 ----------------------------------------
+-- line 298 ----------------------------------------
+  2,268 ( 0.00%)                          }
+-- line 314 ----------------------------------------
+-- line 317 ----------------------------------------
+162,330 ( 0.01%)                      if $self.state.config.trim_text_start {
+ 77,770 ( 0.01%)                      match $reader.read_text($buf, &mut $self.state.offset) $(.$await)? {
+  2,268 ( 0.00%)                              $self.state.state = ParseState::InsideMarkup;
+  2,268 ( 0.00%)                              Ok(Event::Text($self.state.emit_text(bytes)))
+  2,254 ( 0.00%)                              $self.state.state = ParseState::Done;
+  4,508 ( 0.00%)                              let event = $self.state.emit_text(bytes);
+  7,889 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:<quick_xml::reader::state::ReaderState>::emit_text (1,127x)
+  2,254 ( 0.00%)                              if event.is_empty() {
+  2,254 ( 0.00%)                                  Ok(Event::Eof)
+242,865 ( 0.02%)          match event {
+  1,127 ( 0.00%)              Err(_) | Ok(Event::Eof) => $self.state.state = ParseState::Done,
+-- line 386 ----------------------------------------
+-- line 403 ----------------------------------------
+ 80,038 ( 0.01%)          $self.state.state = ParseState::InsideText;
+ 80,038 ( 0.01%)          let start = $self.state.offset;
+428,792 ( 0.04%)          match $reader.peek_one() $(.$await)? {
+-- line 422 ----------------------------------------
+-- line 433 ----------------------------------------
+102,872 ( 0.01%)                  Ok(bytes) => $self.state.emit_end(bytes),
+2,567,206 ( 0.23%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:<quick_xml::reader::state::ReaderState>::emit_end (25,718x)
+  5,635 ( 0.00%)                  Ok(bytes) => $self.state.emit_question_mark(bytes),
+ 31,556 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:<quick_xml::reader::state::ReaderState>::emit_question_mark (1,127x)
+265,965 ( 0.02%)                  Ok(bytes) => Ok($self.state.emit_start(bytes)),
+6,870,159 ( 0.61%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:<quick_xml::reader::state::ReaderState>::emit_start (53,193x)
+-- line 473 ----------------------------------------

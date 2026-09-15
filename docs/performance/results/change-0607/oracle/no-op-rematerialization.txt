@@ -1,0 +1,12 @@
+=== authored deck, 3 slides: save, re-assert the identical title, save again ===
+first_bytes	31672
+second_bytes	31672
+identical	true
+members	43	43	same order and names: True
+members with differing content: 0
+=== authored deck, 50 slides: save, re-assert the identical title, save again ===
+first_bytes	91537
+second_bytes	91537
+identical	true
+members	161	161	same order and names: True
+members with differing content: 0

@@ -1,0 +1,10 @@
+A1	n=30	p50=3252.0	mean=3255.0	p95=3283.9	p99=3291.0 us
+A2	n=30	p50=3266.0	mean=3266.9	p95=3284.2	p99=3285.0 us
+B1	n=30	p50=2929.9	mean=2934.6	p95=2958.4	p99=2976.6 us
+B2	n=30	p50=2937.7	mean=2938.9	p95=2958.9	p99=2967.8 us
+A(resave, pooled)	n=60	p50=3261.0	mean=3261.0	p95=3283.9	p99=3285.0 us
+B(nopsave, pooled)	n=60	p50=2934.8	mean=2936.7	p95=2958.4	p99=2967.8 us
+delta p50 (A-B)	326.2 us	10.00% of A
+delta mean (A-B)	324.2 us	9.94% of A
+A/A floor (A2 vs A1) p50	+0.43%	p99 -0.18%
+B/B floor (B2 vs B1) p50	+0.27%	p99 -0.29%

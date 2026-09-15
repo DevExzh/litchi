@@ -1,0 +1,4 @@
+bytes	open	presentation_mut	is_modified	path	detail
+91537	ok	refused	false	/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0607/oracle/save1.pptx	unsafe PPTX edit during presentation_mut: the lossless facade cannot hydrate an opened package into the mutable writer
+91537	ok	refused	false	/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0607/oracle/save2.pptx	unsafe PPTX edit during presentation_mut: the lossless facade cannot hydrate an opened package into the mutable writer
+# files=2 opened=2 open_refused=0 writer_admitted=0 writer_refused=2
