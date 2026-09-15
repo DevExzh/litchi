@@ -1,0 +1,44 @@
+# `.blob()` occurrences under crates/*/src at base 818e58bee
+#
+#   rg -o --no-heading -t rust '\.blob\(\)' crates/*/src/ \
+#     | sed 's#^crates/\([^/]*\)/.*#\1#' | sort | uniq -c | sort -rn
+#
+# Lexical occurrences, not distinct semantic callers. A small number may be
+# method calls on unrelated types of the same name; 0581 recorded the same
+# caveat. Under C2' none of these sites changes, because `Part::blob` keeps its
+# signature: they are all downstream of an accessor that already returns
+# `Result` and would force the decode before handing out the `&dyn Part`.
+
+    403 litchi-pptx
+    279 litchi-xlsx
+    137 litchi-xlsb
+    134 litchi-docx
+     71 litchi-opc
+     47 litchi-ooxml-common
+      7 litchi-ppt
+   ----
+   1078 total occurrences, on 1069 matching lines
+
+# For comparison, as recorded earlier in the program:
+#   0581 at 32d25e088: 950 matching lines across seven crates
+#   0587 at 2fc5fc657: 1,049 occurrences across six crates (opc 70,
+#     ooxml-common 47, docx 128, xlsx 278, pptx 390, xlsb 136)
+#   this base, same six crates: 1,071 occurrences
+
+# `iter_parts()` occurrences under crates/, by directory role
+#
+#   rg -n --no-heading -t rust '\.iter_parts\(\)' crates/
+#
+#     307  crates/*/src          (259 in-scope production on OpcPackage,
+#                                 27 on SourceBackedPackage, 21 inline tests)
+#      53  crates/*/tests
+#       6  crates/*/examples
+#       2  crates/litchi-opc, other directories
+#     ---
+#     368  total under crates/
+#      61  additionally in tools/perf-baseline
+#
+# Two definitions exist:
+#   OpcPackage::iter_parts          crates/litchi-opc/src/package.rs:717
+#   SourceBackedPackage::iter_parts crates/litchi-opc/src/source_backed.rs:5834
+# Only the first is in C2' scope. No `try_iter_parts` exists at this base.

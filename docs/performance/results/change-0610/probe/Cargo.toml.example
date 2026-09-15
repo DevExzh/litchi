@@ -1,0 +1,25 @@
+# Manifest template for the scratch sizing probe retained in `src/`.
+#
+# Build one copy per leg, each with its own `CARGO_TARGET_DIR`, pointing the
+# path dependencies at that leg's checkout:
+#
+#   litchi-opc  = { path = "<checkout>/crates/litchi-opc" }
+#   litchi-xlsx = { path = "<checkout>/crates/litchi-xlsx" }
+#
+# `--locked` is not used: the probe is a fresh crate with no lockfile of its
+# own. It resolves the same dependency versions through the same path
+# dependencies, and the release profile below mirrors the workspace's.
+
+[package]
+name = "opc-touch-probe"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+litchi-xlsx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-xlsx" }
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+panic = "abort"

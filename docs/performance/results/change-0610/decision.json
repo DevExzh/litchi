@@ -1,0 +1,69 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0610",
+  "title": "An XLSX open-edit-save reads one part of ninety - the frozen design for lazy OPC part decode, and its proposed ADR",
+  "decision": "design only, frozen; a proposed ADR is drafted and awaits human review",
+  "code_state": "no file under crates/ was modified by this batch; three documents added and one ADR index section added",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": [
+    "0587 SAVE-5 (rank 21)"
+  ],
+  "satisfies_gate": "0581 gate 1, as far as a draft can: docs/adr/0030-lazy-opc-part-decode.md exists with status Proposed and is deliberately absent from the accepted ADR table",
+  "reason_codes": [
+    "0581 measured what the eager OPC package retains but nobody measured what an operation reads; this record measures the read set by ablation and finds that the documented XLSX open-then-hide-a-tab-then-save reads exactly one part, /xl/workbook.xml, on all 33 corpus fixtures that admit the operation - 33 of 550 parts and 60,239 of 8,274,037 inflated bytes, 0.728%",
+    "the physical open-edit-publish route reads zero other parts across 325 fixtures and 4,896 parts, so the publication plan needs no decoded payload for any member it copies; change 0593's provenance-identity pristine proof is what makes that true and is therefore a prerequisite for C2', not merely a predecessor",
+    "0587 sized C2's migration at 289 iter_parts() sites; the real population under crates/*/src is 307, of which 21 are inline tests and 27 are SourceBackedPackage::iter_parts (out of scope, since PartView has no blob() and its data() is already fallible), leaving 259 in-scope production sites whose payload-reading group is bracketed 16-88 by two mechanical scopes and put at about 25 by an independent full-context review; none of the 1,078 .blob() sites changes at all, because Part::blob keeps its signature",
+    "0581 gate 2 is smaller than 0581 assumed: the reader already charges PartBytes and TotalPartBytes against the declared central-directory sizes before any decompression (pkgreader.rs:1128, batch pass at :897, regression test at :2149) and again against the actual sizes after (:917-927), so only the second charge moves and the open-time refusal stays where it is",
+    "nothing is implemented and nothing is authorized: gates 3, 4, 5, 7 and 8 require an implementation, and gate 1 is not satisfied until a human accepts ADR 0030"
+  ],
+  "new_measurement": {
+    "census": "334 OOXML fixtures, 5,077 admitted parts, 15,323,729 archive bytes, 45,562,463 inflated bytes (2.97x); XML parts are 4,747 of 5,077 and 90.8% of the inflated bytes",
+    "corroboration": "archive + sum of decompressed payloads accounts for 98.32% of the open retention 0581 measured across its six axis-3 fixtures, confirming an inference 0581 explicitly said it could not measure",
+    "ablation_physical": "opc-reblob over 325 fixtures and 4,896 parts: 0 parts and 0 bytes read beyond the one part the scenario itself rewrites",
+    "ablation_semantic": "xlsx-hide over 33 fixtures: exactly 1 part read per fixture, /xl/workbook.xml on every one; 6.00% of parts and 0.728% of inflated bytes; 1 of 90 parts and 0.164% of bytes on the 132-member flagship",
+    "defect_breadth": "59 of 180 .xlsx fixtures refuse the hide operation with XmlPublication NotCompact FormattingWhitespace - the pre-existing defect 0587 section 4 reported on two operations of one fixture; reported, not diagnosed and not fixed"
+  },
+  "accepted_evidence": {
+    "probe": "a scratch crate with path dependencies on litchi-opc and litchi-xlsx, retained with its manifest template, corpus driver and classifier; tools/perf-baseline has no ordinary-open-and-save selector, as 0587 section 4 and 0593 both record",
+    "method": "ablation - substitute a sentinel payload for one part at a time, re-run the operation, and compare the outcome everywhere except that part's own member; the sentinel is a minimal compact XML document for an XML content type because a replaced XML payload is regenerated and audited rather than copied",
+    "sensitivity": "the same detector reports 0 read parts for the physical route and exactly 1 for the semantic route on every one of 33 fixtures, naming the same part each time; a blind detector would report 0 for both",
+    "enumeration": "ripgrep populations with the exact commands retained, plus a retained classifier that splits production from inline-test sites and classifies each production site by what it does with the iterator; the three unresolved sites are listed and were read by hand",
+    "gates": "cargo fmt --all --check, check_report_claim_classification.py, check_crate_boundaries.py and a 51-link relative-link check all exit 0; check_perf_claims.py and check_example_targets.py are red on the untouched base and reproduced byte-identically there"
+  },
+  "accepted_costs": {
+    "design_only": "no implementation, so five of the eight admission gates cannot be met by this record and are recorded as not attempted",
+    "adr_not_accepted": "ADR 0030 is proposed and awaiting human review; drafting it does not satisfy gate 1",
+    "two_operations_only": "the read set is measured for one physical scenario and one semantic scenario; no DOCX or PPTX semantic-editor read set exists because no example opens a real .docx or .pptx, edits through the model and saves",
+    "one_edit_shape": "xlsx-hide is one edit shape; a cell edit, sheet insert, style change or rename will read more, and rename and activate are blocked on real producer files by the pre-existing NotCompact defect",
+    "lexical_classification": "the retained classifier is mechanical and reports two scopes because neither is honest alone: an 8-line window under-counts payload reads (16) and the enclosing function over-counts them (88). Neither is a proof: litchi-opc/src/sign.rs:357 stores a Resource::Part whose blob() is read in a different function, which no single-scope scan reaches. The narrowed iter_parts item type turns any miss into a compile error rather than a silent defect",
+    "ablation_blind_spot": "a read whose only effect is on the ablated part's own member is invisible; the physical route's own re-blob read is exactly such a case and is stated separately rather than counted",
+    "scope": "the census counts Part payloads only, excluding .rels members and [Content_Types].xml, which are not Part values",
+    "predicted_retention": "the C2' retention column is arithmetic on 0581's measured columns plus this record's measured decoded bytes; no fresh peak-byte probe was run"
+  },
+  "known_gaps": {
+    "docx_pptx": "the read set for a DOCX or PPTX semantic editor save is unknown, not small: a DOCX save regenerates every model-owned part when its single is_modified flag is set and a PPTX save regenerates every slide (0587 SAVE-3)",
+    "unmeasured": "no timing, cycle, instruction, cold-cache, peak-RSS, physical-device, allocation-profile, concurrency or cross-platform figure; no encrypted, signed beyond refusal identity, or malformed package beyond the corpus's own refusals",
+    "implementation_gates": "byte-identical corpus output, exact-source no-op publication, peak-byte and allocation counts on 0581's three axes, and full refusal preservation all require an implementation and were not attempted",
+    "defect": "the 59 NotCompact refusals are a breadth observation for a pre-existing defect; no diagnosis and no fix is proposed here"
+  },
+  "withheld": [
+    "any registered claim, speedup, regression, latency, cold-cache, physical-device, peak-RSS, allocation-profile, concurrency-scaling or cross-platform result",
+    "any authorization to implement C2' or C3"
+  ],
+  "provenance": {
+    "base_commit": "818e58bee20a9d95bbbda5bf3e1f60aa4db45b3f",
+    "branch": "perf/0610-opc-lazy-part-decode-adr-draft",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "build": "the probe is a scratch crate built with cargo build --release and its own CARGO_TARGET_DIR; profile lto = true, panic = abort, mirroring the workspace. --locked is not used: the probe is a fresh crate with no lockfile of its own",
+    "pinning": "taskset -c 30 for every probe process",
+    "note": "every figure in this packet is a deterministic count of parts or bytes and is therefore build-independent and unaffected by the seven other agents active on this host"
+  },
+  "correction": {
+    "what": "the first version of this packet reported 267 production iter_parts() sites with 2 on SourceBackedPackage and 17 reading payload bytes; the corrected figures are 259 in-scope production sites, 27 on SourceBackedPackage, and a payload-reading group bracketed 16-88 and estimated at about 25",
+    "cause": "two defects in the first classifier. It treated the first `#[cfg(test)]` line in a file as the start of an inline test module, but `#[cfg(test)] mod name;` is a declaration and leaves the rest of the file production - crates/litchi-opc/src/package.rs:1238 is exactly that case, which wrongly excluded the production site at :1269. And it classified on a fixed 8-line window, which misses a payload read further away - package.rs:1269 reads part.blob_arc() 17 lines later and pkgwriter.rs:140 reads part.blob() 14 lines later",
+    "found_by": "an independent full-context enumeration commissioned for this same record, which read each enclosing function and followed closures and stored references instead of a window",
+    "what_did_not_change": "every measured figure in this packet - the census, both ablation runs and the retention corroboration. Those are counts produced by the probe, not by the classifier. The design, the ADR's decision content and the admission-gate analysis are unaffected: the migration surface is smaller than 0587's 289 either way, and the corrected numbers strengthen rather than weaken the case, because 27 of the sites turn out to be on the already-lazy type"
+  }
+}

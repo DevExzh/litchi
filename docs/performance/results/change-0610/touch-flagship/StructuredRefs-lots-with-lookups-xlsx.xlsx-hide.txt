@@ -1,0 +1,28 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /xl/worksheets/sheet2.xml 455209 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+part /xl/queryTables/queryTable1.xml 915 application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml untouched
+part /xl/externalLinks/externalLink1.xml 984 application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml untouched
+part /xl/theme/theme1.xml 7139 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /xl/tables/table2.xml 1195 application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml untouched
+part /xl/workbook.xml 2399 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml touched
+part /xl/queryTables/queryTable2.xml 1077 application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml untouched
+part /xl/drawings/drawing1.xml 1074 application/vnd.openxmlformats-officedocument.drawing+xml untouched
+part /xl/tables/table3.xml 1032 application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml untouched
+part /xl/printerSettings/printerSettings1.bin 984 application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings untouched
+part /xl/sharedStrings.xml 140145 application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml untouched
+part /docProps/app.xml 1200 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /xl/worksheets/sheet1.xml 40610 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+part /xl/theme/themeOverride1.xml 6915 application/vnd.openxmlformats-officedocument.themeOverride+xml untouched
+part /xl/worksheets/sheet5.xml 252504 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+part /xl/queryTables/queryTable3.xml 940 application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml untouched
+part /xl/worksheets/sheet4.xml 7848 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+part /xl/charts/chart1.xml 6881 application/vnd.openxmlformats-officedocument.drawingml.chart+xml untouched
+part /docProps/core.xml 658 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /xl/styles.xml 32927 application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml untouched
+part /xl/printerSettings/printerSettings2.bin 984 application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings untouched
+part /xl/connections.xml 620 application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml untouched
+part /xl/tables/table1.xml 1373 application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml untouched
+part /xl/calcChain.xml 160010 application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml untouched
+part /xl/worksheets/sheet3.xml 1558391 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx xlsx-hide 325446 25 2684014 1 2399

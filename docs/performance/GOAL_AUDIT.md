@@ -1,5 +1,38 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0610 — hypothesis 8 is confirmed, and the waste is measured
+
+Design only, against the audit's standing eager-OPC-materialization row.
+`docs/GOAL.md:350`'s hypothesis 8 — *"XLSX selective sheet loading may be
+undermined by eager OPC materialization"* — is now **confirmed by measurement
+rather than by source reading**: the XLSX layer above OPC already defers
+worksheet work, and an open-then-hide-a-tab-then-save reads exactly one part,
+`/xl/workbook.xml`, on every one of the 33 corpus fixtures that admit the
+operation, while `load_parts_eager` has already inflated all 550 parts and
+8,274,037 bytes before the workbook model exists. 99.27% of those bytes are
+decompressed, charged, retained and never read. The record also closes a gap
+0581 left explicitly open: 0581 inferred that its measured open retention is
+`archive + Σ decompressed payloads` and said the inference was not a
+measurement; the new census measures Σ and the formula accounts for 98.32% of
+0581's figure. `GOAL.md`'s standing instruction — *"Do not change an
+architecture solely because it appears suboptimal in source code. Require
+profiles and scenario measurements"* — is honoured: the measurements exist and
+the architecture is still not changed, because gate 1 requires a human to accept
+[ADR 0030](../adr/0030-lazy-opc-part-decode.md) first. Audit rows this does
+**not** close: no DOCX or PPTX semantic-editor read set is measured, because no
+example opens a real `.docx` or `.pptx`, edits through the model and saves —
+0587 §4 recorded that gap, 0593 recorded it again, and it remains open; a DOCX
+save regenerates every model-owned part when one whole-model flag is set and a
+PPTX save regenerates every slide, so those read sets are **unknown, not small**.
+`tools/perf-baseline` still has no ordinary open-and-save selector. One new
+audit item is opened: the pre-existing `NotCompact` publication refusal blocks a
+plain tab-hide on 59 of 180 real `.xlsx` fixtures, which is a correctness defect
+sized here and owned by no record. `performance_claim: none`, and no timing,
+peak-RSS or cold-cache figure is measured. OLE2 and OOXML remain active; ODF is
+deferred until that goal completes and iWork is excluded.
+[Change](0610-opc-lazy-part-decode-design.md);
+[evidence](results/change-0610/README.md).
+
 ## 0608 — a `docs/GOAL.md` step-1 candidate closed on reach rather than on size
 
 Record: [0608](0608-xls-lazy-sst-index-design.md).

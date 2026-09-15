@@ -1,0 +1,26 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /ppt/slideLayouts/slideLayout8.xml 5990 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slides/slide1.xml 3967 application/vnd.openxmlformats-officedocument.presentationml.slide+xml untouched
+part /ppt/tableStyles.xml 182 application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml untouched
+part /ppt/media/media1.mp4 101799 video/mp4 untouched
+part /docProps/core.xml 702 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /ppt/presentation.xml 3380 application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml untouched
+part /ppt/theme/theme1.xml 8399 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /ppt/slideLayouts/slideLayout11.xml 4247 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout1.xml 4733 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout5.xml 7986 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout3.xml 5461 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout9.xml 5918 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /docProps/thumbnail.jpeg 2344 image/jpeg untouched
+part /ppt/presProps.xml 818 application/vnd.openxmlformats-officedocument.presentationml.presProps+xml untouched
+part /ppt/slideLayouts/slideLayout6.xml 3092 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout2.xml 3968 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout7.xml 2550 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout4.xml 5039 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/media/image1.png 65215 image/png untouched
+part /ppt/slideLayouts/slideLayout10.xml 4022 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/viewProps.xml 771 application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml untouched
+part /docProps/app.xml 1280 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /ppt/slideMasters/slideMaster1.xml 13923 application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml untouched
+test-data/poi/test-data/slideshow/EmbeddedVideo.pptx opc-reblob 201418 23 255786 0 0

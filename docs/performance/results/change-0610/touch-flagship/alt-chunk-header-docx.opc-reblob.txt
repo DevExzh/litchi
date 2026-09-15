@@ -1,0 +1,31 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /word/footer1.xml 2593 application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml untouched
+part /docProps/custom.xml 632 application/vnd.openxmlformats-officedocument.custom-properties+xml untouched
+part /word/footer2.xml 6169 application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml untouched
+part /word/theme/theme1.xml 7042 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /word/settings.xml 3940 application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml untouched
+part /word/webSettings.xml 8514 application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml untouched
+part /word/footer3.xml 2593 application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml untouched
+part /docProps/core.xml 655 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /word/media/image1.png 6464 image/png untouched
+part /word/footnotes.xml 5047 application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml untouched
+part /customXml/itemProps3.xml 307 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+part /customXml/itemProps2.xml 363 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+part /word/header1.xml 2593 application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml untouched
+part /word/header3.xml 2593 application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml untouched
+part /word/document.xml 3476 application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml untouched
+part /customXml/itemProps1.xml 341 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+part /word/header2.xml 10551 application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml untouched
+part /customXml/item2.xml 143 application/xml untouched
+part /word/numbering.xml 24010 application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml untouched
+part /docProps/app.xml 1015 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /word/styles.xml 1139 application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml untouched
+part /word/endnotes.xml 5041 application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml untouched
+part /word/media/image2.png 8697 image/png untouched
+part /word/fontTable.xml 3558 application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml untouched
+part /docMetadata/LabelInfo.xml 323 application/vnd.ms-office.classificationlabels+xml untouched
+part /word/afchunk2.docx 38699 application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml untouched
+part /customXml/item1.xml 270 application/xml untouched
+part /customXml/item3.xml 5658 application/xml untouched
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx opc-reblob 77621 28 152426 0 0
