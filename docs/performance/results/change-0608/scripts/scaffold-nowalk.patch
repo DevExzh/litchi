@@ -1,0 +1,30 @@
+diff --git a/crates/litchi-xls/src/records.rs b/crates/litchi-xls/src/records.rs
+index c84100414..2c052f1f1 100644
+--- a/crates/litchi-xls/src/records.rs
++++ b/crates/litchi-xls/src/records.rs
+@@ -1348,6 +1348,11 @@ fn scan_shared_string_records_as<T: SharedStringText>(
+             "SST declares {unique_count} strings but its records are too short"
+         )));
+     }
++    // CHANGE 0608 MEASUREMENT SCAFFOLD -- NOT A CANDIDATE.
++    // Build the segments and run the SST header checks, then skip the
++    // per-string walk entirely, so that `open(base) - open(nowalk)` prices the
++    // ceiling of fully deferred indexing at open. `black_box` keeps the loop
++    // and its instantiation in the binary.
+     let mut entries = Vec::new();
+     entries
+         .try_reserve_exact(unique_count)
+@@ -1355,11 +1360,9 @@ fn scan_shared_string_records_as<T: SharedStringText>(
+             resource: "SST entry locator",
+             requested: unique_count,
+         })?;
+-    for string_index in 0..unique_count {
++    let scaffold_count = std::hint::black_box(0usize);
++    for string_index in 0..scaffold_count {
+         let start = cursor.logical_position();
+-        // The scan retains offsets, never text, so production walks the string
+-        // rather than decoding it. The walk refuses the same inputs at the same
+-        // point in the sequence, with the same typed errors.
+         walk_one_shared_string::<T>(&mut cursor, string_index)?;
+         let end = cursor.logical_position();
+         entries.push(SharedStringEntryLocation { start, end });

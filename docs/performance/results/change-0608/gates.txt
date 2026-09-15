@@ -1,0 +1,45 @@
+Change 0608 gate tails. Nothing under crates/ was modified by this change;
+every gate below ran in the worktree /home/zhuhe/code/litchi-worktrees/0608
+at base commit 818e58bee9dd50e6a064ba7cd0a9a7abbf44e82a, with the two
+measurement scaffolds reverted, over the final docs-only tree (this packet,
+the change record, and the XLS-2 annotation in the 0587 survey).
+
+$ git status --short   (before the gates; the commit is made after them)
+ M docs/performance/0608-xls-lazy-sst-index-design.md
+ M docs/performance/results/change-0608/README.md
+ M docs/performance/results/change-0608/decision.json
+ M docs/performance/results/change-0608/gates.txt
+ M docs/performance/results/change-0608/log-sections.md
+
+==============================================================================
+$ cargo fmt --all --check
+exit: 0  (no output above means clean)
+
+==============================================================================
+$ cargo clippy -p litchi-xls --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.31s
+
+==============================================================================
+$ cargo test -p litchi-xls
+-- aggregated over every test binary --
+test binaries: 72
+passed:  1382
+failed:  0
+ignored: 1
+FAILED result blocks: 0
+the ignored test: crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100)
+
+-- tail of the run --
+
+running 2 tests
+test crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100) ... ignored
+test crates/litchi-xls/src/writer/mod.rs - writer::core (line 22) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.38s; merged doctests compilation took 0.37s
+
+==============================================================================
+$ cargo doc -p litchi-xls --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+   Generated /home/zhuhe/code/litchi-worktrees/0608/target/doc/litchi_xls/index.html

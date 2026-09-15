@@ -1,0 +1,57 @@
+==============================================================================
+Corpus census: what a prefix shared-string index would have to walk
+==============================================================================
+  .xls and .xlt fixtures examined                          126
+  no SST record reachable                                    3
+  carrying an SST record                                   123
+  refused at open by an SST *header* check                   4
+      password.xls                       SST counts must be non-negative signed integers
+      35897-type4.xls                    SST counts must be non-negative signed integers
+      57456.xls                          SST total count is smaller than its unique count
+      xor-encryption-abc.xls             SST counts must be non-negative signed integers
+  indexed at open today                                    119
+  of those, declaring at least one shared string            94
+  of those, with at least one LabelSst cell                 94
+  shared-string entries over the corpus                 17,434
+  LabelSst cells over the corpus                        30,316
+
+  THE DECISIVE COUNT: fixtures where the highest SST index any cell
+  references is the LAST entry (so a full text walks the whole table
+  under a prefix index and deferral saves nothing)           94 of 94
+
+  Entries a prefix index must walk, as a percentage of the table:
+    one uniformly chosen string cell         min  35.34%  p25  55.04%  median  63.88%  p75 100.00%  max 100.00%
+    the first string cell in stream order    min   0.17%  p25  20.00%  median  50.00%  p75 100.00%  max 100.00%
+    a full text, or all cells                100.00% on every fixture
+
+==============================================================================
+The three fixtures this record profiles
+==============================================================================
+fixture                              uniq    SST B  segs   cells  idx_max  mean pfx  harness cell
+ConditionalFormattingSamples.xls      303    4,599     1     658      302     131.5        isst 3
+WithCustomViews.xls                   474  101,073    13     862      473     266.6     no string
+54016.xls                           7,893  224,895    28  16,055    7,892   2,789.3     no string
+
+  'harness cell' is the cell `xls_source_attribution --operation one-cell`
+  reads: row 1, column 0 of the worksheet index this record profiles.
+  A prefix index walks `isst + 1` entries for it, and none at all when
+  that cell is not a shared string.
+
+==============================================================================
+Largest tables in the corpus
+==============================================================================
+fixture                                   uniq   cells  segs  mean pfx %
+54016.xls                                7,893  16,055    28      35.34%
+29942.xls                                4,516   4,516     3      50.01%
+FormulaEvalTestData.xls                  1,249   1,508     2      45.75%
+45365-2.xls                                603     689     3      50.07%
+pivottable_dates_grouping.xls              489   2,018     1      47.18%
+WithCustomViews.xls                        474     862    13      56.25%
+59858.xls                                  334     883     2      38.19%
+ConditionalFormattingSamples copy.xls      303     658     1      43.39%
+ConditionalFormattingSamples.xls           303     658     1      43.39%
+ConditionalFormattingSamples.xls           303     658     1      43.39%
+15228.xls                                  243     448     2      56.74%
+external_name.xls                           91     136     1      38.89%
+
+Probe's own summary line: {"summary": true, "fixtures_with_sst": 119, "fixtures_refused_at_open": 4, "fixtures_with_entries": 94, "fixtures_with_labelsst": 94, "fixtures_no_labelsst": 0, "entries_total": 17434, "labelsst_total": 30316, "prefix_text_total": 17434, "saved_text_corpus": 0.0, "saved_mean_median_over_fixtures": 36.11, "fixtures_where_text_saves_nothing": 94}
