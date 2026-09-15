@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-14T22:05:00Z",
+  "batch": [
+    "0577-ooxml-open-relationship-parts",
+    "0578-zip-passthrough-is-already-bounded",
+    "0579-cfb-resumable-chain-walk",
+    "0580-zip-target-scoped-strict-layout",
+    "0581-opc-package-retention",
+    "0582-zip-strict-scope-differential-fuzz",
+    "0583-zip-local-size-span-bound"
+  ],
+  "removed": [
+    "the session scratchpad in full, 13.9 GiB: two 6.9 GiB git archive extractions used as differential-fuzz build trees, five isolated cargo target directories, the 381 MB generated fuzz corpus, two full differential reports of about 235 MB each, all gate logs, and the coordinator's draft index and summary sections",
+    "one detached measurement worktree created inside the scratchpad for change 0579's before leg, removed by its author",
+    "target/debug/incremental, 26.3 GiB of regenerable compiler cache, removed on the same reasoning as the previous batch and only after confirming no cargo or rustc process was running"
+  ],
+  "retained_in_the_repository": [
+    "for change 0577: the re-captured request traces through change 0572's own probe and classifier, the coalescing model, and the seven-fixture contract probe set that proves the relationship reads are mandatory",
+    "for change 0578: the five peak-retention axes as CSVs with both probe sources and manifests, the ZIP64 fixture hash, and the reproduction README",
+    "for change 0579: the counter captures, callgrind trees, the A/B/B/A matrices, the byte-identical corpus logs for 126 fixtures, replay.py which re-checks 18 assertions from the directory alone, and the rejected cursor implementation with its own evidence",
+    "for change 0580: the before and after scope and census captures against both the pre-0573 and post-0573 baselines, the pre-change test evidence, and residual_window.py, which reproduces both brackets and every measured scenario figure",
+    "for change 0581: the retention axes, the entry-point census, and the gate logs the audit found missing and re-created",
+    "for change 0582: the harness, coverage probe, corpus generator, classifier, run.sh, the corpus fingerprint, the classification and coverage summaries, and the 45-witness verdict table",
+    "for change 0583: run.sh, the archive-prefix generator, the mutation matrix pricing each regression guard, the residual-verdict table, and the re-run classification"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commits 93a610ded and 3649e294b",
+  "background_tasks": "no measurement process remains; every subagent has completed",
+  "notes": [
+    "target/ is 454 GiB of gitignored build output after the incremental cache was reclaimed, and is retained as ordinary build state",
+    "tools/perf-baseline/target and target/non-iwork-gate are gitignored build output retained for the next batch's measurement and gate legs",
+    "the two tracked __pycache__ files under change-0546 and change-0547 were left untouched and survive; the 124 retained evidence manifests verify in exactly the state they were in before this batch, with the same four historical manifests failing because they deliberately seal pre-cleanup state since removed",
+    "four git worktrees outside the repository belong to other concurrent sessions and were deliberately not touched",
+    "the generated differential-fuzz corpus is NOT retained. It is 334,625,602 bytes across 22,875 inputs, and change 0582's build_corpus.py regenerates it byte-identically from RNG_SEED 0x05820580, which was verified by diff before deletion. Retaining a third of a gigabyte of generated adversarial archives to prove a result its own generator reproduces would be the wrong trade for this repository.",
+    "coverage-guided fuzzing of parse_zip remains unavailable on this host: no cargo-fuzz, no nightly toolchain. The gate is recorded as outstanding in change 0582 rather than waived. The artifact retained from the change-0457 fuzz run is the compiled 23 MB binary, not a corpus, and the 98 corpus files it inventories were never retained; only seven seeds survive. A future batch that wants this gate must either install the toolchain or retain corpora rather than binaries.",
+    "a coordinator error is recorded in change 0575 rather than only in this file: approval for a semantic change was sought on one adversarial witness that turned out to be 3.3% of the delta. The differential harness that measured the real class ran after implementation; running it before the approval would have cost nothing and framed the decision correctly."
+  ],
+  "revision": "3649e294b"
+}
