@@ -1,0 +1,98 @@
+# Gates for change 0629
+# worktree /home/zhuhe/code/litchi-worktrees/0629,
+# branch perf/0629-facade-docx-budget-test-bisect,
+# base 1946b964e852d05ea3e16735153f8adb7b7d67ec (current main head)
+# CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0629-work
+# host AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0
+#
+# crates/litchi is the only crate this change touches, and the only edit is
+# inside its #[cfg(test)] module, so no other crate's gates are in scope.
+# `--offline` stands in for `--locked`: Cargo.lock is gitignored in this
+# repository, so a fresh worktree has none until it is copied in.
+
+$ cargo fmt --all --check
+(no output)
+exit=0
+
+$ cargo clippy -p litchi --offline --all-targets
+warning: function `fixture` is never used
+warning: function `assert_unexpected` is never used
+warning: function `assert_boxed_unexpected` is never used
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.96s
+exit=0
+(PRE-EXISTING: the same three dead-code warnings for feature-gated test helpers
+ in crates/litchi/tests/unexpected_format.rs that change 0621's gates.txt
+ records, in a file this change does not touch.)
+
+$ cargo clippy -p litchi --offline --all-targets --features xls,xlsx,xlsb,ods,opc,docx,pptx
+warning: field `bytes` is never read
+warning: function `missing_ooxml_catalog_part_error` is never used
+warning: passing a unit value to a function
+warning: passing a unit value to a function
+warning: `litchi` (lib) generated 4 warnings
+warning: function `missing_ooxml_catalog_part_error` is never used
+warning: passing a unit value to a function
+warning: passing a unit value to a function
+warning: `litchi` (lib test) generated 5 warnings (2 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.03s
+exit=0
+(PRE-EXISTING, and the same nine-line set change 0621 reproduced on the
+ untouched before checkout of 1e4198321. The sites are unchanged:
+ detection_smart/detected.rs:193 and :612, document/doc.rs:775, :921, :2568
+ and :2666. Change 0621 recorded the last of those as :2655; it is the same
+ `DocumentImpl::DocxSource(package, Default::default())` line, moved down 11
+ lines by the test helper this change adds above it. No new warning, and the
+ count is identical.)
+
+$ cargo test -p litchi --offline          # default features = []
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.14s
+26 test binaries: 0 passed, 0 failed, 5 ignored
+exit=0
+(litchi's default feature set is empty, so this compiles almost none of the
+ facade's tests and never reaches the corrected one. This is exactly why the
+ failure survived 94 commits; the feature-bearing run below is the real gate.)
+
+$ cargo test -p litchi --offline --features xls,xlsx,xlsb,ods,opc,docx,pptx
+test result: ok. 227 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out   # lib target
+26 test binaries: 313 passed, 0 failed, 7 ignored
+exit=0
+(Change 0621 recorded "226 passed; 1 failed" for this lib target. The same
+ command on the untouched current head, 1946b964e, reproduces that line
+ verbatim; see suite/before-head-featureset.txt.)
+
+$ cargo doc -p litchi --offline --no-deps
+ Documenting litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0629/crates/litchi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.56s
+   Generated .../doc/litchi/index.html
+exit=0
+(no rustdoc warning)
+
+$ cargo doc -p litchi --offline --no-deps --features xls,xlsx,xlsb,ods,opc,docx,pptx
+warning: unresolved link to `doc`
+   --> crates/litchi/src/lib.rs:344:52
+    |
+344 | /// `litchi-xls` package. It is independent from [`doc`].
+warning: `litchi` (lib doc) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.07s
+exit=0
+(PRE-EXISTING: a crate-level doc comment in crates/litchi/src/lib.rs, a file
+ this change does not touch.)
+
+$ cargo test -p litchi --release --locked --features docx --lib \
+$   managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal
+test document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out
+exit=0
+
+$ python3 -B tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json \
+$   --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit=0
+(this change registers no claim; the registry is unchanged)
+
+$ python3 -B tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+(this change does not edit REPORT.md; its paragraph is in log-sections.md for
+ the coordinator to merge)

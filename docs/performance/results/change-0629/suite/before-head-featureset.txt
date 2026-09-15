@@ -1,0 +1,13 @@
+# BEFORE: current main head 1946b964e, untouched, change 0621's feature set
+# $ cargo test -p litchi --offline --features xls,xlsx,xlsb,ods,opc,docx,pptx
+# (filtered to result / failure lines)
+
+1946b964e
+failures:
+thread 'document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal' (3600024) panicked at crates/litchi/src/document/doc.rs:2659:40:
+called `Result::unwrap()` on an `Err` value: Other("OPC execution failed: Memory budget exceeded in facade-managed-docx-paragraph-text: observed 137474, limit 1154")
+failures:
+    document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal
+test result: FAILED. 226 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+error: test failed, to rerun pass `-p litchi --lib`
+

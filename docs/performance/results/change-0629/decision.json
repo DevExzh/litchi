@@ -1,0 +1,49 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0629",
+  "title": "The managed DOCX facade test fails on change 0495's parser fence, not on anything in the 0588-0594 wave",
+  "decision": "retained, test-only correction and attribution",
+  "code_state": "no library code path was modified; one test and one test-only helper inside the #[cfg(test)] module of crates/litchi/src/document/doc.rs were corrected",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the first bad commit is 44a4710699ef17041d5969240c30984dffbc3319 (change 0495, feat(docx): support budgeted source-backed document edits): the single facade test passes at its parent de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8 and fails at it, in both the test and release profiles",
+    "changes 0588, 0591, 0592, 0593 and 0594 are exonerated: the failure predates the 0587 survey base 08d968f8e by 94 commits, so no allocation statement in this wave is contradicted and no record in it needs a correction",
+    "change 0621's call of pre-existing at 1e4198321 was correct and is confirmed, and the same failure reproduces verbatim on the current main head 1946b964e with the same feature set",
+    "the moved behaviour is a stale expectation, not a defect: 44a471069 gave ensure_source_document_xml and admit_document_query_parser a prepaid parser workspace of xml_len * 32 + 131_072 bytes of Resource::Memory, a documented bounded-resource fence that changes the price of admission and no result; the same commit sized litchi-docx's own managed tests from that formula and did not migrate this cross-crate facade test",
+    "the fence is deliberately not weakened: shrinking the 131_072-byte floor would move where a refusal happens and needs a frozen design record, not a test fix",
+    "the omission survived 94 commits because litchi's default feature set is empty, so cargo test -p litchi never compiles this test; only a feature-bearing run reaches it"
+  ],
+  "accepted_evidence": {
+    "bisect": "git bisect run over 01936e4f1..c1d2caf85 (918 revisions), one detached worktree with one external CARGO_TARGET_DIR, each leg cargo test -p litchi --offline --features docx over the single test; eleven verdicts retained, plus the replayable git bisect log",
+    "range_endpoints": "01936e4f1 adds the test and passes; results/change-0565/quality.md gate 10 and results/change-0571/gate3.txt already carry the test failing with the identical observed 137474, limit 1154, which is what makes c1d2caf85 a documented bad point",
+    "release_confirmation": "cargo test --release over the single test at de8ee88b0 (ok), 44a471069 (FAILED) and 1946b964e (FAILED), so the verdict is not an artefact of the test profile",
+    "arithmetic": "194-byte main document XML, 1,154-byte package; 194 * 32 + 131_072 = 137,280 reserved by the ensure_source_document_xml workspace on top of the 194-byte managed PartData already charged, giving the transcript's observed 137,474 against limit 1,154",
+    "before_after": "cargo test -p litchi --features xls,xlsx,xlsb,ods,opc,docx,pptx on the untouched head (lib 226 passed, 1 failed) and on this branch (lib 227 passed, 0 failed; 313 passed, 0 failed, 7 ignored over 26 binaries)",
+    "gates": "cargo fmt --check, clippy --all-targets with and without the feature set, cargo test with and without it, cargo doc --no-deps with and without it, and a --release --locked run of the corrected test; tails retained in gates.txt"
+  },
+  "accepted_costs": {
+    "ample_budget_leg": "the contract leg now runs under a 1 MiB memory limit instead of a package-sized one, so it no longer exercises the facade under a budget that is tight against the input; the fence leg is added to keep a tight budget under test",
+    "single_run_legs": "one run per bisect leg; the test is deterministic, but the legs establish only where this assertion started failing, not that nothing else changed at those commits"
+  },
+  "known_gaps": {
+    "fence_sizing": "whether xml_len * 32 + 131_072 is the right envelope for quick-xml's real working set, and whether a small document should pay a flat 128 KiB, is unmeasured and no proposal is made",
+    "other_stale_budgets": "no sweep was made for other budgets in the tree still sized to a pre-44a471069 number; the green feature-bearing litchi run bounds the question for that crate only",
+    "coordinator_action": "the correction text for docs/performance/changes/0495-docx-managed-document-edits.md is written in the 0629 record and is left for the coordinator to append"
+  },
+  "withheld": [
+    "any speedup, regression, allocation, peak-RSS, cold-cache, physical-device, range-source or cross-platform result",
+    "any statement that change 0588, 0591, 0592, 0593 or 0594 moved a reservation on this path",
+    "any statement that change 0495's parser workspace is the wrong size"
+  ],
+  "provenance": {
+    "base_commit": "1946b964e852d05ea3e16735153f8adb7b7d67ec",
+    "branch": "perf/0629-facade-docx-budget-test-bisect",
+    "first_bad_commit": "44a4710699ef17041d5969240c30984dffbc3319",
+    "last_good_commit": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "responsible_change": "0495",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "note": "the bisect and the release legs ran in detached worktrees under /home/zhuhe/code/litchi-worktrees with external CARGO_TARGET_DIRs; the shared working copy was never built in; the host carried several concurrent agents, which affects wall time only and no counter reported here"
+  }
+}

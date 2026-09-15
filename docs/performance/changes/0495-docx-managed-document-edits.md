@@ -254,6 +254,41 @@ post-publication. Resource `after_drop` follows package consumption and
 returned-snapshot/commit release. There is no post-publication cache snapshot,
 so the run does not establish cache-after-drop behavior.
 
+**Correction (change [0629](../0629-facade-docx-budget-test-bisect.md)).**
+The coordinator should append the following to
+`docs/performance/changes/0495-docx-managed-document-edits.md`, after
+*Current verification state*:
+
+## Correction (change 0629)
+
+`44a4710699ef17041d5969240c30984dffbc3319` left one test outside this change's
+gate list red, and it stayed red for 94 commits. The facade test
+`document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal`
+in `crates/litchi/src/document/doc.rs` sizes a memory budget to the package it
+opens (1,154 bytes) and calls `Document::paragraph_text` on a managed
+source-backed DOCX. The parser workspace this change introduced —
+`xml.len() * 32 + 131_072` bytes of `Resource::Memory`, reserved by
+`ensure_source_document_xml` before quick-xml's namespace reader allocates,
+and by `admit_document_query_parser` for every parser-backed text query —
+needs 137,280 bytes for that 194-byte document, so the query refuses with
+`Memory budget exceeded in facade-managed-docx-paragraph-text: observed
+137474, limit 1154`. The same commit sized `litchi-docx`'s own managed tests
+from this formula (`source_document_scan_workspace` in
+`crates/litchi-docx/tests/source_backed_managed.rs`); the facade test was not
+migrated with them, because `litchi`'s default feature set is empty and
+`cargo test -p litchi` never compiles it.
+
+**No behaviour of this change is in question.** The contract the test
+asserts — caller-owned text queries remain available on a managed document
+while collection-returning views are refused — is the contract this record
+states, and it holds under any budget that admits the workspace. What was
+stale is the budget the test handed the facade. Change
+[0629](../0629-facade-docx-budget-test-bisect.md) bisected the failure to this
+commit (last good `de8ee88b0`), corrected the test to assert the contract
+rather than the pre-fence number, and left the fence itself untouched. Change
+0621 recorded the failure as pre-existing at `1e4198321`, which was correct;
+changes 0588, 0591, 0592, 0593 and 0594 are not implicated.
+
 ## Scenario classification
 
 The scope is kept distinct so a later report cannot combine unlike workflows:

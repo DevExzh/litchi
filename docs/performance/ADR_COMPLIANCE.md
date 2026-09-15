@@ -1,5 +1,11 @@
 # Performance optimization ADR-compliance matrix
 
+## 0629 — a bounded-resource fence confirmed, and deliberately not weakened
+
+Record: [0629](0629-facade-docx-budget-test-bisect.md).
+
+No library code changed, so no ADR boundary moved and no accepted hash changed. The edit is confined to a test and a test-only helper inside one `#[cfg(test)]` module, from which no typed error, limit, refusal point, validation order, output byte or public API is reachable. The ADR-relevant content of this record is a confirmation and a refusal. The confirmation is ADR 0005's bounded-resource clause on the managed source-backed DOCX read path: `ensure_source_document_xml` still refuses XML over `SOURCE_DOCUMENT_SCAN_MAX_BYTES` and still reserves `xml.len() * 32 + 131_072` bytes of memory, `xml.len() + 1024` objects and `SOURCE_DOCUMENT_SCAN_MAX_DEPTH` of depth before quick-xml's namespace reader runs; `admit_document_query_parser` still takes that envelope plus the `(len + 1)^2` work ceiling for every parser-backed text query; and `check_selective_operation` still refuses every collection-returning managed view with `Error::UnsafeEdit` because an Arc-backed view cannot retain the managed `PartData` reservation. The corrected test asserts that last refusal under an **ample** budget, which is a stronger statement than the version it replaces: the refusal is now shown to be payload identity rather than budget pressure. The refusal is the change this record declines to make. Shrinking the 131,072-byte floor so that a 194-byte document need not pay a flat 128 KiB would move where a refusal happens and weaken a defence over caller-supplied XML; under the wave's own rules that is a contract change and belongs in a frozen design record with a fresh adversarial-input argument, not in a test correction, so it is left open and named in the record's limitations. ADR 0006's preservation default is untouched: nothing here reaches a writer. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.
+
 ## 0627 — a new observation axis, and no boundary on it
 
 Record: [0627](0627-ole2-range-source-selectors.md).
