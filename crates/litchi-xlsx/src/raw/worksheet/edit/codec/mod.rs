@@ -17,16 +17,20 @@ mod tests;
 
 #[cfg(test)]
 pub(super) use snapshot::scan_with_event_limit;
+#[cfg(test)]
+pub(crate) use snapshot::sizes as codec_sizes;
 #[allow(
     unused_imports,
     reason = "the codec facade preserves the complete crate-visible snapshot surface"
 )]
 pub(super) use snapshot::{
-    Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
-    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
+    Attribute, CellFact, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionFact,
+    DimensionTag, Layout, MergeCellsSlot, MergeSlot, RootEffect, RowFact, RowSlot,
+    SharedFormulaGroup, SheetData, Span, Tag, materialize_cell, materialize_tag, scan,
     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
-    write_sheet_data, write_sheet_data_with_provenance,
+    write_sheet_data, write_sheet_data_from_facts, write_sheet_data_with_provenance,
 };
+pub(crate) use snapshot::{EventSpan, FactsBuilder, SourceFacts};
 #[allow(
     unused_imports,
     reason = "the facade retains the package-facing validation seam"

@@ -8,7 +8,7 @@ use litchi_sheet::{Cell as Address, Row};
 use super::super::super::wire::{
     sibling_name, write_attribute, write_cell_tag, write_close, write_tag,
 };
-use super::super::model::{CellSlot, RowSlot, SheetData, Span, Tag};
+use super::super::model::{CellSlot, RowFact, RowSlot, SheetData, SourceFacts, Span, Tag};
 use crate::cell::{Content, Value};
 use crate::error::{Result, invalid};
 use crate::outline::Outline;
@@ -184,6 +184,172 @@ pub(crate) fn write_sheet_data_with_provenance(
     } else {
         Box::new([])
     })
+}
+
+/// Write the complete value-only output from the compact planning facts.
+///
+/// This is the byte-for-byte counterpart of
+/// [`write_sheet_data_with_provenance`] for the narrow shape the fact route
+/// admits: every action updates a cell that already exists in the row the
+/// facts recorded, so no row or cell is ever created, removed or re-tagged.
+/// `slots` carries the scanner slot of each changed cell, materialized from
+/// its retained span before the first byte of output was written, so this
+/// function can no longer decline.
+pub(crate) fn write_sheet_data_from_facts(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    facts: &SourceFacts,
+    cells: BTreeMap<Address, Action>,
+    slots: &BTreeMap<Address, CellSlot>,
+) -> Result<Box<[OmittedCells]>> {
+    let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
+    for (address, action) in cells {
+        let number = address
+            .row()
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row.entry(number).or_default().insert(address, action);
+    }
+    let mut omitted = Vec::new();
+    let mut recording = omitted.try_reserve(facts.rows.len()).is_ok();
+    if !recording {
+        omitted.clear();
+    }
+
+    output.extend_from_slice(&source[facts.sheet_data.start..facts.sheet_data_tag_end]);
+    let mut cursor = facts.sheet_data_tag_end;
+    for row in &*facts.rows {
+        let start = usize::try_from(row.start)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let end = usize::try_from(row.end)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let tag_end = usize::try_from(row.tag_end)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let close_start = usize::try_from(row.close_start)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        output.extend_from_slice(&source[cursor..start]);
+        match by_row.remove(&row.number) {
+            Some(edits) => {
+                write_replacement_row_from_facts(
+                    output,
+                    source,
+                    facts,
+                    row,
+                    &edits,
+                    slots,
+                    &mut omitted,
+                    &mut recording,
+                )?;
+            },
+            None => {
+                output.extend_from_slice(&source[start..tag_end]);
+                let body_start = output.len();
+                output.extend_from_slice(&source[tag_end..close_start]);
+                let body_end = output.len();
+                record_omitted_facts(
+                    &mut omitted,
+                    &mut recording,
+                    facts,
+                    row,
+                    body_start,
+                    body_end,
+                )?;
+                output.extend_from_slice(&source[close_start..end]);
+            },
+        }
+        cursor = end;
+    }
+    if !by_row.is_empty() {
+        return Err(invalid("worksheet fact rewrite lost a staged row"));
+    }
+    output.extend_from_slice(&source[cursor..facts.sheet_data_close_start]);
+    output.extend_from_slice(&source[facts.sheet_data_close_start..facts.sheet_data.end]);
+    Ok(if recording {
+        omitted.into_boxed_slice()
+    } else {
+        Box::new([])
+    })
+}
+
+fn write_replacement_row_from_facts(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    facts: &SourceFacts,
+    row: &RowFact,
+    edits: &BTreeMap<Address, Action>,
+    slots: &BTreeMap<Address, CellSlot>,
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+) -> Result<()> {
+    let start = usize::try_from(row.start)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let end = usize::try_from(row.end)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let tag_end = usize::try_from(row.tag_end)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let close_start = usize::try_from(row.close_start)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    output.extend_from_slice(&source[start..tag_end]);
+    let mut cursor = tag_end;
+    let mut run = None::<(usize, Address, Address)>;
+    let row_cells = facts
+        .row_cells(row)
+        .ok_or_else(|| invalid("worksheet row fact has no cell range"))?;
+    for cell in row_cells {
+        let cell_span_start = usize::try_from(cell.start)
+            .map_err(|_source| invalid("worksheet cell fact does not fit usize"))?;
+        let cell_span_end = usize::try_from(cell.end)
+            .map_err(|_source| invalid("worksheet cell fact does not fit usize"))?;
+        output.extend_from_slice(&source[cursor..cell_span_start]);
+        let cell_start = output.len();
+        if let Some(action) = edits.get(&cell.address) {
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            let slot = slots
+                .get(&cell.address)
+                .ok_or_else(|| invalid("worksheet changed cell lost its materialized slot"))?;
+            match action {
+                Action::Update { .. } => write_cell(output, source, slot, action)?,
+                Action::Remove => {
+                    return Err(invalid("fact rewrite unexpectedly removes a cell"));
+                },
+            }
+        } else {
+            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+            run = Some((start, first, cell.address));
+            output.extend_from_slice(&source[cell_span_start..cell_span_end]);
+        }
+        cursor = cell_span_end;
+    }
+    output.extend_from_slice(&source[cursor..close_start]);
+    if let Some((start, first, last)) = run {
+        record_omitted(omitted, recording, first, last, start, output.len())?;
+    }
+    output.extend_from_slice(&source[close_start..end]);
+    Ok(())
+}
+
+fn record_omitted_facts(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    facts: &SourceFacts,
+    row: &RowFact,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    let cells = facts
+        .row_cells(row)
+        .ok_or_else(|| invalid("worksheet row fact has no cell range"))?;
+    let Some(first) = cells.first() else {
+        return Ok(());
+    };
+    let last = cells
+        .last()
+        .ok_or_else(|| invalid("worksheet row fact lost its last cell"))?;
+    record_omitted(omitted, recording, first.address, last.address, start, end)
 }
 
 fn write_replacement_row(

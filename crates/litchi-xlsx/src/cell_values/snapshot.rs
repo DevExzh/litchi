@@ -54,6 +54,14 @@ pub struct Snapshot {
     sheet_position: usize,
     cells: Arc<Store>,
     source: SourceState,
+    /// Compact source-bound worksheet facts captured by the planning
+    /// traversal of exactly `source.worksheet.bytes`.
+    ///
+    /// Present only on the source-backed planning route and only when the
+    /// builder proved the commit's layout scan would agree with it. Every
+    /// snapshot derived from a rewrite drops them, so a derived snapshot
+    /// commits through the complete scan exactly as before.
+    facts: Option<Arc<raw::worksheet::SourceFacts>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -398,6 +406,7 @@ impl Snapshot {
             sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
             sheet_position: position,
             cells: Arc::new(cells),
+            facts: None,
             source: SourceState {
                 workbook: PartState::new(
                     capture.workbook_uri.clone(),
@@ -443,13 +452,16 @@ impl Snapshot {
         }
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
-        let cells = if let Some(admission) =
+        let (cells, facts) = if let Some(admission) =
             raw::worksheet::source_stream_admission(worksheet_xml.as_bytes())
         {
             validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes(), admission)?
         } else {
             validation::worksheet_xml(worksheet_xml.as_bytes())?;
-            raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?
+            (
+                raw::worksheet::parse(worksheet_xml.as_bytes(), || Ok(None))?,
+                None,
+            )
         };
         package.check_execution()?;
         validate_style_references(&cells, capture.style_count)?;
@@ -459,6 +471,7 @@ impl Snapshot {
             sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
             sheet_position: position,
             cells: Arc::new(cells),
+            facts: facts.map(Arc::new),
             source: SourceState {
                 workbook: PartState::new(
                     capture.workbook_uri.clone(),
@@ -679,6 +692,7 @@ impl Snapshot {
             sheet_name: copy_boxed(sheet_name, "value-only sheet name")?,
             sheet_position,
             cells: Arc::new(cells),
+            facts: None,
             source: SourceState {
                 workbook: PartState::new(workbook_uri, workbook_content_type, workbook_xml)?,
                 worksheet: PartState::new(worksheet_uri, worksheet_content_type, worksheet_xml)?,
@@ -702,6 +716,7 @@ impl Snapshot {
         let cells = raw::worksheet::parse(&bytes, || Ok(None))?;
         let mut result = source.clone();
         result.cells = Arc::new(cells);
+        result.facts = None;
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
         result.source.check_execution()?;
         Ok(result)
@@ -730,6 +745,7 @@ impl Snapshot {
         };
         let mut result = source.clone();
         result.cells = Arc::new(cells);
+        result.facts = None;
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
         result.source.check_execution()?;
         Ok(result)
@@ -801,6 +817,7 @@ impl Snapshot {
         let bytes = rewrite.into_bytes_for(source.source_xml())?;
         validation::worksheet_xml(&bytes)?;
         let mut result = source.clone();
+        result.facts = None;
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
         result.source.check_execution()?;
         Ok(result)
@@ -1031,6 +1048,12 @@ impl Snapshot {
     #[must_use]
     pub fn contains_cell(&self, address: litchi_sheet::Cell) -> bool {
         self.cells.entry(address).is_some()
+    }
+
+    /// Compact planning facts for exactly [`Self::source_xml`], when the
+    /// planning traversal proved them.
+    pub(crate) fn source_facts(&self) -> Option<&raw::worksheet::SourceFacts> {
+        self.facts.as_deref()
     }
 
     /// Exact source worksheet XML.
@@ -2365,8 +2388,13 @@ mod row_reuse_tests {
         source: &'source Snapshot,
         values: &[(&str, u32)],
     ) -> ValueOnlyRewrite<'source> {
-        rewrite_value_only_with_provenance(source.source_xml(), "Sheet1", actions_for_sets(values))
-            .unwrap()
+        rewrite_value_only_with_provenance(
+            source.source_xml(),
+            "Sheet1",
+            actions_for_sets(values),
+            source.source_facts(),
+        )
+        .unwrap()
     }
 
     fn proof_for_set<'source>(
@@ -2406,6 +2434,7 @@ mod row_reuse_tests {
             source.source_xml(),
             "Sheet1",
             actions_for_sets(&values),
+            source.source_facts(),
         )
         .unwrap();
         let ordinary = rewrite(source.source_xml(), "Sheet1", actions_for_sets(&values)).unwrap();
@@ -2427,8 +2456,13 @@ mod row_reuse_tests {
         let source =
             Snapshot::load(&fixture_package(&worksheet), "Sheet1").expect("valid formula source");
         let actions = actions_for_sets(&[("A1", 42)]);
-        let proof = rewrite_value_only_with_provenance(source.source_xml(), "Sheet1", actions)
-            .expect("source-backed provenance rewrite");
+        let proof = rewrite_value_only_with_provenance(
+            source.source_xml(),
+            "Sheet1",
+            actions,
+            source.source_facts(),
+        )
+        .expect("source-backed provenance rewrite");
         assert!(
             !proof.omitted.is_empty(),
             "the valid source-backed case must take the reuse path"

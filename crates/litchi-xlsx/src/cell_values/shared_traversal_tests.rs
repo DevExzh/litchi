@@ -490,7 +490,9 @@ fn authoritative(content: &[u8]) -> crate::Result<crate::cell::Store> {
 /// The admitted path, exactly as `Snapshot::from_source_selected` drives it.
 fn admitted(content: &[u8]) -> crate::Result<crate::cell::Store> {
     match crate::raw::worksheet::source_stream_admission(content) {
-        Some(admission) => super::worksheet_xml_and_parse_source(content, admission),
+        Some(admission) => {
+            super::worksheet_xml_and_parse_source(content, admission).map(|(cells, _)| cells)
+        },
         None => authoritative(content),
     }
 }

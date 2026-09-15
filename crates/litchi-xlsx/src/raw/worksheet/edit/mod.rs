@@ -11,6 +11,9 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(crate) use codec::codec_sizes;
+pub(crate) use codec::{EventSpan, FactsBuilder, SourceFacts};
 #[allow(
     unused_imports,
     reason = "the raw edit facade retains the complete crate-visible effect vocabulary"
@@ -19,6 +22,8 @@ pub(crate) use model::{
     Action, ColumnAction, DefaultsAction, DefaultsEffects, DescentEffect, HeightEffect, MergePlan,
     OptionalEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
 };
+#[cfg(test)]
+pub(crate) use package::route;
 pub(crate) use package::{
     OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
     rewrite_value_only_with_provenance,

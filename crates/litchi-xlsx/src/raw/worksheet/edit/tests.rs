@@ -200,6 +200,7 @@ fn ordinary_and_provenance_writers_match_for_nonsemantic_multi_primary_bytes() {
             Address::from_a1("A1").expect("A1"),
             Action::set("replacement".into()),
         )]),
+        None,
     )
     .expect("raw provenance rewrite");
     let ordinary = rewrite(

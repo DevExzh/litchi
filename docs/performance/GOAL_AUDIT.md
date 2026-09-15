@@ -1,5 +1,29 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
+
+Record: [0622](0622-xlsx-compact-source-facts.md).
+
+Change 0622 closes item XLSX-1 of the 0587 survey and, with it, the line
+0550 opened ("the next task is a private source-bound layout proof that could
+avoid the second complete source scan while preserving lexical spans, scanner
+facts, error order, resource limits and output validation"). It satisfies 0550's
+admission condition — a candidate must improve planning *plus* commit and
+publication rather than shift work — with a measured 33.6-41.4% reduction in
+planning-plus-commit instructions and no change to publication. It also clears
+the two gates that rejected changes 0552 and 0553: valid no-op planning is
+unaffected (the builder never runs when the plan is empty, and an empty plan
+returns before the fact route is consulted), and process peak RSS rises 4.23% at
+the median on the shape where 0552 measured +6.97% and 0553 +5.16%, inside that
+leg's own 6.49% run-to-run spread. The optimization order in `docs/GOAL.md` is
+respected: this removes unnecessary work and unnecessary parsing, ahead of
+layout, algorithms and parallelism; nothing was vectorized and no parallelism was
+introduced. **The audit gap this change does not close**: the route it optimizes
+is unreachable on real producer files. Of 391 real worksheet parts in
+`test-data/`, the value-only planning validator accepts exactly one, and that one
+publishes facts; change 0602 already recorded that the editor admits none of the
+95 real `.xlsx` fixtures. The measured win is on the harness corpora.
+
 ## 0621 — a full XLS text projection took four source observations per shared string; it now takes one per read
 
 Record: [0621](0621-xls-open-fence-count.md).

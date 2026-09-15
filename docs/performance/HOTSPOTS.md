@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
+
+Record: [0622](0622-xlsx-compact-source-facts.md).
+
+**XLSX-1 is implemented (change 0622).** The source-backed value editor's commit
+no longer re-scans the touched worksheet into a `Layout`. The planning traversal
+now retains sixteen bytes per cell — the resolved address and the source span of
+its `<c>` element — plus one record per row and the `<sheetData>` and
+`<dimension>` spans, and the commit rewrites from those, materializing the
+scanner's slot only for the at most 256 cells one commit may touch. Measured on
+`taskset -c 15`, callgrind isolation pairs (N=1, N=11): the whole
+`rewrite_value_only_with_provenance` falls from 18.4 M to 0.21 M Ir per operation
+on the harness `medium` shape, 129.7 M to 1.32 M on `dense-sparse` and 25.6 M to
+0.21 M on `noncompact`, while planning rises 15.0-17.7%; planning plus commit
+together fall 33.6-41.4%. Commit allocation calls fall 53.2-71.9% and commit
+allocated bytes 51.4-75.2%; planning allocated bytes rise 3.90-6.09% and planning
+allocation calls 0.02-0.12%. Paired p50 is 12-20% faster on the source-backed
+cell-value edit-and-save selectors, against an A/A floor stated in the record.
+The remaining XLSX opportunities are unchanged: XLSX-2 (admission-surface
+widening, gated on the `litchi-opc` compactness prerequisite change 0602 named),
+XLSX-3 (publication audit reuse) and XLSX-4 (overlay the candidate `Store`).
+**A new hotspot is now visible on this path**: with the second scan gone, the
+planning traversal is the whole cost of an XLSX value commit, and the fact
+builder is 15-18% of it; the next reduction on this route is the builder's
+per-cell `r` parse and per-element ampersand probe, not the writer.
+
 ## 0621 — a full XLS text projection took four source observations per shared string; it now takes one per read
 
 Takes change 0587 items **CORE-2** (rank 34) and the fence half of **XLS-4** (rank 33) together, and they resolve in opposite directions. Per-site attribution — a probe that buckets a backtrace at every `ReadAt::version()` call, retained in the packet — shows a full text projection of `54016.xls` taking **89,789 source observations**, each a mutex plus a `statx` on a `from_path` workbook: **48,187** of them three per shared string in `resolve_shared_string` (before the segment search, before each chunk read, after the decode), **20,382** two per written object in `SourceCheckedTextSink`, **16,093** one per cursor read, **5,096** one per emitted row in `write_text_sheet`, and 31 in the open and operation brackets. The resolver's three and the row's one are removed: the resolver consumes source bytes only through `SharedOleStreamCursor::read_exact`, which change 0558 already leaves observing once after every read, and `write_text_sheet` emits rows out of a map `scan_text_sheet` has already collected and fenced, with the row's first sink write observing a moment later and before any byte leaves. Four further sites go on the open and detection paths: the duplicate capture in `from_shared_ole_file_with_limits`, `select_workbook_stream`'s leading fence, `SharedOleFile::open_source_with_limits`'s middle observation, and the facade's leading signature fence and two unconditional ODS-probe fences. Five of the ten are **relocated onto their error branches or into the probe whose read made them load-bearing**, not deleted, so change 0317's precedence survives everywhere. **Measured**: full text **89,789 → 36,503** observations (−59.3%) and 89,794 → 36,508 `statx`; the whole-sheet walk **64,307 → 16,117** (−74.9%); the open 25 → 22 and 30 → 27 `statx`; the facade open 36 → 31 `statx`; `pread64`, read bytes and every projection digest identical. Instructions on the projection **−6.07%** (426.9 M → 401.0 M Ir); p50 **48.73 ms → 35.31 ms**, −27.55% and −28.32% in the two paired directions against a −3.71% A/A floor. The three sub-millisecond cases move −0.19% to −1.60% at p50 against in-window A/A floors of +0.10% to +0.31% — outside those, well inside the program's stated 4% host floor — and are reported as evidence with no latency claim. **CORE-2 is falsified on its own terms** — the survey required "below about 10 per open" and 18 of the remaining 22 are structural, 16 of them the trailing fences of the 16 globals fills that ADR 0005 needs — while **XLS-4's fence half is confirmed and the survey modelled it accurately** (predicted ≥48,165 `fstat` plus one per row, which is 53,261 here, against a measured 53,283; what the survey lacked is the denominator of 89,794). What is left on the text path is the sink's two observations per written object, both load-bearing, and the next lever there is `SequentialTextWriter` issuing two `write` calls per row rather than one. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0621-xls-open-fence-count.md); [retained evidence](results/change-0621/README.md).

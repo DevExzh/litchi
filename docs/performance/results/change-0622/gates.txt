@@ -1,0 +1,37 @@
+=== cargo fmt --all --check ===
+(clean, no diff)
+
+=== cargo clippy -p litchi-xlsx --all-targets ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.24s
+
+=== cargo doc -p litchi-xlsx --no-deps ===
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0622/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.32s
+   Generated /home/zhuhe/code/litchi-worktrees/0622/target/doc/litchi_xlsx/index.html
+
+=== cargo check -p litchi --all-targets (facade, depends on litchi-xlsx) ===
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+
+=== cargo test -p litchi-xlsx ===
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.34s; merged doctests compilation took 0.34s
+suites ok: 59
+tests passed: 1305 (0 failed)
+
+=== cargo check --workspace --all-targets: PRE-EXISTING FAILURE, NOT THIS CHANGE ===
+litchi-iwa examples create_pages_donut_chart / create_keynote_donut_chart /
+create_pages_pie_chart fail with E0308 at the base commit 1e4198321 as well.
+Reproduced on the untouched before checkout:
+  cd /home/zhuhe/code/litchi-worktrees/before-1e4198321
+  CARGO_TARGET_DIR=... cargo check -p litchi-iwa --all-targets
+  error[E0308]: crates/litchi-iwa/examples/create_pages_pie_chart.rs:53:5
+  expected Result<ChartData, litchi_iwa::Error>, found Result<ChartData, DataError>
+iWork crates are outside this change's scope and were not touched.
+
+=== differential oracle ===
+change 0622 sizes: CellFact 16 B, RowFact 32 B, CellSlot 96 B
+change 0622 oracle: 391 worksheet parts, 207 admitted to the shared traversal, 1 accepted by the value-only validator, 1 publishing facts, 2840 comparisons, 3 fact-route commits
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 989 filtered out; finished in 74.37s
