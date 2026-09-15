@@ -1,0 +1,40 @@
+--------------------------------------------------------------------------------
+Profile data file 'cg-before-real-1.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 214905947
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597 ir /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0597/fixtures/real.xlsx H680 1 (PID 1626939, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+1,075,669,091 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+129,662,132 (12.05%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 75,815,542 ( 7.05%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597]
+ 68,038,627 ( 6.33%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597]
+ 61,085,108 ( 5.68%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 55,418,849 ( 5.15%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 42,156,562 ( 3.92%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_realloc
+ 28,119,798 ( 2.61%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597]
+ 27,735,834 ( 2.58%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<alloc::raw_vec::RawVecInner>::finish_grow
+ 24,593,345 ( 2.29%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::next [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597]
+ 24,089,464 ( 2.24%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/alloc.rs:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before/release/probe0597]
+ 15,854,843 ( 1.47%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 15,539,622 ( 1.44%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/alloc.rs:<alloc::raw_vec::RawVecInner>::finish_grow
+ 15,310,330 ( 1.42%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 15,227,800 ( 1.42%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/non_null.rs:<quick_xml::events::attributes::IterState>::next
+ 13,208,423 ( 1.23%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]

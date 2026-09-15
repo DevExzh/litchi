@@ -13,6 +13,7 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_xlsx::workbook::{SourceBackedWorkbook, SourceCellView};
 use litchi_xlsx::{Error, MergeEditBlock, Rect, SourceBackedMergeEditor};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -736,4 +737,42 @@ fn source_merge_publication_reports_bounded_sink_and_source_failures() {
         Err(Error::Package(OpcError::IncompleteOutput { source, .. }))
             if matches!(source.as_ref(), OpcError::SourceChanged { .. })
     ));
+}
+
+/// Change 0597: a worksheet the selected stream marks ineligible before
+/// `<sheetData>` must still expose its merges and values through the mandatory
+/// materialized fallback.
+///
+/// `<cols>` marks the scan `NotEligible(Styles)` at worksheet level. The scan
+/// then stops recording document structure, so the later, correctly ordered
+/// `<mergeCells>` used to be refused as "appears before sheetData" on this
+/// public read path although `litchi_xlsx::Workbook` accepts the same bytes.
+#[test]
+fn source_backed_cell_reads_a_column_formatted_worksheet_with_merges() {
+    let sheet = format!(
+        r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><cols><col min="1" max="3" width="12"/></cols><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>anchor</t></is></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells></worksheet>"#
+    );
+    let bytes = fixture(&sheet);
+    let source = Arc::new(VersionedSource::new(bytes.clone()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = workbook.sheets().next().unwrap();
+
+    let anchor = worksheet.cell("A1").unwrap();
+    assert_eq!(
+        format!("{:?}", anchor.stored().expect("stored merge anchor")),
+        r#"Value(Text("anchor"))"#,
+        "unexpected merge anchor value: {anchor:?}"
+    );
+    assert_eq!(
+        worksheet.cell("B1").unwrap(),
+        SourceCellView::Covered(Rect::from_a1("A1:B1").unwrap())
+    );
+    assert_eq!(worksheet.cell("C1").unwrap(), SourceCellView::Missing);
+
+    // The same read over a fresh workbook takes the same streaming route, so
+    // the verdict must not depend on a warm materialized store.
+    let fresh = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let cells = fresh.sheets().next().unwrap().cells("A1:C1").unwrap();
+    assert_eq!(cells.len(), 1);
+    assert_eq!(cells[0].address, Rect::from_a1("A1:A1").unwrap().start());
 }

@@ -3,10 +3,9 @@
 //! This is a source-reader foundation, not a public `SourceWorksheet` route.
 //! The scanner consumes the committed MCE stream together with the x14ac raw
 //! observer in one pass and publishes an eligible result only after XML EOF.
-//! A [`ScanOutcome::NotEligible`] result asserts only that streaming
-//! XML/MCE/raw validation reached EOF successfully; it is not full worksheet
-//! semantic validation. Callers must discard it and fall back to the existing
-//! materialized worksheet parser.
+//! A [`ScanOutcome::NotEligible`] result is never worksheet semantic validity:
+//! callers must discard it and fall back to the existing materialized
+//! worksheet parser, which performs the complete mandatory validation.
 //!
 //! The implementation retains only physical records inside the requested
 //! rectangle, one active-cell lexical scratch area, and bounded parser state.
@@ -148,8 +147,9 @@ pub enum NotEligibleReason {
 pub enum ScanOutcome {
     /// The selected coordinate was scanned with the first-slice semantics.
     Eligible(SelectedCell),
-    /// Streaming XML/MCE/raw validation succeeded, but full worksheet
-    /// semantics were deferred; the caller must use the materialized parser.
+    /// Full worksheet semantics were deferred; the caller must use the
+    /// materialized parser, which owns the mandatory validation and the first
+    /// typed error for this worksheet. The scan itself still reaches XML EOF.
     NotEligible(NotEligibleReason),
 }
 
@@ -159,8 +159,9 @@ pub enum RangeScanOutcome {
     /// The selected physical records were scanned with the first-slice
     /// semantics.
     Eligible(SelectedCells),
-    /// Streaming XML/MCE/raw validation succeeded, but full worksheet
-    /// semantics were deferred; the caller must use the materialized parser.
+    /// Full worksheet semantics were deferred; the caller must use the
+    /// materialized parser, which owns the mandatory validation and the first
+    /// typed error for this worksheet. The scan itself still reaches XML EOF.
     NotEligible(NotEligibleReason),
 }
 
@@ -174,11 +175,11 @@ pub type StreamResult<T> =
 /// Scan one requested coordinate through a source worksheet stream.
 ///
 /// The returned eligible value is published only after the shared MCE/XML
-/// stream reaches EOF. A successful [`ScanOutcome::NotEligible`] outcome is
-/// not a semantic success: it asserts only successful streaming XML/MCE/raw
-/// validation, and callers are required to fall back to the existing
-/// materialized parser. Input, XML/MCE, raw x14ac, and allocation failures
-/// remain typed stream errors and are never converted to `NotEligible`.
+/// stream reaches EOF. A successful [`RangeScanOutcome::NotEligible`] outcome
+/// is not a semantic success, and callers are required to fall back to the
+/// existing materialized parser, which owns the mandatory validation. Input,
+/// XML/MCE, raw x14ac, and allocation failures observed by the stream remain
+/// typed stream errors and are never converted to `NotEligible`.
 #[expect(
     clippy::result_large_err,
     reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
@@ -534,7 +535,7 @@ impl Scanner {
                 if is_spreadsheetml_element(element, "dimension") {
                     self.validate_dimension_placement()?;
                 } else if is_spreadsheetml_element(element, "mergeCells") {
-                    self.validate_merge_cells_placement()?;
+                    self.validate_marked_merge_cells_placement()?;
                 }
             }
             return Ok(());
@@ -779,6 +780,31 @@ impl Scanner {
         if !self.seen_sheet_data {
             return Err(invalid("worksheet mergeCells appears before sheetData"));
         }
+        if self.seen_merge_cells {
+            return Err(invalid("worksheet has duplicate mergeCells elements"));
+        }
+        if self.merge_window_closed {
+            return Err(invalid(
+                "worksheet mergeCells appears after a schema successor",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Merge-placement rules that stay exact after the worksheet is marked.
+    ///
+    /// Change 0597: after [`Self::mark`] this scanner stops observing document
+    /// structure, so `seen_sheet_data` can no longer advance and a
+    /// `<sheetData>` that follows the mark is never recorded. Asking the
+    /// "appears before sheetData" question here therefore refused every
+    /// correctly placed `<mergeCells>` on a worksheet marked at worksheet
+    /// level before its `<sheetData>` — 434 reads over 24 of this
+    /// repository's 180 `.xlsx` fixtures, each of which the mandatory
+    /// materialized parser accepts. That clause is dropped; the materialized
+    /// parser still refuses a genuinely early `<mergeCells>` with the same
+    /// message (`raw::worksheet::codec`). The two remaining clauses read
+    /// state that was complete when the mark was taken, so they stay exact.
+    fn validate_marked_merge_cells_placement(&self) -> Result<()> {
         if self.seen_merge_cells {
             return Err(invalid("worksheet has duplicate mergeCells elements"));
         }

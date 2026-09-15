@@ -1,0 +1,57 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0597",
+  "title": "The ineligible selected-cell scan stopped seeing sheetData and refused merges it could no longer place; the gate that skips the scan stops at its design",
+  "decision": "mixed: one correctness fix retained in litchi-xlsx; the ineligibility gate frozen as a design and not implemented",
+  "code_state": "crates/litchi-xlsx/src/raw/worksheet/selected.rs (one post-mark placement check narrowed, documentation corrected), crates/litchi-xlsx/src/raw/worksheet/tests.rs and crates/litchi-xlsx/tests/source_backed_merge.rs (three regression tests). No other crate touched. The gate candidate is retained only as results/change-0597/design-candidate/gate-candidate.patch.",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the brief's own oracle (identical values, errors and read counts for every .xlsx fixture through cell()) exposed a live defect before it could measure the gate: Scanner::event returns early after mark(), which also stops seen_sheet_data from advancing, so validate_merge_cells_placement refused a correctly ordered <mergeCells> on every worksheet marked at worksheet level before its <sheetData> -- 434 reads over 24 of 180 fixtures",
+    "the fix makes the source-backed selected-cell path agree with the mandatory materialized parser on all 3,948 comparable (fixture, sheet, address) rows; at the base it disagreed on 372, every one of them carrying that one spurious refusal",
+    "the ineligibility gate is measured at -63.19% of a source-backed one-cell read on the control fixture and -14.08% on the real one, and is a byte-identical no-op across the whole 4,606-row real-corpus transcript, so 0587's falsification criterion for XML-2 (post-mark share under 10%) is not met: the share is 63.80%",
+    "the gate nevertheless moves error classes on synthetic malformed input: two refusals become acceptances (an unrecognized entity and an unbound namespace prefix in an ignored prefix element, both already accepted by litchi_xlsx::Workbook on the same bytes), three cases change typed variant and five change message within a variant; the briefing's contract-change rule requires a frozen design for that, so the gate is not landed",
+    "one open question in the design is a genuine limit question: the semantic stream applies selected_stream_limits (max_event_bytes, max_input_bytes) to the worksheet part and a gated worksheet reaches only the materialized path's own limits; whether those ceilings coincide is not established here",
+    "stopping at the first mark instead of pre-gating is not implementable from litchi-xlsx: invoke_active records an active-observer error, disables the callback and lets the MCE driver run to EOF by design, so an early stop needs a new detach signal in litchi-ooxml-common (out of scope) or a manufactured-and-swallowed I/O error"
+  ],
+  "accepted_evidence": {
+    "deterministic_counts": "callgrind 3.26 isolation pairs (N = 1 and N = 11, differenced and divided by 10) for the source-backed one-cell read on two fixtures across three legs; base control 220,680,657 Ir, this change 220,702,530 (+0.010%), this change plus the gate 81,229,237 (-63.19%); base real 1,110,380,265, this change 1,108,340,928 (-0.18%), plus the gate 954,006,724 (-14.08%)",
+    "symbol_attribution": "raw::worksheet::selected::scan inclusive 140,852,422 Ir per read on the base control leg (63.80% of the whole child) and 152,947,518 (13.81%) on the real leg; SourceWorksheet::store 76,285,164 (34.55%) on the control leg; the scan symbol is absent from both gate-leg tables",
+    "differential": "three-leg transcript over every .xlsx under test-data/ (180 packages, 4,606 read rows per leg, a fresh SourceBackedWorkbook over a counting positional source for every read); legs B and C byte-identical; base to this change 434 rows over 24 fixtures, all carrying the same base value",
+    "reference_agreement": "the same grid through the fully materialized litchi_xlsx::Workbook: 3,948 comparable rows, 372 base mismatches, 0 after",
+    "first_error_matrix": "60 synthetic packages in the 0541 style, malformed before the gate prefix, at <cols>, after <cols> before <sheetData>, inside <sheetData>, after <sheetData> and at the root, each in a <cols>-bearing and a <cols>-free shape, read through the public cell() and cells()",
+    "paired_timing": "tools/perf-baseline --warmup 5 --samples 30, order A1 B1 B2 A2 on CPU 20, three cases across their default shapes, plus four base runs for the A/A floor in the same window",
+    "tests": "1,297 tests pass under cargo test -p litchi-xlsx, including three new regression tests; two of the three fail at 08d968f8e and pass here, and the third passes on both legs by design"
+  },
+  "accepted_costs": {
+    "single_leg_counts": "one deterministic callgrind run per leg on two fixtures derived from a single 210 KB real worksheet; instructions rank work, not latency, and callgrind counts rep movsb per byte and runs SHA-256 in software",
+    "timing_floor": "the A/A floor in this window is 0.874% p50 on xlsx_file_selected_cell/medium and 1.368% on xlsx_range_source_first_cell/medium, but 24.011% and 25.501% p50 on the two dense-wide scenarios and 9.091% p50 on xlsx_narrow_column_range_scan/tiny; eight agents were building on the host throughout",
+    "harness_blind_spot": "the generated harness corpora contain no <cols>, no row styles and no <mergeCells>, so no harness worksheet is marked ineligible and none of the three timed selectors reaches the changed branch at all",
+    "behaviour_change": "the 434 moved rows are a behaviour change on a public read path: reads that refused now return values; the claim is only that they match the mandatory materialized parser on this corpus, not that no consumer depended on the refusal"
+  },
+  "known_gaps": {
+    "coverage": "the corpus-wide differential covers SourceWorksheet::cell and cells only; visit_cells shares cells and was not separately transcribed, and the source-backed edit routes, snapshot readers and eager Workbook route were not differenced",
+    "breadth_counts": "the <cols> figures (200 worksheet parts across 180 fixtures, 83 fixtures in the first sheet, largest offset 1,563 B) count raw byte occurrences and do not prove each is a schema <cols> element",
+    "gate_baseline": "the gate was measured on top of this change's fix, not against a leg that lacks it, because without the fix its differential is dominated by the defect",
+    "design_prerequisites": "the frozen design needs the limit question resolved and an ADR 0005 clarification about which reader owns malformed-input refusal for a lazily loaded payload before it can land"
+  },
+  "withheld": [
+    "any speedup, regression, latency, throughput, cold-cache, physical-I/O, allocation, peak-RSS, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0597-xlsx-selected-cell-ineligibility-gate",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 20",
+    "harness_sha256": {
+      "before": "434b28b5298218918418ab251ff4cce40b35579ab5abf6215e2ca9cb5d628ef9",
+      "after": "98688c0a9b59871ea2f7df4b91fa422ee2972487bbf773f253d86ebd3af6321f"
+    },
+    "probe_sha256": {
+      "before": "c3383baafc611fcbcc35dc1fe9d9ec2d25d8044a2160f1240bf6c292a80dbc4a",
+      "after": "d856e292c084867bc6519f874200096899dbd67fcd5388c0ea44e8828ea9a70e",
+      "gate": "not retained; the gate-leg probe was replaced when the candidate patch was reverted"
+    }
+  }
+}

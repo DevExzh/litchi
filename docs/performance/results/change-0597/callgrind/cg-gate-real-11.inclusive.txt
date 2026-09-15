@@ -1,0 +1,30 @@
+10,580,359,097 (100.0%)  PROGRAM TOTALS
+10,514,573,012 (99.38%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::workbook::source::SourceWorksheet>::store [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+10,379,162,982 (98.10%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/mod.rs:litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 8,485,845,101 (80.20%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 1,688,810,531 (15.96%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   621,540,974 ( 5.87%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+   324,479,189 ( 3.07%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   291,442,505 ( 2.75%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   268,282,214 ( 2.54%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   189,042,644 ( 1.79%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+   160,662,172 ( 1.52%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner
+   139,380,891 ( 1.32%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+   138,114,395 ( 1.31%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   106,391,243 ( 1.01%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/styles.rs:litchi_xlsx::raw::styles::parse [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   75,680 ( 0.00%)          let prefix = NcName::new(first)
+   60,544 ( 0.00%)          Ok(QualifiedName::from_parts(Some(&prefix), &local))
+  .                   x14ac::capture(content)?;
+ 55 ( 0.00%)          x14ac::capture(content)?
+291,442,505 ( 2.75%)  => /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture (11x)
+1,688,810,531 (15.96%)  => /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> (11x)
+  .               let mut descent = x14ac::capture_defaults(content)?;
+1,073,193 ( 0.01%)          if attribute.key.prefix().is_some() {
+24,463,714 ( 0.23%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::QName>::prefix (357,731x)
+1,266,496 ( 0.01%)          self.read_event_impl(buf)
+138,114,395 ( 1.31%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> (316,624x)
+         .               fn is_prefix_of(self, haystack: &str) -> bool {
+         .               fn strip_prefix_of(self, haystack: &str) -> Option<&str> {
+    11,374 ( 0.00%)          if self.is_prefix_of(haystack) {
+         .                       // SAFETY: prefix was just verified to exist.
+         .                       FN.store(fun as Fn, Ordering::Relaxed);

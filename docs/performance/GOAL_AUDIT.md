@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0597 — XLSX selected-cell ineligibility gate, frozen at its design
+
+Rank-6 survey item XML-2 is now priced (−63.19% of a source-backed one-cell read on the control fixture, −14.08% on the real one, measured as callgrind isolation pairs) and frozen: the gate moves which typed error a malformed `<cols>`-bearing worksheet reports, so GOAL's "capture BEFORE measurements, make the smallest coherent change, never trade a typed refusal for a partial result" line puts it behind a frozen design rather than in this batch. The same brief's oracle closed a correctness gap instead: `SourceWorksheet::cell`/`cells` refused 434 reads over 24 of 180 fixtures with `worksheet mergeCells appears before sheetData`, a question answered from state the scanner stops maintaining after `mark()`. After the fix the source-backed path agrees with the mandatory materialized parser on all 3,948 comparable rows (372 disagreements at the base). 1,297 tests pass. The unmeasured XML-1 codec expansion, the harness's lack of any marker-bearing or ineligible worksheet corpus, and the gate's two open prerequisites keep the non-iWork performance goal open. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0597-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0597/README.md).
+
 ## 0598 — PPTX cross-package copy revision reuse
 
 Record: [0598](0598-pptx-cross-copy-revision-cache.md).

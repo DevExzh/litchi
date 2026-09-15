@@ -2409,6 +2409,71 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
+    fn change_0597_marked_worksheet_keeps_a_correctly_placed_mergecells() {
+        // `<cols>` marks the worksheet ineligible at worksheet level, before
+        // `<sheetData>`. Every later event is skipped, so the scanner never
+        // records that `<sheetData>` was seen; asking the "appears before
+        // sheetData" question afterwards refused this correctly ordered
+        // worksheet, which the materialized parser accepts. The verdict must
+        // now be the ordinary style fallback.
+        let xml = worksheet(
+            r#"<cols><col min="1" max="2" width="12"/></cols><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="B1:B2"/></mergeCells>"#,
+        );
+        match scan_xml(&xml, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
+            other => panic!("expected a style fallback, got {other:?}"),
+        }
+        match scan_range_xml(&xml, "A1:B2") {
+            Ok(RangeScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
+            other => panic!("expected a style range fallback, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn change_0597_marked_worksheet_still_refuses_misplaced_merge_markup() {
+        // The two placement clauses that read state completed before the mark
+        // stay exact: a `<mergeCells>` after a schema successor and a second
+        // `<mergeCells>` are still refused with their established messages.
+        let after_successor = worksheet(
+            r#"<sheetData/><hyperlinks/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+        assert_scanner_message(
+            scan_xml(&after_successor, "A1"),
+            "worksheet mergeCells appears after a schema successor",
+        );
+
+        let duplicate = worksheet(
+            r#"<sheetData/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><cols><col min="1" max="1" width="4"/></cols><mergeCells count="1"><mergeCell ref="C1:D1"/></mergeCells>"#,
+        );
+        assert_scanner_message(
+            scan_xml(&duplicate, "A1"),
+            "worksheet has duplicate mergeCells elements",
+        );
+
+        // A genuinely early `<mergeCells>` on an unmarked worksheet keeps the
+        // original message; only the post-mark question was removed.
+        let early = worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#);
+        assert_scanner_message(
+            scan_xml(&early, "A1"),
+            "worksheet mergeCells appears before sheetData",
+        );
+    }
+
+    /// Require the scanner's own typed message, not just any failure.
+    fn assert_scanner_message<T: Debug>(result: StreamResult<T>, expected: &str) {
+        match result {
+            Err(error) => match error.as_ref() {
+                StreamError::Callback {
+                    raw_error: None,
+                    active_error: Some(crate::Error::Invalid(actual)),
+                } => assert_eq!(actual, expected),
+                other => panic!("expected {expected:?} from the scanner, got {other:?}"),
+            },
+            other => panic!("expected {expected:?} from the scanner, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn streaming_0367_merge_nested_and_payload_markup_falls_back() {
         let nested = worksheet(
             r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"><mergeCell ref="C1:D1"/></mergeCell></mergeCells>"#,

@@ -1,0 +1,42 @@
+Change 0597: source-backed SourceWorksheet::cell versus the fully
+materialized litchi_xlsx::Workbook (the mandatory reference parser),
+same fixture, sheet and address, over every .xlsx under test-data/.
+
+comparable (fixture, sheet, address) rows: 3948
+A-base   mismatches against the materialized parser: 372
+C-fix+gate mismatches against the materialized parser: 0
+
+Every A-base mismatch carries the same source-backed value:
+   372  Err(Invalid("worksheet mergeCells appears before sheetData"))
+
+First ten A-base mismatches, with the materialized parser's answer:
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | A1
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | A2
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | AA1
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | B1
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | B2
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | BA50
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | C3
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | D4
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | E5
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))
+  test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx | CSE Array Spill Cases | H680
+      source-backed Err(Invalid("worksheet mergeCells appears before sheetData"))
+      materialized  Err(Invalid("worksheet formula expression is empty"))

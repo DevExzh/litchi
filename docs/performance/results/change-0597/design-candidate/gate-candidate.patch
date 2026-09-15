@@ -1,0 +1,153 @@
+--- crates/litchi-xlsx/src/raw/worksheet/selected.rs	2026-09-15 09:53:44.657120436 -0400
++++ /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0597/legs/selected.final.rs	2026-09-15 09:46:14.235347630 -0400
+@@ -7,6 +7,17 @@
+ //! callers must discard it and fall back to the existing materialized
+ //! worksheet parser, which performs the complete mandatory validation.
+ //!
++//! A bounded byte prefix is examined before the stream is opened. When that
++//! prefix carries a `<cols>` column-formatting element, the worksheet is
++//! already known to reach [`NotEligibleReason::Styles`], so the verdict is
++//! published without opening the semantic stream at all (change 0597). The
++//! prefix probe never reports an error of its own: a short or failing prefix
++//! read simply declines the gate and hands the untouched byte stream to the
++//! scanner. Because an ineligible verdict is a mandatory fallback rather than
++//! an acceptance, the pre-gated worksheet's mandatory validation and its first
++//! typed error are the materialized parser's, exactly as they are for every
++//! other ineligible worksheet.
++//!
+ //! The implementation retains only physical records inside the requested
+ //! rectangle, one active-cell lexical scratch area, and bounded parser state.
+ //! It makes no fixed-memory, RSS, or OOM-safety claim. quick-xml, the MCE
+@@ -14,7 +25,7 @@
+ //! bounded-state description; event and input limits provide the aggregate
+ //! bound for the stream.
+ 
+-use std::io::BufRead;
++use std::io::{BufRead, Read};
+ 
+ use litchi_ooxml_common::mce::{Capabilities, SemanticElement, SemanticEvent, StreamLimits};
+ use litchi_sheet::{Cell as Address, Rect};
+@@ -33,6 +44,16 @@
+ use crate::formula::{Cache, Formula, Kind};
+ 
+ const MAX_XML_DEPTH: usize = 256;
++// Change 0597: the ineligibility pre-gate window. `<cols>` is a `<worksheet>`
++// child that the schema places before `<sheetData>`, so a fixed prefix is
++// enough to observe it; 8 KiB clears the largest leading `<sheetPr>`,
++// `<sheetViews>`, `<dimension>` and `<sheetFormatPr>` block observed in the
++// repository corpus (largest `<cols>` offset: 1,563 B across the 200 worksheet
++// parts of 180 `.xlsx` fixtures that declare one) by more than five times.
++// A miss only declines the gate, never a verdict.
++const MAX_INELIGIBILITY_PREFIX_BYTES: usize = 8 * 1024;
++const COLUMNS_MARKER: &[u8] = b"<cols";
++const SHEET_DATA_MARKER: &[u8] = b"<sheetData";
+ const MAX_GENERAL_REFERENCE_TOKEN_BYTES: usize = 12;
+ const MAX_MERGED_RANGES: usize = 16_384;
+ // The 12-byte cap keeps 8192 * 12 formula bytes and 32767 * 12 value bytes
+@@ -149,7 +170,8 @@
+     Eligible(SelectedCell),
+     /// Full worksheet semantics were deferred; the caller must use the
+     /// materialized parser, which owns the mandatory validation and the first
+-    /// typed error for this worksheet. The scan itself still reaches XML EOF.
++    /// typed error for this worksheet. The scan reached XML EOF unless the
++    /// bounded prefix gate published the verdict before opening the stream.
+     NotEligible(NotEligibleReason),
+ }
+ 
+@@ -161,7 +183,8 @@
+     Eligible(SelectedCells),
+     /// Full worksheet semantics were deferred; the caller must use the
+     /// materialized parser, which owns the mandatory validation and the first
+-    /// typed error for this worksheet. The scan itself still reaches XML EOF.
++    /// typed error for this worksheet. The scan reached XML EOF unless the
++    /// bounded prefix gate published the verdict before opening the stream.
+     NotEligible(NotEligibleReason),
+ }
+ 
+@@ -179,7 +202,9 @@
+ /// is not a semantic success, and callers are required to fall back to the
+ /// existing materialized parser, which owns the mandatory validation. Input,
+ /// XML/MCE, raw x14ac, and allocation failures observed by the stream remain
+-/// typed stream errors and are never converted to `NotEligible`.
++/// typed stream errors and are never converted to `NotEligible`; the bounded
++/// prefix gate can publish `NotEligible` before the stream is opened, so a
++/// gated worksheet reports the materialized parser's first error instead.
+ #[expect(
+     clippy::result_large_err,
+     reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+@@ -203,9 +228,25 @@
+     limits: &StreamLimits,
+     requested: Rect,
+ ) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
++    // Change 0597: observe the bounded prefix before the semantic stream is
++    // opened. A `<cols>` element there already decides the same verdict the
++    // stream would publish at EOF, and the caller's mandatory materialized
++    // fallback is unchanged, so the whole stream is unnecessary work.
++    let mut prefix = [0_u8; MAX_INELIGIBILITY_PREFIX_BYTES];
++    let observed = read_bounded_prefix(input, &mut prefix);
++    if prefix_declares_columns(&prefix[..observed]) {
++        return Ok((
++            RangeScanOutcome::NotEligible(NotEligibleReason::Styles),
++            None,
++        ));
++    }
++    // `Chain<&[u8], &mut dyn BufRead>` is itself a `BufRead`, so the replayed
++    // prefix costs no second buffer and no byte copy beyond the probe window.
++    let mut replayed = (&prefix[..observed]).chain(input);
++
+     let mut scanner = Scanner::new(requested);
+     let result = x14ac::capture_stream_with_active(
+-        input,
++        &mut replayed,
+         capabilities,
+         limits,
+         x14ac::RowMode::ValidateOnly,
+@@ -1358,6 +1399,48 @@
+     }
+ }
+ 
++/// Read at most `window.len()` bytes of the worksheet stream into `window`.
++///
++/// This probe is deliberately infallible. It stops at EOF, at a short read
++/// that makes no progress, or at the first transport error, and reports only
++/// how many bytes it observed. Every byte it consumed is replayed into the
++/// scanner by the caller, so a declined probe leaves the stream, its limits,
++/// and its typed errors exactly as they were.
++fn read_bounded_prefix(input: &mut dyn BufRead, window: &mut [u8]) -> usize {
++    let mut filled = 0;
++    while filled < window.len() {
++        match input.read(&mut window[filled..]) {
++            Ok(0) | Err(_) => break,
++            Ok(read) => match filled.checked_add(read) {
++                Some(total) if total <= window.len() => filled = total,
++                _ => break,
++            },
++        }
++    }
++    filled
++}
++
++/// Whether a worksheet prefix carries a `<cols>` column-formatting element.
++///
++/// The search window ends at the first `<sheetData` occurrence because the
++/// schema places `<cols>` before it; a later occurrence is left to the
++/// scanner. The needle must be followed by a name terminator so that no other
++/// element whose name starts with `cols` can match. The predicate reads raw
++/// pre-MCE bytes, so it is deliberately one-sided: a match only ever selects
++/// the materialized parser, which is the authority on this worksheet's values
++/// and on its first typed error, and a miss keeps today's streaming scan.
++fn prefix_declares_columns(prefix: &[u8]) -> bool {
++    let window = match memchr::memmem::find(prefix, SHEET_DATA_MARKER) {
++        Some(position) => &prefix[..position],
++        None => prefix,
++    };
++    memchr::memmem::find_iter(window, COLUMNS_MARKER).any(|position| {
++        window
++            .get(position + COLUMNS_MARKER.len())
++            .is_none_or(|byte| matches!(byte, b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n'))
++    })
++}
++
+ fn parse_value(kind: CellKind, value: &str) -> Result<Option<Value>> {
+     match kind {
+         CellKind::Untyped | CellKind::Numeric => {

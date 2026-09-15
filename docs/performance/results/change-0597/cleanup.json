@@ -1,0 +1,28 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0597",
+  "retained_in_repository": [
+    "docs/performance/0597-xlsx-selected-cell-ineligibility-gate.md",
+    "docs/performance/results/change-0597/ (callgrind tables, the three-leg differential summary and changed rows, the eager-agreement proof, the 60-case first-error matrix and its generator, the frozen gate patch, the probe source, the capture scripts, the eight timing runs, gates.txt, log-sections.md, decision.json, cleanup.json)"
+  ],
+  "removed_after_the_packet_was_assembled": [
+    "the three full 4,606-row corpus transcripts and the materialized-parser transcript (about 3.4 MB); their sha256 sums are in differential/oracle-summary.md and every row the change moves is retained in differential/oracle-changed-rows.tsv",
+    "the 60 generated synthetic .xlsx packages; make_matrix.py regenerates them deterministically from a tracked fixture",
+    "the scratch copies of the two measurement fixtures (control.xlsx is already retained in the change-0587 packet; real.xlsx is the tracked test-data fixture)",
+    "the three scratch copies of selected.rs used to build the measurement legs (base, fix-only, fix+gate); the fix is the committed diff and the gate is design-candidate/gate-candidate.patch",
+    "the raw callgrind .out files, deleted by run_callgrind.sh immediately after each annotation was extracted",
+    "the whole session scratch directory scratchpad/agents/0597 (9.8 MB at its peak; no worktree, target directory or fixture copy was ever placed on the RAM-backed /tmp)"
+  ],
+  "build_directories_removed": [
+    "/home/zhuhe/code/litchi-worktrees/targets/0597-before (1.1 GiB, the before-leg harness build)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0597-probe-before (704 MiB)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after (704 MiB)",
+    "/home/zhuhe/code/litchi-worktrees/0597/target (15 GiB) and target-perf (1.1 GiB), removed with the worktree"
+  ],
+  "worktree": "/home/zhuhe/code/litchi-worktrees/0597 removed after the commit; the branch perf/0597-xlsx-selected-cell-ineligibility-gate is kept",
+  "shared_resources_left_untouched": [
+    "/home/zhuhe/code/litchi (the shared working copy; never built, edited or tested in)",
+    "/home/zhuhe/code/litchi-worktrees/before-08d968f8e (the shared read-only before checkout)"
+  ]
+}
