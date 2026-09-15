@@ -1,0 +1,32 @@
+# OleWriter::write_to determinism: 12 runs in 12 separate processes per storage count
+# Each run builds a CFB with N explicitly created storages, each holding one stream,
+# and prints the output length and an FNV-1a digest of the bytes.
+
+## 1 storage(s)
+     12 {"storages":1,"bytes":2560,"fnv1a":"83490167a5417d81"}
+
+## 2 storage(s)
+      8 {"storages":2,"bytes":3072,"fnv1a":"a56e3d24d2365ac1"}
+      4 {"storages":2,"bytes":3072,"fnv1a":"2f58a235b5b05695"}
+
+## 3 storage(s)
+      3 {"storages":3,"bytes":3072,"fnv1a":"b3fc3c9265eb5d3a"}
+      3 {"storages":3,"bytes":3072,"fnv1a":"6ce46d6429e0f06e"}
+      3 {"storages":3,"bytes":3072,"fnv1a":"413c00fb116b28fa"}
+      1 {"storages":3,"bytes":3072,"fnv1a":"92168a549d263e5a"}
+      1 {"storages":3,"bytes":3072,"fnv1a":"5fe370d0709ae66a"}
+      1 {"storages":3,"bytes":3072,"fnv1a":"1eb7ff925d6a2abe"}
+
+## 8 storage(s)
+      1 {"storages":8,"bytes":4608,"fnv1a":"cdf04bb11c589f41"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"ba882d92004dac75"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"a27595a3e1186135"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"97369bb34ab79945"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"8f4510a473edc6d9"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"766e69d5f55c6615"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"64a22da279bcc635"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"35716401e0a6c50d"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"144024c32df55961"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"0ec006eda0e2c75d"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"042fd1b1be9dcc96"}
+      1 {"storages":8,"bytes":4608,"fnv1a":"02416c3bf8c0d355"}

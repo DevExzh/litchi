@@ -1,0 +1,59 @@
+# Deterministic counts for one length-changing OLE2 edit-and-save.
+# Every figure is read back through the ordinary public CFB parser from the
+# actual output of the actual public editor. Produced by
+#   cfb_save_probe --format FMT --input FIXTURE [--ppt-op OP] --report
+# `chgOnly src` is the size of the synthetic CFB holding only the changed
+# streams, which the `container-changed-only` leg rebuilds.
+
+case              source    output  strms  stream B in  stream B out  unchanged B  unchg%  chgOnly src
+xls54016          984576    984576      4       973636        973688        46458    4.8%       935936
+docfloat          335360    342528     13       324540        334948       264190   81.4%        73216
+docnohf            26112     27648      6        23150         24313        12409   53.6%        13824
+ppt45543          385024    390144      5       379655        384906        64035   16.9%       324608
+pptauthored         8704      9216      4         5535          6265          128    2.3%         8704
+
+# Stream inventory, before the edit; `changed` streams are the ones the public
+# editor rewrote, `untouched` the ones a copy-through writer would stream verbatim.
+
+## xls54016  (test-data/poi/test-data/spreadsheet/54016.xls)
+   changed   'Workbook'                              927178 ->    927230
+   untouched '\x01CompObj'                              114
+   untouched '\x05DocumentSummaryInformation'         46108
+   untouched '\x05SummaryInformation'                   236
+
+## docfloat  (test-data/ole/doc/FloatingPictures.doc)
+   changed   '1Table'                                 21575 ->     26726
+   changed   'WordDocument'                           38775 ->     44032
+   untouched '\x01CompObj'                              113
+   untouched '\x05DocumentSummaryInformation'           884
+   untouched '\x05SummaryInformation'                   436
+   untouched 'Data'                                  255308
+   untouched 'ObjectPool/_1207591883/\x01CompObj'       109
+   untouched 'ObjectPool/_1207591883/\x01Ole'            20
+   untouched 'ObjectPool/_1207591883/\x03EPRINT'       2656
+   untouched 'ObjectPool/_1207591883/\x03ObjInfo'         6
+   untouched 'ObjectPool/_1207591883/\x05DocumentSummaryInformation'       244
+   untouched 'ObjectPool/_1207591883/\x05SummaryInformation'       216
+   untouched 'ObjectPool/_1207591883/Workbook'         4198
+
+## docnohf  (test-data/ole/doc/NoHeadFoot.doc)
+   changed   '1Table'                                  6645 ->      6784
+   changed   'WordDocument'                            4096 ->      5120
+   untouched '\x01CompObj'                              121
+   untouched '\x05DocumentSummaryInformation'          4096
+   untouched '\x05SummaryInformation'                  4096
+   untouched 'Data'                                    4096
+
+## ppt45543  (test-data/poi/test-data/slideshow/45543.ppt)
+   changed   'Current User'                            4096 ->      4096
+   changed   'PowerPoint Document'                   311524 ->    316775
+   untouched '\x05DocumentSummaryInformation'          4096
+   untouched '\x05SummaryInformation'                 21824
+   untouched 'Pictures'                               38115
+
+## pptauthored  (/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/fixtures/authored-3x2.ppt)
+   changed   'Current User'                              32 ->        32
+   changed   'PowerPoint Document'                     5375 ->      6105
+   untouched '\x05DocumentSummaryInformation'            56
+   untouched '\x05SummaryInformation'                    72
+

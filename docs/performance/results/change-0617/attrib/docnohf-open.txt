@@ -1,0 +1,43 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docnohf-open-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docnohf-open-s2.out over 10 operations
+total_self_instructions_per_operation 442048
+
+## by owner
+runtime                          310432   70.23%
+format-doc                        76160   17.23%
+cfb-parser                        49621   11.23%
+ole-common-container               4632    1.05%
+format-other                        853    0.19%
+ole-common-other                    247    0.06%
+probe                               103    0.02%
+
+## top 30 symbols by self instructions per operation
+        140145   31.70%  runtime                __memcpy_avx_unaligned_erms
+         42776    9.68%  runtime                __memset_avx2_unaligned_erms
+         23727    5.37%  runtime                _int_malloc
+         15244    3.45%  cfb-parser             litchi_cfb::directory_name::directory_name_data
+         12924    2.92%  runtime                free
+         11954    2.70%  runtime                _int_free_merge_chunk
+         10203    2.31%  runtime                malloc
+          7910    1.79%  format-doc             litchi_doc::sprm::parse_sprms
+          6270    1.42%  format-doc             <litchi_doc::parts::text::TextExtractor>::new
+          6232    1.41%  runtime                <alloc::raw_vec::RawVecInner>::finish_grow
+          5556    1.26%  format-doc             <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+          5144    1.16%  runtime                <alloc::string::String>::from_utf16
+          4152    0.94%  runtime                <smallvec::SmallVec<[u16; 32]> as core::iter::traits::collect::Extend<u16>>::extend::<core::str::iter::EncodeUtf16>
+          4069    0.92%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validated_directory_entries
+          3928    0.89%  runtime                alloc::fmt::format::format_inner
+          3778    0.85%  cfb-parser             litchi_cfb::file::collect_sector_chain
+          3720    0.84%  runtime                _int_free_maybe_trim
+          3713    0.84%  runtime                unlink_chunk.isra.0
+          3546    0.80%  runtime                __rustc::__rdl_alloc
+          3525    0.80%  format-doc             <litchi_doc::parts::pap_bin_table::PapBinTable>::parse
+          3337    0.75%  format-doc             litchi_doc::parts::styles::codec::parser::parse_style
+          3282    0.74%  runtime                core::fmt::write
+          3052    0.69%  runtime                <alloc::string::String as core::fmt::Write>::write_str
+          2937    0.66%  runtime                realloc
+          2755    0.62%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::load_minifat
+          2744    0.62%  runtime                __libc_malloc2
+          2628    0.59%  runtime                _int_free_chunk
+          2442    0.55%  format-doc             <litchi_doc::parts::fib::FileInformationBlock>::get_table_pointer
+          2335    0.53%  cfb-parser             litchi_cfb::file::decode_utf16le
+          2319    0.52%  runtime                <alloc::raw_vec::RawVecInner>::try_allocate_in

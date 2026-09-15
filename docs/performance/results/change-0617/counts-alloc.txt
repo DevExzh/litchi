@@ -1,0 +1,33 @@
+# Allocation regions, from the isolated `cfb_save_probe_peak` binary, which
+# installs a counting global allocator. One region per operation, each run on
+# a fresh operation; peak live bytes are relative to the region's entry. The
+# timing and callgrind binary carries no allocator wrapper.
+
+case            source B |    open peak  commit peak  container peak  chgonly peak |  cont/src
+xls54016          984576 |     18771707     25410139         5778408       3737315 |     5.87x
+docfloat          335360 |      2454228      3211155         1860994        264546 |     5.55x
+docnohf            26112 |       164258       222239          136535         47366 |     5.23x
+ppt45543          385024 |      1599900      2735329         2235995       1292277 |     5.81x
+pptauthored         8704 |        53269        72401           47043         32986 |     5.40x
+
+case           operation                 alloc calls   allocated B  deallocated B  retained B
+xls54016       open                            51819      27124765       27124765           0
+xls54016       commit                         135803      99558844       99558844           0
+xls54016       container                         346      13882542       13882542           0
+xls54016       container_changed_only             51       3771825        3771825           0
+docfloat       open                             5021       4175704        4175704           0
+docfloat       commit                          14694      15529325       15529325           0
+docfloat       container                         981       4901587        4901587           0
+docfloat       container_changed_only             61        296540         296540           0
+docnohf        open                              439        247017         247017           0
+docnohf        commit                           1486       1026027        1026027           0
+docnohf        container                         376        390966         390966           0
+docnohf        container_changed_only             55         57058          57058           0
+ppt45543       open                             1549       2250956        2250956           0
+ppt45543       commit                           6166      12389881       12389881           0
+ppt45543       container                         347       5696637        5696637           0
+ppt45543       container_changed_only             61       1312066        1312066           0
+pptauthored    open                              229         70063          70063           0
+pptauthored    commit                           1812        541265         541265           0
+pptauthored    container                         297        132307         132307           0
+pptauthored    container_changed_only             65         36443          36443           0

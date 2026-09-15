@@ -1,0 +1,104 @@
+=== cargo fmt --all --check ===
+exit=0
+
+=== cargo clippy -p litchi-cfb -p litchi-ole-common --all-targets --locked ===
+    Checking serde v1.0.229
+    Checking serde_json v1.0.149
+    Checking digest v0.11.3
+    Checking sha2 v0.11.0
+    Checking chrono v0.4.45
+   Compiling thiserror-impl v2.0.18
+   Compiling zerocopy-derive v0.8.57
+    Checking thiserror v2.0.18
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-ole-common)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.32s
+
+=== cargo test -p litchi-cfb --release --locked ===
+   Doc-tests litchi_cfb
+
+running 13 tests
+test crates/litchi-cfb/src/writer/directory.rs - writer::directory::DirectoryEntryBuilder::set_clsid (line 184) ... ignored
+test crates/litchi-cfb/src/writer/core.rs - writer::core::NOSTREAM (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::ENDOFCHAIN (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::save (line 1178) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::MAXREGSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_stream (line 372) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_storage (line 487) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::FATSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::DIFSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::STGTY_ROOT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::set_root_clsid (line 341) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::new (line 273) ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 2.29s; merged doctests compilation took 2.28s
+
+=== cargo test -p litchi-ole-common --release --locked ===
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/property_set_editor.rs (target/release/deps/property_set_editor-6b98eb02c7c83f85)
+
+running 5 tests
+test drm_viewer_content_storages_are_rejected_at_root_and_nested_case_insensitively ... ok
+test generated_property_sets_round_trip_all_office_value_families ... ok
+test mutations_are_atomic_ordered_and_noops_are_byte_exact ... ok
+test poi_and_libreoffice_fixtures_preserve_exact_noop_bytes ... ok
+test protected_containers_are_rejected_at_root_and_nested_case_insensitively ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_ole_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+=== cargo doc -p litchi-cfb -p litchi-ole-common --no-deps --locked ===
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-codepage)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-cfb)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-cfb)
+ Documenting litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0617/crates/litchi-ole-common)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.72s
+   Generated /home/zhuhe/code/litchi-worktrees/0617/target/doc/litchi_cfb/index.html and 1 other file
+
+=== full test result lines ===
+=== cargo test -p litchi-cfb --release --locked (all result lines) ===
+     Running unittests src/lib.rs (target/release/deps/litchi_cfb-4b12bfc17328c03c)
+running 322 tests
+test result: ok. 322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+     Running tests/sequential_writer.rs (target/release/deps/sequential_writer-e85cf304cbbccea6)
+running 13 tests
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/writer_storage_move.rs (target/release/deps/writer_storage_move-add2699522627cb2)
+running 6 tests
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_cfb
+running 13 tests
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+=== cargo test -p litchi-ole-common --release --locked (all result lines) ===
+     Running unittests src/lib.rs (target/release/deps/litchi_ole_common-8958dab377c9e25b)
+running 129 tests
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/object.rs (target/release/deps/object-9784322a901139e6)
+running 14 tests
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/object_link.rs (target/release/deps/object_link-a2155f91ddb4f303)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/object_stream_delete.rs (target/release/deps/object_stream_delete-0aff2ca6b9819cff)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/property_set_editor.rs (target/release/deps/property_set_editor-6b98eb02c7c83f85)
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_ole_common
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

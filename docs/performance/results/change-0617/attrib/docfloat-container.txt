@@ -1,0 +1,43 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docfloat-container-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docfloat-container-s2.out over 10 operations
+total_self_instructions_per_operation 6358582
+
+## by owner
+runtime                         5794538   91.13%
+cfb-parser                       415716    6.54%
+cfb-writer                       115180    1.81%
+ole-common-container              27990    0.44%
+format-other                       3484    0.05%
+ole-common-other                   1554    0.02%
+probe                               120    0.00%
+
+## top 30 symbols by self instructions per operation
+       4030084   63.38%  runtime                __memcpy_avx_unaligned_erms
+       1346765   21.18%  runtime                __memset_avx2_unaligned_erms
+        154182    2.42%  cfb-parser             litchi_cfb::directory_name::directory_name_data
+         60934    0.96%  runtime                _int_malloc
+         53052    0.83%  cfb-parser             litchi_cfb::file::collect_sector_chain
+         51700    0.81%  runtime                __memcmp_avx2_movbe
+         50222    0.79%  cfb-parser             <litchi_cfb::file::SectorChainScratch>::collect_exact
+         42364    0.67%  runtime                <smallvec::SmallVec<[u16; 32]> as core::iter::traits::collect::Extend<u16>>::extend::<core::str::iter::EncodeUtf16>
+         36392    0.57%  runtime                _int_free_merge_chunk
+         27182    0.43%  runtime                free
+         25222    0.40%  runtime                <alloc::raw_vec::RawVecInner>::finish_grow
+         21715    0.34%  runtime                malloc
+         21650    0.34%  runtime                <core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write
+         21250    0.33%  cfb-writer             <litchi_cfb::writer::fat::FatBuilder>::validate
+         17952    0.28%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validated_directory_entries
+         16128    0.25%  cfb-writer             <litchi_cfb::writer::directory::DirectoryEntryBuilder>::to_bytes
+         11526    0.18%  runtime                _int_free_maybe_trim
+         11210    0.18%  runtime                realloc
+         11184    0.18%  runtime                <alloc::string::String>::from_utf16
+         10514    0.17%  cfb-writer             <litchi_cfb::writer::fat::FatBuilder>::allocate_chain_u64
+         10280    0.16%  cfb-parser             litchi_cfb::file::decode_utf16le
+         10219    0.16%  runtime                _int_realloc
+          9692    0.15%  runtime                unlink_chunk.isra.0
+          9255    0.15%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::read_sectors_batched
+          9145    0.14%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<&[u8]>>>::read_sectors_batched
+          9017    0.14%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<&[u8]>>>::validate_stream_allocations
+          8817    0.14%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validate_stream_allocations
+          8772    0.14%  runtime                <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&u32>
+          8070    0.13%  cfb-parser             <litchi_cfb::directory_name::DirectoryNameData>::compare
+          8058    0.13%  runtime                _int_free_chunk

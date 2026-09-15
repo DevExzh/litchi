@@ -1,0 +1,42 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/ppt45543-container-changed-only-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/ppt45543-container-changed-only-s2.out over 10 operations
+total_self_instructions_per_operation 1762305
+
+## by owner
+runtime                         1678745   95.26%
+cfb-parser                        79602    4.52%
+ole-common-container               2897    0.16%
+format-other                        781    0.04%
+ole-common-other                    159    0.01%
+probe                               121    0.01%
+
+## top 30 symbols by self instructions per operation
+       1287898   73.08%  runtime                __memcpy_avx_unaligned_erms
+        330400   18.75%  runtime                __memset_avx2_unaligned_erms
+         42800    2.43%  runtime                __memcmp_avx2_movbe
+         21704    1.23%  cfb-parser             litchi_cfb::file::collect_sector_chain
+         21505    1.22%  cfb-parser             <litchi_cfb::file::SectorChainScratch>::collect_exact
+          8432    0.48%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::read_sectors_batched
+          7610    0.43%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validate_physical_sector_layout
+          6520    0.37%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validate_stream_allocations
+          4844    0.27%  cfb-parser             litchi_cfb::directory_name::directory_name_data
+          3374    0.19%  runtime                _int_malloc
+          1882    0.11%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::validated_directory_entries
+          1778    0.10%  runtime                <alloc::raw_vec::RawVecInner>::finish_grow
+          1590    0.09%  runtime                _int_free_merge_chunk
+          1523    0.09%  runtime                free
+          1334    0.08%  runtime                malloc
+          1283    0.07%  runtime                <smallvec::SmallVec<[u16; 32]> as core::iter::traits::collect::Extend<u16>>::extend::<core::str::iter::EncodeUtf16>
+          1198    0.07%  runtime                <alloc::string::String>::from_utf16
+          1096    0.06%  cfb-parser             litchi_cfb::file::decode_utf16le
+           967    0.05%  ole-common-container   litchi_ole_common::object::directory::codec::decode
+           803    0.05%  runtime                realloc
+           734    0.04%  runtime                _int_realloc
+           600    0.03%  runtime                <alloc::vec::Vec<u32>>::extend_trusted::<core::iter::adapters::map::Map<core::iter::adapters::copied::Copied<core::slice
+           593    0.03%  ole-common-container   litchi_ole_common::object::codec::capture_container::<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>
+           584    0.03%  format-other           litchi_core::simd::fmt::hex_encode_avx2
+           577    0.03%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::load_directory
+           566    0.03%  runtime                _int_free_maybe_trim
+           517    0.03%  runtime                unlink_chunk.isra.0
+           450    0.03%  runtime                __rustc::__rdl_alloc
+           384    0.02%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::load_fat
+           372    0.02%  runtime                _int_free_chunk

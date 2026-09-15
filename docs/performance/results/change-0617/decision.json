@@ -1,0 +1,64 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0617",
+  "title": "The length-changing OLE2 edit-and-save baseline, and the frozen copy-through writer design",
+  "decision": "design retained and frozen; implementation blocked on an ADR clarification of physical sector layout, and declined outright for XLS on the measured share",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 ranked CFB-2 at 32 with size unknown because no selector performs an OLE2 length-changing save, and wrote its own falsification criterion: falsified if a phase attribution of one XLS/DOC/PPT save shows the crates' own record re-encoding, not the container copy, dominates",
+    "measured natively on this host, the container rebuild is 1.07% of cycles and 0.45% of instructions of a length-changing XLS cell-value save, inside the 3.29% A/A floor, so the criterion is met for XLS and the item is declined there",
+    "the same measurement on DOC gives 13.25% of cycles on the 335 KB fixture and 29.99% on the 26 KB one, four and eight times the floor, of which 12.69% and 26.04% of the whole save is work proportional to streams the edit never touched, so the criterion is not met for DOC",
+    "the deciding quantity is the unchanged-stream share, which is a property of the format's stream topology and not of the container: 4.8% on the XLS fixture, where one Workbook stream is 95.2% of the artifact and every edit rewrites it, against 81.4% on the DOC fixture, whose 255 KB Data stream and ObjectPool storages are never rewritten",
+    "the container rebuild's peak retention is 5.2x to 5.9x the artifact size on every case, of which 85.8% is the untouched streams on the DOC fixture: that is the one advantage of the design that does not depend on the format",
+    "the physical-layout policy (FREESECT reuse versus append) is unaddressed by every ADR, and all three candidate policies are defensible readings of ADR 0006 today, so choosing one in code would be making preservation policy inside a performance change",
+    "the design is written out in full anyway, because twenty-one items in the 0587 queue need a frozen design record and this one is now available without re-deriving it",
+    "the baseline also sizes 0587's XLS-9 (rank 31) as a side effect: the XLS commit costs 2.22x its own open in cycles and 64.8% of its instructions are litchi-xls and litchi-biff re-parsing the workbook during the commit readback, which is the larger, cheaper and lower-risk of the two items"
+  ],
+  "accepted_evidence": {
+    "deterministic_counts": "exact stream inventories, changed-stream byte deltas and unchanged-stream shares for five length-changing edit-and-save cases, read back through the ordinary public CFB parser from real public-editor output: 4.8% unchanged on 54016.xls, 81.4% on FloatingPictures.doc, 53.6% on NoHeadFoot.doc, 16.9% on 45543.ppt, 2.3% on a generated 3x2 deck",
+    "instruction_attribution": "callgrind isolation pairs at 2 and 12 iterations, per-symbol self instructions differenced and divided by 10, bucketed by owning crate, for open/commit/container/container-changed-only on all five cases; the litchi-cfb writer's own arithmetic is never above 2.27% of a commit, and the container leg is 63.38% memcpy plus 21.18% memset on the DOC fixture",
+    "native_cycles": "perf stat isolation pairs at 10 and 110 iterations, median of 11 repetitions each, taskset -c 11: container share of the commit is 1.07% (xls54016), 13.25% (docfloat), 29.99% (docnohf), 7.26% (ppt45543) and 19.66% (pptauthored) in cycles, and 0.45%/10.91%/33.33%/7.35%/20.79% in instructions",
+    "allocation_regions": "counting global allocator in an isolated binary, one region per operation: the container rebuild alone peaks at 5.23x to 5.87x the artifact size, and 85.8% of that peak is the untouched streams on FloatingPictures.doc",
+    "aa_floor": "the docfloat commit leg measured as both legs in the same window, 11 repetitions per level per leg: +3.29% on cycles, -0.108% on instructions",
+    "gates": "cargo fmt --all --check, clippy on litchi-cfb and litchi-ole-common with all targets, cargo test -p litchi-cfb (322 + 13 + 6 + 12 passed, 1 ignored, 0 failed), cargo test -p litchi-ole-common (129 + 14 + 2 + 8 + 5 passed, 0 failed), and cargo doc on both crates, all on the clean worktree at the base commit"
+  },
+  "accepted_costs": {
+    "container_leg_is_an_approximation": "the container leg runs Editor::open plus one put_streams_shared as a separate operation over the same source with the same replacement bytes, so it pays its own source parse and allocator warm-up; change 0036 forbids treating measured phases as additive components and this record does not",
+    "changed_only_is_a_bound_not_a_measurement": "container minus container-changed-only removes all container work proportional to untouched streams, where a copy-through writer still writes those bytes once and still walks their chains during the candidate reopen; the realizable saving is roughly three quarters of that bound, which is arithmetic over the mechanism rather than a measurement",
+    "callgrind_overstates_this_term": "85% of the container leg is rep movsb and rep stosb, counted once per byte; callgrind reports 27.52% where the hardware measures 13.25% on docfloat, and 5.8x the whole commit on ppt45543 because valgrind masks the SHA CPUID bit",
+    "shared_host": "seven other agents were building and measuring on the same 32-core host throughout; the cycles A/A is +3.29% and the instruction A/A is -0.108%, which is why the ranking rests on instructions and cycles together rather than on wall clock"
+  },
+  "known_gaps": {
+    "corpus": "five cases is not enough to characterize any format: the unchanged-stream share, which decides whether the design is worth anything, ranges from 2.3% to 81.4% across them. A census of that share over all 212 OLE2 fixtures is the cheapest next measurement and was not taken",
+    "doc_scale": "the largest DOC that body_text::Snapshot::open admits is 335 KB; the 1.6 MB fixture is refused with Refused(DrawingDependency) and most others with 'invalid stylesheet: style names and aliases must be unique', so no DOC claim at scale follows",
+    "ppt_fixture": "no .ppt file in this repository can reach a length-changing shape-text edit (40 fixtures x 6 targets, 43 DependencyClosure refusals, zero admissions), so the shape-text case uses a deck authored by litchi_ppt::writer::Writer and the real-fixture PPT case is a slide removal instead",
+    "adr_blocker": "no ADR addresses the physical sector layout of a saved CFB; the record states three candidate policies and recommends one, but implementation must wait for the clarification",
+    "no_after_leg": "nothing was implemented, so the cost of the copy-through writer itself is unknown"
+  },
+  "withheld": [
+    "any speedup, regression, peak-RSS, cold-cache, file-backed, range-source, syscall, throughput, concurrency-scaling or cross-platform result",
+    "any statement about a format outside the five cases named",
+    "any conclusion about which of the three physical-layout policies is correct",
+    "any size for the copy-through writer itself"
+  ],
+  "adjacent_findings": [
+    "OleWriter::write_to output is not deterministic when a document has two or more explicitly created storages: write_to iterates self.storages (a HashSet) to call add_storage_path, which assigns sid = entries.len(), and entries are serialized in SID order. Rust's default hasher is seeded per process. Confirmed by execution: 12 runs in 12 processes give one digest for 1 storage, two distinct for 2, six for 3 and twelve for 8, with the output length identical every time. ADR 0006 requires deterministic serialization. Reported for the owner, not fixed here",
+    "no .ppt fixture in this repository can reach a length-changing shape-text edit; every litchi-ppt test that exercises that path authors its own deck. Same shape of finding as change 0607's 'no opened deck can reach the PPTX slide regeneration'. Reported, not fixed"
+  ],
+  "provenance": {
+    "base_commit": "8fe9efa55",
+    "branch": "perf/0617-cfb-copy-through-writer-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0, perf available",
+    "measured_cpu": 11,
+    "probe_source_sha256": "c3edfc4844e0bc44914ef9aa72cdddc4fbf553a95ff0c046129154a06d3f5814",
+    "probe_binary_sha256": {
+      "cfb_save_probe": "313d58a8cab2b63416cb6ab60f705682dc21b83ea301141253619f744b491470",
+      "cfb_save_probe_peak": "dc3f512efdcfed200e0ebac8074034e5c68327396b6268f175e078355d0dfa77",
+      "cfb_writer_determinism": "fcf23626ee958c1070186866b275676caedcd367ae0c2ed66c790e7c8a72eeac"
+    },
+    "note": "all work was done in a worktree with its own target directory; the probe is a separate Cargo project outside the repository with path dependencies, and no tracked file outside docs/ was touched at any point"
+  }
+}
