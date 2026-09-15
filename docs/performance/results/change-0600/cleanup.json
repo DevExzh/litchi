@@ -1,0 +1,49 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0600",
+  "removed": [
+    {
+      "path": "$SCRATCH/agents/0600/probe-before, probe-after",
+      "what": "the per-leg copies of the measurement probe project, whose only difference from the retained source is the absolute path dependency in Cargo.toml",
+      "why": "probe/ retains the identical source; each leg is reproducible by pointing the two path dependencies at that leg's checkout"
+    },
+    {
+      "path": "$SCRATCH/agents/0600/cg/*.out",
+      "what": "raw callgrind profile data for both legs, three fixtures and both ends of every isolation pair",
+      "why": "the valgrind summaries (I refs per run) and the annotated self-cost tables are retained under callgrind/; the raw files are large and regenerable from the retained probe"
+    },
+    {
+      "path": "$SCRATCH/agents/0600/digest-before.txt, digest-before1.txt, digest-before2.txt, digest-after.txt, digest-after-v2.txt",
+      "what": "four of the five corpus-digest runs, 948 KB each",
+      "why": "all five are byte-identical; one copy is retained as differential/corpus-digest.txt and every run's SHA-256 is retained in differential/corpus-digest-sha256.txt and in gates.txt"
+    },
+    {
+      "path": "$SCRATCH/agents/0600/sb.rs.bak, counts-before-xlsx.txt, counts-after-v2.txt",
+      "what": "a working copy of source_backed.rs taken while confirming that two new tests fail against the pre-change behaviour, and two superseded count runs",
+      "why": "the confirmation result is stated in the record (10 against 4 with the guard's decrement disabled, and 5 against 4 before the observation was removed); the final counts are retained under counts/"
+    },
+    {
+      "path": "$SCRATCH/agents/0600/*.log",
+      "what": "build logs and the raw gate logs",
+      "why": "gates.txt retains the aggregate and tail of every gate"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0600-before, 0600-probe-before, 0600-probe-after",
+      "what": "three build directories, about 1.5 GiB",
+      "why": "build output; the binary SHA-256 of every measured binary is retained in binary-sha256.txt and inside every harness timing report"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0600",
+      "what": "the candidate git worktree, including its own target/",
+      "why": "removed after the branch was committed; the branch perf/0600-opc-cold-read-observations-and-name-lookup is kept"
+    }
+  ],
+  "kept": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/before-8fe9efa55",
+      "what": "the shared read-only before checkout",
+      "why": "shared with the other agents of this wave; not this change's to remove"
+    }
+  ]
+}

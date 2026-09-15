@@ -38,7 +38,7 @@ use std::io::{BufRead, Read, Write};
 use std::mem::size_of;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -2670,6 +2670,43 @@ impl std::fmt::Display for SourceChangedIoError {
 
 impl std::error::Error for SourceChangedIoError {}
 
+/// Shared depth of the monitored-read scopes open on one source snapshot.
+type MonitoredReadDepth = AtomicUsize;
+
+/// A bounded monitored-read scope on one source snapshot.
+///
+/// While at least one scope is alive, every positional source read and every
+/// publication sink write re-observes the source version through
+/// [`SourceSnapshot::ensure_current_io_if_monitored`]. A scope covers exactly
+/// the operation that needs per-read freshness: a stream, a verified read, or
+/// a publication that copies source bytes into an output. When the last scope
+/// on a snapshot ends the snapshot returns to the unmonitored state a freshly
+/// opened package is in, where the bracketing observations of change 0317
+/// fence a read instead.
+///
+/// It counts rather than latches so that concurrent operations on the same
+/// snapshot, a nested scope, and a scope taken on a clone of the snapshot
+/// cannot end one another's monitoring.
+#[must_use = "monitoring ends when the returned scope is dropped"]
+struct MonitoredReads {
+    depth: Arc<MonitoredReadDepth>,
+}
+
+impl MonitoredReads {
+    fn enter(depth: &Arc<MonitoredReadDepth>) -> Self {
+        depth.fetch_add(1, Ordering::AcqRel);
+        Self {
+            depth: Arc::clone(depth),
+        }
+    }
+}
+
+impl Drop for MonitoredReads {
+    fn drop(&mut self) {
+        self.depth.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
         let result = match &self.read_ahead {
@@ -2699,7 +2736,7 @@ pub(crate) struct SourceSnapshot {
     source: Arc<dyn ReadAt>,
     version: SourceVersion,
     length: u64,
-    monitor_reads: Arc<AtomicBool>,
+    monitor_reads: Arc<MonitoredReadDepth>,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
     input_reservation_failures: Option<Arc<DiagnosticCounter>>,
@@ -2871,7 +2908,7 @@ impl SourceSnapshot {
     }
 
     fn ensure_current_io_if_monitored(&self) -> std::io::Result<()> {
-        if !self.monitor_reads.load(Ordering::Acquire) {
+        if self.monitor_reads.load(Ordering::Acquire) == 0 {
             return Ok(());
         }
         let actual = self.source.version()?;
@@ -2885,8 +2922,11 @@ impl SourceSnapshot {
         }
     }
 
-    fn monitor_publication(&self) {
-        self.monitor_reads.store(true, Ordering::Release);
+    /// Open a monitored-read scope over this snapshot for the caller's
+    /// operation. Every positional read and publication sink write taken
+    /// while the returned scope is alive re-observes the source version.
+    fn monitor_publication(&self) -> MonitoredReads {
+        MonitoredReads::enter(&self.monitor_reads)
     }
 
     pub(crate) fn ensure_current_public(&self) -> Result<()> {
@@ -3761,7 +3801,7 @@ impl SourceBackedPackage {
             .check_context()
             .map_err(map_execution_error)
             .map_err(opc_error)?;
-        self.source.monitor_publication();
+        let _monitored = self.source.monitor_publication();
 
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = match accounting.as_deref_mut() {
@@ -3838,7 +3878,7 @@ impl SourceBackedPackage {
             work_result.map_err(map_execution_error)?;
         }
 
-        self.source.monitor_publication();
+        let _monitored = self.source.monitor_publication();
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let mut output = PartStreamSink::new(sink, &self.source);
         let read_result = self.archive.read_entry_to_with_accounting(
@@ -5293,7 +5333,7 @@ impl SourceBackedPackage {
             source: Arc::clone(&source),
             version,
             length,
-            monitor_reads: Arc::new(AtomicBool::new(false)),
+            monitor_reads: Arc::new(MonitoredReadDepth::new(0)),
             lineage: SourceLineage(Arc::new(())),
             context: None,
             input_reservation_failures: None,
@@ -5642,7 +5682,7 @@ impl SourceBackedPackage {
             source: Arc::clone(&source),
             version,
             length,
-            monitor_reads: Arc::new(AtomicBool::new(false)),
+            monitor_reads: Arc::new(MonitoredReadDepth::new(0)),
             lineage: SourceLineage(Arc::new(())),
             context: context.clone(),
             input_reservation_failures: input_reservation_failures.clone(),
@@ -6329,7 +6369,7 @@ impl SourceBackedPackage {
             self.source.ensure_current()?;
             self.cache.check_context().map_err(map_execution_error)?;
         }
-        self.source.monitor_publication();
+        let _monitored = self.source.monitor_publication();
         let mut captured = None;
         let (data, expected_decoded) = match expected_decoded {
             Some(bytes) => (None, bytes),
@@ -7794,29 +7834,38 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology appended members",
                 source,
             })?;
+        let transfer_source_count = source_xml_tokens
+            .len()
+            .checked_add(
+                additions
+                    .iter()
+                    .filter(|addition| {
+                        matches!(
+                            &addition.payload,
+                            TopologyPartPayload::Precompressed(_)
+                                | TopologyPartPayload::SourceXml(_)
+                        )
+                    })
+                    .count(),
+            )
+            .ok_or_else(|| overlay_unavailable("source-backed OPC source guard count overflows"))?;
         let mut transfer_sources = Vec::new();
         transfer_sources
-            .try_reserve_exact(
-                source_xml_tokens
-                    .len()
-                    .checked_add(
-                        additions
-                            .iter()
-                            .filter(|addition| {
-                                matches!(
-                                    &addition.payload,
-                                    TopologyPartPayload::Precompressed(_)
-                                        | TopologyPartPayload::SourceXml(_)
-                                )
-                            })
-                            .count(),
-                    )
-                    .ok_or_else(|| {
-                        overlay_unavailable("source-backed OPC source guard count overflows")
-                    })?,
-            )
+            .try_reserve_exact(transfer_source_count)
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC precompressed source guards",
+                source,
+            })?;
+        // One monitored-read scope per transfer source, alive for exactly as
+        // long as `transfer_sources` is: this call. The scopes are counted
+        // here rather than latched on the snapshots so that a transfer source
+        // shared with another package stops paying a per-read observation once
+        // this publication returns.
+        let mut monitored_transfer_sources: Vec<MonitoredReads> = Vec::new();
+        monitored_transfer_sources
+            .try_reserve_exact(transfer_source_count)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC transfer source monitors",
                 source,
             })?;
         for source_xml in &source_xml_tokens {
@@ -7826,7 +7875,7 @@ impl SourceBackedPackage {
             // transfer-boundary fence only needs freshness, context, and
             // cancellation.
             source_xml.check_source_state()?;
-            source_xml.source.monitor_publication();
+            monitored_transfer_sources.push(source_xml.source.monitor_publication());
             transfer_sources.push(source_xml.source_snapshot());
         }
         for (index, addition) in additions.iter().enumerate() {
@@ -7852,7 +7901,7 @@ impl SourceBackedPackage {
                     // write_topology_to_stream call before topology planning;
                     // only the late source/context fence is needed here.
                     payload.check_source_state()?;
-                    payload.source.monitor_publication();
+                    monitored_transfer_sources.push(payload.source.monitor_publication());
                     source_xml_tokens.push(payload.as_ref().clone());
                     transfer_sources.push(payload.source_snapshot());
                     soapberry_zip::RegeneratedEntry::new_shared(
@@ -7862,7 +7911,8 @@ impl SourceBackedPackage {
                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
                 },
                 TopologyPartPayload::Precompressed(payload) => {
-                    payload.source_artifact.snapshot.monitor_publication();
+                    monitored_transfer_sources
+                        .push(payload.source_artifact.snapshot.monitor_publication());
                     transfer_sources.push(payload.source_artifact.snapshot.clone());
                     // The decoded bytes remain the XML-validation subject even
                     // when the physical member uses the source's compressed
@@ -9581,7 +9631,7 @@ impl SourceBackedPackage {
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
-        self.source.monitor_publication();
+        let _monitored = self.source.monitor_publication();
         self.source.ensure_current()?;
         let mut scratch = Vec::new();
         scratch
@@ -10193,10 +10243,12 @@ impl SourceBackedPackage {
                 bytes.len() as u64,
                 self.limits.max_part_bytes(),
             )?;
-            // Check immediately before publishing. If the source changed
-            // during the cold read, no stale payload enters the cache.
-            self.source.ensure_current()?;
-            self.cache.check_context().map_err(map_execution_error)?;
+            // No observation here. The post-read fence above already proved
+            // this payload against a current source, nothing between the two
+            // reads the source, and the fence that decides publication is the
+            // one taken after the provisional publication below -- strictly
+            // later, and the only one that can undo what it observes. Change
+            // 0563 removed the warm-path observation on the same argument.
             Ok(Arc::new(bytes))
         })();
         let reservation = flight
@@ -10237,6 +10289,13 @@ impl SourceBackedPackage {
                         drop(payload);
                         self.cache
                             .complete_failure_with_observer(entry_id, &flight, observer);
+                        // The flight is already completed as failed, so this
+                        // early return leaks nothing. Change 0317 fixes the
+                        // observable precedence as source-version failure
+                        // before execution failure, and the removed
+                        // pre-publication observation is what produced it on
+                        // this branch; take it here instead.
+                        self.source.ensure_current()?;
                         return Err(map_execution_error(error));
                     },
                 };
@@ -11116,7 +11175,7 @@ fn write_exact_snapshot<W: Write>(
     if let Some(context) = context {
         context.check().map_err(map_execution_error)?;
     }
-    source.monitor_publication();
+    let _monitored = source.monitor_publication();
     source.ensure_current()?;
     let _workspace_reservation = context
         .map(|context| {
@@ -11241,7 +11300,7 @@ fn write_exact_snapshot_with_accounting<W: Write>(
     if let Some(context) = context {
         context.check().map_err(map_execution_error)?;
     }
-    source.monitor_publication();
+    let _monitored = source.monitor_publication();
     source.ensure_current()?;
     let _workspace_reservation = context
         .map(|context| {
@@ -17981,13 +18040,146 @@ mod tests {
             source.reads.load(Ordering::SeqCst) > reads_before,
             "a cold part read must read source bytes"
         );
-        // The catalog lookup, the cold load's opening observation, and the
-        // three checks that bracket the archive read and its publication.
+        // The catalog lookup in `part()`, the cold load's opening observation,
+        // the post-read fence, and the fence taken after the provisional
+        // publication. Change 0600 removed the fourth, which stood between the
+        // post-read fence and the publication fence with no source read
+        // between them and no side effect of its own.
         assert_eq!(
             source.versions.load(Ordering::SeqCst) - versions_before,
-            5,
+            4,
             "a cold part read must keep its complete observation bracket"
         );
+    }
+
+    #[test]
+    fn a_stream_monitors_every_positional_read_it_takes() {
+        let source = Arc::new(CountingSource::chunked(
+            archive_bytes(root_relationships(), b"monitored stream payload", false),
+            64,
+        ));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let name = PackURI::new("/word/document.xml").unwrap();
+
+        let versions_before = source.versions.load(Ordering::SeqCst);
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let mut sink = Vec::new();
+        package.part(&name).unwrap().stream_to(&mut sink).unwrap();
+        let observations = source.versions.load(Ordering::SeqCst) - versions_before;
+        let reads = source.reads.load(Ordering::SeqCst) - reads_before;
+
+        assert!(reads > 1, "the chunked source must split this stream");
+        assert!(
+            observations >= 2 * reads,
+            "a stream in progress must observe the source on both sides of every \
+             positional read: {observations} observations for {reads} reads"
+        );
+    }
+
+    #[test]
+    fn a_completed_stream_stops_monitoring_later_positional_reads() {
+        let bytes = archive_bytes(root_relationships(), b"bounded monitor scope", false);
+        let name = PackURI::new("/word/document.xml").unwrap();
+
+        // A package that never streamed pays only the cold read's own bracket.
+        let plain_source = Arc::new(CountingSource::new(bytes.clone()));
+        let plain = SourceBackedPackage::from_read_at(plain_source.clone()).unwrap();
+        let plain_before = plain_source.versions.load(Ordering::SeqCst);
+        let plain_data = plain.part(&name).unwrap().data().unwrap();
+        let plain_observations = plain_source.versions.load(Ordering::SeqCst) - plain_before;
+
+        // `stream_to` bypasses the part cache, so the read that follows it on
+        // the same package is still a cold read of the same Part.
+        let streamed_source = Arc::new(CountingSource::new(bytes));
+        let streamed = SourceBackedPackage::from_read_at(streamed_source.clone()).unwrap();
+        let mut sink = Vec::new();
+        streamed.part(&name).unwrap().stream_to(&mut sink).unwrap();
+        let streamed_before = streamed_source.versions.load(Ordering::SeqCst);
+        let streamed_data = streamed.part(&name).unwrap().data().unwrap();
+        let streamed_observations =
+            streamed_source.versions.load(Ordering::SeqCst) - streamed_before;
+
+        assert_eq!(streamed_data.as_bytes(), plain_data.as_bytes());
+        assert_eq!(sink.as_slice(), plain_data.as_bytes());
+        assert_eq!(
+            streamed_observations, plain_observations,
+            "a completed stream must leave later reads on the observation count \
+             an unstreamed package pays"
+        );
+    }
+
+    #[test]
+    fn a_source_change_at_every_observation_of_a_cold_read_is_still_source_changed() {
+        // `ChangeOnHitVersionSource` publishes the new version *on* the
+        // `version()` call it is armed for, so arming at ordinal k makes the
+        // k-th observation of the read the one that sees the change. The cold
+        // read takes four: `part()`, the cold-load closure head, the post-read
+        // fence, and the fence after the provisional publication. Each must
+        // report the same typed error, including ordinal 3, which before
+        // change 0600 was the removed pre-publication observation and is now
+        // the publication fence.
+        for skip in 0..4usize {
+            let source = Arc::new(ChangeOnHitVersionSource::new(archive_bytes(
+                root_relationships(),
+                b"change under a cold read",
+                false,
+            )));
+            let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+            let name = PackURI::new("/word/document.xml").unwrap();
+            source.arm_after_versions(skip);
+            let error = package
+                .part(&name)
+                .and_then(|view| view.data())
+                .expect_err("a changed source must refuse the read");
+            assert!(
+                matches!(error, OpcError::SourceChanged { .. }),
+                "ordinal {skip} reported {error:?}"
+            );
+        }
+
+        // One ordinal past the read's last observation, the read itself is
+        // complete and correct — every fence it took saw the unchanged source —
+        // and the change is reported by the next observation, not lost. Before
+        // change 0600 this ordinal fell inside the read because the read took
+        // one more observation; the mutation is caught either way, only its
+        // reporting point moves.
+        let source = Arc::new(ChangeOnHitVersionSource::new(archive_bytes(
+            root_relationships(),
+            b"change under a cold read",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let name = PackURI::new("/word/document.xml").unwrap();
+        source.arm_after_versions(4);
+        let data = package
+            .part(&name)
+            .and_then(|view| view.data())
+            .expect("the source is unchanged through every fence this read takes");
+        assert_eq!(data.as_bytes(), b"change under a cold read");
+        let error = package
+            .part(&name)
+            .and_then(|view| view.data())
+            .expect_err("the next observation must report the change");
+        assert!(
+            matches!(error, OpcError::SourceChanged { .. }),
+            "the observation after the read reported {error:?}"
+        );
+    }
+
+    #[test]
+    fn a_nested_monitored_scope_does_not_end_the_scope_around_it() {
+        let depth = Arc::new(MonitoredReadDepth::new(0));
+        let outer = MonitoredReads::enter(&depth);
+        let inner = MonitoredReads::enter(&depth);
+        assert_eq!(depth.load(Ordering::SeqCst), 2);
+        drop(inner);
+        assert_eq!(
+            depth.load(Ordering::SeqCst),
+            1,
+            "an inner scope must not end the monitoring its caller opened"
+        );
+        drop(outer);
+        assert_eq!(depth.load(Ordering::SeqCst), 0);
     }
 
     #[test]

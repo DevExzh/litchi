@@ -1,5 +1,34 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0600 compliance update
+
+Change 0600 removes one source observation from the cold OPC Part load, bounds
+the lifetime of the `monitor_reads` flag, and gives `lookup_member_name` a
+borrow-only path for canonical names. ADR 0005 is satisfied on its own terms: no
+`ReadLimits`, `SourceCacheLimits` or ZIP limit value, check or ordering moved,
+and read-order independence is preserved because the lookup is a pure function
+of the name and the catalog verdicts are proven identical member by member over
+179 packages in both physical read orders. Change 0317's error precedence —
+source-version failure, then execution failure, then the mapped ZIP error — is
+preserved by relocating the removed observation onto the
+`publish_pending_with_observer` failure branch, after the flight has been
+completed as failed so no flight leaks and no waiter hangs. Change 0327 is
+untouched: its provisional-publication protocol fences with direct
+`ensure_current()` calls and never consults `monitor_reads`, and the fence that
+decides a publication — the one taken outside the cache locks, which can roll
+the publication back — is the one that remains. The monitored scope counts
+rather than latches, so a concurrent operation, a nested scope and a scope on a
+clone of the same snapshot cannot end one another's monitoring; while any scope
+is open the fencing is exactly what the latch provided. ADR 0006 is untouched:
+no output byte, no typed refusal and no preservation path changed, and the only
+refusal that disappears is an `ErrorKind::Allocation` for an allocation that no
+longer happens. No new `unsafe`, no weakened defence, no hidden global pool, no
+ambient I/O, and no archive, lock or executor type reaches a public signature —
+`MonitoredReads` and `MonitoredReadDepth` are module-private and
+`LookupMemberName` was already private. See
+[Change 0600](0600-opc-cold-read-observations-and-name-lookup.md);
+`performance_claim: none`.
+
 ## 0612 — no boundary moved; the three contracts of change 0565 the frozen design would have had to renegotiate
 
 Record: [0612](0612-xls-skip-uninterpreted-globals-design.md).

@@ -643,7 +643,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             self.limits.max_replay_memory_bytes,
             SpliceResource::ReplayMemoryBytes,
         )?;
-        self.package.source.monitor_publication();
+        let _monitored = self.package.source.monitor_publication();
         self.package.check_topology_progress()?;
 
         let mut scratch = Vec::new();
@@ -902,7 +902,7 @@ fn write_source_artifact_without_output_budget(
         context.check().map_err(map_execution_error)?;
     }
     let source = &artifact.snapshot;
-    source.monitor_publication();
+    let _monitored = source.monitor_publication();
     source.ensure_current()?;
     let _workspace_reservation = context
         .as_ref()
@@ -1520,8 +1520,8 @@ impl SourcePartSplicePublication {
                 "managed source output reservation counter is unavailable",
             ));
         }
-        current.source.monitor_publication();
-        retained.monitor_publication();
+        let _monitored_current = current.source.monitor_publication();
+        let _monitored_retained = retained.monitor_publication();
         if current.source.length != self.candidate_artifact_len {
             return Err(OpcError::SourceArtifactMismatch {
                 artifact: "current",
@@ -3203,7 +3203,7 @@ mod tests {
     use crate::source_backed::SourceLineage;
     use std::io::{BufRead, Cursor, Read, Write};
     use std::num::{NonZeroU64, NonZeroUsize};
-    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
     use litchi_core::{
@@ -3309,7 +3309,7 @@ mod tests {
             source,
             version: SourceVersion::new(0x5350_4c43_455f_5445, 0),
             length,
-            monitor_reads: Arc::new(AtomicBool::new(false)),
+            monitor_reads: Arc::new(crate::source_backed::MonitoredReadDepth::new(0)),
             lineage: SourceLineage(Arc::new(())),
             context: None,
             input_reservation_failures: None,

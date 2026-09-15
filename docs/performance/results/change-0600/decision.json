@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0600",
+  "title": "One fewer observation per cold OPC Part read, a bounded monitored-read scope, and an allocation-free ZIP member lookup",
+  "decision": "retained; ZIP-3 and ZIP-4 of the 0587 queue implemented, with ZIP-3's per-site analysis reaching one of five observation sites and saying why the other four stay",
+  "code_state": "crates/soapberry-zip/src/office.rs, crates/litchi-opc/src/pkgreader.rs, crates/litchi-opc/src/source_backed.rs, crates/litchi-opc/src/source_backed/{splice.rs,artifact_restore.rs,read_ahead.rs}",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "lookup_member_name allocated and re-normalized a String on every contains, metadata, entry_id, is_stored, read, read_stored_borrowed, read_entry_to and session admission, at least twice per structural member; a name that is already its own lookup key is now decided by one byte pass and looked up as a borrowed &str, removing 6.32%, 5.93% and 6.59% of the allocations per open on a 132-member XLSX, a 48-member PPTX and a 10-member DOCX",
+    "open-plus-one-part instructions fall 3.45%, 2.58% and 2.56% on the same three fixtures (callgrind isolation pairs, N = 1 against N = 11); normalize_str_fallibly falls 71% and the rfind(':') memrchr 23%, against a +1.11M increase inside lookup_member_name itself where the new byte scan is charged",
+    "the per-site analysis change 0563 performed reaches exactly one of the five observations a cold part().data() takes: the pre-publication one, which proves a strict subset of the fence taken after the provisional publication, with nothing between them that reads the source and no side effect of its own. The count is 5 to 4, not the 5 to 2 the survey hoped for, and the record states what each surviving site proves that no later site does",
+    "change 0317's precedence is preserved by relocating the removed observation onto the publish_pending_with_observer failure branch, after the flight has been completed as failed so the early return leaks no flight and hangs no waiter",
+    "monitor_reads latched an AtomicBool that nothing cleared, so one stream_to converted every later positional read on that package into two version() calls for the package's lifetime: eight cold Part reads after a stream cost 102, 88 and 78 observations against 40, 40 and 30 on identical packages that had not streamed. A counted RAII scope over the fifteen sites that set the flag brings both to 32, 32 and 24",
+    "change 0327's publication protocol never reads monitor_reads: its fences are direct ensure_current() calls, so bounding the flag cannot weaken it, and what the flag does guarantee is a per-chunk fence during an incremental copy, which the scope now covers exactly",
+    "walk_relationship_graph built the visited key three times per graph node; the re-insert at pop time is replaced by a get_mut through the key enqueue_target already inserted, and the remaining copy no longer routes the name through Display"
+  ],
+  "accepted_evidence": {
+    "counts": "exact source-observation, allocation, allocated-byte, positional-request and requested-byte counts for open, first and second Part read, all Parts in both physical orders, stream_to, the cold reads that follow a stream on the same package, and the same reads on a control package that never streamed, on three real OOXML fixtures, both legs; the request and byte lines are identical between the legs in every phase",
+    "instructions": "callgrind N = 1 / N = 11 isolation pairs on three fixtures, plus callgrind_annotate self-cost tables differenced per symbol",
+    "correctness_differential": "a corpus digest over 179 OOXML packages and 3,450 lines covering every Part's data(), its stream_to(), a second data() taken after that stream, every relationship edge, and three refusal probes per package, byte-identical between the legs; the before leg was run twice first to establish determinism",
+    "correctness_tests": "an exhaustive lookup-equivalence test over every string of length 0 to 4 in {a, /, backslash, ., :} (780 names); a corpus lookup test over 4,215 members and 33,720 spellings with 25,290 payload comparisons; three observation-count invariants in litchi-opc, two of which were confirmed to fail against the pre-change behaviour; a nested-scope test pinning the counting discipline",
+    "timing": "A1 B1 B2 A2 harness runs of docx_file_source_open and pptx_file_source_open, and probe runs of the file-source open, the file-source cold Part read, and the cold reads that follow a stream, each with an A/A floor measured in the same window"
+  },
+  "accepted_costs": {
+    "reach_of_the_observation_removal": "one observation of five on a cold Part read; on an in-memory source it is a load, and the syscall it costs exists only on FileSource",
+    "monitor_scope_reach": "only packages that stream, verify or publish and then keep reading benefit; a package that only reads was already unmonitored",
+    "instruction_accounting": "instructions rank work, not latency (change 0579); the canonical scan moves cost into lookup_member_name rather than removing all of it, and the net is what the isolation pair reports",
+    "timing_window": "every timing leg ran while seven other agents were building and testing on the same 32-core host at load average 70 or above; the floors are reported and the counts carry the argument",
+    "allocation_failure_path": "a canonical lookup can no longer raise ErrorKind::Allocation, because the allocation it guarded no longer happens; no test could observe this without a failing allocator"
+  },
+  "known_gaps": {
+    "remaining_observations": "part()'s observation is a public-API contract litchi-xlsx depends on; the cold-load closure head and the post-read fence are change 0317's brackets; the post-publication fence is change 0327's. None is reachable by a strict-subset argument, so any further reduction is a contract change needing its own frozen design record",
+    "no_file_backed_selector": "no perf-baseline selector reads Parts after a publication on a file source, so that shape is measured only by the retained scratch probe",
+    "concurrency": "the counting discipline is pinned by a unit test, not by a concurrent stress test; change 0583's note that the single-flight proof's concurrency is unexercised still stands",
+    "relationship_iteration_order": "Relationships::iter() walks a HashMap, so its order varies per process. Found while building the differential; reported, not fixed"
+  },
+  "withheld": [
+    "any speedup or regression claim, any RSS or peak-memory claim, any cold-cache, physical-device, range-source, remote-transport, concurrency-scaling or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "8fe9efa55728cf8b9592934f9e9de6f5a66fdc1b",
+    "branch": "perf/0600-opc-cold-read-observations-and-name-lookup",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_affinity": "22",
+    "build": "cargo build --release --locked on both legs",
+    "fixtures": {
+      "ConditionalFormattingSamples.xlsx": "654,688 bytes, 132 members, 90 Parts",
+      "shapes.pptx": "68,822 bytes, 48 members, 27 Parts",
+      "comment.docx": "4,926 bytes, 10 members, 7 Parts"
+    }
+  }
+}
