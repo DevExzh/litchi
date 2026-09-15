@@ -1,0 +1,28 @@
+git bisect start
+# status: waiting for both good and bad commits
+# bad: [c1d2caf856fdbfa3b60b6de6cb2e85dc9ee9abab] perf(xls): read the BIFF globals once, in one windowed pass
+git bisect bad c1d2caf856fdbfa3b60b6de6cb2e85dc9ee9abab
+# status: waiting for good commit(s), bad commit known
+# good: [01936e4f156e29fb404d62cd65b82109c0566fa2] feat(litchi): add selected document paragraph text
+git bisect good 01936e4f156e29fb404d62cd65b82109c0566fa2
+# good: [a6385c762f7c7191374c6520985f444410558997] refactor(pages): retire flat table lock aliases
+git bisect good a6385c762f7c7191374c6520985f444410558997
+# good: [dc4ef4271c70a1200917f2067b3eed89810b3f99] feat(perf): add matched source-backed PPTX lifecycles
+git bisect good dc4ef4271c70a1200917f2067b3eed89810b3f99
+# bad: [44a4710699ef17041d5969240c30984dffbc3319] feat(docx): support budgeted source-backed document edits
+git bisect bad 44a4710699ef17041d5969240c30984dffbc3319
+# good: [36df468bdb97d363c800640a9a9096ae2ad9a7d7] perf(odp): attribute ordinary append lifecycle costs
+git bisect good 36df468bdb97d363c800640a9a9096ae2ad9a7d7
+# good: [90f04691c5ab370e998ab7bb5258eb6b6b0e3404] feat(zip): add explicit central-directory scratch storage
+git bisect good 90f04691c5ab370e998ab7bb5258eb6b6b0e3404
+# good: [3827f03892e2bd11f3fd3a70145beecbe0416b8c] docs(perf): seal DOCX bounded tail append comparison
+git bisect good 3827f03892e2bd11f3fd3a70145beecbe0416b8c
+# good: [4ddec78a56a09d69002c961998eefda8329a68d2] perf(opc): retain consumed replay prefixes across short reads
+git bisect good 4ddec78a56a09d69002c961998eefda8329a68d2
+# good: [e44a23396146d504ffc738e0989de896635f02a3] perf: establish DOCX provider and verified-cold lifecycle baseline
+git bisect good e44a23396146d504ffc738e0989de896635f02a3
+# good: [c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb] perf: add bounded managed OPC source read-ahead
+git bisect good c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb
+# good: [de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8] perf: baseline opened DOCX edits across source providers
+git bisect good de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8
+# first bad commit: [44a4710699ef17041d5969240c30984dffbc3319] feat(docx): support budgeted source-backed document edits

@@ -2627,21 +2627,29 @@ mod tests {
         );
     }
 
-    #[test]
+    /// The document XML this test drives through the managed facade.
     #[cfg(feature = "docx")]
-    fn managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal() {
-        let bytes = minimal_docx(
-            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:p><w:r><w:t>selected</w:t></w:r></w:p></w:body></w:document>"#,
-        );
-        // Managed queries retain the source XML and paragraph index while
-        // admitting a temporary bounded parser. The compressed ZIP length is
-        // therefore not a sufficient memory ceiling for this fixture.
-        let memory = 1_u64 << 20;
+    const MANAGED_FACADE_DOCUMENT_XML: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:p><w:r><w:t>selected</w:t></w:r></w:p></w:body></w:document>"#;
+
+    /// Open the document XML above as a budget-managed source-backed DOCX
+    /// behind the unified facade, under a caller-chosen memory limit.
+    ///
+    /// The cancellation source is returned so the caller keeps it alive for as
+    /// long as the document.
+    #[cfg(feature = "docx")]
+    fn managed_docx_facade_document(
+        memory: u64,
+    ) -> (
+        litchi_core::CancellationSource,
+        litchi_core::Budget,
+        Document,
+    ) {
+        let bytes = minimal_docx(MANAGED_FACADE_DOCUMENT_XML);
         let budget = litchi_core::Budget::root(
             "facade-managed-docx-paragraph-text",
             litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
         );
-        let (_cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
+        let (cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
         let execution_limits = litchi_core::ExecutionLimits::new(
             std::num::NonZeroUsize::MIN,
             std::num::NonZeroUsize::MIN,
@@ -2660,7 +2668,42 @@ mod tests {
         let document = Document {
             inner: DocumentImpl::DocxSource(package, Default::default()),
         };
+        (cancellation_source, budget, document)
+    }
 
+    /// The contract here is payload identity, not a budget size: on a managed
+    /// source-backed DOCX the light `paragraph_text` projection is admitted
+    /// while the Arc-backed rich paragraph views are refused, because those
+    /// views cannot retain the managed `PartData` reservation.
+    ///
+    /// This test used to hand the facade a memory budget equal to the package
+    /// length. That stopped being enough when
+    /// `feat(docx): support budgeted source-backed document edits`
+    /// (44a4710699ef17041d5969240c30984dffbc3319) gave every managed document
+    /// query a prepaid parser workspace of `xml_len * 32 + 131_072` bytes of
+    /// `Resource::Memory` before it enters the namespace scanners. That commit
+    /// taught the owning crate's own tests to size their budgets from the same
+    /// formula (`source_document_scan_workspace` in
+    /// `crates/litchi-docx/tests/source_backed_managed.rs`) but left this
+    /// facade test on the pre-fence number; `litchi` has an empty default
+    /// feature set, so `cargo test -p litchi` never compiles this test and the
+    /// omission stayed unobserved until change 0621's feature-bearing gate run
+    /// (see `docs/performance/0629-facade-docx-budget-test-bisect.md`).
+    ///
+    /// The first leg now runs under a budget that comfortably admits the
+    /// documented workspace, so the two refusals it asserts can only come from
+    /// payload identity. The second leg keeps the fence itself under test: a
+    /// budget sized to the package alone must refuse the projection with a
+    /// typed memory-budget error naming this scope, rather than answering.
+    #[test]
+    #[cfg(feature = "docx")]
+    fn managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal() {
+        // Ample against the documented workspace (`194 * 32 + 131_072` bytes
+        // for this document, plus the package and index admissions), so no
+        // assertion below depends on the exact size of the fence.
+        const AMPLE_MEMORY: u64 = 1 << 20;
+
+        let (_cancellation_source, budget, document) = managed_docx_facade_document(AMPLE_MEMORY);
         assert_eq!(
             document.paragraph_text(1).unwrap().as_deref(),
             Some("selected")
@@ -2676,6 +2719,21 @@ mod tests {
         ));
         drop(document);
         assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
+
+        let package_bytes = minimal_docx(MANAGED_FACADE_DOCUMENT_XML).len() as u64;
+        let (_tight_cancellation_source, tight_budget, tight_document) =
+            managed_docx_facade_document(package_bytes);
+        let refusal = tight_document
+            .paragraph_text(1)
+            .expect_err("a package-sized budget cannot admit the document parser workspace")
+            .to_string();
+        assert!(
+            refusal.contains("Memory budget exceeded")
+                && refusal.contains("facade-managed-docx-paragraph-text"),
+            "expected a typed memory-budget refusal naming the scope, got: {refusal}"
+        );
+        drop(tight_document);
+        assert_eq!(tight_budget.used(litchi_core::Resource::Memory), 0);
     }
 
     #[test]

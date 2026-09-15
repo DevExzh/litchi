@@ -1,0 +1,15 @@
+01936e4f1 GOOD feat(litchi): add selected document paragraph text
+a6385c762 GOOD refactor(pages): retire flat table lock aliases
+dc4ef4271 GOOD feat(perf): add matched source-backed PPTX lifecycles
+44a471069 BAD feat(docx): support budgeted source-backed document edits
+thread 'document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal' (3521593) panicked at crates/litchi/src/document/doc.rs:2631:40:
+called `Result::unwrap()` on an `Err` value: Other("OPC execution failed: Memory budget exceeded in facade-managed-docx-paragraph-text: observed 137474, limit 1154")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+36df468bd GOOD perf(odp): attribute ordinary append lifecycle costs
+90f04691c GOOD feat(zip): add explicit central-directory scratch storage
+3827f0389 GOOD docs(perf): seal DOCX bounded tail append comparison
+4ddec78a5 GOOD perf(opc): retain consumed replay prefixes across short reads
+e44a23396 GOOD perf: establish DOCX provider and verified-cold lifecycle baseline
+c9bf304cf GOOD perf: add bounded managed OPC source read-ahead
+de8ee88b0 GOOD perf: baseline opened DOCX edits across source providers

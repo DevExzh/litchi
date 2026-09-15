@@ -1,0 +1,32 @@
+# Release legs, cargo test -p litchi --release --features docx --lib <test>
+# Each leg: worktree /home/zhuhe/code/litchi-worktrees/0629-bisect (detached),
+# CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0629-bisect-release.
+# The two older legs use --offline because the head Cargo.lock does not satisfy
+# their manifests; the head leg used --locked.
+
+===== leg de8ee88b0 (perf: baseline opened DOCX edits across source providers) =====
+    Finished `release` profile [optimized] target(s) in 42.76s
+test document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 67 filtered out; finished in 0.00s
+===== leg 44a471069 (feat(docx): support budgeted source-backed document edits) =====
+    Finished `release` profile [optimized] target(s) in 42.03s
+test document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal ... FAILED
+thread 'document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal' (3615711) panicked at crates/litchi/src/document/doc.rs:2631:40:
+called `Result::unwrap()` on an `Err` value: Other("OPC execution failed: Memory budget exceeded in facade-managed-docx-paragraph-text: observed 137474, limit 1154")
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 67 filtered out; finished in 0.00s
+error: test failed, to rerun pass `-p litchi --lib`
+
+===== leg 1946b964e (perf(xls): observe the source once per read on the text path, not four times per shared string (0621)) =====
+    Finished `release` profile [optimized] target(s) in 53.31s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/0629-bisect-release/release/deps/litchi-0d8a38ebd5c97e7d)
+running 1 test
+test document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal ... FAILED
+failures:
+---- document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal stdout ----
+thread 'document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal' (3608285) panicked at crates/litchi/src/document/doc.rs:2659:40:
+called `Result::unwrap()` on an `Err` value: Other("OPC execution failed: Memory budget exceeded in facade-managed-docx-paragraph-text: observed 137474, limit 1154")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+failures:
+    document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 71 filtered out; finished in 0.00s
+error: test failed, to rerun pass `-p litchi --lib`
