@@ -1,0 +1,52 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0628",
+  "title": "Relationship iteration order reaches no published .rels byte and no catalog verdict, but it decided which of two duplicate relationships a reuse returns",
+  "decision": "retained as a correctness fix; no optimization proposed, no claim registered",
+  "code_state": "one file under crates/ modified: crates/litchi-opc/src/rel.rs (43 insertions, 20 deletions); one test file added: crates/litchi-opc/tests/relationship_selection_determinism.rs",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the check change 0600 left open is answered negatively for every serializer, every admission verdict, every signature digest and every read order inside litchi-opc: to_xml and try_to_xml_bytes sort by rId, PublicationPlan sorts its parts by partname, the relationship-graph walk is driven by parse-ordered SmallVecs and its visited map is only ever looked up, sign.rs sorts ids, certificates, signatures and parts and holds references in a BTreeMap, is_signed is a disjunction of any(), and main_document_part plus the ADR 0013/0018/0021 ownership scans reject ambiguity rather than picking from it",
+    "it is answered positively for exactly one thing: get_or_add and get_or_add_ext_rel reused the first hash-order match, so a source owning two relationships with the same type, target and target mode returned a per-process rId that the caller writes into part markup",
+    "the shape is present in this repository's corpus: 4 of 336 OOXML fixtures carry a duplicate (Type, Target, TargetMode) group, all External, and all four returned more than one identifier across 16 opens before the fix and exactly one after",
+    "ADR 0006 requires deterministic serialization unless a Clock, actor identity or cryptographic RNG is supplied, and neither reuse path is supplied any of the three",
+    "the smallest rId in byte order was chosen because it is the order the module already serializes in, so the rule reads as the first matching relationship in the published .rels member; a numeric order, an insertion order and a refusal on duplicates were each considered and rejected, with reasons in the record",
+    "86 order-sensitive observable sites were found by audit in the consumer crates and are reported, not fixed: the brief scopes this change to litchi-opc and to a minimal change"
+  ],
+  "accepted_evidence": {
+    "determinism_test": "crates/litchi-opc/tests/relationship_selection_determinism.rs, 7 tests, 128 in-process repeats per determinism assertion plus 16 opens of each of the 4 real corpus packages; 3 pass and 4 fail before the fix, 7 pass after",
+    "corpus_static_scan": "scan_dup_rels.py over 336 OOXML fixtures: 2,218 .rels parts, 6,393 Relationship elements, 4 packages with a duplicate (Type, Target, TargetMode) group, 0 Internal and 4 External",
+    "corpus_reuse_probe": "reuse_selection over 336 fixtures, 16 opens each, 5,258 (owner, type, target, mode) triples: 4 unstable before, 0 after, and the 4 are exactly those the static scan predicted",
+    "corpus_roundtrip_differential": "corpus_roundtrip over 336 fixtures on both legs: files=336 opened=334 published=327 open_refused=2 save_refused=7 on both, and diff of the two SHA-256 digest listings is empty, so all 327 published packages are byte-identical and the 9 refusals are the same refusals with the same messages",
+    "deterministic_counts": "open_save_counts on 4 fixtures with a counting global allocator and a logging ReadAt provider: positional requests, request bytes, allocations and allocated bytes for the source-backed open, allocations for the eager open, and allocations plus output bytes for the save; diff of the two legs is empty",
+    "instruction_counts": "callgrind isolation pair on open_save_iters over ConditionalFormattingSamples.xlsx, N=1 and N=11: 194,662,395.8 instructions per open+save before, 194,669,991.4 after, +7,595.6 or +0.0039%",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-opc --all-targets, cargo doc -p litchi-opc --no-deps, and cargo test -p litchi-opc --no-fail-fast (428 unit tests and 23 integration binaries), all clean apart from one pre-existing failure reproduced on the untouched base checkout"
+  },
+  "accepted_costs": {
+    "scan_is_no_longer_an_early_exit": "min() over the matching relationships replaces find(), so a reuse that formerly stopped at the first match now visits every relationship of one source; the collection is bounded by ReadLimits and the measured open and save counts did not move, but no caller reusing in a tight loop against a very large relationship collection was measured",
+    "instruction_delta_is_not_zero": "+0.0039% per open+save, attributed by the per-symbol tables to __memcpy_avx_unaligned_erms, the PlannedPart quicksort and libc malloc internals with cancelling signs; none of the three changed functions appears in either profile",
+    "no_paired_timing": "no latency measurement was run; nothing on the open or save path calls either changed function and the deterministic counts already show those paths unmoved, so a timing leg would only re-observe this host's A/A floor of about p50 4% and p99 14%",
+    "single_host": "one host, one CPU, eight agents building and testing concurrently throughout"
+  },
+  "known_gaps": {
+    "iterator_still_unordered": "Relationships::iter() still walks a HashMap; that is sound inside litchi-opc because every consumer sorts, aggregates, looks up by key or requires uniqueness, but it is not a guarantee the type offers its callers",
+    "consumer_crates_not_fixed": "86 order-sensitive observable sites in litchi-xlsx, litchi-docx, litchi-pptx and litchi-ooxml-common are reported in the record and not fixed; three that change a verdict or a value rather than a message were verified directly (xlsx cell_values snapshot auxiliary ordering, pptx ActiveX relationship_states, docx content_control signature_token) and the remainder come from a systematic audit that was not individually re-verified",
+    "error_message_selection": "several litchi-opc scans name whichever offending relationship they meet first when a malformed package has more than one; the error variant is stable and only the diagnostic string varies, so this was left alone",
+    "get_or_add_capture_invalidation": "get_or_add drops the open-time source capture even when it reuses an existing relationship and changes nothing, so a .rels member change 0593 would have copied verbatim is reserialized; fixing it would move published bytes wherever the source spelling differs from the canonical one, which is a contract change and is reported rather than implemented",
+    "corpus_bounds": "4 duplicate groups in 336 packages is what this corpus holds; nothing is claimed about the frequency of the shape in the wild"
+  },
+  "withheld": [
+    "any speedup, regression, latency, allocation-profile, peak-RSS, cold-cache, concurrency-scaling or cross-platform result",
+    "any claim that the consumer-crate audit findings are complete or individually verified beyond the three marked verified in the record"
+  ],
+  "provenance": {
+    "base_commit": "2d6fbeaed",
+    "branch": "perf/0628-opc-relationship-iteration-order",
+    "before_checkout": "/home/zhuhe/code/litchi-worktrees/before-2d6fbeaed (shared, read-only; used only to reproduce the pre-existing source_backed_batch cancellation failure)",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "cpu_affinity": "every measured process pinned to CPU 22 with taskset",
+    "note": "both legs are the same worktree with crates/litchi-opc/src/rel.rs reverted or applied; nothing else differed, and probe binary SHA-256 for both legs are in README.md"
+  }
+}

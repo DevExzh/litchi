@@ -1,0 +1,55 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0628/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.74s
+     Running tests/relationship_selection_determinism.rs (target/debug/deps/relationship_selection_determinism-8b207b5b63800bda)
+
+running 7 tests
+test a_fresh_target_still_takes_the_next_free_identifier ... ok
+test an_external_duplicate_does_not_satisfy_an_internal_reuse ... ok
+test corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open ... FAILED
+test external_reuse_is_independent_of_insertion_order ... FAILED
+test external_reuse_picks_the_same_relationship_on_every_build ... FAILED
+test internal_reuse_picks_the_same_relationship_on_every_build ... FAILED
+test reuse_of_a_unique_match_is_unchanged ... ok
+
+failures:
+
+---- corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open stdout ----
+
+thread 'corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open' (3219335) panicked at crates/litchi-opc/tests/relationship_selection_determinism.rs:251:9:
+assertion `left == right` failed: ooxml/xlsx/sharedhyperlink.xlsx: reusing the duplicate relationship on /xl/worksheets/sheet1.xml is not deterministic
+  left: {"rId1", "rId2"}
+ right: {"rId1"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- external_reuse_is_independent_of_insertion_order stdout ----
+
+thread 'external_reuse_is_independent_of_insertion_order' (3219336) panicked at crates/litchi-opc/tests/relationship_selection_determinism.rs:109:5:
+assertion `left == right` failed: reuse depends on the insertion order of the duplicate pair
+  left: {"rId21", "rId23"}
+ right: {"rId21"}
+
+---- external_reuse_picks_the_same_relationship_on_every_build stdout ----
+
+thread 'external_reuse_picks_the_same_relationship_on_every_build' (3219337) panicked at crates/litchi-opc/tests/relationship_selection_determinism.rs:83:9:
+assertion `left == right` failed: get_or_add_ext_rel reused a hash-order-dependent rId for insertion order ["rId1", "rId2"]
+  left: {"rId1", "rId2"}
+ right: {"rId1"}
+
+---- internal_reuse_picks_the_same_relationship_on_every_build stdout ----
+
+thread 'internal_reuse_picks_the_same_relationship_on_every_build' (3219338) panicked at crates/litchi-opc/tests/relationship_selection_determinism.rs:133:5:
+assertion `left == right` failed: get_or_add reused a hash-order-dependent rId
+  left: {"rId4", "rId7", "rId9"}
+ right: {"rId4"}
+
+
+failures:
+    corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open
+    external_reuse_is_independent_of_insertion_order
+    external_reuse_picks_the_same_relationship_on_every_build
+    internal_reuse_picks_the_same_relationship_on_every_build
+
+test result: FAILED. 3 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p litchi-opc --test relationship_selection_determinism`
+exit=101

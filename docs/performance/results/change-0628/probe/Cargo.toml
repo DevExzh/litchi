@@ -1,0 +1,29 @@
+[package]
+name = "opc-relationship-order-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0628/crates/litchi-opc" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0628/crates/litchi-core" }
+sha2 = "0.10"
+
+[[bin]]
+name = "corpus_roundtrip"
+path = "src/corpus_roundtrip.rs"
+
+[[bin]]
+name = "reuse_selection"
+path = "src/reuse_selection.rs"
+
+[[bin]]
+name = "open_save_counts"
+path = "src/open_save_counts.rs"
+
+[[bin]]
+name = "open_save_iters"
+path = "src/open_save_iters.rs"
+
+[profile.release]
+debug = false

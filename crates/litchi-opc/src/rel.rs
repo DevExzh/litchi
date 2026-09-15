@@ -406,11 +406,44 @@ impl Relationships {
         self.rels.get(r_id)
     }
 
+    /// The identifier of the relationship that reuse selects.
+    ///
+    /// A source may legitimately own several relationships that share a type,
+    /// a target, and a target mode under different identifiers: two runs
+    /// hyperlinking the same URL, or two mail-merge references to one data
+    /// file, are the shapes this repository's own corpus carries. Reuse must
+    /// therefore not stop at whichever candidate the map happens to visit
+    /// first, because `rels` is a `HashMap` whose iteration order is seeded per
+    /// instance, and the caller writes the returned identifier into part markup
+    /// ([`crate::Part::relate_to`], [`crate::Part::relate_to_ext`]).
+    ///
+    /// The smallest identifier in byte order is chosen, which is the one
+    /// [`Self::try_to_xml_bytes`] emits first in the serialized `.rels` member,
+    /// so reuse selects "the first matching relationship in the published
+    /// member" and the result is a function of the collection.
+    fn reuse_candidate(
+        &self,
+        reltype: &str,
+        target_ref: &str,
+        target_mode: TargetMode,
+    ) -> Option<&str> {
+        self.rels
+            .values()
+            .filter(|relationship| {
+                relationship.reltype() == reltype
+                    && relationship.target_ref() == target_ref
+                    && relationship.target_mode() == target_mode
+            })
+            .map(Relationship::r_id)
+            .min()
+    }
+
     /// Get or add a relationship to a target part.
     ///
-    /// If a relationship of the given type to the target already exists,
-    /// returns that relationship. Otherwise, creates a new one with the
-    /// next available rId.
+    /// If an internal relationship of the given type to the target already
+    /// exists, returns that relationship; when several match, the one with the
+    /// smallest rId in byte order is reused. Otherwise, creates a new one with
+    /// the next available rId.
     ///
     /// # Arguments
     /// * `reltype` - Relationship type URI
@@ -419,18 +452,10 @@ impl Relationships {
     /// # Returns
     /// Reference to the relationship (existing or newly created)
     pub fn get_or_add(&mut self, reltype: &str, target_ref: &str) -> &Relationship {
-        let r_id = self
-            .rels
-            .values()
-            .find(|relationship| {
-                relationship.reltype() == reltype
-                    && relationship.target_ref() == target_ref
-                    && !relationship.is_external()
-            })
-            .map_or_else(
-                || self.next_r_id(),
-                |relationship| relationship.r_id().to_string(),
-            );
+        let r_id = match self.reuse_candidate(reltype, target_ref, TargetMode::Internal) {
+            Some(existing) => existing.to_string(),
+            None => self.next_r_id(),
+        };
         self.add_relationship(reltype.to_string(), target_ref.to_string(), r_id, false)
     }
 
@@ -438,11 +463,9 @@ impl Relationships {
     ///
     /// Similar to `get_or_add` but for external relationships.
     pub fn get_or_add_ext_rel(&mut self, reltype: &str, target_ref: &str) -> String {
-        // Check if matching relationship already exists
-        for rel in self.rels.values() {
-            if rel.reltype() == reltype && rel.target_ref() == target_ref && rel.is_external() {
-                return rel.r_id().to_string();
-            }
+        // Reuse the established relationship when one already matches.
+        if let Some(existing) = self.reuse_candidate(reltype, target_ref, TargetMode::External) {
+            return existing.to_string();
         }
 
         // Create new relationship with next available rId

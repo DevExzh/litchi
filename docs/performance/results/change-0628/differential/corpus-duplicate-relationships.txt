@@ -1,0 +1,35 @@
+root                     : test-data
+OOXML files found        : 336
+OOXML files opened as zip: 336
+.rels parts scanned      : 2218
+Relationship elements    : 6393
+.rels parts with a duplicate (Type,Target,TargetMode): 4
+packages with a duplicate                            : 4
+duplicate groups, Internal / External                : 0 / 4
+
+  poi/test-data/openxml4j/50154.xlsx
+    member=xl/worksheets/_rels/sheet1.xml.rels count=2 mode=External
+    type=....org/officeDocument/2006/relationships/hyperlink
+    target=..\..\..\..\..\..\..\cygwin\home\yegor\dinom\%5baccess%5d.20
+    ids=['rId3', 'rId2']
+  ooxml/xlsx/sharedhyperlink.xlsx
+    member=xl/worksheets/_rels/sheet1.xml.rels count=2 mode=External
+    type=....org/officeDocument/2006/relationships/hyperlink
+    target=http://www.apache.org/
+    ids=['rId2', 'rId1']
+  ooxml/docx/drawing.docx
+    member=word/_rels/document.xml.rels count=2 mode=External
+    type=....org/officeDocument/2006/relationships/hyperlink
+    target=http://www.regnum.ru/
+    ids=['rId21', 'rId23']
+  libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx
+    member=word/_rels/settings.xml.rels count=2 mode=External
+    type=...fficeDocument/2006/relationships/mailMergeSource
+    target=file:///D:\bug\data%20source.xls
+    ids=['rId2', 'rId1']
+
+packages with at least one duplicate group:
+  libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx
+  ooxml/docx/drawing.docx
+  ooxml/xlsx/sharedhyperlink.xlsx
+  poi/test-data/openxml4j/50154.xlsx

@@ -1,0 +1,2 @@
+
+files=336 triples_probed=5258 unstable_triples=0 repeats=16

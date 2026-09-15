@@ -1,0 +1,16 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0628/crates/litchi-opc)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.37s
+     Running tests/relationship_selection_determinism.rs (target/debug/deps/relationship_selection_determinism-8b207b5b63800bda)
+
+running 7 tests
+test a_fresh_target_still_takes_the_next_free_identifier ... ok
+test an_external_duplicate_does_not_satisfy_an_internal_reuse ... ok
+test corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open ... ok
+test external_reuse_is_independent_of_insertion_order ... ok
+test external_reuse_picks_the_same_relationship_on_every_build ... ok
+test internal_reuse_picks_the_same_relationship_on_every_build ... ok
+test reuse_of_a_unique_match_is_unchanged ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+exit=0
