@@ -1,0 +1,28 @@
+=== litchi-xlsx ===
+     Running tests/relationship_order_verdict_determinism.rs (target/debug/deps/relationship_order_verdict_determinism-0d7bb2ecc95d45e0)
+
+running 3 tests
+test a_genuinely_different_workbook_is_still_refused ... ok
+test single_auxiliary_relationship_keeps_accepting_its_noop_patch ... ok
+test exact_noop_patch_is_accepted_against_every_reload_of_the_same_workbook ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+=== litchi-pptx ===
+     Running tests/pptx_activex_relationship_order_determinism.rs (target/debug/deps/pptx_activex_relationship_order_determinism-d38879f60d669daa)
+
+running 4 tests
+test a_genuinely_different_package_is_still_refused ... ok
+test snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed ... ok
+test a_matching_patch_is_accepted_against_every_build_of_the_same_package ... ok
+test single_relationship_graphs_keep_their_revision_and_accept_their_patch ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+=== litchi-docx ===
+     Running tests/signature_token_relationship_order.rs (target/debug/deps/signature_token_relationship_order-58bb21b33f59daeb)
+
+running 3 tests
+test a_genuinely_different_signature_graph_is_still_refused ... ok
+test single_signature_packages_keep_accepting_their_noop ... ok
+test exact_noop_is_accepted_against_every_build_of_the_same_signed_package ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s

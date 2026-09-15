@@ -1,0 +1,12 @@
+==3760948== Callgrind, a call-graph generating cache profiler
+==3760948== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3760948== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==3760948== Command: /home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters pptx test-data/ooxml/pptx/activex/activex_checkbox.pptx 11
+==3760948== 
+==3760948== For interactive control, run 'callgrind_control -h'.
+pptx test-data/ooxml/pptx/activex/activex_checkbox.pptx iterations=11 total=438108
+==3760948== 
+==3760948== Events    : Ir
+==3760948== Collected : 132793276
+==3760948== 
+==3760948== I   refs:      132,793,276

@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use litchi_ooxml_common::custom_xml;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, Relationship, Relationships};
 
 use crate::package::story::{self, StoryKind, StoryLimits, StoryTopology};
 use crate::{Error, Package, Result};
@@ -1499,15 +1499,20 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
         .map_err(alloc("signature graph token"))?;
     token.extend_from_slice(SIGNATURE_TOKEN_MAGIC);
     put_number(&mut token, relationship_count)?;
-    for relationship in package.rels().iter() {
-        if !root_signature_relationship(package, relationship) {
-            continue;
+    // The count came from the same predicate over the same collection, so a
+    // zero emits nothing and the ordered walk is not worth its allocation. An
+    // unsigned package is the common case and stays exactly as it was.
+    if relationship_count != 0 {
+        for relationship in sorted_relationships(package.rels())? {
+            if !root_signature_relationship(package, relationship) {
+                continue;
+            }
+            token.push(1);
+            put_field(&mut token, relationship.r_id().as_bytes())?;
+            put_field(&mut token, relationship.reltype().as_bytes())?;
+            put_field(&mut token, relationship.target_ref().as_bytes())?;
+            token.push(u8::from(relationship.is_external()));
         }
-        token.push(1);
-        put_field(&mut token, relationship.r_id().as_bytes())?;
-        put_field(&mut token, relationship.reltype().as_bytes())?;
-        put_field(&mut token, relationship.target_ref().as_bytes())?;
-        token.push(u8::from(relationship.is_external()));
     }
     put_number(&mut token, part_names.len())?;
     for part_name in part_names {
@@ -1517,7 +1522,7 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
         put_field(&mut token, part.content_type().as_bytes())?;
         put_field(&mut token, part.blob())?;
         put_number(&mut token, part.rels().len())?;
-        for relationship in part.rels().iter() {
+        for relationship in sorted_relationships(part.rels())? {
             token.push(3);
             put_field(&mut token, relationship.r_id().as_bytes())?;
             put_field(&mut token, relationship.reltype().as_bytes())?;
@@ -1527,6 +1532,29 @@ fn signature_token(package: &OpcPackage, limit: usize) -> Result<Arc<[u8]>> {
     }
     debug_assert_eq!(token.len(), charged);
     Ok(Arc::from(token.into_boxed_slice()))
+}
+
+/// One collection's relationships in rId byte order.
+///
+/// `Relationships::iter` walks a `HashMap`, so the visit order is seeded per
+/// collection. `signature_token` sorts its part names but used to emit each
+/// relationship record straight from that walk, so the returned staleness
+/// token differed byte-for-byte between two loads of the same package whenever
+/// the root or a signature part owned two relationships, and `require_current`
+/// refused an exact no-op as stale. rId byte order is the key
+/// `Relationships::to_xml` emits the `.rels` member in, so the token now reads
+/// the graph in published order and is a function of the package, as ADR 0006
+/// requires. The order does not change what is charged: `add_signature_part`
+/// charges every relationship of every reachable part, so the total and the
+/// limit verdict were already order-free.
+fn sorted_relationships(relationships: &Relationships) -> Result<Vec<&Relationship>> {
+    let mut sorted = Vec::new();
+    sorted
+        .try_reserve_exact(relationships.len())
+        .map_err(alloc("signature graph relationship order"))?;
+    sorted.extend(relationships.iter());
+    sorted.sort_unstable_by_key(|relationship| relationship.r_id());
+    Ok(sorted)
 }
 
 fn add_signature_part(
@@ -1561,10 +1589,7 @@ fn add_signature_part(
     Ok(())
 }
 
-fn root_signature_relationship(
-    package: &OpcPackage,
-    relationship: &litchi_opc::Relationship,
-) -> bool {
+fn root_signature_relationship(package: &OpcPackage, relationship: &Relationship) -> bool {
     if is_signature_relationship(relationship.reltype(), relationship.target_ref()) {
         return true;
     }

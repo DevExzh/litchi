@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running tests/pptx_activex_relationship_order_determinism.rs (target/debug/deps/pptx_activex_relationship_order_determinism-d38879f60d669daa)
+
+running 4 tests
+test a_genuinely_different_package_is_still_refused ... ok
+test a_matching_patch_is_accepted_against_every_build_of_the_same_package ... FAILED
+test single_relationship_graphs_keep_their_revision_and_accept_their_patch ... ok
+test snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed ... ok
+
+failures:
+
+---- a_matching_patch_is_accepted_against_every_build_of_the_same_package stdout ----
+
+thread 'a_matching_patch_is_accepted_against_every_build_of_the_same_package' (3657170) panicked at crates/litchi-pptx/tests/pptx_activex_relationship_order_determinism.rs:194:13:
+attempt 0: a patch captured from one build of the package was refused against an identical build: invalid PresentationML: ActiveX descriptor relationship lifecycle does not match the patch target
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_matching_patch_is_accepted_against_every_build_of_the_same_package
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p litchi-pptx --test pptx_activex_relationship_order_determinism`

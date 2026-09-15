@@ -257,10 +257,20 @@ fn validate_internal_targets(package: &OpcPackage, part: &dyn Part) -> Result<()
     Ok(())
 }
 
+/// Capture one part's relationships in rId byte order.
+///
+/// `Relationships::iter` walks a `HashMap`, so the visit order is seeded per
+/// collection. Three of this module's uses of the captured array are compared
+/// or hashed: `install_patch` and `ensure_binary_part` compare theirs with
+/// `!=` against a patch target, and `load_binary`'s becomes part of the public
+/// snapshot `Revision` through `fingerprint`. Sorting here by rId — the key
+/// `transaction::sorted_relationships` already uses for the slide and
+/// descriptor arrays, and the key `Relationships::to_xml` emits in — makes all
+/// of them functions of the package, as ADR 0006 requires.
 fn relationship_states<'a>(
     relationships: impl Iterator<Item = &'a Relationship>,
 ) -> Result<Vec<RelationshipState>> {
-    relationships
+    let mut states = relationships
         .map(|relationship| {
             Ok(RelationshipState {
                 id: relationship.r_id().to_owned(),
@@ -269,7 +279,9 @@ fn relationship_states<'a>(
                 target_mode: relationship.target_mode(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+    states.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    Ok(states)
 }
 
 fn ensure_relationship(part: &mut dyn Part, desired: &BinarySource) -> Result<()> {

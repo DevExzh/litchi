@@ -1,0 +1,203 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0631/cg/after-docx-11.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 156062776
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters docx test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx 11 (PID 3822924, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.5
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+588,687,170 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+124,786,112 (21.20%)  ???:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+ 83,668,376 (14.21%)  ???:litchi_ooxml_common::mce::codec::BoundedOutput::reserve [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+ 80,654,801 (13.70%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 42,310,422 ( 7.19%)  ???:zlib_rs::inflate::inflate_fast_help [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+ 39,731,296 ( 6.75%)  ???:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+ 18,003,084 ( 3.06%)  ???:zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+ 15,990,508 ( 2.72%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  9,932,670 ( 1.69%)  ???:zlib_rs::inflate::inftrees::inflate_table [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  7,912,521 ( 1.34%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  7,770,312 ( 1.32%)  ???:quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  7,307,674 ( 1.24%)  ???:zlib_rs::inflate::inflate [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  7,307,498 ( 1.24%)  ???:<alloc::vec::Vec<T,A> as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  6,259,532 ( 1.06%)  ???:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  5,847,600 ( 0.99%)  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  5,821,850 ( 0.99%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  5,720,286 ( 0.97%)  ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  5,328,114 ( 0.91%)  ???:quick_xml::name::NamespaceResolver::push [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  5,120,412 ( 0.87%)  ???:litchi_docx::content_control::snapshot::scan [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  4,867,456 ( 0.83%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  4,851,748 ( 0.82%)  ???:quick_xml::name::NamespaceResolver::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  4,534,728 ( 0.77%)  ???:quick_xml::name::NamespaceResolver::add [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  4,446,794 ( 0.76%)  ???:crc32fast::specialized::pclmulqdq::calculate [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  4,152,060 ( 0.71%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,516,828 ( 0.60%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,387,724 ( 0.58%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,237,718 ( 0.55%)  ???:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  3,225,992 ( 0.55%)  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  3,001,878 ( 0.51%)  ???:litchi_docx::content_control::model::Inventory::parse_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,986,126 ( 0.51%)  ???:litchi_ooxml_common::xml_name::validation::is_name_character [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,889,300 ( 0.49%)  ???:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,337,917 ( 0.40%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  2,277,088 ( 0.39%)  ???:litchi_ooxml_common::xml_name::validation::is_ncname [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,226,202 ( 0.38%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,225,894 ( 0.38%)  ???:quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  2,175,140 ( 0.37%)  ???:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,895,256 ( 0.32%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,866,260 ( 0.32%)  ???:zlib_rs::inflate::writer::Writer::extend_from_window_runtime_dispatch [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,667,050 ( 0.28%)  ???:core::iter::traits::iterator::Iterator::try_fold [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,412,634 ( 0.24%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,393,700 ( 0.24%)  ???:quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,389,366 ( 0.24%)  ???:quick_xml::events::Event::into_owned [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,385,824 ( 0.24%)  ???:quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,343,430 ( 0.23%)  ???:<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,300,706 ( 0.22%)  ???:quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,282,204 ( 0.22%)  ???:quick_xml::escape::normalize_attribute_value [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,218,144 ( 0.21%)  ???:__rustc::__rdl_alloc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,207,184 ( 0.21%)  ???:core::slice::memchr::memchr_aligned [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,150,952 ( 0.20%)  ???:quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,115,840 ( 0.19%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,096,180 ( 0.19%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,083,720 ( 0.18%)  ???:litchi_ooxml_common::mce::codec::expand_parts [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+  1,059,520 ( 0.18%)  ???:memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    930,478 ( 0.16%)  ???:core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    904,268 ( 0.15%)  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    882,046 ( 0.15%)  ???:litchi_opc::packuri::PackURI::validate_percent_encoding [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    865,920 ( 0.15%)  ???:memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    864,787 ( 0.15%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    856,174 ( 0.15%)  ???:litchi_ooxml_common::xml_name::validation::is_qualified_name [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    853,732 ( 0.15%)  ???:litchi_opc::packuri::PackURI::new [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    780,538 ( 0.13%)  ???:quick_xml::name::NamespaceResolver::set_level [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    769,344 ( 0.13%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    719,917 ( 0.12%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    653,118 ( 0.11%)  ???:core::slice::memchr::memrchr [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    587,496 ( 0.10%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    574,728 ( 0.10%)  ???:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    549,758 ( 0.09%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    542,058 ( 0.09%)  ???:litchi_docx::content_control::require_ignorable_extensions [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    522,552 ( 0.09%)  ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    499,148 ( 0.08%)  ???:hashbrown::raw::RawTable<T,A>::reserve_rehash [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    481,294 ( 0.08%)  ???:soapberry_zip::office::lookup_member_name [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    427,218 ( 0.07%)  ???:litchi_opc::rel::append_relationship_xml_escaped [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    425,258 ( 0.07%)  ???:litchi_opc::members::PartNameIndex::insert [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    410,366 ( 0.07%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    405,350 ( 0.07%)  ???:quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    398,046 ( 0.07%)  ???:litchi_ooxml_common::custom_xml::codec::validate_payload [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    365,398 ( 0.06%)  ???:litchi_docx::content_control::extend_ignorable [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    332,530 ( 0.06%)  ???:litchi_ooxml_common::custom_xml::codec::inspect_element [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    328,460 ( 0.06%)  ???:litchi_opc::content_type::is_token [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    309,276 ( 0.05%)  ???:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    305,998 ( 0.05%)  ???:quick_xml::name::QName::decompose [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    294,844 ( 0.05%)  ???:litchi_opc::packuri::PackURI::from_rel_ref [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    290,818 ( 0.05%)  ???:litchi_ooxml_common::custom_xml::codec::validate_xml_chars [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    282,656 ( 0.05%)  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    278,784 ( 0.05%)  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    259,600 ( 0.04%)  ???:quick_xml::name::QName::local_name [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    243,474 ( 0.04%)  ???:litchi_docx::content_control::snapshot::is_relevant [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    240,570 ( 0.04%)  ???:litchi_ooxml_common::mce::codec::close [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    235,862 ( 0.04%)  ???:quick_xml::reader::ns_reader::NsReader<R>::read_event_impl [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    232,980 ( 0.04%)  ???:litchi_opc::pkgreader::inspect_relationship_element [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    228,800 ( 0.04%)  ???:std::thread::local::LocalKey<T>::with [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    226,226 ( 0.04%)  ???:alloc::fmt::format::format_inner [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    224,928 ( 0.04%)  ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    218,988 ( 0.04%)  ???:litchi_ooxml_common::mce::codec::expand [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    214,258 ( 0.04%)  ???:soapberry_zip::office::normalize_str_fallibly [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    198,990 ( 0.03%)  ???:litchi_docx::content_control::package::signature_token [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    197,538 ( 0.03%)  ???:alloc::raw_vec::RawVecInner<A>::try_allocate_in [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    192,317 ( 0.03%)  ???:hashbrown::map::HashMap<K,V,S,A>::contains_key [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    191,796 ( 0.03%)  ???:litchi_docx::content_control::is_word_element [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    184,567 ( 0.03%)  ???:core::fmt::write [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    184,303 ( 0.03%)  ???:soapberry_zip::office::ArchiveReader::new_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    171,380 ( 0.03%)  ???:litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    171,204 ( 0.03%)  ???:<alloc::string::String as core::fmt::Write>::write_str [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    168,080 ( 0.03%)  ???:<core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    163,350 ( 0.03%)  ???:<alloc::string::String as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    153,164 ( 0.03%)  ???:soapberry_zip::archive::ZipSliceEntries::next_entry [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    141,328 ( 0.02%)  ???:core::ops::function::FnOnce::call_once [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    139,260 ( 0.02%)  ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    135,276 ( 0.02%)  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    135,275 ( 0.02%)  ???:__rustc::__rdl_dealloc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    135,275 ( 0.02%)  ???:__rustc::__rust_dealloc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    135,144 ( 0.02%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    133,100 ( 0.02%)  ???:<&str as core::str::pattern::Pattern>::is_contained_in [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    129,770 ( 0.02%)  ???:soapberry_zip::office::LazyArchiveReader::read_shared_with_reader [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    128,678 ( 0.02%)  ???:litchi_opc::package::OpcPackage::authorize_owned_source [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    127,490 ( 0.02%)  ???:litchi_ooxml_common::mce::model::Capabilities::understands [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    126,918 ( 0.02%)  ???:litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    120,384 ( 0.02%)  ???:core::ptr::drop_in_place<quick_xml::name::NamespaceResolver> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    115,940 ( 0.02%)  ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ooxml_common::mce::codec::Attr>> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    108,900 ( 0.02%)  ???:hashbrown::raw::RawTableInner::fallible_with_capacity [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    104,250 ( 0.02%)  ./malloc/./malloc/arena.c:free
+    104,236 ( 0.02%)  ???:flate2::zio::read [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+    101,376 ( 0.02%)  ???:std::io::default_read_to_end [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     97,856 ( 0.02%)  ???:litchi_opc::content_type::required_attributes [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     97,328 ( 0.02%)  ???:litchi_ooxml_common::mce::codec::BoundedOutput::push [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     96,250 ( 0.02%)  ???:<alloc::string::String>::try_reserve_exact [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     91,852 ( 0.02%)  ???:litchi_opc::content_type::ContentTypeMap::get [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     91,652 ( 0.02%)  ???:alloc::str::join_generic_copy [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     89,848 ( 0.02%)  ???:litchi_docx::content_control::element_is_active [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     85,096 ( 0.01%)  ???:litchi_docx::package::story::push_story [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     82,525 ( 0.01%)  ???:<core::fmt::Formatter>::pad [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     80,586 ( 0.01%)  ???:litchi_ooxml_common::custom_xml::codec::resolved_namespace [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     77,242 ( 0.01%)  ???:litchi_opc::package::OpcPackage::unmarshal_with_payload_donor [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     76,736 ( 0.01%)  ???:litchi_opc::pkgreader::PackageReader::parse_rels_xml_with_source [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     75,130 ( 0.01%)  ???:litchi_ooxml_common::properties::read::decode [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     72,160 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_opc::error::OpcError> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     71,588 ( 0.01%)  ???:soapberry_zip::office::ArchiveReadSession::read_with_accounting [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     71,189 ( 0.01%)  ???:hashbrown::raw::RawTable<T,A>::remove_entry [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     69,256 ( 0.01%)  ???:litchi_opc::pkgreader::PackageReader::is_relationship_member [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     69,234 ( 0.01%)  ???:<soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     69,102 ( 0.01%)  ???:zlib_rs::inflate::window::Window::extend [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,945 ( 0.01%)  ???:soapberry_zip::office::ArchiveReader::metadata [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,748 ( 0.01%)  ???:<alloc::string::String>::try_reserve [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,528 ( 0.01%)  ???:<quick_xml::name::NamespaceResolver as core::default::Default>::default [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,508 ( 0.01%)  ???:litchi_opc::rel::Relationships::try_add_relationship [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,506 ( 0.01%)  ???:litchi_opc::rel::Relationships::try_to_xml_bytes [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     66,399 ( 0.01%)  ./malloc/./malloc/arena.c:realloc
+     65,164 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_docx::content_control::snapshot::MceFrame> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     61,050 ( 0.01%)  ???:litchi_ooxml_common::custom_xml::codec::validate_qname [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     59,503 ( 0.01%)  ???:hashbrown::rustc_entry::<impl hashbrown::map::HashMap<K,V,S,A>>::rustc_entry [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     58,352 ( 0.01%)  ???:crc32fast::Hasher::internal_new_specialized [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     56,232 ( 0.01%)  ???:litchi_opc::packuri::PackURI::rels_uri [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     55,944 ( 0.01%)  ./malloc/./malloc/arena.c:__libc_malloc2
+     54,901 ( 0.01%)  ???:alloc::sync::Arc<T,A>::drop_slow [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     54,538 ( 0.01%)  ???:litchi_docx::content_control::package::is_signature_relationship [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     54,472 ( 0.01%)  ???:litchi_opc::pkgreader::PackageReader::load_parts_eager [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     53,768 ( 0.01%)  ???:core::str::iter::SplitInternal<P>::next [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     53,702 ( 0.01%)  ???:<core::str::iter::Split<P> as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     52,800 ( 0.01%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     52,140 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_ooxml_common::mce::model::Name> [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     51,249 ( 0.01%)  ???:litchi_opc::content_type::ContentTypeMap::add_override [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     49,434 ( 0.01%)  ???:litchi_opc::content_type::inspect_element [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     47,794 ( 0.01%)  ./stdio-common/./stdio-common/vfscanf-internal.c:__vfscanf_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+     46,200 ( 0.01%)  ???:soapberry_zip::office::finish_lazy_flight [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     45,452 ( 0.01%)  ???:litchi_opc::pkgreader::is_xml_id [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     44,220 ( 0.01%)  ???:quick_xml::events::attributes::Attribute::decoded_and_normalized_value [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     43,362 ( 0.01%)  ???:litchi_docx::content_control::package::root_signature_relationship [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+     43,244 ( 0.01%)  ???:litchi_opc::pkgreader::PackageReader::walk_relationship_graph [/home/zhuhe/code/litchi-worktrees/targets/0631-probe/release/open_edit_save_iters]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./malloc/./malloc/arena.c
+  ./malloc/./malloc/malloc.c
+  ./stdio-common/./stdio-common/vfscanf-internal.c
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+
