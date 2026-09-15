@@ -1,0 +1,21 @@
+== callgrind Ir per publish (isolation pair, M=10) ==
+ConditionalFormattingSamples-addrel         5,744,936 ->    3,251,334   -43.41%
+ConditionalFormattingSamples-pkgrels        4,914,478 ->    2,400,514   -51.15%
+ConditionalFormattingSamples-reblob         4,904,466 ->    2,405,993   -50.94%
+WithChartSheet-pkgrels                      1,227,900 ->      536,422   -56.31%
+docx37-addrel                               1,957,404 ->    1,419,447   -27.48%
+docx37-pkgrels                              1,115,971 ->      564,259   -49.44%
+docx37-reblob                               1,114,404 ->      564,293   -49.36%
+pptx103-addrel                              4,194,338 ->    2,395,977   -42.88%
+pptx103-pkgrels                             3,208,289 ->    1,239,383   -61.37%
+pptx103-reblob                              3,208,032 ->    1,243,140   -61.25%
+
+== native perf isolation pair (M=200, -r 5) ==
+cfs-addrel               cycles          1,063,155 ->      401,875   -62.20%
+cfs-addrel               instructions    3,841,207 ->    1,374,602   -64.21%
+cfs-pkgrels              cycles            992,747 ->      342,567   -65.49%
+cfs-pkgrels              instructions    3,691,466 ->    1,207,622   -67.29%
+pptx103-pkgrels          cycles            831,089 ->      240,120   -71.11%
+pptx103-pkgrels          instructions    3,122,408 ->    1,019,394   -67.35%
+wcs-pkgrels              cycles            255,956 ->       94,205   -63.19%
+wcs-pkgrels              instructions    1,072,242 ->      400,239   -62.67%

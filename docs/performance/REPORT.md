@@ -1,5 +1,36 @@
 # Performance program phase report
 
+## 0593 — pristine-member proof reuse and a buffered atomic tempfile
+
+`crates/litchi-opc` now carries the canonical `.rels` serialization captured at
+open inside each `Relationships`, behind an `Arc` that every mutating method
+clears and that publication matches by pointer identity against the preservation
+provenance for that exact part. A match means the source member is copied
+without reserializing, auditing or deriving its URI; anything else takes the
+unchanged serialize-audit-compare route, so every *changed* member is still
+audited exactly as before (ADR 0006, record 0528). `[Content_Types].xml` is
+decided from provenance before it is built, identical payloads settle on
+`std::ptr::eq` before `memcmp`, and `atomic::replace_with_impl` stages its
+temporary file through a 64 KiB `AtomicSink` flushed before `sync_all` — the
+one API change, replacing `&mut File` with `&mut AtomicSink<'_>` in the closure
+of the public `atomic::replace` and `replace_with`; all six in-tree call sites
+compile unchanged and caller-supplied streaming sinks are never wrapped, so
+`IncompleteOutput.written` still counts bytes the caller's own sink accepted.
+Validation passed `litchi-opc` 422 library tests plus its integration suites,
+and `litchi-xlsx`, `litchi-docx` and `litchi-pptx` tests and clippy, with
+`cargo fmt --all --check` and `cargo doc -p litchi-opc --no-deps` clean; nine
+tests were added, including a differential that publishes one package through
+both routes and requires identical bytes. One intentional behaviour change is
+recorded: the audit of generated XML that is then discarded no longer runs for
+unchanged members, so a package whose unchanged `.rels` would exceed the
+authored-XML auditor's aggregate attribute ceiling (about 62,500 relationships
+on one part) now saves instead of refusing — the published bytes are the source
+member's, and the same package already saved without refusing when no mutation
+occurred. No latency, RSS, cold-cache or OOM claim follows; SAVE-2's modelled
+millisecond-scale gain is reported as falsified on this host. See
+[Change 0593](0593-opc-publication-pristine-members.md);
+`performance_claim: none`.
+
 ## 0595 — retained lean XLS frame loop and cheaper eager SST walk
 
 Two files changed in `litchi-xls`, seven edits, `performance_claim: none`.

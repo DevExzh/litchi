@@ -1,10 +1,71 @@
 //! Atomic filesystem replacement for finalized package artifacts.
 
 use std::fs::{self, File, Permissions};
-use std::io;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use crate::error::{OpcError, Result};
+
+/// Bytes staged before the temporary artifact sees a write syscall.
+///
+/// The preservation writer emits a local header, a payload chunk, an optional
+/// descriptor and a central record per member, so an unbuffered temporary file
+/// took one syscall per framing record. A page-sized staging buffer collapses
+/// those into whole-buffer writes without changing a single published byte.
+const STAGING_BUFFER_BYTES: usize = 64 * 1024;
+
+/// The temporary artifact handed to an atomic replacement closure.
+///
+/// Writes are staged in a fixed buffer and flushed before the artifact is
+/// synchronized and persisted, so finalization reaches the filesystem in
+/// page-sized writes. The buffer is private to this module: a caller-owned
+/// sink passed to a streaming writer is never wrapped, so its incomplete-output
+/// accounting still counts bytes the caller's own sink accepted. Buffered bytes
+/// that a failed finalization leaves unflushed belong to a temporary artifact
+/// that is discarded without replacing the destination.
+pub struct AtomicSink<'file> {
+    inner: BufWriter<&'file mut File>,
+}
+
+impl<'file> AtomicSink<'file> {
+    fn new(file: &'file mut File) -> Self {
+        Self {
+            inner: BufWriter::with_capacity(STAGING_BUFFER_BYTES, file),
+        }
+    }
+
+    /// Flush every staged byte to the temporary artifact.
+    fn finish(self) -> io::Result<()> {
+        self.inner
+            .into_inner()
+            .map_err(io::Error::from)
+            .map(|_file| ())
+    }
+}
+
+impl Write for AtomicSink<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.inner.write(bytes)
+    }
+
+    fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
+        self.inner.write_all(bytes)
+    }
+
+    fn write_vectored(&mut self, buffers: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.inner.write_vectored(buffers)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl std::fmt::Debug for AtomicSink<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("AtomicSink").finish_non_exhaustive()
+    }
+}
 
 /// Finalize an artifact in a sibling temporary file, then replace `path`.
 ///
@@ -20,7 +81,7 @@ use crate::error::{OpcError, Result};
 /// `write` callback fails. If the destination was already replaced but the
 /// parent directory could not be synchronized, the error is
 /// [`OpcError::Committed`].
-pub fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Result<()> {
+pub fn replace(path: &Path, write: impl FnOnce(&mut AtomicSink<'_>) -> Result<()>) -> Result<()> {
     replace_with(path, write)
 }
 
@@ -37,7 +98,7 @@ pub fn replace(path: &Path, write: impl FnOnce(&mut File) -> Result<()>) -> Resu
 /// [`OpcError`]; a `write` failure is returned unchanged.
 pub fn replace_with<E>(
     path: &Path,
-    write: impl FnOnce(&mut File) -> std::result::Result<(), E>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
 ) -> std::result::Result<(), E>
 where
     E: From<OpcError>,
@@ -47,7 +108,7 @@ where
 
 fn replace_with_impl<E, S>(
     path: &Path,
-    write: impl FnOnce(&mut File) -> std::result::Result<(), E>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
     sync: S,
 ) -> std::result::Result<(), E>
 where
@@ -72,7 +133,9 @@ where
         .map_err(OpcError::from)
         .map_err(E::from)?;
 
-    write(temporary.as_file_mut())?;
+    let mut sink = AtomicSink::new(temporary.as_file_mut());
+    write(&mut sink)?;
+    sink.finish().map_err(OpcError::from).map_err(E::from)?;
     if let Some(existing_permissions) = permissions {
         temporary
             .as_file()
@@ -205,6 +268,54 @@ mod tests {
         .expect("atomic replacement");
 
         assert_eq!(fs::read(destination).expect("read destination"), b"new");
+    }
+
+    #[test]
+    fn staged_writes_reach_the_destination_in_order() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+        let payload: Vec<u8> = (0..(STAGING_BUFFER_BYTES * 3 + 7))
+            .map(|index| u8::try_from(index % 251).expect("payload byte"))
+            .collect();
+
+        let staged = payload.clone();
+        replace(&destination, move |temporary| {
+            // One byte at a time is the shape the preservation writer used to
+            // hand the raw file: framing records far smaller than a page.
+            for byte in &staged {
+                temporary.write_all(std::slice::from_ref(byte))?;
+            }
+            Ok(())
+        })
+        .expect("atomic replacement");
+
+        assert_eq!(fs::read(destination).expect("read destination"), payload);
+    }
+
+    #[test]
+    fn a_failed_write_after_staging_leaves_the_destination_untouched() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+        fs::write(&destination, b"original").expect("seed destination");
+
+        let result = replace(&destination, |temporary| {
+            temporary.write_all(&vec![7_u8; STAGING_BUFFER_BYTES / 2])?;
+            Err(OpcError::InvalidRelationship(
+                "injected staged failure".to_owned(),
+            ))
+        });
+
+        assert!(matches!(result, Err(OpcError::InvalidRelationship(_))));
+        assert_eq!(
+            fs::read(&destination).expect("read destination"),
+            b"original"
+        );
+        assert_eq!(
+            fs::read_dir(directory.path())
+                .expect("list temporary directory")
+                .count(),
+            1
+        );
     }
 
     #[cfg(unix)]

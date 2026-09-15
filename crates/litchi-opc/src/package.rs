@@ -13,7 +13,7 @@ use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory};
 use crate::phys_pkg::{PhysPkgReader, read_limited, read_owned_path_with_limits};
 use crate::pkgreader::PackageReader;
-use crate::rel::Relationships;
+use crate::rel::{CanonicalRelationshipsXml, Relationships};
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -42,7 +42,7 @@ pub enum FontEmbedding {
 pub(crate) struct PreservationProvenance {
     pub(crate) members: Vec<SourceMember>,
     pub(crate) parts: HashMap<PackURI, SourcePart>,
-    pub(crate) package_relationships_xml: CanonicalRelationshipsXml,
+    pub(crate) package_relationships_xml: Arc<CanonicalRelationshipsXml>,
 }
 
 #[derive(Debug)]
@@ -63,34 +63,9 @@ pub(crate) enum SourceMemberKind {
 pub(crate) struct SourcePart {
     pub(crate) content_type: String,
     pub(crate) blob: Arc<Vec<u8>>,
-    pub(crate) relationships_xml: CanonicalRelationshipsXml,
+    pub(crate) relationships_xml: Arc<CanonicalRelationshipsXml>,
     pub(crate) member_present: bool,
     pub(crate) relationships_member_present: bool,
-}
-
-const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
-
-#[derive(Debug)]
-pub(crate) enum CanonicalRelationshipsXml {
-    Empty,
-    Owned(Vec<u8>),
-}
-
-impl CanonicalRelationshipsXml {
-    pub(crate) fn from_relationships(relationships: &Relationships) -> Option<Self> {
-        if relationships.is_empty() {
-            Some(Self::Empty)
-        } else {
-            Some(Self::Owned(relationships.try_to_xml_bytes().ok()?))
-        }
-    }
-
-    pub(crate) fn as_bytes(&self) -> &[u8] {
-        match self {
-            Self::Empty => EMPTY_RELATIONSHIPS_XML,
-            Self::Owned(bytes) => bytes.as_slice(),
-        }
-    }
 }
 
 /// Main API class for working with OPC packages.
@@ -526,7 +501,12 @@ impl OpcPackage {
     pub(crate) fn is_exact_source_xml(&self, part: &dyn Part) -> bool {
         self.source_xml_parts
             .get(part.partname())
-            .is_some_and(|source| source.as_slice() == part.blob())
+            .is_some_and(|source| {
+                // The retained payload is normally the same allocation the part
+                // still holds, so settle the identical case on the pointer before
+                // charging a whole-part comparison.
+                std::ptr::eq(source.as_slice(), part.blob()) || source.as_slice() == part.blob()
+            })
     }
 
     /// Get a reference to the main document part.
@@ -1223,10 +1203,35 @@ impl OpcPackage {
 
     fn authorize_owned_source(&mut self, source: Vec<u8>) {
         let source = Arc::new(source);
-        self.preservation =
-            PreservationProvenance::from_package(source.as_slice(), self).map(Arc::new);
+        let preservation = PreservationProvenance::from_package(source.as_slice(), self);
+        if let Some(preservation) = preservation.as_ref() {
+            self.bind_relationship_captures(preservation);
+        }
+        self.preservation = preservation.map(Arc::new);
         self.source_archive = Some(source);
         self.exact_source_authorized = true;
+    }
+
+    /// Hand every relationship collection the canonical serialization the
+    /// provenance captured from it.
+    ///
+    /// Publication planning later compares the two handles by pointer
+    /// identity. A part whose relationships have not changed since this point
+    /// therefore proves itself pristine without reserializing, so its source
+    /// member is copied instead of rebuilt. Only parts whose source archive
+    /// actually carries a relationships member are bound, because a part whose
+    /// member must be created still has to be serialized and audited.
+    fn bind_relationship_captures(&mut self, preservation: &PreservationProvenance) {
+        for (partname, part) in &mut self.parts {
+            if let Some(source_part) = preservation.parts.get(partname)
+                && source_part.relationships_member_present
+            {
+                part.rels_mut()
+                    .set_source_capture(Arc::clone(&source_part.relationships_xml));
+            }
+        }
+        self.rels
+            .set_source_capture(Arc::clone(&preservation.package_relationships_xml));
     }
 }
 
@@ -1282,7 +1287,9 @@ impl PreservationProvenance {
                 SourcePart {
                     content_type: try_owned_string(part.content_type())?,
                     blob: part.blob_arc(),
-                    relationships_xml: CanonicalRelationshipsXml::from_relationships(part.rels())?,
+                    relationships_xml: Arc::new(CanonicalRelationshipsXml::from_relationships(
+                        part.rels(),
+                    )?),
                     member_present: false,
                     relationships_member_present: false,
                 },
@@ -1353,9 +1360,9 @@ impl PreservationProvenance {
         Some(Self {
             members,
             parts,
-            package_relationships_xml: CanonicalRelationshipsXml::from_relationships(
+            package_relationships_xml: Arc::new(CanonicalRelationshipsXml::from_relationships(
                 package.rels(),
-            )?,
+            )?),
         })
     }
 }
@@ -1572,7 +1579,7 @@ mod tests {
         let empty_relationships = Relationships::new(PACKAGE_URI.to_owned());
         let empty = CanonicalRelationshipsXml::from_relationships(&empty_relationships).unwrap();
         assert!(matches!(empty, CanonicalRelationshipsXml::Empty));
-        assert_eq!(empty.as_bytes(), EMPTY_RELATIONSHIPS_XML);
+        assert_eq!(empty.as_bytes(), crate::rel::EMPTY_RELATIONSHIPS_XML);
 
         let mut relationships = Relationships::new(PACKAGE_URI.to_owned());
         relationships

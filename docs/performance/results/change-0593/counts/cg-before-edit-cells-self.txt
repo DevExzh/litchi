@@ -1,0 +1,623 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0593/cg/before-edit-cells.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 5037560
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells /home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0593/out/cg-before-cells.xlsx (PID 1291763, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.9
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                  
+--------------------------------------------------------------------------------
+15,221,321 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+2,515,281 (16.52%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  817,062 ( 5.37%)  ???:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  779,094 ( 5.12%)  ???:zlib_rs::inflate::inftrees::inflate_table [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  724,015 ( 4.76%)  ???:<flate2::mem::Decompress as flate2::zio::Ops>::run [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  684,844 ( 4.50%)  ???:zlib_rs::inflate::inflate_fast_help [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  377,834 ( 2.48%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  345,032 ( 2.27%)  ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  342,867 ( 2.25%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  278,489 ( 1.83%)  ???:core::str::iter::SplitInternal<P>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  252,766 ( 1.66%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  241,974 ( 1.59%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  239,026 ( 1.57%)  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  237,395 ( 1.56%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  225,648 ( 1.48%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  224,466 ( 1.47%)  ???:quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  215,822 ( 1.42%)  ???:zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  210,713 ( 1.38%)  ???:zlib_rs::deflate::algorithm::medium::deflate_medium [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  205,980 ( 1.35%)  ???:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  205,325 ( 1.35%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  191,529 ( 1.26%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  166,523 ( 1.09%)  ???:core::iter::traits::iterator::Iterator::try_fold [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  160,710 ( 1.06%)  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  154,290 ( 1.01%)  ???:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  148,048 ( 0.97%)  ???:soapberry_zip::office::normalize_str_fallibly [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  125,854 ( 0.83%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  122,409 ( 0.80%)  ???:litchi_opc::packuri::PackURI::validate_percent_encoding [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  117,296 ( 0.77%)  ???:litchi_opc::packuri::PackURI::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  113,930 ( 0.75%)  ???:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  113,040 ( 0.74%)  ???:memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  108,691 ( 0.71%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  104,562 ( 0.69%)  ???:core::slice::memchr::memrchr [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  104,209 ( 0.68%)  ???:quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  103,484 ( 0.68%)  ???:litchi_ooxml_common::xml::unqualified_attribute_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  101,264 ( 0.67%)  ???:quick_xml::name::NamespaceResolver::push [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+  100,138 ( 0.66%)  ???:xml_minifier::audit::verify_authored [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   93,678 ( 0.62%)  ???:litchi_xlsx::column::Assignments<T>::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   93,340 ( 0.61%)  ???:quick_xml::name::NamespaceResolver::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   91,763 ( 0.60%)  ???:xml_minifier::audit::check_attribute_layout [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   87,955 ( 0.58%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   82,186 ( 0.54%)  ???:litchi_opc::rel::append_relationship_xml_escaped [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   78,370 ( 0.51%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   70,777 ( 0.46%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   68,963 ( 0.45%)  ???:litchi_opc::members::PartNameIndex::insert [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   68,300 ( 0.45%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   67,967 ( 0.45%)  ???:quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   65,188 ( 0.43%)  ???:quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   64,977 ( 0.43%)  ???:quick_xml::XmlVersion::normalize_attribute_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   63,864 ( 0.42%)  ???:zlib_rs::deflate::longest_match::longest_match [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   62,856 ( 0.41%)  ???:quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   62,326 ( 0.41%)  ???:<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   60,164 ( 0.40%)  ???:zlib_rs::deflate::Heap::pqdownheap [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   57,475 ( 0.38%)  ???:zlib_rs::deflate::flush_block_only [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   56,389 ( 0.37%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   54,837 ( 0.36%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   53,825 ( 0.35%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   51,466 ( 0.34%)  ???:litchi_opc::content_type::is_token [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   49,865 ( 0.33%)  ???:litchi_xlsx::raw::namespace::is_spreadsheetml_name [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   49,831 ( 0.33%)  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   49,464 ( 0.32%)  ???:memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   46,945 ( 0.31%)  ???:litchi_xlsx::raw::worksheet::edit::validation::validate_column_actions [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   46,676 ( 0.31%)  ./stdio-common/./stdio-common/vfscanf-internal.c:__vfscanf_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   45,999 ( 0.30%)  ???:litchi_opc::package::OpcPackage::from_owned_bytes_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   45,108 ( 0.30%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   42,639 ( 0.28%)  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   39,918 ( 0.26%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   37,302 ( 0.25%)  ???:<alloc::vec::Vec<T,A> as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   36,715 ( 0.24%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   36,408 ( 0.24%)  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   35,744 ( 0.23%)  ???:litchi_opc::packuri::PackURI::from_rel_ref [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   35,505 ( 0.23%)  ???:crc32fast::specialized::pclmulqdq::calculate [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   35,020 ( 0.23%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   34,120 ( 0.22%)  ???:litchi_xlsx::raw::compact::changed_worksheet [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   33,002 ( 0.22%)  ???:<unicode_normalization::decompose::Decompositions<I> as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   32,984 ( 0.22%)  ???:litchi_xlsx::workbook::model::Inner::validate_styles [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   32,781 ( 0.22%)  ???:quick_xml::events::attributes::Attribute::decoded_and_normalized_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   31,989 ( 0.21%)  ???:litchi_xlsx::raw::worksheet::parse [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   31,682 ( 0.21%)  ???:xml_minifier::audit::inspect_attributes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   31,438 ( 0.21%)  ???:litchi_xlsx::workbook::model::Worksheet::store [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   31,200 ( 0.20%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   30,003 ( 0.20%)  ???:quick_xml::reader::ns_reader::NsReader<R>::read_event_impl [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   29,372 ( 0.19%)  ???:core::fmt::write [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   28,835 ( 0.19%)  ???:hashbrown::raw::RawTable<T,A>::reserve_rehash [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   27,509 ( 0.18%)  ???:litchi_xlsx::raw::compact::write_start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   26,228 ( 0.17%)  ???:<alloc::string::String as core::fmt::Write>::write_str [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   26,180 ( 0.17%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object_no_relro
+   25,742 ( 0.17%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   25,158 ( 0.17%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   24,802 ( 0.16%)  ???:alloc::fmt::format::format_inner [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   24,084 ( 0.16%)  ./stdlib/../stdlib/strtol_l.c:____strtoul_l_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   23,573 ( 0.15%)  ???:quick_xml::events::Event::into_owned [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   22,320 ( 0.15%)  ???:litchi_opc::package::is_signature_relationship_or_target [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   22,013 ( 0.14%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   21,618 ( 0.14%)  ???:zlib_rs::deflate::BitWriter::send_tree [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   21,556 ( 0.14%)  ???:litchi_opc::pkgwriter::PackageWriter::to_bytes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   20,827 ( 0.14%)  ???:quick_xml::writer::Writer<W>::write_event [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   20,269 ( 0.13%)  ???:litchi_opc::pkgreader::inspect_relationship_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   20,184 ( 0.13%)  ???:unicode_normalization::decompose::Decompositions<I>::push_back [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   20,032 ( 0.13%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   19,932 ( 0.13%)  ???:core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   19,704 ( 0.13%)  ???:litchi_core::xml::escape::escape_xml [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   19,139 ( 0.13%)  ???:litchi_xlsx::raw::web::check::classify_name [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   18,826 ( 0.12%)  ???:litchi_opc::pkgreader::PackageReader::load_parts_eager [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   18,000 ( 0.12%)  ???:soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   17,675 ( 0.12%)  ???:litchi_xlsx::raw::worksheet::semantic::materialize [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   17,448 ( 0.11%)  ???:litchi_xlsx::raw::worksheet::validation::parse_a1 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   16,554 ( 0.11%)  ???:soapberry_zip::archive::ZipSliceEntries::next_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   16,350 ( 0.11%)  ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   15,944 ( 0.10%)  ???:hashbrown::map::HashMap<K,V,S,A>::get [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   15,777 ( 0.10%)  ???:<&str as core::str::pattern::Pattern>::is_contained_in [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   15,717 ( 0.10%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   15,569 ( 0.10%)  ???:litchi_xlsx::calculation_properties::rewriter::inspect_start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   15,182 ( 0.10%)  ???:litchi_opc::rel::Relationships::try_to_xml_bytes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   14,365 ( 0.09%)  ???:litchi_xlsx::column::Assignments<T>::assign_node'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   14,197 ( 0.09%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+   14,168 ( 0.09%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   14,089 ( 0.09%)  ???:litchi_xlsx::workbook::model::Inner::shared_strings [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   14,070 ( 0.09%)  ???:zlib_rs::deflate::scan_tree [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   13,994 ( 0.09%)  ./elf/./elf/do-rel.h:_dl_relocate_object_no_relro
+   13,714 ( 0.09%)  ???:zlib_rs::deflate::gen_codes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   13,700 ( 0.09%)  ???:soapberry_zip::archive::ZipEntries<R>::next_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   13,148 ( 0.09%)  ???:litchi_xlsx::raw::web::check::Probe::observe_start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   12,500 ( 0.08%)  ???:<core::fmt::Formatter>::pad [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   12,385 ( 0.08%)  ./elf/./elf/dl-tunables.c:__GI___tunables_init [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+   12,232 ( 0.08%)  ???:<core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   12,061 ( 0.08%)  ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   12,056 ( 0.08%)  ???:<soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   11,900 ( 0.08%)  ???:soapberry_zip::office::LazyArchiveReader::read_shared_with_reader [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   11,440 ( 0.08%)  ???:soapberry_zip::archive::ZipFileHeaderRecord::from_parts [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   11,010 ( 0.07%)  ???:soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   10,648 ( 0.07%)  ???:zlib_rs::deflate::Heap::construct_huffman_tree [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+   10,194 ( 0.07%)  ???:<f64 as core::str::traits::FromStr>::from_str [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,900 ( 0.07%)  ???:soapberry_zip::preserve::validate_local_span [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,862 ( 0.06%)  ???:litchi_opc::pkgreader::PackageReader::parse_rels_xml_with_source [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,818 ( 0.06%)  ???:litchi_opc::content_type::ContentTypeMap::get [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,762 ( 0.06%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    9,512 ( 0.06%)  ???:litchi_xlsx::raw::worksheet::codec::parse_cell_u32 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,378 ( 0.06%)  ???:core::str::<impl str>::trim_matches [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,337 ( 0.06%)  ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,289 ( 0.06%)  ???:core::iter::traits::iterator::Iterator::try_fold'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,211 ( 0.06%)  ???:litchi_xlsx::calculation_properties::codec::inspect_with_policy [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,150 ( 0.06%)  ???:litchi_xlsx::raw::worksheet::codec::decode_cell_attribute [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    9,120 ( 0.06%)  ???:litchi_xlsx::calculation_properties::rewriter::inspect_layout [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,657 ( 0.06%)  ???:litchi_xlsx::cell::Store::from_unsorted [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,614 ( 0.06%)  ???:litchi_xlsx::raw::catalog::parse_catalog [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,478 ( 0.06%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,437 ( 0.06%)  ???:litchi_xlsx::workbook::model::Workbook::from_package_with_styles [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,382 ( 0.06%)  ???:litchi_opc::package::OpcPackage::is_signed [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,376 ( 0.06%)  ???:litchi_xlsx::raw::worksheet::edit::package::rewrite_with_layout [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,320 ( 0.05%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    8,016 ( 0.05%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-avx2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    7,968 ( 0.05%)  ???:litchi_opc::pkgreader::PackageReader::is_relationship_member [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    7,921 ( 0.05%)  ???:core::ptr::drop_in_place<litchi_opc::error::OpcError> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    7,877 ( 0.05%)  ./elf/./elf/dl-version.c:_dl_check_map_versions [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    7,876 ( 0.05%)  ???:std::io::default_read_to_end [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    7,392 ( 0.05%)  ???:litchi_opc::content_type::required_attributes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,908 ( 0.05%)  ???:soapberry_zip::office::finish_lazy_flight [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,897 ( 0.05%)  ./malloc/./malloc/arena.c:free
+    6,885 ( 0.05%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,660 ( 0.04%)  ???:soapberry_zip::archive::parse_zip64_extra_values [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,592 ( 0.04%)  ???:litchi_opc::packuri::PackURI::rels_uri [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,540 ( 0.04%)  ./malloc/./malloc/arena.c:realloc
+    6,440 ( 0.04%)  ???:hashbrown::raw::RawTableInner::fallible_with_capacity [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,428 ( 0.04%)  ???:soapberry_zip::office::LazyArchiveReader::read_many_serial_shared::{{closure}}::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,312 ( 0.04%)  ???:soapberry_zip::office::ArchiveReader::metadata [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,291 ( 0.04%)  ???:litchi_xlsx::raw::worksheet::validation::optional_bool [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,216 ( 0.04%)  ???:quick_xml::encoding::Decoder::decode_cow [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,176 ( 0.04%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,066 ( 0.04%)  ???:xml_minifier::audit::check_start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    6,010 ( 0.04%)  ???:litchi_opc::content_type::ContentTypeMap::add_override [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,845 ( 0.04%)  ./malloc/./malloc/malloc.c:alloc_perturb [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    5,840 ( 0.04%)  ???:<hashbrown::raw::RawTable<T,A> as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,684 ( 0.04%)  ???:litchi_xlsx::sheet::key [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,652 ( 0.04%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::tag [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,574 ( 0.04%)  ???:litchi_opc::package::is_signature_infrastructure [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,454 ( 0.04%)  ???:litchi_xlsx::raw::namespace::relationship_attribute_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,200 ( 0.03%)  ???:litchi_xlsx::raw::worksheet::semantic::parse_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    5,096 ( 0.03%)  ???:soapberry_zip::preserve::write_prepared_local [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,928 ( 0.03%)  ???:litchi_opc::content_type::validate_content_type [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,888 ( 0.03%)  ???:litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,878 ( 0.03%)  ???:litchi_opc::rel::Relationships::try_add_relationship [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,770 ( 0.03%)  ???:soapberry_zip::archive::resolve_local_entry_size_framing [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,762 ( 0.03%)  ???:litchi_opc::packuri::PackURI::base_uri [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,675 ( 0.03%)  ???:alloc::raw_vec::RawVecInner<A>::try_reserve [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,674 ( 0.03%)  ???:zlib_rs::deflate::State::init_block [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,640 ( 0.03%)  ???:litchi_opc::package::OpcPackage::get_part [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,626 ( 0.03%)  ???:soapberry_zip::office::LazyArchiveReader::read_shared_with_accounting::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,625 ( 0.03%)  ???:litchi_opc::pkgreader::PackageReader::enqueue_target [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,610 ( 0.03%)  ???:litchi_xlsx::raw::styles::start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,480 ( 0.03%)  ???:zlib_rs::deflate::BitWriter::send_bits_overflow [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,472 ( 0.03%)  ???:xml_minifier::audit::package::is_xml_part [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,294 ( 0.03%)  ./malloc/./malloc/arena.c:__libc_malloc2
+    4,237 ( 0.03%)  ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,140 ( 0.03%)  ./libio/./libio/genops.c:_IO_sputbackc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,136 ( 0.03%)  ???:soapberry_zip::office::clone_name_fallibly [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,135 ( 0.03%)  ???:soapberry_zip::accounting::write_all_counted [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,055 ( 0.03%)  ???:crc32fast::Hasher::internal_new_specialized [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    4,010 ( 0.03%)  ???:litchi_opc::pkgreader::is_xml_id [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,928 ( 0.03%)  ???:soapberry_zip::archive::slice_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,900 ( 0.03%)  ???:litchi_opc::content_type::inspect_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,867 ( 0.03%)  ???:soapberry_zip::preserve::read_vec [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,864 ( 0.03%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,798 ( 0.02%)  ???:litchi_xlsx::raw::catalog::WorkbookInfo::process_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,775 ( 0.02%)  ???:<alloc::raw_vec::RawVec<u8>>::grow_one [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,434 ( 0.02%)  ???:litchi_xlsx::calculation_properties::codec::check_attribute_count [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,401 ( 0.02%)  ./libio/./libio/iogetdelim.c:getdelim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    3,386 ( 0.02%)  ???:core::ptr::drop_in_place<litchi_opc::part::XmlPart> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,384 ( 0.02%)  ???:core::ptr::drop_in_place<litchi_xlsx::cell::Cell> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,328 ( 0.02%)  ???:<T as litchi_opc::part::PartClone>::clone_part [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,308 ( 0.02%)  ???:litchi_xlsx::raw::worksheet::validation::optional_u32 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,302 ( 0.02%)  ./elf/../sysdeps/x86/dl-cacheinfo.h:intel_check_word.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    3,240 ( 0.02%)  ???:litchi_xlsx::raw::worksheet::semantic::parse_shared_string_index [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,160 ( 0.02%)  ???:litchi_opc::pkgreader::PackageReader::load_rels_lazy [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,114 ( 0.02%)  ???:litchi_opc::pkgwriter::preservation_member_name [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    3,000 ( 0.02%)  ???:<alloc::string::String as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,993 ( 0.02%)  ???:std::io::Write::write_all [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,976 ( 0.02%)  ???:<quick_xml::name::NamespaceResolver as core::default::Default>::default [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,962 ( 0.02%)  ???:core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::RowSlot> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,945 ( 0.02%)  ???:core::slice::sort::unstable::ipnsort [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,914 ( 0.02%)  ???:hashbrown::map::HashMap<K,V,S,A>::contains_key [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,888 ( 0.02%)  ./elf/./elf/dl-tunables.h:__GI___tunables_init
+    2,860 ( 0.02%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,815 ( 0.02%)  ???:litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,772 ( 0.02%)  ???:hashbrown::map::HashMap<K,V,S,A>::get_mut [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,715 ( 0.02%)  ???:core::slice::sort::unstable::quicksort::quicksort'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,660 ( 0.02%)  ???:alloc::raw_vec::RawVecInner<A>::try_allocate_in [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,660 ( 0.02%)  ???:litchi_xlsx::sheet::validate_str [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,656 ( 0.02%)  ???:core::ptr::drop_in_place<litchi_opc::phys_pkg::PhysPkgReader> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,646 ( 0.02%)  ???:litchi_opc::pkgreader::read_structural_member [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,504 ( 0.02%)  ???:<core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,451 ( 0.02%)  ???:litchi_opc::packuri::PackURI::ext [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,444 ( 0.02%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,304 ( 0.02%)  ???:litchi_xlsx::column::Assignments<T>::collect'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,296 ( 0.02%)  ???:<litchi_opc::package::OpcPackage as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,284 ( 0.02%)  ???:soapberry_zip::office::LazyCacheState::insert [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,212 ( 0.01%)  ???:litchi_opc::content_type::ContentType::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,184 ( 0.01%)  ???:litchi_xlsx::raw::compact::changed [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,139 ( 0.01%)  ???:litchi_opc::pkgreader::required_relationship_attribute [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,131 ( 0.01%)  ???:litchi_xlsx::raw::strings::decode_spreadsheet_text [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,110 ( 0.01%)  ./elf/./elf/dl-load.c:_dl_map_object_from_fd [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    2,076 ( 0.01%)  ???:litchi_ooxml_common::mce::codec::process_ooxml [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,024 ( 0.01%)  ???:soapberry_zip::preserve::central_record_span [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    2,019 ( 0.01%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,992 ( 0.01%)  ./elf/../bits/stdlib-bsearch.h:intel_check_word.constprop.0
+    1,980 ( 0.01%)  ???:soapberry_zip::office::LazyFlight::complete_success [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,933 ( 0.01%)  ???:alloc::sync::Arc<T,A>::drop_slow'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,932 ( 0.01%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+    1,881 ( 0.01%)  ./elf/./elf/dl-cache.c:_dl_cache_libcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    1,875 ( 0.01%)  ???:<litchi_opc::part::XmlPart as litchi_opc::part::Part>::content_type [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,862 ( 0.01%)  ???:flate2::mem::Decompress::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,860 ( 0.01%)  ???:soapberry_zip::preserve::PreparedCentral::checked_bytes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,858 ( 0.01%)  ???:memchr::arch::x86_64::avx2::packedpair::Finder::find_impl [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,843 ( 0.01%)  ???:litchi_sheet::Cell::from_a1 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,841 ( 0.01%)  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S:__memchr_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,837 ( 0.01%)  ???:litchi_xlsx::raw::compact::text_bearing [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,830 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::validation::parse_one_based_row [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,824 ( 0.01%)  ???:litchi_xlsx::raw::strings::Parser::finish [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,804 ( 0.01%)  ???:litchi_opc::package::try_owned_bytes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,772 ( 0.01%)  ???:hashbrown::rustc_entry::<impl hashbrown::map::HashMap<K,V,S,A>>::rustc_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,769 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::x14ac::attribute_name [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,746 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_xlsx::cell::Value> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,742 ( 0.01%)  ???:litchi_opc::rel::Relationships::for_source [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,716 ( 0.01%)  ???:soapberry_zip::office::try_clone_lazy_key [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,710 ( 0.01%)  ./libio/./libio/strops.c:_IO_str_init_static_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,710 ( 0.01%)  ./stdio-common/./stdio-common/isoc23_sscanf.c:__isoc23_sscanf [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,666 ( 0.01%)  ???:litchi_xlsx::calculation_properties::codec::reject_unsafe_event [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,658 ( 0.01%)  ???:<flate2::mem::Compress as flate2::zio::Ops>::run_vec [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,607 ( 0.01%)  ???:alloc::vec::Vec<T,A>::into_boxed_slice [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,602 ( 0.01%)  ???:litchi_xlsx::raw::strings::Parser::start [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,600 ( 0.01%)  ???:<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,562 ( 0.01%)  ???:litchi_xlsx::cell::Number::validate_lexical [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,559 ( 0.01%)  ???:soapberry_zip::preserve::generated_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,540 ( 0.01%)  ???:<alloc::string::String>::try_reserve_exact [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,512 ( 0.01%)  ???:core::ptr::drop_in_place<(alloc::string::String,litchi_opc::rel::Relationship)> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,510 ( 0.01%)  ???:core::slice::sort::unstable::quicksort::quicksort [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,495 ( 0.01%)  ???:alloc::collections::btree::map::IntoIter<K,V,A>::dying_next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,490 ( 0.01%)  ???:litchi_xlsx::raw::catalog::optional_u32 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,479 ( 0.01%)  ???:quick_xml::reader::state::ReaderState::emit_question_mark [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,478 ( 0.01%)  ./malloc/./malloc/malloc.c:_int_memalign [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,452 ( 0.01%)  ???:soapberry_zip::archive::ZipFileHeaderFixed::parse [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,450 ( 0.01%)  ???:soapberry_zip::locator::ZipLocator::locate_in_byte_slice [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,427 ( 0.01%)  ./elf/./elf/dl-deps.c:_dl_map_object_deps [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    1,425 ( 0.01%)  ???:core::slice::sort::shared::smallsort::bidirectional_merge [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,398 ( 0.01%)  ???:alloc::sync::Arc<T,A>::drop_slow [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,390 ( 0.01%)  ???:<&T as core::fmt::Display>::fmt [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,384 ( 0.01%)  ???:core::slice::sort::stable::quicksort::quicksort [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,368 ( 0.01%)  ???:litchi_xlsx::raw::strings::Parser::push_text [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,352 ( 0.01%)  ???:core::str::iter::SplitInternal<P>::next_back [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,342 ( 0.01%)  ???:litchi_opc::rel::Relationship::target_partname [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,332 ( 0.01%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,322 ( 0.01%)  ./elf/./elf/rtld.c:dl_main [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    1,290 ( 0.01%)  ???:core::ptr::drop_in_place<soapberry_zip::preserve::PreparedEntry> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,290 ( 0.01%)  ???:soapberry_zip::accounting::AccountingWriteKind::add [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,254 ( 0.01%)  ???:core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,240 ( 0.01%)  ???:litchi_xlsx::calculation_properties::rewriter::close_frame [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,238 ( 0.01%)  ./nptl/./nptl/pthread_getattr_np.c:pthread_getattr_np@@GLIBC_2.32 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,207 ( 0.01%)  ???:edit_cells::main [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,193 ( 0.01%)  ???:litchi_xlsx::cell::Store::entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,168 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::validation::optional_f64 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,157 ( 0.01%)  ./libio/./libio/genops.c:_IO_no_init [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,144 ( 0.01%)  ???:core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<soapberry_zip::office::LazyCacheState>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,111 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,110 ( 0.01%)  ???:<alloc::string::String as core::fmt::Display>::fmt [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,085 ( 0.01%)  ???:smallvec::SmallVec<A>::push [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,081 ( 0.01%)  ???:litchi_xlsx::column::Assignments<T>::assign_node [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,076 ( 0.01%)  ./elf/./elf/dl-misc.c:_dl_name_match_p [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    1,066 ( 0.01%)  ???:0x0000000004beb680 [???]
+    1,014 ( 0.01%)  ./libio/./libio/genops.c:_IO_old_init [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,012 ( 0.01%)  ???:soapberry_zip::office::LazyCacheState::next_recency [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,012 ( 0.01%)  ???:std::sync::poison::mutex::Mutex<T>::lock [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+    1,008 ( 0.01%)  ???:soapberry_zip::preserve::validate_prepared_local [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      991 ( 0.01%)  ./elf/./elf/get-dynamic-info.h:_dl_map_object_from_fd
+      990 ( 0.01%)  ./stdio-common/../include/scratch_buffer.h:__vfscanf_internal
+      990 ( 0.01%)  ???:litchi_xlsx::calculation_properties::codec::collapse_whitespace [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      962 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      961 ( 0.01%)  ???:litchi_opc::pkgreader::RelationshipLedger::add_relationship [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      940 ( 0.01%)  ./malloc/./malloc/malloc.c:__libc_calloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      936 ( 0.01%)  ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop'2 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      921 ( 0.01%)  ???:<smallvec::SmallVec<A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      906 ( 0.01%)  ./libio/./libio/genops.c:_IO_setb [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      900 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::edit::package::rewrite [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      892 ( 0.01%)  ???:<alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      876 ( 0.01%)  ???:litchi_xlsx::raw::strings::spreadsheet_escape_at [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      862 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_xlsx::cell::Store> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      861 ( 0.01%)  ./malloc/./malloc/malloc.c:_mid_memalign [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      858 ( 0.01%)  ???:litchi_xlsx::calculation_properties::codec::parse_calc_attributes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      855 ( 0.01%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_cell [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      836 ( 0.01%)  ???:soapberry_zip::preserve::central_local_header_offset_patch [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      832 ( 0.01%)  ???:litchi_xlsx::calculation_properties::rewriter::Bounded::extend [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      810 ( 0.01%)  ???:litchi_xlsx::calculation_properties::rewriter::rewrite_properties_start_tag [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      794 ( 0.01%)  ???:memchr::memmem::FinderBuilder::build_forward_with_ranker [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      792 ( 0.01%)  ???:soapberry_zip::archive::validate_borrowed_wayfinder_metadata [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      775 ( 0.01%)  ???:flate2::mem::Decompress::reset [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      765 ( 0.01%)  ./elf/../sysdeps/generic/ldsodefs.h:do_lookup_x
+      760 ( 0.00%)  ???:<litchi_xlsx::cell::Text as core::convert::From<alloc::string::String>>::from [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      759 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      756 ( 0.00%)  ???:soapberry_zip::preserve::PreparedLocal::len [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      751 ( 0.00%)  ./elf/./elf/dl-object.c:_dl_new_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      748 ( 0.00%)  ???:crc32fast::baseline::update_fast_16 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      744 ( 0.00%)  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      732 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::validation::parse_defaults_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      712 ( 0.00%)  ???:<litchi_opc::part::XmlPart as litchi_opc::part::Part>::partname [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      689 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::row_position [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      689 ( 0.00%)  ???:litchi_xlsx::workbook::edit::codec::calculation_chain_removal [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      680 ( 0.00%)  ???:soapberry_zip::office::LazyArchiveReader::read_many_serial_shared [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      672 ( 0.00%)  ???:alloc::boxed::box_new_uninit [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      666 ( 0.00%)  ???:soapberry_zip::preserve::PreparedCentral::bytes [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      645 ( 0.00%)  ???:core::slice::sort::stable::drift::sort [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      637 ( 0.00%)  ./nptl/./nptl/libc-cleanup.c:__libc_cleanup_push_defer [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      632 ( 0.00%)  ./elf/../sysdeps/generic/dl-protected.h:do_lookup_x
+      630 ( 0.00%)  ./stdio-common/../libio/strfile.h:__isoc23_sscanf
+      630 ( 0.00%)  ./stdio-common/./stdio-common/printf-parse.h:__vfscanf_internal
+      619 ( 0.00%)  ./elf/./dl-find_object.h:_dl_find_object_from_map [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      598 ( 0.00%)  ???:<T as alloc::string::SpecToString>::spec_to_string [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      596 ( 0.00%)  ./elf/./elf/dl-minimal-malloc.c:__minimal_malloc [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      596 ( 0.00%)  ???:soapberry_zip::path::ZipFilePath<()>::from_str [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      595 ( 0.00%)  ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      592 ( 0.00%)  ???:litchi_sheet::Cell::a1 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      588 ( 0.00%)  ./elf/./elf/dl-cache.c:_dl_load_cache_lookup [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      588 ( 0.00%)  ./elf/./elf/dl-tunables.c:__tunable_get_val [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      588 ( 0.00%)  ./malloc/./malloc/malloc.c:posix_memalign [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      572 ( 0.00%)  ???:core::ptr::drop_in_place<core::option::Option<soapberry_zip::preserve::PreparedEntry>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      572 ( 0.00%)  ???:litchi_xlsx::raw::strings::encode_spreadsheet_text [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      567 ( 0.00%)  ???:<smallvec::IntoIter<A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      555 ( 0.00%)  ./malloc/./malloc/malloc.c:__ptmalloc_init
+      553 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::write_tag [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      551 ( 0.00%)  ???:core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      546 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      544 ( 0.00%)  ???:litchi_xlsx::column::resolve [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      536 ( 0.00%)  ./elf/./elf/dl-hwcaps_split.c:_dl_hwcaps_split_masked [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      535 ( 0.00%)  ???:<hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      532 ( 0.00%)  ???:soapberry_zip::writer::ZipArchiveWriter<W>::finish [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      528 ( 0.00%)  ./misc/../sysdeps/unix/sysv/linux/x86_64/syscall.S:syscall [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      524 ( 0.00%)  ???:litchi_xlsx::chain::package::validate_part_set [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      523 ( 0.00%)  ./elf/../sysdeps/generic/ldsodefs.h:_dl_relocate_object_no_relro
+      516 ( 0.00%)  ???:litchi_xlsx::calculation_properties::codec::validate_core_order [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      496 ( 0.00%)  ???:core::slice::sort::shared::smallsort::sort4_stable [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      494 ( 0.00%)  ???:<zlib_rs::stable::Inflate as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      490 ( 0.00%)  ./nptl/./nptl/libc-cleanup.c:__libc_cleanup_pop_restore [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      490 ( 0.00%)  ???:zlib_rs::deflate::BitWriter::flush_bits [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      484 ( 0.00%)  ???:soapberry_zip::archive::CompressionMethodId::as_method [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      480 ( 0.00%)  ./elf/../sysdeps/x86/dl-cacheinfo.h:handle_intel.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      480 ( 0.00%)  ???:<hashbrown::map::HashMap<K,V,S,A> as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      478 ( 0.00%)  ???:flate2::deflate::read::DeflateDecoder<R>::new_with_buf [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      469 ( 0.00%)  ???:litchi_xlsx::workbook::edit::validation::FinalOrder::plan::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      459 ( 0.00%)  ???:core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::Layout> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      458 ( 0.00%)  ???:<litchi_opc::part::XmlPart as litchi_opc::part::Part>::rels [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      456 ( 0.00%)  ???:litchi_opc::package::OpcPackage::main_document_part [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      452 ( 0.00%)  ???:litchi_xlsx::workbook::edit::semantic::worksheet::WorksheetEdit::set [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      450 ( 0.00%)  ./stdlib/../stdlib/strtol.c:__strtoul_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      444 ( 0.00%)  ./elf/./elf/dl-load.c:_dl_lookup_map [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      437 ( 0.00%)  ???:alloc::collections::btree::map::BTreeMap<K,V,A>::remove [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      432 ( 0.00%)  ???:litchi_xlsx::merge::Index::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      424 ( 0.00%)  ./misc/../sysdeps/unix/sysv/linux/mmap64.c:mmap [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      411 ( 0.00%)  ./elf/./dl-map-segments.h:_dl_map_object_from_fd
+      408 ( 0.00%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strchr-avx2.S:index [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      408 ( 0.00%)  ???:alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert_entry [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      406 ( 0.00%)  ???:std::sys::fs::metadata [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      397 ( 0.00%)  ./elf/./elf/dl-load.c:open_verify.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      389 ( 0.00%)  ./elf/./elf/dl-load.c:open_path [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      388 ( 0.00%)  ./malloc/./malloc/malloc.c:systrim.constprop.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      384 ( 0.00%)  ???:core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<std::io::cursor::Cursor<&[u8]>>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      382 ( 0.00%)  ./elf/./elf/dl-environ.c:_dl_next_ld_env_entry [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      377 ( 0.00%)  ./elf/./get-dynamic-info.h:dl_main
+      368 ( 0.00%)  ???:__cpu_indicator_init [/usr/lib/x86_64-linux-gnu/libgcc_s.so.1]
+      361 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      357 ( 0.00%)  ???:<alloc::collections::btree::map::IntoIter<K,V,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      356 ( 0.00%)  ./elf/./elf/dl-load.c:_dl_map_new_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      356 ( 0.00%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strlen-avx2.S:strlen [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      352 ( 0.00%)  ???:litchi_ooxml_common::mce::model::Capabilities::preserve_extension_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      345 ( 0.00%)  ???:litchi_sheet::Rect::from_a1 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      341 ( 0.00%)  ???:core::ptr::drop_in_place<quick_xml::events::attributes::Attributes> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      340 ( 0.00%)  ???:<litchi_xlsx::workbook::edit::model::State as core::cmp::PartialEq>::eq [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      340 ( 0.00%)  ???:litchi_xlsx::workbook::edit::model::State::read [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      337 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_payload [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      336 ( 0.00%)  ???:<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob_arc [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      331 ( 0.00%)  ./malloc/./malloc/malloc.c:calloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      331 ( 0.00%)  ???:core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      329 ( 0.00%)  ???:litchi_xlsx::workbook::edit::semantic::transaction::Edit::actions [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      327 ( 0.00%)  ???:litchi_xlsx::workbook::edit::model::State::after [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      324 ( 0.00%)  ???:litchi_xlsx::workbook::model::Workbook::calculation_metadata [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      322 ( 0.00%)  ./elf/./elf/dl-sort-maps.c:_dl_sort_maps [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      321 ( 0.00%)  ???:litchi_opc::content_type::ContentTypeMap::add_default [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      319 ( 0.00%)  ???:litchi_xlsx::workbook::edit::validation::FinalOrder::plan [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      318 ( 0.00%)  ???:<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      314 ( 0.00%)  ./elf/./dl-tls_block_align.h:_dl_allocate_tls_storage
+      309 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::model::merge_successor [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      308 ( 0.00%)  ./elf/./elf/dl-load.c:_dl_init_paths [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      308 ( 0.00%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/memset-vec-unaligned-erms.S:memset [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      308 ( 0.00%)  ???:flate2::mem::Compress::new [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      308 ( 0.00%)  ???:litchi_xlsx::raw::catalog::required_u32 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      306 ( 0.00%)  ???:core::ptr::drop_in_place<quick_xml::events::Event> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      306 ( 0.00%)  ???:std_detect::detect::cache::detect_and_initialize [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      301 ( 0.00%)  ???:litchi_xlsx::calculation_properties::rewriter::escape_attribute [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      300 ( 0.00%)  ???:core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::State> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      297 ( 0.00%)  ???:smallvec::SmallVec<A>::try_reserve [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      295 ( 0.00%)  ./misc/./misc/sbrk.c:sbrk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      295 ( 0.00%)  ???:<litchi_xlsx::cell::Cell as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      294 ( 0.00%)  ???:litchi_xlsx::raw::catalog::optional_string [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      292 ( 0.00%)  ./misc/./misc/getauxval.c:getauxval [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      288 ( 0.00%)  ???:<std::sys::sync::once::futex::Once>::call [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      286 ( 0.00%)  ???:litchi_opc::package::OpcPackage::get_part_mut [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      276 ( 0.00%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/memmove-vec-unaligned-erms.S:mempcpy [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      276 ( 0.00%)  ???:litchi_xlsx::cell::Bounds::finish [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      273 ( 0.00%)  ???:std::fs::write [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      271 ( 0.00%)  ./elf/./get-dynamic-info.h:_dl_start
+      270 ( 0.00%)  ???:core::ptr::drop_in_place<soapberry_zip::errors::Error> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      270 ( 0.00%)  ???:soapberry_zip::writer::ZipEntryWriter<W>::finish [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      268 ( 0.00%)  ./elf/./elf/dl-lookup-direct.c:_dl_lookup_direct [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      266 ( 0.00%)  ./elf/../sysdeps/unix/sysv/linux/dl-sysdep.c:_dl_sysdep_parse_arguments [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      266 ( 0.00%)  ???:litchi_xlsx::cell::Content::validate_for_write [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      264 ( 0.00%)  ???:soapberry_zip::archive::DataDescriptor::parse_complete_with_width [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      263 ( 0.00%)  ./elf/./elf/dl-sort-maps.c:dfs_traversal.part.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      262 ( 0.00%)  ???:litchi_xlsx::workbook::edit::semantic::transaction::validate_final_sheet_names [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      260 ( 0.00%)  ???:litchi_xlsx::raw::recalc::invalidate [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      259 ( 0.00%)  ./elf/../sysdeps/x86/dl-cacheinfo.h:init_cpu_features.constprop.0
+      258 ( 0.00%)  ./elf/./elf/dl-catch.c:_dl_catch_exception [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      258 ( 0.00%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/memmove-vec-unaligned-erms.S:memcpy [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      254 ( 0.00%)  ./elf/./elf/dl-init.c:call_init.part.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      252 ( 0.00%)  ./elf/./elf/dl-find_object.c:_dlfo_process_initial [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      252 ( 0.00%)  ./libio/./libio/fileops.c:_IO_file_underflow@@GLIBC_2.2.5 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      251 ( 0.00%)  ./elf/./elf/dl-minimal.c:strsep [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      251 ( 0.00%)  ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      244 ( 0.00%)  ./elf/./elf/dl-fini.c:_dl_fini [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      240 ( 0.00%)  ./elf/./elf/dl-tunables.c:__GI___tunable_set_val [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      238 ( 0.00%)  ./elf/./elf/rtld.c:_dl_start [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      236 ( 0.00%)  ???:<litchi_opc::part::XmlPart as litchi_opc::part::Part>::blob [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      235 ( 0.00%)  ???:litchi_xlsx::calculation_properties::codec::calc_attribute_index [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      229 ( 0.00%)  ???:alloc::vec::Vec<T,A>::resize [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      228 ( 0.00%)  ./elf/./elf/dl-hwcaps.c:_dl_important_hwcaps [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      224 ( 0.00%)  ???:alloc::raw_vec::RawVecInner<A>::try_reserve_exact [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      221 ( 0.00%)  ./elf/../sysdeps/unix/sysv/linux/dl-parse_auxv.h:_dl_sysdep_parse_arguments
+      221 ( 0.00%)  ./nptl/./nptl/cancellation.c:__syscall_cancel [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      220 ( 0.00%)  ???:core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      219 ( 0.00%)  ???:std::sys::fs::unix::try_statx [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      217 ( 0.00%)  ./elf/../elf/dl-tls.c:_dl_allocate_tls_init [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      214 ( 0.00%)  ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_default [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      208 ( 0.00%)  ./elf/../sysdeps/x86/dl-cacheinfo.h:get_common_cache_info.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      207 ( 0.00%)  ./io/../sysdeps/unix/sysv/linux/open64_nocancel.c:__open_nocancel [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      204 ( 0.00%)  ???:<alloc::string::String>::from_utf8_lossy [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      203 ( 0.00%)  ???:main [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      200 ( 0.00%)  ???:litchi_xlsx::calculation_properties::rewriter::Bounded::push [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      200 ( 0.00%)  ???:litchi_xlsx::calculation_properties::rewriter::attr [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      198 ( 0.00%)  ???:zlib_rs::deflate::algorithm::run [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      196 ( 0.00%)  ./libio/../string/bits/string_fortified.h:getdelim
+      196 ( 0.00%)  ???:zlib_rs::deflate::flush_pending [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      193 ( 0.00%)  ???:core::ptr::drop_in_place<litchi_xlsx::workbook::edit::model::Commit> [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      188 ( 0.00%)  ./signal/../sysdeps/unix/sysv/linux/libc_sigaction.c:__libc_sigaction [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      188 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_text_element [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      186 ( 0.00%)  ???:litchi_xlsx::raw::strings::count_hint [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      184 ( 0.00%)  ???:soapberry_zip::writer::ZipArchiveWriter<W>::reserve_member_metadata [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      184 ( 0.00%)  ???:zlib_rs::deflate::BitWriter::emit_align [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      183 ( 0.00%)  ./elf/./elf/dl-load.c:_dl_map_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      182 ( 0.00%)  ???:alloc::vec::Vec<T,A>::extend_trusted [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      182 ( 0.00%)  ???:litchi_xlsx::calculation_properties::rewriter::follows_calc_pr [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      181 ( 0.00%)  ???:<alloc::collections::btree::map::IntoIter<K,V,A> as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      180 ( 0.00%)  ./libio/./libio/libioP.h:getdelim
+      180 ( 0.00%)  ./stdio-common/./stdio-common/getline.c:getline [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      179 ( 0.00%)  ./libio/./libio/genops.c:_IO_flush_all [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      177 ( 0.00%)  ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      176 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::sibling_name [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      175 ( 0.00%)  ./elf/../sysdeps/x86/cpu-features.c:init_cpu_features.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      174 ( 0.00%)  ./stdlib/./stdlib/cxa_finalize.c:__cxa_finalize [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      173 ( 0.00%)  ???:litchi_xlsx::calculation_properties::codec::parse_u32 [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      170 ( 0.00%)  ./elf/../sysdeps/x86/cpu-features.c:update_active.constprop.0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      170 ( 0.00%)  ./libio/./libio/genops.c:_IO_cleanup [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      168 ( 0.00%)  ???:litchi_xlsx::raw::worksheet::edit::codec::wire::column_range [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      167 ( 0.00%)  ???:litchi_xlsx::workbook::edit::semantic::worksheet::WorksheetEdit::clear [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      166 ( 0.00%)  ./setjmp/../sysdeps/x86_64/setjmp.S:__sigsetjmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      166 ( 0.00%)  ???:<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0} [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      164 ( 0.00%)  ./elf/./elf/dl-call_fini.c:_dl_call_fini [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      161 ( 0.00%)  ???:litchi_xlsx::workbook::model::Workbook::adopt_validated_worksheet_stores [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      160 ( 0.00%)  ./elf/../elf/dl-tls.c:_dl_determine_tlsoffset [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+      158 ( 0.00%)  ???:<std::io::stdio::StdoutLock as std::io::Write>::write_all [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      158 ( 0.00%)  ???:litchi_xlsx::workbook::edit::model::project_merges [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      156 ( 0.00%)  ???:<soapberry_zip::writer::ZipEntryWriter<W> as std::io::Write>::write [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+      156 ( 0.00%)  ???:core::str::pattern::simd_contains::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0593-before/release/examples/edit_cells]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./elf/../bits/stdlib-bsearch.h
+  ./elf/../elf/dl-tls.c
+  ./elf/../sysdeps/generic/dl-new-hash.h
+  ./elf/../sysdeps/generic/dl-protected.h
+  ./elf/../sysdeps/generic/ldsodefs.h
+  ./elf/../sysdeps/unix/sysv/linux/dl-parse_auxv.h
+  ./elf/../sysdeps/unix/sysv/linux/dl-sysdep.c
+  ./elf/../sysdeps/x86/cpu-features.c
+  ./elf/../sysdeps/x86/dl-cacheinfo.h
+  ./elf/../sysdeps/x86_64/dl-machine.h
+  ./elf/./dl-find_object.h
+  ./elf/./dl-map-segments.h
+  ./elf/./dl-tls_block_align.h
+  ./elf/./elf/dl-cache.c
+  ./elf/./elf/dl-call_fini.c
+  ./elf/./elf/dl-catch.c
+  ./elf/./elf/dl-deps.c
+  ./elf/./elf/dl-environ.c
+  ./elf/./elf/dl-find_object.c
+  ./elf/./elf/dl-fini.c
+  ./elf/./elf/dl-hwcaps.c
+  ./elf/./elf/dl-hwcaps_split.c
+  ./elf/./elf/dl-init.c
+  ./elf/./elf/dl-load.c
+  ./elf/./elf/dl-lookup-direct.c
+  ./elf/./elf/dl-lookup.c
+  ./elf/./elf/dl-minimal-malloc.c
+  ./elf/./elf/dl-minimal.c
+  ./elf/./elf/dl-misc.c
+  ./elf/./elf/dl-object.c
+  ./elf/./elf/dl-reloc.c
+  ./elf/./elf/dl-sort-maps.c
+  ./elf/./elf/dl-tunables.c
+  ./elf/./elf/dl-tunables.h
+  ./elf/./elf/dl-version.c
+  ./elf/./elf/do-rel.h
+  ./elf/./elf/get-dynamic-info.h
+  ./elf/./elf/rtld.c
+  ./elf/./get-dynamic-info.h
+  ./io/../sysdeps/unix/sysv/linux/open64_nocancel.c
+  ./libio/../string/bits/string_fortified.h
+  ./libio/./libio/fileops.c
+  ./libio/./libio/genops.c
+  ./libio/./libio/iogetdelim.c
+  ./libio/./libio/libioP.h
+  ./libio/./libio/strops.c
+  ./malloc/../string/bits/string_fortified.h
+  ./malloc/./malloc/arena.c
+  ./malloc/./malloc/malloc.c
+  ./misc/../sysdeps/unix/sysv/linux/mmap64.c
+  ./misc/../sysdeps/unix/sysv/linux/x86_64/syscall.S
+  ./misc/./misc/getauxval.c
+  ./misc/./misc/sbrk.c
+  ./nptl/./nptl/cancellation.c
+  ./nptl/./nptl/libc-cleanup.c
+  ./nptl/./nptl/pthread_getattr_np.c
+  ./setjmp/../sysdeps/x86_64/setjmp.S
+  ./signal/../sysdeps/unix/sysv/linux/libc_sigaction.c
+  ./stdio-common/../include/scratch_buffer.h
+  ./stdio-common/../libio/strfile.h
+  ./stdio-common/./stdio-common/getline.c
+  ./stdio-common/./stdio-common/isoc23_sscanf.c
+  ./stdio-common/./stdio-common/printf-parse.h
+  ./stdio-common/./stdio-common/vfscanf-internal.c
+  ./stdlib/../stdlib/strtol.c
+  ./stdlib/../stdlib/strtol_l.c
+  ./stdlib/./stdlib/cxa_finalize.c
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/memset-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/strchr-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/strlen-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S
+

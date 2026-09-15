@@ -8,6 +8,7 @@ use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
 use std::collections::{HashMap, hash_map::Entry};
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 /// Whether a relationship target is inside or outside the OPC package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -224,6 +225,50 @@ pub struct Relationships {
 
     /// Map of relationship ID to Relationship
     rels: HashMap<String, Relationship>,
+
+    /// Canonical serialization captured when the owning package was opened.
+    ///
+    /// Publication planning compares this handle by pointer identity against
+    /// the preservation provenance that produced it. A match proves the
+    /// collection still holds the value that was serialized at open, so the
+    /// source member can be copied without reserializing or auditing bytes
+    /// that would be discarded. Every mutating method clears the handle, and a
+    /// handle moved into a different collection cannot match another part's
+    /// provenance, so the proof never outlives the value it describes.
+    source_capture: Option<Arc<CanonicalRelationshipsXml>>,
+}
+
+/// Canonical `.rels` serialization of one relationship collection.
+///
+/// Captured while a package is opened and retained by the preservation
+/// provenance. [`Self::Empty`] avoids owning a buffer for the common empty
+/// collection; both variants render the exact bytes
+/// [`Relationships::try_to_xml_bytes`] produces for the same value.
+#[derive(Debug)]
+pub(crate) enum CanonicalRelationshipsXml {
+    /// The collection held no relationships.
+    Empty,
+    /// The serialized bytes of a non-empty collection.
+    Owned(Vec<u8>),
+}
+
+pub(crate) const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+
+impl CanonicalRelationshipsXml {
+    pub(crate) fn from_relationships(relationships: &Relationships) -> Option<Self> {
+        if relationships.is_empty() {
+            Some(Self::Empty)
+        } else {
+            Some(Self::Owned(relationships.try_to_xml_bytes().ok()?))
+        }
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Empty => EMPTY_RELATIONSHIPS_XML,
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
 }
 
 impl Relationships {
@@ -237,6 +282,7 @@ impl Relationships {
             base_uri,
             source_uri: None,
             rels: HashMap::new(),
+            source_capture: None,
         }
     }
 
@@ -246,7 +292,23 @@ impl Relationships {
             base_uri: source.base_uri().to_string(),
             source_uri: Some(source.as_str().to_string()),
             rels: HashMap::new(),
+            source_capture: None,
         }
+    }
+
+    /// Record the canonical serialization captured for this collection at open.
+    pub(crate) fn set_source_capture(&mut self, capture: Arc<CanonicalRelationshipsXml>) {
+        self.source_capture = Some(capture);
+    }
+
+    /// The capture recorded at open, if no mutation has run since.
+    pub(crate) fn source_capture(&self) -> Option<&Arc<CanonicalRelationshipsXml>> {
+        self.source_capture.as_ref()
+    }
+
+    /// Drop the open-time proof because this collection is about to change.
+    fn invalidate_source_capture(&mut self) {
+        self.source_capture = None;
     }
 
     /// Add a relationship to the collection.
@@ -266,6 +328,7 @@ impl Relationships {
         r_id: String,
         is_external: bool,
     ) -> &Relationship {
+        self.invalidate_source_capture();
         // Preserve compatibility for existing writer call sites without ever
         // replacing an established relationship. New code that needs duplicate
         // diagnostics should use `try_add_relationship`.
@@ -302,6 +365,7 @@ impl Relationships {
             return Err(OpcError::DuplicateRelationshipId(r_id));
         }
         self.try_reserve(1)?;
+        self.invalidate_source_capture();
         let base_uri = self.base_uri.clone();
         let source_uri = self.source_uri.clone();
         match self.rels.entry(r_id) {
@@ -326,6 +390,7 @@ impl Relationships {
     /// relationships into the in-memory collection, so map growth remains a
     /// typed allocation error rather than an infallible insertion side effect.
     pub(crate) fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        self.invalidate_source_capture();
         self.rels
             .try_reserve(additional)
             .map_err(|source| OpcError::Allocation {
@@ -474,6 +539,7 @@ impl Relationships {
 
     /// Remove a relationship by its ID.
     pub fn remove(&mut self, r_id: &str) -> Option<Relationship> {
+        self.invalidate_source_capture();
         self.rels.remove(r_id)
     }
 
@@ -485,6 +551,7 @@ impl Relationships {
     /// Returns an error if `r_id` does not identify a relationship in this
     /// collection.
     pub fn retarget(&mut self, r_id: &str, target_ref: String) -> Result<()> {
+        self.invalidate_source_capture();
         let relationship = self.rels.get_mut(r_id).ok_or_else(|| {
             OpcError::RelationshipNotFound(format!("relationship '{r_id}' was not found"))
         })?;
@@ -493,6 +560,7 @@ impl Relationships {
     }
 
     pub(crate) fn retain(&mut self, mut keep: impl FnMut(&Relationship) -> bool) {
+        self.invalidate_source_capture();
         self.rels.retain(|_, relationship| keep(relationship));
     }
 
@@ -728,6 +796,95 @@ mod tests {
             Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
         ));
         assert_eq!(relationships.get("rId1").unwrap().target_ref(), "first.xml");
+    }
+
+    #[test]
+    fn every_value_mutation_drops_the_open_time_capture() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let capture = || Arc::new(CanonicalRelationshipsXml::Empty);
+
+        let mut relationships = Relationships::for_source(&source);
+        assert!(relationships.source_capture().is_none());
+        relationships.set_source_capture(capture());
+        assert!(relationships.source_capture().is_some());
+
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId1".to_owned(),
+            true,
+        );
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "https://example.com/second".to_owned(),
+                "rId2".to_owned(),
+                TargetMode::External,
+            )
+            .expect("fallible insertion");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.get_or_add("urn:test", "target.xml");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.get_or_add_ext_rel("urn:test", "https://example.com/third");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships
+            .retarget("rId1", "https://example.com/moved".to_owned())
+            .expect("retarget");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.retain(|_relationship| true);
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.try_reserve(4).expect("reserve");
+        assert!(relationships.source_capture().is_none());
+
+        // A lookup that changes nothing still drops the proof, because the
+        // caller asked for a mutation; the proof is only ever conservative.
+        relationships.set_source_capture(capture());
+        assert!(relationships.remove("rIdAbsent").is_none());
+        assert!(relationships.source_capture().is_none());
+    }
+
+    #[test]
+    fn a_captured_serialization_matches_what_publication_would_write() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let mut relationships = Relationships::for_source(&source);
+        assert_eq!(
+            CanonicalRelationshipsXml::from_relationships(&relationships)
+                .expect("empty capture")
+                .as_bytes(),
+            relationships.try_to_xml_bytes().expect("empty bytes")
+        );
+
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId1".to_owned(),
+            true,
+        );
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "target.xml".to_owned(),
+            "rId2".to_owned(),
+            false,
+        );
+        assert_eq!(
+            CanonicalRelationshipsXml::from_relationships(&relationships)
+                .expect("owned capture")
+                .as_bytes(),
+            relationships.try_to_xml_bytes().expect("owned bytes")
+        );
     }
 
     #[test]
