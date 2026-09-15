@@ -15,7 +15,7 @@ fn atom(record_type: RecordType, version: u16, instance: u16, data: Vec<u8>) -> 
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -27,7 +27,7 @@ fn opaque(raw_type: u16, version: u16, instance: u16, data: Vec<u8>) -> Record {
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }

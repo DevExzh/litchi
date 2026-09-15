@@ -123,7 +123,7 @@ mod tests {
             record_type: RecordType::Document,
             record_type_raw: RecordType::Document.as_u16(),
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children: vec![child],
         }
     }

@@ -46,7 +46,7 @@ fn sync_container(record: &mut Record) -> Result<()> {
     }
     record.data_length = u32::try_from(payload.len())
         .map_err(|_err| Error::InvalidFormat("PPT structural payload exceeds u32::MAX".into()))?;
-    record.data = payload;
+    record.data = payload.into();
     Ok(())
 }
 
@@ -58,7 +58,7 @@ fn encode_record(record: &Record, force_children: bool) -> Result<Vec<u8>> {
         }
         payload
     } else if record.children.is_empty() {
-        record.data.clone()
+        record.data.to_vec()
     } else {
         let mut payload = Vec::new();
         for child in &record.children {

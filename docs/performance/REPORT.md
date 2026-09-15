@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0606 — PPT record tree borrowed payloads
+
+Retained, `performance_claim: none`. The PPT record parser stops copying every record payload once per nesting level and instead spans the stream the `Presentation` retains; the per-open slide-text extraction becomes lazy. Measured on `45543.ppt`: eager open −23.93% `Ir`, −50.4% allocations, −54.0% allocated bytes, −56.6% retained bytes, −31.1% `memcpy` calls; open plus list slides −21.12% `Ir`; open plus full text −19.17% `Ir`; open, edit and save −12.26% `Ir`. Paired p50 on the registered selectors against an A/A floor of 0.3–1.4%: `ppt_semantic_open` −14.92%, `ppt_semantic_one_edit_save` −5.33%, `ppt_semantic_list_slides` −1.22%, `ppt_semantic_full_text` +4.71%. Two results got worse and are reported, not averaged away: that +4.71%, whose cause is the per-slide re-parse still going through the copying entry point, and a 105.75% regression of a 1,000-iteration single-process `open + list slides` loop on the real fixture, which is a glibc heap-trim artifact of the loop (171,889 versus 768 minor faults; −26.07% and no faults with the glibc thresholds pinned; −14.9% instructions and 128 fewer faults per single-shot process). No speedup, RSS, cold-cache, physical-device or cross-platform claim is registered; the only registered PPT corpus is a 7,680-byte synthetic package, so every real-fixture number comes from a scratch driver retained in the packet. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0606-ppt-record-tree-borrowed-payloads.md); [retained evidence](results/change-0606/README.md).
+
 ## 0601 — a producer-shaped corpus, and what it costs to read one
 
 Record: [0601](0601-perf-harness-real-producer-shape.md).

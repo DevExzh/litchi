@@ -95,7 +95,7 @@ impl Build {
             version: 0,
             instance: 0,
             data_length: BUILD_PAYLOAD_LEN as u32,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -175,7 +175,7 @@ impl Atom {
             version: 0,
             instance: 0,
             data_length: ATOM_PAYLOAD_LEN as u32,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -281,7 +281,7 @@ impl Container {
             version: 0x0F,
             instance: 0,
             data_length: CONTAINER_PAYLOAD_LEN as u32,
-            data,
+            data: data.into(),
             children: vec![build, atom],
         }
     }

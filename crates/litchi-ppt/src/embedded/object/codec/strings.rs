@@ -48,7 +48,7 @@ pub(crate) fn parse_optional_ole_children(
             {
                 return corrupted("MetafileBlob has an invalid header, size, or placement");
             }
-            metafile = Some(child.data.clone());
+            metafile = Some(child.data.to_vec());
         } else {
             return corrupted("OLE object container contains an unexpected child record");
         }

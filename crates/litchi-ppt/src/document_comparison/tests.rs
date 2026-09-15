@@ -17,7 +17,7 @@ fn record(version: u16, kind: RecordType, data: Vec<u8>) -> Record {
         record_type: kind,
         record_type_raw: kind.as_u16(),
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }

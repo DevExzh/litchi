@@ -34,7 +34,7 @@ fn test_text_run_extractor() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(text_data.len()).unwrap(),
-        data: text_data,
+        data: text_data.into(),
         children: Vec::new(),
     };
 
@@ -51,7 +51,7 @@ fn text_run_extractor_uses_ppt_unicode_encodings_and_character_offsets() {
         version: 0,
         instance: 0,
         data_length: 4,
-        data: vec![0x3D, 0xD8, 0x00, 0xDE],
+        data: vec![0x3D, 0xD8, 0x00, 0xDE].into(),
         children: Vec::new(),
     };
     let byte_record = Record {
@@ -60,7 +60,7 @@ fn text_run_extractor_uses_ppt_unicode_encodings_and_character_offsets() {
         version: 0,
         instance: 0,
         data_length: 2,
-        data: vec![0x80, 0xE9],
+        data: vec![0x80, 0xE9].into(),
         children: Vec::new(),
     };
     let mut extractor = TextRunExtractor::new();
@@ -84,7 +84,7 @@ fn style_atom_splits_text_into_character_runs() {
         version: 0,
         instance: 0,
         data_length: 4,
-        data: b"abcd".to_vec(),
+        data: b"abcd".into(),
         children: Vec::new(),
     };
     let mut style_data = Vec::new();
@@ -103,7 +103,7 @@ fn style_atom_splits_text_into_character_runs() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(style_data.len()).unwrap(),
-        data: style_data,
+        data: style_data.into(),
         children: Vec::new(),
     };
     let mut extractor = TextRunExtractor::new();
@@ -195,7 +195,7 @@ fn exposes_complete_paragraph_runs_with_utf16_coverage() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(style_data.len()).unwrap(),
-        data: style_data,
+        data: style_data.into(),
         children: Vec::new(),
     };
     let mut extractor = TextRunExtractor::new();
@@ -293,7 +293,7 @@ fn preserves_formatting_for_an_empty_paragraph() {
         version: 0,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: Vec::new(),
     };
     let mut style_data = Vec::new();
@@ -309,7 +309,7 @@ fn preserves_formatting_for_an_empty_paragraph() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(style_data.len()).unwrap(),
-        data: style_data,
+        data: style_data.into(),
         children: Vec::new(),
     };
     let mut extractor = TextRunExtractor::new();
@@ -345,7 +345,7 @@ fn rejects_invalid_text_cf_font_sizes() {
         version: 0,
         instance: 0,
         data_length: 1,
-        data: b"x".to_vec(),
+        data: b"x".into(),
         children: Vec::new(),
     };
     let mut style_data = Vec::new();
@@ -361,7 +361,7 @@ fn rejects_invalid_text_cf_font_sizes() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(style_data.len()).unwrap(),
-        data: style_data,
+        data: style_data.into(),
         children: Vec::new(),
     };
     let mut extractor = TextRunExtractor::new();

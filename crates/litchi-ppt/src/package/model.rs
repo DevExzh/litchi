@@ -24,7 +24,11 @@ pub struct RecordLimits {
     pub max_depth: usize,
     /// Maximum payload bytes declared by one record.
     pub max_record_payload_bytes: usize,
-    /// Maximum aggregate payload bytes copied into record-owned buffers.
+    /// Maximum aggregate payload bytes materialized by the record parser.
+    ///
+    /// Charged per record whether the payload is copied into the record or
+    /// borrowed from the shared stream buffer, so the refusal boundary does
+    /// not depend on which storage a parse uses.
     pub max_copied_payload_bytes: usize,
 }
 

@@ -116,7 +116,7 @@ impl NormalViewSet {
             ));
         }
         let payload = NormalViewSetInfo::parse(&atom.data).map_or_else(
-            |_| NormalViewSetPayload::Other(atom.data.clone()),
+            |_| NormalViewSetPayload::Other(atom.data.to_vec()),
             NormalViewSetPayload::Layout,
         );
         Ok(Self { payload })

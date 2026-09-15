@@ -402,7 +402,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(bytes.len()).unwrap(),
-            data: Vec::new(),
+            data: Vec::new().into(),
             children: vec![programmable_tags],
         }
     }

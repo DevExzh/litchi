@@ -107,7 +107,7 @@ impl EnvelopeSettings {
             version: 0,
             instance: 0,
             data_length: 4,
-            data: flags.to_le_bytes().to_vec(),
+            data: flags.to_le_bytes().into(),
             children: Vec::new(),
         })
     }

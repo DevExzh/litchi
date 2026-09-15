@@ -21,7 +21,7 @@ fn record(
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }

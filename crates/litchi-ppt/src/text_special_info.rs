@@ -527,7 +527,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data: data.to_vec(),
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -539,7 +539,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data: data.to_vec(),
+            data: data.into(),
             children: Vec::new(),
         }
     }

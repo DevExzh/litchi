@@ -82,7 +82,7 @@ impl ShapeFlags {
             version: 0,
             instance: 0,
             data_length: 1,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -149,7 +149,7 @@ impl ShapeFlags10 {
             version: 0,
             instance: 0,
             data_length: 1,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }

@@ -428,7 +428,7 @@ pub(crate) fn write_review(root: &mut Record, review: &Review, limits: Limits) -
     let blob = record_at_mut(root, &path)?;
     blob.data_length = u32::try_from(payload.len())
         .map_err(|_err| Error::InvalidFormat("review payload exceeds u32".into()))?;
-    blob.data = payload;
+    blob.data = payload.into();
     Ok(())
 }
 
@@ -567,7 +567,7 @@ pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
         for child in &root.children {
             payload.extend_from_slice(&encode_document(child)?);
         }
-        payload
+        payload.into()
     };
     if root.version > 0x0f || root.instance > 0x0fff {
         return Err(Error::InvalidFormat(

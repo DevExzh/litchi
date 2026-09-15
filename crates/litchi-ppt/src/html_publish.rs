@@ -207,7 +207,7 @@ impl HtmlDocumentSettings {
             version: 0,
             instance: 0,
             data_length: 16,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -430,7 +430,7 @@ impl HtmlPublishSettings {
             version: 0x0f,
             instance: 0,
             data_length,
-            data,
+            data: data.into(),
             children: Vec::new(),
         })
     }
@@ -648,7 +648,7 @@ mod tests {
             .unwrap(),
         );
         let mut record = valid.clone();
-        record.data = wrong_order;
+        record.data = wrong_order.into();
         record.data_length = u32::try_from(record.data.len()).unwrap();
         assert!(HtmlPublishSettings::parse(&record).is_err());
 

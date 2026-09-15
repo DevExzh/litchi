@@ -129,7 +129,7 @@ impl Broadcast {
             version: 0x0f,
             instance: 0,
             data_length,
-            data,
+            data: data.into(),
             children: Vec::new(),
         })
     }

@@ -409,7 +409,7 @@ mod tests {
             version: 0x0f,
             instance: 2,
             data_length: u32::try_from(payload.len()).unwrap(),
-            data: payload,
+            data: payload.into(),
             children: Vec::new(),
         }
     }
@@ -430,7 +430,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(tag.len()).unwrap(),
-            data: tag,
+            data: tag.into(),
             children: Vec::new(),
         }
     }
@@ -455,7 +455,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children,
         }
     }
@@ -526,7 +526,7 @@ mod tests {
         assert!(parse_base(&invalid_utf16).is_err());
 
         let mut missing_following = container(2, Some(("A", "B")));
-        missing_following.data.truncate(22);
+        missing_following.data.to_mut().truncate(22);
         missing_following.data_length = u32::try_from(missing_following.data.len()).unwrap();
         assert!(parse_base(&missing_following).is_err());
 

@@ -751,7 +751,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(tag.len()).unwrap(),
-            data: tag,
+            data: tag.into(),
             children: Vec::new(),
         }
     }
@@ -1003,7 +1003,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children: vec![
                 prog_tags_record(9, &ppt9_blob),
                 prog_tags_record(10, &ppt10_blob),

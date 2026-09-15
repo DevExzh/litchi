@@ -298,7 +298,7 @@ mod tests {
             version: 0,
             instance: 1,
             data_length: 31,
-            data: vec![0; 31],
+            data: vec![0; 31].into(),
             children: Vec::new(),
         };
         assert!(ColorSchemeAtom::parse(&short).is_err());
@@ -319,7 +319,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children,
         };
 

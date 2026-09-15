@@ -209,7 +209,7 @@ impl ProgTags {
             version: 0x0f,
             instance: self.instance,
             data_length,
-            data,
+            data: data.into(),
             children: Vec::new(),
         })
     }

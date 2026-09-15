@@ -194,7 +194,7 @@ pub use view_info::{
 
 // Re-export record types
 pub use parsers::RecordParser;
-pub use records::{DocumentInfo, Record, SlideAtomsSet, SlideInfo};
+pub use records::{DocumentInfo, Record, RecordPayload, SlideAtomsSet, SlideInfo};
 
 // Re-export persist types
 pub use persist::{PersistMapping, PersistPtrHolder};

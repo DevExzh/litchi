@@ -120,7 +120,7 @@ fn international_collection_and_pp10_flags_keep_ignored_bits_inert() {
         version: 0,
         instance: 0,
         data_length: 4,
-        data: raw.to_le_bytes().to_vec(),
+        data: raw.to_le_bytes().into(),
         children: Vec::new(),
     })
     .expect("undefined PP10 bits are ignored, not rejected");

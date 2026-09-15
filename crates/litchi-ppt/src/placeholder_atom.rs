@@ -196,7 +196,7 @@ impl PlaceholderAtom {
             version: 0,
             instance: 0,
             data_length: 8,
-            data: self.to_payload(context)?.to_vec(),
+            data: self.to_payload(context)?.into(),
             children: Vec::new(),
         })
     }

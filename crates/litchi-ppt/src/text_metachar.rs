@@ -205,7 +205,7 @@ mod tests {
             record_type,
             record_type_raw: record_type as u16,
             data_length: u32::try_from(data.len()).unwrap(),
-            data: data.to_vec(),
+            data: data.into(),
             children: Vec::new(),
         }
     }

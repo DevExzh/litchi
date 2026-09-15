@@ -151,7 +151,7 @@ impl Hash10 {
             version: 0,
             instance: 0,
             data_length: PAYLOAD_LEN as u32,
-            data: self.to_payload().to_vec(),
+            data: self.to_payload().into(),
             children: Vec::new(),
         }
     }

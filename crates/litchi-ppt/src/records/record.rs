@@ -3,14 +3,55 @@
 //! This module implements the fundamental PPT record parsing based on
 //! Apache POI's HSLF Record.java implementation.
 
+use super::payload::RecordPayload;
 use super::{DocumentInfo, SlideAtomsSet, SlideInfo};
 use crate::consts::RecordType;
 use crate::package::{Error, RecordLimits, Result};
 use crate::text::extractor::{parse_cstring, parse_text_bytes_atom, parse_text_chars_atom};
+use std::sync::Arc;
 use zerocopy::{
     FromBytes,
     byteorder::{LittleEndian, U16, U32},
 };
+
+/// Where `parse_impl` takes each record's payload bytes from.
+///
+/// `Owned` copies the payload into the record, which is what every `&[u8]`
+/// entry point does. `Shared` hands the record a span of the stream buffer the
+/// whole tree is parsed from, so no payload byte is copied at any nesting
+/// level. Both forms produce value-identical records.
+#[derive(Clone, Copy)]
+pub(crate) enum PayloadStore<'a> {
+    /// Copy every payload into its own allocation.
+    Owned(&'a [u8]),
+    /// Borrow every payload from this shared stream buffer.
+    Shared(&'a Arc<Vec<u8>>),
+}
+
+impl<'a> PayloadStore<'a> {
+    /// The bytes record offsets index into.
+    fn bytes(self) -> &'a [u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(buffer) => buffer.as_slice(),
+        }
+    }
+
+    /// Materializes the payload for the already-bounds-checked span.
+    fn payload(self, source: &[u8], start: usize, end: usize) -> Result<RecordPayload> {
+        match self {
+            Self::Owned(_) => {
+                let mut bytes = Vec::new();
+                bytes
+                    .try_reserve_exact(source.len())
+                    .map_err(|_err| Error::AllocationFailed("PPT record payload"))?;
+                bytes.extend_from_slice(source);
+                Ok(RecordPayload::from(bytes))
+            },
+            Self::Shared(buffer) => Ok(RecordPayload::shared(buffer, start, end)),
+        }
+    }
+}
 
 /// A PPT record containing binary data and metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,7 +67,7 @@ pub struct Record {
     /// Record data length
     pub data_length: u32,
     /// Record data
-    pub data: Vec<u8>,
+    pub data: RecordPayload,
     /// Child records (for container records)
     pub children: Vec<Record>,
 }
@@ -61,7 +102,14 @@ impl Record {
         limits: RecordLimits,
     ) -> Result<(Self, usize)> {
         let mut budget = ParseBudget::new(limits, data.len())?;
-        Self::parse_impl(data, offset, false, 0, &mut budget)
+        Self::parse_impl(
+            PayloadStore::Owned(data),
+            offset,
+            data.len(),
+            false,
+            0,
+            &mut budget,
+        )
     }
 
     /// Parse a record without truncation recovery or byte resynchronization.
@@ -75,7 +123,14 @@ impl Record {
         limits: RecordLimits,
     ) -> Result<(Self, usize)> {
         let mut budget = ParseBudget::new(limits, data.len())?;
-        Self::parse_impl(data, offset, true, 0, &mut budget)
+        Self::parse_impl(
+            PayloadStore::Owned(data),
+            offset,
+            data.len(),
+            true,
+            0,
+            &mut budget,
+        )
     }
 
     pub(crate) fn parse_with_budget(
@@ -84,17 +139,51 @@ impl Record {
         strict: bool,
         budget: &mut ParseBudget,
     ) -> Result<(Self, usize)> {
-        Self::parse_impl(data, offset, strict, 0, budget)
+        Self::parse_impl(
+            PayloadStore::Owned(data),
+            offset,
+            data.len(),
+            strict,
+            0,
+            budget,
+        )
+    }
+
+    /// Parse one top-level record whose payloads borrow the shared stream.
+    ///
+    /// Every record in the returned subtree spans `buffer` instead of owning a
+    /// copy of its bytes; the records are otherwise identical to those
+    /// [`Self::parse_with_budget`] returns for the same input.
+    pub(crate) fn parse_shared_with_budget(
+        buffer: &Arc<Vec<u8>>,
+        offset: usize,
+        strict: bool,
+        budget: &mut ParseBudget,
+    ) -> Result<(Self, usize)> {
+        let window_end = buffer.len();
+        Self::parse_impl(
+            PayloadStore::Shared(buffer),
+            offset,
+            window_end,
+            strict,
+            0,
+            budget,
+        )
     }
 
     fn parse_impl(
-        data: &[u8],
+        store: PayloadStore<'_>,
         offset: usize,
+        window_end: usize,
         strict: bool,
         depth: usize,
         budget: &mut ParseBudget,
     ) -> Result<(Self, usize)> {
         const HEADER_LEN: usize = 8;
+
+        let data = store.bytes().get(..window_end).ok_or_else(|| {
+            Error::Corrupted("PPT record window exceeds its containing data".to_string())
+        })?;
 
         let header_end = offset
             .checked_add(HEADER_LEN)
@@ -171,12 +260,11 @@ impl Record {
                 "PPT record at offset {offset} extends beyond its containing data"
             ))
         })?;
+        // Charged for every record whether or not the payload is copied, so a
+        // borrowed payload cannot widen the `max_copied_payload_bytes` refusal
+        // boundary.
         budget.charge_copy(source.len())?;
-        let mut record_data = Vec::new();
-        record_data
-            .try_reserve_exact(source.len())
-            .map_err(|_err| Error::AllocationFailed("PPT record payload"))?;
-        record_data.extend_from_slice(source);
+        let record_data = store.payload(source, header_end, record_end)?;
 
         let mut record = Record {
             record_type: record_type_enum,
@@ -190,15 +278,10 @@ impl Record {
 
         // Parse children if this is a container record
         if Self::is_container_record(record_type_enum) && actual_data_size > 0 {
-            let children_data = data.get(header_end..record_end).ok_or_else(|| {
-                Error::Corrupted(format!(
-                    "PPT record at offset {offset} extends beyond its containing data"
-                ))
-            })?;
             record.children = if strict {
-                Self::parse_container_children_strict(children_data, depth, budget)?
+                Self::parse_container_children_strict(store, header_end, record_end, depth, budget)?
             } else {
-                Self::parse_container_children(children_data, depth, budget)?
+                Self::parse_container_children(store, header_end, record_end, depth, budget)?
             };
         }
 
@@ -268,15 +351,17 @@ impl Record {
 
     /// Parse child records from a container record.
     fn parse_container_children(
-        data: &[u8],
+        store: PayloadStore<'_>,
+        start: usize,
+        end: usize,
         parent_depth: usize,
         budget: &mut ParseBudget,
     ) -> Result<Vec<Record>> {
         let mut children = Vec::new();
-        let mut offset = 0;
+        let mut offset = start;
 
-        while offset + 8 <= data.len() {
-            match Self::parse_impl(data, offset, false, parent_depth + 1, budget) {
+        while offset + 8 <= end {
+            match Self::parse_impl(store, offset, end, false, parent_depth + 1, budget) {
                 Ok((child, consumed)) => {
                     children
                         .try_reserve(1)
@@ -293,7 +378,7 @@ impl Record {
                 },
                 Err(_) => {
                     offset += 1;
-                    if offset + 8 > data.len() {
+                    if offset + 8 > end {
                         break;
                     }
                 },
@@ -304,19 +389,22 @@ impl Record {
     }
 
     fn parse_container_children_strict(
-        data: &[u8],
+        store: PayloadStore<'_>,
+        start: usize,
+        end: usize,
         parent_depth: usize,
         budget: &mut ParseBudget,
     ) -> Result<Vec<Record>> {
         let mut children = Vec::new();
-        let mut offset = 0usize;
-        while offset < data.len() {
-            if data.len() - offset < 8 {
+        let mut offset = start;
+        while offset < end {
+            if end - offset < 8 {
                 return Err(Error::Corrupted(
                     "container ends with a truncated record header".to_string(),
                 ));
             }
-            let (child, consumed) = Self::parse_impl(data, offset, true, parent_depth + 1, budget)?;
+            let (child, consumed) =
+                Self::parse_impl(store, offset, end, true, parent_depth + 1, budget)?;
             if consumed == 0 {
                 return Err(Error::Corrupted(
                     "zero-length progress while parsing a PPT container".to_string(),
@@ -483,7 +571,14 @@ impl Record {
             if record_end > data.len() {
                 return Err(Error::Corrupted(format!("Record extends beyond {context}")));
             }
-            let (record, consumed) = Self::parse_impl(data, offset, true, depth, budget)?;
+            let (record, consumed) = Self::parse_impl(
+                PayloadStore::Owned(data),
+                offset,
+                data.len(),
+                true,
+                depth,
+                budget,
+            )?;
             if consumed != record_end - offset {
                 return Err(Error::Corrupted(format!(
                     "Record in {context} was only partially parsed"
@@ -502,14 +597,14 @@ impl Record {
     #[must_use]
     pub fn extract_slide_data(&self) -> Option<Vec<u8>> {
         if let Some(ppdrawing) = self.find_child(RecordType::PPDrawing) {
-            return Some(ppdrawing.data.clone());
+            return Some(ppdrawing.data.to_vec());
         }
 
         if self.record_type == RecordType::Slide && !self.data.is_empty() && self.data.len() > 8 {
             let first_record_type =
                 U16::<LittleEndian>::read_from_bytes(&self.data[0..2]).map_or(0, U16::get);
             if first_record_type >= 0xF000 {
-                return Some(self.data.clone());
+                return Some(self.data.to_vec());
             }
         }
 
@@ -793,7 +888,14 @@ impl RecordParseSession {
         offset: usize,
         logical_depth: usize,
     ) -> Result<(Record, usize)> {
-        Record::parse_impl(data, offset, true, logical_depth, &mut self.budget)
+        Record::parse_impl(
+            PayloadStore::Owned(data),
+            offset,
+            data.len(),
+            true,
+            logical_depth,
+            &mut self.budget,
+        )
     }
 }
 
@@ -920,6 +1022,7 @@ fn checked_logical_depth(depth: usize, increment: usize) -> Result<usize> {
 )]
 mod tests {
     use super::*;
+    use crate::parsers::RecordParser;
 
     fn atom(record_type: u16, payload: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + payload.len());
@@ -967,7 +1070,7 @@ mod tests {
             version: 1,
             instance: 0,
             data_length: 16,
-            data: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            data: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].into(),
             children: Vec::new(),
         };
 
@@ -1263,5 +1366,106 @@ mod tests {
             ),
             Err(Error::ResourceLimit(message)) if message.contains("copied payload")
         ));
+    }
+
+    /// A nested tree with atoms at every level, so container payloads overlap
+    /// their children's.
+    fn nested_tree() -> Vec<u8> {
+        let mut inner = atom(0x2222, &[1, 2, 3, 4]);
+        inner.extend_from_slice(&atom(0x2223, &[5, 6]));
+        let slide = atom(RecordType::Slide.as_u16(), &inner);
+        let mut document_body = slide.clone();
+        document_body.extend_from_slice(&atom(0x2224, &[7, 8, 9]));
+        atom(RecordType::Document.as_u16(), &document_body)
+    }
+
+    #[test]
+    fn a_shared_parse_returns_the_same_tree_as_an_owned_parse() {
+        for bytes in [
+            nested_tree(),
+            atom(0x2222, &[1, 2, 3, 4]),
+            // A container whose declared length runs past the stream, which the
+            // lenient parser truncates and still descends into.
+            {
+                let mut truncated = atom(RecordType::Document.as_u16(), &atom(0x2222, &[1, 2]));
+                truncated[4..8].copy_from_slice(&1024u32.to_le_bytes());
+                truncated
+            },
+            // Leading garbage before a valid record, which forces the lenient
+            // byte-at-a-time resynchronization.
+            {
+                let mut resync = vec![0xFFu8; 3];
+                resync.extend_from_slice(&nested_tree());
+                resync
+            },
+        ] {
+            let mut owned = RecordParser::new();
+            let owned_result = owned.parse_document(&bytes);
+            let mut shared = RecordParser::new();
+            let shared_result = shared.parse_shared_document_with_limits(
+                &Arc::new(bytes.clone()),
+                RecordLimits::default(),
+            );
+            assert_eq!(
+                format!("{owned_result:?}"),
+                format!("{shared_result:?}"),
+                "both payload sources must report the same outcome"
+            );
+            assert_eq!(owned.find_records_ref(), shared.find_records_ref());
+            assert_eq!(
+                owned.extract_all_text().unwrap(),
+                shared.extract_all_text().unwrap()
+            );
+            assert_eq!(owned.slides(), shared.slides());
+        }
+    }
+
+    #[test]
+    fn a_shared_parse_charges_the_same_copy_budget_as_an_owned_parse() {
+        let bytes = nested_tree();
+        let payload_bytes = {
+            let mut parser = RecordParser::new();
+            parser.parse_document(&bytes).unwrap();
+            parser
+                .find_records_ref()
+                .iter()
+                .map(|record| record.data.len())
+                .sum::<usize>()
+        };
+        assert!(
+            payload_bytes > bytes.len(),
+            "the tree must overlap payloads"
+        );
+
+        for budget in [payload_bytes, payload_bytes - 1] {
+            let limits = RecordLimits {
+                max_copied_payload_bytes: budget,
+                ..RecordLimits::default()
+            };
+            let owned = RecordParser::new()
+                .parse_document_with_limits(&bytes, limits)
+                .is_ok();
+            let shared = RecordParser::new()
+                .parse_shared_document_with_limits(&Arc::new(bytes.clone()), limits)
+                .is_ok();
+            assert_eq!(
+                owned, shared,
+                "copy budget {budget} must refuse identically"
+            );
+            assert_eq!(owned, budget == payload_bytes);
+        }
+    }
+
+    #[test]
+    fn editing_a_shared_payload_leaves_the_stream_and_its_siblings_intact() {
+        let bytes = Arc::new(nested_tree());
+        let mut budget = ParseBudget::new(RecordLimits::default(), bytes.len()).unwrap();
+        let (mut document, _) =
+            Record::parse_shared_with_budget(&bytes, 0, false, &mut budget).unwrap();
+        let before = document.children[0].data.to_vec();
+        document.data.to_mut()[0] = 0xEE;
+        assert_eq!(document.data[0], 0xEE);
+        assert_eq!(document.children[0].data, before);
+        assert_eq!(bytes.as_slice(), nested_tree().as_slice());
     }
 }
