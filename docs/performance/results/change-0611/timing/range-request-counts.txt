@@ -1,0 +1,33 @@
+Physical requests and bytes per timed iteration, from the range simulator's
+own counters. Deterministic: identical across all 30 samples of each leg.
+
+== leg A1 (93b75d32e16e94a7…)
+   opc_range_source_open                    requests=9 bytes=933
+   opc_range_source_open_main_read          requests=12 bytes=1039
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=15 bytes=1732
+== leg B1 (08f7f0bbb2e6d5e2…)
+   opc_range_source_open                    requests=5 bytes=1011
+   opc_range_source_open_main_read          requests=6 bytes=1166
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=7 bytes=1899
+== leg B2 (08f7f0bbb2e6d5e2…)
+   opc_range_source_open                    requests=5 bytes=1011
+   opc_range_source_open_main_read          requests=6 bytes=1166
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=7 bytes=1899
+== leg A2 (93b75d32e16e94a7…)
+   opc_range_source_open                    requests=9 bytes=933
+   opc_range_source_open_main_read          requests=12 bytes=1039
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=15 bytes=1732
+== leg A3 (93b75d32e16e94a7…)
+   opc_range_source_open                    requests=9 bytes=933
+   opc_range_source_open_main_read          requests=12 bytes=1039
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=15 bytes=1732
+== leg A4 (93b75d32e16e94a7…)
+   opc_range_source_open                    requests=9 bytes=933
+   opc_range_source_open_main_read          requests=12 bytes=1039
+   xlsx_range_source_first_cell             requests=10 bytes=666
+   xlsx_range_source_open                   requests=15 bytes=1732

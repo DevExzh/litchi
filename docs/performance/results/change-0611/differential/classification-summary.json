@@ -1,0 +1,36 @@
+{
+ "class_A_inputs": 0,
+ "class_A_reasons": {},
+ "class_B_inputs": 0,
+ "class_B_reasons": {},
+ "class_E_distinct_pairs": 0,
+ "class_E_pairs": {},
+ "crafted_divergent": {},
+ "divergences": {},
+ "inputs_reaching_proof": 15504,
+ "members_examined": {
+  "crafted/fuzz": 2952,
+  "crafted/wide": 2952,
+  "mutations/fuzz": 1356678,
+  "mutations/wide": 1359924,
+  "seeds/fuzz": 114,
+  "seeds/wide": 114,
+  "testdata/fuzz": 81138,
+  "testdata/wide": 82914
+ },
+ "members_reaching_proof": {
+  "crafted/fuzz": 2952,
+  "crafted/wide": 2952,
+  "mutations/fuzz": 1354590,
+  "mutations/wide": 1357836,
+  "seeds/fuzz": 114,
+  "seeds/wide": 114,
+  "testdata/fuzz": 81138,
+  "testdata/wide": 82914
+ },
+ "oracle_failure_count": 0,
+ "oracle_failures": [],
+ "panics": [],
+ "per_api": {},
+ "per_family": {}
+}

@@ -11902,6 +11902,35 @@ mod tests {
         }
     }
 
+    /// The furthest before a member's payload that a read *of that member* can
+    /// begin: the fixed local header plus the widest local variable region
+    /// change 0573 measured in this repository's corpus.
+    const MEMBER_RECORD_PREFIX_BYTES: usize = 640;
+
+    /// Whether one positional read fetches the payload of the member whose
+    /// first payload byte is at `payload`.
+    ///
+    /// The test sources below fire — sleep, cancel, bump their version, park on
+    /// a barrier — when the member they watch is fetched, and used to recognise
+    /// that read by its start offset, because a member's payload arrived in a
+    /// read that *began* at it. Since change 0611 a member's first read is one
+    /// bounded read of its whole local record, which begins at the member's
+    /// local header, so the test is now that the read delivers the payload's
+    /// first byte *and* began inside the member's own local record. Both halves
+    /// matter: delivering the byte distinguishes the member read from the short
+    /// local-record probes issued at the same offset, and beginning inside the
+    /// member's own record keeps a bulk copy that spans the member from
+    /// counting as a fetch of it, which is how these triggers behaved before.
+    ///
+    /// The non-empty requirement excludes the zero-length terminating read a
+    /// range reader issues at the end of a member.
+    fn read_fetches_payload(offset: usize, requested: usize, payload: usize) -> bool {
+        requested > 0
+            && offset <= payload
+            && payload - offset < requested
+            && payload - offset <= MEMBER_RECORD_PREFIX_BYTES
+    }
+
     struct SlowPayloadSource {
         bytes: Vec<u8>,
         payload_offset: usize,
@@ -11909,6 +11938,12 @@ mod tests {
     }
 
     impl SlowPayloadSource {
+        /// Whether one positional read fetches this member's payload.
+        ///
+        /// See [`read_fetches_payload`].
+        fn fetches_payload(&self, offset: usize, requested: usize) -> bool {
+            read_fetches_payload(offset, requested, self.payload_offset)
+        }
         fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
             Self {
                 bytes,
@@ -11927,7 +11962,7 @@ mod tests {
             let offset = usize::try_from(offset).map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
             })?;
-            if offset == self.payload_offset {
+            if self.fetches_payload(offset, output.len()) {
                 self.payload_reads.fetch_add(1, Ordering::SeqCst);
                 // Keep the cold load in flight long enough for the peer to
                 // enter the same part concurrently.
@@ -11958,6 +11993,12 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     impl GatedPayloadSource {
+        /// Whether one positional read fetches this member's payload.
+        ///
+        /// See [`read_fetches_payload`].
+        fn fetches_payload(&self, offset: usize, requested: usize) -> bool {
+            read_fetches_payload(offset, requested, self.payload_offset)
+        }
         fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
             Self {
                 bytes,
@@ -11994,7 +12035,7 @@ mod tests {
             let offset = usize::try_from(offset).map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
             })?;
-            if offset == self.payload_offset {
+            if self.fetches_payload(offset, output.len()) {
                 self.payload_reads.fetch_add(1, Ordering::SeqCst);
                 if self.payload_gate_armed.swap(false, Ordering::AcqRel) {
                     self.payload_gate_entered.store(true, Ordering::Release);
@@ -12026,6 +12067,12 @@ mod tests {
     }
 
     impl GatedCorruptSource {
+        /// Whether one positional read fetches this member's payload.
+        ///
+        /// See [`read_fetches_payload`].
+        fn fetches_payload(&self, offset: usize, requested: usize) -> bool {
+            read_fetches_payload(offset, requested, self.payload_offset)
+        }
         fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
             Self {
                 bytes,
@@ -12055,7 +12102,7 @@ mod tests {
             let offset = usize::try_from(offset).map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
             })?;
-            if offset == self.payload_offset {
+            if self.fetches_payload(offset, output.len()) {
                 self.payload_reads.fetch_add(1, Ordering::SeqCst);
                 if self.payload_gate_armed.swap(false, Ordering::SeqCst) {
                     self.payload_gate_entered.wait();
@@ -12126,6 +12173,12 @@ mod tests {
     }
 
     impl CancelDuringPayloadSource {
+        /// Whether one positional read fetches this member's payload.
+        ///
+        /// See [`read_fetches_payload`].
+        fn fetches_payload(&self, offset: usize, requested: usize) -> bool {
+            read_fetches_payload(offset, requested, self.payload_offset)
+        }
         fn new(
             bytes: Vec<u8>,
             payload_offset: usize,
@@ -12154,7 +12207,9 @@ mod tests {
             }
             let count = output.len().min(self.bytes.len() - offset);
             output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
-            if offset == self.payload_offset && self.armed.swap(false, Ordering::SeqCst) {
+            if self.fetches_payload(offset, output.len())
+                && self.armed.swap(false, Ordering::SeqCst)
+            {
                 // The bytes have been decompressed into the loader's private
                 // allocation, but the publication checks must reject them.
                 self.cancellation_source.cancel();
@@ -12175,6 +12230,12 @@ mod tests {
     }
 
     impl ChangeDuringPayloadSource {
+        /// Whether one positional read fetches this member's payload.
+        ///
+        /// See [`read_fetches_payload`].
+        fn fetches_payload(&self, offset: usize, requested: usize) -> bool {
+            read_fetches_payload(offset, requested, self.payload_offset)
+        }
         fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
             Self {
                 bytes,
@@ -12199,7 +12260,9 @@ mod tests {
             }
             let count = output.len().min(self.bytes.len() - offset);
             output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
-            if offset == self.payload_offset && self.armed.swap(false, Ordering::SeqCst) {
+            if self.fetches_payload(offset, output.len())
+                && self.armed.swap(false, Ordering::SeqCst)
+            {
                 self.revision.fetch_add(1, Ordering::SeqCst);
             }
             Ok(count)

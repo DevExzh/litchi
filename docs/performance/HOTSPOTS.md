@@ -1,5 +1,26 @@
 # Performance hotspot inventory
 
+## 0611: one bounded positional read per ZIP member first-read — a source-backed OOXML open halves its requests, and halves its wall clock on a latency-bearing transport
+
+Record: [0611](0611-zip-single-read-per-member.md).
+
+**ZIP-2 is closed.** A member's first read on a positional source cost two or
+three requests — the 30-byte fixed local header, the payload, and a data
+descriptor when one is declared — and the framing between the header and the
+payload was skipped rather than read. Change 0611 takes one bounded positional
+read of the member's whole local record on the ordinary indexed read path and
+answers every read of that member from it. Measured on change 0587's own probe:
+a source-backed open of the 132-member workbook falls from 87 requests to 45,
+`shapes.pptx` from 45 to 24, `comment.docx` from 12 to 6, a first part read from
+2-3 to 1, and a whole 90-part traversal from 208 to 90, for +0.5% to +23% bytes
+— the local variable region, 84 bytes per structural member on the workbook.
+0587 modelled 87 → 45, 45 → 24, 12 → 6 and 2-3 → 1; all four are met exactly.
+On the 1 ms-per-request transport of changes 0493 and 0572 the request drop is
+wall clock. Rank 14 of the 0587 queue is done; **ZIP-5** (the accessor change
+0577's coalesced structural prefetch is blocked on) is now the next ZIP item and
+its modelled 45 → about 10 is measured from this base, not from 87. ZIP-1 and
+ZIP-3/4 were taken by changes 0594 and 0600.
+
 ## 0629 — the managed DOCX facade test fails on change 0495's parser fence, and no read in this wave moved
 
 Change 0621's feature-bearing gate run found `document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal` failing at `1e4198321`, reproduced it on the untouched checkout and called it pre-existing. That call was right, and the caution behind it was warranted: `1e4198321` already carried changes 0588, 0591, 0592, 0593 and 0594, each of which moved allocation on a DOCX read path and each of which ran only its own crate's tests. A `git bisect run` over the 918 commits from `01936e4f1` (which adds the test, and passes) to `c1d2caf85` — one detached worktree, one external `CARGO_TARGET_DIR`, one test per leg — puts the first bad commit at **`44a471069`, change [0495](changes/0495-docx-managed-document-edits.md)**, whose parent `de8ee88b0` is the last good commit. That is 94 commits before the 0587 survey base, so **all five wave changes are exonerated and none of their records needs a correction**. The mechanism is exact arithmetic, not a hypothesis: `44a471069` gave `ensure_source_document_xml` an `Option<&ExecutionContext>` and made it reserve `xml.len() * 32 + 131_072` bytes of `Resource::Memory` before quick-xml's namespace reader allocates, and added `admit_document_query_parser` with the same envelope for every parser-backed text query. At `44a471069^` the function took `&[u8]` and reserved nothing. For this test's 194-byte main document that workspace is 137,280 bytes; on top of the 194-byte managed `PartData` already charged it gives `observed 137474, limit 1154` — the number in change 0621's transcript, in change 0571's `gate3.txt` 50 records earlier, and in the release legs run here at `de8ee88b0` (ok), `44a471069` (FAILED) and the current head `1946b964e` (FAILED). The test was holding a budget equal to the 1,154-byte package, which the 131,072-byte floor alone can never admit. **This is a stale expectation, not a defect**: the same commit taught `litchi-docx`'s own tests the same formula (`source_document_scan_workspace` in `crates/litchi-docx/tests/source_backed_managed.rs`) and simply never migrated the cross-crate facade test, because `litchi`'s default feature set is empty and `cargo test -p litchi` does not compile it. The test now runs two legs — an ample budget under which the two rich-view refusals can only come from payload identity, and a package-sized budget that must produce a typed memory-budget refusal — so the contract is asserted and the fence stays under test without its constant being pinned. The fence itself is untouched. `performance_claim: none`; no library code path changed. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0629-facade-docx-budget-test-bisect.md); [retained evidence](results/change-0629/README.md).

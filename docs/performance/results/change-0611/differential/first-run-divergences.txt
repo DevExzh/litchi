@@ -1,0 +1,36 @@
+The first run of the extended differential, against the design as frozen and
+before the payload-coverage amendment, classified two divergences. Both are the
+same member under the two limit profiles, and both are class E: the member is
+refused on both legs with a different typed identity. No class A, B, C or D
+divergence, no panic and no oracle failure appeared in that run either.
+
+classification-summary.json of that run, key fields:
+
+  "class_A_inputs": 0, "class_B_inputs": 0,
+  "class_E_distinct_pairs": 1,
+  "divergences": {"E": 2},
+  "oracle_failure_count": 0, "oracle_failures": [], "panics": [],
+  "per_api": {"E/I.read_entry": 2},
+  "per_family": {"E/mutations": 2}
+
+The two verdict lines:
+
+LINE 792214  INPUT mutations/crafted-many-tiny-one-reaching/cdh-crc-e0-ffffffff.zip len=19222 sha=98f30c8a
+  BEFORE fuzz I.read_entry m000.bin err(IO(Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidSize { expected: 4, actual: 5 }, eocd_offset: None } } }))
+  AFTER  fuzz I.read_entry m000.bin err(IO(Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidChecksum { expected: 4294967295, actual: 211534962 }, eocd_offset: None } } }))
+
+LINE 793625  INPUT mutations/crafted-many-tiny-one-reaching/cdh-crc-e0-ffffffff.zip len=19222 sha=98f30c8a
+  BEFORE wide I.read_entry m000.bin err(IO(Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidSize { expected: 4, actual: 5 }, eocd_offset: None } } }))
+  AFTER  wide I.read_entry m000.bin err(IO(Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidChecksum { expected: 4294967295, actual: 211534962 }, eocd_offset: None } } }))
+
+That member's central record declares compressed_size = 4096 while its local
+header declares 4, and the next local header is 42 bytes in, so the window is 42
+bytes and stops inside a payload the reader asks 4,096 bytes of. The
+partly-covered read was served short out of the buffer, which re-chunked the
+decoder's input, and ZipVerifier::read completes a member the first time
+size >= uncompressed_size_hint(): with a 5-byte piece the declared-size check
+failed, with a 4-byte piece it passed and the CRC check failed.
+
+The after binary of that run was 754b61753cbeb9d3e669ff92ac8ccd038e50444ece7ef5a5f6a37594e195e5d3;
+the before binary was 9fc955f1adef9a9b03617b6f311e6b533ef25eac95857ec4c062a802a5c4bec2,
+the same control binary the clean re-run used.

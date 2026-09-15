@@ -1,0 +1,44 @@
+== opc_range_source_open [tiny-compressible]
+   A1  p50=9530.6us mean=9649.7us p95=10713.3us p99=11615.0us
+   B1  p50=5305.4us mean=5300.0us p95=5314.3us p99=5351.7us
+   B2  p50=5303.8us mean=5296.8us p95=5309.5us p99=5315.1us
+   A2  p50=9524.9us mean=9511.0us p95=9531.0us p99=9540.7us
+   A3  p50=9526.0us mean=9514.7us p95=9532.7us p99=9532.9us
+   A4  p50=9528.2us mean=9522.4us p95=9536.2us p99=9536.5us
+   paired A1->B1: p50=-44.33% mean=-45.08% p95=-50.39% p99=-53.92%
+   paired A2->B2: p50=-44.32% mean=-44.31% p95=-44.29% p99=-44.29%
+   floor  A3->A4: p50=+0.02% mean=+0.08% p95=+0.04% p99=+0.04%
+   floor  A1->A2: p50=-0.06% mean=-1.44% p95=-11.04% p99=-17.86%
+== opc_range_source_open_main_read [tiny-compressible]
+   A1  p50=12695.6us mean=12723.7us p95=12717.4us p99=13998.7us
+   B1  p50=6361.4us mean=6353.0us p95=6369.7us p99=6369.8us
+   B2  p50=6359.8us mean=6352.3us p95=6366.5us p99=6368.1us
+   A2  p50=12698.3us mean=12715.0us p95=12745.5us p99=13452.6us
+   A3  p50=12656.9us mean=12671.6us p95=12705.6us p99=12707.2us
+   A4  p50=12655.4us mean=12669.2us p95=12699.3us p99=12706.7us
+   paired A1->B1: p50=-49.89% mean=-50.07% p95=-49.91% p99=-54.50%
+   paired A2->B2: p50=-49.92% mean=-50.04% p95=-50.05% p99=-52.66%
+   floor  A3->A4: p50=-0.01% mean=-0.02% p95=-0.05% p99=-0.00%
+   floor  A1->A2: p50=+0.02% mean=-0.07% p95=+0.22% p99=-3.90%
+== xlsx_range_source_first_cell [xlsx-tiny]
+   A1  p50=10665.3us mean=10666.8us p95=10679.2us p99=10790.5us
+   B1  p50=10664.0us mean=10683.4us p95=10676.4us p99=11363.0us
+   B2  p50=10662.9us mean=10657.8us p95=10674.2us p99=10684.4us
+   A2  p50=10666.3us mean=10662.7us p95=10676.7us p99=10676.8us
+   A3  p50=10672.7us mean=10684.0us p95=10774.1us p99=10980.0us
+   A4  p50=10666.8us mean=10662.0us p95=10681.5us p99=10694.7us
+   paired A1->B1: p50=-0.01% mean=+0.16% p95=-0.03% p99=+5.31%
+   paired A2->B2: p50=-0.03% mean=-0.05% p95=-0.02% p99=+0.07%
+   floor  A3->A4: p50=-0.06% mean=-0.21% p95=-0.86% p99=-2.60%
+   floor  A1->A2: p50=+0.01% mean=-0.04% p95=-0.02% p99=-1.05%
+== xlsx_range_source_open [xlsx-tiny]
+   A1  p50=15869.2us mean=15871.9us p95=15918.1us p99=15959.3us
+   B1  p50=7448.2us mean=7437.6us p95=7456.1us p99=7463.9us
+   B2  p50=7450.7us mean=7447.4us p95=7459.8us p99=7473.4us
+   A2  p50=15863.2us mean=15866.2us p95=15897.8us p99=15902.2us
+   A3  p50=15865.2us mean=15870.4us p95=15905.4us p99=15909.4us
+   A4  p50=15867.7us mean=15931.2us p95=16180.1us p99=17046.0us
+   paired A1->B1: p50=-53.07% mean=-53.14% p95=-53.16% p99=-53.23%
+   paired A2->B2: p50=-53.03% mean=-53.06% p95=-53.08% p99=-53.00%
+   floor  A3->A4: p50=+0.02% mean=+0.38% p95=+1.73% p99=+7.14%
+   floor  A1->A2: p50=-0.04% mean=-0.04% p95=-0.13% p99=-0.36%

@@ -1,0 +1,15 @@
+== report line and byte totals
+  3801502 295172990 /home/zhuhe/code/litchi-worktrees/targets/0611-diffwork/report-before.txt
+  3801502 295172990 /home/zhuhe/code/litchi-worktrees/targets/0611-diffwork/report-after.txt
+  7603004 590345980 total
+
+== the two reports are byte-identical
+cmp: identical
+
+== footers
+TOTAL inputs=22875 panics=0 fuzz[accept=1085207 overlap=147416 other=208259] wide[accept=1089102 overlap=148352 other=208450]
+TOTAL inputs=22875 panics=0 fuzz[accept=1085207 overlap=147416 other=208259] wide[accept=1089102 overlap=148352 other=208450]
+
+== PANIC lines
+0
+0

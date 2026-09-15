@@ -1,5 +1,32 @@
 # Performance program phase report
 
+## 0611: one bounded positional read per ZIP member first-read — a source-backed OOXML open halves its requests, and halves its wall clock on a latency-bearing transport
+
+Record: [0611](0611-zip-single-read-per-member.md).
+
+**0611 — one bounded positional read per ZIP member first-read.** Retained,
+implemented in `soapberry-zip` (`archive.rs`, `office.rs`), `performance_claim:
+none`. Deterministic counts on change 0587's probe: open 87 → 45 requests on the
+132-member workbook, 45 → 24 on `shapes.pptx`, 12 → 6 on `comment.docx`, a first
+part read 2-3 → 1, a 90-part traversal 208 → 90, for +0.5% to +23% bytes and
++1.3% to +4.5% allocation calls; source observations, the `stream_to` counts and
+forward-versus-reverse behaviour are unchanged. Paired ABBA timing on the 1 ms
+per-request simulated transport of changes 0493 and 0572, 30 samples per leg,
+CPU 31, with an A/A floor in the same window under 0.4% at p50. Correctness: the
+change 0582 differential, extended with `IndexedArchive::read_entry` and a
+slice-backed control and re-run in full — both builds, 22,875 archives, every
+member, both directions, both limit profiles, 2,886,786 member verdicts. Its
+first run found two class-E divergences on one crafted mutation whose central and
+local records disagree about compressed size: the same member was refused on both
+legs with a different typed error, because a partly-covered read re-chunked the
+decoder's input and `ZipVerifier` completes a member on a per-read size test. The
+design was amended so the buffer serves a payload only when it holds all of it,
+and the re-run is clean. Thirteen new tests in `soapberry-zip`; sixteen
+tests in `litchi-opc` and `litchi-xlsx` whose *trigger* encoded the old read
+grammar were corrected with every assertion unchanged. Gates: ten sections, all
+exit 0, including the consumer suites for XLSX, DOCX, PPTX, XLSB, ODT, ODC and
+ODF.
+
 ## 0629 — where the DOCX facade failure came from, and what it was not
 
 Change 0629 answers a question change 0621 left open, against the commit history rather than against a hypothesis. `git bisect run` over `01936e4f1..c1d2caf85` — 918 revisions, one detached worktree with an external `CARGO_TARGET_DIR`, each leg a single `cargo test -p litchi --offline --features docx managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal` — returned eleven verdicts and one first bad commit: `44a4710699ef17041d5969240c30984dffbc3319`, `feat(docx): support budgeted source-backed document edits`, change 0495. Its parent `de8ee88b0` is the last good commit, so the attribution is adjacent. Three `--release` legs repeat the pair and add the current head: `de8ee88b0` ok, `44a471069` FAILED, `1946b964e` FAILED, all with the identical `observed 137474, limit 1154`. The range endpoints were taken from the repository's own record set rather than guessed — `results/change-0565/quality.md` gate 10 and `results/change-0571/gate3.txt` already carry this test failing with that same number, 50 records before change 0621 saw it. The mechanism is a reservation, not a regression: at `44a471069^`, `ensure_source_document_xml(xml: &[u8])` reserved nothing; at `44a471069` it takes an `Option<&ExecutionContext>` and reserves `xml.len() * 32 + 131_072` bytes of `Resource::Memory` before the namespace reader allocates, and the new `admit_document_query_parser` takes the same envelope for `extract_text`, `paragraph_count`, `paragraph_text` and the managed branch of `Package::document`. 194 bytes of document XML makes that 137,280; the managed `PartData` already holds 194; the test's limit was the 1,154-byte package. Under any budget that admits the workspace the facade returns the same text, the same refusals with the same identities and the same charged-then-released memory as before, which is what the corrected first leg asserts and what makes this a stale expectation rather than a defect — reinforced by `44a471069` having sized `litchi-docx`'s own managed tests from the identical formula in the same commit. The correction is confined to the `#[cfg(test)]` module of `crates/litchi/src/document/doc.rs`: a helper opens the document under a caller-chosen limit, one leg runs under an ample budget so the rich-view refusals can only be payload identity, and one leg keeps a package-sized budget and requires a typed memory-budget refusal. Gates on `crates/litchi`, the only crate touched: `cargo fmt --all --check` exit 0; `cargo clippy -p litchi --all-targets` exit 0 and with `--features xls,xlsx,xlsb,ods,opc,docx,pptx` exit 0, both reproducing exactly the pre-existing warning sets change 0621 recorded, with no new warning; `cargo doc -p litchi --no-deps` exit 0 clean, and with the feature set one pre-existing broken intra-doc link in `lib.rs`; `cargo test -p litchi --features xls,xlsx,xlsb,ods,opc,docx,pptx` **lib target 227 passed, 0 failed** where the untouched head gives 226 passed, 1 failed, and **313 passed, 0 failed, 7 ignored** over all 26 binaries; and the corrected test `--release --locked`, ok. No library code path changed; `performance_claim: none`. [Change and limitations](0629-facade-docx-budget-test-bisect.md); [retained evidence](results/change-0629/README.md).

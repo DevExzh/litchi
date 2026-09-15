@@ -1,5 +1,36 @@
 # Performance optimization ADR-compliance matrix
 
+## 0611: one bounded positional read per ZIP member first-read — a source-backed OOXML open halves its requests, and halves its wall clock on a latency-bearing transport
+
+Record: [0611](0611-zip-single-read-per-member.md).
+
+**ADR 0005 (bounded resources, read-order independence).** The speculative read
+is bounded by a named ceiling, `MAX_MEMBER_SPAN_READ_BYTES` = 64 KiB, measured
+against 7,757 OOXML members and equal to the largest window `litchi-opc` already
+admits; the buffer is reserved with `try_reserve_exact` and lives only for the
+member read, so the resident bound added is one buffer per member read in
+flight. A member above the ceiling takes no speculative read at all. Read-order
+independence is measured, not asserted: forward and reverse traversal of all 90
+parts of the 132-member workbook cost identical requests and bytes on both legs,
+and the differential runs every member under both directions. **ADR 0006
+(lossless preservation).** No output byte is produced on this path and no
+preservation surface is touched; the preservation index and the writer are
+unchanged. **ADR 0011 (ownership).** No archive type crosses a crate boundary:
+the window is computed inside `soapberry-zip` from central facts and physical
+order the index already holds, which is why `litchi-opc` needed no production
+change — in contrast with change 0577's candidate (c), which still needs a new
+read-side accessor. **Change 0317 (error precedence).** The change sits entirely
+inside 0317's brackets; source-version failure still precedes execution-context
+failure, which still precedes the mapped ZIP member error, and the span read is
+tried once so one member read stays one refusal, one cancellation observation and
+one resource reservation. **One stated consequence.** Under an `ExecutionContext`
+with a finite `Resource::InputBytes` limit, a spanned first read commits the
+member's local variable region as well — bounded by 610 bytes per member,
+measured at 84 — so a finite input budget can be exhausted marginally sooner. No
+error identity changes and no new refusal exists. This is the same class and
+direction as the speculative window change 0573 already landed on the strict
+path.
+
 ## 0629 — a bounded-resource fence confirmed, and deliberately not weakened
 
 Record: [0629](0629-facade-docx-budget-test-bisect.md).

@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0611",
+  "title": "One bounded positional read per ZIP member first-read",
+  "decision": "retained, implemented on the ordinary indexed read path; the frozen design was amended once, before landing, because the extended differential falsified one of its claims",
+  "code_state": "crates/soapberry-zip only: src/archive.rs, src/office.rs, tests/member_span_read.rs. The litchi-opc and litchi-xlsx changes are confined to #[cfg(test)] modules and tests/, and correct test triggers that encoded the old read grammar",
+  "implements": "ZIP-2 of change 0587 (rank 14), which change 0561 named as its target 1 and never implemented",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "claim_authorized": false,
+  "reason_codes": [
+    "a member's first read on a positional source cost two or three requests (30-byte fixed local header, payload, and a data descriptor when declared) and skipped the framing between the header and the payload; one bounded read of the member's whole local record replaces them, so a first read is one request",
+    "the window is min(next local header + descriptor room, 30 + 610 + central compressed size + descriptor room, directory offset) minus the local header offset, admitted only between 30 bytes and a named 64 KiB ceiling; in a gapless archive it is exactly the member's own local record",
+    "measured on change 0587's own probe: open 87 -> 45 requests on the 132-member workbook, 45 -> 24 on shapes.pptx, 12 -> 6 on comment.docx, a first part read 2-3 -> 1, a 90-part traversal 208 -> 90, matching every figure 0587 modelled",
+    "the extra bytes are the local variable region the two-read grammar skipped: 84 bytes per structural member on the workbook, +0.5% to +23% depending on how much of a scenario is framing",
+    "the buffer serves a read only when it holds all of it; the payload is checked for whole coverage against the member's own compressed_data_range before the decoder is built, because serving a partly-covered payload short re-chunks the decoder's input and ZipVerifier completes a member on a per-read size test",
+    "a failed span read is the member read's failure and is tried once, not retried behind the caller's back, so one member read stays one refusal, one cancellation observation and one resource reservation",
+    "the strict target-scoped proof of change 0580 and its residual window (0583) are on paths this change does not enter; the three stream_to request counts are byte-identical before and after"
+  ],
+  "accepted_evidence": {
+    "counts": "change 0587's probe re-run verbatim on both legs against three fixtures: requests, bytes, allocation calls, allocation bytes and source observations per open, per first part read, per whole-package traversal in both directions, and per stream_to; the before leg reproduces 0587's retained request and byte counts exactly",
+    "differential": "change 0582's harness extended with two per-member verdict APIs, I.read_entry (the changed path) and R.read (a slice-backed control), and re-run in full: both git-archive builds, the regenerated 22,875-archive corpus, every member, both directions, both limit profiles, 3,778,625 verdict lines per report; the two reports are byte-identical (cmp clean) and the classifier reports no divergence of any class, no panic and no oracle failure",
+    "first_differential_run": "the run before the amendment found two class-E divergences on one crafted mutation whose central and local records disagree about compressed size, retained verbatim in differential/first-run-divergences.txt",
+    "timing": "paired A1 B1 B2 A2 with an A/A floor A3 A4 in the same window, 30 samples and 5 warmups per case per leg, taskset -c 31. On the simulated 1 ms-per-request transport of changes 0493 and 0572: -44.33%/-44.32%, -49.89%/-49.92% and -53.07%/-53.03% at p50 in the two paired directions on the three OPC and XLSX range-source opens, against an A/A floor under 0.06% at p50, which is 1.05 ms per removed request. On local in-process sources nothing is claimed: that window overlapped the gate run and its floor is 2.3% to 11.7% at p50",
+    "tests": "13 tests in crates/soapberry-zip/tests/member_span_read.rs covering one request per member for Deflate, Store and descriptor-bearing members, order independence forwards, backwards, interleaved and across a shared session, the ceiling fallback, an over-long local variable region, a failing source tried once, a short-reading source, the central-directory bound, the per-member byte bound, and a payload the window cannot cover",
+    "gates": "ten sections, all exit 0: fmt; clippy and doc for soapberry-zip and litchi-opc; tests for soapberry-zip and litchi-opc; and the consumer suites litchi-xlsx/litchi-docx/litchi-pptx, litchi-xlsb/litchi-core and litchi-odt/litchi-odc/litchi-odf-common"
+  },
+  "accepted_costs": {
+    "bytes": "a spanned first read fetches the member's local variable region, which the two-read grammar skipped: +15.6% bytes on the 132-member workbook open, +22.9% on shapes.pptx, +6.7% on comment.docx, and +0.5% to +8.9% on whole-package traversals",
+    "input_budget": "under an ExecutionContext with a finite Resource::InputBytes limit, litchi-opc commits the bytes actually read, so those extra framing bytes are charged and a finite input budget can be exhausted marginally sooner; bounded by 610 bytes per spanned member first-read, measured at 84; no error identity changes and no new refusal exists; ordinary opens pass no ExecutionContext",
+    "allocations": "one fallibly reserved buffer per spanned member read: +1.3% to +2.1% allocation calls and +0.2% to +1.2% allocation bytes per open, and +4.5% calls with +7.4% bytes on a 90-part traversal",
+    "test_triggers": "sixteen tests in four files identified 'the read that fetches this member's payload' by its start offset; fifteen failed and one deadlocked. Their triggers were corrected to a read that delivers the payload's first byte and began inside the member's own local record, which fires exactly once per member fetch under either grammar; every assertion in those tests is unchanged. Three attempts were needed: the non-empty requirement excludes the zero-length terminating read that lands on the next member's header, requiring the payload byte to be delivered separates the member read from the preservation path's short local-record probe at the same offset, and the 640-byte prefix bound keeps a bulk publication copy spanning the member from counting as a fetch of it",
+    "host_contention": "seven other agents were building and measuring on the host throughout; both timing windows carry their own A/A floor"
+  },
+  "known_gaps": {
+    "not_measured": "cold page cache, real devices, peak RSS, allocation profiles beyond the probe's counters, non-glibc allocators, non-Linux platforms and concurrency scaling",
+    "transport": "the latency-bearing result is a deterministic simulated transport, a fixed service time per physical request, not a network or filesystem measurement; what it prices is the request count, which is measured deterministically",
+    "corpora": "the ceiling and the allowance are measured against the 7,757 OOXML members in this repository's test-data; a producer writing larger local extra fields or larger members falls back more often, never incorrectly",
+    "comparability": "the extended differential's members_reaching_proof field now counts two APIs that never enter the proof, so that field is no longer comparable with changes 0582 and 0583; the per-API verdict counts are"
+  },
+  "withheld": [
+    "any registered speedup claim",
+    "any claim at all on a local or in-memory source",
+    "any cold-cache, real-device, peak-RSS, allocation-profile, concurrency-scaling or cross-platform result",
+    "any claim for xlsx_range_source_first_cell, whose timed interval is dominated by strict-proof reads this change does not touch",
+    "any claim from the local-file timing window, whose A/A floor exceeds every delta measured in it"
+  ],
+  "provenance": {
+    "base_commit": "2d6fbeaed2083de104bbb0b52b2990ce69ac7274",
+    "branch": "perf/0611-zip-single-read-per-member",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "build": "cargo build --release --locked; workspace [profile.release] lto = true, panic = \"abort\"",
+    "pinning": "taskset -c 31 for every measured process",
+    "differential_binaries": {
+      "before": "9fc955f1adef9a9b03617b6f311e6b533ef25eac95857ec4c062a802a5c4bec2",
+      "after": "7f8a81644d372d8d5b700e9f211be86beae2df232858ad0210a0f3f4b160afc4"
+    }
+  }
+}
