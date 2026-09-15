@@ -1,0 +1,20 @@
+[package]
+name    = "probe0592"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "probe0592"
+path = "src/main.rs"
+
+[dependencies]
+litchi-core = { path = "__ROOT__/crates/litchi-core" }
+litchi-docx = { path = "__ROOT__/crates/litchi-docx" }
+litchi-opc  = { path = "__ROOT__/crates/litchi-opc" }
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "corpus0592"
+path = "src/corpus.rs"

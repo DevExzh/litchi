@@ -1,0 +1,50 @@
+
+=== sem ===
+case                                        shape             A1 p50      A2 p50      B1 p50      B2 p50    A/A %   B1-A1 %   B2-A2 %  pooled %
+docx_semantic_full_text                     large            3183181     3157721     3124941     3160861    -0.80     -1.83      0.10     -0.87
+docx_semantic_list_paragraphs               large             156176      152100     3012660     2955539    -2.61   1829.02   1843.16   1835.99
+docx_semantic_one_paragraph                 large                130          40     2814595     2831248   -69.232164973.087078020.003320984.12
+docx_semantic_open                          large             330872      273491      316201      311577   -17.34     -4.43     13.93      3.87
+
+case                                        leg           p50          mean         p95         p99         min
+docx_semantic_full_text                     A1        3183181     3195695.2     3274696     3322797     3148545
+docx_semantic_full_text                     B1        3124941     3127497.3     3169187     3211437     3093116
+docx_semantic_full_text                     B2        3160861     3170184.1     3247165     3249006     3112795
+docx_semantic_full_text                     A2        3157721     3163753.4     3240026     3288077     3126116
+docx_semantic_list_paragraphs               A1         156176      156057.8      160441      162061      151621
+docx_semantic_list_paragraphs               B1        3012660     3019257.3     3155587     3205186     2969925
+docx_semantic_list_paragraphs               B2        2955539     2954564.8     2972894     2979085     2935745
+docx_semantic_list_paragraphs               A2         152100      153955.1      161870      176330      151191
+docx_semantic_one_paragraph                 A1            130         121.3         310         320          30
+docx_semantic_one_paragraph                 B1        2814595     2815125.4     2835375     2836815     2786604
+docx_semantic_one_paragraph                 B2        2831248     2840984.8     2878414     3028155     2804394
+docx_semantic_one_paragraph                 A2             40          75.7         180         230          30
+docx_semantic_open                          A1         330872      329904.1      350001      353491      308621
+docx_semantic_open                          B1         316201      318219.6      334731      385302      300652
+docx_semantic_open                          B2         311577      311869.6      342322      344182      286372
+docx_semantic_open                          A2         273491      274379.4      305371      308161      249171
+
+=== fs ===
+case                                        shape             A1 p50      A2 p50      B1 p50      B2 p50    A/A %   B1-A1 %   B2-A2 %  pooled %
+docx_file_eager_full_text                   media-rich        210221      213416      126965      126291     1.52    -39.60    -40.82    -40.22
+docx_file_eager_open_full_text_lifecycle    media-rich      11240922    12200432    11026581    10993215     8.54     -1.91     -9.89     -6.06
+docx_file_eager_paragraph_count             media-rich        126480      127466      134160      133716     0.78      6.07      4.90      5.49
+docx_file_source_full_text                  media-rich        302612      304616      204281      206371     0.66    -32.49    -32.25    -32.37
+
+case                                        leg           p50          mean         p95         p99         min
+docx_file_eager_full_text                   A1         210221      213064.5      226361      245651      206502
+docx_file_eager_full_text                   B1         126965      128229.0      134511      135440      125530
+docx_file_eager_full_text                   B2         126291      127372.7      134930      136531      124510
+docx_file_eager_full_text                   A2         213416      213831.4      223861      224571      205731
+docx_file_eager_open_full_text_lifecycle    A1       11240922    11274003.0    11611749    11640100    10987777
+docx_file_eager_open_full_text_lifecycle    B1       11026581    10985021.1    11178295    11201727    10623165
+docx_file_eager_open_full_text_lifecycle    B2       10993215    13049693.5    31548248    31931174    10394373
+docx_file_eager_open_full_text_lifecycle    A2       12200432    14264691.2    20654784    52679411    11612053
+docx_file_eager_paragraph_count             A1         126480      127759.2      135140      138981      124331
+docx_file_eager_paragraph_count             B1         134160      134856.8      140981      143271      131620
+docx_file_eager_paragraph_count             B2         133716      135913.7      145141      145731      131310
+docx_file_eager_paragraph_count             A2         127466      129147.1      137251      140511      125481
+docx_file_source_full_text                  A1         302612      306100.2      332412      337472      289751
+docx_file_source_full_text                  B1         204281      207174.0      224281      239691      197881
+docx_file_source_full_text                  B2         206371      209143.4      221761      245721      196041
+docx_file_source_full_text                  A2         304616      307947.5      320952      392012      294002

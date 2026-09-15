@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0592",
+  "title": "The DOCX paragraph index is built by the first paragraph query, not by every document()",
+  "decision": "retained",
+  "code_state": "two files under crates/litchi-docx/src changed; one integration test file extended; no public signature, error type, output byte, limit or unsafe block changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": "item DOCX-2, rank 10, of change 0587",
+  "reason_codes": [
+    "DocumentPart::from_part and the unmanaged branch of the source-backed Package::document() built a ParagraphIndex on every call, although only paragraph_count, paragraphs, paragraph(i) and the source-backed paragraph_text(i) read it and eight other readers do not",
+    "the index was already a best-effort cache whose error is swallowed with .ok(), so deferring the identical expression to the first consumer keeps exactly the same operations able to observe exactly the same swallowed failure",
+    "ADR 0005 prescribes lazy loading of semantic payloads into thread-safe caches whose behaviour is semantically invisible; the eager build was the part that did not match",
+    "the budget-managed source-backed branch is deliberately left eager because its index carries an execution-budget charge, and moving that charge is a contract change needing its own frozen design record"
+  ],
+  "accepted_evidence": {
+    "instruction_counts": "callgrind isolation pairs on a scratch probe, two document shapes (200 and 10,000 paragraphs), eleven operations, both legs: document() alone -69.30%, document()+text() -34.88%, document()+write_text_to -19.47%, document()+tables() -40.99% on the 10,000-paragraph document; the removed scan is 45.01 M Ir and 70.5% of the text-extraction pass itself; every paragraph query 0.6-0.7% cheaper",
+    "allocation_counts": "the same isolation pairs with a counting global allocator: document() 51 -> 26 allocations and 345,293 -> 2,558 bytes; document()+text() 1,984,218 -> 1,641,483 bytes; paragraph queries identical on both legs",
+    "native_cycles": "perf stat -e cycles isolation pairs, 15 per leg per order, before/after/after/before, medians: document() -68.34% against an A/A floor of -0.01%, document()+text() -39.81% against +1.60%, document()+paragraph_count() -0.69% against -1.67%",
+    "paired_timing": "order A1 B1 B2 A2, 30 samples and 3 warmups per leg, pinned to CPU 12; docx_file_eager_full_text -40.22% and docx_file_source_full_text -32.37% at p50 against A/A floors of 1.52% and 0.66%",
+    "differential_corpus": "332 documents (62 .docx under test-data/, 270 .docx retained by the change-0483 and change-0495 fuzz campaigns), each signed across ten query families on both the eager and the source-backed facade with every error captured as its Display text; the four signature files are byte-identical between legs",
+    "tests": "five added (three unit, two integration) covering that text, table, element and block reads never fill the cell; that every paragraph query matches the streaming selectors it replaces; concurrent first queries on both facades; and that the budget-managed branch keeps its eager index and its UnsafeEdit refusal",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-docx --all-targets, cargo test -p litchi-docx (1,454 passed, 0 failed, 31 ignored), cargo doc -p litchi-docx --no-deps, tools/non_iwork_gate.py check, tools/check_crate_boundaries.py, tools/check_report_claim_classification.py -- all exit 0"
+  },
+  "accepted_costs": {
+    "reported_regression_harness_boundary": "docx_semantic_one_paragraph and docx_semantic_list_paragraphs regress by a factor of 2.2e4 and by 1,836% at p50, because the harness builds the document view before starting the clock, so the scan that used to happen in untimed setup now happens inside the timed interval; the same lifecycle costs 0.64-0.68% fewer instructions",
+    "reported_regression_unexplained": "docx_file_eager_paragraph_count regresses 5.49% pooled at p50 (both orders agree, +6.07% and +4.90%, A/A floor 0.78%), which is above the 5% review trigger; the same operation pair measured directly is 0.69% cheaper in native cycles and in instructions, and the first measured call after a harness-style untimed preparation takes the same number of page faults on both legs, so the attribution is unresolved and is recorded as an open question",
+    "floor_above_5_percent": "the A/A floor exceeded 5% at p50 on docx_file_eager_open_full_text_lifecycle (8.54%), docx_semantic_open (17.34%) and docx_semantic_one_paragraph (69.2%); for those three the counts and not the timings carry the result",
+    "latency_distribution_shift": "paragraph readers pay the same scan later; a lazily cached value moves cost from the open into the first query, which is intended and is what ADR 0005 asks for",
+    "clone": "a source_backed::Document cloned before its first paragraph query builds its own index, one extra scan per clone",
+    "instruction_counts": "instructions rank work, not latency; native cycles were taken beside them for the four headline operations"
+  },
+  "known_gaps": {
+    "managed_route": "the budget-managed source-backed branch still scans on every document(); deferring it moves an execution-budget charge and needs a frozen design record",
+    "corpus": "the probe fixture is synthetic and carries no mc: markup, so visible_document_xml takes its cheap presence-scan path and the index's share of document() on a real producer file is unknown",
+    "not_measured": "cold cache, physical devices, range sources, peak RSS, concurrency scaling, real-producer documents, other platforms",
+    "observed_not_acted_on": "after this change write_text_to costs 101.9 M Ir and about 90,000 allocations more than text() on the same 10,000-paragraph document; change 0587's DOCX-3 names preflight_semantic_xml as a candidate but the difference also contains the streaming parse and the sink, so no attribution is made"
+  },
+  "withheld": [
+    "any registered performance claim, cold-cache, physical-device, range-source, peak-RSS, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0592-docx-lazy-paragraph-index",
+    "branch_commit": "the tip of perf/0592-docx-lazy-paragraph-index; a commit cannot record its own hash, so the branch name is the reference",
+    "before_leg": "/home/zhuhe/code/litchi-worktrees/before-08d968f8e (shared detached checkout at the base commit, never modified)",
+    "after_leg": "/home/zhuhe/code/litchi-worktrees/0592",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0; seven other agents active on the other 31 cores throughout",
+    "cpu_pinning": "every measured process pinned to CPU 12 with taskset",
+    "binary_sha256": {
+      "litchi-perf-baseline before": "9e773c53aa1d84baf927cf9c9f840c7e8a6d2d68a2c161c63db0ae145fc349d3",
+      "litchi-perf-baseline after": "f34f4f650209281a209683ca4106f6919dad2dd1a6f11f400eff1c72799df020",
+      "probe0592 before": "c7b905113fe730a8411df6d3cc1999d9821338f56c2b8daa388d1b00475f7a83",
+      "probe0592 after": "93477e1496795947c33685c3b8e0a23b7300628cceb1b4304c7dec1e4f71b741",
+      "corpus0592 before": "c201549cf7e5879d673b300df66b39c58604100aefc465f4ee292ad75985b288",
+      "corpus0592 after": "629f031360f0b8cc03290dc85338d60216b2b227e805825b11239ba8d88eae2d"
+    }
+  }
+}

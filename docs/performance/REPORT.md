@@ -1,5 +1,34 @@
 # Performance program phase report
 
+## 0592: one cache, built when it is used
+
+The first implementation off the 0587 queue, and the smallest: `litchi-docx`
+built a paragraph-offset index on every `document()`, and the three readers of
+the eager view that use it — four on the source-backed view — are outnumbered by
+the eight that do not. [0592](0592-docx-lazy-paragraph-index.md)
+moves it into a `OnceLock` filled by the first paragraph query, leaving the MCE
+visibility pass exactly where it was. On a 10,000-paragraph document the open of
+a main-document view drops **69.30%** of its instructions and **99.26%** of its
+allocated bytes; a full text extraction drops **34.88%**; a streaming text export
+drops **19.47%**. Paragraph readers pay the same scan, 0.6-0.7% later and
+0.6-0.7% cheaper. `performance_claim: none`.
+
+Two things about it are worth more than the percentages. The first is that the
+index never carried a numbered record at all — it arrived in a checkpoint commit
+— and so no record had ever priced it on a read that does not use it; the survey
+that found it was the first thing in the program to look. The second is that the
+in-process harness cannot see the result: three of the four `docx_semantic_*`
+DOCX read selectors build the document before starting the clock, so the saving
+lands entirely in their untimed setup and two of them report a large *regression*
+instead, because the scan they used to do untimed now happens inside the
+interval. The record reports those regressions as measured, explains the
+boundary, and rests its result on the file-backed selectors and on the
+instruction counts. The differential that backs the safety argument is 332
+documents — every DOCX fixture in `test-data/` and every DOCX the 0483 and 0495
+fuzz campaigns retained — signed across ten query families on both facades, with
+zero differences, including six malformed documents whose every structural query
+refuses identically on both legs.
+
 ## Change 0591: the ordinary DOCX edit scans the main part twice
 
 Change 0591 removes two of the four whole-part scans in the `litchi-docx`
