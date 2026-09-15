@@ -1,0 +1,69 @@
+=== gate 1: git diff --name-only 8fe9efa55 -- crates/ (worktree /home/zhuhe/code/litchi-worktrees/0609) ===
+  (no output above == no crate file changed)
+  files added by this change:
+  ?? docs/performance/0609-facade-doc-source-route-design.md
+  ?? docs/performance/results/change-0609/
+
+=== gate 2: cargo fmt --all --check (workspace) ===
+exit=0
+
+=== gate 3: cargo fmt --check (probe) ===
+exit=0
+
+=== gate 4: cargo clippy --release --all-targets (probe) ===
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+    Checking facade_doc_route v0.0.0 (/home/zhuhe/code/litchi-worktrees/0609/docs/performance/results/change-0609/probe)
+warning: this loop could be written as a `while let` loop
+   --> src/main.rs:286:13
+    |
+286 | /             loop {
+287 | |                 match snap.paragraph(Position::new(n)) {
+288 | |                     Ok(p) => {
+289 | |                         joined.push_str(p.text());
+...   |
+297 | |             }
+    | |_____________^ help: try: `while let Ok(p) = snap.paragraph(Position::new(n)) { .. }`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#while_let_loop
+    = note: `#[warn(clippy::while_let_loop)]` on by default
+
+warning: `facade_doc_route` (bin "facade_doc_route" test) generated 1 warning
+warning: `facade_doc_route` (bin "facade_doc_route") generated 1 warning (1 duplicate)
+    Finished `release` profile [optimized] target(s) in 44.55s
+exit=0
+
+--- gate 4 re-run after the probe's own while_let_loop lint was fixed (source retained is the fixed one) ---
+warning: function `missing_ooxml_catalog_part_error` is never used
+   --> /home/zhuhe/code/litchi-worktrees/0609/crates/litchi/src/detection_smart/detected.rs:612:4
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 0.07s
+exit=0
+
+=== gate 5: the litchi dead_code warning is pre-existing (reproduced on the untouched before checkout) ===
+    Checking bumpalo v3.20.3
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/before-8fe9efa55/crates/litchi-doc)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/before-8fe9efa55/crates/litchi-docx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/before-8fe9efa55/crates/litchi)
+warning: function `missing_ooxml_catalog_part_error` is never used
+   --> crates/litchi/src/detection_smart/detected.rs:612:4
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 02s
+exit=0

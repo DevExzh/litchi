@@ -1,0 +1,484 @@
+### noheadfoot-litchi facade-open
+mode	facade-open
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	1
+peak_open_bytes	53081
+retained_open_bytes	25636
+peak_bytes	53081
+retained_bytes	25636
+total_alloc_bytes	75250
+alloc_count	290
+### noheadfoot-litchi facade-text
+mode	facade-text
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	134
+peak_open_bytes	53081
+retained_open_bytes	25636
+peak_bytes	53081
+retained_bytes	25636
+total_alloc_bytes	75384
+alloc_count	291
+### noheadfoot-litchi facade-count
+mode	facade-count
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	10
+peak_open_bytes	53081
+retained_open_bytes	25636
+peak_bytes	53081
+retained_bytes	25636
+total_alloc_bytes	75346
+alloc_count	291
+### noheadfoot-litchi facade-para0
+mode	facade-para0
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	31
+peak_open_bytes	53081
+retained_open_bytes	25636
+peak_bytes	63854
+retained_bytes	25636
+total_alloc_bytes	164829
+alloc_count	431
+### noheadfoot-litchi snap-open
+mode	snap-open
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	1
+peak_open_bytes	25129
+retained_open_bytes	4400
+peak_bytes	25129
+retained_bytes	4400
+total_alloc_bytes	111108
+alloc_count	275
+### noheadfoot-litchi snap-para0
+mode	snap-para0
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+acc	31
+peak_open_bytes	25129
+retained_open_bytes	4400
+peak_bytes	25129
+retained_bytes	4400
+total_alloc_bytes	240215
+alloc_count	500
+### documentProperties facade-open
+mode	facade-open
+file	test-data/ole/doc/documentProperties.doc
+acc	1
+peak_open_bytes	47245
+retained_open_bytes	22075
+peak_bytes	47245
+retained_bytes	22075
+total_alloc_bytes	61971
+alloc_count	222
+### documentProperties facade-text
+mode	facade-text
+file	test-data/ole/doc/documentProperties.doc
+acc	22
+peak_open_bytes	47245
+retained_open_bytes	22075
+peak_bytes	47245
+retained_bytes	22075
+total_alloc_bytes	61993
+alloc_count	223
+### documentProperties facade-count
+mode	facade-count
+file	test-data/ole/doc/documentProperties.doc
+acc	1
+peak_open_bytes	47245
+retained_open_bytes	22075
+peak_bytes	47245
+retained_bytes	22075
+total_alloc_bytes	62067
+alloc_count	223
+### documentProperties facade-para0
+mode	facade-para0
+file	test-data/ole/doc/documentProperties.doc
+acc	21
+peak_open_bytes	47245
+retained_open_bytes	22075
+peak_bytes	47245
+retained_bytes	22075
+total_alloc_bytes	90837
+alloc_count	247
+### documentProperties snap-open
+mode	snap-open
+file	test-data/ole/doc/documentProperties.doc
+acc	1
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	107791
+alloc_count	275
+### documentProperties snap-para0
+mode	snap-para0
+file	test-data/ole/doc/documentProperties.doc
+acc	21
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	232540
+alloc_count	500
+### table-merged-cells facade-open
+mode	facade-open
+file	test-data/ole/doc/table-merged-cells.doc
+acc	1
+peak_open_bytes	198439
+retained_open_bytes	159178
+peak_bytes	198439
+retained_bytes	159178
+total_alloc_bytes	358459
+alloc_count	809
+### table-merged-cells facade-text
+mode	facade-text
+file	test-data/ole/doc/table-merged-cells.doc
+acc	85
+peak_open_bytes	198439
+retained_open_bytes	159178
+peak_bytes	198439
+retained_bytes	159178
+total_alloc_bytes	358544
+alloc_count	810
+### table-merged-cells facade-count
+mode	facade-count
+file	test-data/ole/doc/table-merged-cells.doc
+acc	85
+peak_open_bytes	198439
+retained_open_bytes	159178
+peak_bytes	198439
+retained_bytes	159178
+total_alloc_bytes	358555
+alloc_count	810
+### table-merged-cells facade-para0
+mode	facade-para0
+file	test-data/ole/doc/table-merged-cells.doc
+acc	0
+peak_open_bytes	198439
+retained_open_bytes	159178
+peak_bytes	418215
+retained_bytes	159178
+total_alloc_bytes	1109496
+alloc_count	1998
+### table-merged-cells snap-open
+mode	snap-open
+file	test-data/ole/doc/table-merged-cells.doc
+acc	1
+peak_open_bytes	32213
+retained_open_bytes	4372
+peak_bytes	32213
+retained_bytes	4372
+total_alloc_bytes	153506
+alloc_count	280
+### table-merged-cells snap-para0
+mode	snap-para0
+file	test-data/ole/doc/table-merged-cells.doc
+acc	0
+peak_open_bytes	32213
+retained_open_bytes	4372
+peak_bytes	32213
+retained_bytes	4372
+total_alloc_bytes	250632
+alloc_count	399
+### lists-margins facade-open
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### lists-margins facade-text
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### lists-margins facade-count
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### lists-margins facade-para0
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### lists-margins snap-open
+mode	snap-open
+file	test-data/ole/doc/lists-margins.doc
+acc	1
+peak_open_bytes	25653
+retained_open_bytes	4404
+peak_bytes	25653
+retained_bytes	4404
+total_alloc_bytes	114405
+alloc_count	275
+### lists-margins snap-para0
+mode	snap-para0
+file	test-data/ole/doc/lists-margins.doc
+acc	41
+peak_open_bytes	25653
+retained_open_bytes	4404
+peak_bytes	25653
+retained_bytes	4404
+total_alloc_bytes	248502
+alloc_count	503
+### duplicate-style-names facade-open
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### duplicate-style-names facade-text
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### duplicate-style-names facade-count
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### duplicate-style-names facade-para0
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### duplicate-style-names snap-open
+mode	snap-open
+file	test-data/ole/doc/duplicate-style-names.doc
+acc	1
+peak_open_bytes	78929
+retained_open_bytes	4392
+peak_bytes	78929
+retained_bytes	4392
+total_alloc_bytes	438638
+alloc_count	285
+### duplicate-style-names snap-para0
+mode	snap-para0
+file	test-data/ole/doc/duplicate-style-names.doc
+acc	20
+peak_open_bytes	78929
+retained_open_bytes	4392
+peak_bytes	78929
+retained_bytes	4392
+total_alloc_bytes	1003898
+alloc_count	518
+### endingnote facade-open
+mode	facade-open
+file	test-data/ole/doc/endingnote.doc
+acc	1
+peak_open_bytes	50949
+retained_open_bytes	23992
+peak_bytes	50949
+retained_bytes	23992
+total_alloc_bytes	71714
+alloc_count	285
+### endingnote facade-text
+mode	facade-text
+file	test-data/ole/doc/endingnote.doc
+acc	40
+peak_open_bytes	50949
+retained_open_bytes	23992
+peak_bytes	50949
+retained_bytes	23992
+total_alloc_bytes	71754
+alloc_count	286
+### endingnote facade-count
+mode	facade-count
+file	test-data/ole/doc/endingnote.doc
+acc	3
+peak_open_bytes	50949
+retained_open_bytes	23992
+peak_bytes	50949
+retained_bytes	23992
+total_alloc_bytes	71810
+alloc_count	286
+### endingnote facade-para0
+mode	facade-para0
+file	test-data/ole/doc/endingnote.doc
+acc	18
+peak_open_bytes	50949
+retained_open_bytes	23992
+peak_bytes	50949
+retained_bytes	23992
+total_alloc_bytes	126184
+alloc_count	369
+### endingnote snap-open
+mode	snap-open
+file	test-data/ole/doc/endingnote.doc
+acc	1
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	107871
+alloc_count	275
+### endingnote snap-para0
+mode	snap-para0
+file	test-data/ole/doc/endingnote.doc
+acc	0
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	173687
+alloc_count	388
+### footnote facade-open
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### footnote facade-text
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### footnote facade-count
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### footnote facade-para0
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### footnote snap-open
+mode	snap-open
+file	test-data/ole/doc/footnote.doc
+acc	1
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	107991
+alloc_count	275
+### footnote snap-para0
+mode	snap-para0
+file	test-data/ole/doc/footnote.doc
+acc	0
+peak_open_bytes	24605
+retained_open_bytes	4396
+peak_bytes	24605
+retained_bytes	4396
+total_alloc_bytes	173727
+alloc_count	386
+### picture facade-open
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### picture facade-text
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### picture facade-count
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### picture facade-para0
+Error: CorruptedFile("invalid stylesheet: style names and aliases must be unique")
+### picture snap-open
+mode	snap-open
+file	test-data/ole/doc/picture.doc
+acc	1
+peak_open_bytes	1097209
+retained_open_bytes	15648
+peak_bytes	1097209
+retained_bytes	15648
+total_alloc_bytes	6524537
+alloc_count	294
+### picture snap-para0
+mode	snap-para0
+file	test-data/ole/doc/picture.doc
+acc	0
+peak_open_bytes	1097209
+retained_open_bytes	15648
+peak_bytes	1097209
+retained_bytes	15648
+total_alloc_bytes	10835293
+alloc_count	425
+### saved-by-table facade-open
+mode	facade-open
+file	test-data/poi/test-data/document/saved-by-table.doc
+acc	1
+peak_open_bytes	1126154
+retained_open_bytes	1028876
+peak_bytes	1126154
+retained_bytes	1028876
+total_alloc_bytes	2325493
+alloc_count	3229
+### saved-by-table facade-text
+mode	facade-text
+file	test-data/poi/test-data/document/saved-by-table.doc
+acc	27316
+peak_open_bytes	1126154
+retained_open_bytes	1028876
+peak_bytes	1126154
+retained_bytes	1028876
+total_alloc_bytes	2352809
+alloc_count	3230
+### saved-by-table facade-count
+mode	facade-count
+file	test-data/poi/test-data/document/saved-by-table.doc
+acc	443
+peak_open_bytes	1126154
+retained_open_bytes	1028876
+peak_bytes	1126154
+retained_bytes	1028876
+total_alloc_bytes	2325589
+alloc_count	3230
+### saved-by-table facade-para0
+mode	facade-para0
+file	test-data/poi/test-data/document/saved-by-table.doc
+acc	70
+peak_open_bytes	1126154
+retained_open_bytes	1028876
+peak_bytes	2290316
+retained_bytes	1028876
+total_alloc_bytes	5835837
+alloc_count	8664
+### saved-by-table snap-open
+Error: Refused(Drawing)
+### saved-by-table snap-para0
+Error: Refused(Drawing)
+### FloatingPictures facade-open
+mode	facade-open
+file	test-data/ole/doc/FloatingPictures.doc
+acc	1
+peak_open_bytes	1093359
+retained_open_bytes	711859
+peak_bytes	1093359
+retained_bytes	711859
+total_alloc_bytes	1688355
+alloc_count	2858
+### FloatingPictures facade-text
+mode	facade-text
+file	test-data/ole/doc/FloatingPictures.doc
+acc	9017
+peak_open_bytes	1093359
+retained_open_bytes	711859
+peak_bytes	1093359
+retained_bytes	711859
+total_alloc_bytes	1697372
+alloc_count	2859
+### FloatingPictures facade-count
+mode	facade-count
+file	test-data/ole/doc/FloatingPictures.doc
+acc	210
+peak_open_bytes	1093359
+retained_open_bytes	711859
+peak_bytes	1093359
+retained_bytes	711859
+total_alloc_bytes	1688451
+alloc_count	2859
+### FloatingPictures facade-para0
+mode	facade-para0
+file	test-data/ole/doc/FloatingPictures.doc
+acc	6
+peak_open_bytes	1093359
+retained_open_bytes	711859
+peak_bytes	1476126
+retained_bytes	711859
+total_alloc_bytes	4021243
+alloc_count	6496
+### FloatingPictures snap-open
+Error: Refused(Drawing)
+### FloatingPictures snap-para0
+Error: Refused(Drawing)
+### kwsymphony facade-open
+mode	facade-open
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+acc	1
+peak_open_bytes	3640417
+retained_open_bytes	1090299
+peak_bytes	3640417
+retained_bytes	1090299
+total_alloc_bytes	4228580
+alloc_count	2792
+### kwsymphony facade-text
+mode	facade-text
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+acc	1528
+peak_open_bytes	3640417
+retained_open_bytes	1090299
+peak_bytes	3640417
+retained_bytes	1090299
+total_alloc_bytes	4230108
+alloc_count	2793
+### kwsymphony facade-count
+mode	facade-count
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+acc	148
+peak_open_bytes	3640417
+retained_open_bytes	1090299
+peak_bytes	3640417
+retained_bytes	1090299
+total_alloc_bytes	4228676
+alloc_count	2793
+### kwsymphony facade-para0
+mode	facade-para0
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+acc	2
+peak_open_bytes	3640417
+retained_open_bytes	1090299
+peak_bytes	3640417
+retained_bytes	1090299
+total_alloc_bytes	6272096
+alloc_count	9906
+### kwsymphony snap-open
+Error: Refused(Field)
+### kwsymphony snap-para0
+Error: Refused(Field)

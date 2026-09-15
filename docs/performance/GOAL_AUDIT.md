@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0609: the facade's `.doc` slurp is the cheaper route — routing it to the source-backed DOC reader would cost 2-5× the cycles and admit four artifacts the eager reader refuses
+
+Record: [0609](0609-facade-doc-source-route-design.md).
+
+**A source-backed route is not automatically the cheaper route, and this one is
+6.3× to 9.9× worse at p50.** `docs/GOAL.md` hypothesis 1 ranks whole-input
+ingestion as the first thing to remove, and the facade's `.doc` slurp is the
+last such ingress on a priority format. Change 0609 measured it against the
+alternative the repository already owns and found the slurp cheaper on every
+axis but heap peak: 2 `pread64` against 30, 11 `statx` against 153, one complete
+file read against six, 2.12× to 5.07× fewer native cycles. The reason is a
+structural one this audit should carry forward — the eager reader's cost is
+proportional to *document content* and the source-backed reader's to *artifact
+bytes*, because ADR 0006's complete-artifact identity fence is levied on the
+file's length before any paragraph is resolved. Removing whole-input ingestion
+is only a saving when what replaces it reads less, and a fence that hashes the
+artifact three times (six reads) reads more. The second finding is an admission
+one: the two readers' refusal sets are **not nested**, so "try the cheap reader,
+fall back to the strict one" is not a safe pattern in this repository whenever
+the cheap reader skips a validation the strict one performs — here it would have
+admitted four `.doc` fixtures the library calls corrupt. The third is a cost of
+the fallback shape itself: a source-backed probe that is *expected* to be
+refused still costs two complete artifact passes, measured at +25.8%, +192.7%
+and +245.4% on top of the eager open for three real fixtures, growing with file
+size. Evidence gap 5 of change 0587 is unchanged by this batch: there is still
+no `perf-baseline` selector that opens a `.doc` or `.ppt` through the facade, so
+every figure here comes from a retained scratch probe rather than the harness.
+
 ## 0610 — hypothesis 8 is confirmed, and the waste is measured
 
 Design only, against the audit's standing eager-OPC-materialization row.

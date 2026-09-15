@@ -1,5 +1,39 @@
 # Performance optimization ADR-compliance matrix
 
+## 0609: the facade's `.doc` slurp is the cheaper route — routing it to the source-backed DOC reader would cost 2-5× the cycles and admit four artifacts the eager reader refuses
+
+Record: [0609](0609-facade-doc-source-route-design.md).
+
+**ADR 0006 (typed refusals) and ADR 0005 (positional source), facade DOC
+route.** Change 0609 changes no code, and its finding is about what a change
+here would have had to give up. ADR 0006 makes a reader's refusals part of its
+contract, so a facade route may not admit what the facade's own reader refuses.
+Measured over all 57 `.doc` fixtures, `SourceSnapshot::open` admits four —
+`footnote.doc`, `lists-margins.doc`, `duplicate-style-names.doc` and
+`picture.doc` — that `litchi::Document::open` refuses with
+`CorruptedFile("invalid stylesheet: style names and aliases must be unique")`,
+because the source-backed owner never reads the stylesheet: a same-width
+paragraph splice does not need it. The gap is structural, not corpus-dependent,
+and it is the same 15-refusal facade population change 0596's differential
+digest independently covers. Error identity differs on eleven more fixtures the
+two readers both refuse (`InvalidFormat("Word 6.0 documents (nFib 0x0065) are
+not supported")` against `Refused::AmbiguousTopology`,
+`InvalidFormat("DOC password required")` against `Refused::Encrypted`); under a
+fallback shape the eager error is the one the caller sees, so identity survives
+there and only the four admissions cannot be reconciled. Two ADR 0005 notes.
+First, the facade's `.doc` open pins its bytes once and can return
+`SourceChanged` only at open; retaining a snapshot past open would add a
+`SourceChanged` outcome to `paragraph_text` on an unchanged signature, and the
+fallback itself opens a window between the snapshot's six reads and the eager
+reader's seventh, which is a relocation of a typed boundary rather than a
+routing detail. Second, ADR 0005's "no source generics on a document" is *not* a
+blocker for either design: `SourceSnapshot` already erases its source behind
+`Arc<dyn ReadAt>` and a `DocumentImpl::DocSource` variant would be
+crate-internal exactly as `DocxSource` and `OdtSource` are. Record 0105's
+admission contract stands unchanged, and this record adds the measured statement
+that it is an edit owner rather than a reader: its whole read surface is
+`paragraph(Position)`, which serves 2 of 57 fixtures through the facade.
+
 ## 0610 — a proposed ADR, and gate 2 turns out to be smaller than it looked
 
 Nothing is implemented, so no accepted record's position changes; what this

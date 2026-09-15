@@ -1,0 +1,58 @@
+file	bytes	facade	facade_kind	snapshot	snapshot_kind
+test-data/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	22016	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc	8319	ERR NotOfficeFile	NotOfficeFile	ERR Ole(InvalidFormat("Invalid byte order"))	Ole
+test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	66048	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	13312	OK		ERR Refused(Revision)	Refused::Revision
+test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc	10240	OK		OK	
+test-data/office-interop/litchi-changed/noheadfoot-litchi.doc	27648	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/3endnotes.doc	35328	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/DiffFirstPageHeadFoot.doc	27648	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/FancyFoot.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/FloatingPictures.doc	335360	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/HeaderFooterProblematic.doc	61440	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/HeaderFooterUnicode.doc	28672	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/Lists.doc	27648	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/NoHeadFoot.doc	26112	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/PasswordProtected.doc	19968	ERR InvalidFormat("DOC password required")	InvalidFormat	ERR Refused(Encrypted)	Refused::Encrypted
+test-data/ole/doc/PngPicture.doc	14336	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/ThreeColFoot.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/ThreeColHead.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/ThreeColHeadFoot.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/cfb-truncated-final-sector.doc	24065	OK		ERR Refused(Field)	Refused::Field
+test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc	15360	ERR InvalidFormat("Word 95 (7.0) documents (nFib 0x0068) are not supported")	InvalidFormat	ERR Refused(AmbiguousTopology)	Refused::AmbiguousTopology
+test-data/ole/doc/cjklist30.doc	24064	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/cjklist31.doc	24064	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/cjklist34.doc	24064	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/cjklist35.doc	24064	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/commented-table.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/documentProperties.doc	9728	OK		OK	
+test-data/ole/doc/duplicate-style-names.doc	64512	ERR CorruptedFile("invalid stylesheet: style names and aliases must be unique")	CorruptedFile	OK	
+test-data/ole/doc/empty.doc	19456	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/endingnote.doc	9728	OK		OK	
+test-data/ole/doc/equation.doc	13824	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/first-header-footer.doc	23552	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/footnote.doc	9728	ERR CorruptedFile("invalid stylesheet: style names and aliases must be unique")	CorruptedFile	OK	
+test-data/ole/doc/hyperlink.doc	9728	OK		ERR Refused(Field)	Refused::Field
+test-data/ole/doc/image-comment-at-char.doc	24064	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/inline-endnote-and-footnote.doc	24576	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/lists-margins.doc	10752	ERR CorruptedFile("invalid stylesheet: style names and aliases must be unique")	CorruptedFile	OK	
+test-data/ole/doc/picture.doc	1448448	ERR CorruptedFile("invalid stylesheet: style names and aliases must be unique")	CorruptedFile	OK	
+test-data/ole/doc/pictures_escher.doc	120320	ERR CorruptedFile("invalid stylesheet: style names and aliases must be unique")	CorruptedFile	ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/table-merged-cells.doc	17408	OK		OK	
+test-data/ole/doc/tdf71749_with_footnote.doc	20480	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/testPictures.doc	315904	OK		ERR Refused(Field)	Refused::Field
+test-data/ole/doc/watermark.doc	20480	ERR CorruptedFile("grffldEnd.fNested disagrees with field containment")	CorruptedFile	ERR Refused(Drawing)	Refused::Drawing
+test-data/ole/doc/word6-no-table-stream.doc	6656	ERR InvalidFormat("Word 6.0 documents (nFib 0x0065) are not supported")	InvalidFormat	ERR Refused(AmbiguousTopology)	Refused::AmbiguousTopology
+test-data/poi/test-data/document/47950_normal.doc	27136	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/document/Bug53453Section.doc	26112	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	86528	OK		ERR Refused(Macro)	Refused::Macro
+test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	1619457	OK		ERR Refused(Field)	Refused::Field
+test-data/poi/test-data/document/password_password_cryptoapi.doc	27136	ERR InvalidFormat("DOC password required")	InvalidFormat	ERR Refused(Encrypted)	Refused::Encrypted
+test-data/poi/test-data/document/password_tika_binaryrc4.doc	22016	ERR InvalidFormat("DOC password required")	InvalidFormat	ERR Refused(Encrypted)	Refused::Encrypted
+test-data/poi/test-data/document/saved-by-table.doc	65024	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/document/test.doc	32768	ERR CorruptedFile("grffldEnd.fHasSep disagrees with the FieldList")	CorruptedFile	ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/document/word_with_embeded.doc	117248	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/hpsf/TestBug52117.doc	7168	ERR InvalidFormat("Word 6.0 documents (nFib 0x0065) are not supported")	InvalidFormat	ERR Refused(AmbiguousTopology)	Refused::AmbiguousTopology
+test-data/poi/test-data/hpsf/TestGermanWord90.doc	19456	OK		ERR Refused(Drawing)	Refused::Drawing
+test-data/poi/test-data/hpsf/TestMickey.doc	12288	ERR InvalidFormat("Word 95 (7.0) documents (nFib 0x0068) are not supported")	InvalidFormat	ERR Refused(AmbiguousTopology)	Refused::AmbiguousTopology
+test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc	11776	OK		ERR Refused(Revision)	Refused::Revision

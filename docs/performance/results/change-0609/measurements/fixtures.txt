@@ -1,0 +1,11 @@
+noheadfoot-litchi	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+documentProperties	test-data/ole/doc/documentProperties.doc
+table-merged-cells	test-data/ole/doc/table-merged-cells.doc
+lists-margins	test-data/ole/doc/lists-margins.doc
+duplicate-style-names	test-data/ole/doc/duplicate-style-names.doc
+endingnote	test-data/ole/doc/endingnote.doc
+footnote	test-data/ole/doc/footnote.doc
+picture	test-data/ole/doc/picture.doc
+saved-by-table	test-data/poi/test-data/document/saved-by-table.doc
+FloatingPictures	test-data/ole/doc/FloatingPictures.doc
+kwsymphony	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc

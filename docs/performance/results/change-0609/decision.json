@@ -1,0 +1,59 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0609",
+  "title": "The facade's .doc slurp is the cheaper route: routing it to the source-backed DOC reader would cost 2-5x the cycles and admit four artifacts the eager reader refuses",
+  "decision": "retained, design only; survey item CORE-1 is frozen as a design record and nothing is implemented, because no value-identical routing exists",
+  "code_state": "no file under crates/ was modified; git diff --name-only 8fe9efa55 -- crates/ is empty on this branch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "route S (SourceSnapshot::open) admits four .doc fixtures that route E (the facade's eager reader) refuses with CorruptedFile(\"invalid stylesheet: style names and aliases must be unique\"); route S never reads the stylesheet, so no ordering of the two readers can make it compute that refusal, and a source-first route would widen the facade's admitted population in violation of ADR 0006 and of GOAL's rule against trading a typed refusal for a partial result",
+    "route S's entire read surface is paragraph(Position); it has no text() or paragraph_count() primitive, so a facade Document built on it would open route E as well for seven of the DOC arm's eight queries and pay both costs",
+    "route S reads the complete artifact six times per open (identity_fingerprint is plan_same_length_stream_splices(Vec::new()), whose finish_overlay_plan_with_owner fingerprints twice for a generic ReadAt; SourceSnapshot::open takes three identity passes), against route E's single whole-file read",
+    "route S costs 2.12x to 5.07x route E's native cycles, 7.9x to 15.7x its instructions, 15x its read_at calls and 6.30x to 9.90x its p50 latency on the one query both routes answer identically, against an A/A floor of p50 <= 0.9% and p99 <= 1.9%",
+    "0587's own falsification clause for CORE-1 is satisfied in both halves: route S is not lower in instructions (it is 8-16x higher), and widening admission would require skipping a validation the eager path performs",
+    "R-B (capability dispatch, which clears the admission blocker by construction) is designed and not built: its measured benefit is a lower allocator peak on 2 of 57 fixtures at 6.3-9.9x the latency, for a single paragraph, which is speculative complexity under GOAL's decision rules"
+  ],
+  "accepted_evidence": {
+    "admission_census": "all 57 .doc fixtures under test-data/ opened through both routes with the error kind recorded for every refusal; crosstab route E admits 42, route S admits 8, both 4, route-S-only 4, neither 11; route S refusal histogram Drawing 34, Field 4, AmbiguousTopology 4, Encrypted 3, Revision 2, Macro 1, Ole 1",
+    "value_comparison": "all 57 fixtures, route E text() length and FNV-1a digest, paragraph_count(), paragraph_text(0) length and digest, against route S paragraph(0) outcome, length and digest and the concatenation of every position it serves; the two paragraph digests the record calls byte-identical are equal, no other pair of values is",
+    "read_counts": "a counting ReadAt adapter records read_at calls, bytes, version() and len() calls per route-S operation: 30 calls and 6.05x-7.47x the file size on the admitted fixtures, 2.03x-2.12x on the refused ones; six complete passes account for 99.2% of picture.doc's measured bytes",
+    "syscall_counts": "strace isolation pairs, 1 against 11 operations: route E 1 openat, 2 pread64 totalling file size plus 4 bytes, 11 statx; route S 1 openat, 30 pread64, 153 statx",
+    "allocator": "a counting global allocator armed for one operation: route S peak is 47.9% to 83.8% lower and retained bytes 80.1% to 97.3% lower on the four fixtures both routes admit; route E retains less than the file size on the 1.62 MB fixture, correcting 0587's modelled claim that the slurped Vec is retained for the document's lifetime",
+    "instructions": "callgrind isolation pairs (N and N+M, difference divided by M, --cache-sim=no): route S 3.46-5.90 M Ir per open against route E's 0.22-0.74 M on the fixtures both admit; picture.doc 460,073,873 Ir per route-S open, close to half the 912,551,293 change 0587 measured before 0589 landed",
+    "native_cycles": "perf stat -r 3 isolation pairs, 200 against 1,200 operations (20 against 120 for the large fixtures): route S 342,797-435,287 cycles against route E's 67,643-205,021; route S's cost fits 217,274 + 12.90 x file_bytes over two orders of magnitude (+1.5% and +0.4% on two held-out fixtures), route E's is not proportional to bytes at all",
+    "paired_timing": "Document::paragraph_text(0) against SourceSnapshot::paragraph(Position::new(0)) on the two fixtures where both routes return the identical string; 32 samples x 40 operations per leg, order A1 B1 B2 A2; route S against route E +529.9% and +890.2% at p50, route E against route S -84.1% and -89.9%",
+    "floor": "A/A in the same window, two further route-E legs: p50 0.9% and 0.0%, p99 0.5% and 1.9%; the floor is below this repository's usual p50 4% / p99 14% because each sample amortizes 40 operations",
+    "fallback_penalty": "the cost of a route-S open expected to be refused, measured natively with the refusal swallowed: +25.8%, +192.7% and +245.4% on top of route E's open for saved-by-table.doc, FloatingPictures.doc and ca.kwsymphony...doc; the penalty grows with file size because the wasted probe is two complete artifact passes",
+    "gates": "git diff --name-only 8fe9efa55 -- crates/ empty; cargo fmt --all --check pass; probe cargo fmt --check and cargo clippy --release --all-targets pass with no warning; the one litchi dead_code warning reproduced on the untouched before checkout"
+  },
+  "accepted_costs": {
+    "no_ab_pair": "nothing changed, so there is no before/after leg; every figure compares two routes that both exist at the base commit",
+    "callgrind_mispricing": "callgrind runs SHA-256 in software and 87.95% of route S's total is sha2::sha256::soft::unroll::compress, so its instruction ratios overstate latency and are used only to rank work; every latency statement is native perf stat or wall clock",
+    "warm_local_single_thread": "every measurement is warm, local, single-threaded, on one host with SHA-NI; a host without it would widen route S's cycle disadvantage and a network filesystem its statx and read disadvantage, and neither was measured",
+    "allocator_not_rss": "peak and retained figures are counting-allocator bytes, not RSS; they exclude the page-cache copy, the stack and anything the global allocator does not see",
+    "two_probe_binaries": "pair A produced the profiled and timed numbers and pair B (one clippy style fix inside a subcommand no timed mode reaches) the deterministic ones; pair B reproduces every deterministic output byte-for-byte and the timing spot check within the A/A floor",
+    "shared_host": "eight measurement agents were active throughout; every measured process was pinned to CPU 29 and the A/A control was taken in the same window"
+  },
+  "known_gaps": {
+    "corpus_ceiling": "the largest .doc in the repository is 1,619,457 bytes, with no DIFAT-scale artifact and no 4,096-byte-sector CFB; route S's per-byte term means the corpus understates its disadvantage, but the fit is extrapolated beyond 1.45 MB and is labelled modelled where used",
+    "feature_combination": "the facade was measured with features = [\"doc\", \"docx\"]; the docx-disabled arm reaches the same read_path_source_bytes slurp through DocumentSourcePathDetection::Bytes rather than DocxSourcePathDetection::Bytes, so the ingress is identical, but the ODT and OOXML probes that precede it differ and were not measured separately",
+    "no_prototype": "R-B was designed, not prototyped; no patch exists in this packet because the capability blocker makes one premature",
+    "position_semantics": "route S's Position is a zero-based main-story paragraph position and route E's paragraph_text(i) index is a position in the full paragraph projection; they coincide at 0 on the two fixtures compared and the record claims nothing beyond that",
+    "selector": "no perf-baseline selector opens a .doc through the facade, so nothing here moved a harness scenario; 0587 evidence gap 5 is unchanged"
+  },
+  "withheld": [
+    "any registered claim, speedup, regression, cold-cache, physical-device, range-source, RSS, concurrency-scaling or cross-platform result"
+  ],
+  "provenance": {
+    "git_revision": "8fe9efa55728cf8b9592934f9e9de6f5a66fdc1b",
+    "branch": "perf/0609-facade-doc-source-route-design",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": 29,
+    "probe_sha256": {
+      "pair_a": "8d956d66b72e88536cddc5406654cf220b91622fd56b6862923ca82f36f539aa",
+      "pair_b": "080dd424d92c90e8a5806161af370c565c043e1eb3987de83830c8bbfe7d34f5"
+    }
+  }
+}

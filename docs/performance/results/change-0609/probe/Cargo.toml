@@ -1,0 +1,20 @@
+[package]
+name = "facade_doc_route"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+# Path dependencies point at the ordinary checkout so this file works as
+# retained. The measured builds used the change's own worktree
+# (litchi-worktrees/0609), which was byte-identical source at 8fe9efa55;
+# substitute your own checkout if it lives elsewhere.
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi/crates/litchi-core" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi/crates/litchi-cfb" }
+litchi-doc = { path = "/home/zhuhe/code/litchi/crates/litchi-doc" }
+litchi = { path = "/home/zhuhe/code/litchi/crates/litchi", default-features = false, features = ["doc", "docx"] }
+
+[profile.release]
+debug = false
+strip = false
