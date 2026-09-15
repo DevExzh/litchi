@@ -211,9 +211,11 @@ pub struct AttachedGlossary {
 }
 
 impl AttachedGlossary {
+    /// `word_document` is shared so the glossary FIB reads through the same
+    /// stream as the template FIB instead of copying its own suffix.
     pub(crate) fn parse(
         main_fib: &FileInformationBlock,
-        word_document: &[u8],
+        word_document: &Arc<Vec<u8>>,
         table_stream: &[u8],
         data_stream: Option<&[u8]>,
     ) -> Result<Option<Self>> {
@@ -255,7 +257,7 @@ impl AttachedGlossary {
                 "attached glossary FIB starts at or beyond template cbMac",
             ));
         }
-        let fib = FileInformationBlock::parse_at(word_document, offset)?;
+        let fib = FileInformationBlock::parse_shared(Arc::clone(word_document), offset)?;
         if !fib.is_glossary_document() {
             return Err(corrupted("pnNext does not address a glossary-only FIB"));
         }

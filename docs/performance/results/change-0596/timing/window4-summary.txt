@@ -1,0 +1,47 @@
+host=AMD EPYC 9R45 kernel=Linux 7.0.0-1012-aws cpu_affinity=16 rustc=rustc 1.95.0 (59807616e 2026-04-14)
+before sha256=dab64c26373072ab9d88883c64cce710df29aa8a36255d751dbcf3d72f2521a1
+after  sha256=26c709e688d293d3ee4b52e49a70118b6cfddff14623a44969fe0d0cd1946af0
+samples per leg per scenario=500 warmup=30
+
+scenario                                             metric    before ns     after ns    B vs A    A vs B      A/A
+------------------------------------------------------------------------------------------------------------------
+doc_semantic_full_text/large                         p50             680          670    -1.47%    +1.49%   +4.23%
+doc_semantic_full_text/large                         mean            751          721    -3.96%    +4.13%   +4.01%
+doc_semantic_full_text/large                         p95           1,160        1,020   -12.07%   +13.73%   +9.82%
+doc_semantic_full_text/large                         p99           1,430        1,400    -2.10%    +2.14%   +4.70%
+                                                     n             1,000        1,000
+doc_semantic_full_text/tiny                          p50              30           30    +0.00%    +0.00%   +0.00%
+doc_semantic_full_text/tiny                          mean             30           31    +3.83%    -3.69%   -5.08%
+doc_semantic_full_text/tiny                          p95              40           40    +0.00%    +0.00%   +0.00%
+doc_semantic_full_text/tiny                          p99              50           60   +20.00%   -16.67%   +0.00%
+                                                     n             1,000        1,000
+doc_semantic_one_edit_save/large                     p50         671,303      656,354    -2.23%    +2.28%   -1.48%
+doc_semantic_one_edit_save/large                     mean        700,366      805,863   +15.06%   -13.09%  -12.51%
+doc_semantic_one_edit_save/large                     p95         698,553      828,534   +18.61%   -15.69%  -80.09%
+doc_semantic_one_edit_save/large                     p99         849,754    3,745,079  +340.73%   -77.31%   -0.83%
+                                                     n             1,000        1,000
+doc_semantic_one_edit_save/tiny                      p50          35,750       35,400    -0.98%    +0.99%   +1.33%
+doc_semantic_one_edit_save/tiny                      mean         48,848       68,238   +39.69%   -28.41%   -7.93%
+doc_semantic_one_edit_save/tiny                      p95          41,770       42,410    +1.53%    -1.51%   +3.42%
+doc_semantic_one_edit_save/tiny                      p99          70,921       81,121   +14.38%   -12.57%  +20.67%
+                                                     n             1,000        1,000
+doc_semantic_open/large                              p50         332,561      306,981    -7.69%    +8.33%   -2.54%
+doc_semantic_open/large                              mean        424,130      419,778    -1.03%    +1.04%  -13.53%
+doc_semantic_open/large                              p95         371,882      394,502    +6.08%    -5.73%   -5.68%
+doc_semantic_open/large                              p99       3,357,156    3,343,996    -0.39%    +0.39%  -84.45%
+                                                     n             1,000        1,000
+doc_semantic_open/tiny                               p50           7,180        6,790    -5.43%    +5.74%   +0.56%
+doc_semantic_open/tiny                               mean         10,400       13,009   +25.10%   -20.06%  -51.29%
+doc_semantic_open/tiny                               p95           7,510        7,090    -5.59%    +5.92%   +0.80%
+doc_semantic_open/tiny                               p99          15,740       13,320   -15.37%   +18.17%   -6.75%
+                                                     n             1,000        1,000
+doc_semantic_paragraph_count/large                   p50          28,370       28,280    -0.32%    +0.32%   -0.25%
+doc_semantic_paragraph_count/large                   mean         36,781       28,575   -22.31%   +28.72%  -38.45%
+doc_semantic_paragraph_count/large                   p95          29,351       29,020    -1.13%    +1.14%   -1.65%
+doc_semantic_paragraph_count/large                   p99          37,840       36,160    -4.44%    +4.65%   -2.46%
+                                                     n             1,000        1,000
+doc_semantic_paragraph_count/tiny                    p50             220          220    +0.00%    +0.00%   +0.00%
+doc_semantic_paragraph_count/tiny                    mean            219          220    +0.17%    -0.17%   +3.57%
+doc_semantic_paragraph_count/tiny                    p95             230          230    +0.00%    +0.00%   +9.09%
+doc_semantic_paragraph_count/tiny                    p99             240          250    +4.17%    -4.00%  +26.09%
+                                                     n             1,000        1,000

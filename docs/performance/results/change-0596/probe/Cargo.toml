@@ -1,0 +1,16 @@
+[package]
+name = "docppt_survey"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi/crates/litchi-core" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi/crates/litchi-cfb" }
+litchi-doc = { path = "/home/zhuhe/code/litchi/crates/litchi-doc" }
+litchi-ppt = { path = "/home/zhuhe/code/litchi/crates/litchi-ppt" }
+
+[profile.release]
+debug = false
+strip = false

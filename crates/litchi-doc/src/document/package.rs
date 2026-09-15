@@ -47,6 +47,7 @@ use crate::parts::text_services::TextServicesTables;
 use crate::parts::textbox_breaks::TextBoxBreakTables;
 use litchi_cfb::OleFile;
 use std::io::{Read, Seek};
+use std::sync::Arc;
 
 impl Document {
     /// Create a new Document from an OLE file.
@@ -81,10 +82,12 @@ impl Document {
 
         // The FIB selects the table stream, so only WordDocument must be read
         // before every remaining DOC-owned stream can be charged as a group.
-        let mut word_document = ole.open_stream(&["WordDocument"])?;
+        // The stream is shared rather than copied: the FIB, the attached
+        // glossary FIB, and this document all read the same bytes.
+        let mut word_document = Arc::new(ole.open_stream(&["WordDocument"])?);
 
         // Parse the File Information Block (FIB) from the start of WordDocument
-        let mut fib = FileInformationBlock::parse(&word_document)?;
+        let mut fib = FileInformationBlock::parse_shared(Arc::clone(&word_document), 0)?;
 
         // Determine which table stream to use (0Table or 1Table)
         let table_stream_name = if fib.which_table_stream() {
@@ -144,16 +147,20 @@ impl Document {
             .transpose()?;
 
         if fib.is_encrypted() {
+            // Decryption rewrites the stream in place, so it works on a private
+            // copy that then replaces the shared one.
+            let mut decrypted = word_document.as_ref().clone();
             decrypt_document_streams(
                 &fib,
-                &mut word_document,
+                &mut decrypted,
                 &mut table_stream,
                 data_stream.as_deref_mut(),
                 options.password(),
             )?;
+            word_document = Arc::new(decrypted);
             // FibBase is clear, but the rest of the FIB was encrypted and must be
             // reparsed before any offsets or character counts are consulted.
-            fib = FileInformationBlock::parse(&word_document)?;
+            fib = FileInformationBlock::parse_shared(Arc::clone(&word_document), 0)?;
         }
 
         // Create text extractor

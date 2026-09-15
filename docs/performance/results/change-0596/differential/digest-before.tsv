@@ -1,0 +1,58 @@
+file	open	text_len	text_hash	para_count	count_api	para_hash	section_count	section_hash	subdoc	fib_len	fib_hash
+/home/zhuhe/code/litchi/test-data/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	OK	6	3249219367180644658	1	1	17595695751223331741	1	6928544252698535652	16259296873717906256	4096	1055299441801031361
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc	PKGERR Ole(InvalidFormat("Invalid byte order"))										
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	OK	15637	11227527499919993654	-1	130	ERR Corrupted("sprmCFRMark must contain a Boolean8 value")	1	6886042036236948083	6862714652257334828	30769	12540179468927883533
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	OK	297	10213733309017175866	3	3	5678597184327144943	1	7203441055632095696	3376578956634321131	4157	2550792597946160473
+/home/zhuhe/code/litchi/test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc	OK	134	7676547309849864594	10	10	17197608051783357528	1	15883290415847556266	18284887927318136066	3645	13308372005766987638
+/home/zhuhe/code/litchi/test-data/office-interop/litchi-changed/noheadfoot-litchi.doc	OK	135	22449927857812714	10	10	4087014958789844488	1	8588373941685064860	8814539190655625449	5120	16310280238820250393
+/home/zhuhe/code/litchi/test-data/ole/doc/3endnotes.doc	OK	8671	4147331125826702474	38	38	6610904456119039076	1	3802628701376027931	15524691788153894774	12852	13513344918743008145
+/home/zhuhe/code/litchi/test-data/ole/doc/DiffFirstPageHeadFoot.doc	OK	452	14695997727244066206	27	27	164657481107204179	1	6912552931557025198	16253096062859229541	4151	912889532424052896
+/home/zhuhe/code/litchi/test-data/ole/doc/FancyFoot.doc	OK	323	8897985817880942732	22	22	5641017266830087955	1	3390298652223718549	1043315922381605859	4096	5390635120905483479
+/home/zhuhe/code/litchi/test-data/ole/doc/FloatingPictures.doc	OK	9017	13048509408019136506	210	210	10045469001155624980	2	6438219993121340530	2755630649942286221	38775	6260108032019325457
+/home/zhuhe/code/litchi/test-data/ole/doc/HeaderFooterProblematic.doc	OK	15415	9327774035191565684	354	354	12497940867664922141	1	1571245185024697510	16569323156988011187	45625	2952607861511480164
+/home/zhuhe/code/litchi/test-data/ole/doc/HeaderFooterUnicode.doc	OK	544	576837679489258686	34	34	3729690399881707954	1	16864034739519492018	8391843733918954706	5172	12115492166110944903
+/home/zhuhe/code/litchi/test-data/ole/doc/Lists.doc	OK	532	10238283970364906404	40	40	13228489628374120237	1	12089061511316802708	13223448152370182720	5166	18244141656621775587
+/home/zhuhe/code/litchi/test-data/ole/doc/NoHeadFoot.doc	OK	180	9684391324116062295	10	10	6085573166544592153	1	17071216599686392020	1756501194291211341	4096	4624428167462849855
+/home/zhuhe/code/litchi/test-data/ole/doc/PasswordProtected.doc	DOCERR PasswordRequired										
+/home/zhuhe/code/litchi/test-data/ole/doc/PngPicture.doc	OK	46	5953999762743383952	2	2	13695359015746003987	1	5049418217777416666	17745832964815559764	8103	16955986922176024024
+/home/zhuhe/code/litchi/test-data/ole/doc/ThreeColFoot.doc	OK	272	16699817056203026967	23	23	4109505199582900252	1	1408301993153007944	12663115902750424148	4096	1815232232071226657
+/home/zhuhe/code/litchi/test-data/ole/doc/ThreeColHead.doc	OK	276	10367042565593806258	21	21	1248895323587513380	1	810072931371183396	1114977289393130368	4096	3174387517085448317
+/home/zhuhe/code/litchi/test-data/ole/doc/ThreeColHeadFoot.doc	OK	339	15329133411509279492	23	23	16481630098014227263	1	1878856714032881298	13014663987751024188	4096	11751422422095657068
+/home/zhuhe/code/litchi/test-data/ole/doc/cfb-truncated-final-sector.doc	OK	104	12722545357577839501	15	15	4980818251511081947	1	8752827572540363656	6799351617901139100	4096	6250369803378964566
+/home/zhuhe/code/litchi/test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc	DOCERR UnsupportedVersion { nfib: 104, name: "Word 95 (7.0)" }										
+/home/zhuhe/code/litchi/test-data/ole/doc/cjklist30.doc	OK	454	14064542627181926287	29	29	8594827441262808109	1	7955698672882720708	15950448127734054942	4146	10298208324086883453
+/home/zhuhe/code/litchi/test-data/ole/doc/cjklist31.doc	OK	454	14064542627181926287	29	29	4920115024449540649	1	7955698672882720708	15950448127734054942	4146	5479651028240255591
+/home/zhuhe/code/litchi/test-data/ole/doc/cjklist34.doc	OK	454	14064542627181926287	29	29	16198051202069197997	1	7955698672882720708	15950448127734054942	4146	12153327313357763375
+/home/zhuhe/code/litchi/test-data/ole/doc/cjklist35.doc	OK	454	14064542627181926287	29	29	13494785996644050493	1	7955698672882720708	15950448127734054942	4146	5062025938512476685
+/home/zhuhe/code/litchi/test-data/ole/doc/commented-table.doc	OK	32	2248543584713736059	7	7	3666576898096718289	1	13081897525095736259	7414148486288617985	4096	10684821650268509568
+/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc	OK	22	10076329400203661442	1	1	13592208151210565399	1	15183873107341835064	17470550654404574386	3620	7035483139643038945
+/home/zhuhe/code/litchi/test-data/ole/doc/duplicate-style-names.doc	DOCERR Corrupted("invalid stylesheet: style names and aliases must be unique")										
+/home/zhuhe/code/litchi/test-data/ole/doc/empty.doc	OK	1	12642475295903956216	1	1	8313816405398948997	1	4166837977394304041	10027423297413522685	4096	13913949360096715162
+/home/zhuhe/code/litchi/test-data/ole/doc/endingnote.doc	OK	40	1971029994530339815	3	3	8918829570971593958	1	17950611844057874932	7586257106189978849	3620	17761948551677671047
+/home/zhuhe/code/litchi/test-data/ole/doc/equation.doc	OK	40	9584787920299794649	1	1	18374934079149062336	1	17950611844057874932	12184133715111568738	3620	7117504048682869308
+/home/zhuhe/code/litchi/test-data/ole/doc/first-header-footer.doc	OK	330	9373153003489681695	40	40	6836106185349246555	2	2170425456703208277	14189250987246954232	4206	11371728817511488996
+/home/zhuhe/code/litchi/test-data/ole/doc/footnote.doc	DOCERR Corrupted("invalid stylesheet: style names and aliases must be unique")										
+/home/zhuhe/code/litchi/test-data/ole/doc/hyperlink.doc	OK	76	18216839459022871132	1	1	10820460766625805505	1	8625907703655190873	10440466708408046627	3620	10611613393453666338
+/home/zhuhe/code/litchi/test-data/ole/doc/image-comment-at-char.doc	OK	15	8063246895765396224	3	3	532384627669017645	1	15476860606736437858	17277264266511063952	4430	7871150077558921114
+/home/zhuhe/code/litchi/test-data/ole/doc/inline-endnote-and-footnote.doc	OK	88	16480835936739432326	18	18	2342269566971115859	1	12656708009900339277	12124811144279706180	4096	1764010865844517065
+/home/zhuhe/code/litchi/test-data/ole/doc/lists-margins.doc	DOCERR Corrupted("invalid stylesheet: style names and aliases must be unique")										
+/home/zhuhe/code/litchi/test-data/ole/doc/picture.doc	DOCERR Corrupted("invalid stylesheet: style names and aliases must be unique")										
+/home/zhuhe/code/litchi/test-data/ole/doc/pictures_escher.doc	DOCERR Corrupted("invalid stylesheet: style names and aliases must be unique")										
+/home/zhuhe/code/litchi/test-data/ole/doc/table-merged-cells.doc	OK	85	17904917538891143860	85	85	453727753031210199	1	4149384976081372939	6845345479440342633	10276	441951244428146177
+/home/zhuhe/code/litchi/test-data/ole/doc/tdf71749_with_footnote.doc	OK	558	11520092011198541669	37	37	13399946202480495261	1	4934239039397048972	6610885216612625795	4654	17792266225699737457
+/home/zhuhe/code/litchi/test-data/ole/doc/testPictures.doc	OK	218	11256474680611760724	40	40	6705244408527822271	1	16412815104688946145	16278673159797320505	5678	14509629196688199823
+/home/zhuhe/code/litchi/test-data/ole/doc/watermark.doc	DOCERR Corrupted("grffldEnd.fNested disagrees with field containment")										
+/home/zhuhe/code/litchi/test-data/ole/doc/word6-no-table-stream.doc	DOCERR UnsupportedVersion { nfib: 101, name: "Word 6.0" }										
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/47950_normal.doc	OK	31	4900867821389221230	1	1	380064830777197288	1	674191610334628433	9256530319831568678	4096	18265575509567210311
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/Bug53453Section.doc	OK	19	15297331363635960660	2	2	11637671587180841459	2	17044255830160111151	2930802366359010852	4096	18395448995102290985
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	OK	7929	141146359747528097	-1	244	ERR Corrupted("sprmCFRMark must contain a Boolean8 value")	1	11329683029946004344	18080180549900764929	41016	6205444788118379568
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	OK	1528	16537882062487497342	148	148	15616830907264959054	1	340460310697111386	15678053993728485362	697827	3016541745767467116
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/password_password_cryptoapi.doc	DOCERR PasswordRequired										
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/password_tika_binaryrc4.doc	DOCERR PasswordRequired										
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/saved-by-table.doc	OK	27316	16661383637977437166	443	443	13357688222762754854	2	7683219339174873501	5920680301333037279	39996	6373820773368443776
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/test.doc	DOCERR Corrupted("grffldEnd.fHasSep disagrees with the FieldList")										
+/home/zhuhe/code/litchi/test-data/poi/test-data/document/word_with_embeded.doc	OK	152	11689453656244250994	5	5	11452569697077860281	1	18263153195329030823	18364932310262526766	4096	5309795507564765375
+/home/zhuhe/code/litchi/test-data/poi/test-data/hpsf/TestBug52117.doc	DOCERR UnsupportedVersion { nfib: 101, name: "Word 6.0" }										
+/home/zhuhe/code/litchi/test-data/poi/test-data/hpsf/TestGermanWord90.doc	OK	114	2049442953015394128	3	3	14849255683667203801	1	15861025563441712274	16627281866992659212	4096	7595275316915977516
+/home/zhuhe/code/litchi/test-data/poi/test-data/hpsf/TestMickey.doc	DOCERR UnsupportedVersion { nfib: 104, name: "Word 95 (7.0)" }										
+/home/zhuhe/code/litchi/test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc	OK	179	15154153767142092268	14	14	12957142483138851224	1	5616993856797404135	4964078123688661503	3631	14720391436645245216

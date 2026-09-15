@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
+
+**DOC eager open, the three size-independent terms (items DOC-2, DOC-3 and DOC-4
+of change 0587).** Change [0596](../../0596-doc-eager-open-terms.md) implemented
+all three. `TextExtractor::new` no longer walks the decoded text four times: the
+UTF-16 buffer is sized from the pieces' clipped extents, Windows-1252 decodes
+through a 256-entry `u16` table instead of one `encode_utf16` plus
+`extend_from_slice` per character, and `from_utf16_lossy` plus the
+`encode_utf16().count()` plus the `char_indices` walk that built `cp_to_byte`
+collapse into one `char::decode_utf16` pass. `PapBinTable::parse` parses each
+entry's `grpprl` once instead of about three times, keeps a bounded
+least-recently-used map of resolved style baselines instead of change 0051's
+single adjacent-style slot, and reuses one `PrcData` visit set. The FIB reads
+through an `Arc<Vec<u8>>` of the `WordDocument` stream at an offset instead of
+owning a copy of the suffix, so the eager open no longer copies the stream a
+second time and the attached glossary FIB no longer copies it a third.
+**Measured** per-open instructions on the retained 0587 driver: 5,609,212 ->
+4,481,165 (-20.11%) on `saved-by-table.doc`, 3,471,280 -> 3,080,182 (-11.27%) on
+`FloatingPictures.doc`, 4,971,153 -> 4,058,410 (-18.36%) on the 1.6 MB
+kwsymphony form; `parse_sprms` calls per open 1,931 -> 686, 965 -> 531 and
+795 -> 467; `memcpy` calls 10,722 -> 8,955, 7,349 -> 6,615 and 8,754 -> 7,438.
+What remains in `TextExtractor::new` is the `cp_to_byte` table itself, still
+eight bytes per UTF-16 code unit and still built eagerly; the fused decode is
+still the largest single term of the `saved-by-table.doc` open at 38.33%
+inclusive and 1,336,150 instructions self. What remains in `PapBinTable::parse` is the
+per-entry `[sprms, piece_modifier].concat()` (one allocation per entry, retained
+in the run) and the `TapParser`'s own re-parse of the same `grpprl` for
+table paragraphs. Neither is addressed here.
+
 ## 0599 — XLSB cell-value commit: one workbook parse instead of two, none for a proven no-op
 
 Survey item XLSB-1 (rank 19 of change 0587) is implemented in full, and it is

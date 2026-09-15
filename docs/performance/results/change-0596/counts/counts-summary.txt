@@ -1,0 +1,54 @@
+== per-open instruction counts (callgrind isolation pair, s=10 vs s=110, delta/100)
+fixture                             before Ir     after Ir     delta
+saved-by-table.doc (65,024 B)       5,609,212    4,481,165   -20.11%
+FloatingPictures.doc (335,360 B)    3,471,280    3,080,182   -11.27%
+kwsymphony form (1,619,457 B)       4,971,153    4,058,410   -18.36%
+
+== inclusive per-op Ir of the touched terms (share of that open; 'below threshold' = outside the forty largest inclusive deltas of that profile)
+-- saved-by-table.doc (65,024 B)
+   TextExtractor::new                       2,382,695 (42.48%) -> 1,717,448 (38.33%)
+   PapBinTable::parse                       2,109,966 (37.62%) -> 1,682,103 (37.54%)
+   FileInformationBlock::parse_at              below threshold -> below threshold
+   apply_direct_sprms                         569,594 (10.15%) -> 359,707 (8.03%)
+   resolve_paragraph_style_sprms               183,471 (3.27%) -> below threshold
+   __memcpy_avx_unaligned_erms              1,067,341 (19.03%) -> 982,273 (21.92%)
+   __memset_avx2_unaligned_erms                below threshold -> below threshold
+-- FloatingPictures.doc (335,360 B)
+   TextExtractor::new                         788,029 (22.70%) -> 563,800 (18.30%)
+   PapBinTable::parse                         997,528 (28.74%) -> 875,397 (28.42%)
+   FileInformationBlock::parse_at              below threshold -> below threshold
+   apply_direct_sprms                         375,295 (10.81%) -> 253,321 (8.22%)
+   resolve_paragraph_style_sprms               below threshold -> below threshold
+   __memcpy_avx_unaligned_erms                487,597 (14.05%) -> 432,896 (14.05%)
+   __memset_avx2_unaligned_erms                321,216 (9.25%) -> 321,238 (10.43%)
+-- kwsymphony form (1,619,457 B)
+   TextExtractor::new                          138,003 (2.78%) -> below threshold
+   PapBinTable::parse                       1,114,923 (22.43%) -> 937,197 (23.09%)
+   FileInformationBlock::parse_at             698,280 (14.05%) -> below threshold
+   apply_direct_sprms                         577,957 (11.63%) -> 438,462 (10.80%)
+   resolve_paragraph_style_sprms               below threshold -> below threshold
+   __memcpy_avx_unaligned_erms              1,059,610 (21.32%) -> 349,836 (8.62%)
+   __memset_avx2_unaligned_erms             1,629,658 (32.78%) -> 1,629,664 (40.16%)
+
+== call counts per open
+-- saved-by-table.doc (65,024 B)
+   parse_sprms                           1,931.0 -> 686.0
+   memcpy                               10,721.8 -> 8,954.9
+   resolve_paragraph_style_sprms           103.0 -> 12.0
+   ParagraphProperties::clone              548.0 -> 457.0
+   grpprl concat (= PAPX entries)          626.0 -> 626.0
+   malloc                                4,524.0 -> 3,069.0
+-- FloatingPictures.doc (335,360 B)
+   parse_sprms                             965.0 -> 531.0
+   memcpy                                7,349.2 -> 6,615.2
+   resolve_paragraph_style_sprms            12.0 -> 8.0
+   ParagraphProperties::clone              225.0 -> 221.0
+   grpprl concat (= PAPX entries)          475.0 -> 475.0
+   malloc                                3,122.0 -> 2,678.0
+-- kwsymphony form (1,619,457 B)
+   parse_sprms                             795.0 -> 467.0
+   memcpy                                8,753.5 -> 7,438.2
+   resolve_paragraph_style_sprms            16.0 -> 5.0
+   ParagraphProperties::clone              165.0 -> 154.0
+   grpprl concat (= PAPX entries)          391.0 -> 391.0
+   malloc                                2,907.0 -> 2,526.0

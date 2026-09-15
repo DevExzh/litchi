@@ -49,10 +49,12 @@ impl TextExtractor {
     ) -> Result<Self> {
         // Extract text using the piece table
         let utf16 = Self::extract_text_from_pieces(fib, word_document, table_stream)?;
-        let text = Arc::new(String::from_utf16_lossy(&utf16));
-        let cp_to_byte = Arc::from(Self::build_cp_to_byte_map(&text).into_boxed_slice());
+        let (text, cp_to_byte) = Self::decode_with_cp_map(&utf16);
 
-        Ok(Self { text, cp_to_byte })
+        Ok(Self {
+            text: Arc::new(text),
+            cp_to_byte: Arc::from(cp_to_byte.into_boxed_slice()),
+        })
     }
 
     /// Extract all text from the document.
@@ -119,6 +121,31 @@ impl TextExtractor {
             && (index == 0 || self.cp_to_byte[index] != self.cp_to_byte[index - 1])
     }
 
+    /// Decode UTF-16 code units and record each unit's UTF-8 byte offset in one pass.
+    ///
+    /// This is the fused form of `String::from_utf16_lossy` followed by a
+    /// `char_indices` walk that pushes one entry per `len_utf16` unit and a final
+    /// terminator. `char::decode_utf16` yields exactly one scalar per valid
+    /// surrogate pair and one `U+FFFD` per unpaired surrogate, so the decoded
+    /// string spans exactly `utf16.len()` code units and the map holds
+    /// `utf16.len() + 1` entries. Both buffers are therefore sized exactly once
+    /// instead of counting the code units a second time.
+    fn decode_with_cp_map(utf16: &[u16]) -> (String, Vec<usize>) {
+        let mut text = String::with_capacity(utf16.len());
+        let mut cp_to_byte = Vec::with_capacity(utf16.len() + 1);
+        for decoded in char::decode_utf16(utf16.iter().copied()) {
+            let character = decoded.unwrap_or(char::REPLACEMENT_CHARACTER);
+            let offset = text.len();
+            for _ in 0..character.len_utf16() {
+                cp_to_byte.push(offset);
+            }
+            text.push(character);
+        }
+        cp_to_byte.push(text.len());
+        (text, cp_to_byte)
+    }
+
+    #[cfg(test)]
     fn build_cp_to_byte_map(text: &str) -> Vec<usize> {
         let mut cp_to_byte = Vec::with_capacity(text.encode_utf16().count() + 1);
         for (offset, ch) in text.char_indices() {
@@ -360,65 +387,83 @@ impl TextExtractor {
         pieces: &[PieceDescriptor],
         word_document: &[u8],
     ) -> Result<Vec<u16>> {
-        let mut text = Vec::new();
+        // The run contributed by each piece is a pure function of the piece and
+        // the stream, so the exact output length is known before decoding and
+        // the buffer never grows. The reservation is bounded by the bytes the
+        // stream actually holds, not by the character counts the piece table
+        // claims.
+        let units = pieces
+            .iter()
+            .filter_map(|piece| Self::piece_run(piece, word_document))
+            .map(|(run, is_ansi)| {
+                if is_ansi {
+                    run.len()
+                } else {
+                    run.len() / UTF16_CODE_UNIT_BYTES
+                }
+            })
+            .fold(0usize, usize::saturating_add);
+        let mut text = Vec::with_capacity(units);
 
         for piece in pieces {
-            // Character positions in a piece table ascend, but a corrupt or
-            // hostile table can violate that. A descending range is skipped
-            // rather than allowed to wrap the subtraction.
-            let Some(char_count) = piece.cp_end.checked_sub(piece.cp_start) else {
+            let Some((run, is_ansi)) = Self::piece_run(piece, word_document) else {
                 continue;
             };
-            let char_count = char_count as usize;
-
-            if char_count == 0 {
-                continue; // Empty piece
-            }
-
-            // Calculate text size in bytes based on encoding
-            let byte_count = if piece.is_ansi {
-                char_count // 1 byte per character for ANSI
+            if is_ansi {
+                // 8-bit ANSI text (Windows-1252). Every Windows-1252 byte maps to
+                // one BMP scalar, so the table yields exactly one code unit each.
+                text.extend(run.iter().map(|&byte| WINDOWS_1252_TO_UTF16[byte as usize]));
             } else {
-                char_count.saturating_mul(UTF16_CODE_UNIT_BYTES)
-            };
-
-            // Read the text data from the WordDocument stream. A piece that
-            // starts past the end contributes nothing; one that merely extends
-            // past it contributes the bytes that are present.
-            let start = piece.file_pos;
-            if start >= word_document.len() {
-                continue;
-            }
-            let end = start
-                .checked_add(byte_count)
-                .unwrap_or(word_document.len())
-                .min(word_document.len());
-            let text_data = &word_document[start..end];
-
-            if piece.is_ansi {
-                // 8-bit ANSI text (Windows-1252)
-                for &byte in text_data {
-                    let mut encoded = [0u16; 2];
-                    let units = windows_1252_to_char(byte).encode_utf16(&mut encoded);
-                    text.extend_from_slice(units);
-                }
-            } else {
-                // 16-bit Unicode (UTF-16LE)
-                // Make sure we have complete UTF-16LE pairs
-                let utf16_data = if text_data.len().is_multiple_of(2) {
-                    text_data
-                } else {
-                    &text_data[..text_data.len() & !1] // Truncate to even length
-                };
-
-                for chunk in utf16_data.as_chunks::<2>().0.iter() {
-                    let code_unit = u16::from_le_bytes(*chunk);
-                    text.push(code_unit);
-                }
+                // 16-bit Unicode (UTF-16LE), already truncated to whole pairs.
+                text.extend(
+                    run.as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|chunk| u16::from_le_bytes(*chunk)),
+                );
             }
         }
 
         Ok(text)
+    }
+
+    /// Bytes one piece contributes, clipped to the stream, with its encoding.
+    ///
+    /// Character positions in a piece table ascend, but a corrupt or hostile
+    /// table can violate that. A descending range is skipped rather than allowed
+    /// to wrap the subtraction. A piece that starts past the end contributes
+    /// nothing; one that merely extends past it contributes the bytes that are
+    /// present. A Unicode run is truncated to whole UTF-16LE pairs.
+    fn piece_run<'a>(piece: &PieceDescriptor, word_document: &'a [u8]) -> Option<(&'a [u8], bool)> {
+        let char_count = piece.cp_end.checked_sub(piece.cp_start)? as usize;
+        if char_count == 0 {
+            return None; // Empty piece
+        }
+
+        // Calculate text size in bytes based on encoding
+        let byte_count = if piece.is_ansi {
+            char_count // 1 byte per character for ANSI
+        } else {
+            char_count.saturating_mul(UTF16_CODE_UNIT_BYTES)
+        };
+
+        let start = piece.file_pos;
+        if start >= word_document.len() {
+            return None;
+        }
+        let end = start
+            .checked_add(byte_count)
+            .unwrap_or(word_document.len())
+            .min(word_document.len());
+        let text_data = &word_document[start..end];
+
+        if piece.is_ansi {
+            Some((text_data, true))
+        } else if text_data.len().is_multiple_of(2) {
+            Some((text_data, false))
+        } else {
+            Some((&text_data[..text_data.len() & !1], false)) // Truncate to even length
+        }
     }
 
     /// Extract text in a simple way (for Word 6.0 or simplified docs).
@@ -433,17 +478,14 @@ impl TextExtractor {
             return Ok(Vec::new());
         }
 
-        // Try to extract as Windows-1252
-        let mut text = Vec::new();
-        for &byte in &word_document[start_offset..] {
-            // Stop at null terminator or control characters
-            if byte == 0 {
-                break;
-            }
-            let mut encoded = [0u16; 2];
-            let units = windows_1252_to_char(byte).encode_utf16(&mut encoded);
-            text.extend_from_slice(units);
-        }
+        // Try to extract as Windows-1252, stopping at the null terminator
+        let tail = &word_document[start_offset..];
+        let run = &tail[..tail
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(tail.len())];
+        let mut text = Vec::with_capacity(run.len());
+        text.extend(run.iter().map(|&byte| WINDOWS_1252_TO_UTF16[byte as usize]));
 
         Ok(text)
     }
@@ -464,11 +506,28 @@ struct PieceDescriptor {
     is_ansi: bool,
 }
 
+/// Windows-1252 byte to UTF-16 code unit, one entry per byte value.
+///
+/// Every Windows-1252 byte decodes to a single Basic Multilingual Plane scalar,
+/// so one `u16` per byte is an exact encoding of [`windows_1252_to_char`] and a
+/// decoded run needs neither a per-character `encode_utf16` call nor a slice
+/// copy. The equivalence is asserted for all 256 byte values in this module's
+/// tests.
+const WINDOWS_1252_TO_UTF16: [u16; 256] = {
+    let mut table = [0u16; 256];
+    let mut byte = 0usize;
+    while byte < 256 {
+        table[byte] = windows_1252_to_char(byte as u8) as u16;
+        byte += 1;
+    }
+    table
+};
+
 /// Convert a Windows-1252 byte to a Unicode character.
 ///
 /// Windows-1252 is mostly compatible with ISO-8859-1, but has additional
 /// printable characters in the 0x80-0x9F range.
-fn windows_1252_to_char(byte: u8) -> char {
+const fn windows_1252_to_char(byte: u8) -> char {
     match byte {
         0x80 => '€',
         0x82 => '‚',
@@ -511,6 +570,83 @@ mod tests {
         assert_eq!(windows_1252_to_char(0x80), '€');
         assert_eq!(windows_1252_to_char(0x93), '"');
         assert_eq!(windows_1252_to_char(0x94), '"');
+    }
+
+    #[test]
+    fn windows_1252_table_matches_the_scalar_conversion() {
+        for byte in 0..=u8::MAX {
+            let mut encoded = [0u16; 2];
+            let units = windows_1252_to_char(byte).encode_utf16(&mut encoded);
+            assert_eq!(
+                units.len(),
+                1,
+                "Windows-1252 byte 0x{byte:02X} must decode to one UTF-16 code unit"
+            );
+            assert_eq!(WINDOWS_1252_TO_UTF16[byte as usize], units[0]);
+        }
+    }
+
+    #[test]
+    fn fused_decode_matches_lossy_decode_and_the_reference_map() {
+        // Valid text, an isolated high surrogate, an isolated low surrogate, a
+        // well-formed pair, and a pair split across the seam of two runs.
+        let cases: Vec<Vec<u16>> = vec![
+            Vec::new(),
+            "plain ASCII".encode_utf16().collect(),
+            "mixed é € 😀 text".encode_utf16().collect(),
+            vec![0x0041, 0xD800, 0x0042],
+            vec![0xDC00, 0x0041],
+            vec![0xD83D, 0xDE00],
+            vec![0x0041, 0xD83D, 0xDE00, 0xDC00, 0xD800],
+        ];
+        for units in cases {
+            let (text, cp_to_byte) = TextExtractor::decode_with_cp_map(&units);
+            assert_eq!(text, String::from_utf16_lossy(&units));
+            assert_eq!(cp_to_byte, TextExtractor::build_cp_to_byte_map(&text));
+            assert_eq!(cp_to_byte.len(), units.len() + 1);
+        }
+    }
+
+    #[test]
+    fn ansi_and_unicode_pieces_decode_as_before() {
+        // Every byte value in one ANSI piece, then an odd-length Unicode piece
+        // that must truncate to whole pairs, then a piece that runs off the end.
+        let mut word_document: Vec<u8> = (0..=u8::MAX).collect();
+        let unicode_start = word_document.len();
+        word_document.extend_from_slice(&[0x41, 0x00, 0x42, 0x00, 0x43]);
+
+        let pieces = [
+            PieceDescriptor {
+                cp_start: 0,
+                cp_end: 256,
+                file_pos: 0,
+                is_ansi: true,
+            },
+            PieceDescriptor {
+                cp_start: 256,
+                cp_end: 259,
+                file_pos: unicode_start,
+                is_ansi: false,
+            },
+            PieceDescriptor {
+                cp_start: 259,
+                cp_end: 300,
+                file_pos: word_document.len() + 8,
+                is_ansi: true,
+            },
+        ];
+
+        let extracted =
+            TextExtractor::extract_text_from_piece_descriptors(&pieces, &word_document).unwrap();
+
+        let mut expected: Vec<u16> = Vec::new();
+        for byte in 0..=u8::MAX {
+            let mut encoded = [0u16; 2];
+            expected.extend_from_slice(windows_1252_to_char(byte).encode_utf16(&mut encoded));
+        }
+        expected.extend_from_slice(&[0x0041, 0x0042]);
+        assert_eq!(extracted, expected);
+        assert_eq!(extracted.len(), 258);
     }
 
     #[test]

@@ -1,5 +1,23 @@
 # Performance program phase report
 
+## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
+
+- [`0596-doc-eager-open-terms.md`](0596-doc-eager-open-terms.md) — the three
+  size-independent terms of the eager DOC open: the four-pass text decode, the
+  triple PAPX resolution and the FIB's copy of the `WordDocument` suffix.
+  Retained, `performance_claim: none`. Per-open instructions fall 20.11%,
+  11.27% and 18.36% on three real fixtures; native cycles fall 13.3% and 21.2%
+  on two of them and rise 1.97% on the third. Across two windows against the
+  committed candidate, `doc_semantic_open` p50 falls 4.7% and 5.4% on the tiny
+  corpus and `doc_semantic_one_edit_save` p50 1.0% to 3.6%. The record also
+  carries a 13% to 15% regression on `doc_semantic_paragraph_count` that the
+  first candidate caused, the counts that showed it was not added work, and the
+  ninety-instruction edit that removed it. The oracle is a differential digest
+  over all 57 `.doc` fixtures:
+  byte-identical text, identical resolved paragraph, run and section property
+  structures, identical paragraph counts, identical FIB bytes, and identical
+  typed refusals on the 15 fixtures that refuse.
+
 ## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
 
 Change 0599 makes an XLSB cell-value publication parse its candidate workbook

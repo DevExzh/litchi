@@ -1,5 +1,27 @@
 # Performance optimization ADR-compliance matrix
 
+## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
+
+Record: [0596](0596-doc-eager-open-terms.md).
+
+**ADR 0006 (lossless preservation) and ADR 0003 (bounded resources), DOC eager
+open.** Change 0596 is value-identical by construction and checked by a
+differential digest over every admitted `.doc` fixture: `Document::text()`,
+every paragraph's resolved properties and runs, the section table, the
+subdocument ranges and `FileInformationBlock::raw_data()` all hash identically,
+and the 15 typed refusals keep their exact messages. The FIB's shared-stream
+representation preserves `raw_data()` byte for byte, so the public
+`smart_tags::Snapshot::fib_bytes`, its `finish()` output and its `fingerprint()`
+are unchanged. Two bounded-resource notes: the new UTF-16 reservation is sized
+from the bytes the stream actually holds rather than from the character counts
+the piece table claims, so a hostile piece table cannot make it reserve more
+than it will fill; and the style-baseline cache is capped at 64 entries with
+least-recently-used eviction, so a stylesheet naming thousands of styles cannot
+grow it without bound, while a run of same-style paragraphs still resolves its
+baseline once — the property change 0051 established. Retention falls rather
+than rises: the eager `Document` held the `WordDocument` stream twice (once in
+the document, once inside the FIB) and now holds it once.
+
 ## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
 
 Change 0599 tightens, rather than relaxes, the ADR 0003 publication boundary for

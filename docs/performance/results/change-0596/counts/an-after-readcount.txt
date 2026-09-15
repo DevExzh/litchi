@@ -1,0 +1,55 @@
+== readcount: total s100=169,837,543 s1100=1,820,514,547 per-op Ir=1,650,677
+-- inclusive per-op deltas (top 40)
+     3,301,354 200.00%  std::rt::lang_start_internal
+     3,301,354 200.00%  (below main)
+     1,650,677 100.00%  std::rt::lang_start::{{closure}}
+     1,650,677 100.00%  __libc_start_main@@GLIBC_2.34
+     1,650,677 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+     1,650,677 100.00%  main
+     1,650,677 100.00%  docppt_survey::main
+     1,650,677 100.00%  0x0000000000023cc0
+     1,650,677 100.00%  docppt_survey::profile_read
+     1,650,657 100.00%  litchi_doc::document::model::semantic::basics::<impl litchi_doc::document::model::state::Document>::paragraph_count
+     1,650,357  99.98%  <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+           226   0.01%  litchi_doc::parts::fib::FileInformationBlock::get_all_subdoc_ranges
+           105   0.01%  alloc::raw_vec::RawVec<T,A>::grow_one
+            81   0.00%  alloc::raw_vec::RawVecInner<A>::finish_grow
+            77   0.00%  __rustc::__rdl_alloc
+            40   0.00%  __rustc::__rust_alloc
+            35   0.00%  __rustc::__rust_dealloc
+            34   0.00%  __rustc::__rdl_dealloc
+            33   0.00%  free
+            30   0.00%  malloc
+             1   0.00%  __rustc::__rust_no_alloc_shim_is_unstable_v2
+             0   0.00%  <&std::io::stdio::Stdout as std::io::Write>::write_fmt
+             0   0.00%  core::fmt::write
+             0   0.00%  <u64 as core::fmt::Display>::fmt
+             0   0.00%  std::io::stdio::_print
+             0   0.00%  core::slice::memchr::memrchr
+             0   0.00%  <std::io::stdio::StdoutLock as std::io::Write>::write_all
+             0   0.00%  <std::env::Args as core::iter::traits::iterator::Iterator>::next
+             0   0.00%  core::str::converts::from_utf8
+             0   0.00%  <core::fmt::Formatter>::pad_integral
+             0   0.00%  <std::io::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
+             0   0.00%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+-- self per-op deltas (top 25)
+     1,650,357  99.98%  <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+           121   0.01%  litchi_doc::parts::fib::FileInformationBlock::get_all_subdoc_ranges
+            40   0.00%  alloc::raw_vec::RawVecInner<A>::finish_grow
+            39   0.00%  litchi_doc::document::model::semantic::basics::<impl litchi_doc::document::model::state::Document>::paragraph_count
+            33   0.00%  free
+            30   0.00%  malloc
+            24   0.00%  alloc::raw_vec::RawVec<T,A>::grow_one
+            20   0.00%  docppt_survey::profile_read
+             9   0.00%  __rustc::__rdl_alloc
+             1   0.00%  __rustc::__rust_alloc
+             1   0.00%  __rustc::__rdl_dealloc
+             1   0.00%  __rustc::__rust_dealloc
+             1   0.00%  __rustc::__rust_no_alloc_shim_is_unstable_v2
+             0   0.00%  <u64 as core::fmt::Display>::fmt
+             0   0.00%  core::slice::memchr::memrchr
+             0   0.00%  docppt_survey::main
+             0   0.00%  core::str::converts::from_utf8
+-- call counts per op (selected)
+         1.0  malloc
+         1.0  alloc::raw_vec::RawVecInner<A>::finish_grow
