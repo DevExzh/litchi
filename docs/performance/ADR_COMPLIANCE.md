@@ -1,5 +1,49 @@
 # Performance optimization ADR-compliance matrix
 
+## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
+
+ADR 0005 is the governing record and part (1) is the rare case that leaves it
+entirely alone: the walk adds no cache, retains nothing between calls, loads
+nothing eagerly, and performs the same lazy scan `query_cell` performed, exposed
+once instead of once per cell. Every check is taken in the same order against the
+same bytes; `max_worksheet_scan_records` and `max_worksheet_scan_bytes` are
+compared at the same points; the leading cancellation check and `ensure_current`
+fence and the trailing pair are the ones `query_cell` and `finish_query` took,
+and `version()` observations are identical between the legs in all 18 paired
+cells. ADR 0003 is untouched — `SourceBackedWorksheet` is still a two-word
+lifetime-free handle — and ADR 0006 is not engaged, since nothing here is on a
+write path. No new `unsafe`, no weakened malformed-input defence, no hidden global
+Rayon pool, no ambient I/O, no public leakage of archive types, raw locks or
+executors; `CellSink`, `ScanContext`, `TargetCell` and `VisitCells` are private
+and the only public surface added is two methods over already-public types. The
+walk cannot be used to skip validation: it always runs to the worksheet's EOF and
+the visitor cannot stop it. **Two behavioural notes are recorded rather than left
+to be discovered.** First, a `try_reserve` was added before the `Vec::push` of a
+`FORMULA` `STRING` continuation, which the text path already had and `query_cell`
+did not; it can only convert an allocator abort into
+`SourceBackedError::Allocation`, and the counters show it is unreachable on every
+fixture measured. Second, `query_cell` returns `Ok(None)` for any column above
+`u8::MAX`, so a malformed worksheet storing a record at column 256 or beyond
+would be reported by `visit_cells` and unreachable through `cell()`; no corpus
+fixture does this and the differential test asserts the walk's widest column is
+at most 255 on every fixture it covers. Refusal identity is proved by `Display`
+comparison, not by variant matching, on one synthetic defect and on the three
+real flagship worksheets whose shared-formula metadata this reader declines.
+**Part (2) is where ADR 0005 bites and is the reason nothing was built**: its
+lazy-payload clause permits a first-use index, but its "thread-safe weighted
+caches" whose "clean parsed values are evictable" has no implementation anywhere
+in this repository — changes 0193, 0195, 0198 and 0592 are all non-evictable
+`OnceLock`s over data whose size is O(document structure), and change 0005's XLSX
+row-start index is eager over cells already retained — while the measured weight
+here is 623 KB–935 KB for one worksheet of a 984 KB fixture. The design records
+the rule that would keep every refusal in place (retain only complete successful
+scans), the one thing that would measurably change (the freshness-observation
+window, the axis on which changes 0279 and 0358 were rejected), and the five
+admission gates a future implementation must clear. OLE2/OOXML optimization
+remains active; ODF is deferred until completion and iWork excluded. [Change and
+limitations](0605-xls-retained-sheet-index.md); [retained
+evidence](results/change-0605/README.md).
+
 ## Change 0594 compliance update
 
 Change 0594 threads one `IndexedReadSession` through the OPC structural admission

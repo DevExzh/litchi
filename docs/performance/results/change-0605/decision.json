@@ -1,0 +1,55 @@
+{
+ "accepted_costs": {
+  "column_asymmetry": "query_cell returns Ok(None) above column 255, so a malformed worksheet storing a record beyond it would be reported by the walk and unreachable by a query; no corpus fixture does this and the differential test asserts it",
+  "host": "eight measurement agents shared the host; quiescence is not established and the 1-minute load average was 8.27 at the end of the timing window",
+  "instruction_residue": "the existing operations are +0.011% to +0.146% instructions, which the record calls unchanged rather than improved",
+  "modelled_extrapolation": "the 24.6 s whole-sheet per-cell figure rests on three measured points that are linear to within 5%, not on a measured 38,950-position run",
+  "review_triggers": "two of 36 paired comparisons exceed +5%, both on WithCustomViews.xls file-source open and list in one direction only, both inside the same cell's B/B floor, and both on operations that never enter the code this change touched",
+  "third_scan_loop": "scan_text_sheet was deliberately not folded into the shared loop, so source.rs now has three worksheet scan loops where it had two; full text already scanned each sheet once, so unifying it would have risked moving a refusal for no measured gain",
+  "wall_clock_noise": "the B/B floor reaches 46.51% on the 54016 walk at 30 samples, so no latency statement about the walk, the per-cell reading or full text is admissible beyond the ratios, which exceed that floor by an order of magnitude"
+ },
+ "accepted_evidence": {
+  "corpus_differential": "all 126 .xls fixtures under test-data x open/list/one-cell x worksheet indices 0 and 1, both legs, 756 cells each: logical counters, source and eager semantic projections and typed refusals identical line for line, 99 refusals with identical messages included",
+  "corpus_walk_differential": "the same 126 fixtures at worksheet indices 0, 1 and 2 under --operation all-cells, whose oracle re-reads up to 128 reported positions one selected-cell query at a time and fails the run on any disagreement: 291 worksheets, 90,543 cells, zero disagreements",
+  "counters": "3 fixtures x 2 in-memory source modes x open/list/one-cell, before against after: reads, read bytes, source-version observations, len calls and seeks identical to the byte, with every sample within a cell asserted identical while folding",
+  "differential": "the harness computes its all-cells oracle outside the timed region by walking the sheet and re-reading a bounded prefix of the reported positions one query at a time, and fails the run on any disagreement; every all-cells measurement in the record is therefore a passing differential",
+  "hardware_counters": "perf stat cycles, instructions, branches, branch misses, isolated the same way",
+  "instructions": "callgrind isolation pairs (change 0574's method) for open and one-cell on both legs, and for both all-cells strategies on the after leg",
+  "latency": "A1 B1 B2 A2 wall clock, 20 warmups and 60 samples for the light operations, 5 and 30 for the heavy new ones, with the A/A and B/B floors computed in the same window",
+  "tests": "eight tests in litchi-xls covering value agreement with selected-cell queries over the bounding rectangle, the string-valued FORMULA branch, one-scan cost against a linear per-cell cost, Display-equal refusals on one synthetic and three real defects, visitor error propagation, SourceChanged and cancellation; two harness tests for the new knobs and the position-keyed digest",
+  "untouched_paths": "the text projection (scan_text_sheet, write_text_sheet, collect_source_cell, decode_source_cell, SourceTextSheet) and all of crates/litchi-xls/src/records.rs, where the SST scan lives, are byte-identical between the legs, so changes 0576 and 0595's SST differential cannot have moved",
+  "walk_pairing": "the all-cells scenario's two legs in one binary and one build: SourceBackedWorksheet::visit_cells against one cell_value_by_index per position at 8, 64 and 256 positions, on the worksheet of each fixture that stores cells, both source modes"
+ },
+ "change_id": "0605",
+ "claim_registry_entry": false,
+ "code_state": "crates/litchi-xls/src/workbook/source.rs (the frame loop shared behind a private CellSink, two public visit_cells methods), crates/litchi-xls/tests/source_backed.rs (eight tests), tools/perf-baseline/src/bin/xls_source_attribution.rs (three operations, two knobs, an all-cells differential oracle) and its README section",
+ "decision": "part (1) retained; part (2) design only, no production code",
+ "known_gaps": {
+  "not_implemented": "the snapshot-scoped retained sheet index; its representation, lock discipline, refusal analysis, predicted saving and admission gates are on the record and nothing was built",
+  "not_measured": "cold cache, physical device, remote or range sources, peak RSS, allocation profile, concurrency scaling, real-producer corpora, cross-platform",
+  "selectors": "the whole-sheet walk has no litchi-perf-baseline --case selector, only the standalone xls_source_attribution binary; the flagship's full text remains refused, which this change preserves and measures rather than fixes",
+  "unaddressed_neighbours": "XLS-4 (per-string and per-row freshness fences, and emitting retained cells in sorted order instead of walking the DIMENSIONS rectangle) is now cheaper to attempt because the walk exists, and XLS-8 and XLS-10 remain unsized"
+ },
+ "performance_claim": "none",
+ "provenance": {
+  "base_commit": "01a5f5731",
+  "branch": "perf/0605-xls-retained-sheet-index",
+  "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0, perf 7.0.14",
+  "pinning": "CPU 25, setarch x86_64 -R, RAYON_NUM_THREADS=1"
+ },
+ "reason_codes": [
+  "item XLS-3 of change 0587 has two halves and the survey separated them: the whole-sheet iterator needs no design record, the retained index does; this change implements the first and freezes the second",
+  "the brief's gate for implementing part (2) was 'value-identical and the retention accounting in place'; the value-identity half is achievable under the rule that only complete successful scans are retained, but the accounting half is not: ADR 0005's weighted, bounded, evictable cache has no implementation anywhere in this repository and the measured weight is 623 KB-935 KB for one worksheet of a 984 KB fixture",
+  "part (1) removes the index's motivating case: reading many cells of one worksheet is now one scan with zero retention, at 32.3 bytes per cell against 617,079.3",
+  "closes change 0568's third limitation, carried unaddressed for 37 records: the source-backed API had no whole-sheet iterator, so a full cell scan was N independent one-cell queries",
+  "the first working version of the shared loop cost +1.37% instructions on the 54016 one-cell query; folding the sink's four constant arguments into a ScanContext recovered it to +0.011%, and the three trial profiles are retained rather than discarded"
+ ],
+ "schema": "litchi-perf-change-decision",
+ "schema_version": 1,
+ "title": "One validated scan for a whole XLS worksheet, and a frozen design for the retained sheet index",
+ "withheld": [
+  "any speedup of an existing operation",
+  "any cold-cache, physical-device, range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result",
+  "any wall-clock claim for the walk, the per-cell reading or full text beyond their ratios"
+ ]
+}

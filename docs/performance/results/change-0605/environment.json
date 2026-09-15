@@ -1,0 +1,63 @@
+{
+ "base_commit": "01a5f5731",
+ "base_commit_subject": "perf(xlsb): parse the workbook once per cell-value commit (0599)",
+ "binaries": {
+  "after": {
+   "built_from": "/home/zhuhe/code/litchi-worktrees/0605",
+   "name": "xls_source_attribution",
+   "sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+   "target_dir": "/home/zhuhe/code/litchi-worktrees/targets/0605-after"
+  },
+  "before": {
+   "built_from": "/home/zhuhe/code/litchi-worktrees/before-01a5f5731 (shared read-only checkout of the base)",
+   "name": "xls_source_attribution",
+   "sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+   "target_dir": "/home/zhuhe/code/litchi-worktrees/targets/0605-before"
+  }
+ },
+ "branch": "perf/0605-xls-retained-sheet-index",
+ "build": "cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml --bin xls_source_attribution --features xls-source-attribution",
+ "change_id": "0605",
+ "files_that_differ_between_the_legs": [
+  "crates/litchi-xls/src/workbook/source.rs",
+  "crates/litchi-xls/tests/source_backed.rs",
+  "tools/perf-baseline/src/bin/xls_source_attribution.rs",
+  "tools/perf-baseline/README.md"
+ ],
+ "fixtures": {
+  "54016": {
+   "note": "one worksheet, 38,950 stored cells, 7,893 shared strings; the heaviest query in the corpus",
+   "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+   "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+  },
+  "cv": {
+   "note": "3 worksheets; only sheet 0 stores cells (3,325 of them); the query scenarios keep the harness default sheet 1, which stores none",
+   "path": "test-data/ole/xls/WithCustomViews.xls",
+   "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64"
+  },
+  "flagship": {
+   "note": "16 worksheets; sheets 6, 7 and 13 are refused by this reader for shared-formula metadata; the query scenarios use sheet 1, the walk scenarios sheet 11 (347 cells, the widest)",
+   "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  }
+ },
+ "harness_scope": {
+  "not_measured": "cold cache, physical device, range sources, peak RSS, allocation profile, concurrency scaling, real-producer corpora, cross-platform",
+  "source_modes": "owned-readat (an immutable ReadAt over staged bytes, no filesystem I/O) and file-source (a FileSource wrapper over a staged immutable file, warm page cache, logical calls only)"
+ },
+ "host": {
+  "cores": 32,
+  "cpu": "AMD EPYC 9R45",
+  "kernel": "Linux 7.0.0-1012-aws",
+  "memory_gib": 123,
+  "pinning": "CPU 25, setarch x86_64 -R (ASLR off), RAYON_NUM_THREADS=1, single-threaded",
+  "quiescence": "not established; eight measurement agents shared the host, 1-minute load average 8.27 at the end of the timing window"
+ },
+ "schema": "litchi-perf-change-environment",
+ "schema_version": 1,
+ "toolchain": {
+  "perf": "7.0.14",
+  "rustc": "1.95.0 (59807616e 2026-04-14)",
+  "valgrind": "3.26.0"
+ }
+}

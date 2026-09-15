@@ -1,0 +1,196 @@
+== Logical counters, before against after ==
+Every existing operation must be identical in both legs.
+
+fixture    mode          operation           leg       reads       bytes    vers   cells
+flagship   owned-readat  open                before       53      565201      29       -
+flagship   owned-readat  open                after        53      565201      29       -
+flagship   owned-readat  list                before       53      565201      29       -
+flagship   owned-readat  list                after        53      565201      29       -
+flagship   owned-readat  one-cell            before       61      603115      42       -
+flagship   owned-readat  one-cell            after        61      603115      42       -
+flagship   owned-readat  second-cell         after        68      641022      52       -
+flagship   owned-readat  full-text           after       394      790147    1936       -
+flagship   owned-readat  all-cells           after       104      603533     214      87
+flagship   owned-readat  all-cells-per-cell  after       534     2991566     800      64
+flagship   file-source   open                before       53      565201      29       -
+flagship   file-source   open                after        53      565201      29       -
+flagship   file-source   list                before       53      565201      29       -
+flagship   file-source   list                after        53      565201      29       -
+flagship   file-source   one-cell            before       61      603115      42       -
+flagship   file-source   one-cell            after        61      603115      42       -
+flagship   file-source   second-cell         after        68      641022      52       -
+flagship   file-source   full-text           after       394      790147    1936       -
+flagship   file-source   all-cells           after       104      603533     214      87
+flagship   file-source   all-cells-per-cell  after       534     2991566     800      64
+cv         owned-readat  open                before       16      110242      22       -
+cv         owned-readat  open                after        16      110242      22       -
+cv         owned-readat  list                before       16      110242      22       -
+cv         owned-readat  list                after        16      110242      22       -
+cv         owned-readat  one-cell            before       17      110656      25       -
+cv         owned-readat  one-cell            after        17      110656      25       -
+cv         owned-readat  second-cell         after        18      111070      29       -
+cv         owned-readat  full-text           after       898      257894    5025       -
+cv         owned-readat  all-cells           after        17      110656      25       0
+cv         owned-readat  all-cells-per-cell  after        16      110242      21       0
+cv         file-source   open                before       16      110242      22       -
+cv         file-source   open                after        16      110242      22       -
+cv         file-source   list                before       16      110242      22       -
+cv         file-source   list                after        16      110242      22       -
+cv         file-source   one-cell            before       17      110656      25       -
+cv         file-source   one-cell            after        17      110656      25       -
+cv         file-source   second-cell         after        18      111070      29       -
+cv         file-source   full-text           after       898      257894    5025       -
+cv         file-source   all-cells           after        17      110656      25       0
+cv         file-source   all-cells-per-cell  after        16      110242      21       0
+54016      owned-readat  open                before       40      317171      25       -
+54016      owned-readat  open                after        40      317171      25       -
+54016      owned-readat  list                before       40      317171      25       -
+54016      owned-readat  list                after        40      317171      25       -
+54016      owned-readat  one-cell            before       65      932993      43       -
+54016      owned-readat  one-cell            after        65      932993      43       -
+54016      owned-readat  second-cell         after        90     1548815      62       -
+54016      owned-readat  full-text           after     16145     1256139   89789       -
+54016      owned-readat  all-cells           after     16145     1256139   64307   38950
+54016      owned-readat  all-cells-per-cell  after      1690    39731462    1440      64
+54016      file-source   open                before       40      317171      25       -
+54016      file-source   open                after        40      317171      25       -
+54016      file-source   list                before       40      317171      25       -
+54016      file-source   list                after        40      317171      25       -
+54016      file-source   one-cell            before       65      932993      43       -
+54016      file-source   one-cell            after        65      932993      43       -
+54016      file-source   second-cell         after        90     1548815      62       -
+54016      file-source   full-text           after     16145     1256139   89789       -
+54016      file-source   all-cells           after     16145     1256139   64307   38950
+54016      file-source   all-cells-per-cell  after      1690    39731462    1440      64
+
+counters that moved between legs: 0
+
+== The whole-sheet walk against the per-cell reading it replaces ==
+Counters are per operation; p50 is over the retained samples.
+
+case                               sheet strategy  limit  cells   reads       bytes    vers         p50 ns
+54016-file-source-per-cell-256         0 per-cell    256    256    6529   157972311    5244    173,019,786
+54016-file-source-per-cell-64          0 per-cell     64     64    1690    39731462    1440     41,581,630
+54016-file-source-per-cell-8           0 per-cell      8      8     248     5243842     208      5,387,971
+54016-file-source-scan                 0 scan         64  38950   16145     1256139   64307     34,719,677
+54016-owned-readat-per-cell-256        0 per-cell    256    256    6529   157972311    5244    161,990,878
+54016-owned-readat-per-cell-64         0 per-cell     64     64    1690    39731462    1440     40,659,495
+54016-owned-readat-per-cell-8          0 per-cell      8      8     248     5243842     208      5,298,056
+54016-owned-readat-scan                0 scan         64  38950   16145     1256139   64307     20,712,010
+cv-file-source-per-cell-256            0 per-cell    256    256    1910    10499248    2987     12,603,580
+cv-file-source-per-cell-64             0 per-cell     64     64     474     2705634     701      3,143,225
+cv-file-source-per-cell-8              0 per-cell      8      8      73      434688     105        426,537
+cv-file-source-scan                    0 scan         64   3325     896      257066    3501      2,490,407
+cv-owned-readat-per-cell-256           0 per-cell    256    256    1910    10499248    2987     11,670,976
+cv-owned-readat-per-cell-64            0 per-cell     64     64     474     2705634     701      2,900,718
+cv-owned-readat-per-cell-8             0 per-cell      8      8      73      434688     105        391,547
+cv-owned-readat-scan                   0 scan         64   3325     896      257066    3501      1,692,943
+flagship-file-source-per-cell-256     11 per-cell    256    256    2141     9558820    2748      3,840,204
+flagship-file-source-per-cell-64      11 per-cell     64     64     580     2813660     728      1,046,345
+flagship-file-source-per-cell-8       11 per-cell      8      8     124      846312     136        227,851
+flagship-file-source-scan             11 scan         64    347     108      600726     226        265,736
+flagship-owned-readat-per-cell-256    11 per-cell    256    256    2141     9558820    2748      2,892,879
+flagship-owned-readat-per-cell-64     11 per-cell     64     64     580     2813660     728        792,794
+flagship-owned-readat-per-cell-8      11 per-cell      8      8     124      846312     136        174,381
+flagship-owned-readat-scan            11 scan         64    347     108      600726     226        198,366
+
+Bytes per reported cell, and the per-cell leg extrapolated to the sheet:
+
+flagship   owned-readat  walk    1,731.2 B/cell   per-cell     37,339.1 B/cell   ratio        22x   projected per-cell p50        3.9 ms against the walk's 0.20 ms
+flagship   file-source   walk    1,731.2 B/cell   per-cell     37,339.1 B/cell   ratio        22x   projected per-cell p50        5.2 ms against the walk's 0.27 ms
+cv         owned-readat  walk       77.3 B/cell   per-cell     41,012.7 B/cell   ratio       530x   projected per-cell p50      151.6 ms against the walk's 1.69 ms
+cv         file-source   walk       77.3 B/cell   per-cell     41,012.7 B/cell   ratio       530x   projected per-cell p50      163.7 ms against the walk's 2.49 ms
+54016      owned-readat  walk       32.3 B/cell   per-cell    617,079.3 B/cell   ratio    19,134x   projected per-cell p50   24,646.7 ms against the walk's 20.71 ms
+54016      file-source   walk       32.3 B/cell   per-cell    617,079.3 B/cell   ratio    19,134x   projected per-cell p50   26,324.7 ms against the walk's 34.72 ms
+
+== Instructions per operation, callgrind isolation pairs ==
+
+fixture    operation            before          after     delta
+flagship   open              2,326,978      2,327,785   +0.035%
+flagship   one-cell          2,554,707      2,556,593   +0.074%
+cv         open                808,140        809,320   +0.146%
+cv         one-cell            827,903        828,733   +0.100%
+54016      open              5,382,679      5,383,543   +0.016%
+54016      one-cell         18,601,973     18,603,996   +0.011%
+
+all-cells, after leg only: the walk against 64 per-cell queries
+
+fixture    leg                      Ir per operation    Ir per cell
+flagship   all-cells-scan                  3,598,822         10,371
+flagship   all-cells-per-cell             15,400,828        240,638
+cv         all-cells-scan                 31,365,208          9,433
+cv         all-cells-per-cell             57,584,245        899,754
+54016      all-cells-scan                356,255,103          9,146
+54016      all-cells-per-cell            853,156,078     13,330,564
+
+== Cycles and IPC, native perf stat, same isolation method ==
+Single-shot counters: they carry the host's variance, unlike Ir.
+
+fixture    operation      before cyc    after cyc    delta  IPC b  IPC a
+flagship   open              345,046      342,917   -0.62%   3.41   3.44
+flagship   one-cell          397,486      386,806   -2.69%   3.38   3.47
+cv         open              126,433      128,466   +1.61%   4.05   3.99
+cv         one-cell          131,707      131,967   +0.20%   4.04   4.04
+54016      open              867,488      864,836   -0.31%   4.65   4.66
+54016      one-cell        3,672,764    3,702,486   +0.81%   4.37   4.34
+
+fixture    all-cells leg                    cycles     instructions    IPC
+flagship   all-cells-scan                  659,908        2,326,884   3.53
+flagship   all-cells-per-cell            2,768,559       10,669,961   3.85
+cv         all-cells-scan                7,676,448       24,063,663   3.13
+cv         all-cells-per-cell           13,022,164       52,986,513   4.07
+54016      all-cells-scan               92,015,877      321,255,020   3.49
+54016      all-cells-per-cell          182,832,246      774,198,865   4.23
+
+== Wall clock, paired, A1 B1 B2 A2 ==
+a1/a2 are the before binary, b1/b2 the after binary. The floor is the
+same binary against itself in the same window: a1 vs a2, b1 vs b2.
+
+case                                            a1 p50      b1 p50      b2 p50      a2 p50    b1/a1    b2/a2      A/A      B/B
+54016/file-source-all-cells-per-cell               nan 163,651,920 163,872,793         nan    +nan%    +nan%     nan%    0.13%
+54016/file-source-all-cells-scan                   nan  34,969,452  35,185,886         nan    +nan%    +nan%     nan%    0.62%
+54016/file-source-full-text                        nan  43,909,451  50,015,746         nan    +nan%    +nan%     nan%   13.91%
+54016/file-source-list                         211,066     211,591     210,656     209,291   +0.25%   +0.65%    0.84%    0.44%
+54016/file-source-one-cell                     849,770     850,950     851,879     847,134   +0.14%   +0.56%    0.31%    0.11%
+54016/file-source-open                         205,211     205,301     205,751     204,226   +0.04%   +0.75%    0.48%    0.22%
+54016/file-source-second-cell                      nan   1,500,162   1,503,718         nan    +nan%    +nan%     nan%    0.24%
+54016/owned-readat-all-cells-per-cell              nan 159,952,598 160,573,491         nan    +nan%    +nan%     nan%    0.39%
+54016/owned-readat-all-cells-scan                  nan  20,457,933  29,973,330         nan    +nan%    +nan%     nan%   46.51%
+54016/owned-readat-full-text                       nan  24,969,981  30,954,926         nan    +nan%    +nan%     nan%   23.97%
+54016/owned-readat-list                        197,171     191,926     193,886     195,166   -2.66%   -0.66%    1.02%    1.02%
+54016/owned-readat-one-cell                    824,074     832,909     841,829     819,634   +1.07%   +2.71%    0.54%    1.07%
+54016/owned-readat-open                        197,571     196,851     199,226     194,966   -0.36%   +2.18%    1.32%    1.21%
+54016/owned-readat-second-cell                     nan   1,469,012   1,465,398         nan    +nan%    +nan%     nan%    0.25%
+cv/file-source-all-cells-per-cell                  nan  12,401,592  12,520,758         nan    +nan%    +nan%     nan%    0.96%
+cv/file-source-all-cells-scan                      nan   2,467,552   2,524,863         nan    +nan%    +nan%     nan%    2.32%
+cv/file-source-full-text                           nan   2,452,712   2,512,868         nan    +nan%    +nan%     nan%    2.45%
+cv/file-source-list                             34,840      35,320      37,490      35,120   +1.38%   +6.75%    0.80%    6.14%
+cv/file-source-one-cell                         35,950      36,796      38,105      36,720   +2.35%   +3.77%    2.14%    3.56%
+cv/file-source-open                             34,685      35,070      37,410      34,900   +1.11%   +7.19%    0.62%    6.67%
+cv/file-source-second-cell                         nan      38,536      40,865         nan    +nan%    +nan%     nan%    6.05%
+cv/owned-readat-all-cells-per-cell                 nan  11,497,488  11,634,164         nan    +nan%    +nan%     nan%    1.19%
+cv/owned-readat-all-cells-scan                     nan   1,703,104   1,715,178         nan    +nan%    +nan%     nan%    0.71%
+cv/owned-readat-full-text                          nan   1,398,412   1,415,847         nan    +nan%    +nan%     nan%    1.25%
+cv/owned-readat-list                            27,736      28,485      28,715      27,396   +2.70%   +4.82%    1.23%    0.81%
+cv/owned-readat-one-cell                        28,265      28,330      28,425      28,275   +0.23%   +0.53%    0.04%    0.34%
+cv/owned-readat-open                            27,235      27,160      27,620      26,890   -0.28%   +2.72%    1.27%    1.70%
+cv/owned-readat-second-cell                        nan      29,460      30,080         nan    +nan%    +nan%     nan%    2.10%
+flagship/file-source-all-cells-per-cell            nan   3,831,484   3,905,775         nan    +nan%    +nan%     nan%    1.94%
+flagship/file-source-all-cells-scan                nan     262,462     271,166         nan    +nan%    +nan%     nan%    3.32%
+flagship/file-source-full-text                     nan     940,085     956,660         nan    +nan%    +nan%     nan%    1.76%
+flagship/file-source-list                       92,346      91,596      92,790      91,140   -0.81%   +1.81%    1.31%    1.30%
+flagship/file-source-one-cell                  104,320     103,340     105,150     104,101   -0.94%   +1.01%    0.21%    1.75%
+flagship/file-source-open                       90,930      91,045      92,240      90,166   +0.13%   +2.30%    0.84%    1.31%
+flagship/file-source-second-cell                   nan     115,300     117,425         nan    +nan%    +nan%     nan%    1.84%
+flagship/owned-readat-all-cells-per-cell           nan   2,885,225   2,981,585         nan    +nan%    +nan%     nan%    3.34%
+flagship/owned-readat-all-cells-scan               nan     195,866     198,741         nan    +nan%    +nan%     nan%    1.47%
+flagship/owned-readat-full-text                    nan     521,953     530,018         nan    +nan%    +nan%     nan%    1.55%
+flagship/owned-readat-list                      73,055      72,855      73,600      73,050   -0.27%   +0.75%    0.01%    1.02%
+flagship/owned-readat-one-cell                  82,085      81,846      82,876      82,250   -0.29%   +0.76%    0.20%    1.26%
+flagship/owned-readat-open                      72,535      72,406      72,800      72,540   -0.18%   +0.36%    0.01%    0.54%
+flagship/owned-readat-second-cell                  nan      89,281      90,330         nan    +nan%    +nan%     nan%    1.17%
+
+A/A floor over 18 paired cells: p50 0.71%, mean 0.73%, max 2.14%
+B/B floor over 42 cells: p50 1.28%, mean 3.57%, max 46.51%
+paired deltas: 36 comparisons, 9 improve, 2 above the +5% review trigger
+

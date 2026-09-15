@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
+
+Takes change 0587 item XLS-3 (rank 18), whose two halves the survey separated,
+and lands the first: `SourceBackedWorksheet::visit_cells` reports every stored
+cell of a worksheet from **one** validated scan, where reading a worksheet cell
+by cell cost one complete scan of its substream per cell. `query_cell`'s frame
+loop became `scan_worksheet`, generic over a private `CellSink`, with
+`process_cell` moved behind it unchanged and a second sink that reports every
+cell; the only branch the two sinks take differently is the one `query_cell`
+already had, holding a string-valued `FORMULA` back for its `STRING` result. On
+`54016.xls` the walk reports **38,950 cells for 16,145 reads and 1,256,139
+bytes** against **157,972,311 bytes for 256 cells** read one query at a time —
+32.3 bytes per cell against 617,079.3 (19,134×) and 9,146 instructions per cell
+against 13,330,564 (1,457×); the crossover is about three dozen cells on every
+fixture measured. Nothing else moved: reads, bytes, source observations, `len`
+calls and seeks are identical to the byte on `open`, `list` and `one-cell` over
+three fixtures and both source modes, and their instruction counts moved by at
+most +0.146%. This closes change 0568's third limitation, carried unaddressed
+for 37 records, and unblocks the measurement gap change 0587 recorded:
+`xls_source_attribution` now has `all-cells`, `full-text` and `second-cell`
+operations. The **second half — the snapshot-scoped retained sheet index — is
+frozen as a design and not implemented**: its measured weight is 623 KB–935 KB
+for one worksheet of a 984 KB fixture, ADR 0005's weighted, bounded, evictable
+cache has no implementation anywhere in this repository, and part (1) removed the
+index's motivating case. XLS-2 (lazy SST indexing) still requires its own frozen
+design record; XLS-4, 8 and 10 are now cheaper to size because the walk exists.
+OLE2/OOXML optimization remains active; ODF is deferred until completion and
+iWork excluded. [Change and
+limitations](0605-xls-retained-sheet-index.md); [retained
+evidence](results/change-0605/README.md).
+
 ## 0594 — one Deflate decoder per OOXML open, above a measured threshold
 
 Item ZIP-1 of the [0587 queue](0587-remaining-opportunity-survey.md) is

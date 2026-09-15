@@ -1444,6 +1444,57 @@ impl SourceBackedWorksheet {
             .map(SourceBackedCell::into_value))
     }
 
+    /// Reports every stored cell of this worksheet, in stream order, from
+    /// **one** validated scan.
+    ///
+    /// [`cell`](Self::cell) scans the whole worksheet substream to its EOF for
+    /// every lookup, so reading a worksheet cell by cell costs one full
+    /// validated scan per cell. This walks the same records once, under the
+    /// same limits, taking the same checks in the same order, and hands each
+    /// stored cell to `visitor`.
+    ///
+    /// The scan always runs to the worksheet's EOF: the visitor cannot stop it
+    /// early, so a malformed record beyond the last cell is refused here
+    /// exactly as [`cell`](Self::cell) refuses it. A visitor that returns an
+    /// error does end the scan, and that error is returned unchanged.
+    ///
+    /// A cell is *stored* when the worksheet holds a record for it; blank and
+    /// unformatted-blank records are reported, positions with no record are
+    /// not, and a worksheet that stores the same position twice reports it
+    /// twice, in the order the records appear. Nothing is retained between
+    /// calls, so two calls cost two scans.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same framing, limit, parse and freshness errors as
+    /// [`cell`](Self::cell), or whatever `visitor` returns.
+    pub fn visit_cells<F>(&self, visitor: F) -> Result<()>
+    where
+        F: FnMut(SourceBackedCell) -> Result<()>,
+    {
+        visit_worksheet_cells(&self.owner, self.sheet_index, None, visitor)
+    }
+
+    /// Reports every stored cell of this worksheet from one validated scan,
+    /// with cooperative cancellation.
+    ///
+    /// See [`visit_cells`](Self::visit_cells); this variant checks `execution`
+    /// at every point the selected-cell query checks it.
+    ///
+    /// # Errors
+    ///
+    /// As [`visit_cells`](Self::visit_cells), plus cancellation.
+    pub fn visit_cells_with_execution<F>(
+        &self,
+        execution: &ExecutionContext,
+        visitor: F,
+    ) -> Result<()>
+    where
+        F: FnMut(SourceBackedCell) -> Result<()>,
+    {
+        visit_worksheet_cells(&self.owner, self.sheet_index, Some(execution), visitor)
+    }
+
     /// Reads one retained worksheet descriptor behind one trailing fence.
     ///
     /// The lookup and `operation` read only retained in-memory state, so they
@@ -2758,21 +2809,143 @@ fn validate_worksheet_bof(payload: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn query_cell(
+/// What one worksheet scan does with each cell record it parses.
+///
+/// A selected-cell query and a whole-sheet walk run the *identical* frame
+/// loop over the identical checks in the identical order; they differ only in
+/// what they do with a parsed record, and in whether a string-valued `FORMULA`
+/// has to be held back until its `STRING` result arrives. Monomorphizing the
+/// loop over this trait keeps the selected-cell path exactly as it was while
+/// giving the whole-sheet walk **one** validated scan instead of one per cell.
+trait CellSink {
+    /// Consumes one parsed cell record.
+    ///
+    /// Every implementation validates the record's XF index first, for every
+    /// record, so that a malformed cell format is refused wherever it sits.
+    fn accept(
+        &mut self,
+        record: &CellRecord,
+        scan: &ScanContext<'_>,
+        strings: &mut SharedStringResolver<'_>,
+    ) -> Result<()>;
+
+    /// Whether this string-valued `FORMULA` must be held until its `STRING`
+    /// result arrives.
+    ///
+    /// A selected-cell query holds back only the target, because every other
+    /// cell's value is discarded anyway; a whole-sheet walk holds back all of
+    /// them, because it reports every one.
+    fn defers_string_formula(&self, record: &CellRecord) -> bool;
+}
+
+/// The per-scan constants every sink needs, gathered once so that the frame
+/// loop hands a sink two pointers instead of four.
+struct ScanContext<'a> {
+    owner: &'a SourceInner,
+    formatting: &'a Formatting,
+    execution: Option<&'a ExecutionContext>,
+}
+
+/// The selected-cell sink: exactly what `process_cell` did before this scan
+/// loop was shared.
+struct TargetCell {
+    row: u16,
+    column: u16,
+    found: Option<SourceBackedCell>,
+}
+
+impl CellSink for TargetCell {
+    #[inline]
+    fn accept(
+        &mut self,
+        record: &CellRecord,
+        scan: &ScanContext<'_>,
+        strings: &mut SharedStringResolver<'_>,
+    ) -> Result<()> {
+        scan.formatting
+            .validate_cell_xf(cell_xf_index(record))
+            .map_err(SourceBackedError::Parse)?;
+        if record.row() != self.row || record.col() != self.column {
+            return Ok(());
+        }
+        let Some(cell) =
+            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting))
+        else {
+            return Ok(());
+        };
+        let value = if let Some(string_index) = cell.shared_string_index() {
+            resolve_shared_string(scan.owner, string_index, scan.execution, strings)?
+        } else {
+            cell.value().clone()
+        };
+        self.found = Some(SourceBackedCell {
+            row: u32::from(self.row),
+            column: u32::from(self.column),
+            value,
+        });
+        Ok(())
+    }
+
+    #[inline]
+    fn defers_string_formula(&self, record: &CellRecord) -> bool {
+        record.row() == self.row && record.col() == self.column
+    }
+}
+
+/// The whole-sheet sink: reports every stored cell in stream order and retains
+/// nothing of its own.
+struct VisitCells<F> {
+    visitor: F,
+}
+
+impl<F> CellSink for VisitCells<F>
+where
+    F: FnMut(SourceBackedCell) -> Result<()>,
+{
+    fn accept(
+        &mut self,
+        record: &CellRecord,
+        scan: &ScanContext<'_>,
+        strings: &mut SharedStringResolver<'_>,
+    ) -> Result<()> {
+        scan.formatting
+            .validate_cell_xf(cell_xf_index(record))
+            .map_err(SourceBackedError::Parse)?;
+        let Some(cell) =
+            Cell::from_record_with_formula_context(record, None, None, Some(scan.formatting))
+        else {
+            return Ok(());
+        };
+        let value = if let Some(string_index) = cell.shared_string_index() {
+            resolve_shared_string(scan.owner, string_index, scan.execution, strings)?
+        } else {
+            cell.value().clone()
+        };
+        (self.visitor)(SourceBackedCell {
+            row: u32::from(record.row()),
+            column: u32::from(record.col()),
+            value,
+        })
+    }
+
+    fn defers_string_formula(&self, _record: &CellRecord) -> bool {
+        true
+    }
+}
+
+/// Scans one worksheet substream to its EOF, handing every parsed cell record
+/// to `sink`.
+///
+/// The caller has already taken the leading cancellation check and freshness
+/// fence; this function takes the trailing pair when the scan reaches EOF, so
+/// that every operation built on it keeps the same two-observation bracket a
+/// selected-cell query always had.
+fn scan_worksheet<S: CellSink>(
     owner: &Arc<SourceInner>,
     sheet_index: usize,
-    row: u32,
-    column: u32,
     execution: Option<&ExecutionContext>,
-) -> Result<Option<SourceBackedCell>> {
-    if let Some(context) = execution {
-        context.check().map_err(SourceBackedError::from)?;
-    }
-    owner.ensure_current()?;
-    if row > u32::from(u16::MAX) || column > u32::from(u8::MAX) {
-        owner.ensure_current()?;
-        return Ok(None);
-    }
+    sink: &mut S,
+) -> Result<()> {
     let sheet = owner
         .sheets
         .get(sheet_index)
@@ -2783,11 +2956,12 @@ fn query_cell(
         .map(String::as_str)
         .collect::<Vec<_>>();
     let mut strings = SharedStringResolver::new(owner, &refs);
-    let mut found = None;
     let mut pending_formula = None;
-    let target_row = row as u16;
-    let target_column = column as u16;
-    let sheet_format = &owner.formatting;
+    let context = ScanContext {
+        owner,
+        formatting: &owner.formatting,
+        execution,
+    };
     let mut scan = WorksheetScan::new(
         &owner.cfb,
         &refs,
@@ -2821,7 +2995,7 @@ fn query_cell(
                     "string-valued FORMULA lacks STRING result".into(),
                 ));
             }
-            return finish_query(owner, found, execution);
+            return finish_scan(owner, execution);
         }
         if let Some(mut formula) = pending_formula.take() {
             if frame.kind == STRING {
@@ -2839,6 +3013,12 @@ fn query_cell(
                                     "FORMULA string result continuation is not CONTINUE".into(),
                                 ));
                             }
+                            continues.try_reserve(1).map_err(|_error| {
+                                SourceBackedError::Allocation {
+                                    resource: "formula STRING continuations",
+                                    requested: 1,
+                                }
+                            })?;
                             continues.push(scan.take_payload(&next)?);
                         },
                     }
@@ -2847,16 +3027,7 @@ fn query_cell(
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
-                process_cell(
-                    &formula,
-                    owner,
-                    sheet_format,
-                    target_row,
-                    target_column,
-                    execution,
-                    &mut found,
-                    &mut strings,
-                )?;
+                sink.accept(&formula, &context, &mut strings)?;
                 continue;
             }
             if !matches!(frame.kind, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
@@ -2879,63 +3050,27 @@ fn query_cell(
                         ..
                     }
                 ) {
-                    if cell.row() == target_row && cell.col() == target_column {
+                    if sink.defers_string_formula(&cell) {
                         pending_formula = Some(cell);
                     } else {
-                        process_cell(
-                            &cell,
-                            owner,
-                            sheet_format,
-                            target_row,
-                            target_column,
-                            execution,
-                            &mut found,
-                            &mut strings,
-                        )?;
+                        sink.accept(&cell, &context, &mut strings)?;
                     }
                 } else {
-                    process_cell(
-                        &cell,
-                        owner,
-                        sheet_format,
-                        target_row,
-                        target_column,
-                        execution,
-                        &mut found,
-                        &mut strings,
-                    )?;
+                    sink.accept(&cell, &context, &mut strings)?;
                 }
             },
             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
                 let payload = scan.read_payload(&frame)?;
                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
-                process_cell(
-                    &cell,
-                    owner,
-                    sheet_format,
-                    target_row,
-                    target_column,
-                    execution,
-                    &mut found,
-                    &mut strings,
-                )?;
+                sink.accept(&cell, &context, &mut strings)?;
             },
             0x00BD => {
                 let payload = scan.read_payload(&frame)?;
                 let mut processing = Ok(());
                 CellRecord::visit_mul_rk(payload, |cell| {
                     if processing.is_ok() {
-                        processing = process_cell(
-                            &cell,
-                            owner,
-                            sheet_format,
-                            target_row,
-                            target_column,
-                            execution,
-                            &mut found,
-                            &mut strings,
-                        );
+                        processing = sink.accept(&cell, &context, &mut strings);
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
@@ -2946,16 +3081,7 @@ fn query_cell(
                 let mut processing = Ok(());
                 CellRecord::visit_mul_blank(payload, |cell| {
                     if processing.is_ok() {
-                        processing = process_cell(
-                            &cell,
-                            owner,
-                            sheet_format,
-                            target_row,
-                            target_column,
-                            execution,
-                            &mut found,
-                            &mut strings,
-                        );
+                        processing = sink.accept(&cell, &context, &mut strings);
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
@@ -2966,16 +3092,53 @@ fn query_cell(
     }
 }
 
-fn finish_query(
-    owner: &SourceInner,
-    found: Option<SourceBackedCell>,
+fn query_cell(
+    owner: &Arc<SourceInner>,
+    sheet_index: usize,
+    row: u32,
+    column: u32,
     execution: Option<&ExecutionContext>,
 ) -> Result<Option<SourceBackedCell>> {
     if let Some(context) = execution {
         context.check().map_err(SourceBackedError::from)?;
     }
     owner.ensure_current()?;
-    Ok(found)
+    if row > u32::from(u16::MAX) || column > u32::from(u8::MAX) {
+        owner.ensure_current()?;
+        return Ok(None);
+    }
+    let mut sink = TargetCell {
+        row: row as u16,
+        column: column as u16,
+        found: None,
+    };
+    scan_worksheet(owner, sheet_index, execution, &mut sink)?;
+    Ok(sink.found)
+}
+
+/// Walks one worksheet once and reports every stored cell in stream order.
+fn visit_worksheet_cells<F>(
+    owner: &Arc<SourceInner>,
+    sheet_index: usize,
+    execution: Option<&ExecutionContext>,
+    visitor: F,
+) -> Result<()>
+where
+    F: FnMut(SourceBackedCell) -> Result<()>,
+{
+    if let Some(context) = execution {
+        context.check().map_err(SourceBackedError::from)?;
+    }
+    owner.ensure_current()?;
+    let mut sink = VisitCells { visitor };
+    scan_worksheet(owner, sheet_index, execution, &mut sink)
+}
+
+fn finish_scan(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Result<()> {
+    if let Some(context) = execution {
+        context.check().map_err(SourceBackedError::from)?;
+    }
+    owner.ensure_current()
 }
 
 /// The per-scan state `resolve_shared_string` would otherwise rebuild on every
@@ -3180,43 +3343,6 @@ fn collect_source_cell(
     {
         collected.insert(row, column, value, owner.limits)?;
     }
-    Ok(())
-}
-
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one cell visitor with an explicit per-scan shared-string resolver"
-)]
-fn process_cell(
-    record: &CellRecord,
-    owner: &SourceInner,
-    formatting: &Formatting,
-    target_row: u16,
-    target_column: u16,
-    execution: Option<&ExecutionContext>,
-    found: &mut Option<SourceBackedCell>,
-    strings: &mut SharedStringResolver<'_>,
-) -> Result<()> {
-    formatting
-        .validate_cell_xf(cell_xf_index(record))
-        .map_err(SourceBackedError::Parse)?;
-    if record.row() != target_row || record.col() != target_column {
-        return Ok(());
-    }
-    let Some(cell) = Cell::from_record_with_formula_context(record, None, None, Some(formatting))
-    else {
-        return Ok(());
-    };
-    let value = if let Some(string_index) = cell.shared_string_index() {
-        resolve_shared_string(owner, string_index, execution, strings)?
-    } else {
-        cell.value().clone()
-    };
-    *found = Some(SourceBackedCell {
-        row: u32::from(target_row),
-        column: u32::from(target_column),
-        value,
-    });
     Ok(())
 }
 
