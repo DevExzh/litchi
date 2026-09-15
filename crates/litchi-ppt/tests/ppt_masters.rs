@@ -19,7 +19,7 @@ fn atom(record_type: RecordType, version: u16, instance: u16, data: &[u8]) -> Re
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -31,7 +31,7 @@ fn unknown(data: &[u8]) -> Record {
         version: 0,
         instance: 7,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -54,7 +54,7 @@ fn container(record_type: RecordType, children: Vec<Record>) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }

@@ -479,7 +479,7 @@ fn find_ppt10_payload(record: &Record) -> Result<Option<Vec<u8>>> {
                     .ok_or_else(|| {
                         Error::Corrupted("___PPT10 tag is missing BinaryTagData".into())
                     })?;
-                return Ok(Some(data.data.clone()));
+                return Ok(Some(data.data.to_vec()));
             }
         }
     }

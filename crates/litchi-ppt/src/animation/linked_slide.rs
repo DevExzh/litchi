@@ -392,7 +392,7 @@ fn generic_record(record_type: RecordType, data: Vec<u8>) -> Record {
         version: 0,
         instance: 0,
         data_length: PAYLOAD_LEN as u32,
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }

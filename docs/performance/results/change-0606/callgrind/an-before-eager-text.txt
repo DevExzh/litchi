@@ -1,0 +1,98 @@
+== before-eager-text: total s10=26,391,938 s110=262,195,986 per-op Ir=2,358,040
+-- inclusive per-op deltas (top 40)
+     4,716,081 200.00%  (below main)
+     4,716,081 200.00%  std::rt::lang_start_internal
+     2,358,040 100.00%  main
+     2,358,040 100.00%  std::rt::lang_start::{{closure}}
+     2,358,040 100.00%  0x0000000000023cc0
+     2,358,040 100.00%  ppt0606::main
+     2,358,040 100.00%  __libc_start_main@@GLIBC_2.34
+     2,358,040 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+     2,358,020 100.00%  ppt0606::one_operation
+     1,413,903  59.96%  litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_ole_with_options
+     1,155,215  48.99%  __memcpy_avx_unaligned_erms
+       752,513  31.91%  litchi_cfb::file::OleFile<R>::open_stream
+       746,619  31.66%  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+       687,373  29.15%  litchi_ppt::records::record::Record::parse_impl
+       537,345  22.79%  litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits
+       491,919  20.86%  litchi_ppt::records::record::Record::parse_impl'2
+       394,992  16.75%  litchi_ppt::presentation::model::Presentation::text
+       381,378  16.17%  litchi_ppt::records::record::Record::parse_container_children
+       364,552  15.46%  __memset_avx2_unaligned_erms
+       359,574  15.25%  litchi_cfb::file::OleFile<R>::read_sectors_batched
+       239,253  10.15%  __rustc::__rdl_alloc
+       214,022   9.08%  alloc::raw_vec::RawVecInner<A>::finish_grow
+       211,600   8.97%  once_cell::unsync::OnceCell<T>::get_or_try_init
+       211,105   8.95%  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+       196,898   8.35%  litchi_ppt::odraw::codec::text_from_drawing
+       185,761   7.88%  litchi_ppt::records::record::Record::parse_container_children'2
+       165,211   7.01%  litchi_ppt::slide::factory::SlideFactory::parse_slide
+       136,304   5.78%  __rustc::__rdl_realloc
+       121,074   5.13%  __rustc::__rust_alloc
+       111,424   4.73%  malloc
+       102,002   4.33%  litchi_ppt::odraw::codec::push_children
+       100,058   4.24%  _int_malloc
+        97,441   4.13%  core::ptr::drop_in_place<litchi_ppt::records::record::Record>
+        95,619   4.06%  litchi_ppt::package::codec::<impl litchi_ppt::package::model::Package<R>>::from_reader_with_limits
+        94,280   4.00%  __rustc::__rust_dealloc
+        93,750   3.98%  free
+        93,315   3.96%  __rustc::__rdl_dealloc
+        92,967   3.94%  litchi_ppt::slide::directory::SlideDirectory::build_with_limits
+        90,128   3.82%  litchi_cfb::file::OleFile<R>::open
+        88,002   3.73%  __libc_malloc2
+-- self per-op deltas (top 25)
+     1,155,215  48.99%  __memcpy_avx_unaligned_erms
+       364,552  15.46%  __memset_avx2_unaligned_erms
+        92,006   3.90%  _int_malloc
+        63,733   2.70%  litchi_ppt::records::record::Record::parse_impl'2
+        49,315   2.09%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+        46,654   1.98%  _int_free_merge_chunk
+        38,320   1.63%  alloc::raw_vec::RawVecInner<A>::finish_grow
+        31,210   1.32%  free
+        25,992   1.10%  <litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next
+        25,608   1.09%  litchi_cfb::file::SectorChainScratch::collect_exact
+        24,194   1.03%  malloc
+        24,118   1.02%  litchi_cfb::file::collect_sector_chain
+        20,210   0.86%  core::hash::BuildHasher::hash_one
+        16,466   0.70%  litchi_ppt::records::record::Record::extract_text'2
+        15,650   0.66%  litchi_ppt::records::record::Record::parse_container_children'2
+        14,837   0.63%  litchi_ppt::records::record::Record::parse_container_children
+        14,676   0.62%  litchi_ppt::odraw::codec::push_children
+        14,635   0.62%  _int_free_maybe_trim
+        14,414   0.61%  unlink_chunk.isra.0
+        13,984   0.59%  litchi_cfb::directory_name::directory_name_data
+        13,306   0.56%  alloc::vec::Vec<T,A>::extend_trusted
+        10,750   0.46%  realloc
+        10,600   0.45%  litchi_ppt::records::record::ParseBudget::charge_record
+        10,285   0.44%  _int_free_chunk
+         9,672   0.41%  litchi_ppt::odraw::codec::text_from_ppt_records
+-- call counts per op (selected)
+     1,237.5  __memcpy_avx_unaligned_erms
+       965.0  malloc
+       958.0  alloc::raw_vec::RawVecInner<A>::finish_grow
+       512.2  _int_malloc
+       485.0  litchi_ppt::records::record::Record::parse_impl'2
+       285.0  litchi_ppt::records::record::Record::extract_text'2
+        74.0  litchi_ppt::records::record::Record::parse_container_children'2
+        47.0  <alloc::raw_vec::RawVecInner>::finish_grow
+        45.0  litchi_ppt::records::record::Record::parse_impl
+        43.0  litchi_ppt::records::record::Record::extract_text
+        40.0  litchi_ppt::records::record::Record::parse_container_children
+        30.0  __memset_avx2_unaligned_erms
+        11.0  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+        11.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectoryEntry>
+         6.0  <alloc::string::String>::try_reserve
+         6.0  <alloc::string::String>::from_utf16
+         5.0  litchi_ppt::text::extractor::from_utf16le_lossy
+         3.0  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+         3.0  litchi_cfb::file::OleFile<R>::open_stream
+         3.0  litchi_cfb::file::collect_sector_chain
+         1.0  litchi_cfb::file::collect_sector_chain_exact
+         1.0  litchi_cfb::file::OleFile<R>::open
+         1.0  litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping
+         1.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory>
+         1.0  litchi_ppt::parsers::parser::RecordParser::extract_all_text
+         1.0  litchi_ppt::slide::directory::SlideDirectory::build_with_limits
+         1.0  litchi_cfb::file::OleFile<R>::load_directory
+         1.0  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+         1.0  alloc::raw_vec::RawVecInner<A>::try_reserve

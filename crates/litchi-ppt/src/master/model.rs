@@ -129,7 +129,7 @@ impl<'a> Unknown<'a> {
 
     /// The original record body bytes.
     #[must_use]
-    pub const fn bytes(self) -> &'a [u8] {
+    pub fn bytes(self) -> &'a [u8] {
         self.record.data.as_slice()
     }
 

@@ -6,8 +6,8 @@ use super::model::{
 use super::validation;
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
-use crate::records::Record;
 use crate::records::RecordParseSession;
+use crate::records::{Record, RecordPayload};
 
 impl FontCollections {
     /// Validate every owned collection and embedding flag against `limits`.
@@ -637,11 +637,11 @@ impl FontCollection {
             .map_err(|_err| Error::AllocationFailed("owned embedded font facets"))?;
         for child in &mut record.children {
             if child.record_type == RecordType::FontEmbeddedData {
-                payloads.push(std::mem::take(&mut child.data));
+                payloads.push(std::mem::take(&mut child.data).into_vec());
                 child.data_length = 0;
             }
         }
-        record.data.clear();
+        record.data = RecordPayload::default();
         record.data_length = 0;
         let mut collection = Self::parse_with_session(record, limits, &mut session, 0, true, true)?;
         let mut payload_queue = payloads.into_iter();
@@ -752,7 +752,7 @@ impl FontCollection {
             instance: 0,
             data_length: u32::try_from(payload.len())
                 .map_err(|_err| Error::Corrupted("font collection exceeds u32".into()))?,
-            data: payload,
+            data: payload.into(),
             children: Vec::new(),
         })
     }
@@ -1164,18 +1164,18 @@ fn edit_ppt10_records_optional(
             .take()
             .ok_or_else(|| Error::Corrupted("___PPT10 edit closure was already consumed".into()))?;
         apply_edit(&mut records)?;
-        blob.data = encode_sequence(&records, limits.records)?;
+        blob.data = encode_sequence(&records, limits.records)?.into();
         blob.data_length = u32::try_from(blob.data.len())
             .map_err(|_err| Error::Corrupted("PPT10 blob exceeds u32".into()))?;
         blob.children.clear();
-        tag.data = encode_sequence(&pair, limits.records)?;
+        tag.data = encode_sequence(&pair, limits.records)?.into();
         tag.data_length = u32::try_from(tag.data.len())
             .map_err(|_err| Error::Corrupted("PPT10 tag exceeds u32".into()))?;
         tag.children.clear();
         changed = true;
     }
     if changed {
-        prog_tags.data = encode_sequence(&tags, limits.records)?;
+        prog_tags.data = encode_sequence(&tags, limits.records)?.into();
         prog_tags.data_length = u32::try_from(prog_tags.data.len())
             .map_err(|_err| Error::Corrupted("ProgTags exceeds u32".into()))?;
         prog_tags.children.clear();
@@ -1188,7 +1188,7 @@ fn clear_redundant_container_data(record: &mut Record) {
         clear_redundant_container_data(child);
     }
     if !record.children.is_empty() {
-        record.data.clear();
+        record.data = RecordPayload::default();
         record.data_length = 0;
     }
 }
@@ -1333,7 +1333,7 @@ fn atom(kind: RecordType, instance: u16, data: Vec<u8>) -> Record {
         version: 0,
         instance,
         data_length: data.len() as u32,
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }

@@ -38,7 +38,7 @@ fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
                 .iter()
                 .find(|child| child.record_type_raw == 1017)
         {
-            payloads.push(atom.data.clone());
+            payloads.push(atom.data.to_vec());
         }
         offset += consumed;
     }

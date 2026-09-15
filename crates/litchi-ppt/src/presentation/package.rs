@@ -87,20 +87,22 @@ impl Presentation {
             }
         }
 
-        // Parse document structure
+        // Parse document structure. The stream is retained by the presentation
+        // anyway, so the record tree borrows its payloads from it.
+        let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
         if let Some(encryption) = &encrypted {
-            parser.parse_document_at_offsets_with_limits(
+            parser.parse_shared_document_at_offsets_with_limits(
                 &powerpoint_document,
                 &encryption.live_offsets,
                 record_limits,
             )?;
         } else {
-            parser.parse_document_with_limits(&powerpoint_document, record_limits)?;
+            parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
         }
         #[cfg(not(feature = "encryption"))]
-        parser.parse_document_with_limits(&powerpoint_document, record_limits)?;
+        parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
 
         let current_user_bytes = current_user_data
             .as_deref()
@@ -239,19 +241,20 @@ impl Presentation {
             }
         }
 
+        let powerpoint_document = Arc::new(powerpoint_document);
         let mut parser = RecordParser::new();
         #[cfg(feature = "encryption")]
         if let Some(encryption) = &encrypted {
-            parser.parse_document_at_offsets_with_limits(
+            parser.parse_shared_document_at_offsets_with_limits(
                 &powerpoint_document,
                 &encryption.live_offsets,
                 record_limits,
             )?;
         } else {
-            parser.parse_document_with_limits(&powerpoint_document, record_limits)?;
+            parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
         }
         #[cfg(not(feature = "encryption"))]
-        parser.parse_document_with_limits(&powerpoint_document, record_limits)?;
+        parser.parse_shared_document_with_limits(&powerpoint_document, record_limits)?;
 
         let current_user_bytes = current_user_data
             .as_deref()

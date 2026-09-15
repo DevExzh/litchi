@@ -305,7 +305,7 @@ impl VbaInfo {
             version: 2,
             instance: 0,
             data_length: 12,
-            data: atom_data,
+            data: atom_data.into(),
             children: Vec::new(),
         };
         let mut data = Vec::with_capacity(20);
@@ -319,7 +319,7 @@ impl VbaInfo {
             version: 0x0f,
             instance: 1,
             data_length: 20,
-            data,
+            data: data.into(),
             children: vec![atom],
         })
     }

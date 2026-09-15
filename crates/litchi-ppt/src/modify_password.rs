@@ -118,7 +118,7 @@ impl ModifyPassword {
             version: 0,
             instance: 3,
             data_length: data.len() as u32,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -184,8 +184,11 @@ mod tests {
     #[test]
     fn null_terminates_input_but_writer_is_canonical() {
         let mut record = ModifyPassword::new("visible").unwrap().to_record();
-        record.data.extend_from_slice(&0u16.to_le_bytes());
-        record.data.extend_from_slice(&('x' as u16).to_le_bytes());
+        record.data.to_mut().extend_from_slice(&0u16.to_le_bytes());
+        record
+            .data
+            .to_mut()
+            .extend_from_slice(&('x' as u16).to_le_bytes());
         record.data_length = u32::try_from(record.data.len()).unwrap();
         let parsed = ModifyPassword::parse(&record).unwrap();
         assert_eq!(parsed.expose_secret(), "visible");
@@ -203,7 +206,7 @@ mod tests {
             version: 0,
             instance: 3,
             data_length: 2,
-            data: 0xd800u16.to_le_bytes().to_vec(),
+            data: 0xd800u16.to_le_bytes().into(),
             children: Vec::new(),
         };
         assert!(ModifyPassword::parse(&record).is_err());

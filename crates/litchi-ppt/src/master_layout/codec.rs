@@ -68,7 +68,7 @@ impl Encoder {
                     "master-layout container payload is not represented by its child tree",
                 );
             }
-            payload
+            payload.into()
         };
         let length = u32::try_from(payload.len())
             .map_err(|_err| Error::InvalidFormat("PPT record payload exceeds u32".into()))?;
@@ -120,7 +120,7 @@ pub(super) fn sync(record: &mut Record, limits: Limits) -> Result<()> {
     let payload = encode_children(&record.children, limits)?;
     record.data_length = u32::try_from(payload.len())
         .map_err(|_err| Error::InvalidFormat("PPT container payload exceeds u32".into()))?;
-    record.data = payload;
+    record.data = payload.into();
     Ok(())
 }
 

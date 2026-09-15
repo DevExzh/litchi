@@ -19,7 +19,7 @@ fn record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Reco
         version: 0,
         instance: 0,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }
@@ -56,7 +56,7 @@ fn presentation_with_vba_storage() -> Presentation {
     persist_mapping.add_mapping(41, storage_offset);
 
     Presentation {
-        powerpoint_document,
+        powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser,
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
@@ -72,7 +72,7 @@ fn lazy_live_document_reuses_presentation_record_limits() {
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(1, 0);
     let presentation = Presentation {
-        powerpoint_document,
+        powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser: RecordParser::new(),
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
@@ -128,7 +128,10 @@ fn parses_named_shows_container() {
 fn ignores_trailing_partial_slide_id_bytes() {
     let mut show = named_show("Odd", &[0x102]);
     // Append 3 stray bytes to the NamedShowSlides atom.
-    show.children[1].data.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+    show.children[1]
+        .data
+        .to_mut()
+        .extend_from_slice(&[0xAA, 0xBB, 0xCC]);
     let container = named_shows(vec![show]);
 
     let mut shows = Vec::new();

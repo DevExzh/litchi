@@ -157,7 +157,7 @@ fn character_flags_preserve_values_and_presence() {
         version: 0,
         instance: 0,
         data_length: 1,
-        data: b"x".to_vec(),
+        data: b"x".into(),
         children: Vec::new(),
     };
     let style_record = crate::Record {
@@ -166,7 +166,7 @@ fn character_flags_preserve_values_and_presence() {
         version: 0,
         instance: 0,
         data_length: u32::try_from(style.len()).unwrap(),
-        data: style,
+        data: style.into(),
         children: Vec::new(),
     };
     let mut extractor = crate::TextRunExtractor::new();

@@ -26,7 +26,7 @@ pub(super) fn encode(name: &Name) -> Result<Record> {
         version: 0,
         instance: 3,
         data_length,
-        data,
+        data: data.into(),
         children: Vec::new(),
     })
 }

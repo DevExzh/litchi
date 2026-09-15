@@ -385,7 +385,7 @@ fn create_test_record(record_type: RecordType, data: Vec<u8>, children: Vec<Reco
         version: 0,
         instance: 0,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }
@@ -529,7 +529,7 @@ fn exposes_direct_powerpoint12_slide_master_references() {
         record_type: RecordType::RoundTripCompositeMasterId12Atom,
         record_type_raw: 0x041d,
         data_length: 4,
-        data: 17u32.to_le_bytes().to_vec(),
+        data: 17u32.to_le_bytes().into(),
         children: Vec::new(),
     };
     let mut content_data = Vec::new();
@@ -542,7 +542,7 @@ fn exposes_direct_powerpoint12_slide_master_references() {
         record_type: RecordType::RoundTripContentMasterId12Atom,
         record_type_raw: 0x0422,
         data_length: 8,
-        data: content_data,
+        data: content_data.into(),
         children: Vec::new(),
     };
     let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![composite, content]);

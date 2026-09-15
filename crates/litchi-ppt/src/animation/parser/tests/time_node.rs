@@ -201,7 +201,7 @@ fn rejects_invalid_extended_time_node_structure() {
         unreachable!();
     };
     let behavior_bytes = write_time_set_behavior(set).unwrap();
-    record.data.extend(&behavior_bytes);
+    record.data.to_mut().extend(&behavior_bytes);
     record.data_length += u32::try_from(behavior_bytes.len()).unwrap();
     record.children.push(behavior_record);
     assert!(parse_extended_time_node(&record).is_err());

@@ -22,7 +22,7 @@ fn record(
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }
@@ -34,7 +34,7 @@ fn unknown(raw: u16, data: &[u8]) -> Record {
         version: 0,
         instance: 7,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }

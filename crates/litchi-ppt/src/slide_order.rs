@@ -4636,7 +4636,7 @@ fn append_picture_store_owner(
     owners: &mut usize,
 ) -> Result<()> {
     if record.record_type == crate::RecordType::PPDrawingGroup {
-        record.data = append_officeart_bstore(&record.data, entries)?;
+        record.data = append_officeart_bstore(&record.data, entries)?.into();
         *owners = owners.saturating_add(1);
     }
     for child in &mut record.children {

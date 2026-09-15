@@ -15,7 +15,7 @@ fn atom(raw: u16, version: u16, instance: u16, data: &[u8]) -> Record {
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -27,7 +27,7 @@ fn container(raw: u16, children: Vec<Record>) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children,
     }
 }

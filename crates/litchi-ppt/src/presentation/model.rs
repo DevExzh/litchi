@@ -131,8 +131,9 @@ impl LazyPictures {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct Presentation {
-    /// The main document stream data (owned for lifetime management)
-    pub(super) powerpoint_document: Vec<u8>,
+    /// The main document stream data, shared with the record tree whose
+    /// payloads span it (owned for lifetime management)
+    pub(super) powerpoint_document: Arc<Vec<u8>>,
     /// Parsed record structure (reserved for future advanced parsing)
     #[allow(dead_code, reason = "reserved for future advanced parsing")]
     pub(crate) parser: RecordParser,

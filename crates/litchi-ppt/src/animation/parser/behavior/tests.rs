@@ -498,7 +498,7 @@ fn rejects_malformed_image_effect_behaviors() {
 
     let bytes = write_time_effect_behavior(&valid).unwrap();
     let (mut bad_filter_record, _) = Record::parse(&bytes, 0).unwrap();
-    bad_filter_record.children[1].data = vec![3, b'n', 0, b'o', 0, b'p', 0, b'e', 0];
+    bad_filter_record.children[1].data = vec![3, b'n', 0, b'o', 0, b'p', 0, b'e', 0].into();
     bad_filter_record.children[1].data_length = 9;
     assert!(parse_time_effect_behavior(&bad_filter_record).is_err());
 

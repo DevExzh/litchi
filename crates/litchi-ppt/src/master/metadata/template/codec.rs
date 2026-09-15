@@ -24,7 +24,7 @@ pub(crate) fn encode(name: &Name) -> Result<Record> {
         version: 0,
         instance: 2,
         data_length,
-        data,
+        data: data.into(),
         children: Vec::new(),
     })
 }

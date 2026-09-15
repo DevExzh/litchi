@@ -214,7 +214,7 @@ mod hyperlink_tests {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(payload.len()).unwrap(),
-            data: payload,
+            data: payload.into(),
             children: Vec::new(),
         }
     }
@@ -244,7 +244,7 @@ mod hyperlink_tests {
             version: 0x0f,
             instance: 0,
             data_length: u32::try_from(tag.len()).unwrap(),
-            data: tag,
+            data: tag.into(),
             children: Vec::new(),
         }
     }
@@ -276,7 +276,7 @@ mod hyperlink_tests {
             version: 0x0f,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children,
         }
     }

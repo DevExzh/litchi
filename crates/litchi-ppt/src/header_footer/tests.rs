@@ -141,7 +141,7 @@ fn placement_duplicate_and_order_violations_are_rejected() {
     let footer = container.children[1].clone();
 
     let mut out_of_order = container.clone();
-    out_of_order.data.clear();
+    out_of_order.data.to_mut().clear();
     out_of_order.children = vec![footer.clone(), atom.clone()];
     out_of_order.data_length = 0;
     assert!(
@@ -154,7 +154,7 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         version: 0xF,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: vec![container.clone(), container.clone()],
     };
     let records = vec![&document, &document.children[0], &document.children[1]];
@@ -166,7 +166,7 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         version: 0xF,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: vec![container],
     };
     let empty_document = Record {
@@ -175,7 +175,7 @@ fn placement_duplicate_and_order_violations_are_rejected() {
         version: 0xF,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: Vec::new(),
     };
     let wrong_parent_records = vec![&empty_document, &wrong_parent, &wrong_parent.children[0]];

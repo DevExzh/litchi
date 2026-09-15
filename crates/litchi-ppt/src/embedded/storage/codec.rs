@@ -173,7 +173,7 @@ impl Storage {
             return corrupted("ExOleObjStg has an invalid header or stored size");
         }
         match record.instance {
-            0 => Self::uncompressed(kind, record.data.clone()),
+            0 => Self::uncompressed(kind, record.data.to_vec()),
             1 => {
                 let prefix: &[u8; 4] = record
                     .data

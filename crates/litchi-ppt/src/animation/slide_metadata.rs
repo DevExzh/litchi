@@ -146,7 +146,7 @@ impl Flags {
             version: 0,
             instance: 0,
             data_length: FLAGS_PAYLOAD_LEN as u32,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -251,7 +251,7 @@ impl SlideTime {
             version: 0,
             instance: 0,
             data_length: TIME_PAYLOAD_LEN as u32,
-            data,
+            data: data.into(),
             children: Vec::new(),
         }
     }

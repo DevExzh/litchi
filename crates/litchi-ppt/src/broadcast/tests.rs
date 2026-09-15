@@ -110,7 +110,7 @@ fn rejects_dependency_order_reserved_and_lexical_failures() {
         );
     }
     let mut wrong_order = valid.clone();
-    wrong_order.data = data;
+    wrong_order.data = data.into();
     wrong_order.data_length = u32::try_from(wrong_order.data.len()).unwrap();
     assert!(Broadcast::parse(&wrong_order).is_err());
 

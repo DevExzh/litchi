@@ -382,7 +382,7 @@ impl RecolorInfo {
             version: 0,
             instance: 0,
             data_length,
-            data,
+            data: data.into(),
             children: Vec::new(),
         })
     }

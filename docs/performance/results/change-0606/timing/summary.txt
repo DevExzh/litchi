@@ -1,0 +1,101 @@
+== litchi-perf-baseline registered selectors, corpus ppt-tiny (7,680 B archive, 4,127 B document stream)
+   40 timed samples/leg, warmup 5, order A1 B1 B2 A2 AA1 AA2, CPU 26; A = before, B = after
+case                         leg       p50      mean      p95      p99
+ppt_semantic_open            A1      17175   17205.3    17880    18010
+ppt_semantic_open            B1      14490   14743.5    15000    23320
+ppt_semantic_open            B2      14620   14758.4    15040    20520
+ppt_semantic_open            A2      17040   17121.8    17650    18340
+ppt_semantic_open            AA1     16975   17049.3    17930    18230
+ppt_semantic_open            AA2     17075   17129.1    18001    20150
+  -> before->after p50 17108->14555 (-14.92%), mean 17164->14751 (-14.06%); after->before p50 +17.54%; A/A spread p50 1.18% p99 11.88%
+
+ppt_semantic_list_slides     A1       8625    8704.0     8820    12700
+ppt_semantic_list_slides     B1       8545    8552.3     8820     9010
+ppt_semantic_list_slides     B2       8510    8488.6     8730     8880
+ppt_semantic_list_slides     A2       8640    8796.3     8930    15010
+ppt_semantic_list_slides     AA1      8590    9308.8    15200    16791
+ppt_semantic_list_slides     AA2      8525    8520.8     8720     8750
+  -> before->after p50 8632->8528 (-1.22%), mean 8750->8520 (-2.63%); after->before p50 +1.23%; A/A spread p50 1.35% p99 91.90%
+
+ppt_semantic_full_text       A1      26595   26961.7    31110    34561
+ppt_semantic_full_text       B1      27670   27771.7    28171    34120
+ppt_semantic_full_text       B2      28085   28545.4    33590    34420
+ppt_semantic_full_text       A2      26650   26714.1    27190    29970
+ppt_semantic_full_text       AA1     26570   26567.1    27000    27670
+ppt_semantic_full_text       AA2     26655   26809.4    27240    33440
+  -> before->after p50 26622->27878 (+4.71%), mean 26838->28159 (+4.92%); after->before p50 -4.50%; A/A spread p50 0.32% p99 24.90%
+
+ppt_semantic_one_edit_save   A1     266941  268263.7   274862   277892
+ppt_semantic_one_edit_save   B1     254851  257834.6   265431   346931
+ppt_semantic_one_edit_save   B2     252936  254043.8   263321   263991
+ppt_semantic_one_edit_save   A2     269456  271468.1   281131   298431
+ppt_semantic_one_edit_save   AA1    268627  270230.1   278861   292601
+ppt_semantic_one_edit_save   AA2    266452  267766.2   275782   277912
+  -> before->after p50 268198->253894 (-5.33%), mean 269866->255939 (-5.16%); after->before p50 +5.63%; A/A spread p50 1.13% p99 7.39%
+
+== real fixture 45543.ppt (311,524 B document stream), whole operation, glibc defaults
+eager-open       A1   p50=    55270 mean=     56113 p95=    63190 p99=    65620
+eager-open       B1   p50=    37830 mean=     38399 p95=    44341 p99=    46561
+eager-open       B2   p50=    37540 mean=     38592 p95=    49510 p99=    65030
+eager-open       A2   p50=    55610 mean=     56235 p95=    64730 p99=    68700
+eager-open       AA1  p50=    55530 mean=     56996 p95=    64501 p99=   100380
+eager-open       AA2  p50=    56170 mean=     57696 p95=    64150 p99=    93741
+  -> before->after p50 55440->37685 (-32.03%); after->before +47.11%; A/A spread p50 1.63% p99 52.97%
+
+eager-slides     A1   p50=    68720 mean=     69948 p95=    77931 p99=    97481
+eager-slides     B1   p50=   141100 mean=    142817 p95=   151311 p99=   169270
+eager-slides     B2   p50=   140631 mean=    141769 p95=   151430 p99=   162851
+eager-slides     A2   p50=    68210 mean=     69429 p95=    77151 p99=    93981
+eager-slides     AA1  p50=    69141 mean=     69504 p95=    75780 p99=    77830
+eager-slides     AA2  p50=    68170 mean=     69763 p95=    78991 p99=   100101
+  -> before->after p50 68465->140866 (+105.75%); after->before -51.40%; A/A spread p50 1.42% p99 28.61%
+
+eager-text       A1   p50=    77930 mean=     79078 p95=    87660 p99=    89431
+eager-text       B1   p50=    59890 mean=     67043 p95=   141161 p99=   143520
+eager-text       B2   p50=    59760 mean=     67154 p95=   142620 p99=   142751
+eager-text       A2   p50=    78200 mean=     79439 p95=    91351 p99=    96851
+eager-text       AA1  p50=    78090 mean=     80287 p95=    89340 p99=   116890
+eager-text       AA2  p50=    77820 mean=     79119 p95=    87191 p99=    91841
+  -> before->after p50 78065->59825 (-23.37%); after->before +30.49%; A/A spread p50 0.49% p99 30.70%
+
+owned-edit-save  A1   p50=   262632 mean=    264804 p95=   284622 p99=   302622
+owned-edit-save  B1   p50=   226292 mean=    227566 p95=   235751 p99=   236781
+owned-edit-save  B2   p50=   225801 mean=    228045 p95=   238011 p99=   255232
+owned-edit-save  A2   p50=   259962 mean=    262538 p95=   282661 p99=   294752
+owned-edit-save  AA1  p50=   259861 mean=    261403 p95=   274941 p99=   275462
+owned-edit-save  AA2  p50=   262372 mean=    264838 p95=   301802 p99=   302451
+  -> before->after p50 261297->226046 (-13.49%); after->before +15.59%; A/A spread p50 1.07% p99 9.86%
+
+== real fixture 45543.ppt (311,524 B document stream), whole operation, MALLOC_MMAP_THRESHOLD_=MALLOC_TRIM_THRESHOLD_=8 MiB
+eager-open       A1   p50=    55180 mean=     56310 p95=    64230 p99=    78721
+eager-open       B1   p50=    37570 mean=     38261 p95=    46260 p99=    50990
+eager-open       B2   p50=    37480 mean=     38075 p95=    45401 p99=    49810
+eager-open       A2   p50=    55400 mean=     56333 p95=    63870 p99=    74431
+eager-open       AA1  p50=    55060 mean=     55766 p95=    63070 p99=    65760
+eager-open       AA2  p50=    55130 mean=     55694 p95=    63151 p99=    65191
+  -> before->after p50 55290->37525 (-32.13%); after->before +47.34%; A/A spread p50 0.62% p99 20.75%
+
+eager-slides     A1   p50=    68240 mean=     69771 p95=    77630 p99=   103870
+eager-slides     B1   p50=    50161 mean=     50991 p95=    58491 p99=    62790
+eager-slides     B2   p50=    50540 mean=     52404 p95=    68920 p99=    79640
+eager-slides     A2   p50=    67980 mean=     69430 p95=    76880 p99=    90880
+eager-slides     AA1  p50=    68760 mean=     70168 p95=    79331 p99=    97071
+eager-slides     AA2  p50=    68270 mean=     69278 p95=    77320 p99=    83860
+  -> before->after p50 68110->50350 (-26.07%); after->before +35.27%; A/A spread p50 1.15% p99 23.86%
+
+eager-text       A1   p50=    78160 mean=     79808 p95=    91681 p99=    98151
+eager-text       B1   p50=    58790 mean=     60779 p95=    70670 p99=    88661
+eager-text       B2   p50=    59680 mean=     61542 p95=    83680 p99=    88210
+eager-text       A2   p50=    78261 mean=     79870 p95=    87320 p99=   104501
+eager-text       AA1  p50=    79110 mean=     80746 p95=    86901 p99=   109341
+eager-text       AA2  p50=    78040 mean=     79273 p95=    85941 p99=    90171
+  -> before->after p50 78210->59235 (-24.26%); after->before +32.03%; A/A spread p50 1.37% p99 21.26%
+
+owned-edit-save  A1   p50=   189331 mean=    191305 p95=   203671 p99=   212491
+owned-edit-save  B1   p50=   154111 mean=    155841 p95=   176481 p99=   178191
+owned-edit-save  B2   p50=   154281 mean=    155974 p95=   166631 p99=   176361
+owned-edit-save  A2   p50=   187151 mean=    186217 p95=   199401 p99=   206151
+owned-edit-save  AA1  p50=   179711 mean=    181507 p95=   191701 p99=   194241
+owned-edit-save  AA2  p50=   180891 mean=    181892 p95=   192551 p99=   194201
+  -> before->after p50 188241->154196 (-18.09%); after->before +22.08%; A/A spread p50 5.35% p99 9.42%
+

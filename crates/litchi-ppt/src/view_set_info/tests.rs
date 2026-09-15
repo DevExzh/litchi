@@ -16,7 +16,7 @@ fn atom_record(data: &[u8]) -> Record {
         version: 0,
         instance: 0,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -34,7 +34,7 @@ fn container_record(atom_data: &[u8]) -> Record {
         version: 0xF,
         instance: 1,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -103,7 +103,7 @@ fn rejects_malformed_layouts() {
     bad_flags[19] = 0xFC;
     assert!(NormalViewSetInfo::parse(&bad_flags).is_err());
     // Two atoms in one container.
-    let mut data = container_record(&pane_atom()).data;
+    let mut data = container_record(&pane_atom()).data.into_vec();
     data.extend_from_slice(&container_record(&pane_atom()).data);
     let record = Record {
         record_type: RecordType::NormalViewSetInfo9,
@@ -111,7 +111,7 @@ fn rejects_malformed_layouts() {
         version: 0xF,
         instance: 1,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children: Vec::new(),
     };
     assert!(NormalViewSet::parse_record(&record).is_err());

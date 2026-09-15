@@ -1,0 +1,23 @@
+[package]
+name = "ppt0606"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "ppt0606"
+path = "src/main.rs"
+
+[[bin]]
+name = "ppt0606_alloc"
+path = "src/alloc.rs"
+
+[dependencies]
+litchi-core = { path = "@ROOT@/crates/litchi-core" }
+litchi-cfb = { path = "@ROOT@/crates/litchi-cfb" }
+litchi-ppt = { path = "@ROOT@/crates/litchi-ppt" }
+
+[profile.release]
+debug = false
+strip = false

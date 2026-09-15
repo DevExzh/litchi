@@ -165,7 +165,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data,
+            data: data.into(),
             children: vec![],
         };
 
@@ -198,7 +198,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data,
+            data: data.into(),
             children: vec![],
         };
 

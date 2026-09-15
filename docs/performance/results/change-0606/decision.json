@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0606",
+  "title": "The PPT record tree spans the stream it already retains instead of copying every payload once per nesting level",
+  "decision": "retained",
+  "code_state": "crates/litchi-ppt only; 84 files, of which six carry the mechanism and the rest are one-line payload conversions",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the record parser copied each record's payload into an owned Vec and then parsed that record's children from the same bytes, so a container held a private copy of every byte its children also copied: 1.00x to 2.35x the stream across the 30 .ppt fixtures, 2.0x or more on 20 of the 26 that parse",
+    "the Presentation already retains the whole PowerPoint Document stream, so a span into it is value-identical to the copy and costs one Arc clone",
+    "the eager slide-text extraction inside parse_document_with_limits (259 Record::extract_text calls per open on 45543.ppt) is read only by RecordParser::slides()/slide_count(), whose single caller in the workspace is a unit test in the same file; extract_all_text has no failing branch, so deferring it defers no refusal",
+    "all 30 .ppt fixture reader dumps are identical across both legs, including the four encrypted refusals, once two per-process-randomized HashMap Debug renderings are normalized"
+  ],
+  "accepted_evidence": {
+    "counts": "record-tree census over all 30 fixtures; counting-allocator allocation count, allocated bytes, peak live bytes and retained live bytes for five operations on four fixtures; callgrind isolation pairs (s=10 vs s=110) for four operations on both legs giving per-operation instructions, memcpy calls, malloc calls and Record::extract_text calls",
+    "native": "perf stat instructions, cycles and minor faults for four operations on both legs in three configurations: a 1,000-iteration loop under glibc defaults, the same loop with the glibc mmap and trim thresholds pinned at 8 MiB, and 200 single-shot processes",
+    "timing": "four registered selectors and four whole-operation driver modes, 40 timed samples per leg after 5 warm-ups, order A1 B1 B2 A2 with two further before legs in the same window for the A/A floor, both directions reported",
+    "correctness": "a 30-fixture differential oracle covering both readers' complete semantic surface, the owned text editor over 12 targets with no-op and edited commit digests, the source-backed editor's reads, and a record-tree digest; plus seven unit tests added in litchi-ppt"
+  },
+  "accepted_costs": {
+    "corpus": "the only registered PPT corpus is a 7,680-byte synthetic package with a 4,127-byte document stream; every real-fixture number comes from a scratch driver retained in this packet, not from a registered selector",
+    "record_size": "Record grows 8 bytes because RecordPayload is a 32-byte enum rather than a 24-byte Vec; on a record-dense, payload-light fixture (41246-1.ppt, 804 records) that offsets part of the saving",
+    "residual_regression": "ppt_semantic_full_text regresses 4.71% at p50 against a 0.32% A/A floor on the synthetic corpus, because that selector times only Presentation::text(), whose per-slide re-parse still runs through the copying &[u8] entry point in SlideFactory",
+    "loop_regression": "open + list slides in a 1,000-iteration single-process loop regresses 105.75% at p50 under glibc defaults; pinning MALLOC_MMAP_THRESHOLD_ and MALLOC_TRIM_THRESHOLD_ at 8 MiB turns the same measurement into -26.07% and removes 171,422 minor faults, and the single-shot per-process measurement of the same operation is -14.9% instructions and -128 faults",
+    "host": "warm cache, in-memory sources, single-threaded, one host, seven other agents active on other cores; no cold-cache, physical-device or RSS measurement"
+  },
+  "known_gaps": {
+    "not_extended": "SlideFactory, NotesIndex and therefore Presentation::slides, slide_at and text still re-parse each slide through the copying &[u8] entry point; extending the shared buffer to them is the named follow-on",
+    "not_measured": "RSS, cold cache, other hosts, other allocators, concurrency; no owned-edit-save measurement on 41246-1.ppt, which the owned text editor refuses with Refused(NoTextAtom)",
+    "not_attempted": "packing the Record struct"
+  },
+  "withheld": [
+    "any registered speedup or resource claim, any cold-cache, physical-device, peak-RSS, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "6c4c1469beda47c2d44b502024a8dc680af35bfe",
+    "branch": "perf/0606-ppt-record-tree-borrowed-payloads",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "26",
+    "note": "both legs built --release --locked; the before leg from the shared read-only checkout of the base commit with its own CARGO_TARGET_DIR"
+  }
+}

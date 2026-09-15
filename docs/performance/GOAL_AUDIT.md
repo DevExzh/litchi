@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0606 — PPT record tree borrowed payloads
+
+Step 2 of the optimization order (unnecessary copying and allocation) applied to the last unaddressed PPT parser, which change 0301 had explicitly left out of scope. The eager and the source-backed `Presentation` now parse a record tree whose payloads span the `PowerPoint Document` stream the presentation already retains, and the eager per-open full-text extraction that only a unit test consumed is deferred to first use. Retained bytes per byte of stream for an eager open fall from 2.87x to 1.24x on `45543.ppt`, 3.30x to 1.31x on `SampleShow.ppt` and 3.24x to 1.25x on `headers_footers_2007.ppt`; allocations halve. No P1 audit row closes: this is one format's reader, the source-backed PPT path still pays the whole-artifact SHA-256 that 0587 ranked first, `SlideFactory` still copies per slide, and no RSS, cold-cache, physical-device or producer-corpus measurement was taken. Lossless preservation, typed refusals and every record limit are unchanged, and all 30 `.ppt` fixture reader dumps — including the four encrypted refusals — are identical across the two legs. OLE2/OOXML optimization remains active; ODF is deferred until completion and iWork excluded. [Change and limitations](0606-ppt-record-tree-borrowed-payloads.md); [retained evidence](results/change-0606/README.md).
+
 ## 0601 — reproducible baselines on the corpus class the audit was missing
 
 Record: [0601](0601-perf-harness-real-producer-shape.md).

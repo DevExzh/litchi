@@ -60,7 +60,7 @@ pub(crate) fn encode_sync(value: &Synchronization) -> Result<Record> {
         version: 0,
         instance: 0,
         data_length: timestamp_bytes.len() as u32,
-        data: timestamp_bytes,
+        data: timestamp_bytes.into(),
         children: Vec::new(),
     };
     let children = vec![server, url, timestamps];
@@ -71,7 +71,7 @@ pub(crate) fn encode_sync(value: &Synchronization) -> Result<Record> {
         version: 0x0f,
         instance: 0,
         data_length: payload.len() as u32,
-        data: payload,
+        data: payload.into(),
         children,
     })
 }
@@ -92,7 +92,7 @@ fn atom(instance: u16, data: Vec<u8>) -> Record {
         version: 0,
         instance,
         data_length: data.len() as u32,
-        data,
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -127,7 +127,7 @@ impl Encoder {
                 }
                 payload.extend_from_slice(&encoded);
             }
-            payload
+            payload.into()
         };
         let total = payload
             .len()

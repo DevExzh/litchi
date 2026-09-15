@@ -1,0 +1,44 @@
+# Gates for change 0606
+# worktree /home/zhuhe/code/litchi-worktrees/0606, branch perf/0606-ppt-record-tree-borrowed-payloads,
+# base 6c4c1469beda47c2d44b502024a8dc680af35bfe
+
+$ cargo fmt --all --check
+(no output: clean)
+
+$ cargo clippy -p litchi-ppt --all-targets
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0606/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.68s
+
+$ cargo clippy -p litchi-ppt --all-targets --all-features
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+$ cargo test -p litchi-ppt
+32 test binaries: 1212 passed, 0 failed, 11 ignored
+
+all doctests ran in 0.45s; merged doctests compilation took 0.45s
+
+$ cargo test -p litchi-ppt --all-features
+1240 passed, 0 failed, 11 ignored
+
+$ cargo doc -p litchi-ppt --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.86s
+   Generated /home/zhuhe/code/litchi-worktrees/0606/target/doc/litchi_ppt/index.html
+
+$ cargo clippy -p litchi -p litchi-pptx --all-targets   (downstream crates that compile against Record)
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
+(the three warnings are pre-existing dead-code warnings for feature-gated test helpers in
+ crates/litchi/tests/unexpected_format.rs, a file this change does not touch; reproduced
+ verbatim on the untouched before checkout of 6c4c1469b)
+
+$ cargo check --workspace --all-targets
+crates/litchi-iwa/examples/create_numbers_donut_chart.rs:68:5: error[E0308]: mismatched types: expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+error: could not compile `litchi-iwa` (example "create_numbers_donut_chart") due to 1 previous error
+(the only workspace errors are pre-existing and in out-of-scope iWork chart examples;
+ reproduced on the untouched before checkout of 6c4c1469b with the same four files)
+
+$ 30-fixture differential oracle (driver/src/main.rs 'oracle' mode, both legs): see oracle-digests.txt
+30/30 .ppt fixture reader dumps identical after normalizing two HashMap Debug renderings
+(SlideDirectory::by_slide_id / by_persist_id), whose iteration order is randomized per process
+and which differ between two runs of the SAME before binary. Normalized dumps both hash to
+9cdddef6e870aa35884738c3f1729c9e12b6ca7bc22b2e551a4dad586c236b7c.

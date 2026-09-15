@@ -6,6 +6,7 @@ use crate::consts::RecordType;
 use crate::package::{Error, RecordLimits, Result};
 use crate::records::Record;
 use crate::records::record::ParseBudget;
+use std::sync::{Arc, OnceLock};
 
 /// Parser for PPT binary format that extracts document structure and content.
 #[allow(
@@ -15,8 +16,9 @@ use crate::records::record::ParseBudget;
 pub struct RecordParser {
     /// All parsed records
     records: Vec<Record>,
-    /// Slide text organized by `SlideAtomsSets` (following POI's architecture)
-    slide_atoms_sets: Vec<Vec<u8>>,
+    /// Slide text organized by `SlideAtomsSets` (following POI's architecture),
+    /// extracted on first use rather than at every parse.
+    slide_atoms_sets: OnceLock<Vec<Vec<u8>>>,
 }
 
 impl RecordParser {
@@ -25,7 +27,7 @@ impl RecordParser {
     pub fn new() -> Self {
         Self {
             records: Vec::new(),
-            slide_atoms_sets: Vec::new(),
+            slide_atoms_sets: OnceLock::new(),
         }
     }
 
@@ -52,13 +54,45 @@ impl RecordParser {
         if data.is_empty() {
             return Ok(());
         }
-
         let mut budget = ParseBudget::new(limits, data.len())?;
+        self.parse_top_level(data.len(), &mut budget, |offset, budget| {
+            Record::parse_with_budget(data, offset, false, budget)
+        })
+    }
 
-        // Parse all top-level records
+    /// Parse a complete PPT document whose record payloads borrow `data`.
+    ///
+    /// The record tree is value-identical to [`Self::parse_document_with_limits`]
+    /// on the same bytes; only the payload storage differs, so no payload byte
+    /// is copied at any nesting level.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn parse_shared_document_with_limits(
+        &mut self,
+        data: &Arc<Vec<u8>>,
+        limits: RecordLimits,
+    ) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let mut budget = ParseBudget::new(limits, data.len())?;
+        self.parse_top_level(data.len(), &mut budget, |offset, budget| {
+            Record::parse_shared_with_budget(data, offset, false, budget)
+        })
+    }
+
+    /// The lenient top-level record loop shared by both payload sources.
+    fn parse_top_level(
+        &mut self,
+        len: usize,
+        budget: &mut ParseBudget,
+        mut parse: impl FnMut(usize, &mut ParseBudget) -> Result<(Record, usize)>,
+    ) -> Result<()> {
         let mut offset = 0;
-        while offset + 8 <= data.len() {
-            match Record::parse_with_budget(data, offset, false, &mut budget) {
+        while offset + 8 <= len {
+            match parse(offset, budget) {
                 Ok((record, consumed)) => {
                     self.records
                         .try_reserve(1)
@@ -75,62 +109,67 @@ impl RecordParser {
                 },
                 Err(_) => {
                     offset += 1;
-                    if offset + 8 > data.len() {
+                    if offset + 8 > len {
                         break;
                     }
                 },
             }
         }
 
-        // Extract slide text
-        self.extract_slide_text_from_document()?;
-
         Ok(())
     }
 
-    /// Parse only the validated live persist objects of an encrypted document.
+    /// Parse only the validated live persist objects of an encrypted document,
+    /// borrowing their payloads from the decrypted stream.
     #[cfg(feature = "encryption")]
-    pub(crate) fn parse_document_at_offsets_with_limits(
+    pub(crate) fn parse_shared_document_at_offsets_with_limits(
         &mut self,
-        data: &[u8],
+        data: &Arc<Vec<u8>>,
         offsets: &[usize],
         limits: RecordLimits,
     ) -> Result<()> {
         let mut budget = ParseBudget::new(limits, data.len())?;
         for &offset in offsets {
-            let (record, _) = Record::parse_with_budget(data, offset, true, &mut budget)?;
+            let (record, _) = Record::parse_shared_with_budget(data, offset, true, &mut budget)?;
             self.records
                 .try_reserve(1)
                 .map_err(|_err| Error::AllocationFailed("PPT live-record table"))?;
             self.records.push(record);
         }
-        self.extract_slide_text_from_document()
+        Ok(())
     }
 
     /// Extract slide text from the document.
     /// Based on POI's `QuickButCruddyTextExtractor` approach.
-    fn extract_slide_text_from_document(&mut self) -> Result<()> {
-        let all_text = self.extract_all_text()?;
+    fn extract_slide_text_from_document(&self) -> Vec<Vec<u8>> {
+        // `extract_all_text` reports no failure of its own, so deferring it
+        // cannot defer a refusal.
+        let Ok(all_text) = self.extract_all_text() else {
+            return Vec::new();
+        };
 
         // For now, treat all text as a single slide
         // Note: Full slide association would require parsing SlideListWithText structure
-        if !all_text.is_empty() && all_text != "No text content found" {
-            self.slide_atoms_sets.push(all_text.into_bytes());
+        if all_text.is_empty() || all_text == "No text content found" {
+            return Vec::new();
         }
-
-        Ok(())
+        vec![all_text.into_bytes()]
     }
 
     /// Get all slide text data extracted from the document.
+    ///
+    /// The text is extracted on the first call and cached, rather than at every
+    /// parse; the value is the same either way.
     #[must_use]
     pub fn slides(&self) -> &[Vec<u8>] {
-        &self.slide_atoms_sets
+        self.slide_atoms_sets
+            .get_or_init(|| self.extract_slide_text_from_document())
     }
 
     /// Get the number of slides in the document.
     #[must_use]
     pub fn slide_count(&self) -> usize {
-        self.slide_atoms_sets.len()
+        self.slides().len()
     }
 
     /// Find a record of a specific type.

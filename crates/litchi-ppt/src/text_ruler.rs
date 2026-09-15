@@ -289,7 +289,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data,
+            data: data.into(),
             children: Vec::new(),
         };
         let root = Record {
@@ -298,7 +298,7 @@ mod tests {
             version: 0x0f,
             instance: 0,
             data_length: 0,
-            data: Vec::new(),
+            data: Vec::new().into(),
             children: vec![atom],
         };
         assert_eq!(

@@ -21,7 +21,7 @@ fn record(
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }
@@ -81,7 +81,7 @@ fn unknown() -> Record {
         version: 0,
         instance: 7,
         data_length: 3,
-        data: vec![1, 2, 3],
+        data: vec![1, 2, 3].into(),
         children: Vec::new(),
     }
 }
@@ -121,7 +121,7 @@ fn replacement_and_clear_are_atomic_and_keep_unknown_records() {
         version: 0,
         instance: 2,
         data_length: 2,
-        data: vec![9, 8],
+        data: vec![9, 8].into(),
         children: Vec::new(),
     };
     let source = Snapshot::from_record(
@@ -204,9 +204,9 @@ fn rejects_duplicate_malformed_and_oversized_names() {
 
     let odd = name_record("ignored");
     let mut odd_root = master(Context::Notes, vec![odd]);
-    odd_root.children[2].data = vec![0];
+    odd_root.children[2].data = vec![0].into();
     odd_root.children[2].data_length = 1;
-    odd_root.data = children_wire(&odd_root.children);
+    odd_root.data = children_wire(&odd_root.children).into();
     odd_root.data_length = u32::try_from(odd_root.data.len()).unwrap();
     assert!(Snapshot::from_record(Context::Notes, odd_root).is_err());
 

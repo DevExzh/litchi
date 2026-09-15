@@ -250,7 +250,7 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: u32::try_from(data.len()).unwrap(),
-            data: data.to_vec(),
+            data: data.into(),
             children: Vec::new(),
         }
     }
@@ -321,17 +321,17 @@ mod tests {
             version: 0,
             instance: 0,
             data_length: 4,
-            data: 5i32.to_le_bytes().to_vec(),
+            data: 5i32.to_le_bytes().into(),
             children: Vec::new(),
         };
         assert_eq!(OutlineTextRef::parse_record(&record).unwrap().get(), 5);
 
         let mut negative = record.clone();
-        negative.data = (-1i32).to_le_bytes().to_vec();
+        negative.data = (-1i32).to_le_bytes().into();
         assert!(OutlineTextRef::parse_record(&negative).is_err());
 
         let mut long = record.clone();
-        long.data.extend_from_slice(&[0; 4]);
+        long.data.to_mut().extend_from_slice(&[0; 4]);
         assert!(OutlineTextRef::parse_record(&long).is_err());
     }
 }

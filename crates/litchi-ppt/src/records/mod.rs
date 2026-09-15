@@ -3,12 +3,14 @@
 //! This module provides structures and functions for parsing `PowerPoint` binary records.
 
 pub mod document_info;
+pub mod payload;
 pub mod record;
 pub mod slide_atoms_set;
 pub mod slide_info;
 
 // Re-export commonly used types
 pub use document_info::DocumentInfo;
+pub use payload::RecordPayload;
 pub use record::Record;
 #[allow(
     unused_imports,

@@ -35,7 +35,7 @@ fn collection(kind: RecordType, payload: Vec<u8>) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: u32::try_from(payload.len()).unwrap(),
-        data: payload,
+        data: payload.into(),
         children: Vec::new(),
     }
 }
@@ -54,7 +54,7 @@ fn prog_tags_record(blob_payload: &[u8]) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: u32::try_from(tag.len()).unwrap(),
-        data: tag,
+        data: tag.into(),
         children: Vec::new(),
     }
 }
@@ -66,7 +66,7 @@ fn doc_info_list(prog_tags: Record) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: prog_tags.data_length + 8,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: vec![prog_tags],
     }
 }
@@ -88,7 +88,7 @@ fn document(base: Record, ppt10: &[u8]) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: base.data_length + 8,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: vec![base],
     };
     Record {
@@ -97,7 +97,7 @@ fn document(base: Record, ppt10: &[u8]) -> Record {
         version: 0x0f,
         instance: 0,
         data_length: 0,
-        data: Vec::new(),
+        data: Vec::new().into(),
         children: vec![environment, doc_info_list(prog_tags_record(ppt10))],
     }
 }
@@ -266,7 +266,7 @@ fn nested_programmable_tags_share_one_record_budget() {
         version: 0x0f,
         instance: 0,
         data_length: u32::try_from(tags.len()).unwrap(),
-        data: tags,
+        data: tags.into(),
         children: Vec::new(),
     };
     let mut root = document(

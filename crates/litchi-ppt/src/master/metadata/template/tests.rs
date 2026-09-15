@@ -21,7 +21,7 @@ fn record(
         version,
         instance,
         data_length: u32::try_from(data.len()).unwrap(),
-        data,
+        data: data.into(),
         children,
     }
 }
@@ -58,7 +58,7 @@ fn unknown(raw: u16, data: &[u8]) -> Record {
         version: 0,
         instance: 7,
         data_length: u32::try_from(data.len()).unwrap(),
-        data: data.to_vec(),
+        data: data.into(),
         children: Vec::new(),
     }
 }
@@ -163,7 +163,7 @@ fn rejects_wrong_context_duplicate_headers_utf16_and_bounds() {
     );
 
     let mut odd = name_record(2, "bad");
-    odd.data = vec![0];
+    odd.data = vec![0].into();
     odd.data_length = 1;
     assert!(Snapshot::from_record(master(vec![odd])).is_err());
 
