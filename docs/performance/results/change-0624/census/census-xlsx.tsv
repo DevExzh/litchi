@@ -1,0 +1,414 @@
+test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx	xlsxcells:1	ok	members=131	changed=4	changed_bytes=19391	max_changed=9680	changed_ge_256KiB=0
+test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx	xlsxpercent:1	ok	members=131	changed=4	changed_bytes=19391	max_changed=9680	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx	xlsxcells:1	ok	members=20	changed=2	changed_bytes=4764	max_changed=3589	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx	xlsxpercent:1	ok	members=20	changed=2	changed_bytes=4764	max_changed=3589	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXMLMappings.xlsx	xlsxcells:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXMLMappings.xlsx	xlsxpercent:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx	xlsxcells:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx	xlsxpercent:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DataValidationEvaluations.xlsx	xlsxcells:1	ok	members=15	changed=4	changed_bytes=14200	max_changed=10434	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DataValidationEvaluations.xlsx	xlsxpercent:1	ok	members=15	changed=4	changed_bytes=14243	max_changed=10477	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DataValidationListTooLong.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet0", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/ooxml/xlsx/DataValidationListTooLong.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet0", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/ooxml/xlsx/DateFormatNumberTests.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=6398	max_changed=2314	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DateFormatNumberTests.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=6398	max_changed=2314	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DateFormatTests.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=6280	max_changed=2201	changed_ge_256KiB=0
+test-data/ooxml/xlsx/DateFormatTests.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=6280	max_changed=2201	changed_ge_256KiB=0
+test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx	xlsxcells:1	ok	members=27	changed=2	changed_bytes=4034	max_changed=2044	changed_ge_256KiB=0
+test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx	xlsxpercent:1	ok	members=27	changed=2	changed_bytes=4034	max_changed=2044	changed_ge_256KiB=0
+test-data/ooxml/xlsx/ExcelTables.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=4881	max_changed=1949	changed_ge_256KiB=0
+test-data/ooxml/xlsx/ExcelTables.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=4881	max_changed=1949	changed_ge_256KiB=0
+test-data/ooxml/xlsx/FormatChoiceTests.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=4996	max_changed=1887	changed_ge_256KiB=0
+test-data/ooxml/xlsx/FormatChoiceTests.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=4996	max_changed=1887	changed_ge_256KiB=0
+test-data/ooxml/xlsx/FormatConditionTests.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=6397	max_changed=2313	changed_ge_256KiB=0
+test-data/ooxml/xlsx/FormatConditionTests.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=6397	max_changed=2313	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Formatting.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=2556	max_changed=1856	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Formatting.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=2556	max_changed=1856	changed_ge_256KiB=0
+test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=1897	max_changed=1196	changed_ge_256KiB=0
+test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=1897	max_changed=1196	changed_ge_256KiB=0
+test-data/ooxml/xlsx/InlineString.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=2523	max_changed=2213	changed_ge_256KiB=0
+test-data/ooxml/xlsx/InlineString.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=2523	max_changed=2213	changed_ge_256KiB=0
+test-data/ooxml/xlsx/InlineStrings.xlsx	xlsxcells:1	ok	members=16	changed=2	changed_bytes=4708	max_changed=3775	changed_ge_256KiB=0
+test-data/ooxml/xlsx/InlineStrings.xlsx	xlsxpercent:1	ok	members=16	changed=2	changed_bytes=4708	max_changed=3775	changed_ge_256KiB=0
+test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=33084	max_changed=29800	changed_ge_256KiB=0
+test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(2) }, reason: CoveredMerge }
+test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=25999	max_changed=23378	changed_ge_256KiB=0
+test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=26146	max_changed=23525	changed_ge_256KiB=0
+test-data/ooxml/xlsx/NewlineInFormulas.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=4570	max_changed=1729	changed_ge_256KiB=0
+test-data/ooxml/xlsx/NewlineInFormulas.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=4570	max_changed=1729	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4636	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4636	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4622	max_changed=2619	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4622	max_changed=2619	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4636	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4636	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4733	max_changed=2565	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4733	max_changed=2565	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4639	max_changed=2633	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleMultiCell.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=1829	max_changed=1127	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleMultiCell.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=1829	max_changed=1127	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleNormal.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=4051	max_changed=1302	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleNormal.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=4051	max_changed=1302	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleScatterChart.xlsx	xlsxcells:1	ok	members=25	changed=2	changed_bytes=2385	max_changed=1309	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleScatterChart.xlsx	xlsxpercent:1	ok	members=25	changed=2	changed_bytes=2385	max_changed=1309	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleStrict.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=4636	max_changed=1307	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleStrict.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=4636	max_changed=1307	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleWithComments.xlsx	xlsxcells:1	ok	members=15	changed=2	changed_bytes=1614	max_changed=913	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SimpleWithComments.xlsx	xlsxpercent:1	ok	members=15	changed=2	changed_bytes=1614	max_changed=913	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SingleCellTable.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=3358	max_changed=2079	changed_ge_256KiB=0
+test-data/ooxml/xlsx/SingleCellTable.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=3358	max_changed=2079	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Sparklines.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=5188	max_changed=2969	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Sparklines.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=5188	max_changed=2969	changed_ge_256KiB=0
+test-data/ooxml/xlsx/StructuredReferences.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=4629	max_changed=1430	changed_ge_256KiB=0
+test-data/ooxml/xlsx/StructuredReferences.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=4629	max_changed=1430	changed_ge_256KiB=0
+test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx	xlsxcells:1	ok	members=37	changed=4	changed_bytes=48182	max_changed=40672	changed_ge_256KiB=0
+test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx	xlsxpercent:1	ok	members=37	changed=4	changed_bytes=48398	max_changed=40888	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Tables.xlsx	xlsxcells:1	ok	members=45	changed=4	changed_bytes=18722	max_changed=10127	changed_ge_256KiB=0
+test-data/ooxml/xlsx/Tables.xlsx	xlsxpercent:1	ok	members=45	changed=4	changed_bytes=18844	max_changed=10249	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx	xlsxcells:1	ok	members=18	changed=2	changed_bytes=1733	max_changed=996	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx	xlsxpercent:1	ok	members=18	changed=2	changed_bytes=1733	max_changed=996	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TextColor.xlsx	xlsxcells:1	ok	members=14	changed=2	changed_bytes=1728	max_changed=1009	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TextColor.xlsx	xlsxpercent:1	ok	members=14	changed=2	changed_bytes=1728	max_changed=1009	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=1349	max_changed=694	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=1349	max_changed=694	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=1377	max_changed=699	changed_ge_256KiB=0
+test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=1377	max_changed=699	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter-colors-fg.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=3766	max_changed=2687	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter-colors-fg.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=3766	max_changed=2687	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter-colors.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=3727	max_changed=2648	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter-colors.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=3727	max_changed=2648	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=4236	max_changed=3096	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilter.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=4236	max_changed=3096	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilternamedrange.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=3948	max_changed=1993	changed_ge_256KiB=0
+test-data/ooxml/xlsx/autofilternamedrange.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=3948	max_changed=1993	changed_ge_256KiB=0
+test-data/ooxml/xlsx/cell-borders.xlsx	xlsxcells:1	ok	members=20	changed=2	changed_bytes=3783	max_changed=3085	changed_ge_256KiB=0
+test-data/ooxml/xlsx/cell-borders.xlsx	xlsxpercent:1	ok	members=20	changed=2	changed_bytes=3783	max_changed=3085	changed_ge_256KiB=0
+test-data/ooxml/xlsx/cell-multi-line.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=2280	max_changed=1237	changed_ge_256KiB=0
+test-data/ooxml/xlsx/cell-multi-line.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=2280	max_changed=1237	changed_ge_256KiB=0
+test-data/ooxml/xlsx/chart_hyperlink.xlsx	xlsxcells:1	ok	members=25	changed=2	changed_bytes=2438	max_changed=1283	changed_ge_256KiB=0
+test-data/ooxml/xlsx/chart_hyperlink.xlsx	xlsxpercent:1	ok	members=25	changed=2	changed_bytes=2438	max_changed=1283	changed_ge_256KiB=0
+test-data/ooxml/xlsx/column_style.xlsx	xlsxcells:1	ok	members=8	changed=2	changed_bytes=2792	max_changed=1821	changed_ge_256KiB=0
+test-data/ooxml/xlsx/column_style.xlsx	xlsxpercent:1	ok	members=8	changed=2	changed_bytes=2792	max_changed=1821	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condFormat_cellis.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=2325	max_changed=1670	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condFormat_cellis.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=2325	max_changed=1670	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condformat_databar.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=3057	max_changed=1820	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condformat_databar.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=3057	max_changed=1820	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condformat_theme_color.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=3567	max_changed=2272	changed_ge_256KiB=0
+test-data/ooxml/xlsx/condformat_theme_color.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=3567	max_changed=2272	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=4489	max_changed=2593	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=4489	max_changed=2593	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_fmt_origin.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=3492	max_changed=1844	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_fmt_origin.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=3492	max_changed=1844	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=3429	max_changed=2038	changed_ge_256KiB=0
+test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=3429	max_changed=2038	changed_ge_256KiB=0
+test-data/ooxml/xlsx/customxml.xlsx	xlsxcells:1	ok	members=29	changed=2	changed_bytes=18071	max_changed=17092	changed_ge_256KiB=0
+test-data/ooxml/xlsx/customxml.xlsx	xlsxpercent:1	ok	members=29	changed=2	changed_bytes=18443	max_changed=17464	changed_ge_256KiB=0
+test-data/ooxml/xlsx/decimal-format.xlsx	xlsxcells:1	ok	members=18	changed=2	changed_bytes=2247	max_changed=1158	changed_ge_256KiB=0
+test-data/ooxml/xlsx/decimal-format.xlsx	xlsxpercent:1	ok	members=18	changed=2	changed_bytes=2247	max_changed=1158	changed_ge_256KiB=0
+test-data/ooxml/xlsx/duplicate-defined-names.xlsx	xlsxcells:1	error	cells: Invalid("invalid worksheet dimension '1:5': invalid A1 range '1:5': invalid or out-of-grid A1 cell reference '1'")
+test-data/ooxml/xlsx/duplicate-defined-names.xlsx	xlsxpercent:1	error	cells: Invalid("invalid worksheet dimension '1:5': invalid A1 range '1:5': invalid or out-of-grid A1 cell reference '1'")
+test-data/ooxml/xlsx/empty.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=2847	max_changed=1814	changed_ge_256KiB=0
+test-data/ooxml/xlsx/empty.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=2847	max_changed=1814	changed_ge_256KiB=0
+test-data/ooxml/xlsx/enhanced-protection.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/ooxml/xlsx/enhanced-protection.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx	xlsxcells:1	ok	members=44	changed=4	changed_bytes=18784	max_changed=8081	changed_ge_256KiB=0
+test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx	xlsxpercent:1	ok	members=44	changed=4	changed_bytes=18784	max_changed=8081	changed_ge_256KiB=0
+test-data/ooxml/xlsx/external-link-path-missing.xlsx	xlsxcells:1	ok	members=19	changed=2	changed_bytes=3786	max_changed=2158	changed_ge_256KiB=0
+test-data/ooxml/xlsx/external-link-path-missing.xlsx	xlsxpercent:1	ok	members=19	changed=2	changed_bytes=3786	max_changed=2158	changed_ge_256KiB=0
+test-data/ooxml/xlsx/external-link-path-startup.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=12027	max_changed=7509	changed_ge_256KiB=0
+test-data/ooxml/xlsx/external-link-path-startup.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=12027	max_changed=7509	changed_ge_256KiB=0
+test-data/ooxml/xlsx/fontSize.xlsx	xlsxcells:1	ok	members=14	changed=2	changed_bytes=1596	max_changed=877	changed_ge_256KiB=0
+test-data/ooxml/xlsx/fontSize.xlsx	xlsxpercent:1	ok	members=14	changed=2	changed_bytes=1596	max_changed=877	changed_ge_256KiB=0
+test-data/ooxml/xlsx/formats.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=3996	max_changed=3000	changed_ge_256KiB=0
+test-data/ooxml/xlsx/formats.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=3996	max_changed=3000	changed_ge_256KiB=0
+test-data/ooxml/xlsx/headerFooterTest.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=2391	max_changed=1562	changed_ge_256KiB=0
+test-data/ooxml/xlsx/headerFooterTest.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=2391	max_changed=1562	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=2129	max_changed=1313	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=2129	max_changed=1313	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink_export.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=3214	max_changed=2016	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink_export.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=3214	max_changed=2016	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink_formula.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=5290	max_changed=2037	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlink_formula.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=5290	max_changed=2037	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlinks.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=2211	max_changed=1555	changed_ge_256KiB=0
+test-data/ooxml/xlsx/hyperlinks.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=2211	max_changed=1555	changed_ge_256KiB=0
+test-data/ooxml/xlsx/named-ranges-global.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=4785	max_changed=2768	changed_ge_256KiB=0
+test-data/ooxml/xlsx/named-ranges-global.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=4785	max_changed=2768	changed_ge_256KiB=0
+test-data/ooxml/xlsx/named-ranges-hidden.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=3907	max_changed=2520	changed_ge_256KiB=0
+test-data/ooxml/xlsx/named-ranges-hidden.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=3907	max_changed=2520	changed_ge_256KiB=0
+test-data/ooxml/xlsx/noSharedStringTable.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=2199	max_changed=1273	changed_ge_256KiB=0
+test-data/ooxml/xlsx/noSharedStringTable.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=2199	max_changed=1273	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sample.xlsx	xlsxcells:1	ok	members=18	changed=4	changed_bytes=4988	max_changed=1897	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sample.xlsx	xlsxpercent:1	ok	members=18	changed=4	changed_bytes=4988	max_changed=1897	changed_ge_256KiB=0
+test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx	xlsxcells:1	error	cells: Invalid("shared-string count exceeds 2147483647")
+test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx	xlsxpercent:1	error	cells: Invalid("shared-string count exceeds 2147483647")
+test-data/ooxml/xlsx/shared_formulas.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=12819	max_changed=5896	changed_ge_256KiB=0
+test-data/ooxml/xlsx/shared_formulas.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=12819	max_changed=5896	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sharedhyperlink.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=3619	max_changed=1843	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sharedhyperlink.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=3619	max_changed=1843	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheet-names.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=1553	max_changed=827	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheet-names.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=1553	max_changed=827	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheet-state-show.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=92204	max_changed=91230	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheet-state-show.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "стр1", address: Cell { row: Row(0), column: Column(1) }, reason: CoveredMerge }
+test-data/ooxml/xlsx/sheet-tab-color.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=1361	max_changed=763	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheet-tab-color.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=1361	max_changed=763	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Foglio1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Foglio1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=2082	max_changed=1224	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=2082	max_changed=1224	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sortconditionref.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=4068	max_changed=2402	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sortconditionref.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=4068	max_changed=2402	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sortconditionref2.xlsx	xlsxcells:1	ok	members=15	changed=4	changed_bytes=25995	max_changed=21037	changed_ge_256KiB=0
+test-data/ooxml/xlsx/sortconditionref2.xlsx	xlsxpercent:1	ok	members=15	changed=4	changed_bytes=25995	max_changed=21037	changed_ge_256KiB=0
+test-data/ooxml/xlsx/style-alternate-content.xlsx	xlsxcells:1	error	to_bytes: Package(XmlPublication { part: "/xl/workbook.xml", source: NotCompact(Violation { kind: WhitespaceBeforeClose, offset: 53 }) })
+test-data/ooxml/xlsx/style-alternate-content.xlsx	xlsxpercent:1	error	to_bytes: Package(XmlPublication { part: "/xl/workbook.xml", source: NotCompact(Violation { kind: WhitespaceBeforeClose, offset: 53 }) })
+test-data/ooxml/xlsx/styles.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=2757	max_changed=2056	changed_ge_256KiB=0
+test-data/ooxml/xlsx/styles.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=2757	max_changed=2056	changed_ge_256KiB=0
+test-data/ooxml/xlsx/table-sample.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=7233	max_changed=3018	changed_ge_256KiB=0
+test-data/ooxml/xlsx/table-sample.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=7233	max_changed=3018	changed_ge_256KiB=0
+test-data/ooxml/xlsx/tableStyle.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=5525	max_changed=2109	changed_ge_256KiB=0
+test-data/ooxml/xlsx/tableStyle.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=5525	max_changed=2109	changed_ge_256KiB=0
+test-data/ooxml/xlsx/test_conditional_formatting.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=5772	max_changed=2204	changed_ge_256KiB=0
+test-data/ooxml/xlsx/test_conditional_formatting.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=5772	max_changed=2204	changed_ge_256KiB=0
+test-data/ooxml/xlsx/universal-content.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=3419	max_changed=2539	changed_ge_256KiB=0
+test-data/ooxml/xlsx/universal-content.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=3419	max_changed=2539	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx	xlsxcells:1	ok	members=36	changed=4	changed_bytes=12197	max_changed=6169	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx	xlsxpercent:1	ok	members=36	changed=4	changed_bytes=12257	max_changed=6229	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx	xlsxcells:1	ok	members=60	changed=2	changed_bytes=29742	max_changed=29092	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx	xlsxpercent:1	ok	members=60	changed=2	changed_bytes=30368	max_changed=29718	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx	xlsxcells:1	ok	members=60	changed=2	changed_bytes=29742	max_changed=29092	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx	xlsxpercent:1	ok	members=60	changed=2	changed_bytes=30368	max_changed=29718	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/47889.xlsx	xlsxcells:1	ok	members=8	changed=2	changed_bytes=2070	max_changed=1313	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/47889.xlsx	xlsxpercent:1	ok	members=8	changed=2	changed_bytes=2070	max_changed=1313	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/48962.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=5790	max_changed=4930	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/48962.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=5790	max_changed=4930	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/49609.xlsx	xlsxcells:1	error	to_bytes: Package(PreservationUnavailable { reason: "source ZIP framing or opaque members cannot be preserved after this mutation" })
+test-data/poi/test-data/spreadsheet/49609.xlsx	xlsxpercent:1	error	to_bytes: Package(PreservationUnavailable { reason: "source ZIP framing or opaque members cannot be preserved after this mutation" })
+test-data/poi/test-data/spreadsheet/54071.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=3601	max_changed=2939	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/54071.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=3601	max_changed=2939	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/56169.xlsx	xlsxcells:1	ok	members=15	changed=2	changed_bytes=1701	max_changed=1000	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/56169.xlsx	xlsxpercent:1	ok	members=15	changed=2	changed_bytes=1701	max_changed=1000	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/58106.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=6503	max_changed=3645	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/58106.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=6503	max_changed=3645	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/60289.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=1423	max_changed=784	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/60289.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=1423	max_changed=784	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=2650	max_changed=1567	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=2650	max_changed=1567	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/62815.xlsb	xlsxcells:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/62815.xlsb	xlsxpercent:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/62834.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=5579	max_changed=1916	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/62834.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=5579	max_changed=1916	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/66365.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=2092	max_changed=1193	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/66365.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=2092	max_changed=1193	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=1712	max_changed=1012	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=1712	max_changed=1012	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx	xlsxcells:1	ok	members=131	changed=4	changed_bytes=19391	max_changed=9680	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx	xlsxpercent:1	ok	members=131	changed=4	changed_bytes=19391	max_changed=9680	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx	xlsxcells:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx	xlsxpercent:1	ok	members=15	changed=2	changed_bytes=2200	max_changed=1497	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx	xlsxcells:1	ok	members=15	changed=4	changed_bytes=14200	max_changed=10434	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx	xlsxpercent:1	ok	members=15	changed=4	changed_bytes=14243	max_changed=10477	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet0", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet0", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=16282	max_changed=15655	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=16326	max_changed=15699	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx	xlsxcells:1	ok	members=27	changed=2	changed_bytes=4034	max_changed=2044	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx	xlsxpercent:1	ok	members=27	changed=2	changed_bytes=4034	max_changed=2044	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx	xlsxcells:1	ok	members=23	changed=2	changed_bytes=210892	max_changed=209973	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx	xlsxpercent:1	ok	members=23	changed=2	changed_bytes=213977	max_changed=213058	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/FormatKM.xlsx	xlsxcells:1	ok	members=14	changed=4	changed_bytes=7579	max_changed=4310	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/FormatKM.xlsx	xlsxpercent:1	ok	members=14	changed=4	changed_bytes=7579	max_changed=4310	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx	xlsxcells:1	ok	members=37	changed=4	changed_bytes=48182	max_changed=40672	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx	xlsxpercent:1	ok	members=37	changed=4	changed_bytes=48398	max_changed=40888	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx	xlsxcells:1	ok	members=10	changed=4	changed_bytes=4726	max_changed=1610	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx	xlsxpercent:1	ok	members=10	changed=4	changed_bytes=4726	max_changed=1610	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx	xlsxcells:1	ok	members=44	changed=2	changed_bytes=3873	max_changed=2847	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx	xlsxpercent:1	ok	members=44	changed=2	changed_bytes=3873	max_changed=2847	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx	xlsxcells:1	ok	members=20	changed=2	changed_bytes=1647	max_changed=948	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx	xlsxpercent:1	ok	members=20	changed=2	changed_bytes=1647	max_changed=948	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/WithTextBox.xlsb	xlsxcells:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/WithTextBox.xlsb	xlsxpercent:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4661	max_changed=2593	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4661	max_changed=2593	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/chart_sheet.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=1582	max_changed=822	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/chart_sheet.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=1582	max_changed=822	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx	xlsxcells:1	ok	members=18	changed=4	changed_bytes=4995	max_changed=1847	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx	xlsxpercent:1	ok	members=18	changed=4	changed_bytes=4995	max_changed=1847	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx	xlsxcells:1	ok	members=51	changed=4	changed_bytes=33946	max_changed=24818	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx	xlsxpercent:1	ok	members=51	changed=4	changed_bytes=34090	max_changed=24962	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=2391	max_changed=1562	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=2391	max_changed=1562	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=987	max_changed=524	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=987	max_changed=524	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=3383231	max_changed=3382600	changed_ge_256KiB=1
+test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Лист 1", address: Cell { row: Row(0), column: Column(1) }, reason: CoveredMerge }
+test-data/poi/test-data/spreadsheet/right-to-left.xlsx	xlsxcells:1	ok	members=20	changed=2	changed_bytes=3349	max_changed=1827	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/right-to-left.xlsx	xlsxpercent:1	ok	members=20	changed=2	changed_bytes=3349	max_changed=1827	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/sample.xlsx	xlsxcells:1	ok	members=18	changed=4	changed_bytes=4988	max_changed=1897	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/sample.xlsx	xlsxpercent:1	ok	members=18	changed=4	changed_bytes=4988	max_changed=1897	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/shared_formulas.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=12819	max_changed=5896	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/shared_formulas.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=12819	max_changed=5896	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx	xlsxcells:1	error	to_bytes: Package(XmlPublication { part: "/xl/workbook.xml", source: NotCompact(Violation { kind: WhitespaceBeforeClose, offset: 53 }) })
+test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx	xlsxpercent:1	error	to_bytes: Package(XmlPublication { part: "/xl/workbook.xml", source: NotCompact(Violation { kind: WhitespaceBeforeClose, offset: 53 }) })
+test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx	xlsxcells:1	ok	members=10	changed=4	changed_bytes=18809	max_changed=14588	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(1) }, reason: CoveredMerge }
+test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: GroupFormula }
+test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: GroupFormula }
+test-data/poi/test-data/spreadsheet/testVarious.xlsb	xlsxcells:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/testVarious.xlsb	xlsxpercent:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=2302	max_changed=1475	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=2302	max_changed=1475	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=1798	max_changed=1010	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=1798	max_changed=1010	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/xlookup.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=7290	max_changed=2737	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/xlookup.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=7290	max_changed=2737	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx	xlsxcells:1	ok	members=23	changed=2	changed_bytes=2267	max_changed=1287	changed_ge_256KiB=0
+test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx	xlsxpercent:1	ok	members=23	changed=2	changed_bytes=2267	max_changed=1287	changed_ge_256KiB=0
+test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsxcells:1	ok	members=16	changed=2	changed_bytes=4268	max_changed=2184	changed_ge_256KiB=0
+test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsxpercent:1	ok	members=16	changed=2	changed_bytes=4268	max_changed=2184	changed_ge_256KiB=0
+test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsxcells:1	ok	members=22	changed=2	changed_bytes=3553	max_changed=1842	changed_ge_256KiB=0
+test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsxpercent:1	ok	members=22	changed=2	changed_bytes=3553	max_changed=1842	changed_ge_256KiB=0
+test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx	xlsxcells:1	error	cells: Invalid("worksheet formula expression is empty")
+test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx	xlsxpercent:1	error	cells: Invalid("worksheet formula expression is empty")
+test-data/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsxcells:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/libreoffice-core/sc/qa/unit/data/xlsb/tdf108017_calcProtection.xlsb	xlsxpercent:1	error	xlsx open: Invalid("main part '/xl/workbook.bin' has non-XLSX content type 'application/vnd.ms-excel.sheet.binary.macroEnabled.main'")
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx	xlsxcells:1	ok	members=22	changed=4	changed_bytes=11163	max_changed=3031	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx	xlsxpercent:1	ok	members=22	changed=4	changed_bytes=11163	max_changed=3031	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx	xlsxcells:1	ok	members=14	changed=2	changed_bytes=4384	max_changed=2245	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx	xlsxpercent:1	ok	members=14	changed=2	changed_bytes=4384	max_changed=2245	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx	xlsxcells:1	ok	members=14	changed=4	changed_bytes=7927	max_changed=2832	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx	xlsxpercent:1	ok	members=14	changed=4	changed_bytes=7927	max_changed=2832	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=2943	max_changed=1671	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=2943	max_changed=1671	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=2880	max_changed=1490	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=2880	max_changed=1490	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx	xlsxcells:1	ok	members=14	changed=2	changed_bytes=3172	max_changed=1817	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx	xlsxpercent:1	ok	members=14	changed=2	changed_bytes=3172	max_changed=1817	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx	xlsxcells:1	ok	members=10	changed=2	changed_bytes=2889	max_changed=1538	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx	xlsxpercent:1	ok	members=10	changed=2	changed_bytes=2889	max_changed=1538	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=4082	max_changed=1451	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=4082	max_changed=1451	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx	xlsxcells:1	ok	members=17	changed=2	changed_bytes=4668	max_changed=3697	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx	xlsxpercent:1	ok	members=17	changed=2	changed_bytes=4668	max_changed=3697	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Tabelle1", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Tabelle1", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx	xlsxcells:1	ok	members=8	changed=2	changed_bytes=2824	max_changed=1853	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx	xlsxpercent:1	ok	members=8	changed=2	changed_bytes=2824	max_changed=1853	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx	xlsxcells:1	ok	members=22	changed=2	changed_bytes=853	max_changed=467	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx	xlsxpercent:1	ok	members=22	changed=2	changed_bytes=853	max_changed=467	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx	xlsxcells:1	ok	members=13	changed=4	changed_bytes=4941	max_changed=1994	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx	xlsxpercent:1	ok	members=13	changed=4	changed_bytes=4941	max_changed=1994	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=5629	max_changed=2513	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=5629	max_changed=2513	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx	xlsxcells:1	ok	members=9	changed=4	changed_bytes=5159	max_changed=2091	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx	xlsxpercent:1	ok	members=9	changed=4	changed_bytes=5159	max_changed=2091	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx	xlsxcells:1	ok	members=11	changed=4	changed_bytes=4522	max_changed=1728	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx	xlsxpercent:1	ok	members=11	changed=4	changed_bytes=4522	max_changed=1728	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=1361	max_changed=763	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=1361	max_changed=763	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx	xlsxcells:1	ok	members=12	changed=4	changed_bytes=9423	max_changed=5106	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx	xlsxpercent:1	ok	members=12	changed=4	changed_bytes=9423	max_changed=5106	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx	xlsxcells:1	error	cells: Invalid("invalid worksheet dimension '1:5': invalid A1 range '1:5': invalid or out-of-grid A1 cell reference '1'")
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx	xlsxpercent:1	error	cells: Invalid("invalid worksheet dimension '1:5': invalid A1 range '1:5': invalid or out-of-grid A1 cell reference '1'")
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=1253	max_changed=647	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=1253	max_changed=647	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx	xlsxcells:1	ok	members=32	changed=2	changed_bytes=1660	max_changed=1051	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx	xlsxpercent:1	ok	members=32	changed=2	changed_bytes=1660	max_changed=1051	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx	xlsxcells:1	ok	members=22	changed=2	changed_bytes=3005	max_changed=1531	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx	xlsxpercent:1	ok	members=22	changed=2	changed_bytes=3005	max_changed=1531	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx	xlsxcells:1	ok	members=9	changed=2	changed_bytes=5544	max_changed=4568	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx	xlsxpercent:1	ok	members=9	changed=2	changed_bytes=5544	max_changed=4568	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx	xlsxcells:1	ok	members=11	changed=2	changed_bytes=3284	max_changed=1836	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx	xlsxpercent:1	ok	members=11	changed=2	changed_bytes=3284	max_changed=1836	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=3734	max_changed=2174	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=3734	max_changed=2174	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=4173	max_changed=2123	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=4173	max_changed=2123	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=1781	max_changed=1375	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=1781	max_changed=1375	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx	xlsxcells:1	ok	members=24	changed=2	changed_bytes=5253	max_changed=3730	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx	xlsxpercent:1	ok	members=24	changed=2	changed_bytes=5253	max_changed=3730	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx	xlsxcells:1	ok	members=12	changed=2	changed_bytes=1587	max_changed=885	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx	xlsxpercent:1	ok	members=12	changed=2	changed_bytes=1587	max_changed=885	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx	xlsxcells:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx	xlsxpercent:1	error	commit: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx	xlsxcells:1	ok	members=13	changed=2	changed_bytes=7046	max_changed=4042	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx	xlsxpercent:1	ok	members=13	changed=2	changed_bytes=7046	max_changed=4042	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx	xlsxcells:1	ok	members=20	changed=4	changed_bytes=6404	max_changed=2441	changed_ge_256KiB=0
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx	xlsxpercent:1	ok	members=20	changed=4	changed_bytes=6404	max_changed=2441	changed_ge_256KiB=0
+test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf103477.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	xlsxcells:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx	xlsxpercent:1	error	xlsx open: Invalid("main part '/ppt/presentation.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'")
+test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml'")
+test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	xlsxcells:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")
+test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	xlsxpercent:1	error	xlsx open: Invalid("main part '/word/document.xml' has non-XLSX content type 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'")

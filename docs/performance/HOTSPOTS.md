@@ -1,5 +1,54 @@
 # Performance hotspot inventory
 
+## 0624 — deflate is the largest term in a save, and SAVE-6's threshold is wrong in both directions
+
+Frozen design plus the gate measurement item CORE-4 / SAVE-6 of change 0587
+(rank 36) was waiting on; **no production change**. The item set a two-part
+gate — two or more regenerated members of 256 KiB or more, and deflate above
+20% of save wall time — and both parts are measured here for the first time.
+**The timing part passes everywhere**: summing every `zlib_rs`, `flate2` and
+`deflate` symbol under `perf record -e cycles:u`, deflate is **58.85%** of the
+harness dense-wide one-percent save, **61.00%** of a one-cell edit on
+`no_drawing_patriarch.xlsx`, **61.94%** of an authored 50-slide PPTX save,
+**44.18%** of a 40-member `.rels` regeneration on
+`ConditionalFormattingSamples.xlsx` and **24.19%** of a one-cell edit on the
+same workbook; on the dense-wide save one symbol,
+`zlib_rs::deflate::longest_match`, is 45.25% of the whole save against
+`validate_authored_xml` at 23.98%. An independent wall-clock ratio of publish
+p50 to deflate-only p50 agrees on all eight scenarios measured. **The size part
+fails on every real file**: across 336 OOXML fixtures and four realistic edit
+routes — one added relationship, a relationship on every related part, a
+one-cell edit and a one-percent edit — **zero** saves regenerate two members of
+256 KiB or more, the median edit regenerates two members totalling about 4 KB,
+and the only scenario in the program that clears the threshold is
+`xlsx_one_percent_commit_save` on the generated dense-wide corpus (2 ×
+1,893,450 B). **And the threshold predicts the wrong sign**: the one real
+fixture with a regenerated member over 256 KiB is `no_drawing_patriarch.xlsx`,
+whose changed set is one 3.38 MB member and one 631-byte member, and it measures
+**0.997× at widths 2, 4 and 8** — no width can help it — while the 40 × ~871 B
+`.rels` set the rule excludes reaches **3.671× at width 4** and the authored
+50-slide save's 161 members, averaging 1,550 bytes, reach **3.873×**. A controlled
+crossover sweep at a fixed 871-byte member size finds profit from **four**
+members upward (2.724× at width 4 on a 3.5 KB changed set), and a closed-form
+bound `Σtᵢ / max(t₁, Σtᵢ/W)` predicts every measured cell within 8%: the
+predictor is the *second*-largest member, not the largest. A/A floor in the same
+window: serial p50 spread 0.21–1.04%, width-2 0.45–3.62%. Modelled end-to-end
+(Amdahl over the measured section share and speedup, **not measured**): 1.85× on
+the authored 50-slide save, 1.47× on the 40-member regeneration, 1.41× on the
+dense-wide save, 1.00× on `no_drawing_patriarch.xlsx`. **Not implemented**, and
+not for want of size: `docs/GOAL.md` rule 9 requires an explicit execution
+context, the whole write path has zero `ExecutionContext`/`ExecutionLimits`
+references, proposed ADR 0031 is not accepted, and change 0615 §7 orders gates
+G1–G3 before any *use* of the parallelism — this record is that use. The
+optimization order also puts a step-1 item ahead of it in the same profile
+(`validate_authored_xml`, 23.98%). Next in this area: ADR 0031 accepted or
+narrowed, then 0615's G1 and G3, then this record's gates A1–A6, and the
+preservation writer's `PreservationIndex::prepare` before the streaming writer.
+`performance_claim: none`; no claim is registered. OLE2 and OOXML remain active;
+ODF is deferred until that goal completes and iWork is excluded.
+[Change and limitations](0624-parallel-changed-member-deflate-design.md);
+[retained evidence](results/change-0624/README.md).
+
 ## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
 
 Record: [0622](0622-xlsx-compact-source-facts.md).

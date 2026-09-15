@@ -1,0 +1,64 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0624",
+  "title": "Deflate is 24-62% of every multi-member save, and the 256 KiB threshold is wrong in both directions",
+  "decision": "design retained, no production change; the gate is split and the implementation is blocked on an unaccepted ADR rather than on a measurement",
+  "code_state": "no file under crates/ was modified by this change",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "survey_item": "CORE-4 / SAVE-6 of change 0587, rank 36",
+  "reason_codes": [
+    "the gate's timing half is met on every scenario measured: zlib/deflate is 24.19% to 61.94% of native user cycles of a save across five scenarios spanning real fixtures, the harness corpora and the authored path, against a 20% bar",
+    "the gate's shape half fails on every real file: across 336 OOXML fixtures and four realistic edit routes, zero saves regenerate two or more members of 256 KiB or more, and the median edit regenerates two members totalling about 4 KB",
+    "the one real fixture that regenerates a member of 256 KiB or more, no_drawing_patriarch.xlsx, is the one measured case parallel deflate cannot help at all (0.997x at widths 2, 4 and 8), because its changed set is one 3.38 MB member and one 631-byte member",
+    "the threshold itself is falsified in both directions: a real 40-member set of ~871-byte .rels members that the rule excludes reaches 3.671x at width 4, and a controlled crossover sweep finds profit from four 871-byte members upward, three orders of magnitude below the proposed floor",
+    "implementation is blocked by GOAL rule 9 and by change 0615 section 7: the entire write path has zero ExecutionContext or ExecutionLimits references, proposed ADR 0031 that would give it one is not accepted, and 0615 orders gates G1 to G3 before any use of the parallelism",
+    "the optimization order puts a step-1 item ahead of it in the same profile: PackageWriter::validate_authored_xml is 23.98% of the dense-wide save that deflate is 58.85% of"
+  ],
+  "accepted_evidence": {
+    "changed_set_census": "672 OpcPackage rows over 325 fixtures and 414 litchi-xlsx editor rows over 157 workbooks, each reporting published members, changed members, changed bytes, largest changed member and changed members at or above 256 KiB; a member is called changed when its compressed payload, CRC or method differs from the source archive's, which on the preservation path is exactly PreservationAction::Regenerate",
+    "harness_corpus_census": "the three tools/perf-baseline XLSX shapes rebuilt by the probe from build_xlsx_corpus and XlsxShape, censused under a one-cell and a one-percent edit; the dense-wide shape's one-percent edit is the only scenario in the program that regenerates two members of 256 KiB or more",
+    "authored_census": "authored PPTX decks at 1, 50 and 200 slides: 39, 161 and 537 regenerated members, largest member 36,836 bytes, zero members at or above 256 KiB at any deck size",
+    "deflate_share_native": "perf record -e cycles:u -F 4999 over a publish-only loop, summing every zlib_rs, flate2 and deflate symbol: 58.85%, 61.00%, 61.94%, 44.18% and 24.19% across five scenarios",
+    "deflate_share_ratio": "an independent wall-clock ratio of publish p50 to deflate-only p50 over the same changed set, 200 to 500 samples per leg, agreeing with the native shares and reading high for the stated reason",
+    "scaling_real_sets": "the five real changed sets at widths 1, 2, 4 and 8, 40 samples per leg, with speedup, efficiency, Amdahl serial fraction and a cell class per cell",
+    "crossover_sweep": "a controlled sweep at a fixed 871-byte member size varying only member count from 4 to 256, 80 samples per leg, establishing that there is no lower size threshold in the range that matters",
+    "aa_floor": "four repeats of the serial and width-2 legs on three sets in the same window: serial p50 spread 0.21% to 1.04%, width-2 p50 spread 0.45% to 3.62%",
+    "predictive_model": "a closed-form bound, speedup <= sum(t_i) / max(t_1, sum(t_i)/W) with t_i = f + s_i/r, predicting every measured cell to within 8%"
+  },
+  "accepted_costs": {
+    "no_end_to_end": "no parallel save exists, so every end-to-end figure in the record is Amdahl arithmetic over a measured section share and a measured section speedup, and is labelled modelled",
+    "isolation": "the scaling numbers are deflate measured in isolation by a probe with no litchi dependency; they are a ceiling on what a real writer could win, not a measurement of one",
+    "encoder_per_member": "the probe's deflate leg constructs a fresh flate2 encoder per member, which matches the preservation writer today but not the streaming writer after change 0618, so the wall-clock ratios read high and the native cycle shares are the figures to quote",
+    "host_contention": "seven other agents were active throughout; the wide synthetic sweep's width-8 column and smallest cells did not reproduce across windows and are reported out-of-model, with the non-reproducing run retained",
+    "content_dependent_rate": "the per-byte deflate rate varies about fourfold with content across the sets measured, so the model is fitted per set and the design's threshold uses size only as a proxy"
+  },
+  "known_gaps": {
+    "docx_editor": "the DOCX multi-part case CORE-4 names was measured through the OpcPackage publication route over all 62 DOCX fixtures, not through litchi-docx's own editor; the largest DOCX fixture's twelve members at or above 256 KiB are embedded fonts that no paragraph edit regenerates",
+    "streaming_writer": "the authored path carries the largest modelled win and the harder boundary; it is designed only to the extent of naming its constraints and is explicitly out of scope for a first implementation",
+    "not_measured": "cold-cache, physical-device, peak-RSS, allocation-profile, cross-platform and compression-level behaviour; compression level remains fixed at 6 everywhere and is still unmeasured",
+    "refusals": "11 of 336 fixtures are refused at open by the OpcPackage route and 17 one-cell plus 21 one-percent by the litchi-xlsx editor; every refusal is retained in the TSVs and none was investigated"
+  },
+  "withheld": [
+    "any speedup, regression, cold-cache, physical-device, peak-RSS, allocation-profile or cross-platform result",
+    "any claim that a parallel save is faster: nothing parallel was built and nothing end-to-end was timed"
+  ],
+  "unblocking_order": [
+    "ADR 0031 accepted, or a narrower amendment covering Resource::Workers, Resource::CpuTasks and a per-task floor",
+    "change 0615 gate G1: ParallelReadSession builds its pool lazily",
+    "change 0615 gate G3: the budgets compose across sessions",
+    "this record's gates A1 to A6"
+  ],
+  "provenance": {
+    "base_commit": "aba3f943d",
+    "branch": "perf/0624-parallel-changed-member-deflate-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, perf 7.0.14",
+    "codec": "flate2 1.1.10 on zlib-rs 0.6.7, Compression::default() (level 6), raw deflate",
+    "pinning": "taskset -c 18 for deterministic counts; taskset -c 18-25 for scaling legs",
+    "probe_sha256": {
+      "probe0624": "69516155c58b2f9dc04bcad222fd808eaec890298f32262e243b1ec322f37244",
+      "probe0624-deflate": "dc35e7b44bb6ff5fd1d82955044ad9719b0372488776fc82c9ad98257f23380a"
+    }
+  }
+}

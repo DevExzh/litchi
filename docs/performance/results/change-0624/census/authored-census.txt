@@ -1,0 +1,18 @@
+=== authored deck, 1 slides ===
+bytes	29628
+members	39
+total_uncompressed	95327
+max_member	11985
+members_ge_256KiB	0
+=== authored deck, 50 slides ===
+bytes	91537
+members	161
+total_uncompressed	249666
+max_member	11985
+members_ge_256KiB	0
+=== authored deck, 200 slides ===
+bytes	282798
+members	537
+total_uncompressed	724782
+max_member	36836
+members_ge_256KiB	0

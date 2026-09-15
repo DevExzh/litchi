@@ -1,0 +1,27 @@
+# perf report -i ndp-onecell.data --no-children --no-call-graph (cycles:u, F=4999, taskset -c 18)
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 9K of event 'cycles:u'
+# Event count (approx.): 8017800946
+#
+# Overhead  Command    Shared Object         Symbol                                                                                                   
+# ........  .........  ....................  .........................................................................................................
+#
+    47.65%  probe0624  probe0624             [.] zlib_rs::deflate::longest_match::longest_match
+    14.51%  probe0624  probe0624             [.] litchi_opc::pkgwriter::PackageWriter::validate_authored_xml
+    11.18%  probe0624  probe0624             [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     2.57%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::next
+     2.29%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::check_for_duplicates
+     1.70%  probe0624  probe0624             [.] zlib_rs::deflate::flush_block_only
+     1.64%  probe0624  probe0624             [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     1.42%  probe0624  libc.so.6             [.] __memcmp_evex_movbe
+     1.05%  probe0624  probe0624             [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     0.99%  probe0624  probe0624             [.] xml_minifier::audit::inspect_attributes
+     0.98%  probe0624  probe0624             [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     0.76%  probe0624  probe0624             [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.73%  probe0624  probe0624             [.] litchi_ooxml_common::xml::unqualified_attribute_value
+
+# zlib_rs/flate2/deflate total share of cycles:u = 61.00%

@@ -1,0 +1,27 @@
+# perf report -i pptx50.data --no-children --no-call-graph (cycles:u, F=4999, taskset -c 18)
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cycles:u'
+# Event count (approx.): 4606370586
+#
+# Overhead  Command    Shared Object         Symbol                                                                                          
+# ........  .........  ....................  ................................................................................................
+#
+    16.57%  probe0624  probe0624             [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+    16.13%  probe0624  probe0624             [.] zlib_rs::deflate::Heap::pqdownheap
+    11.38%  probe0624  probe0624             [.] zlib_rs::deflate::flush_block_only
+     8.62%  probe0624  probe0624             [.] litchi_opc::pkgwriter::PackageWriter::validate_authored_xml
+     7.70%  probe0624  probe0624             [.] zlib_rs::deflate::longest_match::longest_match
+     7.32%  probe0624  libc.so.6             [.] __memset_avx512_unaligned_erms
+     2.52%  probe0624  probe0624             [.] zlib_rs::deflate::BitWriter::send_tree
+     2.02%  probe0624  probe0624             [.] zlib_rs::deflate::scan_tree
+     2.01%  probe0624  probe0624             [.] zlib_rs::deflate::gen_codes
+     1.75%  probe0624  probe0624             [.] zlib_rs::deflate::Heap::construct_huffman_tree
+     1.70%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::next
+     1.47%  probe0624  probe0624             [.] litchi_opc::phys_pkg::PhysPkgWriter<W>::write
+     1.34%  probe0624  libc.so.6             [.] __memmove_avx512_unaligned_erms
+
+# zlib_rs/flate2/deflate total share of cycles:u = 61.94%

@@ -1,0 +1,27 @@
+# perf report -i cfs-addrelall.data --no-children --no-call-graph (cycles:u, F=4999, taskset -c 18)
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cycles:u'
+# Event count (approx.): 1067514282
+#
+# Overhead  Command    Shared Object         Symbol                                                                                       
+# ........  .........  ....................  .............................................................................................
+#
+    17.33%  probe0624  libc.so.6             [.] __memset_avx512_unaligned_erms
+    12.78%  probe0624  probe0624             [.] zlib_rs::deflate::Heap::pqdownheap
+    12.42%  probe0624  probe0624             [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     7.85%  probe0624  probe0624             [.] zlib_rs::deflate::flush_block_only
+     5.65%  probe0624  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     2.82%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::next
+     2.65%  probe0624  probe0624             [.] zlib_rs::deflate::BitWriter::send_tree
+     2.57%  probe0624  libc.so.6             [.] __memcmp_evex_movbe
+     2.04%  probe0624  probe0624             [.] zlib_rs::deflate::longest_match::longest_match
+     2.04%  probe0624  probe0624             [.] zlib_rs::deflate::gen_codes
+     1.72%  probe0624  probe0624             [.] litchi_opc::rel::append_relationship_xml_escaped
+     1.64%  probe0624  libc.so.6             [.] _int_malloc
+     1.33%  probe0624  probe0624             [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+
+# zlib_rs/flate2/deflate total share of cycles:u = 44.18%

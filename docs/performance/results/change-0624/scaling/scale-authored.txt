@@ -1,0 +1,20 @@
+set	authored-50	members=161	total_bytes=249666	members_ge_256KiB=0	max_bytes=11985
+leg	authored-50	serial	p50=1959330	mean=1962286	p95=1978690	p99=2011080
+leg	authored-50	width1	p50=1965640	mean=1965060	p95=1969990	p99=1976470
+scaling	authored-50	width=1	speedup=0.997	efficiency=0.997	amdahl_s=out-of-model	class=baseline-width
+leg	authored-50	width2	p50=1053325	mean=1053654	p95=1061555	p99=1062365
+scaling	authored-50	width=2	speedup=1.860	efficiency=0.930	amdahl_s=0.0752	class=valid
+leg	authored-50	width4	p50=505942	mean=508602	p95=536572	p99=541493
+scaling	authored-50	width=4	speedup=3.873	efficiency=0.968	amdahl_s=0.0110	class=valid
+leg	authored-50	width8	p50=416602	mean=428598	p95=514173	p99=514613
+scaling	authored-50	width=8	speedup=4.703	efficiency=0.588	amdahl_s=0.1001	class=valid
+set	authored-200	members=537	total_bytes=724782	members_ge_256KiB=0	max_bytes=36836
+leg	authored-200	serial	p50=5683177	mean=5682657	p95=5695878	p99=5708457
+leg	authored-200	width1	p50=5713208	mean=5718238	p95=5764849	p99=5778468
+scaling	authored-200	width=1	speedup=0.995	efficiency=0.995	amdahl_s=out-of-model	class=baseline-width
+leg	authored-200	width2	p50=2955854	mean=2955626	p95=2962834	p99=2965354
+scaling	authored-200	width=2	speedup=1.923	efficiency=0.961	amdahl_s=0.0402	class=valid
+leg	authored-200	width4	p50=1602608	mean=1546396	p95=1620058	p99=1640678
+scaling	authored-200	width=4	speedup=3.546	efficiency=0.887	amdahl_s=0.0427	class=valid
+leg	authored-200	width8	p50=1199186	mean=1180334	p95=1230616	p99=1607727
+scaling	authored-200	width=8	speedup=4.739	efficiency=0.592	amdahl_s=0.0983	class=valid
