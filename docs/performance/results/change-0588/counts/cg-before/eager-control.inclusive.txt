@@ -1,0 +1,40 @@
+80,498,929 (100.0%)  PROGRAM TOTALS
+59,371,156 (73.75%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+14,257,257 (17.71%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+13,797,307 (17.14%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+10,080,798 (12.52%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 8,850,248 (10.99%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 7,617,216 ( 9.46%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 6,536,349 ( 8.12%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 6,212,823 ( 7.72%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 4,718,396 ( 5.86%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 4,109,277 ( 5.10%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 3,773,473 ( 4.69%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 2,901,624 ( 3.60%)  ???:__rustc::__rust_realloc [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 2,855,374 ( 3.55%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 1,381,575 ( 1.72%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/targets/0588-before/release/xmlprobe]
+ 1,018,801 ( 1.27%)  /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-xlsx/src/workbook/model.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+   942,949 ( 1.17%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+ .                   x14ac::capture(content)?;
+ .                   x14ac::capture(content)?
+ 2 ( 0.00%)          let content = std::str::from_utf8(processed.as_ref())
+85,031 ( 0.11%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+59,371,156 (73.75%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}> (1x)
+ .               let mut descent = x14ac::capture_defaults(content)?;
+ .               let content = std::str::from_utf8(processed.as_ref())
+      .           impl BoundedOutput {
+     32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+     10 ( 0.00%)      let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+3,788,950 ( 4.71%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (55x)
+5,061,298 ( 6.29%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (81x)
+ 10,293 ( 0.01%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (55x)
+ 12,356 ( 0.02%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (55x)
+  7,943 ( 0.01%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::push (55x)
+    438 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (1x)
+    116 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (2x)
+    104 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (2x)
+    116 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (2x)
+      .               out: &mut BoundedOutput,
+    680 ( 0.00%)      let q = str::from_utf8(e.name().as_ref()).map_err(xerr)?.to_string();
+ 12,073 ( 0.01%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (136x)
+  1,004 ( 0.00%)              str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),

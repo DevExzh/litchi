@@ -1,0 +1,917 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 8d0a925a8..734515433 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -10,7 +10,7 @@ use std::{borrow::Cow, collections::HashSet, str, sync::Arc};
+ use super::model::{
+     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
+ };
+-use crate::xml_name::{self, QualifiedName};
++use crate::xml_name;
+ 
+ type R<T> = Result<T, Error>;
+ 
+@@ -188,6 +188,17 @@ pub(crate) fn reserve_exact<T>(
+         .map_err(|source| Error::Allocation { resource, source })
+ }
+ 
++/// Reserve with the standard amortized growth policy.
++///
++/// The per-element buffers below grow one entry at a time; an exact reservation
++/// would reallocate on every push, so they take the geometric policy while the
++/// fixed-size reservations above keep their exact one.
++fn reserve_amortized<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> R<()> {
++    values
++        .try_reserve(additional)
++        .map_err(|source| Error::Allocation { resource, source })
++}
++
+ fn active_marker(xml: &[u8]) -> R<[u8; ACTIVE_MARKER_TEMPLATE.len()]> {
+     let hash = xml.iter().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| {
+         (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+@@ -358,11 +369,27 @@ impl Namespaces {
+         })
+     }
+ 
+-    fn for_each_effective(&self, mut visit: impl FnMut(&str, &str) -> R<()>) -> R<()> {
+-        let mut layer = self.head.as_ref();
++    /// Visit the declarations contributed by ancestors this codec does not
++    /// emit, innermost binding first and each prefix at most once.
++    ///
++    /// `head` is the namespace chain an element inherited and `stop` the chain
++    /// in effect at its nearest emitted ancestor. Everything between them was
++    /// declared on an `AlternateContent` wrapper, a `Choice`/`Fallback` branch
++    /// or a `ProcessContent` element that the output drops, so it has to be
++    /// re-declared on the first emitted descendant for every qualified name in
++    /// the output to resolve to the namespace it resolved to in the source.
++    fn for_each_hoisted(
++        head: Option<&Arc<NamespaceLayer>>,
++        stop: Option<&Arc<NamespaceLayer>>,
++        mut visit: impl FnMut(&str, &str) -> R<()>,
++    ) -> R<()> {
++        let mut layer = head;
+         while let Some(current) = layer {
++            if stop.is_some_and(|boundary| Arc::ptr_eq(current, boundary)) {
++                break;
++            }
+             for (prefix, namespace) in &current.local {
+-                if prefix != "xml" && !self.shadowed_before(current, prefix) {
++                if prefix != "xml" && !shadowed_before(head, current, prefix) {
+                     visit(prefix, namespace)?;
+                 }
+             }
+@@ -370,23 +397,63 @@ impl Namespaces {
+         }
+         Ok(())
+     }
++}
+ 
+-    fn shadowed_before(&self, target: &Arc<NamespaceLayer>, prefix: &str) -> bool {
+-        let mut layer = self.head.as_ref();
+-        while let Some(current) = layer {
+-            if Arc::ptr_eq(current, target) {
+-                return false;
+-            }
+-            if current
+-                .local
+-                .iter()
+-                .any(|(candidate, _)| candidate == prefix)
+-            {
+-                return true;
+-            }
+-            layer = current.parent.as_ref();
++/// Whether any declaration sits between an inherited chain and the chain in
++/// effect at the nearest emitted ancestor.
++///
++/// `with_local` shares the parent layer verbatim when an element declares
++/// nothing, so distinct pointers imply at least one intervening declaration.
++fn hoists(head: Option<&Arc<NamespaceLayer>>, stop: Option<&Arc<NamespaceLayer>>) -> bool {
++    match (head, stop) {
++        (None, _) => false,
++        (Some(_), None) => true,
++        (Some(head), Some(stop)) => !Arc::ptr_eq(head, stop),
++    }
++}
++
++fn shadowed_before(
++    head: Option<&Arc<NamespaceLayer>>,
++    target: &Arc<NamespaceLayer>,
++    prefix: &str,
++) -> bool {
++    let mut layer = head;
++    while let Some(current) = layer {
++        if Arc::ptr_eq(current, target) {
++            return false;
++        }
++        if current
++            .local
++            .iter()
++            .any(|(candidate, _)| candidate == prefix)
++        {
++            return true;
++        }
++        layer = current.parent.as_ref();
++    }
++    false
++}
++
++/// The namespace scope an element inherited, and the scope its output already
++/// carries, so that the writer can re-declare exactly the difference.
++struct Inherited {
++    ns: Option<Arc<NamespaceLayer>>,
++    emitted: Option<Arc<NamespaceLayer>>,
++}
++
++impl Inherited {
++    fn hoists(&self) -> bool {
++        hoists(self.ns.as_ref(), self.emitted.as_ref())
++    }
++
++    /// The scope children inherit as already emitted: this element's own scope
++    /// when it reached the output, otherwise the scope it inherited.
++    fn after(&self, ctx: &Ctx, emitted: bool) -> Option<Arc<NamespaceLayer>> {
++        if emitted {
++            ctx.ns.head.clone()
++        } else {
++            self.emitted.clone()
+         }
+-        false
+     }
+ }
+ 
+@@ -493,8 +560,19 @@ impl BoundedOutput {
+             return Err(limit("output bytes"));
+         }
+         if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
++            // Grow geometrically so that a document that outgrows the input-sized
++            // hint costs a logarithmic number of reallocations rather than one per
++            // written run, and clamp the request to the configured output bound so
++            // the reservation never exceeds what the limit already admits.
++            let target = self
++                .bytes
++                .capacity()
++                .saturating_mul(2)
++                .min(self.max)
++                .max(len);
++            let grow = target.saturating_sub(self.bytes.len());
+             self.bytes
+-                .try_reserve_exact(additional)
++                .try_reserve_exact(grow)
+                 .map_err(|source| Error::Allocation {
+                     resource: "MCE output",
+                     source,
+@@ -522,6 +600,18 @@ struct Frame {
+     ctx: Ctx,
+     mode: Mode,
+     active: bool,
++    /// Namespace scope already present in the output at this frame's nearest
++    /// emitted ancestor; declarations between it and `ctx.ns` are hoisted onto
++    /// the first emitted descendant.
++    emitted_ns: Option<Arc<NamespaceLayer>>,
++}
++
++/// One source attribute: the qualified name and normalized value exactly as the
++/// previous writer saw them, plus whether the compatibility filter keeps it.
++struct Attr<'a> {
++    key: &'a str,
++    value: Cow<'a, str>,
++    keep: bool,
+ }
+ /// # Errors
+ ///
+@@ -653,59 +743,75 @@ fn start(
+     if st.len() >= lim.max_depth {
+         return Err(limit("depth"));
+     }
+-    let q = str::from_utf8(e.name().as_ref()).map_err(xerr)?.to_string();
++    let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
+     let mut raw = Vec::new();
+     for a in e.attributes().with_checks(true) {
+         let a = a.map_err(xerr)?;
+-        reserve_exact(&mut raw, 1, "MCE attributes")?;
+-        raw.push((
+-            str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),
+-            a.decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
+-                .map_err(xerr)?
+-                .into_owned(),
+-        ));
++        reserve_amortized(&mut raw, 1, "MCE attributes")?;
++        raw.push(Attr {
++            key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,
++            value: a
++                .decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
++                .map_err(xerr)?,
++            keep: true,
++        });
+     }
+     let mut c = st.last().map_or_else(Ctx::root, |f| f.ctx.clone());
++    let inherited = Inherited {
++        ns: c.ns.head.clone(),
++        emitted: st.last().and_then(|f| f.emitted_ns.clone()),
++    };
+     let mut local_namespaces = Vec::new();
+-    for (a, v) in &raw {
+-        if a == "xmlns" {
+-            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
+-            local_namespaces.push((String::new(), v.clone()));
+-        } else if let Some(p) = a.strip_prefix("xmlns:") {
+-            if !xml_name::is_ncname(p) || v.is_empty() {
++    for a in &raw {
++        if a.key == "xmlns" {
++            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
++            local_namespaces.push((String::new(), a.value.as_ref().to_owned()));
++        } else if let Some(p) = a.key.strip_prefix("xmlns:") {
++            if !xml_name::is_ncname(p) || a.value.is_empty() {
+                 return Err(bad("invalid namespace"));
+             }
+-            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
+-            local_namespaces.push((p.into(), v.clone()));
++            reserve_amortized(&mut local_namespaces, 1, "MCE namespace declarations")?;
++            local_namespaces.push((p.into(), a.value.as_ref().to_owned()));
+         }
+     }
+     c.ns = c.ns.with_local(local_namespaces, lim)?;
+-    let name = expand(&q, &c.ns, true)?;
++    let name = expand(q, &c.ns, true)?;
+     let parent_active = st.last().is_none_or(|f| f.active);
+     if c.opaque {
++        if parent_active {
++            write_start(
++                out,
++                q,
++                &c,
++                &mut raw,
++                caps,
++                false,
++                rep,
++                e.as_ref(),
++                &inherited,
++            )?;
++        }
+         let f = Frame {
+-            ctx: c.clone(),
+-            mode: Mode::Emit(q.clone()),
++            emitted_ns: inherited.after(&c, parent_active),
++            ctx: c,
++            mode: Mode::Emit(q.to_owned()),
+             active: parent_active,
+         };
+-        if parent_active {
+-            write_start(out, &q, &c, &raw, caps, false, rep)?;
+-        }
+         return close(st, f, empty, out);
+     }
+ 
+     let mut directives = Vec::new();
+     let mut tokens = 0usize;
+-    for (a, v) in &raw {
+-        if a == "xmlns" || a.starts_with("xmlns:") {
++    for a in &raw {
++        if a.key == "xmlns" || a.key.starts_with("xmlns:") {
+             continue;
+         }
+-        let n = expand(a, &c.ns, false)?;
+-        if n.namespace != NAMESPACE {
++        let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
++        if namespace != NAMESPACE {
+             continue;
+         }
+         if !matches!(
+-            n.local_name.as_str(),
++            local,
+             "Ignorable"
+                 | "ProcessContent"
+                 | "PreserveElements"
+@@ -715,17 +821,17 @@ fn start(
+             return Err(bad("unknown MCE attribute"));
+         }
+         tokens = tokens
+-            .checked_add(v.split_whitespace().count())
++            .checked_add(a.value.split_whitespace().count())
+             .ok_or_else(|| limit("directive tokens"))?;
+         if tokens > lim.max_directive_tokens {
+             return Err(limit("directive tokens"));
+         }
+-        reserve_exact(&mut directives, 1, "MCE directives")?;
+-        directives.push((n.local_name, v.as_str()));
++        reserve_amortized(&mut directives, 1, "MCE directives")?;
++        directives.push((local, a.value.as_ref()));
+     }
+ 
+     let mut local_ign = HashSet::new();
+-    if let Some((_, value)) = directives.iter().find(|(name, _)| name == "Ignorable") {
++    if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
+         let mut seen = HashSet::new();
+         for prefix in value.split_whitespace() {
+             if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
+@@ -763,7 +869,7 @@ fn start(
+     let mut local_preserve_elements = HashSet::new();
+     let mut local_preserve_attributes = HashSet::new();
+     for (name, value) in &directives {
+-        match name.as_str() {
++        match *name {
+             "Ignorable" => {},
+             "ProcessContent" => {
+                 for token in value.split_whitespace() {
+@@ -873,6 +979,7 @@ fn start(
+                 return close(
+                     st,
+                     Frame {
++                        emitted_ns: inherited.after(&c, false),
+                         ctx: c,
+                         mode: Mode::Skip,
+                         active: false,
+@@ -932,6 +1039,7 @@ fn start(
+         return close(
+             st,
+             Frame {
++                emitted_ns: inherited.after(&c, false),
+                 ctx: c,
+                 mode,
+                 active,
+@@ -956,13 +1064,11 @@ fn start(
+     } else if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
+         if c.preserves_element(&name) {
+             rep.preserved_elements += 1;
+-            Mode::Emit(q.clone())
++            Mode::Emit(q.to_owned())
+         } else if c.processes(&name) {
+-            for (a, _) in &raw {
+-                let n = expand(a, &c.ns, false)?;
+-                if n.namespace == XML_NS
+-                    && matches!(n.local_name.as_str(), "base" | "lang" | "space")
+-                {
++            for a in &raw {
++                let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
++                if namespace == XML_NS && matches!(local, "base" | "lang" | "space") {
+                     return Err(bad("xml context attribute on unwrapped element"));
+                 }
+             }
+@@ -974,10 +1080,21 @@ fn start(
+             Mode::Skip
+         }
+     } else {
+-        Mode::Emit(q.clone())
++        Mode::Emit(q.to_owned())
+     };
+-    if matches!(mode, Mode::Emit(_)) && active {
+-        write_start(out, &q, &c, &raw, caps, true, rep)?;
++    let emitted = matches!(mode, Mode::Emit(_)) && active;
++    if emitted {
++        write_start(
++            out,
++            q,
++            &c,
++            &mut raw,
++            caps,
++            true,
++            rep,
++            e.as_ref(),
++            &inherited,
++        )?;
+     }
+     if st.is_empty() {
+         if *root {
+@@ -988,6 +1105,7 @@ fn start(
+     close(
+         st,
+         Frame {
++            emitted_ns: inherited.after(&c, emitted),
+             ctx: c,
+             mode,
+             active,
+@@ -1009,7 +1127,7 @@ fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) ->
+             Mode::Emit(_) | Mode::Unwrap | Mode::Skip | Mode::Branch => {},
+         }
+     } else {
+-        reserve_exact(st, 1, "MCE element stack")?;
++        reserve_amortized(st, 1, "MCE element stack")?;
+         st.push(f);
+     }
+     Ok(())
+@@ -1026,14 +1144,14 @@ fn limit(s: &str) -> Error {
+ fn xerr(e: impl std::fmt::Display) -> Error {
+     Error::Xml(e.to_string())
+ }
+-fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
++fn attr<'a>(r: &'a [Attr<'_>], n: &str) -> R<Option<&'a str>> {
+     let mut v = None;
+-    for (a, x) in r {
+-        if a == n {
++    for a in r {
++        if a.key == n {
+             if v.is_some() {
+                 return Err(bad("duplicate attribute"));
+             }
+-            v = Some(x.as_str());
++            v = Some(a.value.as_ref());
+         }
+     }
+     Ok(v)
+@@ -1047,16 +1165,16 @@ enum AlternateKind {
+ }
+ 
+ fn validate_alternate_attributes(
+-    raw: &[(String, String)],
++    raw: &[Attr<'_>],
+     ctx: &Ctx,
+     caps: &Capabilities,
+     kind: AlternateKind,
+ ) -> R<()> {
+-    for (qualified, _) in raw {
+-        if qualified == "xmlns" || qualified.starts_with("xmlns:") {
++    for attribute in raw {
++        if attribute.key == "xmlns" || attribute.key.starts_with("xmlns:") {
+             continue;
+         }
+-        let name = expand(qualified, &ctx.ns, false)?;
++        let name = expand(attribute.key, &ctx.ns, false)?;
+         if name.namespace.is_empty() {
+             if matches!(kind, AlternateKind::Choice) && name.local_name == "Requires" {
+                 continue;
+@@ -1080,25 +1198,37 @@ fn validate_alternate_attributes(
+     Ok(())
+ }
+ fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
+-    let qualified =
+-        QualifiedName::try_from(q).map_err(|error| bad(format!("invalid QName: {error}")))?;
+-    let p = qualified.prefix().unwrap_or_default();
+-    let l = qualified.local();
++    let (namespace, local) = expand_parts(q, ns, element)?;
++    Ok(Name {
++        namespace: namespace.to_owned(),
++        local_name: local.into(),
++    })
++}
++
++/// Resolve one qualified name against the in-scope declarations without
++/// materializing an owned [`Name`].
++///
++/// The lexical checks and the error identity are those of
++/// `xml_name::QualifiedName`, which this borrows from rather than allocating:
++/// `parse` reports `InvalidQualifiedName` for every lexical failure and
++/// reconstructs the same `prefix:local` split.
++fn expand_parts<'q, 'n>(q: &'q str, ns: &'n Namespaces, element: bool) -> R<(&'n str, &'q str)> {
++    if !xml_name::is_qualified_name(q) {
++        let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
++        return Err(bad(format!("invalid QName: {error}")));
++    }
++    let (p, l) = q.split_once(':').unwrap_or(("", q));
+     let n = if p.is_empty() {
+         if element {
+-            ns.get("").unwrap_or_default().to_owned()
++            ns.get("").unwrap_or_default()
+         } else {
+-            String::new()
++            ""
+         }
+     } else {
+         ns.get(p)
+-            .map(str::to_owned)
+             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
+     };
+-    Ok(Name {
+-        namespace: n,
+-        local_name: l.into(),
+-    })
++    Ok((n, l))
+ }
+ fn pattern_namespace(pattern: &NamePattern) -> &str {
+     match pattern {
+@@ -1147,52 +1277,114 @@ fn write_start(
+     o: &mut BoundedOutput,
+     q: &str,
+     ctx: &Ctx,
+-    raw: &[(String, String)],
++    raw: &mut [Attr<'_>],
+     caps: &Capabilities,
+     filter: bool,
+     rep: &mut Report,
++    tag: &[u8],
++    inherited: &Inherited,
+ ) -> R<()> {
+-    o.push(b'<')?;
+-    o.extend_from_slice(q.as_bytes())?;
+-    ctx.ns.for_each_effective(|p, u| {
+-        o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
+-        if !p.is_empty() {
+-            o.extend_from_slice(p.as_bytes())?;
++    // Decide the compatibility filter first, so the counters are identical
++    // whether the tag is copied or rebuilt, and so the copy is only taken when
++    // every source attribute survives unchanged.
++    let mut rewrite = false;
++    for a in raw.iter_mut() {
++        a.keep = true;
++        if a.key == "xmlns" {
++            continue;
+         }
+-        o.extend_from_slice(b"=\"")?;
+-        esc(o, u)?;
+-        o.push(b'\"')
+-    })?;
+-    for (a, v) in raw {
+-        if a == "xmlns" || a.starts_with("xmlns:") {
++        if let Some(p) = a.key.strip_prefix("xmlns:") {
++            // The `xml` prefix is bound by the XML specification; a source
++            // re-declaration was never carried into the output and must not
++            // start being carried now.
++            if p == "xml" {
++                a.keep = false;
++                rewrite = true;
++            }
+             continue;
+         }
+-        let n = expand(a, &ctx.ns, false)?;
+-        if filter && n.namespace == NAMESPACE {
++        let (namespace, local) = expand_parts(a.key, &ctx.ns, false)?;
++        if filter && namespace == NAMESPACE {
+             rep.ignored_attributes += 1;
++            a.keep = false;
++            rewrite = true;
+             continue;
+         }
+         if filter
+-            && !n.namespace.is_empty()
+-            && ctx.is_ignorable(&n.namespace)
+-            && !caps.understands(&n.namespace)
++            && !namespace.is_empty()
++            && ctx.is_ignorable(namespace)
++            && !caps.understands(namespace)
+         {
++            let n = Name {
++                namespace: namespace.to_owned(),
++                local_name: local.into(),
++            };
+             if ctx.preserves_attribute(&n) {
+                 rep.preserved_attributes += 1;
+             } else {
+                 rep.ignored_attributes += 1;
+-                continue;
++                a.keep = false;
++                rewrite = true;
++            }
++        }
++    }
++
++    let hoisted = inherited.hoists();
++    if !rewrite
++        && !hoisted
++        && raw.iter().all(|a| matches!(a.value, Cow::Borrowed(_)))
++        && !tag.iter().any(|byte| matches!(*byte, b'&' | b'<'))
++    {
++        // Nothing is dropped, nothing has to be re-declared, no value was
++        // unescaped or normalized and no value holds markup: the source start
++        // tag already is the output start tag, so copy its bytes.
++        o.push(b'<')?;
++        o.extend_from_slice(tag)?;
++        return o.push(b'>');
++    }
++
++    o.push(b'<')?;
++    o.extend_from_slice(q.as_bytes())?;
++    if hoisted {
++        let declared: &[Attr<'_>] = raw;
++        Namespaces::for_each_hoisted(inherited.ns.as_ref(), inherited.emitted.as_ref(), |p, u| {
++            if declares(declared, p) {
++                return Ok(());
++            }
++            o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
++            if !p.is_empty() {
++                o.extend_from_slice(p.as_bytes())?;
+             }
++            o.extend_from_slice(b"=\"")?;
++            esc(o, u)?;
++            o.push(b'\"')
++        })?;
++    }
++    for a in raw.iter() {
++        if !a.keep {
++            continue;
+         }
+         o.push(b' ')?;
+-        o.extend_from_slice(a.as_bytes())?;
++        o.extend_from_slice(a.key.as_bytes())?;
+         o.extend_from_slice(b"=\"")?;
+-        esc(o, v)?;
++        esc(o, &a.value)?;
+         o.push(b'\"')?;
+     }
+     o.push(b'>')?;
+     Ok(())
+ }
++
++/// Whether the element already declares `prefix` itself, in which case the
++/// hoisted binding it shadows must not be emitted a second time.
++fn declares(raw: &[Attr<'_>], prefix: &str) -> bool {
++    raw.iter().any(|a| {
++        if prefix.is_empty() {
++            a.key == "xmlns"
++        } else {
++            a.key.strip_prefix("xmlns:") == Some(prefix)
++        }
++    })
++}
+ fn esc(o: &mut BoundedOutput, s: &str) -> R<()> {
+     for c in s.chars() {
+         match c {
+diff --git a/crates/litchi-ooxml-common/src/mce/tests.rs b/crates/litchi-ooxml-common/src/mce/tests.rs
+index 8a8fc77f4..80e0cb819 100644
+--- a/crates/litchi-ooxml-common/src/mce/tests.rs
++++ b/crates/litchi-ooxml-common/src/mce/tests.rs
+@@ -1964,3 +1964,296 @@ mod streaming_0361_raw_recovery_tests {
+         ));
+     }
+ }
++
++#[cfg(test)]
++mod namespace_emission_0588_tests {
++    use super::super::model::{Capabilities, Error, Limits, NAMESPACE};
++    use super::process_markup_compatibility;
++    use quick_xml::events::Event;
++    use quick_xml::name::ResolveResult;
++    use std::str;
++
++    const MC: &str = NAMESPACE;
++
++    fn run(xml: &str) -> String {
++        run_with(xml, &Capabilities::new(), &Limits::default())
++            .expect("markup compatibility preprocessing must succeed")
++    }
++
++    fn run_with(xml: &str, caps: &Capabilities, limits: &Limits) -> Result<String, Error> {
++        let output = process_markup_compatibility(xml.as_bytes(), caps, limits)?;
++        Ok(String::from_utf8(output.xml.into_owned()).expect("MCE output must remain UTF-8"))
++    }
++
++    fn show(resolved: &ResolveResult<'_>) -> String {
++        match resolved {
++            ResolveResult::Unbound => String::new(),
++            ResolveResult::Bound(namespace) => {
++                format!("{{{}}}", String::from_utf8_lossy(namespace.as_ref()))
++            },
++            // A prefix the writer failed to declare: never expected in output.
++            ResolveResult::Unknown(prefix) => {
++                format!("!unbound:{}!", String::from_utf8_lossy(prefix))
++            },
++        }
++    }
++
++    /// Project XML onto the names a namespace-aware consumer sees: resolved
++    /// (namespace, local) for every element and attribute with its normalized
++    /// value, and no namespace declarations, which are what this change moves.
++    fn resolved(xml: &str) -> Vec<String> {
++        let mut reader = quick_xml::NsReader::from_reader(xml.as_bytes());
++        reader.config_mut().trim_text(false);
++        let mut buffer = Vec::new();
++        let mut names = Vec::new();
++        loop {
++            let event = reader
++                .read_event_into(&mut buffer)
++                .expect("MCE output must stay well formed");
++            match event {
++                Event::Start(ref element) | Event::Empty(ref element) => {
++                    let (namespace, local) = reader.resolver().resolve_element(element.name());
++                    names.push(format!(
++                        "<{}{}",
++                        show(&namespace),
++                        String::from_utf8_lossy(local.as_ref())
++                    ));
++                    let mut attributes = Vec::new();
++                    for attribute in element.attributes() {
++                        let attribute = attribute.expect("attribute");
++                        let key = attribute.key;
++                        if key.as_ref() == b"xmlns" || key.as_ref().starts_with(b"xmlns:") {
++                            continue;
++                        }
++                        let (namespace, local) = reader.resolver().resolve_attribute(key);
++                        let value = attribute
++                            .decoded_and_normalized_value(
++                                quick_xml::XmlVersion::Explicit1_0,
++                                reader.decoder(),
++                            )
++                            .expect("attribute value");
++                        attributes.push(format!(
++                            "@{}{}={value}",
++                            show(&namespace),
++                            String::from_utf8_lossy(local.as_ref())
++                        ));
++                    }
++                    attributes.sort();
++                    names.extend(attributes);
++                },
++                Event::Text(ref text) => {
++                    let decoded = text.decode().expect("text").into_owned();
++                    if !decoded.trim().is_empty() {
++                        names.push(format!("#{decoded}"));
++                    }
++                },
++                Event::Eof => break,
++                _ => {},
++            }
++            buffer.clear();
++        }
++        names
++    }
++
++    #[test]
++    fn emitted_elements_carry_only_their_own_declarations() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:a="urn:a" xmlns:b="urn:b"><c a:one="1"><d b:two="2"/></c></r>"#
++        );
++        let output = run(&xml);
++        assert_eq!(output.matches("xmlns:a=").count(), 1);
++        assert_eq!(output.matches("xmlns:b=").count(), 1);
++        assert_eq!(output.matches("xmlns").count(), 3);
++        assert_eq!(resolved(&output), resolved(&xml));
++    }
++
++    #[test]
++    fn hoisted_declarations_reach_every_emitted_child_of_a_dropped_wrapper() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:z"><mc:Choice Requires="s"><one z:flag="1"/><two z:flag="2"/></mc:Choice><mc:Fallback><f/></mc:Fallback></mc:AlternateContent></r>"#
++        );
++        let mut caps = Capabilities::new();
++        caps.understand_namespace("urn:s");
++        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
++        assert!(!output.contains("AlternateContent"));
++        assert_eq!(output.matches("xmlns:z=").count(), 2);
++        assert_eq!(
++            resolved(&output),
++            vec![
++                "<r".to_owned(),
++                "<one".to_owned(),
++                "@{urn:z}flag=1".to_owned(),
++                "<two".to_owned(),
++                "@{urn:z}flag=2".to_owned(),
++            ]
++        );
++    }
++
++    #[test]
++    fn an_unwrapped_element_hoists_its_default_namespace_onto_its_content() {
++        // `ProcessContent` drops the wrapper but keeps its children, so the
++        // default namespace the wrapper bound has to travel with them.
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap xmlns="urn:default"><one/><two/></x:wrap></r>"#
++        );
++        let output = run(&xml);
++        assert!(!output.contains("x:wrap"));
++        assert_eq!(output.matches(r#"xmlns="urn:default""#).count(), 2);
++        assert_eq!(
++            resolved(&output),
++            vec![
++                "<r".to_owned(),
++                "<{urn:default}one".to_owned(),
++                "<{urn:default}two".to_owned(),
++            ]
++        );
++    }
++
++    #[test]
++    fn process_content_still_refuses_a_wrapper_that_binds_a_prefix() {
++        // Unchanged from the base revision: the unwrap check expands every
++        // attribute name, and `xmlns:z` has no bound prefix. Recorded here so
++        // that the refusal identity stays pinned while the writer changes.
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap xmlns:z="urn:z"><one z:flag="1"/></x:wrap></r>"#
++        );
++        assert!(matches!(
++            run_with(&xml, &Capabilities::new(), &Limits::default()),
++            Err(Error::NonConformant(message)) if message == "unbound prefix xmlns"
++        ));
++    }
++
++    #[test]
++    fn alternate_content_hoists_wrapper_and_branch_declarations() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:q="urn:q"><mc:Choice Requires="s" xmlns:w="urn:w"><e q:a="1" w:b="2"/></mc:Choice><mc:Fallback><f/></mc:Fallback></mc:AlternateContent></r>"#
++        );
++        let mut caps = Capabilities::new();
++        caps.understand_namespace("urn:s");
++        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
++        assert!(output.contains("<e "));
++        assert!(!output.contains("<f"));
++        assert_eq!(
++            resolved(&output),
++            vec![
++                "<r".to_owned(),
++                "<e".to_owned(),
++                "@{urn:q}a=1".to_owned(),
++                "@{urn:w}b=2".to_owned(),
++            ]
++        );
++    }
++
++    #[test]
++    fn a_child_redeclaration_shadows_the_hoisted_binding() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:outer"><mc:Choice Requires="s"><one xmlns:z="urn:inner" z:flag="1"/></mc:Choice></mc:AlternateContent></r>"#
++        );
++        let mut caps = Capabilities::new();
++        caps.understand_namespace("urn:s");
++        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
++        assert_eq!(output.matches("xmlns:z=").count(), 1);
++        assert!(output.contains(r#"xmlns:z="urn:inner""#));
++        assert_eq!(
++            resolved(&output),
++            vec![
++                "<r".to_owned(),
++                "<one".to_owned(),
++                "@{urn:inner}flag=1".to_owned(),
++            ]
++        );
++    }
++
++    #[test]
++    fn nested_dropped_wrappers_hoist_the_innermost_binding() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:outer" xmlns:k="urn:k"><mc:Choice Requires="s" xmlns:z="urn:inner"><leaf z:flag="1" k:other="2"/></mc:Choice></mc:AlternateContent></r>"#
++        );
++        let mut caps = Capabilities::new();
++        caps.understand_namespace("urn:s");
++        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
++        assert_eq!(
++            resolved(&output),
++            vec![
++                "<r".to_owned(),
++                "<leaf".to_owned(),
++                "@{urn:inner}flag=1".to_owned(),
++                "@{urn:k}other=2".to_owned(),
++            ]
++        );
++    }
++
++    #[test]
++    fn the_xml_prefix_is_never_redeclared_in_the_output() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:xml="http://www.w3.org/XML/1998/namespace"><a xml:space="preserve"> </a></r>"#
++        );
++        let output = run(&xml);
++        assert!(!output.contains("xmlns:xml"));
++        assert!(output.contains(r#"xml:space="preserve""#));
++    }
++
++    #[test]
++    fn unchanged_start_tags_are_copied_from_the_source() {
++        let xml = format!(r#"<r xmlns:mc="{MC}"><a b='1' c = "2" /></r>"#);
++        let output = run(&xml);
++        assert!(
++            output.contains(r#"<a b='1' c = "2" >"#),
++            "start tag was rebuilt instead of copied: {output}"
++        );
++    }
++
++    #[test]
++    fn values_that_need_unescaping_or_normalization_are_still_rewritten() {
++        let xml = format!(
++            "<r xmlns:mc=\"{MC}\"><a p=\"&amp;\" q=\"x&#9;y\" r=\"A&#66;\" s=\"x\ty\"/></r>"
++        );
++        let output = run(&xml);
++        assert_eq!(resolved(&output), resolved(&xml));
++        assert!(output.contains(r#"p="&amp;""#));
++        assert!(output.contains(r#"r="AB""#));
++    }
++
++    #[test]
++    fn the_output_bound_is_no_longer_consumed_by_redundant_redeclaration() {
++        // A worksheet-shaped part whose root declares many namespaces. The
++        // previous writer repeated every in-scope binding on every start tag,
++        // so a part that fits its own bound was refused as oversized output.
++        let mut xml = format!(r#"<r xmlns:mc="{MC}""#);
++        for index in 0..24 {
++            xml.push_str(&format!(
++                r#" xmlns:n{index}="urn:namespace-number-{index}""#
++            ));
++        }
++        xml.push('>');
++        for _ in 0..200 {
++            xml.push_str("<cell/>");
++        }
++        xml.push_str("</r>");
++
++        let limits = Limits {
++            max_output_bytes: xml.len().saturating_mul(2),
++            ..Limits::default()
++        };
++        let output = run_with(&xml, &Capabilities::new(), &limits)
++            .expect("a part that fits its own bound is not oversized output");
++        assert!(output.len() <= limits.max_output_bytes);
++        assert_eq!(output.matches("xmlns:n0=").count(), 1);
++        assert_eq!(resolved(&output), resolved(&xml));
++    }
++
++    #[test]
++    fn skipped_branches_do_not_leak_declarations_into_the_output() {
++        let xml = format!(
++            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent><mc:Choice Requires="s" xmlns:dead="urn:dead"><taken/></mc:Choice><mc:Fallback xmlns:alsodead="urn:also"><skipped/></mc:Fallback></mc:AlternateContent></r>"#
++        );
++        let mut caps = Capabilities::new();
++        caps.understand_namespace("urn:s");
++        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
++        assert!(output.contains("<taken"));
++        assert!(!output.contains("skipped"));
++        assert!(!output.contains("urn:also"));
++        // The taken branch still re-declares what its own wrapper bound.
++        assert!(output.contains(r#"xmlns:dead="urn:dead""#));
++    }
++}

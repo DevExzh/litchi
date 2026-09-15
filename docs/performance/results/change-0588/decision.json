@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0588",
+  "title": "The MCE codec stops allocating per attribute and per qualified name; its namespace emission is frozen as a design",
+  "decision": "retained, partially implemented; the namespace-emission rewrite is designed, measured and withdrawn",
+  "code_state": "crates/litchi-ooxml-common/src/mce/codec.rs and crates/litchi-ooxml-common/src/mce/tests.rs only",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": "rank 1 (item XML-1) of change 0587",
+  "reason_codes": [
+    "the implemented subset is byte-identical: 6,964 real fixture parts and 30,000 mutants produce the same processed bytes, the same Report counters, the same borrow-versus-own decision and the same refusal identities, so no contract moves",
+    "the namespace-emission rewrite the survey asked for changes output bytes and was withdrawn: two writers publish the codec's processed stream (litchi-pptx guides rewrite_source, litchi-xlsb drawing_transfer), and litchi-docx depends on a property of the current emission that the rewrite removes",
+    "that property is namespace self-containment of every element span: litchi-docx slices inner w:p and w:tbl byte ranges out of the processed buffer and parses them standalone, so removing the redundant declarations breaks every Paragraph::extensions and Row::extension_ids read on a real Word document",
+    "the withdrawn design is retained as a patch with its measurements because it is worth a further 79.9% of the codec's remaining instructions, and because the blocking dependency is now written down as a test rather than left implicit",
+    "the MCE output-limit defect 0587 named is unchanged by this record and is reported as still open",
+    "the self-containment the slicing consumers rely on is already conditional: the codec borrows the input unchanged when the part carries no MCE namespace, and at the base revision litchi-docx Paragraph::extensions() already refuses on the one test-data .docx whose document.xml has no MCE namespace, with the identical error the withdrawn rewrite produces everywhere; the rewrite universalizes a pre-existing defect rather than creating one"
+  ],
+  "accepted_evidence": {
+    "byte_identity": "mce_oracle.py raw mode over 320 fixtures and 6,964 XML/rels parts: 0 mismatches; mce_mutate.py raw mode over 30,000 mutants with 16,661 refusals: 0 mismatches",
+    "namespace_identity": "mce_oracle.py canon mode over the same 6,964 parts: 0 mismatches; a positive control (before against before) is 0 and a sensitivity check (real against marker-stripped control) differs",
+    "counts": "callgrind isolation pairs for the codec (6 reps against 1, differenced and divided by 5) and whole-process single runs for the public eager and source-backed reads, on one real producer worksheet and its marker-stripped control",
+    "timing": "80 samples per leg in two ABBA blocks, five warmups per block, pinned to CPU 8, with an A/A block in the same window; p50, mean, p95 and p99 per leg and paired deltas in both directions",
+    "no_regression": "litchi-perf-baseline ABBA over xlsx_open_owned, xlsx_first_cell, xlsx_full_cell_scan and xlsx_narrow_column_range_scan with an A/A block: every selector moves less than the floor",
+    "unit_tests": "six tests pinning the self-containment contract, the borrowed resolver's refusal identities, the pre-existing ProcessContent prefix refusal and the exact output bound",
+    "gates": "fmt, clippy (workspace lints deny), test and doc for litchi-ooxml-common, plus 246 test binaries and 5,402 tests across the eight OOXML consumer crates",
+    "consumer_inventory": "workspace sweep of the five codec entry points outside iWork and ODF: 133 production call sites in 7 crates (xlsx 52, pptx 39, docx 28, drawingml 7, ooxml-common 3, xlsb 2, spreadsheet-drawing 2), sorted into one hard, a partial and a publish tier; the hard case and the xlsb counter-case verified directly, five xlsx publish rows and the docx extract_sections row spot-checked, about half the xlsx and pptx sites cleared by grep rather than a full read",
+    "preexisting_defect_probe": "design/docxprobe built against the untouched base checkout: 61 of 62 .docx fixtures carry the MCE namespace in word/document.xml, and on the one that does not, Paragraph::extensions() already returns InvalidFormat(\"Word extension XML must have one [112] root\")"
+  },
+  "accepted_costs": {
+    "single_fixture": "the instruction and timing improvements are measured on one 209,931-byte real worksheet and its control; 0587 counted 41 of 60 XLSX fixtures as marker-bearing but no corpus-wide distribution of the improvement was taken",
+    "harness_blind_spot": "the generated harness corpora carry no MCE markers (0587 section 4), so the four selectors measure only that the borrowed fast path did not regress",
+    "whole_process_counts": "the eager and source-backed figures are whole-process single runs including process setup, not isolation pairs",
+    "shared_host": "seven other measurement agents were active; the A/A floor was measured in the same window and is p50 -0.92% to +0.88%, p99 +0.38% to +3.26%",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte"
+  },
+  "known_gaps": {
+    "not_measured": "allocation counts, cycles, RSS, cold cache, physical I/O, throughput, concurrency scaling, cross-platform, and any DOCX or PPTX public read",
+    "not_fixed": "litchi-docx Paragraph::extensions() already refuses on a marker-free word/document.xml at the base revision and is reported rather than fixed, because it belongs to litchi-docx; the MCE output limit is still enforced against the self-expanded stream; an element unwrapped by mc:ProcessContent still cannot declare a prefixed namespace (pre-existing, now pinned by a test); the two publication paths still publish processed bytes",
+    "blocked_on": "landing the namespace emission needs the pre-existing litchi-docx defect fixed first (it must be fixed anyway), the partial- and publish-tier slicing consumers taught to re-inject their declarations the way the five already-hardened sites do, and a decision on whether litchi-pptx's guides edit and litchi-xlsb's anchor transfer should publish processed bytes at all"
+  },
+  "withheld": [
+    "any speedup claim beyond the stated scenario, corpus, machine, build and metric",
+    "any corpus-wide, cold-cache, allocation, RSS, DOCX, PPTX or cross-platform result",
+    "any claim that the MCE output-limit defect is reduced by this change"
+  ],
+  "pre_existing_failures": [
+    "crates/litchi-iwa/examples/create_keynote_donut_chart.rs:68 does not compile at the base commit, blocking cargo test --workspace; reproduced on the untouched before checkout; iWork is outside this program's scope"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0588-mce-codec-namespace-emission",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "binaries": {
+      "xmlprobe_before_sha256": "e64a54c0ea12f2a0a179baa6844c55f772d88f6d695f97dc15591b397104e0a3",
+      "xmlprobe_after_sha256": "374934f85e03359dc10c106803e0ad608c6d57b041ff1e240f8e0c7fec08c7d0",
+      "perf_baseline_before_sha256": "0bf9d22f468a58c1a2754b8c8ef2c46ec00b7879fb87038d4c4b38dd6b409c9b",
+      "perf_baseline_after_sha256": "8d779a084f3458ae82d856160b64a196764cb14f0da49eb186d34378151e05ec"
+    }
+  }
+}

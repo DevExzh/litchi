@@ -1,5 +1,35 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0588: the cheapest read-side transform in the OOXML path, and a contract nobody had written down
+
+`docs/GOAL.md`'s optimization order puts "eliminate unnecessary allocation and
+copying" ahead of layout and algorithms, and the MCE codec had both in the same
+function: two heap allocations per attribute, an owned `QualifiedName` per
+qualified name on three paths, and an exact reservation per written run.
+[0588](0588-mce-codec-namespace-emission.md) removes them **without changing a
+single output byte** — 57.84% of the codec's instructions on a real Excel
+worksheet, 52.08% of a public eager open plus one cell, p50 -43.88% wall clock —
+which is the cleanest form the decision rules ask for: a change that cannot move
+a refusal, cannot move a limit and cannot change what any consumer sees.
+
+The more durable result is what stopped the rest. 0587 ranked XML-1 first and set
+the precondition "confirm the processed stream is never published". Two writers
+publish it, but the binding constraint turned out to be different and unnamed:
+because the writer re-declares every in-scope binding on every emitted start tag,
+**any element span of the processed buffer can be sliced out and parsed
+standalone**, and `litchi-docx`'s paragraph, table and row views do exactly that.
+That is a contract the codebase relies on and no record stated. It is now a test
+(`every_element_span_of_the_output_is_namespace_self_contained`). It is also
+already broken where the codec's fast path applies: on the one `test-data` `.docx`
+whose `document.xml` declares no MCE namespace, `Paragraph::extensions()` already
+refuses at the base revision, so `docs/GOAL.md`'s correctness-first rule is
+engaged independently of any optimization. The audit's
+"Apply layout, cache, or SIMD tuning only from measured hot loops" row gains a
+sibling requirement from this: an internal representation that several crates
+slice needs its slicing contract written down before it is optimized, or the
+optimization is discovered by a single consumer test. OLE2/OOXML remain the
+active priority; ODF stays deferred and iWork excluded.
+
 ## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
 
 Record: [0596](0596-doc-eager-open-terms.md).

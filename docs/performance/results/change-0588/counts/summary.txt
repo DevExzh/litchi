@@ -1,0 +1,8 @@
+MCE codec per call (callgrind isolation pair, (6 reps - 1 rep) / 5):
+  real     before     723,629,549  after     305,095,214  -57.84%
+  control  before       4,678,948  after       4,678,967  +0.00%
+whole-process Ir (single run each):
+  eager-real      before   1,038,103,099  after     497,483,936  -52.08%
+  eager-control   before      80,498,929  after      75,418,062  -6.31%
+  source-real     before   1,075,309,651  after     654,148,756  -39.17%
+  source-control  before     222,591,457  after     217,655,066  -2.22%

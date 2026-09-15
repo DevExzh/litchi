@@ -1,0 +1,56 @@
+# change 0588 gates
+
+Worktree /home/zhuhe/code/litchi-worktrees/0588, branch
+perf/0588-mce-codec-namespace-emission, base 08d968f8ec7db27cf1187d01911fd08b9d014d91.
+Host: AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0.
+
+$ cargo fmt --all --check
+(no output; exit 0)
+
+$ cargo clippy -p litchi-ooxml-common --all-targets
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.38s
+
+$ cargo test -p litchi-ooxml-common
+  test result: ok. 242 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+  test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+  test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+  (261 tests over 6 binaries plus doctests, 0 failed)
+
+$ cargo doc -p litchi-ooxml-common --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.83s
+   Generated /home/zhuhe/code/litchi-worktrees/0588/target/doc/litchi_ooxml_common/index.html
+
+$ cargo test --release --locked -p litchi-ooxml-common -p litchi-xlsx -p litchi-docx \
+      -p litchi-pptx -p litchi-xlsb -p litchi-drawingml -p litchi-opc \
+      -p litchi-spreadsheet-drawing
+  246 test binaries, 5,402 tests passed, 0 failed, 0 "test result: FAILED".
+  (Run because the change sits under every OOXML crate; the litchi-docx
+  paragraph-extension round trip in particular is the test that rejected the
+  withdrawn namespace-emission design.)
+
+$ python3 docs/performance/results/change-0588/oracle/mce_oracle.py <before> <after> test-data <out> raw
+  fixtures=320 parts=6964 refusals=0 mismatches=0 skipped=0
+
+$ python3 docs/performance/results/change-0588/oracle/mce_oracle.py <before> <after> test-data <out> canon
+  fixtures=320 parts=6964 refusals=0 mismatches=0 skipped=0
+
+$ python3 docs/performance/results/change-0588/oracle/mce_mutate.py <before> <after> <seeds> 30000 <out> raw
+  seeds=9 mutants=30000 refusals=16661 mismatches=0
+
+PRE-EXISTING FAILURE (not caused by this change, reproduced on the untouched
+base checkout /home/zhuhe/code/litchi-worktrees/before-08d968f8e):
+
+$ cargo check -p litchi-iwa --example create_keynote_donut_chart --release --locked
+  error[E0308]: mismatched types
+    --> crates/litchi-iwa/examples/create_keynote_donut_chart.rs:68:5
+     = note: expected enum `Result<_, litchi_iwa::Error>`
+                found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+  error: could not compile `litchi-iwa` (example "create_keynote_donut_chart")
+
+  This blocks `cargo test --workspace`. litchi-iwa is an iWork crate, outside
+  this program's scope, and untouched by this change.

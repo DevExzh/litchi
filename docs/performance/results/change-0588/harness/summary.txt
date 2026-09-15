@@ -1,0 +1,5 @@
+case                                 before p50    after p50    delta    floor
+xlsx_first_cell                        10484025     10457171   -0.26%   -0.66%
+xlsx_full_cell_scan                    10536880     10458700   -0.74%   -0.66%
+xlsx_narrow_column_range_scan              4162         4115   -1.14%   -2.59%
+xlsx_open_owned                          508322       512186   +0.76%   -0.40%

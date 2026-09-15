@@ -1,0 +1,40 @@
+304,820,712 (100.0%)  PROGRAM TOTALS
+304,472,978 (99.89%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+287,752,583 (94.40%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+254,676,297 (83.55%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+232,360,419 (76.23%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+175,643,754 (57.62%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 60,640,028 (19.89%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 15,131,930 ( 4.96%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,539,740 ( 4.11%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 12,425,396 ( 4.08%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+ 12,106,653 ( 3.97%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,105,528 ( 3.97%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 11,335,532 ( 3.72%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+ 11,335,532 ( 3.72%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+  8,501,649 ( 2.79%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc
+  6,052,764 ( 1.99%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mut_ptr.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+  4,390,867 ( 1.44%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:litchi_ooxml_common::mce::codec::start
+  4,215,773 ( 1.38%)  /rust/deps/hashbrown-0.17.1/src/set.rs:litchi_ooxml_common::mce::codec::start
+  3,304,235 ( 1.08%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:litchi_ooxml_common::mce::codec::esc
+  3,074,290 ( 1.01%)  /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::push [/home/zhuhe/code/litchi-worktrees/targets/0588-after/release/xmlprobe]
+114,344 ( 0.04%)          self.read_event_impl(buf)
+12,425,396 ( 4.08%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> (28,586x)
+         .           impl BoundedOutput {
+         8 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+         5 ( 0.00%)      let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+287,326,684 (94.26%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (11,565x)
+   425,899 ( 0.14%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (13x)
+   693,900 ( 0.23%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (11,565x)
+   672,117 ( 0.22%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (11,565x)
+   335,385 ( 0.11%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::push (11,565x)
+   320,080 ( 0.11%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (5,440x)
+        60 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (1x)
+        54 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (1x)
+        60 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0588/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (1x)
+         .               out: &mut BoundedOutput,
+    57,890 ( 0.02%)      let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
+   444,463 ( 0.15%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (11,578x)
+    52,672 ( 0.02%)              key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,
+   610,239 ( 0.20%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (13,168x)
+         .                       write_start(out, q, &c, &raw, caps, false, rep)?;

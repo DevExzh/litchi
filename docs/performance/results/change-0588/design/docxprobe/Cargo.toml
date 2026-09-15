@@ -1,0 +1,12 @@
+[package]
+name = "docxprobe"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-docx = { path = "/home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-docx" }
+
+[profile.release]
+debug = 1

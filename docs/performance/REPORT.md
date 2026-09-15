@@ -1,5 +1,46 @@
 # Performance program phase report
 
+## 0588 — a 52% read with no byte changed, and a 92% one that cannot land yet
+
+Retained, partially implemented. The MCE codec's per-attribute `String` pairs,
+its per-qualified-name `QualifiedName`/`Name` allocations and its exact
+per-run output reservation are replaced by borrowed attributes, a borrowed name
+resolver with identical lexical checks and error identity, and geometric growth
+clamped to `max_output_bytes`. The codec falls 723.6 M to 305.1 M Ir per call on
+a real Excel worksheet (-57.84%), a public eager open plus one cell 1,037.8 M to
+497.5 M (-52.08%) and a source-backed read 1,075.3 M to 654.1 M (-39.17%);
+paired p50 improves 43.88% and 34.89% against an A/A floor of p50 <= 0.92% and
+p99 <= 0.81% in the same window, and four existing XLSX selectors on the
+marker-free harness corpora move less than their own floor. **Output bytes,
+`Report` counters, the borrow-versus-own decision and every refusal identity are
+unchanged**, proven by a differential over 320 fixtures and 6,964 XML parts in
+both a byte-exact and a namespace-resolving mode, and by 30,000 mutants of which
+16,661 refused, all with zero mismatches. Survey item XML-1's headline change —
+emit only an element's own declarations, hoisting a dropped wrapper's onto its
+first emitted child — was implemented and passes the same oracles, and is
+**withdrawn**: the redundant declarations make every element span of the
+processed buffer namespace self-contained, and `litchi-docx` slices inner spans
+out of it and parses them standalone, so the rewrite breaks
+`Paragraph::extensions()` on real Word documents; two writers also publish the
+stream; and a sweep of all 133 production call sites of the five codec entry
+points outside iWork and ODF sorts the rest of the exposure into a partial tier
+behind a single-dominant-prefix fallback and a publish tier of public accessors
+that hand out processed slices verbatim. A probe against the untouched base shows
+that same public call **already refusing**, with the identical error, on the one
+`test-data` `.docx` of 62 whose `document.xml` carries no MCE namespace — because
+the codec then borrows the input unchanged — so the rewrite universalizes a
+pre-existing `litchi-docx` defect rather than creating one, and the fix belongs in
+the slicing consumers. Its patch, its two differential reports, the probe and its
+measurements (a further
+-79.9% of the codec, output 16.9x to 0.93x of input) are retained. All gates
+pass, including 246 test binaries and 5,402 tests across the eight OOXML
+consumer crates; a pre-existing `litchi-iwa` example compile failure blocks
+`cargo test --workspace` and is reproduced on the untouched base. No latency,
+allocation, RSS or cold-cache claim is registered. OLE2/OOXML remain active; ODF
+is deferred until completion and iWork excluded.
+[Change and limitations](0588-mce-codec-namespace-emission.md);
+[retained evidence](results/change-0588/README.md); `performance_claim: none`.
+
 ## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
 
 - [`0596-doc-eager-open-terms.md`](0596-doc-eager-open-terms.md) — the three
