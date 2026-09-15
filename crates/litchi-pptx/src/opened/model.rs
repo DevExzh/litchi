@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
@@ -242,6 +242,16 @@ pub struct Snapshot {
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
+    /// Serialized-archive revision of `package`, memoized with the archive
+    /// bound it was taken under.
+    ///
+    /// The captured package is immutable behind an `Arc` and is never mutated
+    /// after capture, so the serialized archive it publishes — and therefore
+    /// its digest — is a pure function of this snapshot. Clones of a snapshot
+    /// share the same package and the same cache; a rebind onto a different
+    /// package starts an empty one, because content equality does not imply
+    /// an identical retained archive.
+    pub(crate) physical_revision: Arc<OnceLock<(usize, [u8; 32])>>,
 }
 
 impl fmt::Debug for Snapshot {
@@ -290,6 +300,10 @@ impl Snapshot {
         );
         Self {
             package: Arc::new(package.clone()),
+            // `packages_equal` proves the fingerprint inputs are identical; it
+            // says nothing about ZIP ordering, compression, or retained source
+            // bytes, so the serialized-archive revision is not carried over.
+            physical_revision: Arc::new(OnceLock::new()),
             ..self.clone()
         }
     }
@@ -437,6 +451,7 @@ fn capture_internal(
         revision,
         limits,
         physical_source_provenance,
+        physical_revision: Arc::new(OnceLock::new()),
     })
 }
 

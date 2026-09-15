@@ -1,5 +1,40 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0598 — PPTX cross-package copy revision reuse
+
+Record: [0598](0598-pptx-cross-copy-revision-cache.md).
+
+`docs/GOAL.md`'s first two optimization steps — eliminate unnecessary work, then
+unnecessary I/O, serialization and hashing — applied to the cross-package slide
+copy that 0587 ranked fifth and measured at 85% of a media-rich whole child.
+Five of nine complete-archive serializations and four of twelve complete-graph
+hashes per lifecycle are removed by reusing values the same call already proved
+on the same bytes. ADR 0005's "cache behavior is semantically invisible" is the
+licence for the one new piece of state: a private `OnceLock` on the immutable
+`Snapshot`, keyed on the archive bound so no `Error::Limit` moves, never
+inherited across `Snapshot::rebound_to` (where `packages_equal` proves graph
+equality and says nothing about the retained archive), and always a plain
+recomputation on a miss. ADR 0005's bounded-memory rule is also why
+`bounded_package_bytes` keeps its `Vec` rather than becoming a hashing sink: the
+`Vec` is the candidate archive that `from_vec_reusing_payloads` reopens, so the
+saving is taken by digesting it in place. ADR 0003 and 0006 are untouched
+because no revision value or proof format changes and the durable `LPCP0002`
+encoding stays bit-identical; the four staleness proofs still run on the **live**
+packages before any capture, so a stale or foreign source or destination is
+refused exactly where it was. **Measured** −24.61% `Ir` per media-rich lifecycle
+with exact before/after call counts (twelve semantic hashes and nine archive
+serializations before; eight and four after), and −8.39% native whole-child
+cycles against a −0.36% A/A floor. What stays open: the candidate is still built,
+deflated and captured twice per lifecycle (5.96 G `Ir` of deflate on the copied
+closure), and retaining the planned archive to remove the second build changes
+`CrossSlideCopyPlan`'s memory profile under ADR 0005; `validate_candidate`'s
+second capture is the proof that binds the candidate to the plan, so reusing it
+is a contract question, not a value-identical reuse; the four remaining semantic
+hashes need 0587's PPTX-1(c), which redefines the durable revision. No speedup,
+RSS, allocation, cold-cache or real-producer claim follows, and the wall-clock
+floors in this window (A/A −4.99% at p50 on the media-rich selector) are stated
+beside every timing.
+
 ## 0602 — real-producer CRUD coverage is blocked before the editor, and before publication
 
 Record: [0602](0602-xlsx-real-producer-admission-design.md).

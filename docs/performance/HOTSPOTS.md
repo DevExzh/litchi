@@ -1,5 +1,40 @@
 # Performance hotspot inventory
 
+## 0598 — PPTX cross-package copy revision reuse
+
+Item PPTX-2 of the 0587 queue is implemented. A cross-package slide copy
+serialized a complete package twelve times and hashed a complete package graph
+twelve times per plan-plus-apply lifecycle; it now serializes seven times and
+hashes eight. Three reuses, each of a value the same call already holds for the
+same bytes: an immutable `Snapshot` memoizes its serialized-archive revision
+together with the archive bound it was taken under, so the replan inside
+`apply_plan` stops re-hashing the source and destination archives;
+`BoundedVecWriter` digests the candidate archive while `build_candidate` writes
+it, so the second serialization that used to hash it is gone (the bounded `Vec`
+stays — it is the archive `from_vec_reusing_payloads` reopens); and application
+hands the semantic revisions it already proved to `capture_with_revision`
+(change 0590) and returns the candidate's proven archive revision instead of
+recomputing it for the final comparison. **Measured** on the isolation pair
+(`--samples 3` minus `--samples 1`, callgrind, CPU 21): per lifecycle of
+`pptx_cross_copy_media_rich` 35,610,254,229 → 26,847,795,508 `Ir`, **−24.61%**,
+with `physical_package_fingerprint` −66.65%, `package_fingerprint` −33.33% and
+software SHA-256 −31.25%; `pptx_cross_copy_plain` −9.37%; whole child −22.08%
+and −2.37%. Natively, `perf stat` whole child is −8.39% cycles against a −0.36%
+A/A floor. The revision values, the durable `LPCP0002` encoding, every refusal
+and every published byte are unchanged — `zlib_rs::deflate::deflate` differs by
+10,520 instructions in 5.96 G per lifecycle and the published digest is one
+value per corpus across all four timing legs; 867 `litchi-pptx` tests pass,
+seven of them new. Wall clock: `pptx_cross_copy_media_rich` −11.85% at p50
+against a −4.99% A/A floor, its apply phase −16.48%; the two plain selectors are
+inside their own floors and are reported, not relied on. What remains: the whole
+candidate is still built, deflated and captured twice per lifecycle, which is
+5.96 G `Ir` of untouched deflate, and removing the second build means retaining
+the planned archive in the plan — an ADR 0005 memory-profile change needing a
+frozen design record. `performance_claim: none`.
+[Change and limitations](0598-pptx-cross-copy-revision-cache.md);
+[evidence](results/change-0598/README.md). OLE2/OOXML remain active; ODF is
+deferred until completion and iWork excluded.
+
 ## 0602 — XLSX real-producer admission is the blocker, not the readback gate
 
 Change 0587's item XLSX-2 ranked widening `stored_entry_is_supported` and the

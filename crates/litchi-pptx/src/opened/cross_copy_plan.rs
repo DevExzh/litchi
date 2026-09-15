@@ -454,44 +454,49 @@ pub(crate) fn apply_plan(
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    if super::model::package_fingerprint(source)? != plan.source_revision {
+    let limits = plan.patch.patch.limits();
+    let source_revision = super::model::package_fingerprint(source)?;
+    if source_revision != plan.source_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
             reason: "the complete source package graph changed after cross-slide planning",
         });
     }
-    if super::model::package_fingerprint(destination)? != plan.destination_revision {
+    let destination_revision = super::model::package_fingerprint(destination)?;
+    if destination_revision != plan.destination_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
             reason: "the complete destination package graph changed after cross-slide planning",
         });
     }
-    if physical_package_fingerprint(source, plan.patch.patch.limits())?
-        != plan.source_physical_revision
-    {
+    let source_physical_revision = physical_package_fingerprint(source, limits)?;
+    if source_physical_revision != plan.source_physical_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
             reason: "the serialized source package changed after cross-slide planning",
         });
     }
-    if physical_package_fingerprint(destination, plan.patch.patch.limits())?
-        != plan.destination_physical_revision
-    {
+    let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
+    if destination_physical_revision != plan.destination_physical_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_plan",
             reason: "the serialized destination package changed after cross-slide planning",
         });
     }
-    let source_snapshot = super::model::capture(
+    let source_snapshot = super::model::capture_with_revision(
         source,
-        plan.patch.patch.limits(),
+        limits,
         source_physical_source_provenance,
+        source_revision,
     )?;
-    let destination_snapshot = super::model::capture(
+    remember_physical_revision(&source_snapshot, limits, source_physical_revision);
+    let destination_snapshot = super::model::capture_with_revision(
         destination,
-        plan.patch.patch.limits(),
+        limits,
         destination_physical_source_provenance,
+        destination_revision,
     )?;
+    remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let (fresh, candidate) = prepare_cross_slide_copy_for_slides(
         &source_snapshot,
         &destination_snapshot,
@@ -512,7 +517,7 @@ pub(crate) fn apply_plan(
             reason: "the durable cross-slide plan does not match a freshly proven candidate",
         });
     }
-    let (candidate, snapshot) = validate_application_candidate(
+    let (candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
         &plan.patch.patch,
@@ -520,7 +525,7 @@ pub(crate) fn apply_plan(
         destination_physical_source_provenance,
         true,
     )?;
-    if physical_package_fingerprint(&candidate, plan.patch.patch.limits())?
+    if published_archive_revision(&candidate, limits, rebuilt, fresh.target_physical_revision)?
         != plan.target_physical_revision
     {
         return Err(Error::UnsafeEdit {
@@ -539,43 +544,49 @@ pub(crate) fn apply_patch(
     source_physical_source_provenance: bool,
     destination_physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    if super::model::package_fingerprint(source)? != patch.source_revision {
+    let limits = patch.patch.limits();
+    let source_revision = super::model::package_fingerprint(source)?;
+    if source_revision != patch.source_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
             reason: "the complete source package graph differs from the cross-slide patch source",
         });
     }
-    if super::model::package_fingerprint(destination)? != patch.destination_revision {
+    let destination_revision = super::model::package_fingerprint(destination)?;
+    if destination_revision != patch.destination_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
             reason: "the complete destination package graph differs from the cross-slide patch source",
         });
     }
-    if physical_package_fingerprint(source, patch.patch.limits())? != patch.source_physical_revision
-    {
+    let source_physical_revision = physical_package_fingerprint(source, limits)?;
+    if source_physical_revision != patch.source_physical_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
             reason: "the serialized source package differs from the cross-slide patch source",
         });
     }
-    if physical_package_fingerprint(destination, patch.patch.limits())?
-        != patch.destination_physical_revision
-    {
+    let destination_physical_revision = physical_package_fingerprint(destination, limits)?;
+    if destination_physical_revision != patch.destination_physical_revision {
         return Err(Error::UnsafeEdit {
             operation: "apply_cross_slide_copy_patch",
             reason: "the serialized destination package differs from the cross-slide patch source",
         });
     }
-    let source_snapshot = super::model::capture(
+    let source_snapshot = super::model::capture_with_revision(
         source,
-        patch.patch.limits(),
+        limits,
         source_physical_source_provenance,
+        source_revision,
     )?;
-    let destination_snapshot = super::model::capture(
+    remember_physical_revision(&source_snapshot, limits, source_physical_revision);
+    let destination_snapshot = super::model::capture_with_revision(
         destination,
-        patch.patch.limits(),
+        limits,
         destination_physical_source_provenance,
+        destination_revision,
     )?;
+    remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
     let source_slide = find_slide_by_part(&source_snapshot, &patch.source_slide)?;
     let destination_slide = find_slide_by_part(&destination_snapshot, &patch.destination_slide)?;
     let forward_candidate = prepare_cross_slide_copy_for_slides(
@@ -611,18 +622,18 @@ pub(crate) fn apply_patch(
         .is_err()
         {
             None
-        } else if physical_package_fingerprint(&restored, patch.patch.limits()).ok()
+        } else if physical_package_fingerprint(&restored, limits).ok()
             != Some(patch.target_physical_revision)
         {
             None
         } else {
-            let restored_snapshot = super::model::capture(
-                &restored,
-                patch.patch.limits(),
-                destination_physical_source_provenance,
-            );
+            let restored_snapshot =
+                super::model::capture(&restored, limits, destination_physical_source_provenance);
             let inverse_matches = restored_snapshot
                 .ok()
+                .inspect(|base| {
+                    remember_physical_revision(base, limits, patch.target_physical_revision);
+                })
                 .and_then(|base| {
                     let restored_destination =
                         find_slide_by_part(&base, &patch.destination_slide).ok()?;
@@ -644,7 +655,7 @@ pub(crate) fn apply_patch(
         operation: "apply_cross_slide_copy_patch",
         reason: "the durable cross-slide patch does not match a freshly proven candidate",
     })?;
-    let (candidate, snapshot) = validate_application_candidate(
+    let (candidate, snapshot, rebuilt) = validate_application_candidate(
         destination,
         candidate,
         &patch.patch,
@@ -652,7 +663,7 @@ pub(crate) fn apply_patch(
         destination_physical_source_provenance,
         reopened,
     )?;
-    if physical_package_fingerprint(&candidate, patch.patch.limits())?
+    if published_archive_revision(&candidate, limits, rebuilt, patch.target_physical_revision)?
         != patch.target_physical_revision
     {
         return Err(Error::UnsafeEdit {
@@ -671,7 +682,7 @@ fn validate_application_candidate(
     target_revision: [u8; 32],
     physical_source_provenance: bool,
     reopened: bool,
-) -> Result<(OpcPackage, Snapshot)> {
+) -> Result<(OpcPackage, Snapshot, bool)> {
     // Reopening preserves the observable state of untouched owned ingress.
     // Dirty packages can carry caller-defined parts or save preferences that
     // are absent from the archive, so retain their clone-and-apply behavior.
@@ -684,7 +695,7 @@ fn validate_application_candidate(
             target_revision,
             physical_source_provenance,
         )?;
-        return Ok((candidate, snapshot));
+        return Ok((candidate, snapshot, true));
     }
     let snapshot = super::patch::validate_candidate(
         destination,
@@ -693,7 +704,31 @@ fn validate_application_candidate(
         target_revision,
         physical_source_provenance,
     )?;
-    Ok((candidate, snapshot))
+    Ok((candidate, snapshot, false))
+}
+
+/// Serialized-archive revision of the package application is about to publish.
+///
+/// When the candidate reaching publication is the one whose archive revision
+/// was proven a moment earlier — the prepared candidate in `apply_plan` and in
+/// the forward route of `apply_patch`, or the restored candidate in the inverse
+/// route — the value is already known and recomputing it can only reproduce it.
+/// A candidate `validate_application_candidate` rebuilt from the destination is
+/// a different package and is hashed.
+fn published_archive_revision(
+    candidate: &OpcPackage,
+    limits: Limits,
+    rebuilt: bool,
+    proven: [u8; 32],
+) -> Result<[u8; 32]> {
+    if rebuilt {
+        return physical_package_fingerprint(candidate, limits);
+    }
+    debug_assert!(
+        physical_package_fingerprint(candidate, limits).is_ok_and(|fresh| fresh == proven),
+        "cross-slide published a candidate with an unproven serialized package revision"
+    );
+    Ok(proven)
 }
 
 fn plan_cross_slide_copy_for_slides(
@@ -887,10 +922,9 @@ fn prepare_cross_slide_copy_for_slides(
     let slide_id = next_slide_id(&destination.slides)?;
     let presentation_relationship_id = next_relationship_id(destination_presentation.rels())?;
     preflight_parts(destination, &parts, planned_bytes)?;
-    let source_physical_revision = physical_package_fingerprint(source.package.as_ref(), limits)?;
-    let destination_physical_revision =
-        physical_package_fingerprint(destination.package.as_ref(), limits)?;
-    let candidate = build_candidate(
+    let source_physical_revision = snapshot_physical_revision(source, limits)?;
+    let destination_physical_revision = snapshot_physical_revision(destination, limits)?;
+    let (candidate, candidate_revision, candidate_archive_revision) = build_candidate(
         source,
         destination,
         &source_slide,
@@ -909,8 +943,11 @@ fn prepare_cross_slide_copy_for_slides(
         destination.presentation_name.clone(),
         limits,
     )?;
-    let target_revision = super::model::package_fingerprint(&candidate)?;
-    let target_physical_revision = physical_package_fingerprint(&candidate, limits)?;
+    // `build_candidate` already captured this exact package, and a capture's
+    // revision is `package_fingerprint` of the package it captured.
+    let target_revision = candidate_revision;
+    let target_physical_revision =
+        candidate_physical_revision(&candidate, limits, candidate_archive_revision)?;
     let cross_patch = CrossSlideCopyPatch {
         source_revision: source.revision,
         destination_revision: destination.revision,
@@ -971,7 +1008,7 @@ fn build_candidate(
     destination_layout: &PackURI,
     parts: &[super::SlideCopyPart],
     archive_limit: usize,
-) -> Result<OpcPackage> {
+) -> Result<(OpcPackage, [u8; 32], Option<[u8; 32]>)> {
     let mut mapping = HashMap::new();
     mapping
         .try_reserve(parts.len())
@@ -1058,7 +1095,8 @@ fn build_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let serialized = bounded_package_bytes(&candidate, archive_limit)?;
+    let (serialized, archive_digest) = bounded_package_bytes(&candidate, archive_limit)?;
+    let serialized_bytes = serialized.len();
     // Clean owned ingress proves the destination has built-in parts. Keep
     // the existing path for caller-defined parts and revoked authorization.
     let reopened = if destination.package.is_unmodified_owned_source() {
@@ -1070,6 +1108,14 @@ fn build_candidate(
     } else {
         OpcPackage::from_vec(serialized)?
     };
+    // Owned ingress retains the archive it was opened from and republishes it
+    // verbatim, so the bytes just hashed are exactly what a serializing hash
+    // sink would read back. A reopen that revoked that authorization is left
+    // to the ordinary recomputation.
+    let archive_revision = reopened
+        .is_unmodified_owned_source()
+        .then(|| seal_physical_revision(archive_digest, serialized_bytes))
+        .transpose()?;
     let captured = super::model::capture(
         &reopened,
         destination.limits,
@@ -1091,7 +1137,8 @@ fn build_candidate(
             "cross-slide candidate did not retarget the copied slide layout",
         ));
     }
-    Ok(reopened)
+    let revision = captured.revision;
+    Ok((reopened, revision, archive_revision))
 }
 
 fn preflight_parts(
@@ -1868,13 +1915,94 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
         });
     }
     result?;
-    let length = u64::try_from(sink.length)
+    seal_physical_revision(sink.digest.finalize().into(), sink.length)
+}
+
+/// Bind an archive digest and its length into the physical revision.
+///
+/// This is the only place the `litchi-pptx-cross-physical-v2` domain string and
+/// its length prefix are combined, so every route to a physical revision — the
+/// streaming hash sink and the candidate archive that was hashed while it was
+/// being built — produces exactly the same value.
+fn seal_physical_revision(archive_digest: [u8; 32], length: usize) -> Result<[u8; 32]> {
+    let length = u64::try_from(length)
         .map_err(|_error| invalid("cross-slide physical package exceeds u64"))?;
     let mut digest = Sha256::new();
     digest.update(b"litchi-pptx-cross-physical-v2");
     digest.update(length.to_le_bytes());
-    digest.update(sink.digest.finalize());
+    digest.update(archive_digest);
     Ok(digest.finalize().into())
+}
+
+/// Serialized-archive revision of an immutable snapshot's package.
+///
+/// A [`Snapshot`] owns its `OpcPackage` behind an `Arc` and never mutates it,
+/// so [`physical_package_fingerprint`] is a pure function of the snapshot and
+/// the archive bound it is taken under. The first call under a given bound
+/// fills the snapshot's cache and every later call returns the same value the
+/// recomputation would. The unknown-non-Part-member refusal still runs on every
+/// call, so no refusal moves; only the repeated serialization and hash of
+/// unchanged bytes is skipped.
+fn snapshot_physical_revision(snapshot: &Snapshot, limits: Limits) -> Result<[u8; 32]> {
+    let bound = limits.max_patch_bytes();
+    if let Some(&(cached_bound, revision)) = snapshot.physical_revision.get()
+        && cached_bound == bound
+    {
+        reject_unknown_non_part_members(
+            snapshot.package.as_ref(),
+            "cross-slide physical authorization",
+        )?;
+        debug_assert!(
+            physical_package_fingerprint(snapshot.package.as_ref(), limits)
+                .is_ok_and(|fresh| fresh == revision),
+            "cross-slide reused a stale serialized package revision"
+        );
+        return Ok(revision);
+    }
+    let revision = physical_package_fingerprint(snapshot.package.as_ref(), limits)?;
+    let _first = snapshot.physical_revision.set((bound, revision));
+    Ok(revision)
+}
+
+/// Record a serialized-archive revision an application already proved.
+///
+/// Application hashes the live package before capturing it, and `capture`
+/// clones that package into the snapshot. `OpcPackage` clones carry the
+/// retained source archive, its exact-source authorization and the complete
+/// graph, so the clone serializes to the same bytes as the package the caller
+/// hashed. The `debug_assert` re-derives the value on the snapshot's own
+/// package in test and debug builds.
+fn remember_physical_revision(snapshot: &Snapshot, limits: Limits, revision: [u8; 32]) {
+    debug_assert!(
+        physical_package_fingerprint(snapshot.package.as_ref(), limits)
+            .is_ok_and(|fresh| fresh == revision),
+        "cross-slide seeded a snapshot with a foreign serialized package revision"
+    );
+    let _first = snapshot
+        .physical_revision
+        .set((limits.max_patch_bytes(), revision));
+}
+
+/// Physical revision of a candidate whose archive bytes were already hashed.
+///
+/// `build_candidate` hashes the candidate archive while it serializes it and
+/// then reopens that exact `Vec`, so an exact-source-authorized reopen
+/// republishes those bytes verbatim. The unknown-member refusal still runs
+/// here, in the position the recomputation ran it.
+fn candidate_physical_revision(
+    candidate: &OpcPackage,
+    limits: Limits,
+    known: Option<[u8; 32]>,
+) -> Result<[u8; 32]> {
+    let Some(known) = known else {
+        return physical_package_fingerprint(candidate, limits);
+    };
+    reject_unknown_non_part_members(candidate, "cross-slide physical authorization")?;
+    debug_assert!(
+        physical_package_fingerprint(candidate, limits).is_ok_and(|fresh| fresh == known),
+        "cross-slide reused a stale candidate archive revision"
+    );
+    Ok(known)
 }
 
 struct ArchiveHashWriter {
@@ -1923,6 +2051,7 @@ impl Write for ArchiveHashWriter {
 
 struct BoundedVecWriter {
     bytes: Vec<u8>,
+    digest: Sha256,
     limit: usize,
     exceeded: bool,
     allocation_failure: Option<TryReserveError>,
@@ -1932,15 +2061,17 @@ impl BoundedVecWriter {
     fn new(limit: usize) -> Self {
         Self {
             bytes: Vec::new(),
+            digest: Sha256::new(),
             limit,
             exceeded: false,
             allocation_failure: None,
         }
     }
 
-    fn into_bytes(self) -> Result<Vec<u8>> {
+    fn into_bytes(self) -> Result<(Vec<u8>, [u8; 32])> {
+        let digest = self.digest.finalize().into();
         if self.bytes.capacity() == self.bytes.len() {
-            return Ok(self.bytes);
+            return Ok((self.bytes, digest));
         }
         // Owned OPC ingress retains the Vec, including spare capacity. Copy
         // once into a fallibly reserved buffer instead of retaining geometric
@@ -1954,7 +2085,7 @@ impl BoundedVecWriter {
                 source,
             })?;
         compact.extend_from_slice(&self.bytes);
-        Ok(compact)
+        Ok((compact, digest))
     }
 }
 
@@ -1991,6 +2122,7 @@ impl Write for BoundedVecWriter {
                 ));
             }
         }
+        self.digest.update(bytes);
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
     }
@@ -2000,7 +2132,13 @@ impl Write for BoundedVecWriter {
     }
 }
 
-fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<Vec<u8>> {
+/// Serialize `package` into a bounded owned archive and return its digest.
+///
+/// The digest is taken over exactly the bytes the writer accepted, which is
+/// the same stream [`ArchiveHashWriter`] would have hashed, so the caller can
+/// seal it into a physical revision instead of serializing the package a
+/// second time.
+fn bounded_package_bytes(package: &OpcPackage, limit: usize) -> Result<(Vec<u8>, [u8; 32])> {
     let mut writer = BoundedVecWriter::new(limit);
     let result = package.to_stream(&mut writer);
     if let Some(source) = writer.allocation_failure.take() {
@@ -2152,3 +2290,5 @@ impl<'a> WireInput<'a> {
 
 #[cfg(test)]
 mod bounded_writer_tests;
+#[cfg(test)]
+mod revision_cache_tests;

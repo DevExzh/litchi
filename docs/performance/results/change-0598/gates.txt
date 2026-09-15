@@ -1,0 +1,45 @@
+# Gates for change 0598, run in /home/zhuhe/code/litchi-worktrees/0598 at branch perf/0598-pptx-cross-copy-revision-cache
+# Host: AMD EPYC 9R45, Linux 7.0.0-1012-aws, rustc 1.95.0. Base f22f9393598da39272f2185d2dac3d36c4b61d23.
+
+$ cargo fmt --all --check
+exit=0
+
+$ cargo clippy -p litchi-pptx --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+exit=0
+
+$ cargo test -p litchi-pptx
+aggregate over all test binaries: 867 passed, 0 failed, 2 ignored
+test result: ok. 563 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.34s; merged doctests compilation took 0.31s
+exit=0
+
+$ cargo doc -p litchi-pptx --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+   Generated /home/zhuhe/code/litchi-worktrees/0598/target/doc/litchi_pptx/index.html
+exit=0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit=0
+
+$ python3 tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+$ cargo test -p litchi-pptx --lib revision_cache -- --nocapture (the new tests)
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_is_keyed_by_the_archive_bound ... ok
+test opened::cross_copy_plan::revision_cache_tests::candidate_physical_revision_without_a_known_value_recomputes ... ok
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_caches_the_freshly_computed_value ... ok
+test opened::cross_copy_plan::revision_cache_tests::rebound_snapshot_starts_an_empty_physical_revision_cache ... ok
+test opened::cross_copy_plan::revision_cache_tests::planned_and_published_revisions_equal_fresh_serializations ... ok
+test opened::cross_copy_plan::revision_cache_tests::warm_snapshot_caches_do_not_hide_a_stale_source_or_destination ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 557 filtered out; finished in 0.25s
+exit=0
+
+$ cargo test -p litchi-pptx --test source_backed_cross_copy --test source_backed_cross_copy_adversarial
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+exit=0

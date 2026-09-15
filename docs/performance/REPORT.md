@@ -1,5 +1,38 @@
 # Performance program phase report
 
+## Change 0598: PPTX cross-package copy revision reuse
+
+Change 0598 removes five of the nine complete-archive serializations and four of
+the twelve complete-graph hashes in a `litchi-pptx` cross-package slide copy.
+`Snapshot` (`opened/model.rs`) gains one private field, an
+`Arc<OnceLock<(usize, [u8; 32])>>` memoizing the serialized-archive revision of
+its immutable package together with the archive bound it was taken under;
+`Snapshot::rebound_to` starts an empty one. In `opened/cross_copy_plan.rs`,
+`snapshot_physical_revision` reads that memo — still running
+`reject_unknown_non_part_members` on every call, so no refusal moves —
+`BoundedVecWriter` digests the candidate archive as `build_candidate` writes it
+and `seal_physical_revision` binds that digest and its length exactly as the
+streaming sink does, `candidate_physical_revision` consumes the result at the
+position the recomputation occupied, and `apply_plan` and `apply_patch` hand the
+semantic revisions they proved to `capture_with_revision` (change 0590) and seed
+the resulting snapshots with the archive revisions they proved, so the replan
+inside the same call reuses both. `published_archive_revision` returns the
+already-proven revision for a candidate that reached publication unchanged and
+recomputes for one `validate_application_candidate` rebuilt. Validation passed
+`litchi-pptx` library `563/563` plus integration and doc tests, 867 in total,
+with seven new tests covering the cache's freshness, its archive-bound key and
+its `Error::Limit`, the empty cache after a rebind onto a graph-equal package
+with a different retained archive, the equality of planned and published
+revisions with fresh serializations, stale and foreign refusals with both caches
+warm, the no-known-value fallback, and the bounded writer's digest. **Measured**,
+callgrind isolation pair on CPU 21: −24.61% `Ir` per `pptx_cross_copy_media_rich`
+lifecycle and −9.37% per `pptx_cross_copy_plain` lifecycle, with twelve semantic
+hashes and nine archive serializations becoming eight and four; natively −8.39%
+whole-child cycles against a −0.36% A/A floor. The paired wall-clock timings are
+reported beside this host's A/A and B/B floors and are not a speedup claim: two
+of the four selectors sit inside their own floors. See
+[Change 0598](0598-pptx-cross-copy-revision-cache.md); `performance_claim: none`.
+
 ## 0602 — XLSX value-editor admission, sized on derived real-producer fixtures
 
 Four real fixtures were derived onto the value editor's admission surface by two

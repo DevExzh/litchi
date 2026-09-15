@@ -1,0 +1,96 @@
+
+################ pptx_cross_copy_plain ################
+
+--- whole child, --warmup 0 --samples 1 ---
+                                                                         before              after      delta
+PROGRAM TOTALS Ir                                                 4,496,073,687      4,389,546,486     -2.37%
+opened::model::package_fingerprint                                  275,900,135        196,889,891    -28.64%
+cross_copy_plan::physical_package_fingerprint                        72,297,592         31,616,094    -56.27%
+cross_copy_plan::snapshot_physical_revision                                   0         13,001,576         --
+cross_copy_plan::bounded_package_bytes                               45,996,941         59,315,103     28.95%
+opened::model::capture_internal                                     295,248,961        256,267,263    -13.20%
+cross_copy_plan::prepare_cross_slide_copy_for_slides                621,623,764        565,381,516     -9.05%
+pkgwriter::PackageWriter::write_to_stream                           117,635,072         90,463,640    -23.10%
+sha2::sha256::compress256                                         3,475,662,031      3,376,840,597     -2.84%
+zlib_rs::deflate::deflate                                            66,049,140         64,510,434     -2.33%
+soapberry_zip::preserve::PreservationIndex<R>::write_to              51,211,165         55,835,294      9.03%
+
+--- call counts, --warmup 0 --samples 1 ---
+opened::model::package_fingerprint                                           56                 40
+cross_copy_plan::physical_package_fingerprint                                37                 17
+cross_copy_plan::snapshot_physical_revision                                   0                 16
+cross_copy_plan::bounded_package_bytes                                        8                  8
+opened::model::capture_internal                                              36                 36
+cross_copy_plan::prepare_cross_slide_copy_for_slides                         10                 10
+pkgwriter::PackageWriter::write_to_stream                                    46                 26
+
+--- per lifecycle (s3 - s1) / 2 ---
+                                                                         before              after      delta
+instructions                                                        267,299,098        242,266,452     -9.37%
+opened::model::package_fingerprint                                   59,182,098         39,466,336    -33.31%
+cross_copy_plan::physical_package_fingerprint                        14,724,276          6,500,081    -55.85%
+cross_copy_plan::snapshot_physical_revision                                   0          3,250,394         --
+cross_copy_plan::bounded_package_bytes                               12,846,889         16,154,652     25.75%
+opened::model::capture_internal                                      68,566,206         58,466,152    -14.73%
+cross_copy_plan::prepare_cross_slide_copy_for_slides                149,265,232        136,147,792     -8.79%
+pkgwriter::PackageWriter::write_to_stream                            27,432,146         22,563,384    -17.75%
+sha2::sha256::compress256                                            75,154,750         50,665,038    -32.59%
+zlib_rs::deflate::deflate                                             2,494,129          2,494,166      0.00%
+soapberry_zip::preserve::PreservationIndex<R>::write_to               9,037,491         12,327,787     36.41%
+
+--- calls per lifecycle (s3 - s1) / 2 ---
+opened::model::package_fingerprint                                         12.0                8.0
+cross_copy_plan::physical_package_fingerprint                               9.0                4.0
+cross_copy_plan::snapshot_physical_revision                                 0.0                4.0
+cross_copy_plan::bounded_package_bytes                                      2.0                2.0
+opened::model::capture_internal                                             8.0                8.0
+cross_copy_plan::prepare_cross_slide_copy_for_slides                        2.0                2.0
+pkgwriter::PackageWriter::write_to_stream                                  12.0                7.0
+
+################ pptx_cross_copy_media_rich ################
+
+--- whole child, --warmup 0 --samples 1 ---
+                                                                         before              after      delta
+PROGRAM TOTALS Ir                                               158,965,107,851    123,862,232,137    -22.08%
+opened::model::package_fingerprint                               70,199,368,575     48,275,419,206    -31.23%
+cross_copy_plan::physical_package_fingerprint                    42,955,935,229     15,782,571,394    -63.26%
+cross_copy_plan::snapshot_physical_revision                                   0      7,003,881,712         --
+cross_copy_plan::bounded_package_bytes                           21,705,951,263     35,701,125,445     64.48%
+opened::model::capture_internal                                  41,422,302,353     33,519,081,947    -19.08%
+cross_copy_plan::prepare_cross_slide_copy_for_slides             79,502,900,738     58,453,044,616    -26.48%
+pkgwriter::PackageWriter::write_to_stream                        64,671,963,168     51,493,955,533    -20.38%
+sha2::sha256::compress256                                       124,954,533,243     89,903,628,405    -28.05%
+zlib_rs::deflate::deflate                                        26,855,243,968     26,853,691,617     -0.01%
+soapberry_zip::preserve::PreservationIndex<R>::write_to          24,493,077,041     36,698,148,176     49.83%
+
+--- call counts, --warmup 0 --samples 1 ---
+opened::model::package_fingerprint                                           60                 44
+cross_copy_plan::physical_package_fingerprint                                37                 17
+cross_copy_plan::snapshot_physical_revision                                   0                 16
+cross_copy_plan::bounded_package_bytes                                        8                  8
+opened::model::capture_internal                                              40                 40
+cross_copy_plan::prepare_cross_slide_copy_for_slides                         10                 10
+pkgwriter::PackageWriter::write_to_stream                                    46                 26
+
+--- per lifecycle (s3 - s1) / 2 ---
+                                                                         before              after      delta
+instructions                                                     35,610,254,229     26,847,795,508    -24.61%
+opened::model::package_fingerprint                               15,787,570,855     10,525,038,674    -33.33%
+cross_copy_plan::physical_package_fingerprint                    10,501,036,338      3,501,942,793    -66.65%
+cross_copy_plan::snapshot_physical_revision                                   0      1,750,970,428         --
+cross_copy_plan::bounded_package_bytes                            6,181,109,826      9,680,023,702     56.61%
+opened::model::capture_internal                                  10,562,031,349      8,804,305,458    -16.64%
+cross_copy_plan::prepare_cross_slide_copy_for_slides             20,617,285,356     15,361,619,292    -25.49%
+pkgwriter::PackageWriter::write_to_stream                        16,709,918,068     13,209,783,239    -20.95%
+sha2::sha256::compress256                                        28,037,044,392     19,274,528,456    -31.25%
+zlib_rs::deflate::deflate                                         5,955,591,941      5,955,602,461      0.00%
+soapberry_zip::preserve::PreservationIndex<R>::write_to           6,161,186,279      9,660,068,236     56.79%
+
+--- calls per lifecycle (s3 - s1) / 2 ---
+opened::model::package_fingerprint                                         12.0                8.0
+cross_copy_plan::physical_package_fingerprint                               9.0                4.0
+cross_copy_plan::snapshot_physical_revision                                 0.0                4.0
+cross_copy_plan::bounded_package_bytes                                      2.0                2.0
+opened::model::capture_internal                                             8.0                8.0
+cross_copy_plan::prepare_cross_slide_copy_for_slides                        2.0                2.0
+pkgwriter::PackageWriter::write_to_stream                                  12.0                7.0

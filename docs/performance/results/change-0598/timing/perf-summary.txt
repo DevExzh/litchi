@@ -1,0 +1,8 @@
+whole-child perf stat (4 selectors in one process, --warmup 1 --samples 10, taskset -c 21)
+   leg               cycles         instructions
+    A1      114,333,514,634      241,179,025,732
+    B1      103,565,195,289      227,412,838,459
+    B2      105,537,272,919      230,215,329,391
+    A2      113,916,550,394      239,793,628,139
+cycles: before mean 114,125,032,514  after mean 104,551,234,104  delta -8.39%   A/A -0.36%  B/B +1.90%
+instructions: before mean 240,486,326,936  after mean 228,814,083,925  delta -4.85%   A/A -0.57%  B/B +1.23%
