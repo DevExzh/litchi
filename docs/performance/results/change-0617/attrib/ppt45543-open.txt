@@ -1,0 +1,41 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/ppt45543-open-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/ppt45543-open-s2.out over 10 operations
+total_self_instructions_per_operation 3458197
+
+## by owner
+runtime                         3012364   87.11%
+format-ppt                       305187    8.83%
+cfb-parser                       139725    4.04%
+format-other                        835    0.02%
+probe                                86    0.00%
+
+## top 30 symbols by self instructions per operation
+       1821024   52.66%  runtime                __memcpy_avx_unaligned_erms
+        680272   19.67%  runtime                __memset_avx2_unaligned_erms
+        131278    3.80%  runtime                _int_malloc
+         90961    2.63%  format-ppt             <litchi_ppt::records::record::Record>::parse_impl'2
+         66070    1.91%  runtime                _int_free_merge_chunk
+         46257    1.34%  runtime                <alloc::raw_vec::RawVecInner>::finish_grow
+         45482    1.32%  cfb-parser             litchi_cfb::file::collect_sector_chain
+         44975    1.30%  runtime                free
+         34053    0.98%  runtime                malloc
+         25608    0.74%  cfb-parser             <litchi_cfb::file::SectorChainScratch>::collect_exact
+         24757    0.72%  format-ppt             core::ptr::drop_glue::<litchi_ppt::records::record::Record>'2
+         21820    0.63%  format-ppt             <litchi_ppt::records::record::Record>::parse_container_children_strict'2
+         20439    0.59%  runtime                _int_free_maybe_trim
+         20116    0.58%  runtime                unlink_chunk.isra.0
+         17595    0.51%  cfb-parser             <litchi_cfb::file::OleFile<core::io::cursor::Cursor<&[u8]>>>::read_sectors_batched
+         17513    0.51%  format-ppt             <litchi_ppt::document_structure::transaction::Snapshot>::parse_with_limits::<alloc::vec::Vec<u8>>
+         16042    0.46%  cfb-parser             litchi_cfb::directory_name::directory_name_data
+         15050    0.44%  runtime                <std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&i32>
+         14397    0.42%  runtime                _int_free_chunk
+         14258    0.41%  runtime                __libc_malloc2
+         14180    0.41%  format-ppt             <litchi_ppt::records::record::ParseBudget>::charge_record
+         13555    0.39%  runtime                realloc
+         13123    0.38%  format-ppt             <litchi_ppt::records::record::Record>::extract_text'2
+         12240    0.35%  runtime                __rustc::__rdl_alloc
+         12179    0.35%  runtime                _int_realloc
+         12053    0.35%  format-ppt             <litchi_ppt::records::record::ParseBudget>::charge_visit
+         10794    0.31%  format-ppt             <litchi_ppt::consts::RecordType as core::convert::From<u16>>::from
+         10461    0.30%  format-ppt             litchi_ppt::document_structure::codec::encode_record'2
+         10210    0.30%  format-ppt             litchi_ppt::document_comparison::codec::encode_document'2
+          9662    0.28%  format-ppt             <litchi_ppt::records::record::Record>::parse_container_children

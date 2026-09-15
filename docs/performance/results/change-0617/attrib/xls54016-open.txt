@@ -1,0 +1,44 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/xls54016-open-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/xls54016-open-s2.out over 10 operations
+total_self_instructions_per_operation 159559995
+
+## by owner
+format-xls                    105727689   66.26%
+runtime                        46911271   29.40%
+format-biff                     5623600    3.52%
+format-other                     841709    0.53%
+cfb-parser                       451769    0.28%
+ole-common-container               3679    0.00%
+ole-common-other                    209    0.00%
+probe                                69    0.00%
+
+## top 30 symbols by self instructions per operation
+      23033582   14.44%  format-xls             <alloc::collections::btree::map::BTreeMap<(u32, u32), litchi_xls::cell::Cell>>::insert
+      20789254   13.03%  format-xls             litchi_xls::workbook::codec::semantic::worksheet::add_cell
+      17781360   11.14%  runtime                __memcpy_avx_unaligned_erms
+      11317921    7.09%  format-xls             <litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<alloc::vec::Vec<u8>>>>::parse_worksheet_records_with_com
+       7304195    4.58%  runtime                _int_malloc
+       6448718    4.04%  runtime                <alloc::string::String>::from_utf16
+       5623600    3.52%  format-biff            <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+       5482626    3.44%  format-xls             <litchi_xls::row_block_index::codec::RowBlockIndexCollector>::feed_record
+       4567932    2.86%  format-xls             <litchi_xls::cell::Cell>::from_record_with_formula_context
+       3378768    2.12%  format-xls             <litchi_xls::layout::Collector>::feed_record
+       2818485    1.77%  runtime                _int_free_merge_chunk
+       2108004    1.32%  format-xls             litchi_xls::cell_values::parse_worksheet
+       1920594    1.20%  format-xls             <alloc::collections::btree::map::IntoIter<(u32, u32), litchi_xls::cell::Cell>>::dying_next
+       1911593    1.20%  runtime                __memset_avx2_unaligned_erms
+       1706764    1.07%  format-xls             <litchi_xls::conditional_format::codec::Collector>::feed_record
+       1693948    1.06%  runtime                free
+       1630835    1.02%  format-xls             <litchi_xls::comments::codec::CommentCollector>::feed_record
+       1510372    0.95%  format-xls             litchi_xls::cell_values::push_entry
+       1501100    0.94%  format-xls             <litchi_xls::records::SstCursor>::read_characters
+       1479194    0.93%  format-xls             <litchi_xls::scenario::ScenarioCollector>::feed_record
+       1213712    0.76%  format-xls             <litchi_xls::pivot_table::package::PivotTableCollector>::feed_record
+       1138115    0.71%  runtime                unlink_chunk.isra.0
+       1118848    0.70%  runtime                malloc
+       1100172    0.69%  format-xls             <litchi_xls::page_setup::PageSetupCollector>::feed_record
+       1100043    0.69%  format-xls             <litchi_xls::consolidation::ConsolidationCollector>::feed_record
+       1024064    0.64%  format-xls             <litchi_xls::list_object::package::collector::ListObjectCollector>::feed_record
+        986128    0.62%  format-xls             <litchi_xls::sort_data::SortDataCollector>::feed_record
+        969650    0.61%  format-xls             <litchi_xls::number_format::model::Formatting>::validate_cell_xf
+        948786    0.59%  format-xls             <litchi_xls::view::codec::ViewCollector>::feed_record
+        948200    0.59%  format-xls             <litchi_xls::query_table::validation::QueryTableCollector>::feed_record

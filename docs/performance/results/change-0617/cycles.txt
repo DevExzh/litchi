@@ -1,0 +1,41 @@
+# Native `perf stat` isolation pairs, CPU 11, release build with debug = 1.
+# Each leg: 11 repetitions at 10 iterations and 11 at 110; the medians are
+# differenced and divided by 100, so process start-up, the fixture read and
+# the probe's own printing cancel out.
+
+case           operation                    cycles/op  instructions/op    IPC
+xls54016       open                        60,867,372      147,800,641   2.43
+xls54016       commit                     134,973,045      342,696,585   2.54
+xls54016       container                    1,444,903        1,549,473   1.07
+xls54016       container-changed-only         497,040          540,835   1.09
+docfloat       open                         1,862,311        4,840,457   2.60
+docfloat       commit                       4,956,372       11,950,094   2.41
+docfloat       container                      656,574        1,303,425   1.99
+docfloat       container-changed-only          27,512           73,672   2.68
+docnohf        open                            96,328          292,038   3.03
+docnohf        commit                         359,673        1,035,758   2.88
+docnohf        container                      107,855          345,235   3.20
+docnohf        container-changed-only          14,184           39,508   2.79
+ppt45543       open                           500,765        1,106,025   2.21
+ppt45543       commit                       6,501,647       10,365,173   1.59
+ppt45543       container                      472,088          761,888   1.61
+ppt45543       container-changed-only         169,054          216,171   1.28
+pptauthored    open                            46,751          159,937   3.42
+pptauthored    commit                         383,970        1,261,555   3.29
+pptauthored    container                       75,473          262,240   3.47
+pptauthored    container-changed-only          11,235           44,920   4.00
+aafloorA       commit                       5,210,586       11,957,909   2.29
+aafloorB       commit                       5,381,788       11,944,953   2.22
+
+# Container share of one length-changing edit-and-save
+case            cont/commit cyc  cont/commit Ir  untouched/commit cyc  untouched/commit Ir
+xls54016                  1.07%           0.45%                 0.70%                0.29%
+docfloat                 13.25%          10.91%                12.69%               10.29%
+docnohf                  29.99%          33.33%                26.04%               29.52%
+ppt45543                  7.26%           7.35%                 4.66%                5.26%
+pptauthored              19.66%          20.79%                16.73%               17.23%
+
+# A/A control: the docfloat commit leg measured twice with the same binary,
+# interleaved with the runs above, 11 repetitions per level per leg.
+#   cycles       A 5,210,586  B 5,381,788  delta +3.29%
+#   instructions A 11,957,909  B 11,944,953  delta -0.108%

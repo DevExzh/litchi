@@ -1,0 +1,56 @@
+# Callgrind isolation pairs, CPU 11, release build with debug = 1.
+# Per-symbol SELF instructions at 12 iterations minus at 2, divided by 10.
+# Symbols are bucketed by crate; `runtime` is libc (memcpy, memset, malloc)
+# plus sha2 and other non-litchi code.
+#
+# CAVEAT: callgrind counts `rep movsb`/`rep stosb` once per BYTE, and 85% of
+# the container leg is exactly those two instructions, so every container
+# share here is an upper bound. See cycles.txt for the native figures.
+
+case           operation                    self Ir/op
+xls54016       open                        159,559,995
+xls54016       commit                      392,345,905
+xls54016       container                    16,525,225
+xls54016       container-changed-only        5,016,521
+docfloat       open                          6,878,409
+docfloat       commit                       23,105,764
+docfloat       container                     6,358,582
+docfloat       container-changed-only          422,829
+docnohf        open                            442,048
+docnohf        commit                        1,531,433
+docnohf        container                       545,924
+docnohf        container-changed-only           82,974
+ppt45543       open                          3,458,197
+ppt45543       commit                       60,090,521
+ppt45543       container                     5,352,589
+ppt45543       container-changed-only        1,762,305
+pptauthored    open                            196,127
+pptauthored    commit                        1,492,036
+pptauthored    container                       312,143
+pptauthored    container-changed-only           72,386
+
+# Container share of one length-changing edit-and-save (callgrind, upper bound)
+case                commit Ir   container Ir  cont/commit   untouched Ir  untouched/commit
+xls54016          392,345,905     16,525,225        4.21%     11,508,704             2.93%
+docfloat           23,105,764      6,358,582       27.52%      5,935,753            25.69%
+docnohf             1,531,433        545,924       35.65%        462,950            30.23%
+ppt45543           60,090,521      5,352,589        8.91%      3,590,284             5.97%
+pptauthored         1,492,036        312,143       20.92%        239,757            16.07%
+
+# Ownership of the whole `commit`, as a share of self instructions
+case                      cfb-writer            cfb-parser  ole-common-container      ole-common-other            format-xls            format-doc            format-ppt           format-biff          format-other                 probe               runtime
+xls54016                       0.03%                 0.29%                 0.00%                 0.00%                56.34%                 0.00%                 0.00%                 8.48%                 0.44%                 0.00%                34.41%
+docfloat                       0.50%                 3.59%                 0.22%                 0.07%                 0.00%                19.79%                 0.00%                 0.00%                 0.03%                 0.00%                75.79%
+docnohf                        2.27%                14.10%                 1.49%                 0.06%                 0.00%                12.58%                 0.00%                 0.00%                 0.22%                 0.01%                69.26%
+ppt45543                       0.05%                 2.23%                 0.00%                 0.00%                 0.00%                 0.00%                 1.53%                 0.00%                 0.01%                 0.00%                96.17%
+pptauthored                    0.82%                21.14%                 0.00%                 0.01%                 0.00%                 0.00%                19.35%                 0.00%                 0.24%                 0.01%                56.23%
+
+# Ownership of the `container` leg alone
+case                      cfb-writer            cfb-parser  ole-common-container      ole-common-other            format-xls            format-doc            format-ppt           format-biff          format-other                 probe               runtime
+xls54016                       0.72%                 2.94%                 0.06%                 0.00%                 0.00%                 0.00%                 0.00%                 0.00%                 0.01%                 0.00%                96.27%
+docfloat                       1.81%                 6.54%                 0.44%                 0.02%                 0.00%                 0.00%                 0.00%                 0.00%                 0.05%                 0.00%                91.13%
+docnohf                        6.36%                21.27%                 2.29%                 0.09%                 0.00%                 0.00%                 0.00%                 0.00%                 0.31%                 0.02%                69.65%
+ppt45543                       1.21%                 4.70%                 0.21%                 0.01%                 0.00%                 0.00%                 0.00%                 0.00%                 0.03%                 0.00%                93.84%
+pptauthored                    7.90%                31.95%                 3.19%                 0.13%                 0.00%                 0.00%                 0.00%                 0.00%                 0.52%                 0.04%                56.27%
+
+# Per-case top symbols are in attrib/<case>-<operation>.txt.

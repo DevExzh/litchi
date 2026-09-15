@@ -1,0 +1,30 @@
+[package]
+name = "cfb-save-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "cfb_save_probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-cfb = { path = "<REPO-ROOT>/crates/litchi-cfb", features = ["write"] }
+litchi-core = { path = "<REPO-ROOT>/crates/litchi-core" }
+litchi-doc = { path = "<REPO-ROOT>/crates/litchi-doc" }
+litchi-ppt = { path = "<REPO-ROOT>/crates/litchi-ppt" }
+litchi-xls = { path = "<REPO-ROOT>/crates/litchi-xls" }
+litchi-ole-common = { path = "<REPO-ROOT>/crates/litchi-ole-common" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "cfb_save_probe_peak"
+path = "src/bin/peak.rs"
+
+[[bin]]
+name = "cfb_writer_determinism"
+path = "src/bin/determinism.rs"

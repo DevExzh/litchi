@@ -1,0 +1,43 @@
+# PPT length-changing shape-text sweep: 40 fixtures x (slide 0,1) x (shape 0,1,2)
+# Command: cfb_save_probe --format ppt --ppt-op text --slide S --shape H --input FIXTURE --report
+# An admitted target would print a JSON line; every line below is a refusal.
+
+     43 Error: Refused(DependencyClosure)
+     42 Error: Refused(SlideNotFound { position: Position(1) })
+     29 Error: Refused(ShapeNotFound)
+     28 Error: Refused(NoTextAtom)
+     24 Error: Package(UnsupportedEncryption(CryptoApi))
+      8 Error: Refused(NoTextbox)
+      6 Error: Refused(SlideNotFound { position: Position(0) })
+
+# fixtures swept:
+#   test-data/ole/ppt/text_shapes.ppt
+#   test-data/ole/ppt/empty_textbox.ppt
+#   test-data/ole/ppt/ppt_with_png.ppt
+#   test-data/ole/ppt/empty.ppt
+#   test-data/ole/ppt/SampleShow.ppt
+#   test-data/ole/ppt/text-margins.ppt
+#   test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt
+#   test-data/office-interop/litchi-changed/45543-transition-litchi.ppt
+#   test-data/poi/test-data/slideshow/45543.ppt
+#   test-data/poi/test-data/slideshow/ppt_with_embeded.ppt
+#   test-data/poi/test-data/slideshow/cryptoapi-proc2356.ppt
+#   test-data/poi/test-data/slideshow/testPPT_oleWorkbook.ppt
+#   test-data/poi/test-data/slideshow/WithLinks.ppt
+#   test-data/poi/test-data/slideshow/bug58144-headers-footers-2007.ppt
+#   test-data/poi/test-data/slideshow/incorrect_slide_order.ppt
+#   test-data/poi/test-data/slideshow/ole2-embedding-2003.ppt
+#   test-data/poi/test-data/slideshow/datetime.ppt
+#   test-data/poi/test-data/slideshow/54880_chinese.ppt
+#   test-data/poi/test-data/slideshow/Password_Protected-56-hello.ppt
+#   test-data/poi/test-data/slideshow/Password_Protected-hello.ppt
+#   test-data/poi/test-data/slideshow/bug58144-headers-footers-2003.ppt
+#   test-data/poi/test-data/slideshow/41246-1.ppt
+#   test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt
+#   test-data/poi/test-data/slideshow/WithComments.ppt
+#   test-data/poi/test-data/slideshow/sound.ppt
+#   test-data/poi/test-data/slideshow/headers_footers.ppt
+#   test-data/poi/test-data/slideshow/Password_Protected-np-hello.ppt
+#   test-data/poi/test-data/slideshow/headers_footers_2007.ppt
+#   test-data/poi/test-data/slideshow/text-margins.ppt
+#   test-data/poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt

@@ -1,0 +1,44 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docfloat-commit-s12.out - /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0617/raw/docfloat-commit-s2.out over 10 operations
+total_self_instructions_per_operation 23105764
+
+## by owner
+runtime                        17512967   75.79%
+format-doc                      4572072   19.79%
+cfb-parser                       829921    3.59%
+cfb-writer                       115180    0.50%
+ole-common-container              50826    0.22%
+ole-common-other                  17127    0.07%
+format-other                       7460    0.03%
+probe                               211    0.00%
+
+## top 30 symbols by self instructions per operation
+      11317510   48.98%  runtime                __memcpy_avx_unaligned_erms
+       2665937   11.54%  runtime                __memset_avx2_unaligned_erms
+        799624    3.46%  format-doc             litchi_doc::sprm::parse_sprms
+        787548    3.41%  runtime                _int_malloc
+        593345    2.57%  format-doc             <litchi_doc::parts::text::TextExtractor>::new
+        477852    2.07%  runtime                free
+        462326    2.00%  runtime                _int_free_merge_chunk
+        364689    1.58%  runtime                malloc
+        267227    1.16%  format-doc             <litchi_doc::tracked_revision::package::RevisionEditor>::revisions
+        240394    1.04%  cfb-parser             litchi_cfb::directory_name::directory_name_data
+        204766    0.89%  format-doc             <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+        190890    0.83%  format-doc             <litchi_doc::tracked_revision::package::RevisionEditor>::decode_text_range
+        184921    0.80%  format-doc             litchi_doc::body_text::source_paragraphs
+        183523    0.79%  format-doc             <litchi_doc::parts::piece_table::PieceTable>::fc_range_to_cp_ranges
+        176655    0.76%  format-doc             <litchi_doc::parts::chp_bin_table::ChpBinTable>::parse
+        150076    0.65%  cfb-parser             litchi_cfb::file::collect_sector_chain
+        146131    0.63%  format-doc             <litchi_doc::parts::pap_bin_table::PapBinTable>::parse
+        137265    0.59%  runtime                _int_free_maybe_trim
+        127170    0.55%  runtime                __rustc::__rdl_alloc
+        124724    0.54%  runtime                unlink_chunk.isra.0
+        115467    0.50%  runtime                __libc_malloc2
+        102957    0.45%  format-doc             <litchi_doc::parts::fkp::ChpxFkp>::parse
+        102305    0.44%  format-doc             <litchi_doc::parts::fkp::PapxFkp>::parse
+        100444    0.43%  cfb-parser             <litchi_cfb::file::SectorChainScratch>::collect_exact
+         96703    0.42%  runtime                _int_free_chunk
+         96378    0.42%  runtime                <alloc::raw_vec::RawVecInner>::finish_grow
+         90776    0.39%  runtime                <[&[u8]] as alloc::slice::Concat<u8>>::concat
+         87217    0.38%  format-doc             <litchi_doc::parts::text::TextExtractor>::extract_text_from_piece_descriptors
+         83788    0.36%  format-doc             <litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+         82376    0.36%  format-doc             litchi_doc::tracked_revision::codec::parse_chpx
