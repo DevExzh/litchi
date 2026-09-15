@@ -1,0 +1,13 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0618/timing/opc-addrel-repeat
+A1                       n=2000  p50=     89.01 mean=     89.79 p95=     96.25 p99=     97.44 us
+A2                       n=2000  p50=     88.19 mean=     89.06 p95=     95.90 p99=     97.82 us
+B1                       n=2000  p50=     90.28 mean=     91.05 p95=     97.38 p99=     99.24 us
+B2                       n=2000  p50=     88.72 mean=     89.60 p95=     96.67 p99=     98.24 us
+A (before, pooled)       n=4000  p50=     88.72 mean=     89.43 p95=     96.15 p99=     97.68 us
+B (after, pooled)        n=4000  p50=     89.82 mean=     90.33 p95=     97.09 p99=     98.80 us
+delta p50   B-A =      +1.10 us    +1.24% of A   A-B =      -1.10 us    -1.22% of B
+delta mean  B-A =      +0.90 us    +1.01% of A   A-B =      -0.90 us    -1.00% of B
+delta p95   B-A =      +0.94 us    +0.98% of A   A-B =      -0.94 us    -0.97% of B
+delta p99   B-A =      +1.12 us    +1.15% of A   A-B =      -1.12 us    -1.13% of B
+A/A floor (A2 vs A1)     p50 -0.92%  p95 -0.36%  p99 +0.39%
+B/B floor (B2 vs B1)     p50 -1.73%  p95 -0.73%  p99 -1.01%

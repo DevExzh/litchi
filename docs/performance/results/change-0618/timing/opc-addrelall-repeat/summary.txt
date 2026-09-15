@@ -1,0 +1,13 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0618/timing/opc-addrelall-repeat
+A1                       n=2000  p50=    604.46 mean=    604.44 p95=    609.95 p99=    633.08 us
+A2                       n=2000  p50=    600.46 mean=    600.86 p95=    621.10 p99=    628.75 us
+B1                       n=2000  p50=    591.19 mean=    590.67 p95=    596.24 p99=    616.22 us
+B2                       n=2000  p50=    586.18 mean=    586.85 p95=    597.04 p99=    613.30 us
+A (before, pooled)       n=4000  p50=    601.69 mean=    602.65 p95=    617.83 p99=    631.21 us
+B (after, pooled)        n=4000  p50=    588.43 mean=    588.76 p95=    596.63 p99=    614.52 us
+delta p50   B-A =     -13.26 us    -2.20% of A   A-B =     +13.26 us    +2.25% of B
+delta mean  B-A =     -13.89 us    -2.31% of A   A-B =     +13.89 us    +2.36% of B
+delta p95   B-A =     -21.20 us    -3.43% of A   A-B =     +21.20 us    +3.55% of B
+delta p99   B-A =     -16.68 us    -2.64% of A   A-B =     +16.68 us    +2.71% of B
+A/A floor (A2 vs A1)     p50 -0.66%  p95 +1.83%  p99 -0.68%
+B/B floor (B2 vs B1)     p50 -0.85%  p95 +0.13%  p99 -0.47%

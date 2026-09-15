@@ -1,0 +1,21 @@
+# Native isolation pairs (perf stat -r 5, taskset -c 12). per-operation = (N+M - N) / M
+scenario                                       metric                before          after          delta        %
+
+## preservation writer, CFS workbook, publish only
+addrel     (1 regenerated member)              cycles               402,645        403,176            531   +0.13%
+addrel     (1 regenerated member)              instructions       1,371,972      1,368,759         -3,213   -0.23%
+addrel     (1 regenerated member)              page-faults               -0             -0              0  -50.00%
+addrelN:8  (8 regenerated members)             cycles               832,243        816,657        -15,585   -1.87%
+addrelN:8  (8 regenerated members)             instructions       2,931,666      2,901,340        -30,326   -1.03%
+addrelN:8  (8 regenerated members)             page-faults                0             -0             -0       -
+addrelall  (40 regenerated members)            cycles             2,673,674      2,614,286        -59,388   -2.22%
+addrelall  (40 regenerated members)            instructions       9,559,247      9,415,296       -143,951   -1.51%
+addrelall  (40 regenerated members)            page-faults                0             -0             -0 -300.00%
+
+## streaming writer, authored PPTX save
+create 1   (39 output members)                 cycles             5,063,727      4,358,787       -704,940  -13.92%
+create 1   (39 output members)                 instructions      15,757,367     14,737,266     -1,020,101   -6.47%
+create 1   (39 output members)                 page-faults               95             -0            -95 -100.36%
+create 50  (161 output members)                cycles            14,512,118     12,735,482     -1,776,636  -12.24%
+create 50  (161 output members)                instructions      48,071,748     45,920,075     -2,151,673   -4.48%
+create 50  (161 output members)                page-faults               11             12              1  +10.69%

@@ -1,0 +1,9 @@
+profile                               Compress::new   ReusableState::new  zlib deflate::reset   mini-archive parse
+before-pptx-create50-6                          966                    0                    0                    0
+after-pptx-create50-6                             0                    6                  966                    0
+before-pptx-create1-21                          819                    0                    0                    0
+after-pptx-create1-21                             0                   21                  819                    0
+before-opc-addrelall-24                         960                    0                    0                  960
+after-opc-addrelall-24                            0                  960                  960                  960
+before-opc-addrel-24                             24                    0                    0                   24
+after-opc-addrel-24                               0                   24                   24                   24

@@ -1,5 +1,42 @@
 # Performance program phase report
 
+## 0618 — the ZIP writer drives the Deflate compressor at both Office write sites
+
+`crates/soapberry-zip` renames change 0476's `OwnedDeflateState` to
+`ReusableDeflateState`, makes it `pub(crate)`, generalizes its write, flush and
+finish helpers from `OwnedCompressedEntry<W>` to any `W: Write`, and adds a
+`pub(crate) ReusedDeflateEncoder<'state, W>` that offers the same `Write` plus
+`finish` surface `flate2::write::DeflateEncoder` offers — including flate2's
+`Drop`, which finishes an unfinished stream and discards the result, so an
+abandoned member emits the bytes it emitted before. The state's reset moved from
+the end of a member to the start of the next one, so a save with a single
+Deflate member pays exactly the one construction it always paid, and its 32 KiB
+output buffer moved from an inline array to a `Box<[u8]>` so moving the struct
+into its box no longer zeroes and copies 32 KiB. `StreamingArchiveWriter` takes
+the state from its archive at all three of its Deflate sites and returns it only
+after that member's final Deflate output succeeded; a failed member drops it and
+the next one constructs a fresh one, the discipline 0476 established. The
+preservation writer's `generated_entry` keeps one compressor per regenerated
+member and builds it the same way. No public API, dependency, `unsafe` or limit
+changes; the compression level, strategy, framing, data descriptors, ZIP64
+decisions and accounting are untouched, as is the one-entry mini-archive the
+preservation writer builds and re-parses to derive a member's framing — priced
+at 617 Ir per member, 0.15%, and deliberately left in place because computing
+the framing directly would duplicate the writer's descriptor and ZIP64 decisions
+inside `preserve.rs` and drop a structural check on a preservation path.
+Validation passed `cargo fmt --all --check`, `cargo clippy -p soapberry-zip
+--all-targets`, `cargo test -p soapberry-zip`, `cargo doc -p soapberry-zip
+--no-deps`, and the consumer suites `litchi-opc`, `litchi-xlsx`/`litchi-docx`/
+`litchi-pptx` and `litchi-odt`/`litchi-odc`/`litchi-odf-common`/
+`litchi-iwa-archive`; five tests were added, four of them differentials that
+require the complete ZIP bytes to equal an archive built with one fresh
+`DeflateEncoder` per member, one of which pins the member that follows a refused
+one. One incidental finding is recorded and is unchanged by this work: the
+reader-fed streaming route and the whole-payload route produce slightly
+different Deflate bytes for the same member, because zlib-rs's block decisions
+are not invariant under regrouping of the input across codec calls. See
+[Change 0618](0618-zip-writer-deflate-state-reuse.md); `performance_claim: none`.
+
 ## 0619 — where the harness failure came from, and what it was not
 
 Change 0619 answers a question change 0601 left open and answers it against the commit history rather than against a hypothesis. The single harness test `tests::xls_source_backed_lifecycle_selectors_are_matched_and_local` was run on eight detached checkouts — `6b13261e5`, `c1d2caf85`, `2391a3462`, `93a610ded`, `08d968f8e`, `c1503db2b`, `f8cf7d2a1` and `1e4198321` — each built `--release --locked` in its own worktree with its own external `CARGO_TARGET_DIR`. Exactly one leg passes: `6b13261e5`, the parent of `c1d2caf85`. The first bad commit is therefore change 0565, `perf(xls): read the BIFF globals once, in one windowed pass`, and changes 0595 and 0605 — both of which state that reads, bytes and observations are unchanged per scenario — are cleared. A probe patched into `InstrumentedSource::read_at` then attributed every read of one source-backed XLS open at head: fifteen reads, 138,280 bytes, of which `cfb_structural` 136,704, `workbook_global` 1,483, `selected_worksheet` **0**, `opaque_payload` **0** and `unselected_worksheets` **93**. The 93 bytes are the tail of the second window fill, issued at logical 552 and bounded by the stream because no `BoundSheet8` had been framed yet, running 93 bytes past the corpus's 1,483-byte globals end; change 0565's record states the same number for the same corpus in two separate places. The gate `validate_xls_source_locality` bounds worksheet bytes at 65,536 and has passed throughout; what failed is the unit test, which asserts the pre-0565 contract at three sites through two published booleans that are still computed as `== 0`. The fix is confined to the test: the booleans are now asserted against their own definitions, so a definition drift is still caught, and the contract is asserted on the byte counters — selected worksheet exactly zero, any worksheet body at most one globals window. Gates on `tools/perf-baseline`, the separate Cargo project this change touches: `cargo fmt --all --check` exit 0, `cargo clippy --locked --all-targets` exit 0 with no warning, `cargo doc --locked --no-deps` exit 0 with no rustdoc warning, and `cargo test --locked --release` **508 passed, 0 failed, 1 ignored** over 509 tests where change 0601 recorded 501 passed and 7 failed, so the XLS lifecycle assertion and its six `PoisonError` cascades are all closed. No file under `crates/` changed; `performance_claim: none`. [Change and limitations](0619-harness-xls-lifecycle-assertion.md); [retained evidence](results/change-0619/README.md).

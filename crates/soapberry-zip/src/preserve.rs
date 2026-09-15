@@ -8,6 +8,7 @@
 
 use crate::office::ArchiveLimits;
 use crate::office::VerifiedPrecompressedEntry;
+use crate::writer::{ReusableDeflateState, ReusedDeflateEncoder};
 use crate::{
     CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
     ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
@@ -2153,18 +2154,22 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
                 writer.write_stored_file(&entry.name, entry.data.as_slice())?
             },
             CompressionMethod::Deflate => {
-                use flate2::Compression;
-                use flate2::write::DeflateEncoder;
-
                 // This helper remains fully buffered; the selector only establishes
                 // valid ZIP framing before the one-pass compressor starts.
                 let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
+                // One compressor per regenerated member, constructed and
+                // freed inside it. Carrying one across the members of a plan
+                // was measured and rejected: the plan retains one buffer per
+                // regenerated member, so a compressor held across them cannot
+                // be recycled by the allocator and costs 271 minor page faults
+                // per publish (change 0618).
+                let mut state = ReusableDeflateState::new();
                 let (mut file, config) = writer
                     .new_file(&entry.name)
                     .compression_method(CompressionMethod::Deflate)
                     .zip64(zip64)
                     .start()?;
-                let encoder = DeflateEncoder::new(&mut file, Compression::default());
+                let encoder = ReusedDeflateEncoder::new(&mut state, &mut file);
                 let mut data_writer = config.wrap(encoder);
                 data_writer.write_all(entry.data.as_slice())?;
                 let (encoder, descriptor) = data_writer.finish()?;
@@ -3833,6 +3838,85 @@ mod tests {
             precompressed_accounting.generated_deflate_payload_bytes_emitted(),
             0
         );
+    }
+
+    /// A regenerated Deflate member must be exactly the bytes a freshly
+    /// constructed `flate2` encoder produced before the writer drove the
+    /// compressor itself: same framing, same payload, same central record.
+    #[test]
+    fn a_regenerated_deflate_member_matches_a_fresh_flate2_encoder() {
+        fn payload(seed: u64, length: usize) -> Vec<u8> {
+            let mut xml = String::from("<?xml version=\"1.0\"?><r>");
+            let mut value = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
+            while xml.len() < length {
+                value ^= value << 13;
+                value ^= value >> 7;
+                value ^= value << 17;
+                xml.push_str(&format!(
+                    "<e id=\"{}\">text {}</e>",
+                    value % 9973,
+                    value % 101
+                ));
+            }
+            xml.push_str("</r>");
+            xml.into_bytes()
+        }
+
+        fn fresh_mini_archive(name: &str, data: &[u8]) -> Vec<u8> {
+            let zip64 = generated_deflate_needs_zip64(data.len(), name.len()).unwrap();
+            let mut writer = ZipArchiveWriter::new(Vec::new());
+            let (mut file, config) = writer
+                .new_file(name)
+                .compression_method(CompressionMethod::Deflate)
+                .zip64(zip64)
+                .start()
+                .unwrap();
+            let encoder = DeflateEncoder::new(&mut file, Compression::default());
+            let mut data_writer = config.wrap(encoder);
+            data_writer.write_all(data).unwrap();
+            let (encoder, descriptor) = data_writer.finish().unwrap();
+            encoder.finish().unwrap();
+            file.finish(descriptor).unwrap();
+            writer.finish().unwrap()
+        }
+
+        for (index, length) in [0usize, 37, 3_800, 64 * 1024 + 11, 91, 12_289]
+            .into_iter()
+            .enumerate()
+        {
+            let name = format!("word/part{index}.xml");
+            let data = payload(index as u64 + 1, length);
+            let entry = RegeneratedEntry::new(name.clone(), data.clone())
+                .compression_method(CompressionMethod::Deflate);
+            let prepared = generated_entry(&entry).unwrap();
+
+            let local = match &prepared.local {
+                PreparedLocal::Shared { bytes, range } => bytes[range.clone()].to_vec(),
+                _ => panic!("generated Deflate must publish shared local bytes"),
+            };
+            let central = match &prepared.central {
+                PreparedCentral::Shared { bytes, range } => bytes[range.clone()].to_vec(),
+                _ => panic!("generated Deflate must publish a shared central record"),
+            };
+            assert!(
+                prepared.generated_payload.is_some(),
+                "member {index} did not report its payload range"
+            );
+
+            let reference = fresh_mini_archive(&name, &data);
+            let central_end = local.len() + central.len();
+            assert!(reference.len() >= central_end);
+            assert_eq!(
+                local,
+                reference[..local.len()],
+                "member {index} local framing and payload differ from a fresh encoder"
+            );
+            assert_eq!(
+                central,
+                reference[local.len()..central_end],
+                "member {index} central record differs from a fresh encoder"
+            );
+        }
     }
 
     #[test]

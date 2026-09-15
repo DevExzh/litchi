@@ -888,3 +888,249 @@ fn dropping_incomplete_owned_deflate_does_not_publish_a_complete_archive() {
     }
     assert!(ZipArchive::from_slice(&output).is_err());
 }
+
+// ---------------------------------------------------------------------------
+// Change 0618: the Office streaming writer reuses one Deflate state across the
+// members of one archive. Every member must still be the byte-for-byte output
+// of a freshly constructed encoder, including after a refused member.
+// ---------------------------------------------------------------------------
+
+/// The streaming writer's own zip64 selection for default limits, mirrored so
+/// the reference archive opens its entries the same way.
+fn streaming_zip64_for_default_limits() -> bool {
+    let limits = StreamingArchiveLimits::default();
+    limits.max_compressed_size >= u64::from(u32::MAX)
+        || limits.max_entry_size >= u64::from(u32::MAX)
+}
+
+fn streaming_corpus() -> Vec<Member> {
+    vec![
+        Member {
+            name: "first.xml".to_string(),
+            method: CompressionMethod::Deflate,
+            payload: patterned_payload(3_800, 21),
+            zip64: false,
+        },
+        Member {
+            name: "empty.xml".to_string(),
+            method: CompressionMethod::Deflate,
+            payload: Vec::new(),
+            zip64: false,
+        },
+        Member {
+            name: "second.xml".to_string(),
+            method: CompressionMethod::Deflate,
+            payload: patterned_payload(96 * 1024 + 19, 22),
+            zip64: false,
+        },
+        Member {
+            name: "unicode/é.xml".to_string(),
+            method: CompressionMethod::Deflate,
+            payload: patterned_payload(1_021, 23),
+            zip64: false,
+        },
+        Member {
+            name: "third.xml".to_string(),
+            method: CompressionMethod::Deflate,
+            payload: patterned_payload(37 * 1024 + 5, 24),
+            zip64: false,
+        },
+    ]
+}
+
+/// One fresh `DeflateEncoder` per member, through the same borrowed entry API
+/// the streaming writer used before the state became reusable.
+fn fresh_streaming_reference(members: &[Member], zip64: bool) -> Vec<u8> {
+    let mut output = Vec::new();
+    {
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        for member in members {
+            let (mut entry, config) = archive
+                .new_file(&member.name)
+                .compression_method(CompressionMethod::Deflate)
+                .zip64(zip64)
+                .start()
+                .expect("reference streaming entry");
+            let encoder = DeflateEncoder::new(&mut entry, Compression::default());
+            let mut writer = config.wrap(encoder);
+            writer
+                .write_all(&member.payload)
+                .expect("reference payload");
+            let (encoder, descriptor) = writer.finish().expect("reference data finish");
+            encoder.finish().expect("reference Deflate finish");
+            entry.finish(descriptor).expect("reference entry finish");
+        }
+        archive.finish().expect("reference archive finish");
+    }
+    output
+}
+
+#[test]
+fn streaming_deflate_members_match_one_fresh_encoder_each() {
+    let members = streaming_corpus();
+    let mut writer = StreamingArchiveWriter::new();
+    for member in &members {
+        writer
+            .write_deflated(&member.name, &member.payload)
+            .expect("streaming Deflate member");
+    }
+    let reused = writer.finish_to_bytes().expect("streaming archive finish");
+    let reference = fresh_streaming_reference(&members, streaming_zip64_for_default_limits());
+    assert_eq!(
+        reused, reference,
+        "reusing one Deflate state changed the streaming archive bytes"
+    );
+    assert_round_trip(&reused, &members);
+}
+
+#[test]
+fn streaming_sized_deflate_members_match_one_fresh_encoder_each() {
+    let members = streaming_corpus();
+    let mut writer = StreamingArchiveWriter::new();
+    for member in &members {
+        writer
+            .write_deflated_sized(&member.name, &member.payload)
+            .expect("streaming sized Deflate member");
+    }
+    let reused = writer.finish_to_bytes().expect("sized archive finish");
+
+    let mut reference_writer = ZipArchiveWriter::new(Vec::new());
+    for member in &members {
+        // The sized route compresses into scratch with no intervening flush,
+        // then publishes the member with upfront sizes.
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&member.payload).expect("sized payload");
+        let compressed = encoder.finish().expect("sized Deflate finish");
+        reference_writer
+            .write_precompressed_file(
+                &member.name,
+                CompressionMethod::Deflate,
+                soapberry_zip::crc32(&member.payload),
+                member.payload.len() as u64,
+                &compressed,
+            )
+            .expect("sized reference member");
+    }
+    let reference = reference_writer.finish().expect("sized reference finish");
+    assert_eq!(
+        reused, reference,
+        "reusing one Deflate state changed the sized streaming archive bytes"
+    );
+    assert_round_trip(&reused, &members);
+}
+
+/// The reader-fed route copies through a fixed stream buffer, so its encoder
+/// sees the payload in fixed-size pieces. Deflate output is not invariant
+/// under that regrouping (the streaming and whole-payload routes have always
+/// produced slightly different bytes for the same member), so the reference
+/// for this route feeds the same pieces.
+fn fresh_chunked_reference(members: &[Member], zip64: bool, chunk: usize) -> Vec<u8> {
+    let mut output = Vec::new();
+    {
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        for member in members {
+            let (mut entry, config) = archive
+                .new_file(&member.name)
+                .compression_method(CompressionMethod::Deflate)
+                .zip64(zip64)
+                .start()
+                .expect("reference chunked entry");
+            let encoder = DeflateEncoder::new(&mut entry, Compression::default());
+            let mut writer = config.wrap(encoder);
+            for piece in member.payload.chunks(chunk) {
+                writer.write_all(piece).expect("reference chunked payload");
+            }
+            let (encoder, descriptor) = writer.finish().expect("reference chunked data finish");
+            encoder.finish().expect("reference chunked Deflate finish");
+            entry
+                .finish(descriptor)
+                .expect("reference chunked entry finish");
+        }
+        archive.finish().expect("reference chunked archive finish");
+    }
+    output
+}
+
+/// A reader that never returns more than `chunk` bytes per call, so the copy
+/// loop's writes — and therefore the encoder's input pieces — are known.
+struct ChunkedReader<'a> {
+    payload: &'a [u8],
+    chunk: usize,
+}
+
+impl Read for ChunkedReader<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let take = self.payload.len().min(self.chunk).min(buffer.len());
+        buffer[..take].copy_from_slice(&self.payload[..take]);
+        self.payload = &self.payload[take..];
+        Ok(take)
+    }
+}
+
+#[test]
+fn streaming_deflate_stream_members_match_one_fresh_encoder_each() {
+    const CHUNK: usize = 4_096;
+    let members = streaming_corpus();
+    let mut writer = StreamingArchiveWriter::new();
+    for member in &members {
+        writer
+            .write_deflated_stream(
+                &member.name,
+                ChunkedReader {
+                    payload: &member.payload,
+                    chunk: CHUNK,
+                },
+            )
+            .expect("streaming Deflate reader member");
+    }
+    let reused = writer.finish_to_bytes().expect("reader archive finish");
+    let reference = fresh_chunked_reference(&members, streaming_zip64_for_default_limits(), CHUNK);
+    assert_eq!(
+        reused, reference,
+        "reusing one Deflate state changed the reader-fed archive bytes"
+    );
+    assert_round_trip(&reused, &members);
+}
+
+#[test]
+fn a_refused_sized_member_leaves_the_next_member_byte_identical() {
+    // The sized route refuses before any archive byte is written, so the
+    // writer stays usable. The refused member's Deflate stream is abandoned
+    // part-way; the member after it must not inherit any of it.
+    let limits = StreamingArchiveLimits {
+        max_compressed_size: 4 * 1024,
+        ..StreamingArchiveLimits::default()
+    };
+    let kept = streaming_corpus();
+    let oversized = patterned_payload(256 * 1024, 25);
+
+    let mut writer = StreamingArchiveWriter::with_limits(limits);
+    writer
+        .write_deflated_sized(&kept[3].name, &kept[3].payload)
+        .expect("small member fits the compressed-size limit");
+    let refused = writer
+        .write_deflated_sized("refused.bin", &oversized)
+        .expect_err("an oversized member must be refused");
+    assert!(
+        matches!(refused.kind(), ErrorKind::LimitExceeded { .. }),
+        "expected a typed compressed-size refusal, got {refused:?}"
+    );
+    writer
+        .write_deflated_sized(&kept[1].name, &kept[1].payload)
+        .expect("the writer stays usable after a refused member");
+    let after_refusal = writer.finish_to_bytes().expect("archive finish");
+
+    let mut clean = StreamingArchiveWriter::with_limits(limits);
+    clean
+        .write_deflated_sized(&kept[3].name, &kept[3].payload)
+        .expect("small member");
+    clean
+        .write_deflated_sized(&kept[1].name, &kept[1].payload)
+        .expect("small member");
+    let without_refusal = clean.finish_to_bytes().expect("archive finish");
+
+    assert_eq!(
+        after_refusal, without_refusal,
+        "an abandoned Deflate stream leaked into the member that followed it"
+    );
+}
