@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-15T06:30:00Z",
+  "batch": [
+    "0584-ole2-profile-at-head",
+    "0585-cfb-resumable-cursor-construction",
+    "0586-doc-paragraph-hint-rejected"
+  ],
+  "removed": [
+    "the session scratchpad in full, from a peak of 29 GiB to zero: four detached measurement worktrees at about 6.9 GiB each (wt-before, wt-after, sst/wt, w0585/wt-before, w0585/wt-after), eleven isolated cargo target directories, two profiler output trees whose cited contents are retained in the repository, and the coordinator's drafts and backups",
+    "one worktree under /dev/shm created by a terminated measurement agent, removed and pruned",
+    "the temporary chain-step instrumentation applied to crates/litchi-cfb/src/shared.rs and crates/litchi-cfb/src/lib.rs, and the two throwaway probe examples crates/litchi-xls/examples/chain_probe.rs and crates/litchi-doc/examples/doc_chain_probe.rs; the three production files were verified byte-identical to their pre-instrumentation sha256 digests afterwards",
+    "two files that had been staged for change 0584's evidence packet and were found on audit to belong to a different concurrent investigation: a --tree=caller annotation over ConditionalFormattingSamples.xlsx produced by an OOXML probe binary, and a build log shared between the two"
+  ],
+  "retained_in_the_repository": [
+    "for change 0584: the consolidated per-symbol profile, 199 callgrind_annotate outputs across the XLS and DOC/PPT fixture families, the folded per-symbol JSON for both, the DOC/PPT harness source, every capture and analysis script, and two byte-layout models with their corpus output",
+    "for change 0585: the raw three-leg chain-link output for every .xls fixture, its folded summary, and instrumentation.patch.md, which records the exact switches, the three legs, and the argument for measuring link counts from one binary rather than paired builds",
+    "for change 0586: the raw two-leg output for every .doc fixture including the 49 the library refuses, its folded summary, and the rejected implementation as a patch"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after batch commit 57b25a820",
+  "background_tasks": "no measurement process remains; every subagent has completed or been stopped",
+  "notes": [
+    "target/ is 466 GiB of gitignored build output and is retained as ordinary build state; tools/perf-baseline/target is 948 MiB and target/non-iwork-gate is gate output, both gitignored and retained for the next batch",
+    "four git worktrees outside the repository belong to other concurrent sessions and were deliberately not touched",
+    "one gate fails and is pre-existing: tools/test_check_crate_boundaries.py has one failure of 1,104, an iWork policy-edge assertion of 240 edges against 241 found. It was not assumed to predate the batch but verified to, by stashing the batch in full and reproducing the identical single failure against a clean e927e139c. No Cargo.toml and no file under tools/ is modified by this batch, so none of that test's inputs moved.",
+    "the raw callgrind.out files behind change 0584's annotations are not retained; they are regenerable from the retained capture scripts and the recorded binary sha256, and every annotation they produce is retained in full",
+    "two coordinator errors are recorded here rather than left implicit. First, guidance was sent to an implementing agent asserting that the one-cell scenario could not benefit from the cursor hint; that reasoning considered only repeats inside the shared-string loop and missed that the globals scan has already walked the same stream, and it was corrected in a follow-up message before it could shape the design. Second, evidence for change 0584 was assembled from a scratch directory two agents were writing to concurrently, and two files belonging to the other investigation were caught only by auditing every candidate file for the wrong binary name before retention. Both are cheap to avoid: state a scenario's call count before predicting its saving, and give each agent an output directory of its own.",
+    "the session's Bash tool failed for roughly ten minutes, returning exit code 1 with no output on every command including 'true', while Read/Write/Edit and subagents' shells continued working. It recovered without a clear trigger. The user attributed it to /tmp exhausting its quota; a later check found 27 GiB free and no enforced quota, so the cause is recorded as unconfirmed. /tmp here is a 62 GiB tmpfs, so scratchpad growth consumes system memory, which is reason enough to sweep it during a long batch rather than only at the end.",
+    "measurement of this batch was interrupted by a session rate limit that terminated five agents mid-run. The chain-link counter was chosen as the evidence that could be taken reliably afterwards, not as the evidence one would prefer; perf stat, callgrind, cold-cache, allocation and RSS captures for change 0585 remain outstanding and are named as such in the record."
+  ],
+  "revision": "57b25a820"
+}
