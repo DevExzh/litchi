@@ -1,0 +1,11 @@
+==751984== Callgrind, a call-graph generating cache profiler
+==751984== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==751984== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==751984== Command: ./target/release/xmlprobe source real.xlsx H680
+==751984== 
+==751984== For interactive control, run 'callgrind_control -h'.
+==751984== 
+==751984== Events    : Ir
+==751984== Collected : 1075496653
+==751984== 
+==751984== I   refs:      1,075,496,653

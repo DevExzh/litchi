@@ -1,0 +1,104 @@
+== docmid-facade: total s10=38,447,005 s110=385,178,057 per-op Ir=3,467,311
+-- inclusive per-op deltas (top 40)
+     6,934,621 200.00%  std::rt::lang_start_internal
+     6,934,621 200.00%  (below main)
+     3,467,311 100.00%  0x0000000000023cc0
+     3,467,310 100.00%  docppt_survey::main
+     3,467,310 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+     3,467,310 100.00%  __libc_start_main@@GLIBC_2.34
+     3,467,310 100.00%  std::rt::lang_start::{{closure}}
+     3,467,310 100.00%  main
+     3,181,365  91.75%  litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options
+       996,281  28.73%  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+       796,270  22.97%  litchi_doc::parts::text::TextExtractor::new
+       578,615  16.69%  litchi_doc::document::package::<impl litchi_doc::document::model::state::Document>::from_ole_with_options::{{closure}}
+       573,687  16.55%  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       542,645  15.65%  __rustc::__rdl_alloc
+       483,275  13.94%  __memcpy_avx_unaligned_erms
+       374,321  10.80%  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_sprms
+       359,552  10.37%  litchi_cfb::file::OleFile<R>::open_stream
+       355,587  10.26%  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+       321,227   9.26%  __memset_avx2_unaligned_erms
+       276,006   7.96%  __rustc::__rust_alloc
+       265,855   7.67%  <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+       257,049   7.41%  litchi_doc::sprm::parse_sprms
+       244,786   7.06%  malloc
+       242,487   6.99%  __rustc::__rust_dealloc
+       239,357   6.90%  __rustc::__rdl_dealloc
+       239,056   6.89%  free
+       203,119   5.86%  __rustc::__rdl_realloc
+       193,129   5.57%  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_context
+       170,000   4.90%  litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+       166,487   4.80%  _int_realloc
+       163,730   4.72%  __libc_malloc2
+       160,607   4.63%  alloc::raw_vec::RawVecInner<A>::finish_grow
+       152,738   4.41%  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+       150,165   4.33%  _int_malloc
+       146,362   4.22%  core::ptr::drop_in_place<litchi_doc::document::model::state::Document>
+       145,066   4.18%  <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+       141,653   4.09%  litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+       138,571   4.00%  _int_free_chunk
+       134,278   3.87%  litchi_doc::package::codec::<impl litchi_doc::package::model::Package>::open_with
+       133,950   3.86%  <[V] as alloc::slice::Concat<T>>::concat
+-- self per-op deltas (top 25)
+       483,275  13.94%  __memcpy_avx_unaligned_erms
+       321,227   9.26%  __memset_avx2_unaligned_erms
+       287,382   8.29%  litchi_doc::parts::text::TextExtractor::new
+       259,614   7.49%  <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+       175,217   5.05%  litchi_doc::sprm::parse_sprms
+       141,674   4.09%  litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+       141,056   4.07%  _int_malloc
+       105,237   3.04%  free
+        91,665   2.64%  litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+        86,917   2.51%  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+        82,867   2.39%  malloc
+        81,842   2.36%  _int_free_merge_chunk
+        77,584   2.24%  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+        74,760   2.16%  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+        45,340   1.31%  <[V] as alloc::slice::Concat<T>>::concat
+        42,288   1.22%  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_context
+        42,088   1.21%  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+        39,899   1.15%  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_sprms
+        38,881   1.12%  litchi_doc::parts::proofing::ProofingStatus::from_raw
+        36,662   1.06%  litchi_doc::parts::proofing::ProofingStateTable::parse_bytes_with_max_cp
+        34,886   1.01%  litchi_doc::parts::proofing::ProofingStatus::validate
+        28,098   0.81%  __rustc::__rdl_alloc
+        27,394   0.79%  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_sprm
+        26,831   0.77%  alloc::raw_vec::RawVecInner<A>::finish_grow
+        24,771   0.71%  litchi_cfb::file::SectorChainScratch::collect_exact
+-- call counts per op (selected)
+     7,346.1  __memcpy_avx_unaligned_erms
+     3,122.0  malloc
+       965.0  litchi_doc::sprm::parse_sprms
+       954.8  _int_malloc
+       671.0  alloc::raw_vec::RawVecInner<A>::finish_grow
+       475.0  litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+       475.0  <[V] as alloc::slice::Concat<T>>::concat
+       262.0  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+       225.0  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+       213.0  litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections
+       213.0  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_context
+        69.0  __memset_avx2_unaligned_erms
+        59.0  <alloc::raw_vec::RawVecInner>::finish_grow
+        43.0  <alloc::string::String>::from_utf16
+        16.0  <alloc::string::String>::try_reserve
+        12.0  litchi_doc::parts::fkp::PapxFkp::parse
+        12.0  litchi_doc::parts::styles::semantic::resolve::<impl litchi_doc::parts::styles::model::StyleSheet>::resolve_paragraph_sty
+        12.0  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::paragraph_style_on_baseline
+         7.0  litchi_doc::parts::fkp::ChpxFkp::parse
+         4.0  litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections'2
+         4.0  litchi_doc::parts::styles::semantic::resolve::<impl litchi_doc::parts::styles::model::StyleSheet>::resolve_table_propert
+         3.0  litchi_cfb::file::OleFile<R>::open_stream
+         3.0  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+         3.0  litchi_cfb::file::collect_sector_chain
+         2.0  litchi_cfb::file::collect_sector_chain_exact
+         1.0  litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+         1.0  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+         1.0  litchi_cfb::file::OleFile<R>::load_directory
+         1.0  litchi_doc::parts::styles::semantic::resolve::<impl litchi_doc::parts::styles::model::StyleSheet>::resolve_revision_auth
+         1.0  alloc::sync::Arc<T,A>::from_box_in
+         1.0  litchi_cfb::file::OleFile<R>::open
+         1.0  litchi_doc::parts::smart_tags::DocumentSmartTags::parse_impl
+         1.0  litchi_doc::parts::styles::codec::parser::<impl litchi_doc::parts::styles::model::StyleSheet>::parse_with_leniency
+         1.0  litchi_doc::parts::styles::codec::parser::<impl litchi_doc::parts::styles::model::StyleSheet>::parse_data
+         1.0  core::ptr::drop_in_place<core::option::Option<litchi_doc::parts::styles::model::StyleSheet>>

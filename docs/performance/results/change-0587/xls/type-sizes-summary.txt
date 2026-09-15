@@ -1,0 +1,16 @@
+# rustc -Zprint-type-sizes, litchi-xls --release --locked, HEAD 2fc5fc657, rustc 1.95 (RUSTC_BOOTSTRAP=1), scratch CARGO_TARGET_DIR
+print-type-size type: `error::Error`: 48 bytes, alignment: 8 bytes
+print-type-size type: `litchi_cfb::OleError`: 40 bytes, alignment: 8 bytes
+print-type-size type: `litchi_core::ExecutionError`: 40 bytes, alignment: 8 bytes
+print-type-size type: `records::CellRecord`: 88 bytes, alignment: 8 bytes
+print-type-size type: `records::SharedStringEntryLocation`: 16 bytes, alignment: 8 bytes
+print-type-size type: `records::SharedStringScanError`: 48 bytes, alignment: 8 bytes
+print-type-size type: `records::SharedStringSstSegment`: 24 bytes, alignment: 8 bytes
+print-type-size type: `row_block_index::model::DbCellRecord`: 40 bytes, alignment: 8 bytes
+print-type-size type: `sheet_visibility::SheetEntry`: 48 bytes, alignment: 8 bytes
+print-type-size type: `std::result::Result<(), workbook::source::SourceBackedError>`: 48 bytes, alignment: 8 bytes
+print-type-size type: `std::result::Result<workbook::source::WorksheetFrame, workbook::source::SourceBackedError>`: 48 bytes, alignment: 8 bytes
+print-type-size type: `workbook::source::SheetEntry`: 72 bytes, alignment: 8 bytes
+print-type-size type: `workbook::source::SourceBackedError`: 48 bytes, alignment: 8 bytes
+print-type-size type: `workbook::source::SourceBackedLimits`: 80 bytes, alignment: 8 bytes
+print-type-size type: `workbook::source::WorksheetFrame`: 16 bytes, alignment: 8 bytes

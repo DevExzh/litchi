@@ -1,0 +1,12 @@
+fixture | bytes | sect | phys | FAT | DIFAT | MiniFAT | dirsec | entries | ministream | slurped@open | slurped/size | streams
+ConditionalFormattingSamples.xls | 1402368 | 512 | 2738 | 22 | 0 | 1 | 3 | 12 | 2112 | 1314225 | 93.71% | {'Workbook': 1314225}
+54016.xls | 984576 | 512 | 1922 | 16 | 0 | 1 | 2 | 5 | 384 | 927178 | 94.17% | {'Workbook': 927178}
+45543-transition-litchi.ppt | 842240 | 512 | 1644 | 13 | 0 | 1 | 2 | 8 | 1088 | 205092 | 24.35% | {'PowerPoint Document': 205048, 'Current User': 44}
+FloatingPictures.doc | 335360 | 512 | 654 | 6 | 0 | 1 | 4 | 16 | 4928 | 315658 | 94.13% | {'WordDocument': 38775, '1Table': 21575, 'Data': 255308}
+SampleShow.ppt | 125440 | 512 | 244 | 3 | 0 | 1 | 2 | 5 | 640 | 62458 | 49.79% | {'PowerPoint Document': 62399, 'Current User': 59}
+ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc | 1619457 | 512 | 3162 | 25 | 0 | 1 | 2 | 7 | 128 | 1595422 | 98.52% | {'WordDocument': 697827, '1Table': 893499, 'Data': 4096}
+saved-by-table.doc | 65024 | 512 | 126 | 1 | 0 | 1 | 2 | 7 | 128 | 52844 | 81.27% | {'WordDocument': 39996, '1Table': 12848}
+45543.ppt | 385024 | 512 | 751 | 6 | 0 | 0 | 2 | 6 | 0 | 315620 | 81.97% | {'PowerPoint Document': 311524, 'Current User': 4096}
+corpus xls: files=126 with_DIFAT=0 v4_sectors=0 max_bytes=1402368 max_entries=67 max_FAT_sectors=22 median_slurped/size=48.66% min=2.84% max=97.00%
+corpus doc: files=56 with_DIFAT=0 v4_sectors=0 max_bytes=1619457 max_entries=39 max_FAT_sectors=25 median_slurped/size=57.24% min=8.59% max=98.91%
+corpus ppt: files=30 with_DIFAT=0 v4_sectors=0 max_bytes=1341952 max_entries=8 max_FAT_sectors=21 median_slurped/size=53.43% min=21.60% max=86.02%

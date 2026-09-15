@@ -1,0 +1,45 @@
+12,425,676 (100.0%)  PROGRAM TOTALS
+2,234,582 (17.98%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms 
+  989,730 ( 7.97%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms 
+  645,397 ( 5.19%)  ???:zlib_rs::inflate::inftrees::inflate_table 
+  603,574 ( 4.86%)  ???:zlib_rs::inflate::inflate 
+  449,252 ( 3.62%)  ???:<quick_xml::events::attributes::IterState>::next 
+  447,876 ( 3.60%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match 
+  379,775 ( 3.06%)  ./malloc/./malloc/malloc.c:_int_malloc 
+  353,889 ( 2.85%)  ???:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write 
+  337,180 ( 2.71%)  ???:zlib_rs::inflate::inflate_fast_help 
+  330,570 ( 2.66%)  ???:core::slice::memchr::memchr_aligned 
+  306,104 ( 2.46%)  ???:soapberry_zip::office::normalize_str_fallibly 
+  237,894 ( 1.91%)  ???:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&litchi_opc::packuri::PackURI> 
+  235,894 ( 1.90%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk 
+  222,997 ( 1.79%)  ???:core::slice::memchr::memrchr 
+  208,381 ( 1.68%)  ???:<litchi_opc::packuri::PackURI>::validate_percent_encoding 
+  202,098 ( 1.63%)  ???:<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any
+  188,151 ( 1.51%)  ???:<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any
+  167,751 ( 1.35%)  ./malloc/./malloc/malloc.c:free 
+  167,224 ( 1.35%)  ???:<litchi_opc::packuri::PackURI>::new::<alloc::string::String> 
+  156,515 ( 1.26%)  ???:<litchi_opc::members::PartNameIndex>::insert 
+  154,670 ( 1.24%)  ???:<core::str::iter::Chars as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any
+  144,850 ( 1.17%)  ???:quick_xml::escape::normalize_attribute_value::<quick_xml::escape::is_xml10_normalization_char, quick_xml::escape::normalize_xm
+  129,760 ( 1.04%)  ./malloc/./malloc/malloc.c:malloc 
+  103,042 ( 0.83%)  ???:<alloc::raw_vec::RawVecInner>::finish_grow 
+   95,188 ( 0.77%)  ???:litchi_opc::pkgreader::inspect_relationship_element 
+   81,191 ( 0.65%)  ???:core::str::converts::from_utf8 
+   80,000 ( 0.64%)  ???:<zlib_rs::inflate::writer::Writer>::copy_match_runtime_dispatch 
+   75,025 ( 0.60%)  ???:<quick_xml::reader::Reader<&
+   73,678 ( 0.59%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim 
+   70,468 ( 0.57%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe 
+   54,967 ( 0.44%)  ???:__rustc::__rust_alloc 
+   54,949 ( 0.44%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 
+   54,244 ( 0.44%)  ???:litchi_opc::content_type::is_token 
+   53,788 ( 0.43%)  ???:<litchi_opc::packuri::PackURI>::from_rel_ref 
+   52,834 ( 0.43%)  ???:<quick_xml::events::attributes::IterState>::check_for_duplicates 
+   52,058 ( 0.42%)  ???:zip_opc_read_probe::summarize 
+   50,211 ( 0.40%)  ./malloc/./malloc/malloc.c:__libc_malloc2 
+   50,067 ( 0.40%)  ./malloc/./malloc/malloc.c:_int_free_chunk 
+   48,584 ( 0.39%)  ???:<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>::from_reader_with_limits_and_policy 
+   45,558 ( 0.37%)  ./stdio-common/./stdio-common/vfscanf-internal.c:__vfscanf_internal 
+   45,510 ( 0.37%)  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 
+   44,820 ( 0.36%)  ???:<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&str> 
+   42,236 ( 0.34%)  ???:<core::str::iter::SplitInternal<char>>::next 
+   42,090 ( 0.34%)  ???:<alloc::string::String>::try_reserve 

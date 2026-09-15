@@ -1,0 +1,1 @@
+----- per-op (21 ops) flagship open: pread 53 statx 34; flagship one-cell: pread 61 statx 47; 54016 open: pread 40 statx 30

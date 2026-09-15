@@ -1,5 +1,41 @@
 # Performance program phase report
 
+## 0587: a whole-path survey, and nothing landed
+
+One record, no production change. [0587](0587-remaining-opportunity-survey.md)
+is the cross-area survey the program had not written: eleven parallel surveys
+over the CFB substrate, XLS, DOC and PPT, the ZIP and OPC read path, the OPC
+save path, XLSX, DOCX and PPTX, the shared XML substrate, XLSB, `litchi-core`
+with the facade and the parallel sessions, and the program's own evidence,
+each screened against the 586 records before it. The result is a queue of 36
+opportunities ranked across the whole OLE2 and OOXML path, an ADR compliance
+matrix filled in advance, an evidence-gap table ranked by the DEFINITION OF
+DONE clause each gap blocks, and six correctness or compliance findings
+reported rather than fixed. `performance_claim: none`.
+
+Its headline is uncomfortable for the 225 records that precede it on the
+OOXML side. Every planning, selected-cell and commit measurement from 0362 to
+0553 ran on generated worksheets that carry none of the markup Excel writes by
+default, and on those files the MCE codec re-declares every in-scope namespace
+on every element it emits: one real worksheet grows 16.9× before the parser
+sees it, an eager open plus one cell costs 12.9× the marker-free control, and
+41 of 60 real fixtures take that path. Three landed optimizations are switched
+off on most real files by the same markers. On the OLE2 side the finding is
+that whole-artifact SHA-256, which callgrind cannot price, dominates the
+source-backed DOC and PPT snapshot opens — 13.4× the full eager parse of the
+same PPT in native cycles — and explains why change 0586 measured zero; the
+same term is 34.9% of a PPTX opened transaction and 85% of a cross-package
+slide copy. The CFB substrate itself is at its floor for this corpus, and the
+XLS one-cell query's remaining cost is framing overhead that 0584 named and no
+batch implemented.
+
+Every fresh figure is a single leg with the stated caveats, and the top item
+is measured on one fixture; the record's first prerequisite is a
+real-producer shape in the harness so that the next batches can be priced on
+the path real files take. The survey's first wave of eleven agents was
+terminated by a session usage cap before any had read a file and was relaunched
+in two waves; no evidence was lost.
+
 ## 0577-0583: a refusal narrowed under review, and three hypotheses refuted
 
 Seven records. Two production changes, two refutations, two designs and one

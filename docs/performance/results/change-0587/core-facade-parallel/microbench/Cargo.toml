@@ -1,0 +1,13 @@
+[package]
+name = "core-microbench"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi/crates/litchi-core" }
+
+[profile.release]
+debug = false
+lto = false
+codegen-units = 16

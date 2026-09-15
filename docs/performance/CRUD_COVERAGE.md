@@ -1,5 +1,30 @@
 # Performance CRUD coverage
 
+## 0587: coverage gaps named by the survey; no coverage change
+
+Change [0587](0587-remaining-opportunity-survey.md) adds no selector and
+promotes no row; it names the scenarios its ranked queue depends on that no
+selector measures today, so that the coverage work can be ordered by the queue
+rather than by convenience. The "Highest-return next cases" section further
+down this file predates about 340 records and is superseded by 0587's queue; it
+is retained as history.
+
+Missing on the OLE2 side: any facade open of a `.doc` or `.ppt` (0584's and
+0587's DOC and PPT figures come from throwaway drivers), any OLE2
+length-changing edit and save, XLS full text and all-cells reads through the
+source-backed owner, and any OLE2 range-source case although the CFB readers
+already take `ReadAt`. Missing on the OOXML side: the ordinary documented save
+path of every format (only the source-backed publication routes are timed), a
+file-backed cold part read, PPTX capture, commit, apply and publication as
+separate phases, eager DOCX phases, and an eager PPTX corpus opened with
+provenance (`from_vec`) rather than `from_bytes`. Missing everywhere: a corpus
+shape that carries what real producers write — MCE markers, `<cols>`, a
+shared-string part, worksheet relationships — since every generated shape
+omits them and 41 of 60 real XLSX fixtures have them; a refusal census per
+format, so that the 49-of-57 DOC and 57-of-95 XLSX refusal counts stop being
+re-derived by hand; and XLSB in the coverage index at all, none of `xlsb_crud`'s
+eight selectors being mapped.
+
 ## 0508: four text-export selectors enter the default contract
 
 [0508](changes/0508-default-semantic-text-export.md) adds plain RTF, ODT, ODS
@@ -1185,6 +1210,10 @@ timing, broad structural PPTX streaming output, and non-seek semantic
 conversion for other formats remain.
 
 ## Highest-return next cases
+
+Superseded on 2026-09-15 by change [0587](0587-remaining-opportunity-survey.md),
+whose ranked queue and coverage-gap list replace the priorities below; this
+section is retained as written for its history.
 
 1. Change 0165 records a private native-DOC lazy/fused fingerprint proof and a
    bounded descriptive comparison on the existing owner/public phase selector. Each immutable snapshot keeps its

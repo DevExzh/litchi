@@ -1,0 +1,27 @@
+Cell                                       72
+Option<Cell>                               72
+Value                                      24
+Option<Value>                              24
+Content                                    72
+Formula                                    72
+Option<Formula>                            72
+Unknown                                    48
+Text                                       16
+Number                                     16
+Date                                       16
+ErrorValue                                 24
+Address                                     8
+Option<Address>                            12
+Rect                                       16
+Option<Rect>                               20
+RowIndex                                    4
+ColumnIndex                                 4
+Option<u32>                                 8
+Option<usize>                              16
+(Address, Cell)                            80
+litchi_xlsx::workbook::SourceCell          80
+litchi_xlsx::workbook::SourceCellView      72
+litchi_xlsx::cell::View<'static>           24
+litchi_xlsx::row::Props                    48
+litchi_xlsx::Style                         16
+litchi_xlsx::streaming::StreamingCell<'static>   32

@@ -1,0 +1,40 @@
+1,037,845,761 (100.0%)  PROGRAM TOTALS
+  849,541,700 (81.86%)  /home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+  152,616,896 (14.71%)  /home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+   56,504,943 ( 5.44%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+   29,498,891 ( 2.84%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+   26,566,647 ( 2.56%)  /home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+   24,461,169 ( 2.36%)  /home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+   17,185,869 ( 1.66%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+   14,605,956 ( 1.41%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner
+   12,670,343 ( 1.22%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+   12,555,207 ( 1.21%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+      .                               String::from_utf8_lossy(name)
+523,827 ( 0.05%)      pub fn resolve_event<'i>(&self, event: Event<'i>) -> (ResolveResult<'_>, Event<'i>) {
+    342 ( 0.00%)      fn read_event_impl<'i, B>(&mut self, buf: B) -> Result<Event<'i>>
+174,552 ( 0.02%)          let event = self.reader.read_event_impl(buf);
+9,731,385 ( 0.94%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> (28,586x)
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+    513 ( 0.00%)          let event = self.read_event_impl(())?;
+ 28,327 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::read_event_impl::<()> (18x)
+    228 ( 0.00%)          Ok(self.ns_resolver.resolve_event(event))
+  2,815 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (18x)
+400,372 ( 0.04%)              let (namespace, event) = reader.resolver().resolve_event(event);
+3,765,702 ( 0.36%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (28,598x)
+     11 ( 0.00%)      capture_inner(content, true)
+24,461,169 ( 2.36%)  => /home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner (1x)
+     11 ( 0.00%)  fn capture_inner(content: &[u8], capture_rows: bool) -> Result<Values> {
+400,204 ( 0.04%)          let (namespace, event) = reader.resolver().resolve_event(event);
+3,763,441 ( 0.36%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (28,586x)
+     11 ( 0.00%)      memchr::memmem::find(content, b"dyDescent").is_some()
+    913 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:memchr::memmem::find (1x)
+        32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+    58,570 ( 0.01%)      let q = str::from_utf8(e.name().as_ref()).map_err(xerr)?.to_string();
+   456,536 ( 0.04%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (11,714x)
+    53,676 ( 0.01%)              str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),
+   633,836 ( 0.06%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (13,419x)
+        32 ( 0.00%)      process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
+849,541,700 (81.86%)  => /home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility (4x)
+     .                           String::from_utf8_lossy(name)
+27,200 ( 0.00%)      let row = std::str::from_utf8(&bytes[split..])
