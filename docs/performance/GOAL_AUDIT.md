@@ -1,5 +1,32 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0593 — unchanged-member preservation stops paying for discarded work
+
+Retained implementation against the audit's standing "close ZIP64/CFB and
+output-source preservation intersections" row, on its unchanged-member
+passthrough clause. Every OOXML save through `PackageWriter` previously paid a
+whole-package XML serialization and audit pass for members it then copied
+verbatim; the open-time canonical capture now proves the unchanged case in one
+pointer comparison, and the content-types manifest is decided from provenance
+before it is built. Correctness is established by whole-corpus byte identity,
+not by inspection: 336 OOXML fixtures × 4 mutation scenarios = 1,344 published
+digests and typed errors, before and after, with an empty diff, including 27
+preserved save refusals and 8 preserved open refusals; plus 12 of 12 identical
+editor-level rows, among them the two pre-existing `NotCompact` refusals 0587
+reported. Measured per publish: native cycles −62.20% to −71.11% on four
+fixture/scenario pairs, callgrind Ir −27.48% to −61.37% across ten, publish-only
+p50 −61.52% to −68.68% against a p50 A/A floor of ±0.7%. The audit row this does
+**not** close: no DOCX or PPTX semantic-editor save was measured through the
+ordinary save path, because no example opens a real `.docx` or `.pptx`, edits
+through the model and saves — 0587 §4 recorded that gap and it remains open, as
+does the absence of an ordinary-save selector in `tools/perf-baseline`. Cold
+cache, peak RSS and real-device fsync distributions remain unmeasured, and
+`save(path)` remains fsync-bound at ~7.5 ms of an 8.3 ms median on this host.
+`performance_claim: none`. OLE2 and OOXML remain active; ODF is deferred until
+that goal completes and iWork is excluded.
+[Change](0593-opc-publication-pristine-members.md);
+[evidence](results/change-0593/README.md).
+
 ## 0595 — retained lean XLS frame loop and cheaper eager SST walk
 
 Closes two rows of change 0587's ranked queue by GOAL step 1 (eliminate

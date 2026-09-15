@@ -1,0 +1,24 @@
+before tabs ConditionalFormattingSamples.xlsx [Home hide] -> e16b47a1ee8f6f95 :: saved 1 semantic change(s); Home is Hidden, active=false, position=0
+before tabs ConditionalFormattingSamples.xlsx [Home rename Home2] -> none :: Error: Package(XmlPublication { part: "/docProps/app.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+before tabs ConditionalFormattingSamples.xlsx [Products1 activate] -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet10.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+before edit_cells ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+before tabs WithChartSheet.xlsx [Home hide] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+before tabs WithChartSheet.xlsx [Home rename Home2] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+before tabs WithChartSheet.xlsx [Products1 activate] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Products1'" }
+before edit_cells WithChartSheet.xlsx -> 6f3cdf7cf605385f :: committed 4 semantic changes
+before tabs no_drawing_patriarch.xlsx [Home hide] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+before tabs no_drawing_patriarch.xlsx [Home rename Home2] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+before tabs no_drawing_patriarch.xlsx [Products1 activate] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Products1'" }
+before edit_cells no_drawing_patriarch.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs ConditionalFormattingSamples.xlsx [Home hide] -> e16b47a1ee8f6f95 :: saved 1 semantic change(s); Home is Hidden, active=false, position=0
+after tabs ConditionalFormattingSamples.xlsx [Home rename Home2] -> none :: Error: Package(XmlPublication { part: "/docProps/app.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after tabs ConditionalFormattingSamples.xlsx [Products1 activate] -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet10.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit_cells ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs WithChartSheet.xlsx [Home hide] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+after tabs WithChartSheet.xlsx [Home rename Home2] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+after tabs WithChartSheet.xlsx [Products1 activate] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Products1'" }
+after edit_cells WithChartSheet.xlsx -> 6f3cdf7cf605385f :: committed 4 semantic changes
+after tabs no_drawing_patriarch.xlsx [Home hide] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+after tabs no_drawing_patriarch.xlsx [Home rename Home2] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Home'" }
+after tabs no_drawing_patriarch.xlsx [Products1 activate] -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Products1'" }
+after edit_cells no_drawing_patriarch.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }

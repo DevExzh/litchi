@@ -1,5 +1,37 @@
 # Performance hotspot inventory
 
+## 0593 — OPC publication reuses the open-time relationship proof
+
+Retained implementation of 0587's SAVE-1 and SAVE-2. The publication plan
+reserialized and XML-audited the `.rels` of every part with relationships and
+rebuilt and audited `[Content_Types].xml` on every save, then byte-compared the
+result and raw-copied the source member, so the audited bytes never reached the
+output: 40 of 42 audits and all 41 reserializations on the 132-member hide save
+were for unchanged members. `Relationships` now carries the canonical
+serialization the preservation provenance captured at open, behind an `Arc`
+cleared by every mutation and matched by pointer identity, so an unchanged
+collection is copied without being serialized or audited; the content-types
+manifest is decided from provenance before it is built; identical payloads
+settle on the pointer before `memcmp`; and `atomic::replace_with_impl` stages
+the temporary file through a 64 KiB buffer. Per publish on the 132-member
+workbook with every member unchanged: `verify_authored` 42 → 0,
+`try_to_xml_bytes` 78 → 0, native cycles 992,747 → 342,567 (−65.49%), callgrind
+Ir 4,914,478 → 2,400,514 (−51.15%); on a 103-member PPTX, cycles −71.11%. The
+real `tabs … hide` save falls from 14.00% to 9.43% of the operation
+(−35.82% of the save) with its one regenerated part still audited. Write
+syscalls on `save(path)` fall 531 → 14 for the same 654,681 bytes and the same
+digest, but `save(path)` is fsync-bound: SAVE-2's modelled 0.8–1.6 ms is
+**falsified** here at a measured p50 of −2.33%, inside the host's 4% p50 floor.
+Publish-only p50 improves 61.52–68.68% across four fixture/scenario pairs with a
+p50 A/A floor of −0.57% to +0.66%; the p99 A/A floor in that window was −38.54%
+to +99.40% and the tails are not interpreted. `performance_claim: none`;
+`claim_authorized: false`. Remaining in this area: SAVE-3 (PPTX eager save
+regenerates every slide, frozen design needed), SAVE-4 (fresh deflate state per
+regenerated member), SAVE-5 (C2′ lazy part decode, proposed ADR needed). OLE2
+and OOXML remain active; ODF is deferred until that goal completes and iWork is
+excluded. [Change and limitations](0593-opc-publication-pristine-members.md);
+[retained evidence](results/change-0593/README.md).
+
 ## 0595 — retained lean XLS frame loop and cheaper eager SST walk
 
 Retains change 0587 items XLS-1 (rank 9, change 0584's never-landed candidate 2)

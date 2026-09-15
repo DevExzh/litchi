@@ -55,9 +55,13 @@ impl<W: Write> Write for Counted<'_, W> {
 /// serialization and XML audit completes before a sequential sink sees bytes.
 struct PublicationPlan<'package> {
     content_types_uri: PackURI,
-    content_types_xml: String,
+    /// `None` while the opened source's own `[Content_Types].xml` still
+    /// describes the package exactly, so the member is copied and a rebuilt
+    /// manifest would never be published.
+    content_types_xml: Option<String>,
     package_rels_uri: PackURI,
-    package_rels_xml: Vec<u8>,
+    /// `None` while the package relationships are unchanged since open.
+    package_rels_xml: Option<Vec<u8>>,
     parts: Vec<PlannedPart<'package>>,
 }
 
@@ -68,7 +72,18 @@ struct PlannedPart<'package> {
     authored_xml: bool,
     rels: &'package Relationships,
     relationships_member_present: bool,
+    /// The source `.rels` member still holds these relationships, proven by
+    /// the open-time capture, so the member is copied verbatim and no
+    /// serialization or audit is planned for it.
+    relationships_pristine: bool,
     relationships: Option<PlannedRelationships>,
+}
+
+impl PlannedPart<'_> {
+    /// Whether publication emits a relationships member for this part.
+    fn has_relationships(&self) -> bool {
+        self.relationships_pristine || self.relationships.is_some()
+    }
 }
 
 struct PlannedRelationships {
@@ -108,6 +123,9 @@ impl PlannedAppend<'_> {
 
 impl<'package> PublicationPlan<'package> {
     fn from_package(package: &'package OpcPackage) -> Result<Self> {
+        let provenance = package
+            .preservation_source()
+            .map(|(_source, provenance)| provenance);
         let mut parts = Vec::new();
         parts
             .try_reserve_exact(package.part_count())
@@ -115,7 +133,21 @@ impl<'package> PublicationPlan<'package> {
                 resource: "OPC XML publication part plan",
                 source,
             })?;
+        // Every part whose content type still matches the opened source leaves
+        // the source manifest describing the package exactly. Removed and
+        // added parts are caught by the part-count comparison below.
+        let mut content_types_match_source = provenance.is_some();
         for part in package.iter_parts() {
+            let source_part =
+                provenance.and_then(|provenance| provenance.parts.get(part.partname()));
+            content_types_match_source &= source_part
+                .is_some_and(|source_part| source_part.content_type == part.content_type());
+            let relationships_pristine = source_part.is_some_and(|source_part| {
+                source_part.relationships_member_present
+                    && part.rels().source_capture().is_some_and(|capture| {
+                        std::sync::Arc::ptr_eq(capture, &source_part.relationships_xml)
+                    })
+            });
             parts.push(PlannedPart {
                 partname: part.partname(),
                 content_type: part.content_type(),
@@ -127,26 +159,51 @@ impl<'package> PublicationPlan<'package> {
                 rels: part.rels(),
                 relationships_member_present: package
                     .source_relationships_member_present(part.partname()),
+                relationships_pristine,
                 relationships: None,
             });
         }
         parts.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
 
+        let content_types_pristine = content_types_match_source
+            && provenance.is_some_and(|provenance| provenance.parts.len() == parts.len());
+        let package_rels_pristine = provenance.is_some_and(|provenance| {
+            package.rels().source_capture().is_some_and(|capture| {
+                std::sync::Arc::ptr_eq(capture, &provenance.package_relationships_xml)
+            })
+        });
+
         let content_types_uri =
             PackURI::new(CONTENT_TYPES_URI).map_err(crate::OpcError::InvalidPackUri)?;
-        let content_types_xml = ContentTypesItem::from_parts(&parts)?.to_xml();
-        PackageWriter::validate_authored_xml("[Content_Types].xml", content_types_xml.as_bytes())?;
+        let content_types_xml = if content_types_pristine {
+            None
+        } else {
+            let content_types_xml = ContentTypesItem::from_parts(&parts)?.to_xml();
+            PackageWriter::validate_authored_xml(
+                "[Content_Types].xml",
+                content_types_xml.as_bytes(),
+            )?;
+            Some(content_types_xml)
+        };
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(crate::OpcError::InvalidPackUri)?;
         let package_rels_uri = package_uri
             .rels_uri()
             .map_err(crate::OpcError::InvalidPackUri)?;
-        let package_rels_xml = package.rels().try_to_xml_bytes()?;
-        PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
+        let package_rels_xml = if package_rels_pristine {
+            None
+        } else {
+            let package_rels_xml = package.rels().try_to_xml_bytes()?;
+            PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
+            Some(package_rels_xml)
+        };
 
         for part in &mut parts {
             if part.authored_xml {
                 PackageWriter::validate_authored_xml(part.partname.as_str(), part.blob)?;
+            }
+            if part.relationships_pristine {
+                continue;
             }
             if !part.rels.is_empty() || part.relationships_member_present {
                 let uri = part
@@ -168,10 +225,56 @@ impl<'package> PublicationPlan<'package> {
         })
     }
 
+    /// Serialize and audit every member this plan left to the source archive.
+    ///
+    /// Preservation copies pristine members straight out of the source, so
+    /// their bytes are never built. The full writer republishes every member
+    /// instead, so it needs them materialized. Materializing here keeps every
+    /// fallible serialization and audit ahead of emission, exactly as building
+    /// the plan does.
+    fn materialize_pristine(&mut self, package: &OpcPackage) -> Result<()> {
+        if self.content_types_xml.is_none() {
+            let content_types_xml = ContentTypesItem::from_parts(&self.parts)?.to_xml();
+            PackageWriter::validate_authored_xml(
+                "[Content_Types].xml",
+                content_types_xml.as_bytes(),
+            )?;
+            self.content_types_xml = Some(content_types_xml);
+        }
+        if self.package_rels_xml.is_none() {
+            let package_rels_xml = package.rels().try_to_xml_bytes()?;
+            PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
+            self.package_rels_xml = Some(package_rels_xml);
+        }
+        for part in &mut self.parts {
+            if !part.relationships_pristine {
+                continue;
+            }
+            let uri = part
+                .partname
+                .rels_uri()
+                .map_err(crate::OpcError::InvalidPackUri)?;
+            let xml = part.rels.try_to_xml_bytes()?;
+            PackageWriter::validate_authored_xml(uri.as_str(), xml.as_slice())?;
+            part.relationships_pristine = false;
+            part.relationships = Some(PlannedRelationships { uri, xml });
+        }
+        Ok(())
+    }
+
     fn write<W: Write>(&self, physical: &mut PhysPkgWriter<W>) -> Result<()> {
-        physical.write(&self.content_types_uri, self.content_types_xml.as_bytes())?;
-        physical.write(&self.package_rels_uri, self.package_rels_xml.as_slice())?;
+        let (Some(content_types_xml), Some(package_rels_xml)) = (
+            self.content_types_xml.as_ref(),
+            self.package_rels_xml.as_ref(),
+        ) else {
+            return Err(unmaterialized_publication_error());
+        };
+        physical.write(&self.content_types_uri, content_types_xml.as_bytes())?;
+        physical.write(&self.package_rels_uri, package_rels_xml.as_slice())?;
         for part in &self.parts {
+            if part.relationships_pristine {
+                return Err(unmaterialized_publication_error());
+            }
             physical.write(part.partname, part.blob)?;
             if let Some(relationships) = &part.relationships {
                 physical.write(&relationships.uri, relationships.xml.as_slice())?;
@@ -244,7 +347,7 @@ fn try_write_preserved<W: Write>(
             if !source_part.member_present {
                 return Ok(PreservationWrite::Fallback(writer));
             }
-            if !source_part.relationships_member_present && part.relationships.is_some() {
+            if !source_part.relationships_member_present && part.has_relationships() {
                 relationship_additions.push(part);
             }
             planned_parts.insert(part.partname, part);
@@ -267,7 +370,7 @@ fn try_write_preserved<W: Write>(
             SourceMemberKind::Part(partname) => !planned_parts.contains_key(partname),
             SourceMemberKind::PartRelationships(partname) => planned_parts
                 .get(partname)
-                .is_none_or(|part| part.relationships.is_none()),
+                .is_none_or(|part| !part.has_relationships()),
             SourceMemberKind::ContentTypes
             | SourceMemberKind::PackageRelationships
             | SourceMemberKind::Unknown => false,
@@ -411,14 +514,21 @@ fn try_write_preserved<W: Write>(
             )? {
                 return Ok(PreservationWrite::Fallback(writer));
             }
-            if let Some(relationships) = part.relationships.as_ref()
-                && !insert_final_member_name(
+            if part.has_relationships() {
+                // A pristine part has no planned relationships URI, because
+                // the plan never serialized one; the member name is the same
+                // one the plan would have derived from the part name.
+                let relationships_uri = part
+                    .partname
+                    .rels_uri()
+                    .map_err(crate::OpcError::InvalidPackUri)?;
+                if !insert_final_member_name(
                     &mut final_member_names,
-                    &relationships.uri,
+                    &relationships_uri,
                     "OPC final member name",
-                )?
-            {
-                return Ok(PreservationWrite::Fallback(writer));
+                )? {
+                    return Ok(PreservationWrite::Fallback(writer));
+                }
             }
         }
         if has_final_member_prefix_conflict(&final_member_names) {
@@ -498,20 +608,13 @@ fn try_write_preserved<W: Write>(
         return Ok(PreservationWrite::Fallback(writer));
     }
 
-    let removed_part = provenance
-        .members
-        .iter()
-        .zip(index.entries())
-        .any(|(member, entry)| {
-            omitted_ids.contains(&entry.id()) && matches!(member.kind, SourceMemberKind::Part(_))
-        });
-    let content_types_changed = removed_part
-        || publication.parts.iter().any(|part| {
-            provenance
-                .parts
-                .get(part.partname)
-                .is_none_or(|source| source.content_type != part.content_type)
-        });
+    // The plan already decided this: it holds a rebuilt manifest exactly when
+    // a part was added, removed or retyped since the package was opened.
+    let content_types_changed = publication.content_types_xml.is_some();
+    let package_rels_changed = publication
+        .package_rels_xml
+        .as_ref()
+        .is_some_and(|xml| provenance.package_relationships_xml.as_bytes() != xml.as_slice());
     let mut regenerated_bytes = 0_u64;
     let mut regenerated_members = 0_u64;
     let omitted_members = u64::try_from(omitted_ids.len())
@@ -524,13 +627,10 @@ fn try_write_preserved<W: Write>(
         }
         let bytes = match &member.kind {
             SourceMemberKind::ContentTypes if content_types_changed => {
-                Some(publication.content_types_xml.len())
+                publication.content_types_xml.as_ref().map(String::len)
             },
-            SourceMemberKind::PackageRelationships
-                if provenance.package_relationships_xml.as_bytes()
-                    != publication.package_rels_xml.as_slice() =>
-            {
-                Some(publication.package_rels_xml.len())
+            SourceMemberKind::PackageRelationships if package_rels_changed => {
+                publication.package_rels_xml.as_ref().map(Vec::len)
             },
             SourceMemberKind::Part(partname) => {
                 let Some(part) = planned_parts.get(partname) else {
@@ -539,20 +639,24 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                (source_part.blob.as_slice() != part.blob).then_some(part.blob.len())
+                (!source_blob_retained(source_part, part)).then_some(part.blob.len())
             },
             SourceMemberKind::PartRelationships(partname) => {
                 let Some(part) = planned_parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                let Some(relationships) = part.relationships.as_ref() else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                let Some(source_part) = provenance.parts.get(partname) else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                (source_part.relationships_xml.as_bytes() != relationships.xml.as_slice())
-                    .then_some(relationships.xml.len())
+                if part.relationships_pristine {
+                    None
+                } else {
+                    let Some(relationships) = part.relationships.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(source_part) = provenance.parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    (source_part.relationships_xml.as_bytes() != relationships.xml.as_slice())
+                        .then_some(relationships.xml.len())
+                }
             },
             SourceMemberKind::ContentTypes
             | SourceMemberKind::PackageRelationships
@@ -615,19 +719,24 @@ fn try_write_preserved<W: Write>(
             soapberry_zip::PreservationAction::Omit(indexed_entry.id())
         } else {
             match &source_member.kind {
-                SourceMemberKind::ContentTypes if content_types_changed => regenerated_action(
-                    indexed_entry.id(),
-                    preservation_member_name(source_member, indexed_entry),
-                    publication.content_types_xml.as_bytes(),
-                )?,
-                SourceMemberKind::PackageRelationships
-                    if provenance.package_relationships_xml.as_bytes()
-                        != publication.package_rels_xml.as_slice() =>
-                {
+                SourceMemberKind::ContentTypes if content_types_changed => {
+                    let Some(content_types_xml) = publication.content_types_xml.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
                     regenerated_action(
                         indexed_entry.id(),
                         preservation_member_name(source_member, indexed_entry),
-                        publication.package_rels_xml.as_slice(),
+                        content_types_xml.as_bytes(),
+                    )?
+                },
+                SourceMemberKind::PackageRelationships if package_rels_changed => {
+                    let Some(package_rels_xml) = publication.package_rels_xml.as_ref() else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    regenerated_action(
+                        indexed_entry.id(),
+                        preservation_member_name(source_member, indexed_entry),
+                        package_rels_xml.as_slice(),
                     )?
                 },
                 SourceMemberKind::Part(partname) => {
@@ -637,7 +746,7 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_part.blob.as_slice() == part.blob {
+                    if source_blob_retained(source_part, part) {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_shared_action(
@@ -651,20 +760,25 @@ fn try_write_preserved<W: Write>(
                     let Some(part) = planned_parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    let Some(relationships) = &part.relationships else {
-                        return Ok(PreservationWrite::Fallback(writer));
-                    };
-                    let Some(source_part) = provenance.parts.get(partname) else {
-                        return Ok(PreservationWrite::Fallback(writer));
-                    };
-                    if source_part.relationships_xml.as_bytes() == relationships.xml.as_slice() {
+                    if part.relationships_pristine {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
-                        regenerated_action(
-                            indexed_entry.id(),
-                            preservation_member_name(source_member, indexed_entry),
-                            relationships.xml.as_slice(),
-                        )?
+                        let Some(relationships) = &part.relationships else {
+                            return Ok(PreservationWrite::Fallback(writer));
+                        };
+                        let Some(source_part) = provenance.parts.get(partname) else {
+                            return Ok(PreservationWrite::Fallback(writer));
+                        };
+                        if source_part.relationships_xml.as_bytes() == relationships.xml.as_slice()
+                        {
+                            soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                        } else {
+                            regenerated_action(
+                                indexed_entry.id(),
+                                preservation_member_name(source_member, indexed_entry),
+                                relationships.xml.as_slice(),
+                            )?
+                        }
                     }
                 },
                 SourceMemberKind::ContentTypes
@@ -704,6 +818,30 @@ fn try_write_preserved<W: Write>(
         .write_to(&plan, Chunked { inner: writer })
         .map(|writer| PreservationWrite::Written(writer.inner))
         .map_err(|error| crate::OpcError::ZipError(error.to_string()))
+}
+
+/// Whether the part still holds the exact payload the source member carries.
+///
+/// The provenance normally retains the very allocation the part was loaded
+/// with, so the pointer settles the untouched case before a whole-part
+/// comparison is charged. The byte comparison remains the decision for every
+/// part whose payload was replaced.
+fn source_blob_retained(source_part: &crate::package::SourcePart, part: &PlannedPart<'_>) -> bool {
+    std::ptr::eq(source_part.blob.as_slice(), part.blob) || source_part.blob.as_slice() == part.blob
+}
+
+/// A plan reached the full writer with members only preservation can publish.
+///
+/// Pristine members exist only while an owned source archive backs the
+/// package, and such a package never reaches the full writer: it is refused
+/// with [`owned_source_preservation_error`] first. This keeps that reasoning
+/// enforced instead of assumed, so a future route cannot silently drop a
+/// member the plan left to the source.
+fn unmaterialized_publication_error() -> crate::OpcError {
+    crate::OpcError::PreservationUnavailable {
+        reason: "publication plan retained source members the full writer cannot republish"
+            .to_owned(),
+    }
 }
 
 fn insert_final_member_name(
@@ -929,13 +1067,14 @@ impl PackageWriter {
             return Ok(());
         }
         Self::validate_source_publication(package)?;
-        let plan = PublicationPlan::from_package(package)?;
+        let mut plan = PublicationPlan::from_package(package)?;
         let writer = match try_write_preserved(writer, package, &plan)? {
             PreservationWrite::Written(_writer) => return Ok(()),
             PreservationWrite::Fallback(writer) => {
                 if package.requires_owned_source_preservation() {
                     return Err(owned_source_preservation_error());
                 }
+                plan.materialize_pristine(package)?;
                 writer
             },
         };
@@ -970,7 +1109,7 @@ impl PackageWriter {
             return Ok(bytes);
         }
         Self::validate_source_publication(package)?;
-        let plan = PublicationPlan::from_package(package)?;
+        let mut plan = PublicationPlan::from_package(package)?;
         match try_write_preserved(Vec::new(), package, &plan)? {
             PreservationWrite::Written(bytes) => return Ok(bytes),
             PreservationWrite::Fallback(bytes) => {
@@ -978,6 +1117,7 @@ impl PackageWriter {
                     return Err(owned_source_preservation_error());
                 }
                 debug_assert!(bytes.is_empty());
+                plan.materialize_pristine(package)?;
             },
         }
         let mut physical = PhysPkgWriter::new();
@@ -1944,6 +2084,147 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn two_related_parts_source() -> (Vec<u8>, PackURI, PackURI) {
+        let first = PackURI::new("/custom/first.bin").expect("first URI");
+        let second = PackURI::new("/custom/second.bin").expect("second URI");
+        let mut first_part = crate::BlobPart::new(
+            first.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(4 * 1024, 0x1234_5678),
+        );
+        crate::Part::relate_to_ext(&mut first_part, "https://example.com/first", "urn:test");
+        let mut second_part = crate::BlobPart::new(
+            second.clone(),
+            "application/octet-stream".to_owned(),
+            pseudo_random_bytes(4 * 1024, 0x8765_4321),
+        );
+        crate::Part::relate_to_ext(&mut second_part, "https://example.com/second", "urn:test");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(first_part));
+        package.add_part(Box::new(second_part));
+        (
+            PackageWriter::to_bytes(&package).expect("serialize related source"),
+            first,
+            second,
+        )
+    }
+
+    fn partnames(package: &OpcPackage) -> Vec<PackURI> {
+        package
+            .iter_parts()
+            .map(|part| part.partname().clone())
+            .collect()
+    }
+
+    #[test]
+    fn a_pristine_relationships_proof_publishes_what_the_byte_compare_publishes() {
+        let (source, _first, _second) = two_related_parts_source();
+
+        // Taking the package relationship seam revokes exact-source
+        // authorization without changing a value, so publication takes the
+        // preservation route with every member still pristine.
+        let mut pristine = OpcPackage::from_vec(source.clone()).expect("open pristine source");
+        let _seam = pristine.rels_mut();
+        let pristine_output = PackageWriter::to_bytes(&pristine).expect("publish pristine package");
+
+        // Removing an absent identifier keeps every value identical but drops
+        // every open-time proof, so the same publication has to serialize and
+        // byte-compare each member exactly as it did before this change.
+        let mut compared = OpcPackage::from_vec(source.clone()).expect("open compared source");
+        compared.rels_mut().remove("rIdAbsent0593");
+        for partname in partnames(&compared) {
+            compared
+                .get_part_mut(&partname)
+                .expect("compared part")
+                .rels_mut()
+                .remove("rIdAbsent0593");
+        }
+        let compared_output =
+            PackageWriter::to_bytes(&compared).expect("publish byte-compared package");
+
+        assert_eq!(pristine_output, compared_output);
+        let reopened = OpcPackage::from_bytes(&pristine_output).expect("reopen pristine output");
+        assert_eq!(reopened.part_count(), 2);
+    }
+
+    #[test]
+    fn a_relationship_collection_moved_between_parts_cannot_reuse_its_proof() {
+        let (source, first, second) = two_related_parts_source();
+
+        let donor = OpcPackage::from_vec(source.clone()).expect("open donor source");
+        let donated = donor.get_part(&first).expect("donor part").rels().clone();
+
+        let mut package = OpcPackage::from_vec(source).expect("open target source");
+        let _seam = package.rels_mut();
+        *package
+            .get_part_mut(&second)
+            .expect("second part")
+            .rels_mut() = donated;
+
+        let output = PackageWriter::to_bytes(&package).expect("publish moved collection");
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen moved collection");
+        // The donated proof describes the first part, so the second part's
+        // member is serialized and compared rather than copied, and the
+        // publication carries the donated relationship instead of the source's.
+        let relationship = reopened
+            .get_part(&second)
+            .expect("republished second part")
+            .rels()
+            .get("rId1")
+            .expect("moved relationship");
+        assert_eq!(relationship.target_ref(), "https://example.com/first");
+    }
+
+    #[test]
+    fn adding_a_part_still_rebuilds_the_content_types_manifest() {
+        let (source, _first, _second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open topology source");
+        let third = PackURI::new("/custom/third.dat").expect("third URI");
+        package.add_part(Box::new(crate::BlobPart::new(
+            third,
+            "application/vnd.example.added".to_owned(),
+            pseudo_random_bytes(512, 0x0fed_cba9),
+        )));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish topology add");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["[Content_Types].xml"],
+            source_raw.local_members["[Content_Types].xml"]
+        );
+    }
+
+    #[test]
+    fn removing_a_part_still_rebuilds_the_content_types_manifest() {
+        let (source, first, _second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open removal source");
+        assert!(package.remove_part(&first));
+
+        let output = PackageWriter::to_bytes(&package).expect("publish removal");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["[Content_Types].xml"],
+            source_raw.local_members["[Content_Types].xml"]
+        );
+    }
+
+    #[test]
+    fn package_relationship_changes_still_regenerate_the_package_member() {
+        let (source, _first, second) = two_related_parts_source();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        package.relate_to(second.membername(), "urn:package:test");
+
+        let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
+        let raw = raw_archive(&output);
+        assert_ne!(
+            raw.local_members["_rels/.rels"],
+            source_raw.local_members["_rels/.rels"]
+        );
     }
 
     #[test]

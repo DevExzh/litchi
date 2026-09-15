@@ -1,5 +1,35 @@
 # Performance optimization ADR-compliance matrix
 
+## 0593 — preservation provenance stays planning evidence
+
+ADR 0005's 2026-08-21 amendment holds: the open-time relationship capture is used
+exactly as the byte comparison it replaces was used, to choose `Copy` for one
+member inside an already-proven preservation plan. It does not touch
+`exact_source_authorized`, does not widen who may take whole-archive exact
+passthrough, does not authorize a normalizing full-writer fallback, and does not
+remove the retained source archive ADR 0005 requires. The proof is conservative
+in one direction only — a pointer match proves "unchanged", a mismatch proves
+nothing and costs the previous path — and cannot be borrowed across parts or
+packages, because each part's provenance owns its own `Arc` allocation; a
+collection moved wholesale into another slot therefore falls back to
+serialize-and-compare, which a dedicated test asserts. ADR 0006 and record 0528
+hold: both the original and the replacement OPC audits remain for every changed
+member, and the XML-part audit is untouched. `ReadLimits` and the authored-XML
+`Limits` are unchanged; no malformed-input defence over published bytes is
+removed; no new `unsafe`, global cache, executor, lock, hidden Rayon pool or
+ambient I/O is introduced, and no archive type, raw lock or executor is leaked —
+the new public `AtomicSink` is a plain `Write` adapter over a temporary file the
+module owns. ADR 0005's output rules hold: atomic replacement keeps its sibling
+temporary artifact, permission preservation, symbolic-link refusal, flush,
+`sync_all`, rename, parent-directory sync and `Committed` error identity, and
+the added staging buffer is flushed before synchronization. One typed behaviour
+boundary moves and is recorded rather than hidden: the authored-XML audit of
+bytes that are generated and then discarded no longer runs for unchanged
+members. Focused validation passed 9 new tests, `litchi-opc` 422 library tests
+and its integration suites, and the `litchi-xlsx`, `litchi-docx` and
+`litchi-pptx` suites. See [Change 0593](0593-opc-publication-pristine-members.md);
+`performance_claim: none`.
+
 ## 0595 — retained lean XLS frame loop and cheaper eager SST walk
 
 ADR 0005 is the governing record and is satisfied unchanged: every

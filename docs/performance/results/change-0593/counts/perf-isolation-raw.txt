@@ -1,0 +1,16 @@
+cfs pkgrels before 20 cycles=32410553 instructions=99719245 
+cfs pkgrels before 220 cycles=230960018 instructions=838012462 
+cfs pkgrels after 20 cycles=18769738 instructions=49788741 
+cfs pkgrels after 220 cycles=87283233 instructions=291313161 
+cfs addrel before 20 cycles=34722087 instructions=102816176 
+cfs addrel before 220 cycles=247353009 instructions=871057545 
+cfs addrel after 20 cycles=21715520 instructions=53325979 
+cfs addrel after 220 cycles=102090530 instructions=328246295 
+pptx103 pkgrels before 20 cycles=24514499 instructions=81045411 
+pptx103 pkgrels before 220 cycles=190732232 instructions=705526996 
+pptx103 pkgrels after 20 cycles=13129160 instructions=39324727 
+pptx103 pkgrels after 220 cycles=61153243 instructions=243203595 
+wcs pkgrels before 20 cycles=9299676 instructions=28746061 
+wcs pkgrels before 220 cycles=60490931 instructions=243194488 
+wcs pkgrels after 20 cycles=5775287 instructions=15261013 
+wcs pkgrels after 220 cycles=24616348 instructions=95308843 
