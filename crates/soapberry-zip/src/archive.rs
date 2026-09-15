@@ -53,7 +53,7 @@ pub const RECOMMENDED_BUFFER_SIZE: usize = 1 << 16;
 /// This is a ceiling, not the read size. The actual read is also bounded by
 /// where the member's own payload must begin, so in a gapless archive it is
 /// exactly the fixed header plus that member's variable region.
-const STRICT_LOCAL_HEADER_WINDOW: usize = 640;
+pub(crate) const STRICT_LOCAL_HEADER_WINDOW: usize = 640;
 
 /// The widest data descriptor the strict paths accept, in bytes.
 ///
@@ -62,7 +62,7 @@ const STRICT_LOCAL_HEADER_WINDOW: usize = 640;
 /// sizes. The strict local-header window reserves this much room for a
 /// descriptor-bearing member, because the descriptor's real width is not known
 /// until that member's local header has been parsed.
-const MAX_DATA_DESCRIPTOR_SIZE: u64 = 24;
+pub(crate) const MAX_DATA_DESCRIPTOR_SIZE: u64 = 24;
 
 /// The widest local variable region a ZIP local file header can declare.
 ///
@@ -2036,9 +2036,28 @@ where
 
     /// Seeks to the given file entry in the zip archive.
     pub fn get_entry(&self, entry: ZipArchiveEntryWayfinder) -> Result<ZipEntry<'_, R>, Error> {
+        self.get_entry_from(entry, &self.reader)
+    }
+
+    /// [`Self::get_entry`], reading this member's local framing from `source`.
+    ///
+    /// `source` must present this archive's own bytes at this archive's own
+    /// offsets; it exists so a caller that has already buffered the member's
+    /// local record can answer these reads without a second positional
+    /// request. Every parse, bound and refusal below is the one
+    /// [`Self::get_entry`] performs, in the same order, on the same values: a
+    /// source that does not cover an offset is expected to delegate, so an
+    /// uncovered read reaches the archive reader unchanged.
+    pub(crate) fn get_entry_from<S>(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        source: &S,
+    ) -> Result<ZipEntry<'_, R>, Error>
+    where
+        S: ReaderAt,
+    {
         let mut buffer = [0u8; ZipLocalFileHeaderFixed::SIZE];
-        self.reader
-            .read_exact_at(&mut buffer, entry.local_header_offset)?;
+        source.read_exact_at(&mut buffer, entry.local_header_offset)?;
 
         // The central directory is the source of truth so we really only parse
         // out the local file header to verify the signature and understand the
@@ -2073,7 +2092,7 @@ where
                 })?;
             local_extra.resize(extra_length, 0);
             if extra_length != 0 {
-                self.reader.read_exact_at(&mut local_extra, extra_offset)?;
+                source.read_exact_at(&mut local_extra, extra_offset)?;
             }
             resolve_local_entry_size_framing(&file_header, &local_extra, &entry)?
         } else {
@@ -2130,15 +2149,22 @@ where
 
     /// Returns a [`ZipReader`] for reading the compressed data of this entry.
     pub fn reader(&self) -> ZipReader<&'archive R> {
+        self.reader_over(self.archive.get_ref())
+    }
+
+    /// [`Self::reader`], reading this entry's compressed payload from
+    /// `source`.
+    ///
+    /// The range is the one [`Self::reader`] uses, computed from the local
+    /// header this entry was built from. `source` only decides which reader
+    /// answers a positional read, never which bytes are asked for.
+    pub(crate) fn reader_over<S>(&self, source: S) -> ZipReader<S> {
         ZipReader {
             entry: self.entry,
             archive_is_zip64: self.archive_is_zip64,
             central_directory_offset: self.central_directory_offset,
             descriptor_width: self.descriptor_width,
-            range_reader: RangeReader::new(
-                self.archive.get_ref(),
-                self.body_offset..self.body_end_offset,
-            ),
+            range_reader: RangeReader::new(source, self.body_offset..self.body_end_offset),
         }
     }
 
@@ -2149,11 +2175,24 @@ where
     where
         D: std::io::Read,
     {
+        self.verifying_reader_over(reader, self.archive.get_ref())
+    }
+
+    /// [`Self::verifying_reader`], resolving a declared data descriptor
+    /// through `source`.
+    ///
+    /// The descriptor offset, width hint and central-directory bound are the
+    /// ones [`Self::verifying_reader`] uses; only the reader that answers the
+    /// positional read differs.
+    pub(crate) fn verifying_reader_over<D, S>(&self, reader: D, source: S) -> ZipVerifier<D, S>
+    where
+        D: std::io::Read,
+    {
         ZipVerifier {
             reader,
             crc: 0,
             size: 0,
-            archive: self.archive.get_ref(),
+            archive: source,
             end_offset: self.body_end_offset,
             wayfinder: self.entry,
             archive_is_zip64: self.archive_is_zip64,
@@ -3753,6 +3792,12 @@ impl ZipArchiveEntryWayfinder {
     #[inline]
     pub(crate) fn local_header_offset(&self) -> u64 {
         self.local_header_offset
+    }
+
+    /// Whether this member's central record declares a data descriptor.
+    #[inline]
+    pub(crate) fn has_data_descriptor(&self) -> bool {
+        self.has_data_descriptor
     }
 
     pub(crate) fn borrowed_provenance_supported(&self) -> bool {

@@ -1,0 +1,6 @@
+change-0582 build_corpus.py, RNG_SEED 0x05820580, regenerated for change 0611
+total: 22875
+family crafted: 45
+family mutations: 22307
+family seeds: 7
+family testdata: 516

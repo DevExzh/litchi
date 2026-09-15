@@ -219,8 +219,33 @@ fn corrupt_member_crc(bytes: &mut [u8], wanted: &str) {
 #[derive(Debug, Clone, Copy)]
 struct MemberRange {
     name: &'static str,
+    /// The offset of this member's first payload byte.
     start: u64,
-    end: u64,
+}
+
+/// The furthest before a member's payload that a read *of that member* can
+/// begin: the fixed local header plus the widest local variable region change
+/// 0573 measured in this repository's corpus.
+const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
+
+/// Whether one positional read fetches the payload of the member whose first
+/// payload byte is at `payload`.
+///
+/// Since change 0611 a member's first read is one bounded read of its whole
+/// local record, which begins at the member's local header rather than at its
+/// payload, so a probe keyed on the payload offset alone would never see a
+/// member start. The read must deliver the payload's first byte and must have
+/// begun inside the member's own local record; the non-empty requirement
+/// excludes the zero-length terminating read a range reader issues at the end
+/// of the preceding member.
+fn read_fetches_member(offset: u64, requested: usize, payload: u64) -> bool {
+    let Ok(requested) = u64::try_from(requested) else {
+        return false;
+    };
+    requested > 0
+        && offset <= payload
+        && payload - offset < requested
+        && payload - offset <= MEMBER_RECORD_PREFIX_BYTES
 }
 
 fn stored_member_ranges(bytes: &[u8]) -> Vec<MemberRange> {
@@ -244,7 +269,6 @@ fn stored_member_ranges(bytes: &[u8]) -> Vec<MemberRange> {
             ranges.push(MemberRange {
                 name,
                 start: u64::try_from(data_start).unwrap(),
-                end: u64::try_from(data_end).unwrap(),
             });
         }
         cursor = data_end;
@@ -294,10 +318,19 @@ impl MemberWaveProbe {
         changed.notify_all();
     }
 
-    fn member_at(&self, offset: u64) -> Option<usize> {
+    /// The member whose payload's first byte one positional read delivers.
+    ///
+    /// A member's payload used to arrive in a read that began exactly at its
+    /// offset. Since change 0611 a member's first read is one bounded read of
+    /// its whole local record, which begins at the member's local header, so a
+    /// probe keyed on the payload range alone would never see a member start.
+    /// Delivering the payload's first byte holds exactly once per member fetch
+    /// under either grammar: a 30-byte local-header read stops inside the
+    /// variable region, and a zero-length terminating read delivers nothing.
+    fn member_at(&self, offset: u64, requested: usize) -> Option<usize> {
         self.ranges
             .iter()
-            .position(|range| range.start <= offset && offset < range.end)
+            .position(|range| read_fetches_member(offset, requested, range.start))
     }
 
     fn wait_for_started(&self, target: usize, timeout: Duration) -> bool {
@@ -350,7 +383,7 @@ impl ReadAt for MemberWaveProbe {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        let Some(member) = self.member_at(offset) else {
+        let Some(member) = self.member_at(offset, output.len()) else {
             return self.inner.read_at(offset, output);
         };
         let (lock, changed) = &*self.state;
@@ -414,10 +447,19 @@ impl OrderedFailureProbe {
         }
     }
 
-    fn member_at(&self, offset: u64) -> Option<&'static str> {
+    /// The member whose payload's first byte one positional read delivers.
+    ///
+    /// A member's payload used to arrive in a read that began exactly at its
+    /// offset. Since change 0611 a member's first read is one bounded read of
+    /// its whole local record, which begins at the member's local header, so a
+    /// probe keyed on the payload range alone would never see a member start.
+    /// Delivering the payload's first byte holds exactly once per member fetch
+    /// under either grammar: a 30-byte local-header read stops inside the
+    /// variable region, and a zero-length terminating read delivers nothing.
+    fn member_at(&self, offset: u64, requested: usize) -> Option<&'static str> {
         self.ranges
             .iter()
-            .find(|range| range.start <= offset && offset < range.end)
+            .find(|range| read_fetches_member(offset, requested, range.start))
             .map(|range| range.name)
     }
 
@@ -464,7 +506,7 @@ impl ReadAt for OrderedFailureProbe {
         if !self.state.0.lock().unwrap().armed {
             return self.inner.read_at(offset, output);
         }
-        match self.member_at(offset) {
+        match self.member_at(offset, output.len()) {
             Some(name) if name == ALPHA_MEMBER => {
                 let (lock, changed) = &*self.state;
                 let mut state = lock.lock().unwrap();

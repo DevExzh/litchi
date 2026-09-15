@@ -1,0 +1,12 @@
+[package]
+name = "zip-opc-read-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "@TREE@/crates/litchi-core" }
+litchi-opc = { path = "@TREE@/crates/litchi-opc" }
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+
+[workspace]

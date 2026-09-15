@@ -1,0 +1,191 @@
+########################################################################
+## cargo fmt --all --check
+## $ nice -n 5 cargo fmt --all --check
+## exit status: 0
+
+########################################################################
+## cargo clippy -p soapberry-zip --all-targets
+## $ nice -n 5 cargo clippy -p soapberry-zip --all-targets -j 6 --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+## exit status: 0
+
+########################################################################
+## cargo clippy -p litchi-opc --all-targets
+## $ nice -n 5 cargo clippy -p litchi-opc --all-targets -j 6 --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+## exit status: 0
+
+########################################################################
+## cargo test -p soapberry-zip
+## $ nice -n 5 cargo test -p soapberry-zip -j 6 --locked
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive (line 1644) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<()>::from_seekable (line 1693) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::compressed_data_range (line 2218) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipSliceArchive (line 102) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipEntry<'archive,R>::local_header (line 2264) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::max_search_space (line 344) ... ok
+test crates/soapberry-zip/src/time.rs - time::ZipDateTime<TZ>::from_components (line 278) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 580) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_slice (line 487) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_file (line 530) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::comment (line 1824) ... ok
+test crates/soapberry-zip/src/path.rs - path (line 45) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_dir (line 1697) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1182) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_file (line 1803) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_reader (line 580) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 566) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriterBuilder::with_offset (line 487) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::stream_offset (line 892) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1195) ... ok
+test crates/soapberry-zip/src/time.rs - time (line 17) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::extra_field (line 1066) ... ok
+
+test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+## exit status: 0
+
+########################################################################
+## cargo test -p litchi-opc
+## $ nice -n 5 cargo test -p litchi-opc -j 6 --locked
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 1054) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 248) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 992) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 1001) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 1080) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.35s; merged doctests compilation took 0.35s
+## exit status: 0
+
+########################################################################
+## cargo doc -p soapberry-zip --no-deps
+## $ nice -n 5 cargo doc -p soapberry-zip --no-deps -j 6 --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+   Generated /home/zhuhe/code/litchi-worktrees/0611/target/doc/soapberry_zip/index.html
+## exit status: 0
+
+########################################################################
+## cargo doc -p litchi-opc --no-deps
+## $ nice -n 5 cargo doc -p litchi-opc --no-deps -j 6 --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+   Generated /home/zhuhe/code/litchi-worktrees/0611/target/doc/litchi_opc/index.html
+## exit status: 0
+
+########################################################################
+## consumer suites: litchi-xlsx, litchi-docx, litchi-pptx
+## $ nice -n 5 cargo test -p litchi-xlsx -p litchi-docx -p litchi-pptx -j 6 --locked
+test crates/litchi-pptx/src/shape/theme/part.rs - shape::theme::part::Part<'a>::read (line 80) ... ignored
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::linear_gradient (line 225) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+all doctests ran in 0.40s; merged doctests compilation took 0.33s
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+## exit status: 0
+
+########################################################################
+## consumer suites: litchi-xlsb, litchi-core
+## $ nice -n 5 cargo test -p litchi-xlsb -p litchi-core -j 6 --locked
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_conditional_formatting (line 1203) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_data_validation (line 1171) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_hyperlink (line 692) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_merged_cell (line 677) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::delete_cell (line 479) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::delete_row (line 1307) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::new (line 134) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::set_cell (line 191) ... ignored
+test crates/litchi-xlsb/src/writer/mod.rs - writer (line 17) - compile ... ok
+test crates/litchi-xlsb/src/writer/workbook/model.rs - writer::workbook::model::WorkbookWriter (line 30) - compile ... ok
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 7) ... ok
+test crates/litchi-xlsb/src/date_utils.rs - date_utils::excel_serial_to_unix (line 50) ... ok
+test crates/litchi-xlsb/src/writer/workbook/model.rs - writer::workbook::model::WorkbookWriter::add_worksheet (line 172) ... ok
+test crates/litchi-xlsb/src/date_utils.rs - date_utils::unix_to_excel_serial (line 86) ... ok
+
+test result: ok. 6 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 30) - compile fail ... ok
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 36) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+all doctests ran in 0.45s; merged doctests compilation took 0.41s
+## exit status: 0
+
+########################################################################
+## consumer suites: litchi-odt, litchi-odc, litchi-odf-common
+## $ nice -n 5 cargo test -p litchi-odt -p litchi-odc -p litchi-odf-common -j 6 --locked
+test crates/litchi-odt/src/elements/table_expansion.rs - elements::table_expansion::TableExpander::expand_table (line 32) - compile ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_paragraph_element (line 902) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::new (line 108) ... ok
+test crates/litchi-odt/src/mutable/package.rs - mutable::package::MutableDocument::from_document (line 25) - compile ... ok
+test crates/litchi-odt/src/mutable/package.rs - mutable::package::MutableDocument::insert_image (line 98) - compile ... ok
+test crates/litchi-odt/src/mutable/package.rs - mutable::package::MutableDocument::save (line 386) - compile ... ok
+test crates/litchi-odt/src/mutable/package.rs - mutable::package::MutableDocument::to_bytes (line 436) - compile ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_rich_paragraph (line 797) ... ok
+test crates/litchi-odt/src/mutable/semantic/mod.rs - mutable::semantic (line 7) - compile ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_bool (line 217) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_color (line 388) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_length (line 324) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_int (line 246) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::extract_local_name (line 433) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_float (line 294) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::extract_prefix (line 412) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::is_namespace (line 490) ... ok
+test crates/litchi-odt/src/elements/style_builder.rs - elements::style_builder::StyleBuilder (line 16) ... ok
+test crates/litchi-odt/src/streaming.rs - streaming (line 12) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::match_tag (line 466) ... ok
+test crates/litchi-odt/src/mutable/model.rs - mutable::model::MutableDocument::new (line 46) ... ok
+
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.39s; merged doctests compilation took 0.38s
+## exit status: 0
+
+########################################################################
+## aggregate test totals per gate section
+## (the section tails above show only the last 25 lines, which for a
+##  test section is its doctest tail; these are the totals)
+
+soapberry-zip: 610 passed, 0 failed, 2 ignored, across 12 binaries
+litchi-opc: 679 passed, 0 failed, 1 ignored, across 24 binaries
+litchi-xlsx litchi-docx litchi-pptx: 3629 passed, 0 failed, 33 ignored, across 186 binaries
+litchi-xlsb litchi-core: 946 passed, 0 failed, 11 ignored, across 20 binaries
+litchi-odt litchi-odc litchi-odf-common: 1544 passed, 0 failed, 1 ignored, across 90 binaries

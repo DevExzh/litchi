@@ -1,5 +1,40 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0611: one bounded positional read per ZIP member first-read — a source-backed OOXML open halves its requests, and halves its wall clock on a latency-bearing transport
+
+Record: [0611](0611-zip-single-read-per-member.md).
+
+Change 0611 is the first change in this programme to price a read-grammar change
+on a latency-bearing transport rather than on a warm local source, and it is
+worth recording why that was the right instrument. Change 0561 attributed this
+span model and declined to implement it because change 0493 had already measured
+the same mechanism, as an opt-in read-ahead window, at ±2% on a warm local
+source and −85% at 1 ms per request; its conclusion was that collapsing these
+reads is worth nothing locally and must be argued against a range-source
+measurement. This change is the measurement 0561 asked for, and it confirms both
+halves: on local, in-process sources every selector sits inside the A/A floor and
+nothing is claimed, while on the simulated transport a source-backed OPC open
+halves its wall clock. The standing instruction that instruction counts rank
+work and not latency has a counterpart here — **request counts rank latency on a
+transport and not work**; the deterministic count is the durable result and the
+timing is its price at one service time. A third lesson is about *test triggers* rather than assertions: sixteen tests in
+two consumer crates identified "the read that fetches this member" by its start
+offset, and every one of them broke without a single contract moving. Three
+successive predicates were needed before one held under both grammars, and each
+wrong one was found by a different test — a zero-length terminating read landing
+on the next member's header, a preservation probe at the same offset as the
+member read, and a bulk publication copy spanning the member from 64 KiB away.
+A read-grammar change should expect to spend as much effort on triggers as on
+the code.
+
+The second lesson is about oracles. The
+differential change 0582 built, the gate 0587 names for any read-grammar change,
+exercises only the strict-layout APIs and never calls `IndexedArchive::read_entry`
+— the path every ordinary OPC part read takes. Re-running it unchanged would
+have proved nothing about this change. It had to be extended before it could
+gate, and once extended it immediately found a real divergence that no test in
+either crate caught.
+
 ## 0629 — a fence the program wanted, a test the gate list could not see
 
 Record: [0629](0629-facade-docx-budget-test-bisect.md).

@@ -39,7 +39,7 @@ use crate::accounting::{
 };
 use crate::crc::crc32_chunk;
 use crate::path::{RawPath, ZipFilePath};
-use crate::reader_at::validate_read_count;
+use crate::reader_at::{ReaderAtExt, validate_read_count};
 use crate::writer::ReusedDeflateEncoder;
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
@@ -1135,6 +1135,147 @@ impl<E: std::error::Error + 'static> std::error::Error for VerifiedPrecompressed
     }
 }
 
+/// The largest member local record one positional read will cover.
+///
+/// This is a ceiling on a speculative read and on the buffer that holds it,
+/// not the read size: the window is also bounded by the member's own declared
+/// compressed size and by where the next local header begins, so in a gapless
+/// archive it is exactly that member's local record.
+///
+/// The size is measured, not guessed. Across the 7,757 members of the 335
+/// OOXML containers under `test-data`, `30 + local variable region +
+/// compressed size + 24` is at most 4 KiB for 7,493 members, 32 KiB for 7,695
+/// and 64 KiB for 7,732 (99.68%); a member above the ceiling keeps the
+/// historical two-read path unchanged. 64 KiB is also the largest single
+/// speculative window `litchi-opc` will issue for its own read-ahead
+/// (`MAX_SOURCE_READ_AHEAD_BYTES`), so this path adds no larger resident
+/// buffer than the layer above it already admits.
+const MAX_MEMBER_SPAN_READ_BYTES: u64 = 64 * 1024;
+
+/// The framing a member's *declared* span bound reserves for its fixed local
+/// header and its local variable region.
+///
+/// Neither half of the variable region is carried by the central directory, so
+/// a bound computed before the local header is read must allow for it. This is
+/// change 0573's measured window — 30 fixed bytes plus 610 — which covers every
+/// OOXML member's variable region in this repository's corpus.
+const MEMBER_SPAN_METADATA_ALLOWANCE: u64 = crate::STRICT_LOCAL_HEADER_WINDOW as u64;
+
+/// One member's local record, read once and served to every reader of that
+/// member.
+///
+/// The buffer is a cache of source bytes and nothing else. No value is trusted
+/// because it came from here: the local header is parsed, bounded and verified
+/// by exactly the code that parses, bounds and verifies it when each read goes
+/// to the source separately.
+#[derive(Debug)]
+struct MemberSpan {
+    /// The archive offset the first buffered byte was read from.
+    base: u64,
+    /// Whatever the one positional read returned, which may be short.
+    bytes: Vec<u8>,
+}
+
+/// A positional reader that answers from one member's buffered local record
+/// and delegates every other read to the archive's own source.
+///
+/// A read the buffer does not hold at all reaches the source at exactly the
+/// offset and length it would have reached without the buffer. A read the
+/// buffer holds only the start of is answered with that prefix, and the caller
+/// asks for the rest at the next offset, where the same rule applies: the bytes
+/// delivered are the same, in more pieces. That is harmless for a
+/// [`ReaderAt::read_exact_at`] caller, which loops until its buffer is full,
+/// and it is *not* harmless for the payload a decoder consumes, so the payload
+/// is routed by [`SpannedSource::covers`] and never served in part.
+///
+/// The reader therefore changes how many positional requests a member costs and
+/// nothing else — not which bytes are asked for, not which checks run, not in
+/// what order, and not which error is produced.
+pub(crate) struct SpannedSource<'archive, R> {
+    source: &'archive R,
+    span: Option<Arc<MemberSpan>>,
+}
+
+impl<'archive, R> SpannedSource<'archive, R> {
+    /// A reader that buffers nothing and forwards every read to `source`.
+    const fn passthrough(source: &'archive R) -> Self {
+        Self { source, span: None }
+    }
+
+    /// The source this reader falls back to.
+    const fn source(&self) -> &'archive R {
+        self.source
+    }
+
+    /// Whether the buffer holds every byte of `range`.
+    ///
+    /// A partly-covered range is served correctly — the covered prefix comes
+    /// from the buffer and the rest from the source — but it is served in
+    /// different-sized pieces than the source would have delivered, and a
+    /// consumer that decides something per read, as the ZIP verifier does when
+    /// it completes a member, can then reach a different one of two refusals
+    /// for the same malformed member. A caller that cares about that asks for
+    /// full coverage and takes the passthrough reader when it is not there.
+    fn covers(&self, range: std::ops::Range<u64>) -> bool {
+        let Some(span) = self.span.as_deref() else {
+            return false;
+        };
+        let end = span
+            .base
+            .saturating_add(span.bytes.len().try_into().unwrap_or(u64::MAX));
+        span.base <= range.start && range.end <= end
+    }
+}
+
+impl<R> Clone for SpannedSource<'_, R> {
+    fn clone(&self) -> Self {
+        Self {
+            source: self.source,
+            span: self.span.clone(),
+        }
+    }
+}
+
+impl<R> std::fmt::Debug for SpannedSource<'_, R> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SpannedSource")
+            .field(
+                "span",
+                &self.span.as_ref().map(|span| (span.base, span.bytes.len())),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl<R> ReaderAt for SpannedSource<'_, R>
+where
+    R: ReaderAt,
+{
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        // A zero-length read fetches nothing, so there is nothing for the
+        // buffer to answer with. It still reaches the source, where a
+        // versioned or cancellable adapter gets the same chance to refuse it
+        // that it has today.
+        if buf.is_empty() {
+            return self.source.read_at(buf, offset);
+        }
+        if let Some(span) = self.span.as_deref() {
+            let buffered = offset
+                .checked_sub(span.base)
+                .and_then(|start| usize::try_from(start).ok())
+                .and_then(|start| span.bytes.get(start..))
+                .filter(|available| !available.is_empty());
+            if let Some(available) = buffered {
+                let length = available.len().min(buf.len());
+                buf[..length].copy_from_slice(&available[..length]);
+                return Ok(length);
+            }
+        }
+        self.source.read_at(buf, offset)
+    }
+}
+
 /// One validated, positionally-readable ZIP archive index.
 ///
 /// Unlike [`ArchiveReader`], this type is not restricted to a contiguous byte
@@ -1211,7 +1352,7 @@ where
     R: ReaderAt,
 {
     archive: &'a IndexedArchive<R>,
-    decoder: Option<DeflateDecoder<CountingReader<ZipReader<&'a R>>>>,
+    decoder: Option<DeflateDecoder<CountingReader<ZipReader<SpannedSource<'a, R>>>>>,
 }
 
 impl<'a, R> IndexedReadSession<'a, R>
@@ -1265,7 +1406,15 @@ where
         accounting: &mut ZipOperationAccounting,
     ) -> Result<Vec<u8>, Error> {
         let indexed = self.archive.indexed_entry(entry_id)?;
-        let entry = self.archive.archive.get_entry(indexed.info.wayfinder)?;
+        // One positional read covers this member's whole local record — fixed
+        // header, variable region, payload and data descriptor — and every
+        // read below is answered from it. A member the window does not admit
+        // yields the passthrough reader and the historical grammar.
+        let spanned = self.archive.member_source(&indexed.info.wayfinder)?;
+        let entry = self
+            .archive
+            .archive
+            .get_entry_from(indexed.info.wayfinder, &spanned)?;
         let size = usize::try_from(indexed.info.uncompressed_size).map_err(|_| {
             Error::from(ErrorKind::InvalidInput {
                 msg: format!(
@@ -1302,11 +1451,25 @@ where
             })
         })?;
 
+        // The payload is served from the buffer only when the buffer holds all
+        // of it. A partly-covered payload would be handed to the decoder in
+        // different-sized pieces than the source would have delivered, and the
+        // verifier completes a member on a per-read size test, so a member
+        // whose declared size and declared CRC are both wrong could be refused
+        // by the other of those two checks. Falling back here keeps the
+        // decoder's input chunking exactly what it is today.
+        let (payload_start, payload_end) = entry.compressed_data_range();
+        let payload = if spanned.covers(payload_start..payload_end) {
+            spanned
+        } else {
+            SpannedSource::passthrough(spanned.source())
+        };
+
         match indexed.info.compression_method {
             CompressionMethod::Store => {
-                let mut source = CountingReader::new(entry.reader());
+                let mut source = CountingReader::new(entry.reader_over(payload.clone()));
                 let result = entry
-                    .verifying_reader(&mut source)
+                    .verifying_reader_over(&mut source, payload.clone())
                     .take(read_limit)
                     .read_to_end(&mut output)
                     .map_err(Error::from);
@@ -1328,17 +1491,18 @@ where
                 let (result, compressed_read, produced) = {
                     let decoder = match self.decoder.as_mut() {
                         Some(decoder) => {
-                            let _previous = decoder.reset(CountingReader::new(entry.reader()));
+                            let _previous = decoder
+                                .reset(CountingReader::new(entry.reader_over(payload.clone())));
                             decoder
                         },
-                        None => self
-                            .decoder
-                            .insert(DeflateDecoder::new(CountingReader::new(entry.reader()))),
+                        None => self.decoder.insert(DeflateDecoder::new(CountingReader::new(
+                            entry.reader_over(payload.clone()),
+                        ))),
                     };
                     let (result, produced_count) = {
                         let mut produced_reader = CountingReader::new(&mut *decoder);
                         let result = entry
-                            .verifying_reader(&mut produced_reader)
+                            .verifying_reader_over(&mut produced_reader, payload.clone())
                             .take(read_limit)
                             .read_to_end(&mut output)
                             .map_err(Error::from);
@@ -4698,6 +4862,114 @@ where
                 "unknown indexed ZIP entry {}",
                 entry_id.0
             )))
+        })
+    }
+
+    /// The first local-header offset strictly after `base`, or the located
+    /// central-directory offset when `base` belongs to the last record.
+    ///
+    /// `layout` is sorted by local-header offset, so this is a binary search
+    /// over facts the central directory already carries. Duplicate offsets
+    /// collapse to the first strictly greater one, which is what a bound must
+    /// use.
+    fn next_local_header_offset(&self, base: u64) -> u64 {
+        let position = self
+            .layout
+            .partition_point(|entry| entry.wayfinder.local_header_offset() <= base);
+        self.layout.get(position).map_or_else(
+            || self.archive.directory_offset(),
+            |entry| entry.wayfinder.local_header_offset(),
+        )
+    }
+
+    /// How many bytes one positional read should cover for `entry`'s first
+    /// read, or `None` when this member keeps the historical grammar.
+    ///
+    /// The window is the smaller of two bounds and is then clamped to the
+    /// located central directory:
+    ///
+    /// * the **physical** bound, where the next local record begins, plus room
+    ///   for the widest data descriptor when this record declares one. In a
+    ///   gapless archive this is exactly `30 + variable region + compressed
+    ///   size + descriptor`, so the read covers the member's own local record
+    ///   and no byte beyond it;
+    /// * the **declared** bound, [`MEMBER_SPAN_METADATA_ALLOWANCE`] plus this
+    ///   record's central compressed size plus the same descriptor room, which
+    ///   keeps a padded or sparse archive from turning one member into a large
+    ///   read.
+    ///
+    /// Neither bound is a verdict. A window that is too short for the member's
+    /// real local variable region simply fails to cover the payload, and those
+    /// reads reach the source exactly as they do today.
+    fn member_span_length(&self, entry: &crate::ZipArchiveEntryWayfinder) -> Option<usize> {
+        let directory_offset = self.archive.directory_offset();
+        let base = entry.local_header_offset();
+        if base >= directory_offset {
+            return None;
+        }
+        let descriptor = if entry.has_data_descriptor() {
+            crate::MAX_DATA_DESCRIPTOR_SIZE
+        } else {
+            0
+        };
+        let physical = self
+            .next_local_header_offset(base)
+            .min(directory_offset)
+            .saturating_add(descriptor);
+        let declared = base
+            .saturating_add(MEMBER_SPAN_METADATA_ALLOWANCE)
+            .saturating_add(entry.compressed_size_hint())
+            .saturating_add(descriptor);
+        let length = physical
+            .min(declared)
+            .min(directory_offset)
+            .saturating_sub(base);
+        if !(STRICT_FIXED_LOCAL_HEADER_BYTES..=MAX_MEMBER_SPAN_READ_BYTES).contains(&length) {
+            return None;
+        }
+        usize::try_from(length).ok()
+    }
+
+    /// The reader one member's first read is served from.
+    ///
+    /// This issues the single positional read that replaces the local-header,
+    /// payload and data-descriptor reads of the historical grammar. It begins
+    /// at the member's local header, which is where the historical grammar's
+    /// first read begins too, and it is the member read's first contact with
+    /// the source, so a source failure here is the member read's failure and
+    /// is reported as such rather than retried behind the caller's back. That
+    /// keeps one member read to one refusal, one cancellation observation and
+    /// one resource reservation, as it is today.
+    ///
+    /// A short read is not a failure: whatever the read did not cover is read
+    /// exactly as it is today, so a truncated source still fails at the byte,
+    /// and with the message, it fails at now.
+    ///
+    /// Two conditions take the historical grammar with no speculative read at
+    /// all, neither of which touches the source: a member the window does not
+    /// admit, and a buffer that cannot be reserved.
+    fn member_source(
+        &self,
+        entry: &crate::ZipArchiveEntryWayfinder,
+    ) -> Result<SpannedSource<'_, R>, Error> {
+        let source = self.archive.get_ref();
+        let Some(length) = self.member_span_length(entry) else {
+            return Ok(SpannedSource::passthrough(source));
+        };
+        let base = entry.local_header_offset();
+        let mut bytes = Vec::new();
+        if bytes.try_reserve_exact(length).is_err() {
+            return Ok(SpannedSource::passthrough(source));
+        }
+        bytes.resize(length, 0);
+        let present = source.try_read_at_least_at(&mut bytes, length, base)?;
+        if present == 0 {
+            return Ok(SpannedSource::passthrough(source));
+        }
+        bytes.truncate(present);
+        Ok(SpannedSource {
+            source,
+            span: Some(Arc::new(MemberSpan { base, bytes })),
         })
     }
 }

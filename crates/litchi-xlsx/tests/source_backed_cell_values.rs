@@ -172,22 +172,64 @@ impl VersionedSource {
     }
 }
 
+/// The furthest before a member's payload that a read *of that member* can
+/// begin: the fixed local header plus the widest local variable region change
+/// 0573 measured in this repository's corpus.
+const MEMBER_RECORD_PREFIX_BYTES: u64 = 640;
+
+/// Whether one positional read fetches the payload of the member whose first
+/// payload byte is at `payload`.
+///
+/// These diagnostics and triggers used to recognise that read by its start
+/// offset, because a member's payload arrived in a read that *began* at it.
+/// Since change 0611 a member's first read is one bounded read of its whole
+/// local record, which begins at the member's local header, so the test is now
+/// that the read delivers the payload's first byte *and* began inside the
+/// member's own local record. Both halves matter:
+///
+/// * delivering the byte is what distinguishes the member read from the short
+///   local-record probes the preservation path issues at the same offset;
+/// * beginning inside the member's own record is what keeps a bulk publication
+///   copy — which spans the member from far away — from counting as a fetch of
+///   it, which is how these triggers behaved before.
+///
+/// The non-empty requirement excludes the zero-length terminating read a range
+/// reader issues at the end of a member.
+fn read_fetches_member(offset: u64, requested: usize, payload: u64) -> bool {
+    let Ok(requested) = u64::try_from(requested) else {
+        return false;
+    };
+    requested > 0
+        && offset <= payload
+        && payload - offset < requested
+        && payload - offset <= MEMBER_RECORD_PREFIX_BYTES
+}
+
 impl ReadAt for VersionedSource {
     fn len(&self) -> io::Result<u64> {
         Ok(self.bytes.len() as u64)
     }
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         self.read_calls.fetch_add(1, Ordering::SeqCst);
-        if offset == self.selected_worksheet_offset.load(Ordering::SeqCst) {
+        let requested = output.len();
+        if read_fetches_member(
+            offset,
+            requested,
+            self.selected_worksheet_offset.load(Ordering::SeqCst),
+        ) {
             self.selected_worksheet_data_reads
                 .fetch_add(1, Ordering::SeqCst);
         }
-        if offset == self.unselected_worksheet_offset.load(Ordering::SeqCst) {
+        if read_fetches_member(
+            offset,
+            requested,
+            self.unselected_worksheet_offset.load(Ordering::SeqCst),
+        ) {
             self.unselected_worksheet_data_reads
                 .fetch_add(1, Ordering::SeqCst);
         }
         let flip_offset = self.flip_after_read_offset.load(Ordering::SeqCst);
-        if offset == flip_offset
+        if read_fetches_member(offset, requested, flip_offset)
             && self
                 .flip_after_read_offset
                 .compare_exchange(flip_offset, u64::MAX, Ordering::SeqCst, Ordering::SeqCst)
@@ -198,7 +240,11 @@ impl ReadAt for VersionedSource {
             // must observe the new one.
             self.pending_version_flip.store(3, Ordering::SeqCst);
         }
-        if offset == self.rejected_read_offset.load(Ordering::SeqCst) {
+        if read_fetches_member(
+            offset,
+            requested,
+            self.rejected_read_offset.load(Ordering::SeqCst),
+        ) {
             self.rejected_read_count.fetch_add(1, Ordering::SeqCst);
             return Err(io::Error::other("selected worksheet payload read rejected"));
         }
@@ -318,6 +364,7 @@ fn replace_sheet_with_cancel_on_blob_arc(
     )));
 }
 
+/// The offset of a member's first payload byte. See [`read_fetches_member`].
 fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
     for offset in 0..bytes.len().saturating_sub(30) {
         if bytes.get(offset..offset + 4) != Some(b"PK\x03\x04") {
