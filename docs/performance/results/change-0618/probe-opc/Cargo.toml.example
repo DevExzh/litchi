@@ -1,0 +1,21 @@
+# Manifest template for the scratch publication probe retained in `src/`.
+# Build one copy per leg, each with its own `CARGO_TARGET_DIR`, pointing the
+# path dependency at that leg's checkout. `--locked` is not used: the probe is
+# a fresh crate with no lockfile of its own, and both legs resolve the same
+# dependency versions through the same path dependency.
+
+[package]
+name = "probe0618-opc"
+version = "0.0.1"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+panic = "abort"
+debug = 1

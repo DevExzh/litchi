@@ -1,0 +1,422 @@
+after tabs-hide-first libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx -> f180ede1431283f9474828dc43f501bd
+after tabs-hide-first libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx -> 70c0dda53b9768c55e37a33c2fb760fe
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(2), column: Column(2) }, reason: GroupFormula }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx -> a97497e768720fbdbe6f1a030cbaa246
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx -> 253f7cb709d5222392088769b240fe90
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx -> dd474f51e9ff3b78ec9039c20f114130
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx -> 4b63a9f93adf0363514176f8d8d2886b
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx -> e46c54c0f6c520a859034657444fe202
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx -> 6b802afdddad5fcda44f7b3d899d7a77
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx -> 330c11ca233a879600ec2adc6cac6de4
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx -> 9a079e0667ccb962b637ef29f8f4ee30
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx -> fdd97dcec2875ff47411d82e555038cf
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx -> 1ff133ccd26e4e580ed0206c1bdc8c0c
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx -> 484fcd1fe610634f27bdaaa871fbedff
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx -> 78981b4ad5de1517e9220a2aa038aee7
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx -> 37e91835dfdf2f93d872f10afb4b992d
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx -> 5c6ad64dc6e95fc971b76d677648ee4f
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx -> 179cdf45c7b60d9092ed95053d7cf707
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx -> none :: Error: TabEditBlocked { sheet: "sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx -> 983af6a0d00886707756980da8efd3b1
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx -> 8131a3fecba343e29ace4834a99beaad
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: DataValidation }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx -> 2800e4d8a162e61b2bfef68ce85efd75
+after tabs-hide-first office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first office-interop/litchi-changed/date-autofilter-litchi.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells office-interop/litchi-changed/date-autofilter-litchi.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/CustomXMLMappings-complex-type.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/CustomXMLMappings-complex-type.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/CustomXMLMappings.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/CustomXMLMappings.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/DataValidationEvaluations.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/DataValidationEvaluations.xlsx -> 19f9721db88b0427e6ada3f83fafd2e8
+after tabs-hide-first ooxml/xlsx/DataValidationListTooLong.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/DataValidationListTooLong.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/DateFormatNumberTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/DateFormatNumberTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/DateFormatTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/DateFormatTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/ExcelPivotTableSample.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/ExcelPivotTableSample.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/ExcelTables.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/ExcelTables.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/FormatChoiceTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/FormatChoiceTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/FormatConditionTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/FormatConditionTests.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/Formatting.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/Formatting.xlsx -> c90123b8fb0158a6f6acb94e06d01569
+after tabs-hide-first ooxml/xlsx/HeaderFooterComplexFormats.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/HeaderFooterComplexFormats.xlsx -> 14e0dd3c75c5993eafe28ca93d1814a1
+after tabs-hide-first ooxml/xlsx/InlineString.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/InlineString.xlsx -> 7555851a8b7c09547148dbe1250c69dd
+after tabs-hide-first ooxml/xlsx/InlineStrings.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/InlineStrings.xlsx -> f003bfd31b742615585be31336a80b2e
+after tabs-hide-first ooxml/xlsx/MatrixFormulaEvalTestData.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/MatrixFormulaEvalTestData.xlsx -> ee6f17acae54bd02e8f8af83bc0c0ec6
+after tabs-hide-first ooxml/xlsx/NewStyleConditionalFormattings.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/NewStyleConditionalFormattings.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/NewlineInFormulas.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/NewlineInFormulas.xlsx -> 2b92c64d45f3fadec72ea57eed8c9f5f
+after tabs-hide-first ooxml/xlsx/Pivot1_Row.xlsx -> 5f00e6b74aaf3b4249a8af998dae4cdb
+after edit-cells ooxml/xlsx/Pivot1_Row.xlsx -> 4d6c3cce52cbcd6e8a7a529109d2adb0
+after tabs-hide-first ooxml/xlsx/Pivot1_Row_Grand.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet2.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/Pivot1_Row_Grand.xlsx -> fe3052b38cccf8ccdae42a6a0729c5f7
+after tabs-hide-first ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx -> a9dcccb096332f3729a2ca6a4eb04fe0
+after edit-cells ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx -> 104ffdf8a77db56c74776f67603951a5
+after tabs-hide-first ooxml/xlsx/Pivot2_Row.xlsx -> d96cb0200cb4570bc6945532543a3593
+after edit-cells ooxml/xlsx/Pivot2_Row.xlsx -> d18d5f95c2b2f149cb6b3dce04a28825
+after tabs-hide-first ooxml/xlsx/Pivot2_Row_Compact.xlsx -> 30d3abd34c64b83556050ce6fcc53044
+after edit-cells ooxml/xlsx/Pivot2_Row_Compact.xlsx -> 8cf2c5b6389622a4bc07e4f00c181847
+after tabs-hide-first ooxml/xlsx/Pivot2_Row_Grand.xlsx -> 325fac2dcbdb9f9281e9c9ab386759e5
+after edit-cells ooxml/xlsx/Pivot2_Row_Grand.xlsx -> 24a6c9327eb909b98b8d7c898a395b07
+after tabs-hide-first ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx -> 7dcaab01016fd8ae5613282ce7a29588
+after edit-cells ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx -> 2d575c526b242a31af1327b2c572ee1b
+after tabs-hide-first ooxml/xlsx/Pivot2_Row_Subtotals.xlsx -> eafeecf37e81bbe72c5f1d345fcf9509
+after edit-cells ooxml/xlsx/Pivot2_Row_Subtotals.xlsx -> 6dea2fc5959dbcfb48e032d014f04203
+after tabs-hide-first ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx -> 0486b8d2b0f11f38c2d190f2c9ea6ae4
+after edit-cells ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx -> 8110c10bae52e49564ef466d23f32219
+after tabs-hide-first ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx -> 4c3278c8a49c2cc5a5edb1270ba4b09d
+after edit-cells ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx -> 3283ced5348e2bed85af88ab8c03e383
+after tabs-hide-first ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx -> 2375d6eb25f087674e575a9dbf8d4843
+after edit-cells ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx -> 0325bc4098b12a50aea5cab494ac0714
+after tabs-hide-first ooxml/xlsx/SimpleMultiCell.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/SimpleMultiCell.xlsx -> 94d1492938802bf68a6e3d661da44299
+after tabs-hide-first ooxml/xlsx/SimpleNormal.xlsx -> 746f3b7bd9a90181cb29c2fef4bb84a5
+after edit-cells ooxml/xlsx/SimpleNormal.xlsx -> 805575d8e6f73700102b824a0d4e7bc8
+after tabs-hide-first ooxml/xlsx/SimpleScatterChart.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/chartsheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/SimpleScatterChart.xlsx -> f30f06a986638f771968fc2ff0dd3700
+after tabs-hide-first ooxml/xlsx/SimpleStrict.xlsx -> de0d79ffa9bafcad445032b7e4c402e4
+after edit-cells ooxml/xlsx/SimpleStrict.xlsx -> d3d8a7deb39c14ababbe0637f9d4e643
+after tabs-hide-first ooxml/xlsx/SimpleWithComments.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/SimpleWithComments.xlsx -> cff08381523983da443948807a58ff38
+after tabs-hide-first ooxml/xlsx/SingleCellTable.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/SingleCellTable.xlsx -> f5c6e977a049559c8086bea9f6bda252
+after tabs-hide-first ooxml/xlsx/Sparklines.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/Sparklines.xlsx -> 95fe26d854398cd9a2ba0e9750c8b40b
+after tabs-hide-first ooxml/xlsx/StructuredReferences.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/StructuredReferences.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/Tables.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/Tables.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/TablesWithDifferentHeaders.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/TablesWithDifferentHeaders.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/TextColor.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/TextColor.xlsx -> ed515195b45b565a97013b8e6895041a
+after tabs-hide-first ooxml/xlsx/TwoSheetsNoneHidden.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/TwoSheetsNoneHidden.xlsx -> 42889187dc6944259fa7508724c1461f
+after tabs-hide-first ooxml/xlsx/TwoSheetsOneHidden.xlsx -> 3e9749837cac5a19a7628d7e60c1a1c6
+after edit-cells ooxml/xlsx/TwoSheetsOneHidden.xlsx -> d5b4f281f452063f03b662cf0a47306c
+after tabs-hide-first ooxml/xlsx/autofilter-colors-fg.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/autofilter-colors-fg.xlsx -> 296d39eaa6995929dc748445167135b5
+after tabs-hide-first ooxml/xlsx/autofilter-colors.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/autofilter-colors.xlsx -> de35a8f74163c4e531eb27f9abe7671d
+after tabs-hide-first ooxml/xlsx/autofilter.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/autofilter.xlsx -> 469d2933da4f2aa8c18632199ceacadb
+after tabs-hide-first ooxml/xlsx/autofilternamedrange.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/autofilternamedrange.xlsx -> 30afca87c2c70ddb6b5ca498a0ef332b
+after tabs-hide-first ooxml/xlsx/cell-borders.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/cell-borders.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/cell-multi-line.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/cell-multi-line.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/chart_hyperlink.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/chart_hyperlink.xlsx -> 5b5615b651cce3d8f8aab011b80660a6
+after tabs-hide-first ooxml/xlsx/column_style.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/column_style.xlsx -> 7fc142918bac4671fc0badcad2a495bc
+after tabs-hide-first ooxml/xlsx/condFormat_cellis.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/condFormat_cellis.xlsx -> f6eb55d541d1634b607ce83fad017ab0
+after tabs-hide-first ooxml/xlsx/condformat_databar.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/condformat_databar.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/condformat_theme_color.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/condformat_theme_color.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/conditional_fmt_checkpriority.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/conditional_fmt_checkpriority.xlsx -> af804cad6fc1b5c0ffe8aafeb45d493e
+after tabs-hide-first ooxml/xlsx/conditional_fmt_origin.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/conditional_fmt_origin.xlsx -> 77a84197fb251f351efa80f557c8b4fb
+after tabs-hide-first ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx -> c290124511396c15be012b90df88ba6b
+after tabs-hide-first ooxml/xlsx/customxml.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/customxml.xlsx -> 56f601c9b21acc14061b2a6518cf958b
+after tabs-hide-first ooxml/xlsx/decimal-format.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/decimal-format.xlsx -> 22cf3a635594d366b07f37d2207ab988
+after tabs-hide-first ooxml/xlsx/duplicate-defined-names.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/duplicate-defined-names.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/empty.xlsx -> dea5115ccabb71a682fdd46634ae14ba
+after edit-cells ooxml/xlsx/empty.xlsx -> 79910f3c2fce972220b884d164b54f3a
+after tabs-hide-first ooxml/xlsx/enhanced-protection.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/enhanced-protection.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+after tabs-hide-first ooxml/xlsx/external-cache-multi-letter-column.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/external-cache-multi-letter-column.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/external-link-path-missing.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/external-link-path-missing.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/external-link-path-startup.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/external-link-path-startup.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/fontSize.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/fontSize.xlsx -> 5d8d5fc67bc04f898249c638b5dfd657
+after tabs-hide-first ooxml/xlsx/formats.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/formats.xlsx -> f68c8e1be1111747a64280270fb9fc6f
+after tabs-hide-first ooxml/xlsx/headerFooterTest.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/headerFooterTest.xlsx -> bb0765af94b5bec610ce1295ecdbba51
+after tabs-hide-first ooxml/xlsx/hyperlink.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/hyperlink.xlsx -> 9b78ca269556d9f48eb86937af6c2600
+after tabs-hide-first ooxml/xlsx/hyperlink_export.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/hyperlink_export.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/hyperlink_formula.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/hyperlink_formula.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/hyperlinks.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/hyperlinks.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/named-ranges-global.xlsx -> 4ad702f51e2e69b0694580bed0d77aa5
+after edit-cells ooxml/xlsx/named-ranges-global.xlsx -> c672236ad7b14b94304736c187e69e07
+after tabs-hide-first ooxml/xlsx/named-ranges-hidden.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/named-ranges-hidden.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/noSharedStringTable.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/noSharedStringTable.xlsx -> 446133fef9cef9ad94b871d769fbb9e1
+after tabs-hide-first ooxml/xlsx/sample.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/sample.xlsx -> e0010b55a0992cdb2eab2d0bb2676a60
+after tabs-hide-first ooxml/xlsx/shared-strings-malformed-count.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/shared-strings-malformed-count.xlsx -> none :: Error: Invalid("shared-string count exceeds 2147483647")
+after tabs-hide-first ooxml/xlsx/shared_formulas.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/shared_formulas.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sharedhyperlink.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sharedhyperlink.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sheet-names.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sheet-names.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sheet-state-show.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sheet-state-show.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sheet-tab-color.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sheet-tab-color.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sheetProtection_allLocked.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sheetProtection_allLocked.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sheetProtection_not_protected.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/sheetProtection_not_protected.xlsx -> 0d4e670ff60f1badee3fb19e28d88ceb
+after tabs-hide-first ooxml/xlsx/sortconditionref.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sortconditionref.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/sortconditionref2.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/sortconditionref2.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/style-alternate-content.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/style-alternate-content.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/styles.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/styles.xlsx -> 7d62c696a746878e687a7aa1cb24dbc9
+after tabs-hide-first ooxml/xlsx/table-sample.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells ooxml/xlsx/table-sample.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first ooxml/xlsx/tableStyle.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/tableStyle.xlsx -> b2d1f4569cdac0c4f4b0324060d6e5f7
+after tabs-hide-first ooxml/xlsx/test_conditional_formatting.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells ooxml/xlsx/test_conditional_formatting.xlsx -> 4398ef068945deb87dbf90db5af41fba
+after tabs-hide-first ooxml/xlsx/universal-content.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells ooxml/xlsx/universal-content.xlsx -> 68ebac2371a1a22fd81bcb13c6bb57f5
+after tabs-hide-first poi/test-data/openxml4j/50154.xlsx -> 9b7f46c2bd2fbb97930ad7cee7369e24
+after edit-cells poi/test-data/openxml4j/50154.xlsx -> 3b32b042c7d3418e5a81b49c3f7a3a4e
+after tabs-hide-first poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx -> c90241f11d3d40a7f4aad8b07c813edb
+after tabs-hide-first poi/test-data/spreadsheet/45540_classic_Header.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/45540_classic_Header.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/45540_form_Footer.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/45540_form_Footer.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/45540_form_Header.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/45540_form_Header.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/47889.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 38 }) })
+after edit-cells poi/test-data/spreadsheet/47889.xlsx -> 41c27388671a2b375504b7840ceea617
+after tabs-hide-first poi/test-data/spreadsheet/48962.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/48962.xlsx -> 1270248cfd5d7f9079736067ca6337dd
+after tabs-hide-first poi/test-data/spreadsheet/49609.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/49609.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/54071.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/54071.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/56169.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/56169.xlsx -> 1a90cf9f1414f5228587b429ef6baf68
+after tabs-hide-first poi/test-data/spreadsheet/58106.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/58106.xlsx -> c54817759540efa0119c7273e60efad8
+after tabs-hide-first poi/test-data/spreadsheet/60289.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/60289.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx -> da41c13daa3a9efcfb3bb172ed1dc011
+after tabs-hide-first poi/test-data/spreadsheet/62834.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/62834.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/66365.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/66365.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(1), column: Column(1) }, reason: GroupFormula }
+after tabs-hide-first poi/test-data/spreadsheet/AmpersandHeader.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/AmpersandHeader.xlsx -> 1df95de9545fd5e8b788d88e7430f1e1
+after tabs-hide-first poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/CustomXMLMappings.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/CustomXMLMappings.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/DataValidationEvaluations.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/DataValidationEvaluations.xlsx -> 19f9721db88b0427e6ada3f83fafd2e8
+after tabs-hide-first poi/test-data/spreadsheet/DataValidationListTooLong.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/DataValidationListTooLong.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/DataValidations-49244.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/DataValidations-49244.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(1), column: Column(1) }, reason: DataValidation }
+after tabs-hide-first poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/FormatKM.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/FormatKM.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(3), column: Column(3) }, reason: GroupFormula }
+after tabs-hide-first poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(4), column: Column(4) }, reason: GroupFormula }
+after tabs-hide-first poi/test-data/spreadsheet/WithChartSheet.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/WithChartSheet.xlsx -> 6f3cdf7cf605385fabaaed479ac99b8b
+after tabs-hide-first poi/test-data/spreadsheet/WithEmbeded.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/WithEmbeded.xlsx -> 81482f492f39051e8497bbf37a04b4e4
+after tabs-hide-first poi/test-data/spreadsheet/bug64512_embed.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/bug64512_embed.xlsx -> 856aaefa353232aa5b32a6de644dbf0d
+after tabs-hide-first poi/test-data/spreadsheet/chart_sheet.xlsx -> bc4955f71974d1677d4c28b9e510a226
+after edit-cells poi/test-data/spreadsheet/chart_sheet.xlsx -> 237e9277c8ca35e971f7c2379893a2ff
+after tabs-hide-first poi/test-data/spreadsheet/customIndexedColors.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/customIndexedColors.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/dataValidationTableRange.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/dataValidationTableRange.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/headerFooterTest.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/headerFooterTest.xlsx -> bb0765af94b5bec610ce1295ecdbba51
+after tabs-hide-first poi/test-data/spreadsheet/link-external-workbook-b.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/link-external-workbook-b.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/no_drawing_patriarch.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/no_drawing_patriarch.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/right-to-left.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/right-to-left.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/sample.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/sample.xlsx -> e0010b55a0992cdb2eab2d0bb2676a60
+after tabs-hide-first poi/test-data/spreadsheet/shared_formulas.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/shared_formulas.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/style-alternate-content.xlsx -> none :: Error: Custom { kind: NotFound, error: "workbook has no sheet named 'Sheet1'" }
+after edit-cells poi/test-data/spreadsheet/style-alternate-content.xlsx -> none :: Error: Custom { kind: NotFound, error: "baseline worksheet is missing" }
+after tabs-hide-first poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx -> df8f8d904182283a24faa8e42215f6ca
+after tabs-hide-first poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: GroupFormula }
+after tabs-hide-first poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx -> none :: Error: EditBlocked { sheet: "Sheet1", address: Cell { row: Row(0), column: Column(0) }, reason: ProtectedSheet }
+after tabs-hide-first poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx -> 25b6cf7d59b40faf35de8eecdeeb7fca
+after tabs-hide-first poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx -> 32f80839f1d52db61e12d1a5f3fdf7a0
+after tabs-hide-first poi/test-data/spreadsheet/xlookup.xlsx -> none :: Error: Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+after edit-cells poi/test-data/spreadsheet/xlookup.xlsx -> 792d3d34d6e3f4e93bd275a8be70952e
+after tabs-hide-first poi/test-data/spreadsheet/xxe_in_schema.xlsx -> none :: Error: TabEditBlocked { sheet: "Sheet1", position: 0, reason: LastVisibleTab }
+after edit-cells poi/test-data/spreadsheet/xxe_in_schema.xlsx -> 361a856c65210671a34db0a285e9ac67
+after tabs-hide-first poi/test-data/xmldsign/hello-world-signed.xlsx -> none :: Error: Signed
+after edit-cells poi/test-data/xmldsign/hello-world-signed.xlsx -> none :: Error: Signed
+after tabs-hide-first poi/test-data/xmldsign/ms-office-2010-signed.xlsx -> none :: Error: Signed
+after edit-cells poi/test-data/xmldsign/ms-office-2010-signed.xlsx -> none :: Error: Signed
+after docx-append-paragraph libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx -> none :: Error: Scan("complex paragraph content is outside the bounded closure")
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph office-interop/libreoffice-resaved/document-properties-litchi.docx -> none :: Error: Document(Invalid("invalid Word East Asian theme font language tag ''"))
+after docx-append-paragraph office-interop/litchi-changed/document-properties-litchi.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/ComplexNumberedLists.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/FancyFoot.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/Headers.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/Hyperlink.docx -> none :: Error: Refused(ExternalRelationship)
+after docx-append-paragraph ooxml/docx/comment.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/documentProperties.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/documentProtection_comments_no_password.docx -> none :: Error: Refused(Protection)
+after docx-append-paragraph ooxml/docx/documentProtection_forms_no_password.docx -> none :: Error: Refused(Protection)
+after docx-append-paragraph ooxml/docx/documentProtection_no_protection.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/documentProtection_readonly_no_password.docx -> none :: Error: Refused(Protection)
+after docx-append-paragraph ooxml/docx/drawing.docx -> none :: Error: Refused(ExternalRelationship)
+after docx-append-paragraph ooxml/docx/endnotes.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/footnotes.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/headerFooter.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/headerPic.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/table-alignment.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/table-indent.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph ooxml/docx/table_footnotes.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph ooxml/docx/testComment.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph poi/test-data/document/61745.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/Bug54849.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph poi/test-data/document/ComplexNumberedLists.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/EmbeddedDocument.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/Numbering.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/NumberingWOverrides.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/NumberingWithOutOfOrderId.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/heading123.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/document/saut_page.docx -> none :: Error: Document(Invalid("invalid Word East Asian theme font language tag ''"))
+after docx-append-paragraph poi/test-data/document/testComment.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph poi/test-data/integration/test_recursive_embedded.docx -> none :: Error: Refused(UnsupportedDependency)
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx -> none :: Error: Opc(MultipleCorePropertiesRelationships)
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx -> none :: Error: Scan("attribute is outside the plain-story closure")
+after docx-append-paragraph poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx -> none :: Error: Opc(DerivedPartNames { existing: "/word/document.xml", candidate: "/word/document.xml/image1.gif" })
+after docx-append-paragraph poi/test-data/xmldsign/hello-world-signed-twice.docx -> none :: Error: Refused(SignatureInfrastructure)
+after docx-append-paragraph poi/test-data/xmldsign/hello-world-signed.docx -> none :: Error: Refused(SignatureInfrastructure)
+after docx-append-paragraph poi/test-data/xmldsign/ms-office-2010-signed.docx -> none :: Error: Refused(SignatureInfrastructure)

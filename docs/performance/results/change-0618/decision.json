@@ -1,0 +1,51 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0618",
+  "title": "One Deflate compressor per authored save instead of one per member",
+  "decision": "retained, implemented at both Office write sites; the cross-member compressor pool proposed for the preservation writer was implemented, measured and removed",
+  "code_state": "crates/soapberry-zip only: src/writer.rs, src/office.rs, src/preserve.rs, tests/deflate_reuse.rs",
+  "implements": "SAVE-4 of change 0587, at the two sites change 0607 identified",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "claim_authorized": false,
+  "reason_codes": [
+    "the streaming archive writer behind every authored XLSX, DOCX and PPTX publication constructed one flate2 DeflateEncoder per member, 161 per 50-slide authored PPTX save, each allocating and zeroing a ~300 KiB compressor state; it now drives change 0476's reusable state, one per archive",
+    "the reset moved from the end of a member to the start of the next one, so a save with a single Deflate member pays exactly the one construction it always paid and no reset at all",
+    "the preservation writer keeps one compressor per regenerated member, but builds it as a ReusableDeflateState driven by ReusedDeflateEncoder, which removes flate2's per-codec-call zeroing of its output vector's spare capacity",
+    "carrying one compressor across a preservation plan's regenerated members reached 40 constructions -> 1 and callgrind Ir -42.74%, but cost +14.1% native cycles, +9.9% instructions and 271 minor page faults per publish, and was removed",
+    "the one-entry mini-archive round trip in the preservation writer was priced at 617 Ir per member (0.15% of a regenerated member) and deliberately left in place"
+  ],
+  "accepted_evidence": {
+    "byte_identity": "336 OOXML fixtures x 4 mutation scenarios (1,344 rows) and x 3 multi-member regeneration scenarios (1,008 rows), published length and SHA-256 or typed error, empty diff on both; 422 editor-route rows from tabs, edit_cells and append_plain_paragraph over the whole corpus (110 digests, 312 typed refusals), empty diff; 48 authored-PPTX digests across six deck sizes, empty diff; 78 opened decks, exact-source passthrough 78 of 78 on both legs",
+    "counts": "callgrind isolation pairs for five scenarios on both legs, with per-save Deflate-compressor construction and reset counts; per-caller attribution of memset and memcpy behind the rejected variant",
+    "native": "perf stat -x, -r 5 isolation pairs for cycles, instructions and minor page faults on five scenarios, both legs",
+    "timing": "paired A1 B1 B2 A2 timing with an A/A floor in the same window: the authored 50-slide save (40 samples per leg-run) and the preservation publish at 40 and at 1 regenerated member (2,000 samples per leg-run, two windows each)",
+    "tests": "four differentials in tests/deflate_reuse.rs requiring complete ZIP-byte equality with one fresh DeflateEncoder per member, including the member that follows a refused one; one unit test in preserve.rs comparing a regenerated member's framing, payload and central record against a fresh flate2 mini archive over six payload sizes",
+    "gates": "seven sections, all exit 0: fmt, clippy, test and doc for soapberry-zip (593 tests), plus the consumer suites litchi-opc (675), litchi-xlsx/litchi-docx/litchi-pptx (340) and litchi-odt/litchi-odc/litchi-odf-common/litchi-iwa-archive (352)"
+  },
+  "accepted_costs": {
+    "callgrind_over_pricing": "callgrind counts rep stos once per byte and the compressor's ~300 KiB state zeroing is exactly that, so its -42.85% and -38.64% instruction deltas are an upper bound; the native cycle deltas (-12.24% and -13.92%) are the price",
+    "host_contention": "seven other agents were building and measuring on the host; run-window load average 20-25, and both timing windows carry their own A/A floor",
+    "tail_statistics": "the p99 delta on the authored save is inside the A/A floor (-14.36%) and is not claimed; window 1 of the preservation timing carries a tail outlier in its A1 leg, so only window 2's tail is read",
+    "allocator_dependence": "the page-fault mechanism that sank the pooled variant is glibc-malloc behaviour; a different allocator could rank it differently"
+  },
+  "known_gaps": {
+    "not_measured": "authored DOCX and XLSX publication uses the same writer and the same code path but was covered only by the byte-identity oracles and the test suites, not by its own timing, because tools/perf-baseline still has no ordinary-save selector",
+    "corpora": "every regenerated member in the preservation scenarios is a .rels part of a few hundred bytes, so those numbers are the fixed per-member cost and not a payload-size result; no fixture in the corpus regenerates a large content part through the preservation writer",
+    "environment": "cold cache, physical devices, peak RSS, allocation profiles, non-glibc allocators and non-Linux platforms were not measured"
+  },
+  "withheld": [
+    "any registered speedup claim",
+    "any p99 claim on the authored save",
+    "any claim at all for a preservation publish with a single regenerated member",
+    "any cold-cache, real-device, peak-RSS, allocation-profile or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "8fe9efa55728cf8b9592934f9e9de6f5a66fdc1b",
+    "branch": "perf/0618-zip-preservation-writer-deflate-reuse",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "build": "cargo build --release --locked; workspace [profile.release] lto = true, panic = \"abort\"; the scratch probes add debug = 1",
+    "pinning": "taskset -c 12 for every measured process"
+  }
+}

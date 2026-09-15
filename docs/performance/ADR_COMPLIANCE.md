@@ -1,5 +1,37 @@
 # Performance optimization ADR-compliance matrix
 
+## 0618 — compressor reuse stays invisible in the published bytes
+
+ADR 0006 is the binding constraint and it is met by measurement, not by
+argument: 2,352 corpus publications, 422 editor-route runs, 48 authored-PPTX
+digests and 78 opened-deck passthroughs are byte-identical between legs, and
+every typed refusal reproduces with identical text. Reuse is byte-transparent by
+construction — `Compress::reset` is `deflateReset`, restoring the level,
+strategy and window the constructor selected, and `ReusedDeflateEncoder` keeps
+0476's hand-driven call boundaries, so the sequence of codec calls a member sees
+is the one flate2 would have produced. The 32 KiB output buffer's size is
+unchanged, which matters beyond speed: `LimitedEntryWriter` charges the
+compressed-size budget per write call, so a different drain granularity could
+move when a limit is refused. ADR 0005's bounded resources hold: the compressor
+that existed per member now exists per archive at the streaming writer and still
+per member at the preservation writer, so no ceiling rises and no cache is
+introduced; `ReadLimits`, the streaming limits and `CompressedScratch`'s
+before-any-byte refusal are untouched, and a refused sized member still leaves
+the writer usable — a new test requires the member after such a refusal to be
+byte-identical. ADR 0011 holds: `ReusableDeflateState` and `ReusedDeflateEncoder`
+are `pub(crate)`, so no archive type, raw lock or executor is leaked and the
+public API is unchanged. No new `unsafe`, global cache, hidden Rayon pool or
+ambient I/O appears; the preservation writer's structural validation of the
+mini-archive it builds — entry count, directory and EOCD ordering, central
+record framing, payload range — is retained in full. The only new error is a
+defensive `InvalidInput` for a writer-internal state the writer itself always
+prepares, unreachable from any caller, and the existing progress-failure text is
+deliberately left unchanged. Focused validation passed 5 new tests, 593
+`soapberry-zip` tests across the library and its integration binaries, and the `litchi-opc`,
+`litchi-xlsx`, `litchi-docx`, `litchi-pptx`, `litchi-odt`, `litchi-odc`,
+`litchi-odf-common` and `litchi-iwa-archive` suites. See
+[Change 0618](0618-zip-writer-deflate-state-reuse.md); `performance_claim: none`.
+
 ## 0619 — no ADR boundary is reachable from a test assertion
 
 Record: [0619](0619-harness-xls-lifecycle-assertion.md).

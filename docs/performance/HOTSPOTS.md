@@ -1,5 +1,39 @@
 # Performance hotspot inventory
 
+## 0618 — one Deflate compressor per authored save instead of one per member
+
+Retained implementation of 0587's SAVE-4 at the two sites 0607 named, with one
+of its two proposed mechanisms measured and rejected. `StreamingArchiveWriter`
+— the writer behind every authored XLSX, DOCX and PPTX publication — constructed
+a fresh `flate2` `DeflateEncoder` per member, 161 constructions on a 50-slide
+authored PPTX save, each allocating and zeroing a ~300 KiB compressor state. It
+now drives 0476's reusable state, generalized from the owned writer, through a
+new `pub(crate) ReusedDeflateEncoder`: one archive, one compressor, reset before
+each member after the first. Per authored save: constructions 161 → 1 at 50
+slides and 39 → 1 at 1 slide; native cycles 14,512,118 → 12,735,482 (−12.24%)
+and 5,063,727 → 4,358,787 (−13.92%); minor page faults per 1-slide save 95 → 0;
+callgrind Ir −42.85% and −38.64% (an upper bound: callgrind prices the state
+zeroing per byte). Paired timing of the 50-slide authored save: p50 3,299.46 →
+2,899.69 µs (−12.12%), mean −12.29%, p95 −12.42%, against a p50 A/A floor of
+−1.90%; the p99 delta is inside the floor and is not claimed. The preservation
+writer keeps one compressor per regenerated member but builds it the same way,
+which removes flate2's per-codec-call zeroing of its output vector's spare
+capacity: cycles −2.22% at 40 regenerated members, −1.87% at 8, and inside the
+floor at 1, with publish p50 −1.99% and −2.20% in two windows against a ±0.9%
+floor. **Rejected and removed:** carrying one compressor across a plan's
+regenerated members. It reached 40 constructions → 1 and callgrind Ir −42.74%,
+but cost +14.1% native cycles, +9.9% instructions and 271 minor page faults per
+publish, because `prepare` retains one mini-archive buffer per regenerated
+member and glibc cannot recycle a ~300 KiB block freed underneath them. **Priced
+and not taken:** the preservation writer's one-entry mini-archive round trip, at
+617 Ir per member — 0.15% of a regenerated member's cost. `performance_claim:
+none`; `claim_authorized: false`. Remaining in this area: SAVE-3 is resolved by
+0607, SAVE-5 (C2′ lazy part decode) still needs a proposed ADR, and SAVE-6
+(per-member parallel deflate) is unmeasured. OLE2 and OOXML remain active; ODF
+is deferred until that goal completes and iWork is excluded.
+[Change and limitations](0618-zip-writer-deflate-state-reuse.md);
+[retained evidence](results/change-0618/README.md).
+
 ## 0619 — the standing XLS lifecycle failure is change 0565's, and no library read moved
 
 Change 0601 reported a harness failure it did not introduce — `tests::xls_source_backed_lifecycle_selectors_are_matched_and_local` asserting `open_reads_zero_worksheet_payload == [true]` and getting `[false]`, with six `PoisonError` cascades behind it — and named change 0595's area as the place to look. A bisect over eight detached checkouts, each built `--release --locked` with its own external `CARGO_TARGET_DIR`, puts the first bad commit at **`c1d2caf85`, change [0565](0565-xls-globals-single-pass.md)**: the test passes at its parent `6b13261e5` and fails at it and at every commit measured since, four production changes before 0595 (`c1503db2b`) and ten before 0605 (`117bdf4c3`), so **both are exonerated and neither record's unchanged-reads statement is contradicted**. No library read moved. A per-read trace of one `XlsSourceBackedOpen` at head — fifteen reads, with each read's overlap against the five classification range sets — reproduces change 0565's own figure to the byte: eight structural reads (136,704 B), an exact prologue of five reads covering logical `[0, 40)`, a 512-byte first window fill, and a second doubled fill issued at logical 552 with no `BoundSheet8` framed yet, which runs to logical 1,576 and therefore **93 bytes past the 1,483-byte globals end** into the first (unselected) worksheet. `GlobalsBuffer::fill_cap` has no `min_sheet_start` to clamp with until a `BoundSheet8` has been framed; the bytes are dropped by `bytes.truncate(global_len)` and never framed, interpreted or published. 93 ≤ 65,536, so `validate_xls_source_locality` — which change 0565 deliberately bounded — passes on every measured sample and always has. What 0565 left behind is the pair of published booleans, still computed as `== 0`, and **three assertion groups in the harness's own unit test** that read them; `tools/perf-baseline` is a separate Cargo project, so 0565's gate list (1,351 `litchi-xls` tests and one facade test) never ran it. The assertions now state the post-0565 contract — no byte of the selected worksheet, at most one globals window of any worksheet body — and the published field definitions are deliberately unchanged, because `results/change-0412/verify-capture.py` and retained packets read `open_reads_zero_worksheet_payload` by name. Seven Rust tests return to green and the allocation-metrics mutex is no longer poisoned, which unblocks every agent's harness gate run. `performance_claim: none`; no file under `crates/` changed. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0619-harness-xls-lifecycle-assertion.md); [retained evidence](results/change-0619/README.md).

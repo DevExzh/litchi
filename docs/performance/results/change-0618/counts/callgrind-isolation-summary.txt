@@ -1,0 +1,40 @@
+# Callgrind isolation pairs, change 0618. taskset -c 12, valgrind 3.26.0,
+# --cache-sim=no --branch-sim=no. before = detached checkout 8fe9efa55,
+# after = the perf/0618 worktree. per-operation Ir = (Ir at N+M - Ir at N) / M.
+#
+# Callgrind counts a `rep stos`/`rep movs` once per byte, and the Deflate
+# compressor's ~300 KiB state zeroing is exactly that, so these deltas are an
+# upper bound on the work removed. `perf-summary.txt` carries the native price.
+
+## preservation writer: CFS workbook (132 members, 654,688 bytes), publish only
+case                                              before Ir       after Ir          delta        %
+addrel     (1 regenerated .rels member)           3,245,905      3,119,576       -126,329   -3.89%
+addrelN:8  (8 regenerated .rels members)          9,671,970      8,618,644     -1,053,326  -10.89%
+addrelall  (40 regenerated .rels members)        38,527,311     33,270,402     -5,256,910  -13.64%
+
+## streaming writer: authored PPTX save
+case                                              before Ir       after Ir          delta        %
+create 1   (39 output members)                   42,391,193     26,010,098    -16,381,096  -38.64%
+create 50  (161 output members)                 159,989,232     91,439,843    -68,549,389  -42.85%
+
+## raw totals
+after-opc-addrel-24                  98,630,411
+after-opc-addrel-4                   36,238,895
+after-opc-addrelN-8-24              231,158,363
+after-opc-addrelN-8-4                58,785,473
+after-opc-addrelall-24              825,332,998
+after-opc-addrelall-4               159,924,966
+after-pptx-create1-1                 26,294,297
+after-pptx-create1-21               546,496,252
+after-pptx-create50-1                91,615,019
+after-pptx-create50-6               548,814,233
+before-opc-addrel-24                101,703,301
+before-opc-addrel-4                  36,785,207
+before-opc-addrelN-8-24             256,425,789
+before-opc-addrelN-8-4               62,986,380
+before-opc-addrelall-24             951,508,431
+before-opc-addrelall-4              180,962,206
+before-pptx-create1-1                42,680,869
+before-pptx-create1-21              890,504,737
+before-pptx-create50-1              160,144,821
+before-pptx-create50-6              960,090,982

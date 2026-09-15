@@ -1,0 +1,78 @@
+== slides=1 stability ==
+first_bytes	29628
+second_bytes	29628
+identical	true
+== slides=1 editdiff ==
+first_bytes	29628
+second_bytes	29629
+identical	false
+first_difference_at	Some(21770)
+sha256 1 save1.pptx 01c49cecbcf420e9b7b3883454c35343f18342db35cf763faca3d607bcfd20e2
+sha256 1 save2.pptx 01c49cecbcf420e9b7b3883454c35343f18342db35cf763faca3d607bcfd20e2
+sha256 1 edit-before.pptx 01c49cecbcf420e9b7b3883454c35343f18342db35cf763faca3d607bcfd20e2
+sha256 1 edit-after.pptx ccee088706c7a3885c0c4dce3c5755399eec26f74dc6833872007d16a0c79084
+== slides=2 stability ==
+first_bytes	30651
+second_bytes	30651
+identical	true
+== slides=2 editdiff ==
+first_bytes	30651
+second_bytes	30652
+identical	false
+first_difference_at	Some(21791)
+sha256 2 save1.pptx 5d76b4fff54b5d3ee28d5c9881792b03f1b9b9c0b60c13fc485e0099c6878220
+sha256 2 save2.pptx 5d76b4fff54b5d3ee28d5c9881792b03f1b9b9c0b60c13fc485e0099c6878220
+sha256 2 edit-before.pptx 5d76b4fff54b5d3ee28d5c9881792b03f1b9b9c0b60c13fc485e0099c6878220
+sha256 2 edit-after.pptx c039932d6ebee45aab2e0533b47eaa4d295e5c438e6e4a05930043df129481c0
+== slides=5 stability ==
+first_bytes	34704
+second_bytes	34704
+identical	true
+== slides=5 editdiff ==
+first_bytes	34704
+second_bytes	34705
+identical	false
+first_difference_at	Some(22649)
+sha256 5 save1.pptx 71e5268db1690717586745f3da2ce02bba824e13406fe78a396c5f66ce974244
+sha256 5 save2.pptx 71e5268db1690717586745f3da2ce02bba824e13406fe78a396c5f66ce974244
+sha256 5 edit-before.pptx 71e5268db1690717586745f3da2ce02bba824e13406fe78a396c5f66ce974244
+sha256 5 edit-after.pptx 4034c5fa33821cb6fda54ee4270e8d524633c2a82be9233e1661fbbcc9da60a2
+== slides=10 stability ==
+first_bytes	40776
+second_bytes	40776
+identical	true
+== slides=10 editdiff ==
+first_bytes	40776
+second_bytes	40777
+identical	false
+first_difference_at	Some(23518)
+sha256 10 save1.pptx baa49ebe010ab8fbfd387a9712ffef808d79c08e81fa3d0408e057b55611dac9
+sha256 10 save2.pptx baa49ebe010ab8fbfd387a9712ffef808d79c08e81fa3d0408e057b55611dac9
+sha256 10 edit-before.pptx baa49ebe010ab8fbfd387a9712ffef808d79c08e81fa3d0408e057b55611dac9
+sha256 10 edit-after.pptx d138a492fd216debb0f03903b1137851321019ef7c16e177bdc99c0483267027
+== slides=50 stability ==
+first_bytes	91537
+second_bytes	91537
+identical	true
+== slides=50 editdiff ==
+first_bytes	91537
+second_bytes	91538
+identical	false
+first_difference_at	Some(32112)
+sha256 50 save1.pptx cdbd785dc174edef9bfc4dc3e902b80373a7523de91172c151cc1b1f21bc103f
+sha256 50 save2.pptx cdbd785dc174edef9bfc4dc3e902b80373a7523de91172c151cc1b1f21bc103f
+sha256 50 edit-before.pptx cdbd785dc174edef9bfc4dc3e902b80373a7523de91172c151cc1b1f21bc103f
+sha256 50 edit-after.pptx 6701be289d38a4b69711fe46b67573c9c2b5e88e8f650f62bc07697d57c929f8
+== slides=200 stability ==
+first_bytes	282798
+second_bytes	282798
+identical	true
+== slides=200 editdiff ==
+first_bytes	282798
+second_bytes	282799
+identical	false
+first_difference_at	Some(64662)
+sha256 200 save1.pptx 40dac8b6fc2f4e6d7bb1da845d64c81712567f72e8eac0d549afb5263cebd278
+sha256 200 save2.pptx 40dac8b6fc2f4e6d7bb1da845d64c81712567f72e8eac0d549afb5263cebd278
+sha256 200 edit-before.pptx 40dac8b6fc2f4e6d7bb1da845d64c81712567f72e8eac0d549afb5263cebd278
+sha256 200 edit-after.pptx d1db584f11f7c1c6f93f6b5be7eaba2946d3b35588f38770ee912dec90da5de9

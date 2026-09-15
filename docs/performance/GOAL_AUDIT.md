@@ -1,5 +1,34 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0618 — the save path stops rebuilding its compressor for every member
+
+Retained implementation against the audit's standing "eliminate unnecessary
+work before unnecessary I/O" ordering, on the authored-publication clause. Every
+authored OOXML save allocated, zeroed and released one ~300 KiB Deflate state
+per output member; a 39-member authored save faulted in and released 39 of them,
+at a net 95 minor page faults per save, and now constructs one and faults in
+none. Correctness is
+established by whole-corpus byte identity rather than by inspection: 336 OOXML
+fixtures × 4 mutation scenarios (1,344 rows) and the same fixtures × 3
+multi-member regeneration scenarios (1,008 rows) published identically on both
+legs, including 8 preserved open refusals and 27 preserved save refusals matched
+by typed-error text; 422 rows from the real `tabs`, `edit_cells` and
+`append_plain_paragraph` routes over the whole corpus, 110 published digests and
+312 typed refusals, all identical; 48 authored-PPTX digests across six deck
+sizes; and 78 opened decks still saving as exact-source passthrough on both
+legs. The audit rows this does **not** close: authored DOCX and XLSX publication
+uses the same writer and the same code path but was covered only by the oracles
+and the test suites, not by its own timing, because `tools/perf-baseline` still
+has no ordinary-save selector; and the preservation numbers are the fixed
+per-member cost on `.rels` members of a few hundred bytes, since no fixture in
+the corpus regenerates a large content part. Cold cache, peak RSS, real-device
+behaviour and non-glibc allocators remain unmeasured — and the last of those
+matters here, because the rejected pooled variant was rejected on glibc page-fault
+behaviour. `performance_claim: none`. OLE2 and OOXML remain active; ODF is
+deferred until that goal completes and iWork is excluded.
+[Change](0618-zip-writer-deflate-state-reuse.md);
+[evidence](results/change-0618/README.md).
+
 ## 0619 — the instrument was wrong, not the library; one standing failure closed
 
 Record: [0619](0619-harness-xls-lifecycle-assertion.md).

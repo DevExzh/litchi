@@ -1,0 +1,18 @@
+# Manifest template for change 0607's PPTX probe, reused unchanged by 0618.
+# Build one copy per leg with its own `CARGO_TARGET_DIR`.
+
+[package]
+name = "probe0618-pptx"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-pptx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-pptx" }
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+panic = "abort"
+debug = 1

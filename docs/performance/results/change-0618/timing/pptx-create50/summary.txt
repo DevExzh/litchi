@@ -1,0 +1,13 @@
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0618/timing/pptx-create50
+A1                       n=40    p50=   3329.29 mean=   3347.09 p95=   3413.30 p99=   3878.72 us
+A2                       n=40    p50=   3266.17 mean=   3266.76 p95=   3299.69 p99=   3321.82 us
+B1                       n=40    p50=   2913.77 mean=   2913.74 p95=   2943.81 p99=   2989.28 us
+B2                       n=40    p50=   2884.34 mean=   2887.03 p95=   2906.64 p99=   2910.41 us
+A (before, pooled)       n=80    p50=   3299.46 mean=   3306.92 p95=   3355.94 p99=   3555.69 us
+B (after, pooled)        n=80    p50=   2899.69 mean=   2900.39 p95=   2939.20 p99=   2951.08 us
+delta p50   B-A =    -399.77 us   -12.12% of A   A-B =    +399.77 us   +13.79% of B
+delta mean  B-A =    -406.54 us   -12.29% of A   A-B =    +406.54 us   +14.02% of B
+delta p95   B-A =    -416.74 us   -12.42% of A   A-B =    +416.74 us   +14.18% of B
+delta p99   B-A =    -604.61 us   -17.00% of A   A-B =    +604.61 us   +20.49% of B
+A/A floor (A2 vs A1)     p50 -1.90%  p95 -3.33%  p99 -14.36%
+B/B floor (B2 vs B1)     p50 -1.01%  p95 -1.26%  p99 -2.64%

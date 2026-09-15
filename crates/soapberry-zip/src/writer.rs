@@ -591,7 +591,7 @@ pub struct ZipArchiveWriter<W> {
     files: Vec<FileHeader>,
     file_names: Vec<u8>,
     writer: CountWriter<W>,
-    reusable_deflate: Option<Box<OwnedDeflateState>>,
+    reusable_deflate: Option<Box<ReusableDeflateState>>,
     directory_spool: Option<Box<DirectorySpool>>,
     pending_borrowed_entry: bool,
     poisoned: bool,
@@ -925,6 +925,27 @@ impl<W> ZipArchiveWriter<W> {
     /// ```
     pub fn stream_offset(&self) -> u64 {
         self.writer.count()
+    }
+
+    /// Borrows the archive's reusable Deflate state, constructing it on first
+    /// use.
+    ///
+    /// The state leaves the archive for the lifetime of one member so that an
+    /// abandoned member drops an unfinished compressor instead of returning it.
+    /// Callers must return it with [`Self::restore_reusable_deflate`] only
+    /// after the member's final Deflate output succeeded.
+    pub(crate) fn take_reusable_deflate(&mut self) -> Box<ReusableDeflateState> {
+        let mut state = self
+            .reusable_deflate
+            .take()
+            .unwrap_or_else(|| Box::new(ReusableDeflateState::new()));
+        state.begin_member();
+        state
+    }
+
+    /// Returns a finished Deflate state to the archive for the next member.
+    pub(crate) fn restore_reusable_deflate(&mut self, state: Box<ReusableDeflateState>) {
+        self.reusable_deflate = Some(state);
     }
 }
 
@@ -1986,11 +2007,7 @@ where
         }
 
         let reusable_deflate = if options.compression_method == CompressionMethod::Deflate {
-            Some(
-                self.reusable_deflate
-                    .take()
-                    .unwrap_or_else(|| Box::new(OwnedDeflateState::new())),
-            )
+            Some(self.take_reusable_deflate())
         } else {
             None
         };
@@ -2418,37 +2435,63 @@ impl<W> OwnedCompressedEntry<W> {
 ///
 /// `DeflateEncoder` uses a `Vec` with this initial capacity.  Keeping the same
 /// capacity here preserves its input/output boundaries while avoiding one
-/// fresh vector allocation for every owned entry.
-const OWNED_DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
+/// fresh vector allocation for every member.
+const REUSABLE_DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
 
 /// Reusable state for one raw Deflate stream at a time.
 ///
-/// The state is held by the parent archive between successfully finalized
-/// entries.  An active entry owns it, so dropping an unfinished entry drops
-/// the compressor instead of returning a partially finished stream to the
-/// parent archive.
+/// The state is held by its owner — the archive writer between successfully
+/// finalized owned entries, the streaming Office writer and the preservation
+/// writer between members — so that one save constructs one compressor
+/// instead of one per member.  An active entry owns it, so dropping an
+/// unfinished entry drops the compressor instead of returning a partially
+/// finished stream to its owner.
+///
+/// Reuse is byte-transparent: [`Compress::reset`] restores the same level,
+/// strategy and window the constructor selects, and the pending-output
+/// boundaries below reproduce flate2's `zio::Writer` call sequence exactly, so
+/// a reused stream emits the same bytes a fresh [`DeflateEncoder`] would.
 #[derive(Debug)]
-struct OwnedDeflateState {
+pub(crate) struct ReusableDeflateState {
     compressor: Compress,
-    output: [u8; OWNED_DEFLATE_OUTPUT_BUFFER_SIZE],
+    // Heap-resident so the struct itself stays a few words wide: it is moved
+    // into a `Box` on construction, and a 32 KiB inline array would be
+    // memset on the stack and then copied into that box on every save.
+    output: Box<[u8]>,
     pending_start: usize,
     pending_end: usize,
+    /// Whether a member has already been fed through this state.
+    ///
+    /// The reset is paid when the *next* member starts, not when the previous
+    /// one finishes, so a save with a single Deflate member pays exactly the
+    /// one construction it paid before this state existed and no reset at all.
+    used: bool,
 }
 
-impl OwnedDeflateState {
-    fn new() -> Self {
+impl ReusableDeflateState {
+    pub(crate) fn new() -> Self {
         Self {
             compressor: Compress::new(Compression::default(), false),
-            output: [0; OWNED_DEFLATE_OUTPUT_BUFFER_SIZE],
+            output: vec![0; REUSABLE_DEFLATE_OUTPUT_BUFFER_SIZE].into_boxed_slice(),
             pending_start: 0,
             pending_end: 0,
+            used: false,
         }
     }
 
-    fn reset(&mut self) {
-        self.compressor.reset();
-        self.pending_start = 0;
-        self.pending_end = 0;
+    /// Readies the state for one member, resetting the compressor only when a
+    /// previous member left a stream in it.
+    ///
+    /// `Compress::reset` restores the level, strategy and window the
+    /// constructor selected, so the member that follows emits exactly the
+    /// bytes a freshly constructed encoder would.
+    pub(crate) fn begin_member(&mut self) {
+        if self.used {
+            self.compressor.reset();
+            self.pending_start = 0;
+            self.pending_end = 0;
+        }
+        self.used = true;
     }
 
     fn compress_once(
@@ -2461,22 +2504,22 @@ impl OwnedDeflateState {
         let status = self
             .compressor
             .compress(input, &mut self.output[self.pending_end..], flush)
-            .map_err(|_| owned_deflate_error())?;
+            .map_err(|_| reusable_deflate_error())?;
         let consumed = self
             .compressor
             .total_in()
             .checked_sub(before_in)
             .and_then(|value| usize::try_from(value).ok())
-            .ok_or_else(owned_deflate_progress_error)?;
+            .ok_or_else(reusable_deflate_progress_error)?;
         let produced = self
             .compressor
             .total_out()
             .checked_sub(before_out)
             .and_then(|value| usize::try_from(value).ok())
-            .ok_or_else(owned_deflate_progress_error)?;
+            .ok_or_else(reusable_deflate_progress_error)?;
         let available = self.output.len() - self.pending_end;
         if consumed > input.len() || produced > available {
-            return Err(owned_deflate_progress_error());
+            return Err(reusable_deflate_progress_error());
         }
         self.pending_end += produced;
         Ok((status, consumed, produced))
@@ -2492,7 +2535,7 @@ impl OwnedDeflateState {
         }
     }
 
-    fn drain_pending<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+    fn drain_pending<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
         while self.pending_start < self.pending_end {
             let start = self.pending_start;
             let end = self.pending_end;
@@ -2523,9 +2566,9 @@ impl OwnedDeflateState {
         Ok(())
     }
 
-    fn write_to<W: Write>(
+    pub(crate) fn write_to<W: Write + ?Sized>(
         &mut self,
-        entry: &mut OwnedCompressedEntry<W>,
+        entry: &mut W,
         input: &[u8],
     ) -> io::Result<usize> {
         // Keep the same write boundary as flate2's zio writer: one codec
@@ -2537,7 +2580,7 @@ impl OwnedDeflateState {
             let (status, consumed, produced) = self.compress_once(input, FlushCompress::None)?;
             if !input.is_empty() && consumed == 0 && status != Status::StreamEnd {
                 if produced == 0 {
-                    return Err(owned_deflate_progress_error());
+                    return Err(reusable_deflate_progress_error());
                 }
                 continue;
             }
@@ -2545,13 +2588,13 @@ impl OwnedDeflateState {
         }
     }
 
-    fn flush_to<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+    pub(crate) fn flush_to<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
         // zio runs the initial sync flush before dumping output already
         // buffered by the preceding write. This intentionally uses only the
         // remaining scratch capacity, then drains the combined range.
         let (_, consumed, _) = self.compress_once(&[], FlushCompress::Sync)?;
         if consumed != 0 {
-            return Err(owned_deflate_progress_error());
+            return Err(reusable_deflate_progress_error());
         }
 
         // zio::Writer drains any bytes left by the sync flush with no-flush
@@ -2561,7 +2604,7 @@ impl OwnedDeflateState {
             let before_out = self.compressor.total_out();
             let (_, consumed, _) = self.compress_once(&[], FlushCompress::None)?;
             if consumed != 0 {
-                return Err(owned_deflate_progress_error());
+                return Err(reusable_deflate_progress_error());
             }
             if self.compressor.total_out() == before_out {
                 break;
@@ -2570,39 +2613,114 @@ impl OwnedDeflateState {
         entry.flush()
     }
 
-    fn finish_to<W: Write>(&mut self, entry: &mut OwnedCompressedEntry<W>) -> io::Result<()> {
+    pub(crate) fn finish_to<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
         loop {
             self.drain_pending(entry)?;
             let before_out = self.compressor.total_out();
             let (status, consumed, _) = self.compress_once(&[], FlushCompress::Finish)?;
             if consumed != 0 {
-                return Err(owned_deflate_progress_error());
+                return Err(reusable_deflate_progress_error());
             }
             if status == Status::StreamEnd {
                 self.drain_pending(entry)?;
                 return Ok(());
             }
             if self.compressor.total_out() == before_out {
-                return Err(owned_deflate_progress_error());
+                return Err(reusable_deflate_progress_error());
             }
         }
     }
 }
 
-fn owned_deflate_error() -> io::Error {
+fn reusable_deflate_error() -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, "corrupt deflate stream")
 }
 
-fn owned_deflate_progress_error() -> io::Error {
+fn reusable_deflate_progress_error() -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
         "owned Deflate compressor made no valid progress",
     )
 }
 
+/// A raw Deflate encoder that borrows a [`ReusableDeflateState`] instead of
+/// constructing its own compressor.
+///
+/// This is a drop-in replacement for `flate2::write::DeflateEncoder` at the
+/// Office writer sites that compress one whole member at a time: it keeps the
+/// same `Write` boundaries and the same `finish` semantics, but the compressor
+/// and its 32 KiB output buffer belong to the caller and outlive the member.
+/// The caller readies the state with [`ReusableDeflateState::begin_member`];
+/// a member that fails mid-stream leaves the state unfinished, so its owner
+/// discards it rather than handing it to the next member.
+pub(crate) struct ReusedDeflateEncoder<'state, W: Write> {
+    state: &'state mut ReusableDeflateState,
+    // `None` only after a successful `finish`, exactly as flate2's
+    // `zio::Writer` clears its object after `take_inner`.  `Drop` below reads
+    // it to decide whether the stream still needs a final block.
+    sink: Option<W>,
+}
+
+impl<'state, W: Write> ReusedDeflateEncoder<'state, W> {
+    pub(crate) fn new(state: &'state mut ReusableDeflateState, sink: W) -> Self {
+        Self {
+            state,
+            sink: Some(sink),
+        }
+    }
+
+    /// Emits the final Deflate block and returns the wrapped sink, matching
+    /// `DeflateEncoder::finish`.
+    pub(crate) fn finish(mut self) -> io::Result<W> {
+        match self.sink.as_mut() {
+            Some(sink) => self.state.finish_to(sink)?,
+            None => return Err(reused_deflate_finished_error()),
+        }
+        match self.sink.take() {
+            Some(sink) => Ok(sink),
+            None => Err(reused_deflate_finished_error()),
+        }
+    }
+}
+
+impl<W: Write> Write for ReusedDeflateEncoder<'_, W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        match self.sink.as_mut() {
+            Some(sink) => self.state.write_to(sink, buffer),
+            None => Err(reused_deflate_finished_error()),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.sink.as_mut() {
+            Some(sink) => self.state.flush_to(sink),
+            None => Err(reused_deflate_finished_error()),
+        }
+    }
+}
+
+impl<W: Write> Drop for ReusedDeflateEncoder<'_, W> {
+    fn drop(&mut self) {
+        // flate2's `zio::Writer` finishes an unfinished stream on drop and
+        // discards the result. An entry abandoned mid-member keeps that
+        // behaviour so a failed member emits the same bytes it did before,
+        // and its owner discards the borrowed state rather than reusing it.
+        if let Some(sink) = self.sink.as_mut() {
+            let _ = self.state.finish_to(sink);
+        }
+    }
+}
+
+fn reused_deflate_finished_error() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "reused Deflate encoder was already finished",
+    )
+}
+
 #[derive(Debug)]
 struct OwnedDeflateCompressor<W: Write> {
-    state: Box<OwnedDeflateState>,
+    state: Box<ReusableDeflateState>,
     entry: OwnedCompressedEntry<W>,
 }
 
@@ -2636,8 +2754,7 @@ impl<W: Write> OwnedCompressor<W> {
             Self::Deflate(mut compressor) => {
                 compressor.state.finish_to(&mut compressor.entry)?;
                 let mut archive = compressor.entry.finish(output)?;
-                compressor.state.reset();
-                archive.reusable_deflate = Some(compressor.state);
+                archive.restore_reusable_deflate(compressor.state);
                 Ok(archive)
             },
         }

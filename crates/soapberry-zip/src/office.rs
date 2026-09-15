@@ -40,14 +40,13 @@ use crate::accounting::{
 use crate::crc::crc32_chunk;
 use crate::path::{RawPath, ZipFilePath};
 use crate::reader_at::validate_read_count;
+use crate::writer::ReusedDeflateEncoder;
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
     ZipArchive, ZipArchiveWriter, ZipLocator, ZipOperationAccounting, ZipReader, ZipSliceArchive,
     ZipVerification,
 };
-use flate2::Compression;
 use flate2::read::DeflateDecoder;
-use flate2::write::DeflateEncoder;
 use flate2::{Decompress, FlushDecompress, Status};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -4989,6 +4988,15 @@ fn physical_entry_bound(
     })
 }
 
+/// The streaming writer prepares one reusable Deflate state before opening a
+/// Deflate member. Reaching a Deflate branch without it is a writer bug, not a
+/// caller error, so it is refused rather than papered over with a fresh state.
+fn missing_deflate_state() -> Error {
+    Error::from(ErrorKind::InvalidInput {
+        msg: "streaming Deflate state was not prepared".to_string(),
+    })
+}
+
 #[inline]
 fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
     ErrorKind::LimitExceeded {
@@ -6640,6 +6648,11 @@ impl<W: Write> StreamingArchiveWriter<W> {
         let admission = self.validate_streaming_entry(name)?;
         self.reserve_streaming_entry()?;
         let zip64 = self.streaming_entry_uses_zip64();
+        // One compressor serves every Deflate member of this archive: taken
+        // before the entry borrows the archive, returned only after the
+        // member's final Deflate output succeeded.
+        let mut deflate_state = (compression_method == CompressionMethod::Deflate)
+            .then(|| self.archive.take_reusable_deflate());
         let started = self
             .archive
             .new_file(&admission.normalized_name)
@@ -6688,7 +6701,11 @@ impl<W: Write> StreamingArchiveWriter<W> {
                         accounting,
                         AccountingWriteKind::GeneratedDeflate,
                     );
-                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
+                    let state = match deflate_state.as_deref_mut() {
+                        Some(state) => state,
+                        None => return Err(missing_deflate_state()),
+                    };
+                    let encoder = ReusedDeflateEncoder::new(state, &mut limited_entry);
                     let mut data_writer = config.wrap(encoder);
                     let accepted = Self::copy_stream(
                         &mut reader,
@@ -6714,6 +6731,9 @@ impl<W: Write> StreamingArchiveWriter<W> {
             Ok(accepted) => accepted,
             Err(error) => return Err(self.poison(error)),
         };
+        if let Some(state) = deflate_state {
+            self.archive.restore_reusable_deflate(state);
+        }
         self.total_uncompressed_bytes = match self
             .total_uncompressed_bytes
             .checked_add(accepted_uncompressed)
@@ -6907,6 +6927,10 @@ impl<W: Write> StreamingArchiveWriter<W> {
         self.validate_known_payload(data_bytes)?;
         self.reserve_streaming_entry()?;
         let zip64 = self.streaming_entry_uses_zip64();
+        // One compressor serves every Deflate member of this archive: taken
+        // before the entry borrows the archive, returned only after the
+        // member's final Deflate output succeeded.
+        let mut deflate_state = self.archive.take_reusable_deflate();
         let started = self
             .archive
             .new_file(&admission.normalized_name)
@@ -6922,7 +6946,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
                         accounting,
                         AccountingWriteKind::GeneratedDeflate,
                     );
-                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
+                    let encoder = ReusedDeflateEncoder::new(&mut deflate_state, &mut limited_entry);
                     let mut writer = config.wrap(encoder);
                     writer.write_all(data)?;
                     let (encoder, desc) = writer.finish()?;
@@ -6938,6 +6962,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
         if let Err(error) = result {
             return Err(self.poison(error));
         }
+        self.archive.restore_reusable_deflate(deflate_state);
         self.total_uncompressed_bytes = match self.total_uncompressed_bytes.checked_add(data_bytes)
         {
             Some(total) => total,
@@ -6993,10 +7018,15 @@ impl<W: Write> StreamingArchiveWriter<W> {
                     source,
                 })
             })?;
+        // One compressor serves every Deflate member of this archive. The
+        // state returns to the archive only after this member's final Deflate
+        // output succeeded; a refused member drops its unfinished stream and
+        // the next member starts from a fresh one, so the writer stays usable.
+        let mut deflate_state = self.archive.take_reusable_deflate();
         let compression = (|| {
             let mut scratch =
                 CompressedScratch::new(&mut compressed, self.limits.max_compressed_size);
-            let mut encoder = DeflateEncoder::new(&mut scratch, Compression::default());
+            let mut encoder = ReusedDeflateEncoder::new(&mut deflate_state, &mut scratch);
             encoder.write_all(data)?;
             encoder.finish().map(|_scratch| ())
         })();
@@ -7011,6 +7041,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 _ => error,
             });
         }
+        self.archive.restore_reusable_deflate(deflate_state);
         let compressed_bytes = usize_to_u64(compressed.len(), "compressed Deflate payload length")?;
         let metadata_extra = Self::generated_central_zip64_extra_bytes(
             false,
@@ -8104,6 +8135,8 @@ const _: () = {
 mod tests {
     use super::*;
     use crate::Crc32Option;
+    use flate2::Compression;
+    use flate2::write::DeflateEncoder;
     use std::io::{self, Cursor};
 
     #[derive(Debug)]
