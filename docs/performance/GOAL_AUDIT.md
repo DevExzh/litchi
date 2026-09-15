@@ -1,5 +1,41 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
+
+GOAL step 1 (eliminate unnecessary work) in its purest form: the work removed is
+N−1 complete validated scans of a worksheet substream, and nothing about the
+remaining scan changed. No step was skipped — no layout change, no algorithm
+substitution, no parallelism, no SIMD — and no validation was moved, relaxed or
+deferred, because the walk runs to the worksheet's EOF exactly as a selected-cell
+query does; an early exit would be change 0574's opportunity 6, which ADR 0005's
+mandatory-validation clause rejects. The decision rules are satisfied in order:
+before measurements captured from the shared read-only checkout of the base,
+hypothesis and mechanism stated, smallest coherent change, correctness and
+adversarial evidence, after measurements with identical setup. Evidence tiers:
+**measured** for the 42 logical-counter cells, the 24 walk-against-per-cell
+cells, the 18 callgrind isolation pairs (36 annotated profiles), the 18
+`perf stat` pairs, the 120 timing runs across four rounds and the corpus
+differential over every XLS fixture; **modelled** for the 24.6 s whole-sheet
+per-cell extrapolation, which rests on three measured points that are linear to
+within 5%, and for every number in the part (2) design. The rule that a measurement blocker is itself work
+was applied rather than noted: change 0587 recorded that no source-backed XLS
+all-cells or full-text selector existed, so this change built them, and their
+all-cells oracle is a differential that fails the run on any disagreement between
+the walk and a selected-cell query. The standing instruction to price
+pointer-chase work in cycles is honoured, and it is what caught the one real
+problem: the first shared loop cost +1.37% instructions and +1.36% cycles on the
+`54016` one-cell query, `#[inline]` hints and a restored branch shape did not
+recover it, and folding the sink's four constant arguments into one `ScanContext`
+did, to +0.011%; the three trial profiles are retained rather than discarded.
+Host quiescence is not established — eight measurement agents shared 32 cores,
+1-minute load 8.27 — so the floor is measured in the same window: A/A p50 0.71%,
+max 2.14% over the 18 cells that exist on both legs, but B/B up to 46.51% on the
+heavy new scenarios, which is why no wall-clock statement is made about them
+beyond their ratios. OLE2/OOXML optimization remains active; ODF is deferred
+until completion and iWork excluded. [Change and
+limitations](0605-xls-retained-sheet-index.md); [retained
+evidence](results/change-0605/README.md).
+
 ## 0594 — one Deflate decoder per OOXML open, above a measured threshold
 
 `docs/GOAL.md` puts unnecessary allocation ahead of layout, algorithms and

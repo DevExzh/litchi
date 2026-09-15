@@ -447,6 +447,46 @@ allocation, RSS, throughput, latency, or ABBA claim, and do not define an
 ABBA schema. The selectors raise the current selectable registry from 393 to
 398; the default remains 36 cases / 198 records.
 
+## XLS whole-sheet walk and text attribution (change 0605)
+
+`xls_source_attribution` is a standalone binary, not a
+`litchi-perf-baseline --case` selector; it takes `--input PATH` and reports
+per-sample logical counters and elapsed nanoseconds for one operation of the
+public `litchi_xls::SourceBackedWorkbook` API. Change 0605 adds three
+operations to the `open` / `list` / `one-cell` set it carried before:
+
+```text
+--operation second-cell   two selected-cell queries on the same worksheet
+--operation all-cells     every stored cell of one worksheet
+--operation full-text     the workbook's complete text projection
+```
+
+`all-cells` takes a strategy:
+
+```text
+--all-cells-strategy scan       SourceBackedWorksheet::visit_cells: one scan
+--all-cells-strategy per-cell   one cell_value_by_index call per position
+--per-cell-limit N              positions the per-cell strategy reads (default 64)
+```
+
+The two strategies are the paired legs of the all-cells scenario inside one
+binary and one build: `per-cell` is what a caller had to write before the walk
+existed, and it pays one complete validated scan of the worksheet substream per
+position, so it reads a bounded prefix rather than a whole sheet. The oracle is
+computed once outside the timed region and fails the run when the walk and the
+selected-cell queries disagree on any of the positions it compares, so every
+measurement is also a differential.
+
+`full-text` records a typed refusal as an outcome rather than failing the run:
+several real fixtures, including `ConditionalFormattingSamples.xls`, are
+refused by this reader, and holding the refusal identical across legs is the
+point. `second-cell` exists to size a repeated query on one worksheet, which is
+the scenario a retained sheet index would serve.
+
+`eager-file` and `facade-file` reject all three: neither control implements a
+source-backed whole-sheet walk or a source-backed text projection, and their
+`limitation` field says so.
+
 ## Change 0259 relationship-heavy OPC structural open
 
 At change 0259's landing, the opt-in `opc_relationship_open` selector raised

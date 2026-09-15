@@ -1,0 +1,154 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0605/out/callgrind/cg-after-54016-all-cells-per-cell-slarge.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 2123221172
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution --input /home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls --mode owned-readat --operation all-cells --all-cells-strategy per-cell --per-cell-limit 64 --worksheet-index 0 --warmups 2 --samples 6 (PID 2267612, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.9
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+8,604,592,801 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+1,718,527,104 (19.97%)  ???:litchi_xls::workbook::source::query_cell [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+1,641,429,405 (19.08%)  ???:litchi_xls::workbook::source::WorksheetScan::next_frame [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  964,830,312 (11.21%)  ???:<litchi_xls::workbook::source::TargetCell as litchi_xls::workbook::source::CellSink>::accept [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  858,880,656 ( 9.98%)  ???:litchi_xls::workbook::source::WorksheetScan::read_payload [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  576,129,756 ( 6.70%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  516,388,090 ( 6.00%)  ???:litchi_xls::records::CellRecord::parse [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  495,400,950 ( 5.76%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::validate_cell_xf [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  408,828,807 ( 4.75%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  382,722,700 ( 4.45%)  ???:core::ptr::drop_in_place<litchi_xls::records::CellRecord> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+  357,522,037 ( 4.16%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  106,082,604 ( 1.23%)  ???:litchi_xls::workbook::source::WorksheetScan::skip_payload [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   73,216,866 ( 0.85%)  ???:litchi_xls::records::CellRecord::packed_cell_range [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   69,836,616 ( 0.81%)  ???:litchi_cfb::shared::next_chain_sector [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   40,893,929 ( 0.48%)  ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   35,029,025 ( 0.41%)  ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   25,018,792 ( 0.29%)  ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   24,363,839 ( 0.28%)  ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   20,828,204 ( 0.24%)  ???:litchi_xls::workbook::codec::semantic::worksheet::add_cell [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   19,387,106 ( 0.23%)  ???:xls_source_attribution::positions_of [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   19,078,878 ( 0.22%)  ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   16,029,354 ( 0.19%)  ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   15,147,569 ( 0.18%)  ???:<alloc::string::String>::from_utf16 [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   11,682,715 ( 0.14%)  ???:litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+   10,981,615 ( 0.13%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   10,406,856 ( 0.12%)  ???:litchi_cfb::directory_name::directory_name_data [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    8,608,752 ( 0.10%)  ???:litchi_xls::cell::Cell::from_record_with_formula_context [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    7,134,726 ( 0.08%)  ???:litchi_xls::workbook::source::resolve_shared_string [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    6,831,882 ( 0.08%)  ???:<litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    6,795,278 ( 0.08%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    6,679,953 ( 0.08%)  ???:litchi_xls::records::walk_one_shared_string [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    5,803,089 ( 0.07%)  ???:alloc::collections::btree::search::<impl alloc::collections::btree::node::NodeRef<BorrowType,K,V,alloc::collections::btree::node::marker::LeafOrInternal>>::search_tree [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    5,716,060 ( 0.07%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    5,487,555 ( 0.06%)  ???:litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    4,929,210 ( 0.06%)  ???:litchi_cfb::shared::SharedOleFile::find_entry [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    4,905,587 ( 0.06%)  ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    4,496,675 ( 0.05%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,412,528 ( 0.05%)  ???:<litchi_xls::workbook::source::VisitCells<F> as litchi_xls::workbook::source::CellSink>::accept [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    3,893,274 ( 0.05%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    3,873,559 ( 0.05%)  ???:alloc::collections::btree::map::IntoIter<K,V,A>::dying_next [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    3,785,100 ( 0.04%)  ???:litchi_xls::border_fill::parse_xf_border_fill [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    3,746,025 ( 0.04%)  ???:litchi_xls::records::SstCursor::read_characters [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,990,880 ( 0.03%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,891,242 ( 0.03%)  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,648,853 ( 0.03%)  ???:alloc::fmt::format::format_inner [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,635,746 ( 0.03%)  ???:litchi_xls::workbook::source::visit_worksheet_cells [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,629,574 ( 0.03%)  ???:core::ptr::drop_in_place<litchi_core::sheet::types::CellValue> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,377,370 ( 0.03%)  ???:litchi_xls::number_format::codec::parse_xf [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,319,641 ( 0.03%)  ???:core::fmt::write [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,272,036 ( 0.03%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,161,280 ( 0.03%)  ???:<alloc::string::String as core::fmt::Write>::write_str [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,143,602 ( 0.02%)  ???:litchi_xls::records::scan_shared_string_records [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    2,135,730 ( 0.02%)  ???:alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,932,372 ( 0.02%)  ???:alloc::raw_vec::RawVecInner<A>::try_reserve_exact [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,839,032 ( 0.02%)  ???:litchi_xls::records::SstCursor::walk_formatting_runs [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,776,998 ( 0.02%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,706,764 ( 0.02%)  ???:litchi_xls::conditional_format::codec::Collector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,706,691 ( 0.02%)  ???:litchi_xls::comments::codec::CommentCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,654,551 ( 0.02%)  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,591,002 ( 0.02%)  ???:__rustc::__rdl_alloc [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,565,925 ( 0.02%)  ???:litchi_core::source::ReadAt::read_exact_at [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,518,485 ( 0.02%)  ???:litchi_xls::records::decode_shared_string_entry [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,512,227 ( 0.02%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,496,124 ( 0.02%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,479,194 ( 0.02%)  ???:litchi_xls::scenario::ScenarioCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,391,408 ( 0.02%)  ???:alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert_entry [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,305,691 ( 0.02%)  ???:xls_source_attribution::cell_projection [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,299,880 ( 0.02%)  ???:litchi_xls::layout::Collector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,262,260 ( 0.01%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,247,319 ( 0.01%)  ???:litchi_xls::workbook::source::GlobalsBuffer::ensure [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,233,641 ( 0.01%)  ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,213,712 ( 0.01%)  ???:litchi_xls::pivot_table::package::PivotTableCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,188,908 ( 0.01%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,149,795 ( 0.01%)  ???:<core::fmt::Formatter>::pad_integral [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,137,973 ( 0.01%)  ???:litchi_xls::consolidation::ConsolidationCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,134,959 ( 0.01%)  ???:litchi_xls::workbook::source::WorksheetScan::fill [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,100,176 ( 0.01%)  ???:litchi_xls::page_setup::PageSetupCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,061,984 ( 0.01%)  ???:litchi_xls::sort_data::SortDataCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,024,637 ( 0.01%)  ???:litchi_xls::view::codec::ViewCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+    1,021,935 ( 0.01%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      995,170 ( 0.01%)  ???:litchi_xls::hyperlinks::package::HyperlinkCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      986,136 ( 0.01%)  ???:litchi_xls::list_object::package::collector::ListObjectCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      954,800 ( 0.01%)  ???:litchi_xls::alignment::CellAlignment::parse [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      948,200 ( 0.01%)  ???:litchi_xls::query_table::validation::QueryTableCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      927,664 ( 0.01%)  ???:<std::sys::pal::unix::time::Timespec>::sub_timespec [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      910,296 ( 0.01%)  ???:litchi_xls::scenario::ScenarioCollector::finish_pending [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      888,256 ( 0.01%)  ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      856,900 ( 0.01%)  ???:alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Dying,K,V,NodeType>,alloc::collections::btree::node::marker::KV>::drop_key_val [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      802,304 ( 0.01%)  ???:<std::sys::pal::unix::time::Timespec>::now [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      796,508 ( 0.01%)  ???:litchi_xls::vba::WorksheetVbaCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      765,869 ( 0.01%)  ???:litchi_xls::records::SharedStringTable::parse_segments [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      758,618 ( 0.01%)  ???:litchi_xls::worksheet::layout::Collector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      750,994 ( 0.01%)  ???:core::ptr::drop_in_place<litchi_xls::cell::Cell> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      720,801 ( 0.01%)  ???:litchi_xls::calculation::package::WorksheetCalculationCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      705,610 ( 0.01%)  ???:<litchi_core::sheet::types::CellValue as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      664,949 ( 0.01%)  ???:alloc::vec::Vec<T,A>::resize [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      660,600 ( 0.01%)  ???:litchi_xls::workbook::source::SourceInner::ensure_current [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      652,140 ( 0.01%)  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      651,872 ( 0.01%)  ???:<std::time::Instant>::elapsed [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      607,125 ( 0.01%)  ???:<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      594,400 ( 0.01%)  ???:core::ptr::drop_in_place<alloc::vec::Vec<alloc::vec::Vec<u8>>> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      582,682 ( 0.01%)  ???:<u64 as core::fmt::Display>::fmt [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      568,920 ( 0.01%)  ???:litchi_xls::protection::SheetProtectionCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      551,584 ( 0.01%)  ./time/../sysdeps/unix/sysv/linux/clock_gettime.c:clock_gettime@@GLIBC_2.17 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      494,828 ( 0.01%)  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      493,028 ( 0.01%)  ???:litchi_xls::records::CellRecord::parse_mul_blank [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      489,216 ( 0.01%)  ???:litchi_xls::layout::row::parse [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      482,424 ( 0.01%)  ???:<alloc::string::String as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      475,802 ( 0.01%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      455,140 ( 0.01%)  ???:litchi_xls::formula_errors::codec::FormulaErrorCollector::feed_record [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      444,683 ( 0.01%)  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      430,896 ( 0.01%)  ???:litchi_xls::records::CellRecord::visit_mul_blank [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      430,800 ( 0.01%)  ???:<core::fmt::Formatter>::pad [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      427,235 ( 0.00%)  ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      411,246 ( 0.00%)  ???:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      410,320 ( 0.00%)  ???:<core::fmt::Formatter>::pad_integral::write_prefix [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      390,855 ( 0.00%)  ???:core::ptr::drop_in_place<alloc::vec::Vec<(u32,u32,alloc::string::String)>> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      380,688 ( 0.00%)  ???:<xls_source_attribution::OwnedReadAt as litchi_core::source::ReadAt>::version [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      344,720 ( 0.00%)  ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      328,625 ( 0.00%)  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+      310,300 ( 0.00%)  ???:<usize as core::fmt::LowerHex>::fmt [/home/zhuhe/code/litchi-worktrees/targets/0605-after/release/xls_source_attribution]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./malloc/./malloc/malloc.c
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+  ./time/../sysdeps/unix/sysv/linux/clock_gettime.c
+

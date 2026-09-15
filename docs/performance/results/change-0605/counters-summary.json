@@ -1,0 +1,1314 @@
+{
+ "cells": [
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 16,
+      "worksheet_names": null
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 16,
+      "worksheet_names": null
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "open"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Home",
+       "Products1",
+       "Products2",
+       "Book tour",
+       "Grades",
+       "Customers1",
+       "Quarters",
+       "Bike rating",
+       "FY months",
+       "Regional sales",
+       "Mountains",
+       "Category sales",
+       "Banded rows",
+       "Compare to totals",
+       "Products3",
+       "Customers2"
+      ]
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Home",
+       "Products1",
+       "Products2",
+       "Book tour",
+       "Grades",
+       "Customers1",
+       "Quarters",
+       "Bike rating",
+       "FY months",
+       "Regional sales",
+       "Mountains",
+       "Category sales",
+       "Banded rows",
+       "Compare to totals",
+       "Products3",
+       "Customers2"
+      ]
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "list"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": "string:4:Date",
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603115,
+     "read_calls": 61,
+     "seek_calls": 0,
+     "version_calls": 42
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": "string:4:Date",
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603115,
+     "read_calls": 61,
+     "seek_calls": 0,
+     "version_calls": 42
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=string:4:Date|b=datetime:39181",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 641022,
+     "read_calls": 68,
+     "seek_calls": 0,
+     "version_calls": 52
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 790147,
+     "read_calls": 394,
+     "seek_calls": 0,
+     "version_calls": 1936
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 87,
+      "kind": "all-cells",
+      "outcome": "cells:87:27d1fcfb731d3134301b07912cb90ec91706b318c62bc735e942788de1e4ad1c",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603533,
+     "read_calls": 104,
+     "seek_calls": 0,
+     "version_calls": 214
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 64,
+      "kind": "all-cells",
+      "outcome": "cells:64:d94f0707230fc1fe90c6c8993a9b8117cdaa5ca5c9599918f72753f50ebc46d8",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 2991566,
+     "read_calls": 534,
+     "seek_calls": 0,
+     "version_calls": 800
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells-per-cell"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 16,
+      "worksheet_names": null
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 16,
+      "worksheet_names": null
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "file-source",
+   "operation": "open"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Home",
+       "Products1",
+       "Products2",
+       "Book tour",
+       "Grades",
+       "Customers1",
+       "Quarters",
+       "Bike rating",
+       "FY months",
+       "Regional sales",
+       "Mountains",
+       "Category sales",
+       "Banded rows",
+       "Compare to totals",
+       "Products3",
+       "Customers2"
+      ]
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Home",
+       "Products1",
+       "Products2",
+       "Book tour",
+       "Grades",
+       "Customers1",
+       "Quarters",
+       "Bike rating",
+       "FY months",
+       "Regional sales",
+       "Mountains",
+       "Category sales",
+       "Banded rows",
+       "Compare to totals",
+       "Products3",
+       "Customers2"
+      ]
+     },
+     "read_bytes": 565201,
+     "read_calls": 53,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "file-source",
+   "operation": "list"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": "string:4:Date",
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603115,
+     "read_calls": 61,
+     "seek_calls": 0,
+     "version_calls": 42
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": "string:4:Date",
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603115,
+     "read_calls": 61,
+     "seek_calls": 0,
+     "version_calls": 42
+    }
+   },
+   "mode": "file-source",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=string:4:Date|b=datetime:39181",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 641022,
+     "read_calls": 68,
+     "seek_calls": 0,
+     "version_calls": 52
+    }
+   },
+   "mode": "file-source",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 790147,
+     "read_calls": 394,
+     "seek_calls": 0,
+     "version_calls": 1936
+    }
+   },
+   "mode": "file-source",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 87,
+      "kind": "all-cells",
+      "outcome": "cells:87:27d1fcfb731d3134301b07912cb90ec91706b318c62bc735e942788de1e4ad1c",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 603533,
+     "read_calls": 104,
+     "seek_calls": 0,
+     "version_calls": 214
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "flagship",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 64,
+      "kind": "all-cells",
+      "outcome": "cells:64:d94f0707230fc1fe90c6c8993a9b8117cdaa5ca5c9599918f72753f50ebc46d8",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 2991566,
+     "read_calls": 534,
+     "seek_calls": 0,
+     "version_calls": 800
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells-per-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 3,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 3,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "open"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Plan1",
+       "Plan2",
+       "Plan3"
+      ]
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Plan1",
+       "Plan2",
+       "Plan3"
+      ]
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "list"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=absent|b=absent",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 111070,
+     "read_calls": 18,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "text:107420:bdd9a79ef483a767ac8cd118a46ca2a59ecadf84d461042ab1420f04f7b71ed5",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 257894,
+     "read_calls": 898,
+     "seek_calls": 0,
+     "version_calls": 5025
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 0,
+      "kind": "all-cells",
+      "outcome": "cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 0,
+      "kind": "all-cells",
+      "outcome": "cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 21
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells-per-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 3,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 3,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    }
+   },
+   "mode": "file-source",
+   "operation": "open"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Plan1",
+       "Plan2",
+       "Plan3"
+      ]
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Plan1",
+       "Plan2",
+       "Plan3"
+      ]
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 22
+    }
+   },
+   "mode": "file-source",
+   "operation": "list"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "file-source",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=absent|b=absent",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 111070,
+     "read_calls": 18,
+     "seek_calls": 0,
+     "version_calls": 29
+    }
+   },
+   "mode": "file-source",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "text:107420:bdd9a79ef483a767ac8cd118a46ca2a59ecadf84d461042ab1420f04f7b71ed5",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 257894,
+     "read_calls": 898,
+     "seek_calls": 0,
+     "version_calls": 5025
+    }
+   },
+   "mode": "file-source",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 0,
+      "kind": "all-cells",
+      "outcome": "cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110656,
+     "read_calls": 17,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "cv",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 0,
+      "kind": "all-cells",
+      "outcome": "cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 110242,
+     "read_calls": 16,
+     "seek_calls": 0,
+     "version_calls": 21
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells-per-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 1,
+      "worksheet_names": null
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 1,
+      "worksheet_names": null
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "open"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Sheet1"
+      ]
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Sheet1"
+      ]
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "list"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": "float:4024000000000000",
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 932993,
+     "read_calls": 65,
+     "seek_calls": 0,
+     "version_calls": 43
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": "float:4024000000000000",
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 932993,
+     "read_calls": 65,
+     "seek_calls": 0,
+     "version_calls": 43
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=float:4024000000000000|b=float:408f400000000000",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1548815,
+     "read_calls": 90,
+     "seek_calls": 0,
+     "version_calls": 62
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1256139,
+     "read_calls": 16145,
+     "seek_calls": 0,
+     "version_calls": 89789
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 38950,
+      "kind": "all-cells",
+      "outcome": "cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1256139,
+     "read_calls": 16145,
+     "seek_calls": 0,
+     "version_calls": 64307
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 64,
+      "kind": "all-cells",
+      "outcome": "cells:64:7477278e9e56169ba021be18ec25353dc00fdb738ea65cf6894cde06de6e5e89",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 39731462,
+     "read_calls": 1690,
+     "seek_calls": 0,
+     "version_calls": 1440
+    }
+   },
+   "mode": "owned-readat",
+   "operation": "all-cells-per-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "open",
+      "outcome": null,
+      "worksheet_count": 1,
+      "worksheet_names": null
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "open",
+      "worksheet_count": 1,
+      "worksheet_names": null
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "file-source",
+   "operation": "open"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "list",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Sheet1"
+      ]
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "kind": "list",
+      "worksheet_count": null,
+      "worksheet_names": [
+       "Sheet1"
+      ]
+     },
+     "read_bytes": 317171,
+     "read_calls": 40,
+     "seek_calls": 0,
+     "version_calls": 25
+    }
+   },
+   "mode": "file-source",
+   "operation": "list"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": "float:4024000000000000",
+      "cells_reported": null,
+      "kind": "one-cell",
+      "outcome": null,
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 932993,
+     "read_calls": 65,
+     "seek_calls": 0,
+     "version_calls": 43
+    },
+    "before": {
+     "binary_sha256": "d594674deffb3e686ceb920396f0f1352a78583dec060ad52e394abee29c48e9",
+     "len_calls": 1,
+     "observation": {
+      "cell": "float:4024000000000000",
+      "kind": "one-cell",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 932993,
+     "read_calls": 65,
+     "seek_calls": 0,
+     "version_calls": 43
+    }
+   },
+   "mode": "file-source",
+   "operation": "one-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "second-cell",
+      "outcome": "a=float:4024000000000000|b=float:408f400000000000",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1548815,
+     "read_calls": 90,
+     "seek_calls": 0,
+     "version_calls": 62
+    }
+   },
+   "mode": "file-source",
+   "operation": "second-cell"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": null,
+      "kind": "full-text",
+      "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1256139,
+     "read_calls": 16145,
+     "seek_calls": 0,
+     "version_calls": 89789
+    }
+   },
+   "mode": "file-source",
+   "operation": "full-text"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 38950,
+      "kind": "all-cells",
+      "outcome": "cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 1256139,
+     "read_calls": 16145,
+     "seek_calls": 0,
+     "version_calls": 64307
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells"
+  },
+  {
+   "fixture": "54016",
+   "legs": {
+    "after": {
+     "binary_sha256": "b22152a6cd59637663d6bc2acb4dab25f716b5c98b90f25ff899fee67da20b45",
+     "len_calls": 1,
+     "observation": {
+      "cell": null,
+      "cells_reported": 64,
+      "kind": "all-cells",
+      "outcome": "cells:64:7477278e9e56169ba021be18ec25353dc00fdb738ea65cf6894cde06de6e5e89",
+      "worksheet_count": null,
+      "worksheet_names": null
+     },
+     "read_bytes": 39731462,
+     "read_calls": 1690,
+     "seek_calls": 0,
+     "version_calls": 1440
+    }
+   },
+   "mode": "file-source",
+   "operation": "all-cells-per-cell"
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+Gates for change 0605, run in the change's own worktree at
+/home/zhuhe/code/litchi-worktrees/0605 on branch perf/0605-xls-retained-sheet-index.
+Two crates were touched: litchi-xls and the standalone perf-baseline harness
+binary xls_source_attribution.
+
+$ cargo fmt --all --check
+fmt exit=0
+
+$ cargo clippy -p litchi-xls --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+clippy exit=0
+
+$ cargo clippy --manifest-path tools/perf-baseline/Cargo.toml \
+    --bin xls_source_attribution --features xls-source-attribution --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+clippy exit=0
+
+$ cargo test -p litchi-xls
+72 test binaries, 1,390 passed, 0 failed, 1 ignored. The eight tests this change
+adds are in tests/source_backed.rs, which reports:
+     Running tests/source_backed.rs (target/debug/deps/source_backed-83e679c0b3cbe3ed)
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.58s
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.30s; merged doctests compilation took 0.30s
+test exit=0
+
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml \
+    --bin xls_source_attribution --features xls-source-attribution
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test exit=0
+
+$ cargo doc -p litchi-xls --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.36s
+   Generated /home/zhuhe/code/litchi-worktrees/0605/target/doc/litchi_xls/index.html
+doc exit=0
+
+Corpus differentials the record cites.
+
+$ ./capture_corpus.sh <before-binary> before corpus-before.txt
+$ ./capture_corpus.sh <after-binary>  after  corpus-after.txt
+$ diff corpus-before.txt corpus-after.txt
+(no output; exit 0)
+
+All 126 .xls fixtures under test-data, three operations, worksheet indices 0 and
+1: 756 cells per leg, identical line for line, including 99 typed refusals with
+identical messages (23 WorksheetNotFound, 18 EncryptedUnsupported, 12 corrupted
+FAT, and the malformed-XFCRC, short-SST, invalid-font and reserved-formula-bit
+families).
+
+$ ./capture_walk_differential.sh <after-binary> walk-differential.txt
+agreed: 291
+disagreements: 0
+
+The same 126 fixtures at worksheet indices 0, 1 and 2. Each --operation
+all-cells run builds its oracle outside the timed region by walking the
+worksheet and re-reading up to 128 of the reported positions one
+cell_value_by_index call at a time, and fails the run if the two projections
+differ at any position. 291 worksheets walked, 90,543 cells reported, zero
+disagreements. That oracle also runs inside every counter, callgrind, perf and
+latency child that uses --operation all-cells, so every all-cells row in
+analysis.txt is a passing differential too.
+
+No pre-existing failure was encountered, so none is recorded.

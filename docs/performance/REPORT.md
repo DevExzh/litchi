@@ -1,5 +1,40 @@
 # Performance program phase report
 
+## 0605 — retained whole-sheet XLS walk; retained sheet index frozen as a design
+
+Three files changed in `litchi-xls` and the standalone attribution harness,
+`performance_claim: none`. The headline is a new capability, not a speedup of an
+existing path, so it is reported as a ratio inside one binary and one build:
+`visit_cells` against one `cell_value_by_index` per position, the latter using
+only API that predates this change. `54016.xls` worksheet 0 — 38,950 cells,
+16,145 reads, 1,256,139 bytes, p50 20.71 ms — against 256 positions read one at a
+time — 6,529 reads, 157,972,311 bytes, p50 161.99 ms; `WithCustomViews.xls`
+sheet 0, 3,325 cells for 257,066 bytes against 10,499,248 for 256; the flagship's
+sheet 11, 347 cells for 600,726 bytes against 9,558,820 for 256. Controls: all 18
+before-against-after counter cells identical in reads, bytes, observations, `len`
+calls and seeks, with identical semantic projections, and instruction counts
++0.011% to +0.146% across the six isolation pairs. Full text is a control too and
+is unchanged — it already scanned each sheet once — including the flagship's
+refusal, which the harness now records as an outcome rather than a failure and
+which is byte-identical across legs. **Two of 36 paired wall-clock comparisons
+exceed the +5% review trigger** and are reported rather than netted into a mean:
+`WithCustomViews.xls` `file-source` open (+7.19%) and list (+6.75%), both in one
+direction only, both inside the same cell's 6.67% and 6.14% B/B floor, both on
+operations that never enter the worksheet frame loop this change touched, and
+both on the smallest absolute times in the matrix (34.7 µs, where 2 µs is 6%).
+The heavy new scenarios carry a same-binary floor up to 46.51% at 30 samples, so
+their evidence is the deterministic counters and instruction counts, not their
+wall clock. Gates: `cargo fmt --all --check`, `cargo clippy` on both touched
+crates, `cargo test -p litchi-xls` (72 binaries, 1,390 passed, 0 failed, 1
+pre-existing ignored doctest), the harness's own 11 tests, and `cargo doc -p
+litchi-xls --no-deps`, all clean. Part (2), the snapshot-scoped retained sheet
+index, is designed and not built. No cold-cache, physical-device, range-source,
+RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform
+result is claimed. OLE2/OOXML optimization remains active; ODF is deferred until
+completion and iWork excluded. [Change and
+limitations](0605-xls-retained-sheet-index.md); [retained
+evidence](results/change-0605/README.md).
+
 ## 0594 — one Deflate decoder per OOXML open, above a measured threshold
 
 `IndexedArchive::read` built a fresh `IndexedReadSession` and a fresh

@@ -2684,3 +2684,326 @@ fn frame_bytes(kind: u16, payload: &[u8]) -> Vec<u8> {
     bytes.extend_from_slice(payload);
     bytes
 }
+
+/// Collects every stored cell of one worksheet through the whole-sheet walk.
+fn visited_cells(owner: &SourceBackedWorkbook, sheet: usize) -> Vec<(u32, u32, CellValue)> {
+    let mut cells = Vec::new();
+    owner
+        .worksheet_by_index(sheet)
+        .unwrap()
+        .unwrap()
+        .visit_cells(|cell| {
+            cells.push((cell.row(), cell.column(), cell.value().clone()));
+            Ok(())
+        })
+        .unwrap();
+    cells
+}
+
+/// The oracle for the whole-sheet walk: over the bounding rectangle of what the
+/// walk reported, every position must agree with an independent selected-cell
+/// query, including the positions the walk did **not** report, which must come
+/// back absent.
+fn assert_walk_matches_queries(bytes: Vec<u8>, sheet: usize, least_cells: usize) {
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let walked = visited_cells(&owner, sheet);
+    assert!(
+        walked.len() >= least_cells,
+        "the fixture must store at least {least_cells} cells, walked {}",
+        walked.len()
+    );
+    let mut seen = std::collections::HashMap::new();
+    for (row, column, value) in &walked {
+        // A worksheet may store a position twice; a query reports the last one.
+        let _ = seen.insert((*row, *column), value.clone());
+    }
+    let last_row = walked.iter().map(|(row, _, _)| *row).max().unwrap();
+    let last_column = walked.iter().map(|(_, column, _)| *column).max().unwrap();
+    assert!(
+        last_column <= u32::from(u8::MAX),
+        "queries stop at column 255"
+    );
+    let worksheet = owner.worksheet_by_index(sheet).unwrap().unwrap();
+    for row in 0..=last_row {
+        for column in 0..=last_column {
+            let queried = worksheet.cell(row, column).unwrap().map(|cell| {
+                assert_eq!(cell.row(), row);
+                assert_eq!(cell.column(), column);
+                cell.into_value()
+            });
+            assert_eq!(
+                queried.as_ref(),
+                seen.get(&(row, column)),
+                "walk and query disagree at ({row}, {column})"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_whole_sheet_walk_agrees_with_selected_cell_queries() {
+    assert_walk_matches_queries(fixture("Simple.xls"), 0, 1);
+    // Strings, floats, dates and stored blanks over 24 rows.
+    assert_walk_matches_queries(ole_fixture("ConditionalFormattingSamples.xls"), 1, 87);
+    // Booleans as well.
+    assert_walk_matches_queries(ole_fixture("ConditionalFormattingSamples.xls"), 15, 192);
+}
+
+#[test]
+fn the_whole_sheet_walk_reports_a_string_valued_formula_with_its_string_result() {
+    // A string-valued FORMULA is the one record where the walk and a selected
+    // cell query take different branches: a query holds back only the target,
+    // the walk holds back every one. Both must end at the same value.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut formula = Vec::new();
+    formula.extend_from_slice(&60_005_u16.to_le_bytes());
+    formula.extend_from_slice(&6_u16.to_le_bytes());
+    formula.extend_from_slice(&0_u16.to_le_bytes());
+    formula.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0xFF, 0xFF]);
+    formula.extend_from_slice(&0_u16.to_le_bytes());
+    formula.extend_from_slice(&0_u32.to_le_bytes());
+    formula.extend_from_slice(&0_u16.to_le_bytes());
+    let mut string = Vec::new();
+    string.extend_from_slice(&9_u16.to_le_bytes());
+    string.push(0);
+    string.extend_from_slice(b"abc");
+    let continuation = |text: &[u8]| {
+        let mut payload = vec![0];
+        payload.extend_from_slice(text);
+        frame_bytes(0x003C, &payload)
+    };
+    let mut chain = frame_bytes(0x0006, &formula);
+    chain.extend_from_slice(&frame_bytes(0x0207, &string));
+    chain.extend_from_slice(&continuation(b"def"));
+    chain.extend_from_slice(&continuation(b"ghi"));
+    let modified = insert_before_worksheet_eof(&original, &chain);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+    let expected = owner.cell_value_by_index(0, 60_005, 6).unwrap();
+    assert!(expected.is_some(), "the query must find the formula cell");
+    let walked = visited_cells(&owner, 0);
+    let found = walked
+        .iter()
+        .find(|(row, column, _)| *row == 60_005 && *column == 6)
+        .map(|(_, _, value)| value.clone());
+    assert_eq!(found, expected, "the walk must resolve the STRING result");
+    assert_walk_matches_queries(bytes, 0, 2);
+}
+
+#[test]
+fn the_whole_sheet_walk_reports_shared_strings() {
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture("Simple.xls"))))
+            .unwrap();
+    let walked = visited_cells(&owner, 0);
+    assert!(
+        walked
+            .iter()
+            .any(|(_, _, value)| matches!(value, CellValue::String(_))),
+        "the fixture must exercise the shared-string resolve path: {walked:?}"
+    );
+}
+
+#[test]
+fn the_whole_sheet_walk_costs_one_scan_not_one_per_cell() {
+    let source = Arc::new(CountingSource::new(ole_fixture("WithCustomViews.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    // One selected-cell query: the whole-substream scan every query pays for,
+    // plus the one shared string it resolves.
+    source.clear_ranges();
+    source.clear_version_calls();
+    let _ = worksheet.cell(0, 0).unwrap();
+    let query_reads = source.ranges().len();
+    let query_bytes = source.bytes_read();
+    assert!(query_reads > 0, "a query must reach the source");
+
+    // The whole-sheet walk over the same worksheet.
+    source.clear_ranges();
+    source.clear_version_calls();
+    let mut cells = Vec::new();
+    worksheet
+        .visit_cells(|cell| {
+            cells.push((cell.row(), cell.column()));
+            Ok(())
+        })
+        .unwrap();
+    let walk_reads = source.ranges().len();
+    let walk_bytes = source.bytes_read();
+    let walk_versions = source.version_calls();
+    assert!(
+        cells.len() > 3_000,
+        "the fixture must store many cells, got {}",
+        cells.len()
+    );
+
+    // Reading a bounded sample of the same cells one at a time repeats the
+    // whole substream scan once per cell, so its cost is linear in the sample
+    // while the walk's is not.
+    const SAMPLE: usize = 256;
+    let per_cell = |take: usize| {
+        source.clear_ranges();
+        source.clear_version_calls();
+        for (row, column) in cells.iter().take(take) {
+            let _ = worksheet.cell(*row, *column).unwrap();
+        }
+        (
+            source.ranges().len(),
+            source.bytes_read(),
+            source.version_calls(),
+        )
+    };
+    let (half_reads, half_bytes, _) = per_cell(SAMPLE / 2);
+    let (sample_reads, sample_bytes, sample_versions) = per_cell(SAMPLE);
+
+    // Linear in the number of cells queried, to within the shared strings the
+    // second half happens to resolve.
+    assert!(
+        sample_reads >= half_reads * 2 - SAMPLE / 2 && sample_reads <= half_reads * 2 + SAMPLE / 2,
+        "per-cell reads must be linear: {half_reads} for {} cells, {sample_reads} for {SAMPLE}",
+        SAMPLE / 2
+    );
+    assert!(
+        sample_bytes >= half_bytes * 2 - half_bytes / 8,
+        "per-cell bytes must be linear: {half_bytes} then {sample_bytes}"
+    );
+
+    // The walk covers every one of the fixture's cells for less I/O than
+    // querying 256 of them one at a time.
+    assert!(
+        walk_reads < sample_reads,
+        "walk {walk_reads} reads for {} cells must beat {sample_reads} reads for {SAMPLE}",
+        cells.len()
+    );
+    assert!(
+        walk_bytes < sample_bytes,
+        "walk {walk_bytes} bytes for {} cells must beat {sample_bytes} bytes for {SAMPLE}",
+        cells.len()
+    );
+    // Freshness observations are dominated by the per-string resolve's three
+    // fences, which the walk pays once per string and the per-cell path pays
+    // once per query as well, so the walk wins there only once enough cells are
+    // wanted. Compare against the per-cell path scaled to the whole sheet
+    // rather than to the 256-cell sample.
+    let projected = sample_versions.saturating_mul(cells.len() as u64) / SAMPLE as u64;
+    assert!(
+        walk_versions * 4 < projected,
+        "walk {walk_versions} observations must be far below the {projected} a per-cell \
+         reading of all {} cells projects from {sample_versions} for {SAMPLE}",
+        cells.len()
+    );
+    // The walk's worksheet scan itself is a single pass: its byte total is one
+    // scan's worth plus the shared-string resolves the cells require, never a
+    // multiple of the substream.
+    assert!(
+        walk_bytes < query_bytes.saturating_mul(SAMPLE),
+        "walk {walk_bytes} bytes must stay far below {SAMPLE} scans"
+    );
+}
+
+#[test]
+fn the_whole_sheet_walk_refuses_what_a_selected_cell_query_refuses() {
+    // A synthetic defect: a `Number` record whose payload is too short.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let malformed =
+        insert_before_worksheet_eof(&original, &frame_bytes(0x0203, &[0, 0, 0, 0, 1, 0]));
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(cfb_with_streams(
+        &[("Workbook", &malformed)],
+    ))))
+    .unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    assert_eq!(
+        worksheet.cell(0, 0).unwrap_err().to_string(),
+        worksheet
+            .visit_cells(|_cell| Ok(()))
+            .unwrap_err()
+            .to_string(),
+        "the walk must carry the query's error identity"
+    );
+
+    // A real defect: three worksheets of the flagship fixture carry shared
+    // formula metadata this reader refuses, which is why its text extraction
+    // is refused (0568, 0585). The walk must refuse them identically.
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(ole_fixture(
+        "ConditionalFormattingSamples.xls",
+    ))))
+    .unwrap();
+    let mut refusals = 0_usize;
+    for sheet in [6_usize, 7, 13] {
+        let worksheet = owner.worksheet_by_index(sheet).unwrap().unwrap();
+        let walk = worksheet
+            .visit_cells(|_cell| Ok(()))
+            .unwrap_err()
+            .to_string();
+        // Find the position the query refuses at: the walk stops at the same
+        // record, so any query over the sheet refuses with the same message.
+        let query = worksheet.cell(0, 0).unwrap_err().to_string();
+        assert_eq!(walk, query, "sheet {sheet} refusals differ");
+        assert!(walk.contains("PtgExp"), "unexpected refusal: {walk}");
+        refusals += 1;
+    }
+    assert_eq!(refusals, 3);
+}
+
+#[test]
+fn the_whole_sheet_walk_returns_a_visitor_error_unchanged() {
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(ole_fixture(
+        "WithCustomViews.xls",
+    ))))
+    .unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    let mut seen = 0_usize;
+    let error = worksheet
+        .visit_cells(|_cell| {
+            seen += 1;
+            Err(SourceBackedError::Allocation {
+                resource: "test sink",
+                requested: 7,
+            })
+        })
+        .unwrap_err();
+    assert_eq!(seen, 1, "the scan stops at the first visitor error");
+    assert!(matches!(
+        error,
+        SourceBackedError::Allocation {
+            resource: "test sink",
+            requested: 7,
+        }
+    ));
+}
+
+#[test]
+fn the_whole_sheet_walk_observes_a_source_change() {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    source.bump();
+    let error = worksheet.visit_cells(|_cell| Ok(())).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected SourceChanged, got {error:?}"
+    );
+}
+
+#[test]
+fn the_whole_sheet_walk_honours_cancellation() {
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture("Simple.xls"))))
+            .unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+    let (cancellation, execution) = execution_pair();
+    cancellation.cancel();
+    let error = worksheet
+        .visit_cells_with_execution(&execution, |_cell| Ok(()))
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            SourceBackedError::Execution(ExecutionError::Cancelled)
+        ),
+        "expected cancellation, got {error:?}"
+    );
+}

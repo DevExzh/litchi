@@ -32,6 +32,13 @@ const DEFAULT_SAMPLES: usize = 15;
 const DEFAULT_WORKSHEET_INDEX: usize = 1;
 const DEFAULT_ROW: u32 = 1;
 const DEFAULT_COLUMN: u32 = 0;
+/// Positions the `per-cell` all-cells strategy reads one query at a time.
+///
+/// Every one of them costs a complete validated scan of the worksheet
+/// substream, so a sheet with tens of thousands of cells cannot be read
+/// exhaustively that way inside a benchmark; the strategy reads a bounded
+/// prefix and the record states the per-position cost it implies.
+const DEFAULT_PER_CELL_LIMIT: usize = 64;
 
 const PROCESS_SCOPE: &str =
     "samples share one benchmark process; invoke once per retained sample for fresh-child evidence";
@@ -44,6 +51,9 @@ enum Operation {
     Open,
     List,
     OneCell,
+    SecondCell,
+    AllCells,
+    FullText,
 }
 
 impl Operation {
@@ -52,6 +62,29 @@ impl Operation {
             Self::Open => "open",
             Self::List => "list",
             Self::OneCell => "one-cell",
+            Self::SecondCell => "second-cell",
+            Self::AllCells => "all-cells",
+            Self::FullText => "full-text",
+        }
+    }
+}
+
+/// How the all-cells scenario reaches every stored cell of one worksheet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AllCellsStrategy {
+    /// `SourceBackedWorksheet::visit_cells`: one validated scan.
+    Scan,
+    /// One `cell_value_by_index` call per position of the walked bounding
+    /// rectangle: what a caller had to write before the walk existed, and one
+    /// full validated scan per position.
+    PerCell,
+}
+
+impl AllCellsStrategy {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Scan => "scan",
+            Self::PerCell => "per-cell",
         }
     }
 }
@@ -115,9 +148,19 @@ impl Mode {
 
     const fn limitation(self, operation: Operation) -> Option<&'static str> {
         match self {
-            Self::FacadeFile if matches!(operation, Operation::OneCell) => Some(
-                "unsupported: the unified facade exposes worksheet listing but not selected-cell access",
+            Self::FacadeFile if !matches!(operation, Operation::Open | Operation::List) => Some(
+                "unsupported: the unified facade exposes worksheet listing but not selected-cell or whole-sheet access",
             ),
+            Self::EagerFile
+                if matches!(
+                    operation,
+                    Operation::SecondCell | Operation::AllCells | Operation::FullText
+                ) =>
+            {
+                Some(
+                    "unsupported: the eager control has no source-backed whole-sheet walk or source-backed text projection",
+                )
+            },
             Self::FacadeFile => Some(
                 "facade-file uses the unified public Workbook API; filesystem counters are not exposed; the staged fixture is immutable and warm-cache, so physical I/O is not measured",
             ),
@@ -145,6 +188,8 @@ struct Config {
     worksheet_index: usize,
     row: u32,
     column: u32,
+    all_cells_strategy: AllCellsStrategy,
+    per_cell_limit: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -152,6 +197,8 @@ struct Coordinates {
     worksheet_index: usize,
     row: u32,
     column: u32,
+    all_cells_strategy: AllCellsStrategy,
+    per_cell_limit: usize,
 }
 
 #[derive(Debug)]
@@ -187,6 +234,7 @@ struct SemanticProjection {
     worksheet_count: usize,
     worksheet_names: Vec<String>,
     selected_cell: Option<String>,
+    outcome: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -202,13 +250,29 @@ struct ObservationJson {
     worksheet_count: Option<usize>,
     worksheet_names: Option<Vec<String>>,
     cell: Option<String>,
+    outcome: Option<String>,
+    cells_reported: Option<usize>,
 }
 
 #[derive(Debug)]
 enum Observation {
-    Open { worksheet_count: usize },
-    List { worksheet_names: Vec<String> },
-    OneCell { cell: Option<CellValue> },
+    Open {
+        worksheet_count: usize,
+    },
+    List {
+        worksheet_names: Vec<String>,
+    },
+    OneCell {
+        cell: Option<CellValue>,
+    },
+    /// Second cell, all cells and full text share one shape: a compact,
+    /// order-independent projection of what the operation produced, or the
+    /// typed refusal it produced instead.
+    Outcome {
+        kind: &'static str,
+        outcome: String,
+        cells_reported: Option<usize>,
+    },
 }
 
 impl Observation {
@@ -219,18 +283,36 @@ impl Observation {
                 worksheet_count: Some(worksheet_count),
                 worksheet_names: None,
                 cell: None,
+                outcome: None,
+                cells_reported: None,
             },
             Self::List { worksheet_names } => ObservationJson {
                 kind: "list",
                 worksheet_count: None,
                 worksheet_names: Some(worksheet_names),
                 cell: None,
+                outcome: None,
+                cells_reported: None,
             },
             Self::OneCell { cell } => ObservationJson {
                 kind: "one-cell",
                 worksheet_count: None,
                 worksheet_names: None,
                 cell: cell.as_ref().map(cell_projection),
+                outcome: None,
+                cells_reported: None,
+            },
+            Self::Outcome {
+                kind,
+                outcome,
+                cells_reported,
+            } => ObservationJson {
+                kind,
+                worksheet_count: None,
+                worksheet_names: None,
+                cell: None,
+                outcome: Some(outcome),
+                cells_reported,
             },
         }
     }
@@ -591,6 +673,8 @@ struct Report {
     worksheet_index: usize,
     row: u32,
     column: u32,
+    all_cells_strategy: &'static str,
+    per_cell_limit: usize,
     semantic_oracle: SemanticOracle,
     elapsed_samples_ns: Vec<u64>,
     records: Vec<Sample>,
@@ -685,6 +769,153 @@ fn source_operation(
                 coordinates.column,
             )?),
         }),
+        Operation::SecondCell => {
+            let first = std::hint::black_box(workbook.cell_value_by_index(
+                coordinates.worksheet_index,
+                coordinates.row,
+                coordinates.column,
+            )?);
+            let second = std::hint::black_box(workbook.cell_value_by_index(
+                coordinates.worksheet_index,
+                coordinates.row.saturating_add(1),
+                coordinates.column,
+            )?);
+            Ok(Observation::Outcome {
+                kind: "second-cell",
+                outcome: format!(
+                    "a={}|b={}",
+                    first
+                        .as_ref()
+                        .map_or_else(|| "absent".to_owned(), cell_projection),
+                    second
+                        .as_ref()
+                        .map_or_else(|| "absent".to_owned(), cell_projection),
+                ),
+                cells_reported: None,
+            })
+        },
+        Operation::AllCells => {
+            let (outcome, reported) = all_cells_outcome(workbook, coordinates)?;
+            Ok(Observation::Outcome {
+                kind: "all-cells",
+                outcome,
+                cells_reported: Some(reported),
+            })
+        },
+        Operation::FullText => Ok(Observation::Outcome {
+            kind: "full-text",
+            outcome: full_text_outcome(workbook),
+            cells_reported: None,
+        }),
+    }
+}
+
+/// Sorts the positions the walk reported so the two strategies compare on the
+/// same ordering, which the walk itself does not guarantee (it reports records
+/// in stream order, and a worksheet may store a position twice).
+fn positions_of(cells: &[(u32, u32, String)]) -> Vec<(u32, u32)> {
+    let mut seen = std::collections::BTreeSet::new();
+    for (row, column, _) in cells {
+        let _ = seen.insert((*row, *column));
+    }
+    seen.into_iter().collect()
+}
+
+/// A stable, position-keyed projection of a set of cells. The walk may report a
+/// position twice; the last record wins, exactly as a selected-cell query
+/// reports the last record it saw.
+fn cells_digest(cells: &[(u32, u32, String)]) -> String {
+    let mut by_position = std::collections::BTreeMap::new();
+    for (row, column, projection) in cells {
+        let _ = by_position.insert((*row, *column), projection.clone());
+    }
+    let mut hasher = Sha256::new();
+    for ((row, column), projection) in &by_position {
+        hasher.update(format!("{row},{column}={projection}\n").as_bytes());
+    }
+    let digest: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("cells:{}:{digest}", by_position.len())
+}
+
+/// Walks one worksheet with `visit_cells` and projects every reported cell.
+fn walk_cells(
+    workbook: &litchi_xls::SourceBackedWorkbook,
+    worksheet_index: usize,
+) -> Result<Vec<(u32, u32, String)>, AnyError> {
+    let worksheet = workbook
+        .worksheet_by_index(worksheet_index)?
+        .ok_or_else(|| io::Error::other("worksheet index out of range"))?;
+    let mut cells = Vec::new();
+    worksheet.visit_cells(|cell| {
+        cells.push((cell.row(), cell.column(), cell_projection(cell.value())));
+        Ok(())
+    })?;
+    Ok(cells)
+}
+
+/// Reads a bounded prefix of `positions` one selected-cell query at a time:
+/// what a caller had to write before the walk existed.
+fn query_cells(
+    workbook: &litchi_xls::SourceBackedWorkbook,
+    worksheet_index: usize,
+    positions: &[(u32, u32)],
+    limit: usize,
+) -> Result<Vec<(u32, u32, String)>, AnyError> {
+    let mut cells = Vec::new();
+    for (row, column) in positions.iter().take(limit) {
+        if let Some(value) = workbook.cell_value_by_index(worksheet_index, *row, *column)? {
+            cells.push((*row, *column, cell_projection(&value)));
+        }
+    }
+    Ok(cells)
+}
+
+fn all_cells_outcome(
+    workbook: &litchi_xls::SourceBackedWorkbook,
+    coordinates: Coordinates,
+) -> Result<(String, usize), AnyError> {
+    match coordinates.all_cells_strategy {
+        AllCellsStrategy::Scan => {
+            let cells = std::hint::black_box(walk_cells(workbook, coordinates.worksheet_index)?);
+            let reported = cells.len();
+            Ok((cells_digest(&cells), reported))
+        },
+        AllCellsStrategy::PerCell => {
+            // The positions are established once, outside the timed region, by
+            // the caller through `all_cells_positions`; recomputing them here
+            // would time the walk inside the per-cell leg.
+            let positions = ALL_CELLS_POSITIONS.with(|slot| slot.borrow().clone());
+            let cells = std::hint::black_box(query_cells(
+                workbook,
+                coordinates.worksheet_index,
+                &positions,
+                coordinates.per_cell_limit,
+            )?);
+            let reported = cells.len();
+            Ok((cells_digest(&cells), reported))
+        },
+    }
+}
+
+thread_local! {
+    /// The sorted positions the walk reports for the configured worksheet,
+    /// established once from the oracle so the per-cell strategy times only its
+    /// queries.
+    static ALL_CELLS_POSITIONS: std::cell::RefCell<Vec<(u32, u32)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Projects a full-text extraction, including the typed refusal the reader
+/// produces for a fixture it declines: a refusal is an outcome to be held
+/// identical across legs, not a reason to abandon the scenario.
+fn full_text_outcome(workbook: &litchi_xls::SourceBackedWorkbook) -> String {
+    match std::hint::black_box(workbook.text()) {
+        Ok(text) => format!("text:{}:{}", text.len(), sha256_hex(text.as_bytes())),
+        Err(error) => format!("refused:{error}"),
     }
 }
 
@@ -721,6 +952,11 @@ fn eager_operation<R: Read + Seek>(
                     .map(|cell| cell.value().clone()),
             ),
         }),
+        Operation::SecondCell | Operation::AllCells | Operation::FullText => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "the eager control does not implement the source-backed walk scenarios",
+        )
+        .into()),
     }
 }
 
@@ -778,6 +1014,69 @@ fn build_oracle(
         None
     };
 
+    // The whole-sheet walk's oracle is the selected-cell query it replaces:
+    // over the positions the walk reports, a bounded prefix is re-read one
+    // query at a time and the two projections must agree exactly. This is the
+    // differential the record cites, and it runs on every fixture measured.
+    let source_outcome = match operation {
+        Operation::AllCells => {
+            let walked = walk_cells(&source_workbook, coordinates.worksheet_index)?;
+            let positions = positions_of(&walked);
+            let queried = query_cells(
+                &source_workbook,
+                coordinates.worksheet_index,
+                &positions,
+                coordinates.per_cell_limit,
+            )?;
+            let walked_prefix: Vec<(u32, u32, String)> = {
+                let allowed: std::collections::BTreeSet<(u32, u32)> = positions
+                    .iter()
+                    .take(coordinates.per_cell_limit)
+                    .copied()
+                    .collect();
+                walked
+                    .iter()
+                    .filter(|(row, column, _)| allowed.contains(&(*row, *column)))
+                    .cloned()
+                    .collect()
+            };
+            if cells_digest(&walked_prefix) != cells_digest(&queried) {
+                return Err(io::Error::other(
+                    "whole-sheet walk and selected-cell queries disagree",
+                )
+                .into());
+            }
+            ALL_CELLS_POSITIONS.with(|slot| *slot.borrow_mut() = positions);
+            Some(match coordinates.all_cells_strategy {
+                AllCellsStrategy::Scan => cells_digest(&walked),
+                AllCellsStrategy::PerCell => cells_digest(&queried),
+            })
+        },
+        Operation::FullText => Some(full_text_outcome(&source_workbook)),
+        Operation::SecondCell => {
+            let first = source_workbook.cell_value_by_index(
+                coordinates.worksheet_index,
+                coordinates.row,
+                coordinates.column,
+            )?;
+            let second = source_workbook.cell_value_by_index(
+                coordinates.worksheet_index,
+                coordinates.row.saturating_add(1),
+                coordinates.column,
+            )?;
+            Some(format!(
+                "a={}|b={}",
+                first
+                    .as_ref()
+                    .map_or_else(|| "absent".to_owned(), cell_projection),
+                second
+                    .as_ref()
+                    .map_or_else(|| "absent".to_owned(), cell_projection),
+            ))
+        },
+        Operation::Open | Operation::List | Operation::OneCell => None,
+    };
+
     let eager_workbook = litchi_xls::Workbook::new(Cursor::new(input.to_vec()))?;
     let eager_worksheet_names = eager_names(&eager_workbook);
     let eager_selected_cell = if operation == Operation::OneCell {
@@ -793,11 +1092,13 @@ fn build_oracle(
             worksheet_count: source_worksheet_count,
             worksheet_names: source_worksheet_names,
             selected_cell: source_selected_cell,
+            outcome: source_outcome,
         },
         eager_implementation_projection: SemanticProjection {
             worksheet_count: eager_worksheet_names.len(),
             worksheet_names: eager_worksheet_names,
             selected_cell: eager_selected_cell,
+            outcome: None,
         },
         scope: ORACLE_SCOPE,
     })
@@ -823,6 +1124,11 @@ fn validate_source_observation(
             let actual = cell.as_ref().map(cell_projection);
             if actual != projection.selected_cell {
                 return Err(io::Error::other("source cell oracle mismatch").into());
+            }
+        },
+        Observation::Outcome { kind, outcome, .. } => {
+            if Some(outcome) != projection.outcome.as_ref() {
+                return Err(io::Error::other(format!("source {kind} oracle mismatch")).into());
             }
         },
     }
@@ -854,6 +1160,13 @@ fn validate_eager_observation<R: Read + Seek>(
                 return Err(io::Error::other("eager cell oracle mismatch").into());
             }
         },
+        Observation::Outcome { .. } => {
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "the eager control has no oracle for the whole-sheet walk scenarios",
+            )
+            .into());
+        },
     }
     Ok(())
 }
@@ -873,7 +1186,7 @@ fn validate_facade_parity(
         {
             Ok(())
         },
-        Observation::OneCell { .. } => Err(io::Error::new(
+        Observation::OneCell { .. } | Observation::Outcome { .. } => Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "facade/source parity is defined only for open and list",
         )
@@ -990,10 +1303,10 @@ fn run_facade_sample(
         Operation::List => Observation::List {
             worksheet_names: std::hint::black_box(workbook.worksheet_names()?),
         },
-        Operation::OneCell => {
+        Operation::OneCell | Operation::SecondCell | Operation::AllCells | Operation::FullText => {
             return Err(io::Error::new(
                 io::ErrorKind::Unsupported,
-                "facade-file does not expose selected-cell access",
+                "facade-file does not expose selected-cell or whole-sheet access",
             )
             .into());
         },
@@ -1018,6 +1331,8 @@ fn run_one_sample(
         worksheet_index: config.worksheet_index,
         row: config.row,
         column: config.column,
+        all_cells_strategy: config.all_cells_strategy,
+        per_cell_limit: config.per_cell_limit,
     };
     match config.mode {
         Mode::OwnedReadAt | Mode::AtomicFile | Mode::TrackedFile | Mode::FileSource => {
@@ -1126,7 +1441,7 @@ fn revision() -> String {
 }
 
 fn usage() -> &'static str {
-    "usage: xls_source_attribution --input PATH [--mode owned-readat|atomic-file|tracked-file|file-source|eager-file|facade-file] [--operation open|list|one-cell] [--warmups N] [--samples N] [--worksheet-index N] [--row N] [--column N]"
+    "usage: xls_source_attribution --input PATH [--mode owned-readat|atomic-file|tracked-file|file-source|eager-file|facade-file] [--operation open|list|one-cell|second-cell|all-cells|full-text] [--warmups N] [--samples N] [--worksheet-index N] [--row N] [--column N] [--all-cells-strategy scan|per-cell] [--per-cell-limit N]"
 }
 
 fn parse_usize(value: Option<&str>, option: &str) -> Result<usize, String> {
@@ -1155,6 +1470,8 @@ where
     let mut worksheet_index = DEFAULT_WORKSHEET_INDEX;
     let mut row = DEFAULT_ROW;
     let mut column = DEFAULT_COLUMN;
+    let mut all_cells_strategy = AllCellsStrategy::Scan;
+    let mut per_cell_limit = DEFAULT_PER_CELL_LIMIT;
     let mut arguments = arguments.into_iter();
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
@@ -1173,6 +1490,9 @@ where
                     "open" => Operation::Open,
                     "list" => Operation::List,
                     "one-cell" => Operation::OneCell,
+                    "second-cell" => Operation::SecondCell,
+                    "all-cells" => Operation::AllCells,
+                    "full-text" => Operation::FullText,
                     value => return Err(format!("unknown operation {value:?}")),
                 };
             },
@@ -1198,6 +1518,20 @@ where
             },
             "--row" => row = parse_u32(arguments.next().as_deref(), "--row")?,
             "--column" => column = parse_u32(arguments.next().as_deref(), "--column")?,
+            "--all-cells-strategy" => {
+                all_cells_strategy = match arguments
+                    .next()
+                    .ok_or("--all-cells-strategy requires a value")?
+                    .as_str()
+                {
+                    "scan" => AllCellsStrategy::Scan,
+                    "per-cell" => AllCellsStrategy::PerCell,
+                    value => return Err(format!("unknown all-cells strategy {value:?}")),
+                };
+            },
+            "--per-cell-limit" => {
+                per_cell_limit = parse_usize(arguments.next().as_deref(), "--per-cell-limit")?;
+            },
             value if !value.starts_with('-') && input.is_none() => {
                 input = Some(PathBuf::from(value))
             },
@@ -1206,6 +1540,9 @@ where
     }
     if warmups == 0 || samples == 0 {
         return Err("--warmups and --samples must be greater than zero".into());
+    }
+    if per_cell_limit == 0 {
+        return Err("--per-cell-limit must be greater than zero".into());
     }
     Ok(Some(Config {
         input: input.ok_or("--input PATH is required")?,
@@ -1216,6 +1553,8 @@ where
         worksheet_index,
         row,
         column,
+        all_cells_strategy,
+        per_cell_limit,
     }))
 }
 
@@ -1244,6 +1583,8 @@ fn run(config: Config) -> Result<Report, AnyError> {
         worksheet_index: config.worksheet_index,
         row: config.row,
         column: config.column,
+        all_cells_strategy: config.all_cells_strategy,
+        per_cell_limit: config.per_cell_limit,
     };
     let oracle = build_oracle(&input.bytes, config.operation, coordinates)?;
     let (total_iterations, mut records) = allocate_records(config.warmups, config.samples)?;
@@ -1278,6 +1619,8 @@ fn run(config: Config) -> Result<Report, AnyError> {
         worksheet_index: config.worksheet_index,
         row: config.row,
         column: config.column,
+        all_cells_strategy: config.all_cells_strategy.as_str(),
+        per_cell_limit: config.per_cell_limit,
         semantic_oracle: oracle,
         elapsed_samples_ns,
         records,
@@ -1422,6 +1765,7 @@ mod tests {
             worksheet_count: 2,
             worksheet_names: vec!["One".to_owned(), "Two".to_owned()],
             selected_cell: Some("string:4:Date".to_owned()),
+            outcome: None,
         };
         assert!(
             validate_facade_parity(&Observation::Open { worksheet_count: 2 }, &projection,).is_ok()
@@ -1436,6 +1780,87 @@ mod tests {
             .is_ok()
         );
         assert!(validate_facade_parity(&Observation::OneCell { cell: None }, &projection).is_err());
+        assert!(
+            validate_facade_parity(
+                &Observation::Outcome {
+                    kind: "all-cells",
+                    outcome: "cells:0:".to_owned(),
+                    cells_reported: Some(0),
+                },
+                &projection,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn the_whole_sheet_scenarios_parse_and_default_explicitly() {
+        let config = parse_args_from(
+            [
+                "--input",
+                "x.xls",
+                "--operation",
+                "all-cells",
+                "--all-cells-strategy",
+                "per-cell",
+                "--per-cell-limit",
+                "9",
+            ]
+            .into_iter()
+            .map(str::to_owned),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(config.operation, Operation::AllCells);
+        assert_eq!(config.all_cells_strategy, AllCellsStrategy::PerCell);
+        assert_eq!(config.per_cell_limit, 9);
+
+        let defaults = parse_args_from(["--input", "x.xls"].into_iter().map(str::to_owned))
+            .unwrap()
+            .unwrap();
+        assert_eq!(defaults.all_cells_strategy, AllCellsStrategy::Scan);
+        assert_eq!(defaults.per_cell_limit, DEFAULT_PER_CELL_LIMIT);
+        assert!(
+            parse_args_from(
+                ["--input", "x.xls", "--per-cell-limit", "0"]
+                    .into_iter()
+                    .map(str::to_owned)
+            )
+            .is_err()
+        );
+        for (name, operation) in [
+            ("second-cell", Operation::SecondCell),
+            ("all-cells", Operation::AllCells),
+            ("full-text", Operation::FullText),
+        ] {
+            let parsed = parse_args_from(
+                ["--input", "x.xls", "--operation", name]
+                    .into_iter()
+                    .map(str::to_owned),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(parsed.operation, operation);
+            assert_eq!(parsed.operation.as_str(), name);
+        }
+    }
+
+    /// The position-keyed digest must ignore the order the walk reports cells
+    /// in and must let the last record for a position win, exactly as a
+    /// selected-cell query does.
+    #[test]
+    fn the_cells_digest_is_position_keyed_and_last_record_wins() {
+        let a = vec![(1, 1, "int:1".to_owned()), (0, 0, "int:0".to_owned())];
+        let b = vec![(0, 0, "int:0".to_owned()), (1, 1, "int:1".to_owned())];
+        assert_eq!(cells_digest(&a), cells_digest(&b));
+        let duplicated = vec![
+            (0, 0, "int:9".to_owned()),
+            (0, 0, "int:0".to_owned()),
+            (1, 1, "int:1".to_owned()),
+        ];
+        assert_eq!(cells_digest(&duplicated), cells_digest(&b));
+        assert_eq!(positions_of(&duplicated), vec![(0, 0), (1, 1)]);
+        assert!(cells_digest(&b).starts_with("cells:2:"));
     }
 
     #[test]
