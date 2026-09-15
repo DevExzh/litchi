@@ -1,0 +1,57 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0598",
+  "scratch_root": "/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0598",
+  "removed": [
+    {
+      "what": "cg-{before,after}-pptx_cross_copy_{plain,media_rich}-s{1,3}.out",
+      "count": 8,
+      "bytes_each": "460-504 KB",
+      "why": "raw callgrind profiles; every number this record cites was extracted into counts/incl-*.txt and counts/calls-*.txt before deletion"
+    },
+    {
+      "what": "cg-*.json (the harness reports written during the callgrind profiles)",
+      "count": 8,
+      "why": "profiling runs at --warmup 0 --samples 1 and 3; their timings are meaningless and the record cites none of them"
+    },
+    {
+      "what": "timing-{A1,B1,B2,A2}.log, perf-{A1,B1,B2,A2}.{log,json}",
+      "why": "stdout of the timing legs and the perf-stat legs' harness reports; the retained timing-*.json carry the same samples and the retained perf-*.txt carry the counters"
+    },
+    {
+      "what": "build-{before,after}.log, gate-{clippy,doc,test,test-final}.log, test-first.log",
+      "why": "build and gate transcripts; gates.txt retains the tail of every gate this record cites"
+    },
+    {
+      "what": "smoke-plain.json, smoke-rest.json",
+      "why": "sizing runs taken before the measurement legs; nothing cites them"
+    },
+    {
+      "what": "patch_model.py, patch_cross.py, patch_cross2.py, patch_cross3.py, patch_cross4.py, patch_btests.py, __pycache__/",
+      "why": "one-shot editing scripts used to apply the source change; the change itself is the commit"
+    },
+    {
+      "what": "the whole scratch directory, after the packet was assembled",
+      "why": "session scratchpad on a 62 GiB RAM-backed tmpfs shared with the other agents of this wave"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/0598 (git worktree, about 19 GiB including its own cargo target)",
+      "why": "removed with `git worktree remove --force` after the commit; the branch perf/0598-pptx-cross-copy-revision-cache is kept"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/targets/0598-before and /home/zhuhe/code/litchi-worktrees/targets/0598-after (about 1.1 GiB each)",
+      "why": "per-agent CARGO_TARGET_DIRs for the two measured harness builds; the binaries' sha256s are recorded in README.md and decision.json"
+    }
+  ],
+  "kept": [
+    {
+      "what": "docs/performance/results/change-0598/ (about 830 KB)",
+      "why": "the evidence this record cites: both legs' annotations, call counts, timing and perf-stat reports, the scripts that produced them, the gates, the decision record and the log paragraphs"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/before-f22f93935",
+      "why": "the shared read-only before checkout; owned by the coordinator, not this agent"
+    }
+  ]
+}

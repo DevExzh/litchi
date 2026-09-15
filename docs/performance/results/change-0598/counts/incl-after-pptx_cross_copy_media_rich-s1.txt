@@ -1,0 +1,118 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0598/cg-after-pptx_cross_copy_media_rich-s1.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 12408391884
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline --warmup 0 --samples 1 --case pptx_cross_copy_media_rich --json /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0598/cg-after-pptx_cross_copy_media_rich-s1.json (PID 1856619, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.5
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                       
+--------------------------------------------------------------------------------
+123,862,232,137 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                        file:function
+--------------------------------------------------------------------------------
+123,862,232,137 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+123,861,622,667 (100.0%)  ???:(below main) [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,622,655 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+123,861,622,474 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+123,861,620,445 (100.0%)  ???:main [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,620,434 (100.0%)  ???:std::rt::lang_start_internal [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,505,258 (100.0%)  ???:std::rt::lang_start::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,505,244 (100.0%)  ???:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,505,240 (100.0%)  ???:litchi_perf_baseline::main [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+123,861,501,337 (100.0%)  ???:litchi_perf_baseline::run [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 89,903,628,405 (72.58%)  ???:sha2::sha256::compress256 [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 89,903,472,224 (72.58%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 88,549,153,599 (71.49%)  ???:litchi_perf_baseline::build_pptx_cross_copy_corpus [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 58,453,044,616 (47.19%)  ???:litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 54,787,626,953 (44.23%)  ???:litchi_perf_baseline::verify_pptx_cross_copy_refusal_gates [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 51,493,955,533 (41.57%)  ???:litchi_opc::pkgwriter::PackageWriter::write_to_stream [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 51,059,870,346 (41.22%)  ???:litchi_pptx::opened::cross_copy_plan::build_candidate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 48,275,419,206 (38.98%)  ???:litchi_pptx::opened::model::package_fingerprint [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 48,274,002,421 (38.97%)  ???:litchi_pptx::opened::model::feed [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 36,698,148,176 (29.63%)  ???:soapberry_zip::preserve::PreservationIndex<R>::write_to [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 35,701,125,445 (28.82%)  ???:litchi_pptx::opened::cross_copy_plan::bounded_package_bytes [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 34,219,689,721 (27.63%)  ???:litchi_pptx::opened::cross_copy_plan::<impl litchi_pptx::opened::model::Snapshot>::plan_cross_slide_copy [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 34,219,685,781 (27.63%)  ???:litchi_pptx::opened::cross_copy_plan::plan_cross_slide_copy_for_slides [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 33,519,081,947 (27.06%)  ???:litchi_pptx::opened::model::capture_internal [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 32,184,050,901 (25.98%)  ???:litchi_perf_baseline::run_pptx_cross_copy [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 27,676,300,916 (22.34%)  ???:litchi_pptx::package::model::Package::apply_cross_slide_copy_plan [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 27,047,418,630 (21.84%)  ???:<flate2::mem::Compress as flate2::zio::Ops>::run_vec [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 26,853,959,292 (21.68%)  ???:zlib_rs::stable::Deflate::compress [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 26,853,691,617 (21.68%)  ???:zlib_rs::deflate::deflate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 26,852,422,839 (21.68%)  ???:zlib_rs::deflate::algorithm::run [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 26,852,343,054 (21.68%)  ???:zlib_rs::deflate::algorithm::medium::deflate_medium [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 26,757,940,079 (21.60%)  ???:std::io::Write::write_all [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 24,728,673,861 (19.96%)  ???:litchi_pptx::package::model::Package::apply_cross_slide_copy_patch [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 21,195,224,899 (17.11%)  ???:soapberry_zip::preserve::generated_entry [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 21,188,934,398 (17.11%)  ???:soapberry_zip::preserve::PreservationIndex<R>::prepare [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 20,739,064,749 (16.74%)  ???:flate2::zio::Writer<W,D>::write_with_status [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 15,782,571,394 (12.74%)  ???:litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 15,756,847,551 (12.72%)  ???:<litchi_pptx::opened::cross_copy_plan::ArchiveHashWriter as std::io::Write>::write [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 15,498,900,164 (12.51%)  ???:soapberry_zip::preserve::write_prepared_local [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 15,153,980,571 (12.23%)  ???:soapberry_zip::accounting::write_all_counted [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 14,279,156,579 (11.53%)  ???:<litchi_pptx::opened::cross_copy_plan::BoundedVecWriter as std::io::Write>::write [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+ 11,469,182,109 ( 9.26%)  ???:litchi_pptx::package::model::Package::opened_presentation [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  8,751,323,444 ( 7.07%)  ???:litchi_perf_baseline::sha256_hex [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  8,694,787,068 ( 7.02%)  ???:litchi_perf_baseline::pptx_cross_copy_bytes [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  7,003,881,712 ( 5.65%)  ???:litchi_pptx::opened::cross_copy_plan::snapshot_physical_revision [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,646,211,400 ( 5.37%)  ???:zlib_rs::deflate::longest_match::longest_match [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,445,864,712 ( 5.20%)  ???:litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::to_bytes [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,445,438,403 ( 5.20%)  ???:litchi_opc::pkgwriter::PackageWriter::to_bytes [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,203,363,375 ( 5.01%)  ???:litchi_opc::phys_pkg::PhysPkgWriter<W>::write [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,201,730,387 ( 5.01%)  ???:soapberry_zip::office::StreamingArchiveWriter<W>::write_deflated_with_accounting [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,162,993,505 ( 4.98%)  ???:litchi_pptx::opened::cross_copy_plan::validate_application_candidate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  6,162,993,109 ( 4.98%)  ???:litchi_pptx::opened::patch::validate_candidate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  5,948,132,159 ( 4.80%)  ???:<flate2::deflate::write::DeflateEncoder<W> as std::io::Write>::write [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  4,204,762,318 ( 3.39%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  4,137,743,614 ( 3.34%)  ???:std::io::default_read_to_end [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,820,981,180 ( 3.08%)  ???:litchi_opc::pkgreader::PackageReader::from_phys_reader [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,800,352,032 ( 3.07%)  ???:litchi_opc::pkgreader::PackageReader::load_parts_eager [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,799,638,013 ( 3.07%)  ???:litchi_pptx::opened::cross_copy_plan::apply_patch::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,729,998,816 ( 3.01%)  ???:soapberry_zip::office::LazyArchiveReader::read_shared_with_reader [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,666,835,027 ( 2.96%)  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,666,464,000 ( 2.96%)  ???:soapberry_zip::office::LazyArchiveReader::read_many_serial_shared [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,660,563,107 ( 2.96%)  ???:soapberry_zip::office::LazyArchiveReader::read_many_serial_shared::{{closure}}::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,660,560,543 ( 2.96%)  ???:soapberry_zip::office::ArchiveReadSession::read_with_accounting [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,540,862,613 ( 2.86%)  ???:litchi_pptx::opened::transaction::Transaction::commit [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,224,981,195 ( 2.60%)  ???:<soapberry_zip::archive::ZipSliceVerifier<D> as std::io::Read>::read [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  3,127,476,950 ( 2.52%)  ???:litchi_perf_baseline::current_executable_identity [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  2,806,385,523 ( 2.27%)  ???:flate2::zio::read [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  2,453,144,761 ( 1.98%)  ???:zlib_rs::deflate::flush_block_only [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  2,426,222,982 ( 1.96%)  ???:litchi_opc::package::OpcPackage::from_owned_bytes_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  2,270,106,690 ( 1.83%)  ???:litchi_pptx::package::codec::<impl litchi_pptx::package::model::Package>::from_vec [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  2,268,942,168 ( 1.83%)  ???:litchi_opc::package::OpcPackage::from_vec_with_limits [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,896,576,713 ( 1.53%)  ???:<flate2::mem::Decompress as flate2::zio::Ops>::run [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,895,356,971 ( 1.53%)  ???:zlib_rs::stable::Inflate::decompress [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,894,104,263 ( 1.53%)  ???:zlib_rs::inflate::inflate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,836,669,984 ( 1.48%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,146,239,478 ( 0.93%)  ???:litchi_perf_baseline::verify_pptx_cross_copy_output [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,132,661,333 ( 0.91%)  ???:litchi_opc::package::OpcPackage::from_vec_reusing_payloads [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,101,320,664 ( 0.89%)  ???:zlib_rs::deflate::Heap::construct_huffman_tree [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+  1,071,519,812 ( 0.87%)  ???:zlib_rs::deflate::Heap::pqdownheap [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+    895,352,680 ( 0.72%)  ???:zlib_rs::inflate::window::Window::extend [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+    888,117,030 ( 0.72%)  ???:litchi_pptx::opened::patch::apply_with_revision [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+    883,270,311 ( 0.71%)  ???:litchi_pptx::opened::patch::capture_candidate [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+    637,545,977 ( 0.51%)  ???:litchi_perf_baseline::payload_bytes [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+    529,669,058 ( 0.43%)  ???:soapberry_zip::office::ArchiveReader::read_with_accounting [/home/zhuhe/code/litchi-worktrees/targets/0598-after/release/litchi-perf-baseline]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./csu/../csu/libc-start.c
+  ./csu/../sysdeps/nptl/libc_start_call_main.h
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+

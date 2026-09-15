@@ -1,5 +1,40 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0598 compliance update
+
+Change 0598 keeps ADR 0003's and ADR 0006's revision binding exactly. The
+semantic revision is still `package_fingerprint` over the complete OPC graph and
+the physical revision is still SHA-256 over the `litchi-pptx-cross-physical-v2`
+domain string, the `u64` little-endian archive length and the archive digest —
+now produced by a single `seal_physical_revision`, so the streaming sink and the
+archive hashed while it was built cannot drift. No revision value changes, so
+the durable `CrossSlideCopyPatch` (`LPCP0002`) encoding with its six 32-byte
+revisions remains bit-identical and patches serialized before the change still
+apply after it; no published byte changes, confirmed by an identical
+`output_sha256` per corpus across all four measured legs and by deflate work
+stable to 10,520 instructions in 5.96 G per lifecycle. ADR 0005's statement that
+"cache behavior is semantically invisible" covers the one new piece of state: the
+memo is private, lives only on an immutable `Snapshot` whose `Arc<OpcPackage>` is
+never mutated, is keyed on the archive bound so that a smaller bound still raises
+its typed `Error::Limit` rather than reading a memo, is never inherited across
+`Snapshot::rebound_to`, and degrades to an ordinary recomputation on a miss.
+ADR 0005's bounded-memory rule is preserved in the candidate path: the bounded
+`Vec` and its `max_patch_bytes` ceiling are unchanged, and the saving comes from
+digesting those bytes in place rather than from removing the bound. ADR 0005's
+mandatory validation is intact: `reject_unknown_non_part_members` still runs on
+every cached read and on the candidate, in the same position; `validate_before`,
+`validate_after` and `validate_candidate`'s own revision check are untouched; and
+the four staleness proofs in `apply_plan` and `apply_patch` are still computed
+from the live `&OpcPackage` arguments before any capture, so the caches never
+cover a package a caller can still mutate. ADR 0013's notes-topology check still
+runs inside every capture, because `capture_with_revision` skips only the hash.
+Change 0454's "dedup only with proven equivalence" is untouched: the source
+closure is still copied byte-for-byte, no destination member is reused on byte
+equality, and the layout inheritance graph is still proven before a layout is
+reused. No `unsafe`, no ambient I/O, no global pool, no weakened limit, no public
+API change — `Snapshot`'s new field is private. See
+[Change 0598](0598-pptx-cross-copy-revision-cache.md); `performance_claim: none`.
+
 ## 0602 — what admitting real producers would cost in contracts
 
 The frozen design widens the value editor's admission surface in five ordered

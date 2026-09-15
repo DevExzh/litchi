@@ -6,6 +6,8 @@
 
 use std::io::{self, Write};
 
+use sha2::{Digest, Sha256};
+
 use super::BoundedVecWriter;
 
 #[test]
@@ -106,12 +108,13 @@ fn bounded_writer_into_bytes_reuses_an_exact_buffer() {
     let length = bytes.len();
     let writer = BoundedVecWriter {
         bytes,
+        digest: Sha256::new(),
         limit: length,
         exceeded: false,
         allocation_failure: None,
     };
 
-    let output = writer.into_bytes().expect("exact buffer needs no copy");
+    let (output, _digest) = writer.into_bytes().expect("exact buffer needs no copy");
     assert_eq!(output.as_ptr(), pointer);
     assert_eq!(output, expected);
 }
@@ -119,8 +122,10 @@ fn bounded_writer_into_bytes_reuses_an_exact_buffer() {
 #[test]
 fn bounded_writer_into_bytes_allows_an_empty_archive() {
     let writer = BoundedVecWriter::new(0);
-    let output = writer.into_bytes().expect("an empty archive needs no copy");
+    let (output, digest) = writer.into_bytes().expect("an empty archive needs no copy");
     assert!(output.is_empty());
+    let expected: [u8; 32] = Sha256::new().finalize().into();
+    assert_eq!(digest, expected);
 }
 
 #[test]
@@ -133,14 +138,35 @@ fn bounded_writer_into_bytes_copies_when_spare_capacity_exists() {
     let length = bytes.len();
     let writer = BoundedVecWriter {
         bytes,
+        digest: Sha256::new(),
         limit: length,
         exceeded: false,
         allocation_failure: None,
     };
 
-    let output = writer
+    let (output, _digest) = writer
         .into_bytes()
         .expect("spare capacity must be compacted");
     assert_ne!(output.as_ptr(), pointer);
     assert_eq!(output, payload);
+}
+
+#[test]
+fn bounded_writer_digests_exactly_the_accepted_bytes() {
+    let limit = 64;
+    let chunks: &[&[u8]] = &[b"a", b"bc", b"defgh", b"ijklmnop", b"qrstuvwxyz"];
+    let mut writer = BoundedVecWriter::new(limit);
+    let mut expected = Vec::new();
+    for chunk in chunks {
+        assert_eq!(writer.write(chunk).expect("bounded write"), chunk.len());
+        expected.extend_from_slice(chunk);
+    }
+    // A write that the bound refuses must not reach the digest.
+    let refused = vec![b'z'; limit];
+    assert!(writer.write(&refused).is_err());
+
+    let (output, digest) = writer.into_bytes().expect("bounded archive");
+    assert_eq!(output, expected);
+    let direct: [u8; 32] = Sha256::digest(&expected).into();
+    assert_eq!(digest, direct);
 }

@@ -1,0 +1,16 @@
+# callgrind call counts, leg=before case=pptx_cross_copy_plain --warmup 0 --samples 3
+# binary: Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0598-before/release/litchi-perf-baseline --warmup 0 --samples 3 --case pptx_cross_copy_plain --json /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0598/cg-before-pptx_cross_copy_plain-s3.json (PID 1631242, part 1)
+total_Ir	5,030,671,882 (100.0%)  PROGRAM TOTALS
+litchi_pptx::opened::model::package_fingerprint: 80
+          80  litchi_pptx::opened::model::package_fingerprint
+litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint: 55
+          55  litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+litchi_pptx::opened::cross_copy_plan::snapshot_physical_revision: 0
+litchi_pptx::opened::cross_copy_plan::bounded_package_bytes: 12
+          12  litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+litchi_pptx::opened::model::capture_internal: 52
+          52  litchi_pptx::opened::model::capture_internal
+litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides: 14
+          14  litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides
+litchi_opc::pkgwriter::PackageWriter::write_to_stream: 70
+          70  litchi_opc::pkgwriter::PackageWriter::write_to_stream
