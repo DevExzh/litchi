@@ -973,11 +973,37 @@ impl OleWriter {
             directory.set_root_clsid(self.entries[0].clsid);
         }
 
-        // Pre-create storages declared explicitly by user
+        // Pre-create storages declared explicitly by the caller. `storages` and
+        // `storage_clsids` are hash tables whose iteration order Rust seeds per
+        // process, so visiting them directly would assign directory SIDs — and
+        // therefore emit bytes — that differ between runs over the same
+        // document. Both are visited in `storage_directory_order` instead.
+        let mut ordered_storages: Vec<&Vec<String>> = Vec::new();
+        ordered_storages
+            .try_reserve_exact(self.storages.len())
+            .map_err(|source| OleError::allocation("storage directory order", source))?;
         for storage_path in &self.storages {
+            ordered_storages.push(storage_path);
+        }
+        ordered_storages.sort_unstable_by(|left, right| {
+            storage_directory_order(left.as_slice(), right.as_slice())
+        });
+
+        let mut ordered_clsids: Vec<(&Vec<String>, &[u8; 16])> = Vec::new();
+        ordered_clsids
+            .try_reserve_exact(self.storage_clsids.len())
+            .map_err(|source| OleError::allocation("storage CLSID order", source))?;
+        for entry in &self.storage_clsids {
+            ordered_clsids.push(entry);
+        }
+        ordered_clsids.sort_unstable_by(|(left, _), (right, _)| {
+            storage_directory_order(left.as_slice(), right.as_slice())
+        });
+
+        for storage_path in ordered_storages {
             directory.add_storage_path(storage_path)?;
         }
-        for (storage_path, clsid) in &self.storage_clsids {
+        for (storage_path, clsid) in ordered_clsids {
             directory.set_storage_clsid(storage_path, *clsid)?;
         }
 
@@ -1415,6 +1441,25 @@ fn rebase_path(
         )?);
     }
     Ok(rebased)
+}
+
+/// Canonical serialization order for explicitly registered storage paths.
+///
+/// [`OleWriter`] keeps its storages in hash tables, whose iteration order Rust
+/// seeds per process, so `write_to` has to impose an order of its own before it
+/// assigns directory SIDs. Ordering by depth and then by the stored path
+/// components makes the emitted directory a function of the writer's content
+/// rather than of the caller's declaration order or of the process's hash seed,
+/// which is the determinism ADR 0006 requires of serialization. Shallowest
+/// first keeps every ancestor ahead of its descendants, so
+/// `DirectoryBuilder::add_storage_path` never has to create a parent implicitly
+/// out of order, and the comparison is total over the distinct keys of a
+/// `HashSet`, so the sort needs no stability guarantee. It is also the order
+/// `litchi-ole-common`'s package renderer already computes before it calls
+/// [`OleWriter::create_storage`], so the writer now preserves the only
+/// canonical storage order the tree already had.
+fn storage_directory_order(left: &[String], right: &[String]) -> std::cmp::Ordering {
+    left.len().cmp(&right.len()).then_with(|| left.cmp(right))
 }
 
 fn canonical_cfb_path(path: &[String]) -> Result<CanonicalPath, OleError> {

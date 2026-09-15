@@ -1,0 +1,63 @@
+# Gates for change 0625, all run in the worktree at
+# /home/zhuhe/code/litchi-worktrees/0625, branch
+# perf/0625-cfb-writer-deterministic-storage-order, base 1e41983213dc.
+# Only crates/litchi-cfb was modified, so the first four gates cover the
+# changed crate; the two test gates after them cover the four OLE2 suites
+# the brief names and every other crate that calls OleWriter::create_storage.
+
+=== cargo fmt --all --check ===
+(no output; exit 0)
+
+=== cargo clippy -p litchi-cfb --all-targets --locked ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
+
+=== cargo doc -p litchi-cfb --no-deps --locked ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
+   Generated /home/zhuhe/code/litchi-worktrees/0625/target/doc/litchi_cfb/index.html
+
+=== cargo test -p litchi-cfb --locked ===
+     Running unittests src/lib.rs (target/debug/deps/litchi_cfb-95ababb0001066f2)
+test result: ok. 322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/sequential_writer.rs (target/debug/deps/sequential_writer-d031230f23725d05)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/writer_storage_determinism.rs (target/debug/deps/writer_storage_determinism-d4d4f882dd8f4d7b)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/writer_storage_move.rs (target/debug/deps/writer_storage_move-3aa8b82231d06147)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+   Doc-tests litchi_cfb
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== cargo test -p litchi-xls -p litchi-doc -p litchi-ppt --locked ===
+# The three OLE2 format suites the brief names. 145 test binaries; every
+# 'test result' line is in test-formats.txt, the totals are below.
+   Doc-tests litchi_doc
+test result: ok. 14 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_ppt
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_xls
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+TOTAL over 145 test binaries: 3779 passed; 0 failed; 25 ignored
+
+=== cargo test -p litchi-ole-common -p litchi-crypto -p litchi-vba -p litchi-sign -p litchi-ograph --locked ===
+# Every other crate in the workspace that calls OleWriter::create_storage:
+# the generic OLE2 object and custom-XML editors, the encrypted-OOXML
+# DataSpaces writer, the VBA project writer, the CFB signature writer and
+# the OGraph package writer.
+   Doc-tests litchi_ole_common
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_sign
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_vba
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+TOTAL over 21 test binaries: 312 passed; 0 failed; 0 ignored
+
+=== corpus differential (compare.py over corpus-before.jsonl and corpus-after.jsonl) ===
+fixtures considered: 214   rebuilt: 211   refused: 3
+  refused libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc: before=parse-refused after=parse-refused same=True
+  refused poi/test-data/spreadsheet/1900DateWindowing.xls: before=parse-refused after=parse-refused same=True
+  refused poi/test-data/spreadsheet/1904DateWindowing.xls: before=parse-refused after=parse-refused same=True
+with >=2 incomparable storage paths (susceptible): 8
+non-deterministic BEFORE (>1 digest in 16 rebuilds): 8
+non-deterministic AFTER: 0
+already deterministic BEFORE and byte-identical AFTER: 203
+already deterministic BEFORE but CHANGED AFTER: 0

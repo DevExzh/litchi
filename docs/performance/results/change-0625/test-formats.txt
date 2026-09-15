@@ -1,0 +1,291 @@
+### cargo test -p litchi-xls -p litchi-doc -p litchi-ppt --locked
+     Running unittests src/lib.rs (target/debug/deps/litchi_doc-5c1a0b289f53f02b)
+test result: ok. 999 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.69s
+     Running tests/binary_digital_signatures.rs (target/debug/deps/binary_digital_signatures-68cda00c3aff2063)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_associated_strings.rs (target/debug/deps/doc_associated_strings-c0a6a69e348d51a8)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_auto_summary.rs (target/debug/deps/doc_auto_summary-8895a56d7dbc7584)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_body_transaction.rs (target/debug/deps/doc_body_transaction-5cb6d59c43598976)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+     Running tests/doc_captions.rs (target/debug/deps/doc_captions-6e128e9b8e65b753)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_embedded_fonts.rs (target/debug/deps/doc_embedded_fonts-92876096941410ef)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_embedded_object_writer.rs (target/debug/deps/doc_embedded_object_writer-6bb3f89eb0365c40)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_fields.rs (target/debug/deps/doc_fields-89e745330f463b5f)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_form_fields.rs (target/debug/deps/doc_form_fields-c2fa43c1ce4dfce8)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_leniency.rs (target/debug/deps/doc_leniency-c1d66ca2b65be0c0)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_mail_merge.rs (target/debug/deps/doc_mail_merge-2f28da005abb2fb2)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_mtef_equation_writer.rs (target/debug/deps/doc_mtef_equation_writer-ab0612b25b8f21f0)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_open_limits.rs (target/debug/deps/doc_open_limits-7577605e2ebf3342)
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_paragraph_count.rs (target/debug/deps/doc_paragraph_count-d20221c93c335ea6)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_protection.rs (target/debug/deps/doc_protection-cf3dbe0f1ebfc756)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_rmd_threading.rs (target/debug/deps/doc_rmd_threading-15f9f6e8e9a986b0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_route_slip.rs (target/debug/deps/doc_route_slip-1f5db00953e3b95a)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_rsids.rs (target/debug/deps/doc_rsids-40db0d1af98bd239)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_saved_by.rs (target/debug/deps/doc_saved_by-9c5b3f03c854a1d3)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_section_columns.rs (target/debug/deps/doc_section_columns-b3dad952d91d5138)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_section_page_borders.rs (target/debug/deps/doc_section_page_borders-829375078ba02c90)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_semantic_paragraph_at.rs (target/debug/deps/doc_semantic_paragraph_at-7b04225bf48f69cd)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_stories.rs (target/debug/deps/doc_stories-66cbe065c6936700)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_subdocuments.rs (target/debug/deps/doc_subdocuments-d222f1daa7f66087)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_tracked_revision_editor.rs (target/debug/deps/doc_tracked_revision_editor-2b32734519b3ed79)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_vba_writer.rs (target/debug/deps/doc_vba_writer-09687653442ebb27)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_auxiliary_strings.rs (target/debug/deps/doc_writer_auxiliary_strings-4015eadef395e274)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_encryption.rs (target/debug/deps/doc_writer_encryption-8c7fbb0d74638ab3)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_glossary.rs (target/debug/deps/doc_writer_glossary-8e2f3364b8d2f507)
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/doc_writer_header_kinds.rs (target/debug/deps/doc_writer_header_kinds-a3bc5f1a6d9636c6)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_header_textboxes.rs (target/debug/deps/doc_writer_header_textboxes-aba26c2612e0f99c)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_headers.rs (target/debug/deps/doc_writer_headers-8d4e253498dd8bcd)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_images.rs (target/debug/deps/doc_writer_images-dc5be8563c91a45a)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_proofing.rs (target/debug/deps/doc_writer_proofing-b7a48e6f72a76db8)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_shapes.rs (target/debug/deps/doc_writer_shapes-b2971bdd6be0285e)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_textboxes.rs (target/debug/deps/doc_writer_textboxes-c68fe937134b23a8)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/ole_controls.rs (target/debug/deps/ole_controls-9bcb8acc396cd454)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ole_property_set_editor.rs (target/debug/deps/ole_property_set_editor-625d3754bacf3350)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/user_defined_hyperlinks.rs (target/debug/deps/user_defined_hyperlinks-16a78ce8a72141a8)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/litchi_ppt-5ab1a721fb511f00)
+test result: ok. 1085 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.17s
+     Running tests/binary_digital_signatures.rs (target/debug/deps/binary_digital_signatures-4ad8c502f94da2c4)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ole_property_set_editor.rs (target/debug/deps/ole_property_set_editor-944f77d4e39773f3)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_animation_editor.rs (target/debug/deps/ppt_animation_editor-20034e5654539c9c)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_chart_writer.rs (target/debug/deps/ppt_chart_writer-ee7f67dd3f276191)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_charts.rs (target/debug/deps/ppt_charts-3614a46ba2587c1c)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/ppt_embedded_fonts_spec.rs (target/debug/deps/ppt_embedded_fonts_spec-894613d80f2c1777)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_font_writer.rs (target/debug/deps/ppt_font_writer-e0253675519e8c14)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/ppt_header_footer.rs (target/debug/deps/ppt_header_footer-3036a1cf28726827)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_header_footer_writer.rs (target/debug/deps/ppt_header_footer_writer-7c7ef29c6d7d4f75)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_interaction_sound_writer.rs (target/debug/deps/ppt_interaction_sound_writer-d207eb4a027abab7)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_interaction_writer.rs (target/debug/deps/ppt_interaction_writer-17955805eccfa18f)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_masters.rs (target/debug/deps/ppt_masters-211983c2a6e8a0c4)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_ole_fixtures.rs (target/debug/deps/ppt_ole_fixtures-28ead4abbc973633)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_prog_tags.rs (target/debug/deps/ppt_prog_tags-66e8ae59ef57594c)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_sound_collection.rs (target/debug/deps/ppt_sound_collection-17ce15a5b35389e7)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_table_writer.rs (target/debug/deps/ppt_table_writer-3dd4734ce764db86)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_text_interaction_writer.rs (target/debug/deps/ppt_text_interaction_writer-13a1d2faa7407474)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_text_metachars.rs (target/debug/deps/ppt_text_metachars-6768de4458ff5f1e)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_text_si_exception.rs (target/debug/deps/ppt_text_si_exception-0d6c8265c948cbdd)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_transition_comments.rs (target/debug/deps/ppt_transition_comments-92aeba7fc2538239)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_transition_visual_native_handoff.rs (target/debug/deps/ppt_transition_visual_native_handoff-5a3a445f1884b1f4)
+test result: ok. 2 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/ppt_transition_writer.rs (target/debug/deps/ppt_transition_writer-3826463b9e8c8185)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_vba_writer.rs (target/debug/deps/ppt_vba_writer-b15aa5079abe4bc0)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_view_info.rs (target/debug/deps/ppt_view_info-66b35c89a5b5babf)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_view_info_writer.rs (target/debug/deps/ppt_view_info_writer-eb5c0b16fbe77568)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_view_set_info.rs (target/debug/deps/ppt_view_set_info-0193c829cbfe8df7)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_writer_encryption.rs (target/debug/deps/ppt_writer_encryption-51ee953b0b415429)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ppt_writer_modify_password.rs (target/debug/deps/ppt_writer_modify_password-f0273334b62805b0)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/source_backed_pictures.rs (target/debug/deps/source_backed_pictures-b8f0a19052acc5e8)
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/validation.rs (target/debug/deps/validation-840f315d6047d1ae)
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/litchi_xls-e2b2fbd4bf162df4)
+test result: ok. 1048 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+     Running tests/source_backed.rs (target/debug/deps/source_backed-dd1bb9e632d361c3)
+test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.65s
+     Running tests/sst_scan_allocations.rs (target/debug/deps/sst_scan_allocations-995c9f06e1d82649)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/validation.rs (target/debug/deps/validation-b583469f863d0866)
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_alignment.rs (target/debug/deps/xls_alignment-c385f4b128458f18)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_array_formulas.rs (target/debug/deps/xls_array_formulas-b1f68ce17989dabc)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_autofilter12.rs (target/debug/deps/xls_autofilter12-042287ff6a795b89)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_book_ext.rs (target/debug/deps/xls_book_ext-c847448072208882)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_border_fill.rs (target/debug/deps/xls_border_fill-4b8e4617fe50b433)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_calculation.rs (target/debug/deps/xls_calculation-32c91b795af6ae76)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_cell_values.rs (target/debug/deps/xls_cell_values-bb9f0198610ea936)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_charts.rs (target/debug/deps/xls_charts-f2eb286a64b4ccd3)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_comment_transactions.rs (target/debug/deps/xls_comment_transactions-55cf6cfa57b49274)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/xls_comments_writer.rs (target/debug/deps/xls_comments_writer-6f5bc979e721f819)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_conditional_format.rs (target/debug/deps/xls_conditional_format-22ecd7a160f9e327)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_consolidation.rs (target/debug/deps/xls_consolidation-fc5e10097b336926)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/xls_cross_workbook_scalar.rs (target/debug/deps/xls_cross_workbook_scalar-ab7af60ac20728dc)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_custom_table_styles_writer.rs (target/debug/deps/xls_custom_table_styles_writer-796e57b78094d482)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_custom_views.rs (target/debug/deps/xls_custom_views-bfff09b3b114820f)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_data_tables.rs (target/debug/deps/xls_data_tables-007e7911e971bd20)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_data_validation.rs (target/debug/deps/xls_data_validation-19a77ef0a2320cd2)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_defined_name_metadata.rs (target/debug/deps/xls_defined_name_metadata-7c63d50744c4838e)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_environment.rs (target/debug/deps/xls_environment-1423484c902c5950)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_external_links.rs (target/debug/deps/xls_external_links-646c664952954844)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_external_names.rs (target/debug/deps/xls_external_names-48141a1feae39714)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/xls_external_tables.rs (target/debug/deps/xls_external_tables-ebe49d0bb619bc99)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_fonts.rs (target/debug/deps/xls_fonts-87cb18a45c3e8d75)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_form_controls.rs (target/debug/deps/xls_form_controls-64f46d78d48883a8)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_formula_ancillary.rs (target/debug/deps/xls_formula_ancillary-21a49fc1136541e6)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/xls_formula_ancillary_rejections.rs (target/debug/deps/xls_formula_ancillary_rejections-c964852d3609b2ae)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_formula_errors.rs (target/debug/deps/xls_formula_errors-d420127d79a15306)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_function_groups.rs (target/debug/deps/xls_function_groups-d2bc42484527f848)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/xls_header_footer.rs (target/debug/deps/xls_header_footer-a19c17d112349c7e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_host_capabilities.rs (target/debug/deps/xls_host_capabilities-4caffd9a705d7f8a)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_leniency.rs (target/debug/deps/xls_leniency-d6389a2b2b9f38bf)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_list_objects.rs (target/debug/deps/xls_list_objects-c4f0ec4d05967173)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_mutation_policy.rs (target/debug/deps/xls_mutation_policy-aae98dbb9e0ea8e9)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_ole_objects.rs (target/debug/deps/xls_ole_objects-f1d1d85e47c71365)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_page_setup.rs (target/debug/deps/xls_page_setup-c9dbcf5a573a97f5)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_palette.rs (target/debug/deps/xls_palette-752a16adca7b85d4)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_phonetic_info.rs (target/debug/deps/xls_phonetic_info-426c3e7e9e25eed4)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_pivot_cache_grouping.rs (target/debug/deps/xls_pivot_cache_grouping-dc2905f60922fed3)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_pivot_cache_links.rs (target/debug/deps/xls_pivot_cache_links-b3aef788a92f2919)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_pivot_cache_values.rs (target/debug/deps/xls_pivot_cache_values-b41c688a8ff74f4f)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_pivot_view_reader.rs (target/debug/deps/xls_pivot_view_reader-4b7457c0950831e8)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/xls_protection.rs (target/debug/deps/xls_protection-d97f3281945da4ec)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_query_tables.rs (target/debug/deps/xls_query_tables-fdf110d089acc0cf)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/xls_real_time_data.rs (target/debug/deps/xls_real_time_data-ec59f1951d222238)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_revision_log.rs (target/debug/deps/xls_revision_log-319ae7d464d73d9d)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_row_block_index.rs (target/debug/deps/xls_row_block_index-0a97804e019f298e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/xls_row_block_writer.rs (target/debug/deps/xls_row_block_writer-4d512e2e65abec70)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_scenario.rs (target/debug/deps/xls_scenario-d0610b4861527936)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/xls_shape_groups_writer.rs (target/debug/deps/xls_shape_groups_writer-d560653eb2326fd3)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_shapes_writer.rs (target/debug/deps/xls_shapes_writer-9cb57d5d2bb21300)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_shared_string_index.rs (target/debug/deps/xls_shared_string_index-8eb41a1501c7ad74)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_shared_string_properties.rs (target/debug/deps/xls_shared_string_properties-d93a582ea72e411e)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_sheet_ext.rs (target/debug/deps/xls_sheet_ext-41260c920a0520e6)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_sheet_layout.rs (target/debug/deps/xls_sheet_layout-30ffa4b58db30092)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_sort_data.rs (target/debug/deps/xls_sort_data-453f64966b73ec3a)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_style_ext.rs (target/debug/deps/xls_style_ext-a2146bae23f2a670)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_theme.rs (target/debug/deps/xls_theme-c56481a65c574fa5)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_toolbar.rs (target/debug/deps/xls_toolbar-d60ce48e419d1e31)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_vba_metadata.rs (target/debug/deps/xls_vba_metadata-38766d442426c9fb)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_view.rs (target/debug/deps/xls_view-34ed8202b8f14d60)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_view_writer.rs (target/debug/deps/xls_view_writer-9e4b98afe2efb606)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_web_pub.rs (target/debug/deps/xls_web_pub-7cf029ecde3fe19c)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_workbook_view.rs (target/debug/deps/xls_workbook_view-57d91f3bcbf4a013)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_writer_encryption.rs (target/debug/deps/xls_writer_encryption-c7da28d5b15da181)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/xls_writer_locations.rs (target/debug/deps/xls_writer_locations-5f7ba55f16c49bf7)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_xf_ext.rs (target/debug/deps/xls_xf_ext-11774adfc1195961)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xls_xf_inheritance.rs (target/debug/deps/xls_xf_inheritance-fe451075519390ae)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_doc
+test result: ok. 14 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_ppt
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_xls
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

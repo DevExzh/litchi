@@ -1,0 +1,24 @@
+before docembed 2 3425091
+before xls54016 2 16218848
+before docembed 12 14810398
+before xls54016 12 79784938
+after docembed 2 3428382
+after xls54016 2 16220879
+after docembed 12 14828790
+after xls54016 12 79787750
+before docembed 2 r2 3423410
+before xls54016 2 r2 16218848
+before docembed 12 r2 14819146
+before xls54016 12 r2 79784938
+after docembed 2 r2 3428522
+after xls54016 2 r2 16220879
+after docembed 12 r2 14830961
+after xls54016 12 r2 79787750
+before docembed 2 r3 3424916
+before xls54016 2 r3 16218848
+before docembed 12 r3 14810367
+before xls54016 12 r3 79784938
+after docembed 2 r3 3427058
+after xls54016 2 r3 16220879
+after docembed 12 r3 14818461
+after xls54016 12 r3 79787750

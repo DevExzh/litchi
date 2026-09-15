@@ -1,0 +1,30 @@
+fixtures considered: 214   rebuilt: 211   refused: 3
+  refused libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc: before=parse-refused after=parse-refused same=True
+  refused poi/test-data/spreadsheet/1900DateWindowing.xls: before=parse-refused after=parse-refused same=True
+  refused poi/test-data/spreadsheet/1904DateWindowing.xls: before=parse-refused after=parse-refused same=True
+with >=2 incomparable storage paths (susceptible): 8
+non-deterministic BEFORE (>1 digest in 16 rebuilds): 8
+non-deterministic AFTER: 0
+already deterministic BEFORE and byte-identical AFTER: 203
+already deterministic BEFORE but CHANGED AFTER: 0
+output length differs before/after: 0
+
+Susceptible fixtures (>=2 incomparable storage paths):
+  libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls: storages=3 streams=26 before_distinct=2 after_distinct=1 after_digest=15f0995671ecc029 after_in_before_set=True
+  ole/xls/ConditionalFormattingSamples copy.xls: storages=3 streams=8 before_distinct=2 after_distinct=1 after_digest=59763728db2709b6 after_in_before_set=True
+  ole/xls/ConditionalFormattingSamples.xls: storages=3 streams=8 before_distinct=2 after_distinct=1 after_digest=59763728db2709b6 after_in_before_set=True
+  ole/xls/WithEmbeddedObjects.xls: storages=11 streams=55 before_distinct=15 after_distinct=1 after_digest=e0a0decc6efccc8a after_in_before_set=False
+  poi/test-data/document/word_with_embeded.doc: storages=5 streams=33 before_distinct=12 after_distinct=1 after_digest=9af8cd4d7c30680e after_in_before_set=True
+  poi/test-data/hpsf/TestZeroLengthCodePage.mpp: storages=18 streams=67 before_distinct=16 after_distinct=1 after_digest=64ce84f3fc2339fe after_in_before_set=False
+  poi/test-data/spreadsheet/59858.xls: storages=10 streams=55 before_distinct=15 after_distinct=1 after_digest=1cebda96d94cf75a after_in_before_set=False
+  poi/test-data/spreadsheet/ConditionalFormattingSamples.xls: storages=3 streams=8 before_distinct=2 after_distinct=1 after_digest=59763728db2709b6 after_in_before_set=True
+
+Storage-count histogram over rebuilt fixtures:
+  0 storages: 176 fixtures
+  1 storages: 12 fixtures
+  2 storages: 15 fixtures
+  3 storages: 4 fixtures
+  5 storages: 1 fixtures
+  10 storages: 1 fixtures
+  11 storages: 1 fixtures
+  18 storages: 1 fixtures
