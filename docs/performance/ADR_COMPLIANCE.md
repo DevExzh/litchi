@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0597 — XLSX selected-cell ineligibility gate, frozen at its design
+
+ADR 0005 places mandatory structural validation at open and loads semantic payloads lazily; the worksheet payload's mandatory validation is the materialized parser's, and change 0362 already required every `NotEligible` result to reach it ("`NotEligible` is not worksheet semantic validity"). The landed fix routes to that parser instead of around it and touches no fence: `with_verified_decoded_reader`, the CRC/size/source/execution fences of changes 0363 and 0365, `selected_stream_limits`, the MCE and x14ac observers and `Scanner::finish` are unchanged, the stream still reaches XML/MCE/x14ac EOF on every worksheet, and both placement helpers stay private. No new `unsafe`, no new dependency, no weakened limit, no public API change. The frozen gate is frozen precisely on ADR grounds: it would let a `<cols>`-bearing worksheet reach only the materialized path's limits rather than the stream's `max_event_bytes`/`max_input_bytes`, and it would turn two synthetic refusals into acceptances that `litchi_xlsx::Workbook` already grants on the same bytes — a convergence or a weakened defence depending on which reader ADR 0005 means to own malformed-input refusal for a lazily loaded payload, which this record does not decide. 1,297 tests pass; `cargo fmt --all --check`, `cargo clippy -p litchi-xlsx --all-targets`, `cargo doc -p litchi-xlsx --no-deps` are clean. Accepted ADR hashes unchanged. See [Change 0597](0597-xlsx-selected-cell-ineligibility-gate.md); `performance_claim: none`.
+
 ## Change 0598 compliance update
 
 Change 0598 keeps ADR 0003's and ADR 0006's revision binding exactly. The

@@ -1,0 +1,30 @@
+893,622,294 (100.0%)  PROGRAM TOTALS
+832,287,679 (93.14%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::workbook::source::SourceWorksheet>::store [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+701,104,189 (78.46%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/mod.rs:litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+647,690,728 (72.48%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+156,836,950 (17.55%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+155,467,120 (17.40%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+110,898,324 (12.41%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+106,415,481 (11.91%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/styles.rs:litchi_xlsx::raw::styles::parse [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 51,901,620 ( 5.81%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 41,508,203 ( 4.64%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 20,119,517 ( 2.25%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::QName>::prefix [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 16,209,149 ( 1.81%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::name::QName>::prefix
+ 14,259,661 ( 1.60%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 12,950,411 ( 1.45%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+     .                   self.monitor_reads.store(true, Ordering::Release);
+     .                           self.diagnostics.overflowed.store(true, Ordering::Release);
+     .                       self.diagnostics.overflowed.store(true, Ordering::Release);
+        .                   unsafe { store_chunk::<N>(dst, chunk) };
+        .                       unsafe { store_chunk::<N>(dst, chunk) };
+   143 ( 0.00%)          Ok(match self.store()?.view(address) {
+832,287,679 (93.14%)  => /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::workbook::source::SourceWorksheet>::store (11x)
+2,732,085 ( 0.31%)  => /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/selected.rs:litchi_xlsx::raw::worksheet::selected::scan (11x)
+     .               /// Read every stored cell selected by a checked range into owning values.
+     .               /// the materialized store. The returned cells are independent of the
+     .               /// Bounding rectangle of stored cell records.
+     .               pub fn stored_extent(&self) -> Result<Option<Rect>> {
+     .                   let extent = self.store()?.extents().stored();
+    99 ( 0.00%)      fn store(&self) -> Result<&Store> {
+     .                   // when this worksheet's parsed semantic store is already retained.
+     .                   if let Some(store) = self.data.cells.get() {

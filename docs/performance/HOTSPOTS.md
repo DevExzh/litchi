@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0597 — XLSX selected-cell ineligibility gate, frozen at its design
+
+Survey item XML-2 priced and frozen. On a source-backed one-cell read of an ineligible worksheet, `raw::worksheet::selected::scan` is 140,852,422 Ir (63.80% of the whole child) on the marker-stripped control fixture and 152,947,518 (13.81%) on the real one, after which `SourceWorksheet::store` re-parses the same part; 0587's falsification threshold of 10% is not met. A bounded 8 KiB `<cols>` pre-gate removes that scan for −63.19% and −14.08% of the two reads and is a byte-identical no-op across the whole 4,606-row real-corpus transcript, but it moves error identity on malformed input — two refusals become acceptances, three change typed variant, five change message — so it stops at a frozen design with its patch retained, pending a limit question and an ADR 0005 clarification. Stopping at the first mark instead is not implementable from `litchi-xlsx`: `invoke_active` disables the observer and lets the MCE driver run to EOF by design. The brief's oracle also found a live defect, fixed here and separately logged. No speedup, latency or resource claim. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0597-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0597/README.md).
+
 ## 0598 — PPTX cross-package copy revision reuse
 
 Item PPTX-2 of the 0587 queue is implemented. A cross-package slide copy

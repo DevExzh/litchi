@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0597 — XLSX selected-cell ineligibility gate, frozen at its design
+
+Mixed outcome, `performance_claim: none`. Implemented: the selected-cell scanner's post-mark merge placement check no longer asks whether `<mergeCells>` "appears before sheetData", a question it answered from a `seen_sheet_data` flag that its own post-mark early return prevents from advancing; 434 reads over 24 of 180 `.xlsx` fixtures were refused for a placement the bytes contradict, and after the fix the path agrees with the fully materialized `litchi_xlsx::Workbook` on all 3,948 comparable rows. Frozen, not implemented: a bounded 8 KiB `<cols>` pre-gate that skips the whole semantic stream, worth −63.19% and −14.08% of a source-backed one-cell read on the two survey fixtures and observationally a no-op on the real corpus, but which moves eight error classes on a 60-case first-error matrix in the 0541 style; its patch, matrix and prize are retained. Paired timing of `xlsx_file_selected_cell`, `xlsx_range_source_first_cell` and `xlsx_narrow_column_range_scan` moves nothing outside an A/A floor that runs from 0.874% to 24.011% at p50 across the seven scenario/shape pairs; the two deltas above 5% are reported and both are below their own floor. No speedup, latency, cold-cache, physical-I/O, allocation or RSS claim follows. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0597-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0597/README.md).
+
 ## Change 0598: PPTX cross-package copy revision reuse
 
 Change 0598 removes five of the nine complete-archive serializations and four of

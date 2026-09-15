@@ -1,0 +1,30 @@
+81,329,927 (100.0%)  PROGRAM TOTALS
+75,450,811 (92.77%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::workbook::source::SourceWorksheet>::store [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+63,780,403 (78.42%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/mod.rs:litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+58,924,270 (72.45%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+14,257,543 (17.53%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+13,868,374 (17.05%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+10,081,795 (12.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 9,419,211 (11.58%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/styles.rs:litchi_xlsx::raw::styles::parse [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 4,718,366 ( 5.80%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 3,773,473 ( 4.64%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 1,829,047 ( 2.25%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::QName>::prefix [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 1,473,559 ( 1.81%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::name::QName>::prefix
+ 1,296,341 ( 1.59%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+ 1,163,313 ( 1.43%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+    323 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:<memchr::memmem::FindIter as core::iter::traits::iterator::Iterator>::next (1x)
+    342 ( 0.00%)      fn read_event_impl<'i, B>(&mut self, buf: B) -> Result<Event<'i>>
+ 88,758 ( 0.11%)          let event = self.reader.read_event_impl(buf);
+182,979 ( 0.22%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> (685x)
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+    513 ( 0.00%)          let event = self.read_event_impl(())?;
+ 51,066 ( 0.06%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::read_event_impl::<()> (39x)
+    .                   self.monitor_reads.store(true, Ordering::Release);
+    .                           self.diagnostics.overflowed.store(true, Ordering::Release);
+    .                       self.diagnostics.overflowed.store(true, Ordering::Release);
+  .               match archive.read_stored_borrowed(name)? {
+  .               fn read_stored_borrowed<'a>(
+  .               /// item-name comparison ASCII case-insensitive, so a package that stores the
+      .                       .map(Cache::stored);
+      .                       "inline-string cell stores text in an is element, not v",

@@ -1,0 +1,13 @@
+[package]
+name = "probe0597"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0597/crates/litchi-core" }
+
+[profile.release]
+debug = 1

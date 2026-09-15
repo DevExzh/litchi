@@ -1,0 +1,30 @@
+1,040,291,859 (100.0%)  PROGRAM TOTALS
+1,034,005,654 (99.40%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/workbook/source.rs:<litchi_xlsx::workbook::source::SourceWorksheet>::store [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+1,021,935,926 (98.24%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/mod.rs:litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+  850,197,568 (81.73%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+  152,924,932 (14.70%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   56,504,949 ( 5.43%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+   29,498,744 ( 2.84%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   26,472,335 ( 2.54%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   24,366,854 ( 2.34%)  /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+   17,185,885 ( 1.65%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+   14,606,121 ( 1.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner
+   12,669,732 ( 1.22%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+   12,554,596 ( 1.21%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/targets/0597-probe-after/release/probe0597]
+24,366,854 ( 2.34%)  => /home/zhuhe/code/litchi-worktrees/0597/crates/litchi-xlsx/src/raw/worksheet/x14ac.rs:litchi_xlsx::raw::worksheet::x14ac::capture_inner (1x)
+     11 ( 0.00%)      memchr::memmem::find(content, b"dyDescent").is_some()
+    916 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:memchr::memmem::find (1x)
+ 97,563 ( 0.01%)          if attribute.key.prefix().is_some() {
+2,223,974 ( 0.21%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::QName>::prefix (32,521x)
+       413 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:<memchr::memmem::FindIter as core::iter::traits::iterator::Iterator>::next (1x)
+  6,880 ( 0.00%)          let prefix = NcName::new(first)
+  5,504 ( 0.00%)          Ok(QualifiedName::from_parts(Some(&prefix), &local))
+    342 ( 0.00%)      fn read_event_impl<'i, B>(&mut self, buf: B) -> Result<Event<'i>>
+174,552 ( 0.02%)          let event = self.reader.read_event_impl(buf);
+182,915 ( 0.02%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> (685x)
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+    513 ( 0.00%)          let event = self.read_event_impl(())?;
+ 28,696 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::read_event_impl::<()> (18x)
+      .           /// The complete lexical value is stored once. Prefix and local-name accessors
+  6,880 ( 0.00%)      pub(crate) fn from_parts(prefix: Option<&NcName>, local: &NcName) -> Self {
