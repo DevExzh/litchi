@@ -1,0 +1,56 @@
+[
+  {
+    "blocking": false,
+    "comparator_exit_status": 0,
+    "comparator_status": "pass",
+    "fallback_reasons": [
+      "reference_fetched: no successful full run has published a reference artifact"
+    ],
+    "job_exit_status": 0,
+    "mode": "self_comparison",
+    "outcome": "plumbing_pass",
+    "scenario": "fallback"
+  },
+  {
+    "blocking": false,
+    "comparator_exit_status": 0,
+    "comparator_status": "pass",
+    "fallback_reasons": [],
+    "job_exit_status": 0,
+    "mode": "fetched_reference",
+    "outcome": "reference_pass",
+    "scenario": "fetched"
+  },
+  {
+    "blocking": false,
+    "comparator_exit_status": 1,
+    "comparator_status": "regression",
+    "fallback_reasons": [],
+    "job_exit_status": 0,
+    "mode": "fetched_reference",
+    "outcome": "reference_regression",
+    "scenario": "regression"
+  },
+  {
+    "blocking": false,
+    "comparator_exit_status": 2,
+    "comparator_status": "invalid",
+    "fallback_reasons": [],
+    "job_exit_status": 0,
+    "mode": "fetched_reference",
+    "outcome": "reference_environment_drift",
+    "scenario": "drift"
+  },
+  {
+    "blocking": false,
+    "comparator_exit_status": 0,
+    "comparator_status": "pass",
+    "fallback_reasons": [
+      "corpus_key_manifest_sha256: reference key manifest 36f44718f1b92b87552969e26702d6f54a964c781905a90051cb3eadb1153f8a, policy debb700930d4be1d2d597de60ef5b64200403407c138bab17dd268996975ec7a"
+    ],
+    "job_exit_status": 0,
+    "mode": "self_comparison",
+    "outcome": "plumbing_pass",
+    "scenario": "incompatible"
+  }
+]

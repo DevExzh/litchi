@@ -43,6 +43,8 @@ on:
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
+      - 'tools/perf_smoke_baseline.py'
+      - 'tools/test_perf_smoke_baseline.py'
       - 'tools/perf_abba_package.py'
       - 'tools/test_perf_abba_package.py'
       - 'tools/perf_abba_summary.py'
@@ -65,6 +67,7 @@ on:
       - 'docs/performance/report-claim-classification-v1.json'
       - 'docs/performance/REPORT.md'
       - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/perf-smoke-baseline-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
@@ -118,6 +121,8 @@ on:
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
+      - 'tools/perf_smoke_baseline.py'
+      - 'tools/test_perf_smoke_baseline.py'
       - 'tools/perf_abba_package.py'
       - 'tools/test_perf_abba_package.py'
       - 'tools/perf_abba_summary.py'
@@ -140,6 +145,7 @@ on:
       - 'docs/performance/report-claim-classification-v1.json'
       - 'docs/performance/REPORT.md'
       - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/perf-smoke-baseline-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
@@ -186,6 +192,10 @@ jobs:
     timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+      LITCHI_RUNNER_LABELS: ubuntu-latest
+      LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
+      LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
+      LITCHI_SMOKE_DIR: target/perf/allocator-smoke
 
     steps:
       - name: Checkout repository
@@ -240,9 +250,9 @@ jobs:
             --features allocator-metrics \
             --bin litchi-perf-baseline-alloc
 
-      - name: Run bounded allocator evidence and policy smoke
+      - name: Run bounded allocator evidence
         run: |
-          mkdir -p target/perf/allocator-smoke
+          mkdir -p "$LITCHI_SMOKE_DIR"
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" \
             --features allocator-metrics \
             --bin litchi-perf-baseline-alloc -- \
@@ -250,43 +260,109 @@ jobs:
             --samples 15 \
             --case opc_file_eager_open \
             --filesystem-cache warm,cold-requested \
-            --json target/perf/allocator-smoke/current.json
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
+            --json "$LITCHI_SMOKE_DIR/current.json"
 
-          current_path = Path("target/perf/allocator-smoke/current.json")
-          baseline_path = Path("target/perf/allocator-smoke/baseline.json")
-          current = json.loads(current_path.read_text())
-          revision = current["environment"].get("git_revision")
-          assert isinstance(revision, str) and revision
-          baseline = json.loads(json.dumps(current))
-          baseline["environment"]["git_revision"] = (
-              f"allocator-smoke-reference:{revision}"
-          )
-          baseline_path.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n")
-          PY
+      - name: Fetch the last successful full-run allocator reference
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p "$LITCHI_SMOKE_DIR/reference"
+          status_file="$LITCHI_SMOKE_DIR/fetch-status.json"
+          python3 tools/perf_smoke_baseline.py fetch-status \
+            --out "$status_file" \
+            --reason "the reference fetch did not complete"
+          if ! command -v gh > /dev/null 2>&1; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "the gh CLI is not available on this runner"
+            exit 0
+          fi
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow perf-baseline.yml \
+            --branch main \
+            --status success \
+            --limit 40 \
+            --json databaseId,event,conclusion,headSha,createdAt \
+            > "$LITCHI_SMOKE_DIR/runs.json"
+          if [ $? -ne 0 ]; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "gh run list did not return a run listing"
+            exit 0
+          fi
+          python3 tools/perf_smoke_baseline.py choose-runs \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --runs "$LITCHI_SMOKE_DIR/runs.json" \
+            --current-sha "$GITHUB_SHA" \
+            --out "$LITCHI_SMOKE_DIR/candidates.txt"
+          if [ $? -ne 0 ]; then
+            python3 tools/perf_smoke_baseline.py fetch-status \
+              --out "$status_file" \
+              --reason "no candidate reference run could be read from the listing"
+            exit 0
+          fi
+          python3 tools/perf_smoke_baseline.py fetch-status \
+            --out "$status_file" \
+            --reason "no successful full run has published a reference artifact"
+          while read -r candidate_run_id; do
+            [ -n "$candidate_run_id" ] || continue
+            gh run download "$candidate_run_id" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "container-performance-baseline-$candidate_run_id" \
+              --dir "$LITCHI_SMOKE_DIR/reference"
+            if [ $? -eq 0 ]; then
+              python3 tools/perf_smoke_baseline.py fetch-status \
+                --out "$status_file" \
+                --fetched \
+                --run-id "$candidate_run_id" \
+                --reason "downloaded the baseline artifact of run $candidate_run_id"
+              break
+            fi
+          done < "$LITCHI_SMOKE_DIR/candidates.txt"
+          exit 0
+
+      - name: Select the smoke comparison baseline
+        run: |
+          python3 tools/perf_smoke_baseline.py select \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --comparator-policy "$LITCHI_ALLOCATOR_POLICY" \
+            --current "$LITCHI_SMOKE_DIR/current.json" \
+            --reference-dir "$LITCHI_SMOKE_DIR/reference" \
+            --fetch-status "$LITCHI_SMOKE_DIR/fetch-status.json" \
+            --runner-labels "$LITCHI_RUNNER_LABELS" \
+            --current-run-id "$GITHUB_RUN_ID" \
+            --baseline-out "$LITCHI_SMOKE_DIR/baseline.json" \
+            --selection-out "$LITCHI_SMOKE_DIR/selection.json"
+
+      - name: Compare the smoke report against the selected baseline
+        run: |
+          set +e
           python3 tools/perf_compare.py \
-            --policy docs/performance/perf-regression-policy-allocator-v1.json \
-            --baseline target/perf/allocator-smoke/baseline.json \
-            --current target/perf/allocator-smoke/current.json \
-            --json-out target/perf/allocator-smoke/comparison.json \
-            --summary-out target/perf/allocator-smoke/comparison.txt
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
+            --policy "$LITCHI_ALLOCATOR_POLICY" \
+            --baseline "$LITCHI_SMOKE_DIR/baseline.json" \
+            --current "$LITCHI_SMOKE_DIR/current.json" \
+            --json-out "$LITCHI_SMOKE_DIR/comparison.json" \
+            --summary-out "$LITCHI_SMOKE_DIR/comparison.txt"
+          comparator_status=$?
+          set -e
+          printf '%s\n' "$comparator_status" \
+            > "$LITCHI_SMOKE_DIR/comparator-exit-status.txt"
+          echo "comparator exit status: $comparator_status"
 
-          comparison = json.loads(
-              Path("target/perf/allocator-smoke/comparison.json").read_text()
-          )
-          assert comparison["status"] == "pass"
-          assert comparison["summary"]["matched_results"] == 2
-          assert comparison["summary"]["regressions"] == 0
-          assert comparison["summary"]["latency_claims"] == "withheld_instrumentation"
-          assert comparison["summary"]["latency_compared_results"] == 0
-          assert comparison["summary"]["latency_excluded_results"] == 2
-          assert comparison["summary"]["compared_metrics"] == 20
-          PY
+      - name: Report the smoke comparison outcome
+        run: |
+          python3 tools/perf_smoke_baseline.py report \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --selection "$LITCHI_SMOKE_DIR/selection.json" \
+            --comparison "$LITCHI_SMOKE_DIR/comparison.json" \
+            --comparator-exit-status \
+              "$(cat "$LITCHI_SMOKE_DIR/comparator-exit-status.txt")" \
+            --classification-out "$LITCHI_SMOKE_DIR/classification.json" \
+            --summary-out "$LITCHI_SMOKE_DIR/outcome.md" \
+            --step-summary "$GITHUB_STEP_SUMMARY"
 
       - name: Ensure zstd is available for strict claim checking
         run: |
@@ -300,6 +376,7 @@ jobs:
         run: |
           python3 -m unittest \
             tools.test_perf_compare \
+            tools.test_perf_smoke_baseline \
             tools.test_perf_abba_summary \
             tools.test_perf_abba_package \
             tools.test_perf_resource_profile \
@@ -1315,6 +1392,21 @@ jobs:
             ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
           } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/after-workload.txt"
 
+      - name: Upload smoke comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-smoke-comparison-${{ github.run_id }}
+          path: |
+            target/perf/allocator-smoke/selection.json
+            target/perf/allocator-smoke/classification.json
+            target/perf/allocator-smoke/comparison.json
+            target/perf/allocator-smoke/comparison.txt
+            target/perf/allocator-smoke/outcome.md
+            target/perf/allocator-smoke/fetch-status.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload performance diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -1346,6 +1438,9 @@ jobs:
     timeout-minutes: 240
     env:
       CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
+      LITCHI_RUNNER_LABELS: ubuntu-latest
+      LITCHI_SMOKE_POLICY: docs/performance/perf-smoke-baseline-policy-v1.json
+      LITCHI_ALLOCATOR_POLICY: docs/performance/perf-regression-policy-allocator-v1.json
 
     steps:
       - name: Checkout repository
@@ -1415,6 +1510,27 @@ jobs:
 
       - name: Build release harness
         run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
+
+      - name: Publish the bounded allocator reference for the smoke comparison
+        run: |
+          mkdir -p target/perf
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc -- \
+            --warmup 3 \
+            --samples 15 \
+            --case opc_file_eager_open \
+            --filesystem-cache warm,cold-requested \
+            --json target/perf/allocator-baseline.json
+          python3 tools/perf_smoke_baseline.py descriptor \
+            --policy "$LITCHI_SMOKE_POLICY" \
+            --comparator-policy "$LITCHI_ALLOCATOR_POLICY" \
+            --report target/perf/allocator-baseline.json \
+            --runner-labels "$LITCHI_RUNNER_LABELS" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --event "$GITHUB_EVENT_NAME" \
+            --out target/perf/allocator-baseline-descriptor.json
 
       - name: Run current-HEAD resource profile
         run: |
@@ -2490,6 +2606,8 @@ jobs:
           path: |
             target/perf/container-baseline.json
             target/perf/container-baseline.corpus-manifest-v2.json
+            target/perf/allocator-baseline.json
+            target/perf/allocator-baseline-descriptor.json
             target/perf/crud-coverage-index-v1.json
             target/perf/resource-profile.json
             target/perf/xlsx-commit-read-baseline.json

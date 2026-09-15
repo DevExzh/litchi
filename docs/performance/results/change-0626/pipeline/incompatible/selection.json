@@ -1,0 +1,96 @@
+{
+  "checks": [
+    {
+      "detail": "downloaded the artifact of run '11111111'",
+      "name": "reference_fetched",
+      "passed": true
+    },
+    {
+      "detail": "the fetched report parsed as an object",
+      "name": "reference_report_parsed",
+      "passed": true
+    },
+    {
+      "detail": "reference schema_version 1, expected 1",
+      "name": "reference_report_schema",
+      "passed": true
+    },
+    {
+      "detail": "reference tool identity matches comparator policy 'litchi-hosted-allocator-filesystem-v1'",
+      "name": "reference_tool_identity",
+      "passed": true
+    },
+    {
+      "detail": "current tool identity matches comparator policy 'litchi-hosted-allocator-filesystem-v1'",
+      "name": "current_tool_identity",
+      "passed": true
+    },
+    {
+      "detail": "reference profile 'release', current profile 'release', expected 'release'",
+      "name": "harness_binary_profile",
+      "passed": true
+    },
+    {
+      "detail": "descriptor accepted",
+      "name": "reference_descriptor",
+      "passed": true
+    },
+    {
+      "detail": "descriptor names 'litchi-ci-smoke-baseline-v1'/'litchi-hosted-allocator-filesystem-v1'; expected 'litchi-ci-smoke-baseline-v1'/'litchi-hosted-allocator-filesystem-v1'",
+      "name": "descriptor_policy_identity",
+      "passed": true
+    },
+    {
+      "detail": "reference ran on ['ubuntu-latest'], this job runs on ['ubuntu-latest']",
+      "name": "runner_labels",
+      "passed": true
+    },
+    {
+      "detail": "descriptor names run '11111111'; the artifact was downloaded from run '11111111'",
+      "name": "descriptor_run_identity",
+      "passed": true
+    },
+    {
+      "detail": "descriptor names revision '7082a1a3f480589c0025aad8925cae315a4cfd4b'",
+      "name": "descriptor_revision_identity",
+      "passed": true
+    },
+    {
+      "detail": "reference key manifest 36f44718f1b92b87552969e26702d6f54a964c781905a90051cb3eadb1153f8a, policy debb700930d4be1d2d597de60ef5b64200403407c138bab17dd268996975ec7a",
+      "name": "corpus_key_manifest_sha256",
+      "passed": false
+    },
+    {
+      "detail": "reference revision '7082a1a3f480589c0025aad8925cae315a4cfd4b', current revision '77220b62b9c149001a5ee18116412291370b2979'",
+      "name": "distinct_revisions",
+      "passed": true
+    },
+    {
+      "detail": "reference git_worktree_dirty is False",
+      "name": "reference_clean_worktree",
+      "passed": true
+    }
+  ],
+  "comparator_policy_id": "litchi-hosted-allocator-filesystem-v1",
+  "current": {
+    "git_revision": "77220b62b9c149001a5ee18116412291370b2979",
+    "run_id": "22222222",
+    "runner_labels": [
+      "ubuntu-latest"
+    ]
+  },
+  "enforcement": "advisory",
+  "fallback_reasons": [
+    "corpus_key_manifest_sha256: reference key manifest 36f44718f1b92b87552969e26702d6f54a964c781905a90051cb3eadb1153f8a, policy debb700930d4be1d2d597de60ef5b64200403407c138bab17dd268996975ec7a"
+  ],
+  "is_regression_detector": false,
+  "label": "plumbing check only: today's report compared against itself, which cannot detect a regression",
+  "mode": "self_comparison",
+  "policy_id": "litchi-ci-smoke-baseline-v1",
+  "reference": null,
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-smoke-baseline",
+    "version": "0.1.0"
+  }
+}

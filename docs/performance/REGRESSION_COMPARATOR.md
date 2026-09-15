@@ -42,8 +42,16 @@ provenance claim.
 
 Allocator-only evidence uses the separate
 [`perf-regression-policy-allocator-v1.json`](perf-regression-policy-allocator-v1.json).
-That policy requires the `litchi-perf-baseline-alloc` binary identity and
-`system_allocator_operation_scoped` instrumentation identity. It deliberately
+That policy requires the `litchi-perf-baseline-alloc` binary identity,
+`system_allocator_operation_scoped` instrumentation identity and, since change
+0626, the `serialized_region_peak_v3` allocator counter revision the current
+harness emits. The comparator compares the complete tool identity, so a policy
+that omits the counter revision rejects every freshly captured allocator
+report; change 0421 introduced the marker and left the policy markerless for
+historical replay, which silently disabled the CI allocator comparison from the
+commit that introduced `serialized_region_peak_v3` onward. Reports captured by
+an older allocator binary are no longer valid inputs to this policy. It
+deliberately
 selects only the measured filesystem case `opc_file_eager_open`, with warm and
 cold-requested rows keyed by cache state and the pinned corpus in
 [`perf-regression-allocator-manifest-v1.json`](results/perf-regression-allocator-manifest-v1.json).
@@ -242,6 +250,50 @@ downloads the named prior full-run artifact and the current artifact, applies
 the checked schema-2 policy, and uploads both summaries. A regression or any
 identity/input defect fails that manual job. Leaving the input empty records
 the scheduled/manual baseline without a latency gate.
+
+### The smoke job's baseline
+
+Until change 0626 the `smoke` job built its comparison baseline by copying the
+report it had just produced and changing only the recorded git revision. That
+is a working plumbing check for the comparator and cannot detect a regression,
+because both sides are the same measurement.
+
+The `full` job now also captures the bounded allocator report the smoke job
+captures — the same binary, warmup, sample count, case and cache states — and
+uploads it as `allocator-baseline.json` with an
+`allocator-baseline-descriptor.json` naming the run, its event, its runner
+labels, its git revision, the harness binary profile and the case/corpus key
+manifest digest. The `smoke` job lists recent successful runs of this workflow
+on `main`, downloads the newest artifact that carries such a report, and
+compares against it.
+
+The fetched report is used only when it is bound to the same comparator policy
+identity, the same case/corpus key manifest digest (recomputed from the report,
+not trusted from the descriptor), the same harness binary profile and the same
+runner labels, and only when its revision differs from the commit under test
+and its worktree was clean. Every other case falls back to the old
+self-comparison, which the job summary labels as a plumbing check that detects
+no regression, listing each reason the fetched reference was rejected.
+[`perf-smoke-baseline-policy-v1.json`](perf-smoke-baseline-policy-v1.json)
+carries those bindings, the self-comparison's expected shape and the
+enforcement setting; `tools/perf_smoke_baseline.py` implements the decision and
+`tools/test_perf_smoke_baseline.py` covers every branch of it.
+
+Enforcement is `advisory`. `docs/GOAL.md` deliverable 8 forbids making noisy
+cloud-hosted microbenchmarks a hard merge gate until variance is understood, so
+a regression or an unusable comparison against the fetched reference is
+annotated in the job summary and uploaded as
+`container-performance-smoke-comparison-<run id>`, and does not fail the job.
+Two outcomes are distinguished: a comparator verdict whose every error is a
+build-identity difference is infrastructure drift, since a hosted runner may
+change CPU model, kernel, memory size or toolchain between runs, and never
+blocks even under `blocking` enforcement; anything else is an input defect. A
+broken self-comparison always fails the job, because a comparator that cannot
+compare a report with itself is a tooling defect rather than a measurement.
+
+This comparison inherits every caveat below. It is not a controlled
+environment, it withholds all latency claims because the allocator policy
+withholds them, and it authorizes no performance claim.
 
 GitHub-hosted runner labels and the report identity fields are compatibility
 checks; they do not prove identical CPU frequency, host model, thermals, or

@@ -1,0 +1,45 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0626",
+  "title": "The CI smoke check compares against the last successful full run, with a labelled fallback",
+  "decision": "retained, workflow and Python tooling only",
+  "code_state": "no file under crates/ or tools/perf-baseline/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "evidence gap 1 of change 0587 ranked highest: the smoke job built its baseline as a byte-copy of the report it had just produced, so it could not detect a regression on any push or pull request",
+    "the comparator, the allocator policy and the artifact plumbing already existed end to end; what was missing was a reference artifact from a prior run and the decision logic that binds one",
+    "the self-comparison the survey called a working plumbing check had in fact been failing closed for 273 commits, since 126c4a8b2 added tool.allocator_counter_revision to the harness while the checked allocator policy stayed markerless",
+    "docs/GOAL.md deliverable 8 forbids making noisy cloud-hosted microbenchmarks a hard merge gate until variance is understood, so the fetched comparison is advisory and only a broken plumbing check fails the job"
+  ],
+  "accepted_evidence": {
+    "real_harness_legs": "two release litchi-perf-baseline-alloc reports, each captured on a clean worktree pinned to CPU 21 at a distinct revision (7082a1a3f and 77220b62b), retained under reports/",
+    "pipeline_scenarios": "five end-to-end runs of the descriptor, fetch-status, select, perf_compare and report steps over those two reports: no artifact, compatible reference, allocation counters raised 10%, reference CPU model changed, reference over another corpus; each with its transcript, selection, comparison, classification and rendered job summary",
+    "defect_reproduction": "the same freshly captured report compared against the base commit's own copy of the allocator policy (ComparisonInputError: baseline.tool does not match the policy tool identity) and against the pinned copy (pass, 2 matched results, 20 compared metrics, 0 regressions)",
+    "unit_coverage": "121 tests in tools/test_perf_smoke_baseline.py over every branch of the new module, including nine that assert the workflow's wiring textually",
+    "gate_transcripts": "ten gate sections with their tails and exit statuses, plus one pre-existing failure reproduced on the untouched base commit"
+  },
+  "accepted_costs": {
+    "no_actions_run": "neither gh nor actionlint is installed on this host, so the fetch step's shell has never executed and the workflow was not linted by actionlint; PyYAML, tools/test_perf_workflow_policy.py and nine new wiring tests stand in its place",
+    "first_run_falls_back": "no full run has ever published allocator-baseline.json, so the first push after this lands falls back to the labelled plumbing check; the fetched path begins working after the next scheduled or dispatched full run",
+    "policy_strictness": "pinning tool_identity.allocator_counter_revision means a report from an older allocator binary can no longer be compared under the checked allocator policy; that is deliberate and is the strict direction",
+    "full_job_cost": "the full job pays one extra feature-enabled build of the harness and one 15-sample allocator run; the added wall time on a hosted runner was not measured",
+    "classifier_coupling": "the environment-drift classifier matches two literal message prefixes from perf_compare.py; if those change, drift is annotated as an input defect until they are updated"
+  },
+  "known_gaps": {
+    "hosted_variance": "whether a GitHub-hosted runner's build identity and allocation counters are stable enough between runs for the fetched comparison to fire usefully is unknown; that is exactly the variance deliverable 8 says must be understood before enforcement could change",
+    "reference_breadth": "the reference is one case, opc_file_eager_open, over one pinned corpus in warm and cold-requested states: twenty deterministic allocation counters, not the 201-result release matrix",
+    "fork_pull_requests": "whether the read-only token on a fork pull request can list runs and download another run's artifact was not verified"
+  },
+  "withheld": [
+    "any latency, cycle, instruction, peak-RSS, cold-cache, range-source, concurrency-scaling, real-producer or cross-platform result",
+    "any statement that the smoke comparison constitutes acceptance evidence for an optimization, or that a passing comparison shows performance is unchanged"
+  ],
+  "provenance": {
+    "base_commit": "7082a1a3f480589c0025aad8925cae315a4cfd4b",
+    "branch": "perf/0626-perf-ci-smoke-baseline-fetch",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, Python 3.14.4, PyYAML 6.0.3",
+    "note": "the two harness legs were built in separate worktrees with their own external CARGO_TARGET_DIR and run pinned to CPU 21; the current leg records revision 77220b62b, the implementation commit that the branch's final commit amends to add this packet"
+  }
+}

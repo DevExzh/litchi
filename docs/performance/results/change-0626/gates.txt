@@ -1,0 +1,65 @@
+$ cargo fmt --all --check
+exit status 0
+
+$ python3 -c "import yaml; yaml.safe_load(open('.github/workflows/perf-baseline.yml')); print('perf-baseline.yml parsed by PyYAML', yaml.__version__)"
+perf-baseline.yml parsed by PyYAML 6.0.3
+exit status 0
+
+$ python3 -m unittest tools.test_perf_smoke_baseline 2>&1 1>/dev/null
+----------------------------------------------------------------------
+Ran 121 tests in 0.133s
+
+OK
+exit status 0
+
+$ python3 -m unittest tools.test_perf_compare tools.test_perf_smoke_baseline tools.test_perf_abba_summary tools.test_perf_abba_package tools.test_perf_resource_profile tools.test_perf_corpus_binding tools.test_validate_opc_serial_eager_allocator_abba tools.test_crud_coverage_index tools.test_perf_workflow_policy 2>&1 1>/dev/null
+----------------------------------------------------------------------
+Ran 466 tests in 2.983s
+
+OK
+exit status 0
+
+$ python3 -m unittest tools.test_perf_baseline_source_policy 2>&1 1>/dev/null
+----------------------------------------------------------------------
+Ran 14 tests in 0.014s
+
+OK
+exit status 0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit status 0
+
+$ python3 tools/check_report_claim_classification.py --registry docs/performance/report-claim-classification-v1.json --repo-root . && python3 -m unittest tools.test_report_claim_classification 2>&1 1>/dev/null | tail -1
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+OK
+exit status 0
+
+$ python3 tools/validate_crud_coverage_index.py --index docs/performance/crud-coverage-index-v1.json --catalog docs/performance/results/perf-corpus-manifest-v2.json --selector-source tools/perf-baseline/src/lib.rs --checklist docs/CRUD_Scenario_Checklist.md --repo-root .
+validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)
+exit status 0
+
+$ python3 tools/non_iwork_gate.py verify
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit status 0
+
+$ command -v actionlint || echo 'actionlint is not installed on this host; the YAML was validated with PyYAML and tools/test_perf_workflow_policy.py instead'
+actionlint is not installed on this host; the YAML was validated with PyYAML and tools/test_perf_workflow_policy.py instead
+exit status 0
+
+# Pre-existing failure, reproduced on the untouched base commit
+
+tools.test_perf_claims.ClaimRegistryStructuralTests
+  .test_seed_registry_is_structurally_valid fails with
+
+    AssertionError: Items in the first set but not the second:
+    'abba-0418-pptx-cross-copy-lifecycle'
+    'abba-0467-xlsx-cell-attributes-fixed-checkout'
+
+Reproduced in a detached worktree at 7082a1a3f, the base commit, with no file
+from this change present: same two evidence ids, same assertion. The other 48
+tests in that module pass, and `check_perf_claims.py --mode strict` itself
+exits 0 over all 10 claims. Nothing in this change touches the claim registry,
+its evidence directories or that test.

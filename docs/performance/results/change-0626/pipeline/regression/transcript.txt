@@ -1,0 +1,70 @@
+# scenario: regression
+
+$ perf_smoke_baseline.py descriptor --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --comparator-policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --report /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/full-run-report.json --runner-labels ubuntu-latest --run-id 11111111 --event schedule --out /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/reference/allocator-baseline-descriptor.json
+reference descriptor for run 11111111 at 7082a1a3f480589c0025aad8925cae315a4cfd4b
+exit status 0
+
+$ perf_smoke_baseline.py fetch-status --out docs/performance/results/change-0626/pipeline/regression/fetch-status.json --reason downloaded the baseline artifact of run 11111111 --fetched --run-id 11111111
+reference fetch: downloaded the baseline artifact of run 11111111
+exit status 0
+
+$ perf_smoke_baseline.py select --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --comparator-policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/current.json --reference-dir /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/reference --fetch-status docs/performance/results/change-0626/pipeline/regression/fetch-status.json --runner-labels ubuntu-latest --current-run-id 22222222 --baseline-out /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/baseline.json --selection-out docs/performance/results/change-0626/pipeline/regression/selection.json
+fetched_reference: regression comparison against the last successful full run (11111111, schedule)
+exit status 0
+
+$ perf_compare.py --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --baseline /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/baseline.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/regression/current.json --json-out docs/performance/results/change-0626/pipeline/regression/comparison.json --summary-out docs/performance/results/change-0626/pipeline/regression/comparison.txt
+REGRESSION: 2 matched results, 20 metrics, 18 regressions
+Latency comparison excluded for 2 evidence-only result(s)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.allocated_bytes.values: 3.38245e+07 -> 3.72069e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.allocation_calls.values: 251 -> 276 (+9.96%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.deallocated_bytes.values: 3.38245e+07 -> 3.72069e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.deallocation_calls.values: 232 -> 255 (+9.91%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.live_bytes_after.values: 1337 -> 1473 (+10.17%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.live_bytes_before.values: 1337 -> 1473 (+10.17%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.peak_live_bytes_after.values: 3.36573e+07 -> 3.70231e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.peak_live_bytes_before.values: 4025 -> 4430 (+10.06%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/cold-requested] operation_metrics.allocation.reallocation_calls.values: 19 -> 21 (+10.53%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.allocated_bytes.values: 3.38245e+07 -> 3.72069e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.allocation_calls.values: 251 -> 276 (+9.96%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.deallocated_bytes.values: 3.38245e+07 -> 3.72069e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.deallocation_calls.values: 232 -> 255 (+9.91%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.live_bytes_after.values: 1337 -> 1473 (+10.17%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.live_bytes_before.values: 1337 -> 1473 (+10.17%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.peak_live_bytes_after.values: 3.36573e+07 -> 3.70231e+07 (+10.00%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.peak_live_bytes_before.values: 4025 -> 4430 (+10.06%; limit +5.00%)
+REGRESSION opc_file_eager_open[few-large/warm] operation_metrics.allocation.reallocation_calls.values: 19 -> 21 (+10.53%; limit +5.00%)
+exit status 1
+
+$ perf_smoke_baseline.py report --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --selection docs/performance/results/change-0626/pipeline/regression/selection.json --comparison docs/performance/results/change-0626/pipeline/regression/comparison.json --comparator-exit-status 1 --classification-out docs/performance/results/change-0626/pipeline/regression/classification.json --summary-out docs/performance/results/change-0626/pipeline/regression/outcome.md --step-summary docs/performance/results/change-0626/pipeline/regression/step-summary.md
+::warning title=Performance smoke: regression against the last full run::regression comparison against the last successful full run (11111111, schedule) | opc_file_eager_open operation_metrics.allocation.allocated_bytes.values: 33824465.0 -> 37206912.0 | opc_file_eager_open operation_metrics.allocation.allocation_calls.values: 251.0 -> 276.0 | opc_file_eager_open operation_metrics.allocation.deallocated_bytes.values: 33824465.0 -> 37206912.0 | opc_file_eager_open operation_metrics.allocation.deallocation_calls.values: 232.0 -> 255.0 | opc_file_eager_open operation_metrics.allocation.live_bytes_after.values: 1337.0 -> 1473.0 | opc_file_eager_open operation_metrics.allocation.live_bytes_before.values: 1337.0 -> 1473.0 | opc_file_eager_open operation_metrics.allocation.peak_live_bytes_after.values: 33657344.0 -> 37023081.0 | opc_file_eager_open operation_metrics.allocation.peak_live_bytes_before.values: 4025.0 -> 4430.0 | opc_file_eager_open operation_metrics.allocation.reallocation_calls.values: 19.0 -> 21.0 | opc_file_eager_open operation_metrics.allocation.allocated_bytes.values: 33824465.0 -> 37206912.0 | opc_file_eager_open operation_metrics.allocation.allocation_calls.values: 251.0 -> 276.0 | opc_file_eager_open operation_metrics.allocation.deallocated_bytes.values: 33824465.0 -> 37206912.0 | opc_file_eager_open operation_metrics.allocation.deallocation_calls.values: 232.0 -> 255.0 | opc_file_eager_open operation_metrics.allocation.live_bytes_after.values: 1337.0 -> 1473.0 | opc_file_eager_open operation_metrics.allocation.live_bytes_before.values: 1337.0 -> 1473.0 | opc_file_eager_open operation_metrics.allocation.peak_live_bytes_after.values: 33657344.0 -> 37023081.0 | opc_file_eager_open operation_metrics.allocation.peak_live_bytes_before.values: 4025.0 -> 4430.0 | opc_file_eager_open operation_metrics.allocation.reallocation_calls.values: 19.0 -> 21.0 | advisory: reported, not enforced (docs/GOAL.md deliverable 8)
+## Performance smoke comparison
+
+- Mode: `fetched_reference` — regression comparison against the last successful full run (11111111, schedule)
+- Detects regressions: yes
+- Reference: run `11111111` at revision `7082a1a3f480589c0025aad8925cae315a4cfd4b`
+- Comparator status: `regression`
+- Outcome: `reference_regression`
+- Enforcement: `advisory` (advisory)
+
+Detail:
+
+- opc_file_eager_open operation_metrics.allocation.allocated_bytes.values: 33824465.0 -> 37206912.0
+- opc_file_eager_open operation_metrics.allocation.allocation_calls.values: 251.0 -> 276.0
+- opc_file_eager_open operation_metrics.allocation.deallocated_bytes.values: 33824465.0 -> 37206912.0
+- opc_file_eager_open operation_metrics.allocation.deallocation_calls.values: 232.0 -> 255.0
+- opc_file_eager_open operation_metrics.allocation.live_bytes_after.values: 1337.0 -> 1473.0
+- opc_file_eager_open operation_metrics.allocation.live_bytes_before.values: 1337.0 -> 1473.0
+- opc_file_eager_open operation_metrics.allocation.peak_live_bytes_after.values: 33657344.0 -> 37023081.0
+- opc_file_eager_open operation_metrics.allocation.peak_live_bytes_before.values: 4025.0 -> 4430.0
+- opc_file_eager_open operation_metrics.allocation.reallocation_calls.values: 19.0 -> 21.0
+- opc_file_eager_open operation_metrics.allocation.allocated_bytes.values: 33824465.0 -> 37206912.0
+- opc_file_eager_open operation_metrics.allocation.allocation_calls.values: 251.0 -> 276.0
+- opc_file_eager_open operation_metrics.allocation.deallocated_bytes.values: 33824465.0 -> 37206912.0
+- opc_file_eager_open operation_metrics.allocation.deallocation_calls.values: 232.0 -> 255.0
+- opc_file_eager_open operation_metrics.allocation.live_bytes_after.values: 1337.0 -> 1473.0
+- opc_file_eager_open operation_metrics.allocation.live_bytes_before.values: 1337.0 -> 1473.0
+- opc_file_eager_open operation_metrics.allocation.peak_live_bytes_after.values: 33657344.0 -> 37023081.0
+- opc_file_eager_open operation_metrics.allocation.peak_live_bytes_before.values: 4025.0 -> 4430.0
+- opc_file_eager_open operation_metrics.allocation.reallocation_calls.values: 19.0 -> 21.0
+exit status 0
+

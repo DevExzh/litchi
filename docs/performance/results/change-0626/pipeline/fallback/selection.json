@@ -1,0 +1,31 @@
+{
+  "checks": [
+    {
+      "detail": "no successful full run has published a reference artifact",
+      "name": "reference_fetched",
+      "passed": false
+    }
+  ],
+  "comparator_policy_id": "litchi-hosted-allocator-filesystem-v1",
+  "current": {
+    "git_revision": "77220b62b9c149001a5ee18116412291370b2979",
+    "run_id": "22222222",
+    "runner_labels": [
+      "ubuntu-latest"
+    ]
+  },
+  "enforcement": "advisory",
+  "fallback_reasons": [
+    "reference_fetched: no successful full run has published a reference artifact"
+  ],
+  "is_regression_detector": false,
+  "label": "plumbing check only: today's report compared against itself, which cannot detect a regression",
+  "mode": "self_comparison",
+  "policy_id": "litchi-ci-smoke-baseline-v1",
+  "reference": null,
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-smoke-baseline",
+    "version": "0.1.0"
+  }
+}

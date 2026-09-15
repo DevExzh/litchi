@@ -1,5 +1,42 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0626 — deliverable 8's smoke check starts comparing against history, and stays off the merge gate on purpose
+
+Record: [0626](0626-perf-ci-smoke-baseline-fetch.md).
+
+`docs/GOAL.md` deliverable 8 asks for "a lightweight, stable performance smoke
+check suitable for CI, plus a fuller manually triggered or scheduled benchmark
+workflow", and adds "do not make noisy cloud-hosted microbenchmarks a hard merge
+gate until variance is understood". Both halves existed; the first half was
+comparing today's report with itself. It now compares against the last
+successful `full` run's artifact when one is bound to the same policy identity,
+corpus key manifest digest, harness binary profile and runner labels, which is
+the first time any push or pull request in this program has been measured
+against prior history at all. The second half is honoured structurally rather
+than by assertion: the comparison runs under the allocator policy, so
+`perf_compare` reports `latency_claims: withheld_instrumentation` and compares
+zero latency results, and the twenty metrics it does compare are deterministic
+allocation counters; on top of that `enforcement: advisory` means a regression
+or an unusable comparison annotates the run and does not fail it. The audit rows
+this leaves open are named in the record: nobody has yet observed a GitHub
+Actions run of this workflow, because neither `gh` nor `actionlint` is installed
+on the program host, so the fetch step's shell has never executed; whether a
+hosted runner's build identity is stable enough between runs for the fetched
+mode to fire in practice is exactly the variance deliverable 8 says must be
+understood, and it is unknown; and the reference is one case over one pinned
+corpus, not the 201-result release matrix a pull-request job cannot afford.
+Deliverable 6's machine-readable results gain a small, honest addition — the
+selection, comparison and classification of every smoke run upload as
+`container-performance-smoke-comparison-<run id>`, each stating in its own text
+whether it detected regressions or merely checked plumbing. Two audit
+corrections are owed to earlier entries: change 0587's evidence-gap table
+described the smoke self-comparison as "a real, working plumbing check", which
+was true when written but had not been true since `126c4a8b2`; and change 0421's
+"policies opt into the new identity once both sides are freshly captured"
+applies to the CI allocator policy, where both sides always are, and was never
+acted on. No production code, contract, limit or refusal is touched. OLE2/OOXML
+remain active; ODF is deferred until completion and iWork excluded.
+
 ## 0628 — ADR 0006's determinism clause, checked across OPC and found to hold everywhere but one place
 
 Record: [0628](0628-opc-relationship-iteration-order.md).

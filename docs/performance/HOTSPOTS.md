@@ -1,5 +1,46 @@
 # Performance hotspot inventory
 
+## 0626 — the CI smoke check gets a real baseline, and the comparison it was already running turns out to have been failing closed for 273 commits
+
+Evidence gap 1 of the 0587 survey, ranked highest of twelve, was that the
+`smoke` job of `.github/workflows/perf-baseline.yml` "builds `baseline` as a
+byte-copy of `current` with only the revision label changed, then asserts the
+comparator passes against itself" — a working plumbing check that cannot detect
+anything, because both sides are the same measurement. The `full` job now also
+captures the bounded allocator report the smoke job captures (the same release
+`litchi-perf-baseline-alloc`, `--warmup 3 --samples 15 --case
+opc_file_eager_open --filesystem-cache warm,cold-requested`) and ships it, with
+a descriptor naming the run, in the existing baseline artifact; the smoke job
+lists recent successful runs on `main`, downloads the newest such artifact and
+compares against it, falling back to the old self-comparison — **labelled, in the
+job summary and the annotation, as a plumbing check that detects no
+regression** — only when the fetched report is not bound to the same comparator
+policy identity, case/corpus key manifest digest, harness binary profile and
+runner labels, at a distinct revision, from a clean worktree. The survey's own
+premise did not survive the work: that self-comparison **has not run since
+`126c4a8b2`**, 273 commits back, because the allocator harness began emitting
+`tool.allocator_counter_revision` while the checked
+`perf-regression-policy-allocator-v1.json`, last edited two weeks earlier,
+omits it — and `perf_compare` compares the *complete* tool identity, so every
+freshly captured allocator report is rejected with `baseline.tool does not match
+the policy tool identity` and the step exits 2. Reproduced on two real reports
+from the release harness and fixed by pinning the field the harness actually
+emits, with a test that asserts the pinned string against the harness source so
+the two cannot drift apart silently again. Five end-to-end scenarios over those
+two real reports (distinct revisions `7082a1a3f` and `77220b62b`, both clean,
+both pinned to CPU 21) behave as designed: no artifact → self-comparison,
+plumbing pass; compatible reference → real comparison, pass; **allocation
+counters raised 10% → comparator regression, reported, job exit 0**; reference
+CPU model changed → comparator invalid, classified as infrastructure drift, job
+exit 0; reference over another corpus → falls back naming both digests. The
+comparison compares twenty deterministic allocation counters and withholds every
+latency claim, and `enforcement: advisory` keeps it off the merge gate per
+`docs/GOAL.md` deliverable 8; only a broken plumbing check fails the job.
+`performance_claim: none`; no file under `crates/` or `tools/perf-baseline/`
+changed. OLE2/OOXML remain active; ODF is deferred until completion and iWork
+excluded. [Record and limitations](0626-perf-ci-smoke-baseline-fetch.md);
+[retained evidence](results/change-0626/README.md).
+
 ## 0628 — OPC relationship order reaches no published byte, except through relationship reuse
 
 Not a hotspot: the correctness check change [0600](0600-opc-cold-read-observations-and-name-lookup.md) left open, answered and closed. `Relationships` stores its relationships in a `HashMap` keyed by rId and `Relationships::iter` walks it, so the visit order is a per-instance hash seed. Every place inside `litchi-opc` where that order could escape turns out already to be canonical, and the record states each with its evidence: `to_xml` and `try_to_xml_bytes` sort by rId, which is the map's own unique key, so the `.rels` bytes are a function of the collection; `PublicationPlan::from_package` iterates `iter_parts()` over a `HashMap<PackURI, Box<dyn Part>>` but sorts by partname before a single byte or manifest is built, so the published member order and `[Content_Types].xml` are functions of the package; `walk_relationship_graph` seeds its LIFO queue from parse-ordered `SmallVec`s and its `visited` map is only ever looked up, while `classify_part_members` admits parts in ZIP central-directory order, so read order, admission order and the node at which `max_relationship_graph_nodes` trips are all functions of the archive bytes; `sign.rs` sorts ids, certificates, signatures and parts and holds its references in a `BTreeMap`; `is_signed` is a disjunction of `any()`; and `main_document_part` plus the ADR 0013, 0018 and 0021 ownership scans reject ambiguity rather than picking from it. **One thing did vary.** `get_or_add` and `get_or_add_ext_rel` reused the *first* hash-order relationship whose type, target and target mode matched, and the identifier they return is written by the caller straight into part markup as `r:id="rIdN"`. A static scan of all **336 OOXML fixtures** (2,218 `.rels` parts, 6,393 `Relationship` elements) found **4 packages** carrying a duplicate (Type, Target, TargetMode) group — two shared hyperlinks, one repeated hyperlink, one repeated `mailMergeSource`, all External — and probing every one of **5,258** (owner, type, target, mode) triples in the corpus with 16 opens each returned more than one identifier for exactly those **4** before the fix and **0** after. Reuse now takes the smallest rId in byte order, which is the order the serialized `.rels` member is already written in. Cost: `min()` replaces `find()`, so a matching scan is no longer an early exit; all 327 published packages in the corpus are byte-identical across the legs, the deterministic open and save counts on four fixtures `diff` empty, and open+save moves **+7,595.6 Ir (+0.0039%)** — code layout and allocator drift, since none of the three functions appears in either callgrind profile. `performance_claim: none`; nothing got faster and no claim is registered. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0628-opc-relationship-iteration-order.md); [retained evidence](results/change-0628/README.md).
