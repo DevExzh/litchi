@@ -48,8 +48,20 @@ impl ParagraphProperties {
     }
 
     fn from_sprm_context(grpprl: &[u8], stylesheet: Option<&StyleSheet>) -> Result<Self> {
-        let mut pap = Self::default();
         let sprms = parse_sprms(grpprl)?;
+        Self::from_sprm_parsed(grpprl, &sprms, stylesheet)
+    }
+
+    /// [`Self::from_sprm_context`] over an already parsed `grpprl`.
+    ///
+    /// `sprms` must be `parse_sprms(grpprl)` for the very same bytes; the whole
+    /// body below, including the exact-consumption check, reads only that parse.
+    fn from_sprm_parsed(
+        grpprl: &[u8],
+        sprms: &[Sprm],
+        stylesheet: Option<&StyleSheet>,
+    ) -> Result<Self> {
+        let mut pap = Self::default();
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
         if consumed != grpprl.len() {
             return Err(PackageError::Corrupted(
@@ -57,7 +69,7 @@ impl ParagraphProperties {
             ));
         }
 
-        for sprm in &sprms {
+        for sprm in sprms {
             // Only process PAP SPRMs (type = 1)
             if get_sprm_type(sprm.opcode) == 1 {
                 Self::apply_sprm(&mut pap, sprm)?;
@@ -108,16 +120,22 @@ impl ParagraphProperties {
     ///
     /// A direct `sprmPIstd` or permutation still resolves from the document
     /// baseline, exactly as [`Self::cascade_styles`] does.
+    ///
+    /// `pre_parsed`, when present, must be `parse_sprms(direct_sprms)` for the
+    /// very same bytes. It lets a caller that has already parsed the run hand
+    /// that parse over instead of repeating it; `None` parses here as before.
     pub(crate) fn cascade_styles_from_resolved_baseline(
         resolved_initial: &Self,
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
+        pre_parsed: Option<&[Sprm]>,
     ) -> Result<Self> {
         Self::apply_direct_sprms(
             resolved_initial.clone(),
             &Self::default(),
             direct_sprms,
             stylesheet,
+            pre_parsed,
         )
     }
 
@@ -143,7 +161,7 @@ impl ParagraphProperties {
         stylesheet: &StyleSheet,
     ) -> Result<Self> {
         let current = Self::paragraph_style_on_baseline(baseline, initial_style_index, stylesheet)?;
-        Self::apply_direct_sprms(current, baseline, direct_sprms, stylesheet)
+        Self::apply_direct_sprms(current, baseline, direct_sprms, stylesheet, None)
     }
 
     fn apply_direct_sprms(
@@ -151,15 +169,23 @@ impl ParagraphProperties {
         style_baseline: &Self,
         direct_sprms: &[u8],
         stylesheet: &StyleSheet,
+        pre_parsed: Option<&[Sprm]>,
     ) -> Result<Self> {
-        let sprms = parse_sprms(direct_sprms)?;
+        let owned;
+        let sprms: &[Sprm] = match pre_parsed {
+            Some(sprms) => sprms,
+            None => {
+                owned = parse_sprms(direct_sprms)?;
+                &owned
+            },
+        };
         let consumed = sprms.last().map_or(0, |sprm| sprm.offset + sprm.size);
         if consumed != direct_sprms.len() {
             return Err(PackageError::Corrupted(
                 "PAPX grpprl does not contain a whole number of SPRMs".to_string(),
             ));
         }
-        for sprm in &sprms {
+        for sprm in sprms {
             if get_sprm_type(sprm.opcode) != 1 {
                 continue;
             }
@@ -183,7 +209,10 @@ impl ParagraphProperties {
             }
         }
 
-        let table_state = Self::from_sprm_with_stylesheet(direct_sprms, stylesheet)?;
+        // The table and table-revision state is derived from the very same
+        // `grpprl` this function just walked, so it reuses that parse rather
+        // than parsing the run a third time.
+        let table_state = Self::from_sprm_parsed(direct_sprms, sprms, Some(stylesheet))?;
         current.table_properties = table_state.table_properties;
         current.has_table_formatting_revision = table_state.has_table_formatting_revision;
         current.table_formatting_revision_author_index =

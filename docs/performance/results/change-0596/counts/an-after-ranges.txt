@@ -1,0 +1,51 @@
+== ranges: total s1000=5,058,716 s11000=7,948,752 per-op Ir=289
+-- inclusive per-op deltas (top 40)
+           578 200.00%  (below main)
+           578 200.00%  std::rt::lang_start_internal
+           289 100.00%  docppt_survey::main
+           289 100.00%  0x0000000000023cc0
+           289 100.00%  std::rt::lang_start::{{closure}}
+           289 100.00%  __libc_start_main@@GLIBC_2.34
+           289 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+           289 100.00%  main
+           289 100.00%  docppt_survey::profile_read
+           226  78.20%  litchi_doc::parts::fib::FileInformationBlock::get_all_subdoc_ranges
+           105  36.33%  alloc::raw_vec::RawVec<T,A>::grow_one
+            81  28.03%  alloc::raw_vec::RawVecInner<A>::finish_grow
+            77  26.64%  __rustc::__rdl_alloc
+            40  13.84%  __rustc::__rust_alloc
+            35  12.11%  __rustc::__rust_dealloc
+            34  11.76%  __rustc::__rdl_dealloc
+            33  11.42%  free
+            30  10.38%  malloc
+             1   0.35%  __rustc::__rust_no_alloc_shim_is_unstable_v2
+             0   0.00%  <&std::io::stdio::Stdout as std::io::Write>::write_fmt
+             0   0.00%  core::fmt::write
+             0   0.00%  <std::io::stdio::StdoutLock as std::io::Write>::write_all
+             0   0.00%  <u64 as core::fmt::Display>::fmt
+             0   0.00%  core::slice::memchr::memrchr
+             0   0.00%  std::io::stdio::_print
+             0   0.00%  <std::io::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
+             0   0.00%  <core::fmt::Formatter>::pad_integral
+             0   0.00%  <std::env::Args as core::iter::traits::iterator::Iterator>::next
+             0   0.00%  core::str::converts::from_utf8
+             0   0.00%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+-- self per-op deltas (top 25)
+           121  41.87%  litchi_doc::parts::fib::FileInformationBlock::get_all_subdoc_ranges
+            40  13.84%  alloc::raw_vec::RawVecInner<A>::finish_grow
+            33  11.42%  free
+            30  10.38%  malloc
+            28   9.69%  docppt_survey::profile_read
+            24   8.30%  alloc::raw_vec::RawVec<T,A>::grow_one
+             9   3.11%  __rustc::__rdl_alloc
+             1   0.35%  __rustc::__rdl_dealloc
+             1   0.35%  __rustc::__rust_alloc
+             1   0.35%  __rustc::__rust_no_alloc_shim_is_unstable_v2
+             1   0.35%  __rustc::__rust_dealloc
+             0   0.00%  core::slice::memchr::memrchr
+             0   0.00%  docppt_survey::main
+             0   0.00%  <u64 as core::fmt::Display>::fmt
+             0   0.00%  core::str::converts::from_utf8
+-- call counts per op (selected)
+         1.0  malloc
+         1.0  alloc::raw_vec::RawVecInner<A>::finish_grow

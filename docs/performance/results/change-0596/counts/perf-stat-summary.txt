@@ -1,0 +1,15 @@
+native perf stat, CPU 16, 20 warmups + 2000 timed opens per run, median of 3 runs, per open
+fixture      metric               before          after     delta
+docsmall     instructions      5,749,093      4,728,617   -17.75%
+docsmall     cycles            1,633,987      1,415,946   -13.34%
+docsmall     task-clock us            370            318   -14.16%
+docmid       instructions      3,000,179      2,829,208    -5.70%
+docmid       cycles              854,248        871,077    +1.97%
+docmid       task-clock us            192            196    +2.23%
+docbig       instructions      5,674,117      4,552,121   -19.77%
+docbig       cycles            2,314,943      1,824,307   -21.19%
+docbig       task-clock us            519            409   -21.25%
+
+native perf stat, paragraph_count on saved-by-table.doc, 50 warmups + 2000 calls, median of 3
+paragraph_count  instructions      1,654,851      1,654,633    -0.01%
+paragraph_count  cycles              257,914        256,199    -0.66%

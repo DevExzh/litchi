@@ -7,6 +7,7 @@
 /// - Pointers to various data structures
 /// - Document flags and properties
 use super::super::package::{Error as PackageError, Result};
+use std::sync::Arc;
 use zerocopy::{FromBytes, LE, U16, U32};
 
 /// Minimum FIB size in bytes (the base FIB structure)
@@ -37,7 +38,7 @@ pub const WORD_97_NFIB: u16 = 0x00C1;
 /// - Bytes 2-3: nFib (version number)
 /// - Bytes 10-11: flags (including which table stream to use)
 /// - Bytes 32+: Variable length fields pointing to data structures
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FileInformationBlock {
     /// File format version
     nfib: u16,
@@ -49,8 +50,24 @@ pub struct FileInformationBlock {
     which_table_stream: bool,
     /// Language ID
     lid: u16,
-    /// Complete FIB data for extended parsing
-    data: Vec<u8>,
+    /// `WordDocument` bytes this FIB reads through, shared with whoever owns them.
+    stream: Arc<Vec<u8>>,
+    /// Byte offset of this FIB within `stream`.
+    offset: usize,
+}
+
+impl std::fmt::Debug for FileInformationBlock {
+    /// Prints the FIB's own bytes, not the shared stream that carries them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileInformationBlock")
+            .field("nfib", &self.nfib)
+            .field("flags", &self.flags)
+            .field("l_key", &self.l_key)
+            .field("which_table_stream", &self.which_table_stream)
+            .field("lid", &self.lid)
+            .field("data", &self.data())
+            .finish()
+    }
 }
 
 impl FileInformationBlock {
@@ -73,6 +90,21 @@ impl FileInformationBlock {
     /// The returned object owns only the suffix beginning at the requested FIB,
     /// rather than copying the prefix that precedes it.
     pub fn parse_at(word_document: &[u8], offset: usize) -> Result<Self> {
+        let data = word_document.get(offset..).ok_or_else(|| {
+            PackageError::Corrupted(format!(
+                "FIB offset {offset} is beyond the WordDocument stream"
+            ))
+        })?;
+        Self::parse_shared(Arc::new(data.to_vec()), 0)
+    }
+
+    /// Parse a FIB at a byte offset in a `WordDocument` stream the caller shares.
+    ///
+    /// The returned object reads through the shared stream instead of copying
+    /// the suffix that begins at the requested FIB. `raw_data` still yields
+    /// exactly that suffix, so every reader sees the same bytes as
+    /// [`Self::parse_at`] would have handed it.
+    pub(crate) fn parse_shared(word_document: Arc<Vec<u8>>, offset: usize) -> Result<Self> {
         let data = word_document.get(offset..).ok_or_else(|| {
             PackageError::Corrupted(format!(
                 "FIB offset {offset} is beyond the WordDocument stream"
@@ -103,17 +135,21 @@ impl FileInformationBlock {
         // This is the fWhichTblStm flag
         let which_table_stream = (flags & 0x0200) != 0;
 
-        // Store the complete FIB data for later parsing of variable fields
-        let data = data.to_vec();
-
         Ok(Self {
             nfib,
             flags,
             l_key,
             which_table_stream,
             lid,
-            data,
+            stream: word_document,
+            offset,
         })
+    }
+
+    /// The FIB's own bytes: the shared stream from this FIB's offset onwards.
+    #[inline]
+    fn data(&self) -> &[u8] {
+        self.stream.get(self.offset..).unwrap_or_default()
     }
 
     /// Get the file format version.
@@ -195,14 +231,14 @@ impl FileInformationBlock {
     #[inline]
     #[must_use]
     pub fn next_fib_page(&self) -> u16 {
-        U16::<LE>::read_from_bytes(&self.data[8..10]).map_or(0, U16::get)
+        U16::<LE>::read_from_bytes(&self.data()[8..10]).map_or(0, U16::get)
     }
 
     /// `FibRgLw97.cbMac`, shared by a template and its attached glossary FIB.
     #[inline]
     #[must_use]
     pub fn word_document_size(&self) -> Option<u32> {
-        self.data
+        self.data()
             .get(64..68)
             .and_then(|bytes| U32::<LE>::read_from_bytes(bytes).ok())
             .map(U32::get)
@@ -255,7 +291,7 @@ impl FileInformationBlock {
         }
         let entry_offset = base_offset.checked_add(index.checked_mul(TABLE_POINTER_SIZE)?)?;
         let entry = self
-            .data
+            .data()
             .get(entry_offset..entry_offset.checked_add(TABLE_POINTER_SIZE)?)?;
 
         let offset = U32::<LE>::read_from_bytes(&entry[..4]).map_or(0, U32::get);
@@ -279,14 +315,14 @@ impl FileInformationBlock {
             (TABLE_POINTER_COUNT_OFFSET, LEGACY_TABLE_POINTER_COUNT)
         } else {
             let count_bytes = self
-                .data
+                .data()
                 .get(TABLE_POINTER_COUNT_OFFSET..TABLE_POINTERS_OFFSET)?;
             let count = usize::from(U16::<LE>::read_from_bytes(count_bytes).map_or(0, U16::get));
             (TABLE_POINTERS_OFFSET, count)
         };
         let byte_len = count.checked_mul(TABLE_POINTER_SIZE)?;
         let end = offset.checked_add(byte_len)?;
-        (end <= self.data.len()).then_some((offset, count))
+        (end <= self.data().len()).then_some((offset, count))
     }
 
     /// Minimum byte extent occupied by this FIB through its declared pointer array.
@@ -299,7 +335,7 @@ impl FileInformationBlock {
     #[inline]
     #[must_use]
     pub fn raw_data(&self) -> &[u8] {
-        &self.data
+        self.data()
     }
 
     /// Get character count for a subdocument.
@@ -325,12 +361,23 @@ impl FileInformationBlock {
     ///
     /// Character count, or 0 if out of bounds
     fn get_character_count(&self, index: usize) -> u32 {
+        Self::character_count_at(self.data(), index)
+    }
+
+    /// One `FibRgLw97` character count read from already resolved FIB bytes.
+    fn character_count_at(data: &[u8], index: usize) -> u32 {
         // FibRgLw97 starts at offset 64, character counts start at +0xC
         let offset = 64 + 0xC + (index * 4);
-        if offset + 4 > self.data.len() {
+        if offset + 4 > data.len() {
             return 0;
         }
-        U32::<LE>::read_from_bytes(&self.data[offset..offset + 4]).map_or(0, U32::get)
+        U32::<LE>::read_from_bytes(&data[offset..offset + 4]).map_or(0, U32::get)
+    }
+
+    /// All eight subdocument character counts, resolving the FIB bytes once.
+    fn character_counts(&self) -> [u32; 8] {
+        let data = self.data();
+        std::array::from_fn(|index| Self::character_count_at(data, index))
     }
 
     /// End CP of the concatenated set of all document parts.
@@ -455,37 +502,36 @@ impl FileInformationBlock {
     /// Get all subdocument ranges that exist in this document.
     ///
     /// Returns a vector of (name, `start_cp`, `end_cp`) tuples for all non-empty subdocuments.
+    ///
+    /// Every range is derived from one read of the eight `FibRgLw97` counts,
+    /// rather than resolving the FIB bytes once per count as the individual
+    /// range accessors do.
     #[must_use]
     pub fn get_all_subdoc_ranges(&self) -> Vec<(&'static str, u32, u32)> {
+        let counts = self.character_counts();
         let mut ranges = Vec::new();
 
-        let (start, end) = self.get_main_doc_range();
+        let (start, end) = (0, counts[0]);
         if end > start {
             ranges.push(("Main Document", start, end));
         }
 
-        if let Some((start, end)) = self.get_footnote_range() {
-            ranges.push(("Footnotes", start, end));
-        }
-
-        if let Some((start, end)) = self.get_header_range() {
-            ranges.push(("Headers/Footers", start, end));
-        }
-
-        if let Some((start, end)) = self.get_comment_range() {
-            ranges.push(("Comments", start, end));
-        }
-
-        if let Some((start, end)) = self.get_endnote_range() {
-            ranges.push(("Endnotes", start, end));
-        }
-
-        if let Some((start, end)) = self.get_textbox_range() {
-            ranges.push(("Text Boxes", start, end));
-        }
-
-        if let Some((start, end)) = self.get_header_textbox_range() {
-            ranges.push(("Header Text Boxes", start, end));
+        // Each subdocument follows the concatenation of the ones before it.
+        // Macros (index 3) are skipped as a range but still shift the base.
+        for (index, name) in [
+            (1usize, "Footnotes"),
+            (2, "Headers/Footers"),
+            (4, "Comments"),
+            (5, "Endnotes"),
+            (6, "Text Boxes"),
+            (7, "Header Text Boxes"),
+        ] {
+            // `Sum for u32` is the same left-to-right `+` chain the individual
+            // range accessors spell out, so overflow behaves identically.
+            let base = counts[..index].iter().sum::<u32>();
+            if counts[index] > 0 {
+                ranges.push((name, base, base + counts[index]));
+            }
         }
 
         ranges

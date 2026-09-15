@@ -1,0 +1,91 @@
+# Gates for change 0596, run in the candidate worktree at branch perf/0596-doc-eager-open-terms
+# host AMD EPYC 9R45, Linux 7.0.0-1012-aws, rustc 1.95.0
+
+$ cargo fmt --all --check
+exit=0 (no output above means clean)
+
+$ cargo clippy -p litchi-doc --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+$ cargo doc -p litchi-doc --no-deps
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0596/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.71s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0596-after/doc/litchi_doc/index.html
+
+$ cargo test -p litchi-doc
+running 25 tests
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::paragraph_count (line 29) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::text (line 10) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/links.rs - document::model::semantic::links::Document::hyperlinks (line 17) ... ignored
+test crates/litchi-doc/src/document/model/semantic/media.rs - document::model::semantic::media::Document::image_data (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/numbering.rs - document::model::semantic::numbering::Document::list_tables (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/headers.rs - document::model::semantic::subdocuments::headers::Document::headers_footers (line 16) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::endnotes (line 51) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::footnotes (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::paragraphs (line 46) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::table_count (line 56) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::elements (line 217) - compile ... ok
+test crates/litchi-doc/src/document/model/state.rs - document::model::state::Document (line 54) - compile ... ok
+test crates/litchi-doc/src/lib.rs - (line 97) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::tables (line 193) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::document (line 151) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 124) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_reader (line 57) - compile ... ok
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph (line 17) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph::formulas_as_latex (line 247) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run (line 279) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::image (line 651) ... ignored
+test crates/litchi-doc/src/table.rs - table::Table (line 17) ... ignored
+test crates/litchi-doc/src/package/model.rs - package::model::Package (line 521) - compile ... ok
+test crates/litchi-doc/src/writer/mod.rs - writer::core (line 57) - compile ... ok
+
+test result: ok. 14 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.36s; merged doctests compilation took 0.36s
+
+# every 'test result:' line from the same cargo test -p litchi-doc run
+running 998 tests	test result: ok. 996 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.68s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 8 tests	test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 6 tests	test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.70s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 7 tests	test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests	test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 10 tests	test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 5 tests	test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 5 tests	test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 14 tests	test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 5 tests	test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests	test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 12 tests	test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 3 tests	test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 7 tests	test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 4 tests	test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 2 tests	test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 8 tests	test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 25 tests	test result: ok. 14 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+# totals
+passed=1174 failed=0 ignored=13 across 41 suites

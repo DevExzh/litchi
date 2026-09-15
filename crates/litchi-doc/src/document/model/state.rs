@@ -69,7 +69,7 @@ pub struct Document {
         dead_code,
         reason = "reserved DOC structure retained for format completeness or future round-trip support"
     )]
-    pub(in crate::document) word_document: Vec<u8>,
+    pub(in crate::document) word_document: Arc<Vec<u8>>,
     /// The Data stream - contains embedded objects, pictures, etc.
     /// According to Apache POI, pictures are stored here, not in `WordDocument` stream.
     pub(in crate::document) data_stream: Option<Vec<u8>>,

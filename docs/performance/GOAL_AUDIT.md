@@ -1,5 +1,27 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0596: the eager DOC open stops decoding text four times, resolving each PAPX three times, and copying the WordDocument stream twice
+
+Record: [0596](0596-doc-eager-open-terms.md).
+
+**A ninety-instruction edit moved one harness scenario by fifteen percentage
+points.** Change 0596 removed 19.8% of the instructions of the 1.6 MB DOC open
+and 21.2% of its native cycles — the two agree because the removed term is a
+`memcpy` of a 697,827-byte stream. But its first candidate build was 13% to 15%
+worse at p50 on `doc_semantic_paragraph_count`, reproducibly, in two independent
+windows against a floor under 0.3%, on a path where the query's own instruction
+count moved by +0.03% and its native cycles by -0.66%. 99.98% of that query is
+`ParagraphExtractor::count_paragraphs_in_range`, source the change does not
+touch, which the candidate build inlines differently. Hoisting one FIB slice
+resolution out of `get_all_subdoc_ranges` — worth 299 to 289 instructions per
+call — turned that scenario into -2.63% and -0.32% in the next two windows. The
+lesson for this audit is that at these scenario sizes harness percentiles rank
+candidates rather than measure them, and that the A/A floor must be read per
+scenario and per window, not once per run: in one window of this batch the floor
+was -10.26% at p50 on `doc_semantic_open/large` and -0.11% on
+`doc_semantic_paragraph_count/large` at the same time, and in another it reached
+-80% at p95.
+
 ## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
 
 Record: [0599](0599-xlsb-commit-single-parse.md).
