@@ -1119,6 +1119,7 @@ impl Parser {
 /// so its historical extension-error retry can still run.
 pub(super) fn parse_source_with_observer<'a, F, O>(
     content: &[u8],
+    admission: super::SourceAdmission,
     strings: F,
     mut observer: O,
 ) -> super::SourceParseAttempt
@@ -1132,6 +1133,13 @@ where
     let mut stack = Vec::new();
     let mut closed_root = false;
     let mut event_count = 0usize;
+    // A source that mentions the MCE namespace is rewritten by the
+    // authoritative path before it is parsed. The traversal parses the source
+    // instead, so it carries the proof that the two agree.
+    let mut equivalence = match admission {
+        super::SourceAdmission::Borrowed => None,
+        super::SourceAdmission::Rewritten => Some(super::MceRewriteEquivalence::new(content)),
+    };
 
     loop {
         let event = match reader.read_event() {
@@ -1146,6 +1154,11 @@ where
             None => true,
         };
         let (namespace, event) = reader.resolver().resolve_event(event);
+        if let Some(equivalence) = equivalence.as_mut()
+            && !equivalence.observe(&event)
+        {
+            return super::SourceParseAttempt::ProvisionalFailed;
+        }
         let decoder = reader.decoder();
         let resolver = reader.resolver();
         let parser_allowed = observer(&namespace, &event);

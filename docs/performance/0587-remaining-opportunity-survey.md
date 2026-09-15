@@ -281,6 +281,15 @@ files, and with XML-1 fixed the codec pass becomes a scan. Modelled from 0540
 (validator and parser passes are equal) and XML-1's numbers. Records: 0546,
 0032, 0540-0545 (fallback and "historical x14ac retry" preserved). Risk medium
 (error precedence, 0541 guards); frozen design record.
+**Corrected by change 0603:** the gate is as described, the consequence is not.
+The fused traversal has one call site, `Snapshot::from_source_selected`, and on
+the 207 real worksheet parts it completes on **0 before and 0 after** admission is
+widened, because the value-only element and attribute vocabulary (0602's gate G6)
+refuses every real worksheet first; 0603 admits declaration-only compatibility
+worksheets under an equivalence proof (plan-and-commit −27% to −61% on 0602's
+derived projections) and freezes the `mc:Ignorable`/`dyDescent` widening as an
+admission-surface question. XML-2 and XML-4 need the same reachability check
+before they are scheduled.
 
 **XML-4. Owned expanded names in the MCE semantic stream** (step 2). Per
 element and attribute the stream clones names into `String`s twice although

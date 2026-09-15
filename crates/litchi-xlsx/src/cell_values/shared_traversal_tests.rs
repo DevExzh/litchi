@@ -472,3 +472,252 @@ fn eligible_small_source_uses_successful_value_edit_control() {
     );
     assert_eq!(source.as_slice(), bytes.as_slice());
 }
+
+// ---------------------------------------------------------------------------
+// Markup-compatibility admission (change 0603)
+// ---------------------------------------------------------------------------
+
+const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
+
+/// The established two-pass path: complete value-only validation of the source,
+/// then the preprocessing raw parse of the same source.
+fn authoritative(content: &[u8]) -> crate::Result<crate::cell::Store> {
+    super::worksheet_xml(content)?;
+    crate::raw::worksheet::parse(content, || Ok(None))
+}
+
+/// The admitted path, exactly as `Snapshot::from_source_selected` drives it.
+fn admitted(content: &[u8]) -> crate::Result<crate::cell::Store> {
+    match crate::raw::worksheet::source_stream_admission(content) {
+        Some(admission) => super::worksheet_xml_and_parse_source(content, admission),
+        None => authoritative(content),
+    }
+}
+
+/// Report whether admission changed the parsed value or the exact error.
+fn admission_difference(name: &str, content: &[u8]) -> Option<String> {
+    match (authoritative(content), admitted(content)) {
+        (Ok(expected), Ok(actual)) => {
+            let (expected, actual) = (format!("{expected:?}"), format!("{actual:?}"));
+            (expected != actual).then(|| format!("{name}: admitted store differs"))
+        },
+        (Err(expected), Err(actual)) => {
+            let (expected, actual) = (format!("{expected}"), format!("{actual}"));
+            (expected != actual)
+                .then(|| format!("{name}: admitted error '{actual}' replaces '{expected}'"))
+        },
+        (Ok(_), Err(actual)) => Some(format!(
+            "{name}: admission refused an accepted worksheet: {actual}"
+        )),
+        (Err(expected), Ok(_)) => Some(format!(
+            "{name}: admission accepted a worksheet refused with '{expected}'"
+        )),
+    }
+}
+
+/// Assert that admission changed neither the parsed value nor the exact error.
+fn assert_admission_is_transparent(name: &str, content: &[u8]) {
+    assert_eq!(admission_difference(name, content), None);
+}
+
+fn worksheet_with_root_attributes(attributes: &str, body: &str) -> Vec<u8> {
+    format!("<worksheet xmlns=\"{SML}\"{attributes}>{body}</worksheet>").into_bytes()
+}
+
+#[test]
+fn declaration_only_markers_reach_the_shared_traversal() {
+    use crate::raw::worksheet::{SourceAdmission, source_stream_admission};
+
+    let declaration_only = worksheet_with_root_attributes(
+        &format!(" xmlns:mc=\"{MCE}\" xmlns:x14ac=\"{X14AC}\""),
+        "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+    );
+    assert_eq!(
+        source_stream_admission(&declaration_only),
+        Some(SourceAdmission::Rewritten)
+    );
+    assert_valid_noop(&declaration_only);
+    assert_admission_is_transparent("declaration-only", &declaration_only);
+
+    // An x14ac declaration without a descent value never reached the shared
+    // reader before; with no markup-compatibility namespace the preprocessor
+    // borrows, so the traversal needs no proof at all.
+    let extension_only = worksheet_with_root_attributes(
+        &format!(" xmlns:x14ac=\"{X14AC}\""),
+        "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+    );
+    assert_eq!(
+        source_stream_admission(&extension_only),
+        Some(SourceAdmission::Borrowed)
+    );
+    assert_valid_noop(&extension_only);
+
+    // The two markers that still refuse admission outright.
+    let descent = worksheet_with_root_attributes(
+        &format!(" xmlns:mc=\"{MCE}\" xmlns:x14ac=\"{X14AC}\" mc:Ignorable=\"x14ac\""),
+        "<sheetData><row r=\"1\" x14ac:dyDescent=\"0.25\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+    );
+    assert_eq!(source_stream_admission(&descent), None);
+    let alternate = worksheet_with_root_attributes(
+        &format!(" xmlns:mc=\"{MCE}\""),
+        "<sheetData/><mc:AlternateContent><mc:Choice Requires=\"x\"/></mc:AlternateContent>",
+    );
+    assert_eq!(source_stream_admission(&alternate), None);
+}
+
+#[test]
+fn rewrite_only_refusals_survive_marker_admission() {
+    let tail = "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>";
+    let declared = format!(" xmlns:mc=\"{MCE}\"");
+    let mut cases: Vec<(&str, Vec<u8>)> = vec![
+        // The preprocessor rejects processing instructions and DTDs outright,
+        // where the worksheet parser ignores both.
+        (
+            "processing instruction",
+            worksheet_with_root_attributes(&declared, &format!("<?target data?>{tail}")),
+        ),
+        (
+            "leading processing instruction",
+            format!(
+                "<?target data?><worksheet xmlns=\"{SML}\" xmlns:mc=\"{MCE}\">{tail}</worksheet>"
+            )
+            .into_bytes(),
+        ),
+        // A declaration inside the root is rejected as late.
+        (
+            "late declaration",
+            worksheet_with_root_attributes(&declared, &format!("<?xml version=\"1.0\"?>{tail}")),
+        ),
+        // Only the predefined entities and character references are re-emitted.
+        (
+            "custom entity",
+            worksheet_with_root_attributes(
+                &declared,
+                "<sheetData><row r=\"1\"><c r=\"A1\"><v>&custom;</v></c></row></sheetData>",
+            ),
+        ),
+        // An empty namespace value is an undeclaration to the reader and an
+        // invalid namespace to the preprocessor.
+        (
+            "empty namespace value",
+            worksheet_with_root_attributes(&format!("{declared} xmlns:empty=\"\""), tail),
+        ),
+        // A markup-compatibility directive is dropped by the preprocessor.
+        (
+            "ignorable directive",
+            worksheet_with_root_attributes(
+                &format!("{declared} xmlns:x14ac=\"{X14AC}\" mc:Ignorable=\"x14ac\""),
+                tail,
+            ),
+        ),
+        // A name the reader accepts but the preprocessor refuses as an
+        // invalid QName.
+        (
+            "invalid element name",
+            worksheet_with_root_attributes(&declared, &format!("{tail}<1bad/>")),
+        ),
+        (
+            "invalid attribute name",
+            worksheet_with_root_attributes(
+                &declared,
+                "<sheetData><row r=\"1\" 1bad=\"2\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+            ),
+        ),
+        // A prefixed element may be unwrapped, skipped or refused.
+        (
+            "prefixed element",
+            worksheet_with_root_attributes(
+                &format!("{declared} xmlns:u=\"urn:litchi:unknown\""),
+                &format!("{tail}<u:future/>"),
+            ),
+        ),
+        // An unbound prefix parses and does not preprocess.
+        (
+            "unbound attribute prefix",
+            worksheet_with_root_attributes(
+                &declared,
+                &format!(
+                    "<sheetData><row r=\"1\" u:flag=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData>{}",
+                    ""
+                ),
+            ),
+        ),
+        // An undecodable attribute value is read by the preprocessor and not by
+        // the parser.
+        (
+            "unrecognized attribute entity",
+            worksheet_with_root_attributes(
+                &declared,
+                "<sheetData><row r=\"1\" spans=\"&custom;\"><c r=\"A1\"><v>1</v></c></row></sheetData>",
+            ),
+        ),
+    ];
+    // More declarations than one rewritten start tag may carry.
+    let mut flood = String::from(&declared);
+    for index in 0..=crate::raw::worksheet::MAX_REWRITTEN_DECLARATIONS {
+        let _ = write!(flood, " xmlns:p{index}=\"urn:litchi:{index}\"");
+    }
+    cases.push((
+        "declaration flood",
+        worksheet_with_root_attributes(&flood, tail),
+    ));
+
+    let differences: Vec<String> = cases
+        .iter()
+        .filter_map(|(name, sheet)| admission_difference(name, sheet))
+        .collect();
+    assert!(
+        differences.is_empty(),
+        "marker admission changed {} of {} rewrite-only outcomes: {differences:#?}",
+        differences.len(),
+        cases.len()
+    );
+}
+
+#[test]
+fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
+    use litchi_opc::OpcPackage;
+
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data/ooxml/xlsx");
+    let mut paths: Vec<std::path::PathBuf> = std::fs::read_dir(root)
+        .expect("fixture directory")
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().is_some_and(|value| value == "xlsx"))
+        .collect();
+    paths.sort();
+    assert!(
+        paths.len() >= 90,
+        "unexpected fixture count {}",
+        paths.len()
+    );
+
+    let mut parts = 0usize;
+    let mut rewritten = 0usize;
+    let mut borrowed = 0usize;
+    for path in &paths {
+        let Ok(package) = OpcPackage::open(path) else {
+            continue;
+        };
+        for part in package.iter_parts() {
+            let name = part.partname().as_str().to_owned();
+            if !name.starts_with("/xl/worksheets/sheet") || !name.ends_with(".xml") {
+                continue;
+            }
+            let content = part.blob();
+            parts += 1;
+            match crate::raw::worksheet::source_stream_admission(content) {
+                Some(crate::raw::worksheet::SourceAdmission::Rewritten) => rewritten += 1,
+                Some(crate::raw::worksheet::SourceAdmission::Borrowed) => borrowed += 1,
+                None => {},
+            }
+            assert_admission_is_transparent(&format!("{}{name}", path.display()), content);
+        }
+    }
+    assert!(parts >= 200, "unexpected worksheet part count {parts}");
+    assert!(borrowed > 0, "no worksheet took the borrowed traversal");
+    assert!(
+        rewritten > 0,
+        "no real worksheet exercised the rewrite-equivalence proof"
+    );
+}

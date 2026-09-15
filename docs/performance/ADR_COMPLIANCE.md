@@ -1,5 +1,34 @@
 # Performance optimization ADR-compliance matrix
 
+## 0603 — a read-side admission decision that moves no refusal
+
+The change is confined to which of two existing paths parses an already-validated
+worksheet, and the ADR reading is correspondingly narrow. ADR 0005's mandatory
+validation is untouched: complete value-only validation still runs over the
+**source** bytes on every path and before any store is built, because the
+fallback validated the source too — only the parser's input changes, from the
+preprocessed bytes to the source. ADR 0006's preservation default is untouched:
+nothing is published, no output byte moves, and the preprocessed stream that
+change 0588 found two writers publish is produced by exactly the same code on
+exactly the same inputs. The one contract risk is that the preprocessor refuses
+inputs a bare reader accepts — processing instructions and DTDs, late XML
+declarations, custom entities, `xmlns:p=""`, unbound prefixes, invalid QNames,
+its output-byte bound, and the 256-declaration limit `quick_xml` applies to the
+*rewritten* tags — so `MceRewriteEquivalence` proves each is absent and
+otherwise takes change 0546's established provisional failure, which repeats the
+authoritative passes in change 0541's historical order. A disabled-proof
+negative control shows 5 of 12 synthetics would otherwise trade a typed refusal
+for a result. The two widenings change 0587 also asked for are refused on
+contract grounds, not on effort: a worksheet carrying `mc:Ignorable` or
+`x14ac:dyDescent` is refused today by `validate_attributes` on the source bytes,
+in the fallback exactly as in the fused path, and making the traversal see the
+post-preprocessing events means dropping those attributes before the validator —
+a widening of the editor's admission surface, which belongs with change 0602's
+D1–D4 and its `litchi-opc` prerequisite. No ADR is amended and no ADR
+clarification is proposed.
+[Change 0603](0603-xlsx-fused-traversal-marker-admission.md);
+`performance_claim: none`.
+
 ## 0607 — preserving an unmodified slide is the more correct behaviour, under seven gates
 
 The frozen design keeps unmodified slides' parts in place instead of deleting

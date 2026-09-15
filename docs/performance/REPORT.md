@@ -1,5 +1,30 @@
 # Performance program phase report
 
+## 0603 — XLSX marker admission, measured on change 0602's projections
+
+Five derived fixtures were regenerated with change 0602's `degate.py` and
+`project.py`; four carry `xmlns:mc` and `xmlns:x14ac` with every `mc:` and
+`x14ac:` attribute already removed by the projection, and the fifth is
+marker-free and serves as the control. Callgrind isolation pairs at N=1 and N=4
+with `--separate-callers=1`, both legs on CPU 24, put one plan-and-commit
+operation at 11.87M, 56.69M, 97.00M and 267.54M instructions before and 8.61M,
+33.60M, 38.00M and 112.08M after — **−27.5%, −40.7%, −60.8% and −58.1%** — with
+planning down 39.7–81.4%. The preprocessing pass is what leaves: its inclusive
+Ir falls by 2.16M, 16.06M, 43.60M and 117.99M, which is **18.2%, 28.3%, 45.0%
+and 44.1%** of the whole operation, while the marker-free control's
+preprocessing figure is byte-identical across the two legs at 166,834,244 Ir.
+Paired A1/B1/B2/A2 legs of the identical probe source agree: p50 improves
+28.0–28.7%, 38.8–41.5%, 55.2–56.2% and 59.9–60.5%, against A/A floors measured
+in the same window of 0.78–1.13% on two fixtures, 3.44% on one
+`MatrixFormulaEvalTestData` pair and 4.28% on one `FormatConditionTests` pair.
+No scenario regressed above the 5% trigger: the marker-free control moves by at
+most 1.00% in either direction, inside its own 1.90% floor and −0.26% over eight
+interleaved legs, with its instruction count down 0.13%; its A1 leg's tail is
+contaminated by the seven other agents on the host and is reported but not used.
+No real producer file was measured as shipped, and none can be on this path. See
+[Change 0603](0603-xlsx-fused-traversal-marker-admission.md);
+`performance_claim: none`.
+
 ## 0607 — the authored PPTX save, measured end to end for the first time
 
 No record had profiled an eager PPTX save. On an authored 50-slide deck (161

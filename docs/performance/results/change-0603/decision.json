@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0603",
+  "title": "The fused XLSX traversal admits declaration-only compatibility markers, and completes on no real worksheet",
+  "decision": "retained, partially implemented; the dyDescent and mc:Ignorable widenings are frozen as a design",
+  "code_state": "crates/litchi-xlsx/src/raw/worksheet/mod.rs, raw/worksheet/codec.rs, cell_values/validation.rs and cell_values/snapshot.rs; no public API, limit, error type or output byte changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's item XML-3 asked for three widenings of source_stream_eligible; the x14ac-namespace half admits nothing at all, because 0 of 207 real worksheet parts declare the x14ac namespace without also declaring the markup-compatibility namespace",
+    "the third widening, declaration-only markup-compatibility markers, is value-identical and is implemented: the fallback validates the SOURCE and only the parser sees the preprocessed bytes, so admission changes exactly one thing, and the four ways the rewrite differs from its input are each invisible to raw::worksheet's parser",
+    "the rewrite also ADDS refusals a bare NsReader would not produce, so MceRewriteEquivalence proves their absence event by event and otherwise takes the established provisional failure; with the proof disabled, 5 of 12 adversarial synthetics lose a typed refusal",
+    "admitting a worksheet that USES mc:Ignorable or x14ac:dyDescent requires dropping those attributes before the value-only validator, which refuses every qualified attribute on the source bytes in the fallback exactly as in the fused path; that widens the editor's admission surface rather than its cost, so it is frozen, as change 0602 froze the same class of change at its gate G6",
+    "the fused traversal completes on 0 of 207 real worksheet parts before this change and 0 after, so nothing is claimed for a real producer file; the measured shapes are change 0602's projections"
+  ],
+  "accepted_evidence": {
+    "admission_census": "every xl/worksheets/sheet*.xml part of every .xlsx under test-data/ooxml/xlsx and test-data/office-interop, classified by a standalone script and by an in-crate scratch test: 207 parts, admitted 71 before and 102 after, completing 0 before and 0 after; on change 0602's projections 7 of 16 newly complete",
+    "differential_oracle": "a committed test compares the admitted path against validation::worksheet_xml followed by raw::worksheet::parse for every worksheet part of every .xlsx fixture under test-data/ooxml/xlsx, requiring the same Store or the same exact error, and asserts that both the borrowed and the rewrite-proof paths were exercised",
+    "negative_control": "the twelve-case adversarial synthetic table re-run with MceRewriteEquivalence::observe forced to accept, showing which five refusals the proof is load-bearing for, retained verbatim",
+    "instruction_attribution": "callgrind isolation pairs at N=1 and N=4 with --separate-callers=1, both legs, five fixtures, differenced over M=3 into inclusive Ir per plan-and-commit operation; the marker-free control's preprocessing figure is byte-identical across the legs, which is what makes the four differences attributable",
+    "latency": "paired A1/B1/B2/A2 legs of the identical probe source built against each checkout, 5 warmup and 40 samples per leg (30 on the largest), pinned to CPU 24, with four further before legs per fixture giving the A/A floor in the same window, plus a four-leg repeat of the control",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-xlsx --all-targets, cargo doc -p litchi-xlsx --no-deps and cargo test -p litchi-xlsx with 1,297 tests passing, including change 0541's public planning error-order guards"
+  },
+  "accepted_costs": {
+    "derived_fixtures": "no real producer file was measured as shipped, and none can be: the traversal completes on none of them. Every instruction and timing figure is from change 0602's projections, which keep the producer's cell geometry and lose the envelope the editor refuses",
+    "control_regression": "no scenario regressed above the 5% review trigger. The marker-free control takes the identical code path in both legs and its p50 moves by at most 1.00% in either direction, inside its own 1.90% A/A floor and -0.26% over eight interleaved legs, while its instruction count fell 0.13% and its preprocessing figure is byte-identical across the legs. Its A1 leg carries a contaminated tail (mean 290 ms, p99 748 ms against a 256 ms p50) from the seven other agents on the host; its p50 is reported and its tail is not",
+    "floor": "the A/A floor reached 4.28% on one FormatConditionTests pair and 3.44% on one MatrixFormulaEvalTestData pair while the other pairs stayed under 2%, so the floor is quoted per fixture and the instruction counts carry the ranking",
+    "conservative_proof": "the proof refuses admission for any & in any attribute value, any prefixed element name, more than 256 cumulative namespace declarations, and a sixfold escaping allowance in the output bound; each only sends a source to the authoritative fallback",
+    "instruction_counts": "instructions rank work, not latency; callgrind prices rep movsb per byte so the rewrite's copy share is an upper bound. No SHA-256 runs on this path"
+  },
+  "known_gaps": {
+    "harness": "tools/perf-baseline's generated worksheets carry no mc, x14ac, dyDescent or cols markup and no option feeds a real file, so the substrate's real-producer path is still unreachable from the harness; change 0587 reported this and it is unchanged",
+    "reachability": "the shared traversal has exactly one call site, Snapshot::from_source_selected, and change 0602 measured that no real package reaches the editor at all; widening admission cannot help a real file until that record's D0 prerequisite on litchi-opc lands",
+    "not_measured": "allocation counts, peak RSS, cold cache, range sources, concurrency, publication cost, and every platform other than this host"
+  },
+  "withheld": [
+    "any speedup or resource result for a real producer file as shipped",
+    "any claim that the dyDescent or mc:Ignorable widenings are implementable without a contract record: both move where a refusal happens"
+  ],
+  "provenance": {
+    "base_commit": "6c4c1469beda47c2d44b502024a8dc680af35bfe",
+    "branch": "perf/0603-xlsx-fused-traversal-marker-admission",
+    "probe_binary_sha256_before": "f04f8bb376cbd7a48d08c342acf82d921424fe38c2e46f6ea8e1a8a381309e34",
+    "probe_binary_sha256_after": "001319089e7be4d1762ce2a0b1794e84ea05d3d63aabced2ccc5bfd5ee5b6f64",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "24",
+    "note": "both legs were built and measured in detached worktrees with CARGO_TARGET_DIRs outside them; the shared working copy was neither built in nor modified"
+  }
+}

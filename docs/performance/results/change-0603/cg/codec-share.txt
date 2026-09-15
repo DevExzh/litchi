@@ -1,0 +1,11 @@
+fixture leg              op Ir       codec Ir        codec %
+fct    before        11865305        6303903         53.13%
+fct    after          8605157        4140642         48.12%
+dvtr   before        56687954       29980454         52.89%
+dvtr   after         33595897       13921216         41.44%
+sss    before       267542005      138329292         51.70%
+sss    after        112075548       20339394         18.15%
+mfe    before        96998758       48198051         49.69%
+mfe    after         38004903        4597299         12.10%
+ndp    before      4106291095      166834244          4.06%
+ndp    after       4100975500      166834244          4.07%

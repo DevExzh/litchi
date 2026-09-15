@@ -1,0 +1,15 @@
+files	10
+worksheet_parts	16
+admission_refused	7
+admission_borrowed	2
+admission_rewritten	7
+fused_completed_before	0
+fused_completed_after	7
+newly_fused	derived/FormatConditionTests-proj-plain.xlsx/xl/worksheets/sheet2.xml
+newly_fused	derived/FormatConditionTests-proj-plain.xlsx/xl/worksheets/sheet1.xml
+newly_fused	derived/MatrixFormulaEvalTestData-proj-plain.xlsx/xl/worksheets/sheet1.xml
+newly_fused	derived/dataValidationTableRange-proj-plain.xlsx/xl/worksheets/sheet1.xml
+newly_fused	derived/dataValidationTableRange-proj-plain.xlsx/xl/worksheets/sheet2.xml
+newly_fused	derived/sheet-state-show-proj-plain.xlsx/xl/worksheets/sheet2.xml
+newly_fused	derived/sheet-state-show-proj-plain.xlsx/xl/worksheets/sheet1.xml
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 987 filtered out; finished in 0.46s

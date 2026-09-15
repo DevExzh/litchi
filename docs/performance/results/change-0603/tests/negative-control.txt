@@ -1,0 +1,22 @@
+
+failures:
+
+---- cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission stdout ----
+
+thread 'cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission' (2417187) panicked at crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs:670:5:
+marker admission changed 5 of 12 rewrite-only outcomes: [
+    "processing instruction: admission accepted a worksheet refused with 'markup compatibility error: non-conformant markup compatibility XML: DTD and processing instructions are rejected'",
+    "leading processing instruction: admission accepted a worksheet refused with 'markup compatibility error: non-conformant markup compatibility XML: DTD and processing instructions are rejected'",
+    "late declaration: admission accepted a worksheet refused with 'markup compatibility error: non-conformant markup compatibility XML: late XML declaration'",
+    "empty namespace value: admission accepted a worksheet refused with 'markup compatibility error: non-conformant markup compatibility XML: invalid namespace'",
+    "unrecognized attribute entity: admission accepted a worksheet refused with 'markup compatibility error: markup compatibility XML error: at 1..7: unrecognized entity `custom`'",
+]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 986 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-xlsx --lib`

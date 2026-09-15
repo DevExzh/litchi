@@ -1,0 +1,64 @@
+Gates for change 0603, run in the detached worktree /home/zhuhe/code/litchi-worktrees/0603
+on branch perf/0603-xlsx-fused-traversal-marker-admission, base 6c4c1469b.
+rustc 1.95.0 (59807616e 2026-04-14). Tails only; every command is reproducible as shown.
+
+$ cargo fmt --all --check
+(no output, exit 0)
+
+$ cargo clippy -p litchi-xlsx --all-targets
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0603/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.70s
+
+$ cargo doc -p litchi-xlsx --no-deps
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0603/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.00s
+   Generated /home/zhuhe/code/litchi-worktrees/0603/target/doc/litchi_xlsx/index.html
+
+$ cargo test -p litchi-xlsx
+    59 test-result lines, 1297 passed, 0 failed, 0 ignored, 0 measured:
+          1 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+         18 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+          1 test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+          1 test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+          1 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+         10 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+          2 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+          1 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+          1 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+          1 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+          1 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+          2 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+          1 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+          1 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+          2 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+          2 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+          2 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+          3 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+          1 test result: ok. 74 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.23s
+          1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+          1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+          1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+          1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+          1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+          1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+          1 test result: ok. 987 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.78s
+
+$ cargo test -p litchi-xlsx --lib shared_traversal
+
+running 10 tests
+test cell_values::validation::shared_traversal_tests::eligible_small_source_uses_successful_value_edit_control ... ok
+test cell_values::validation::shared_traversal_tests::declaration_only_markers_reach_the_shared_traversal ... ok
+test cell_values::validation::shared_traversal_tests::rewrite_only_refusals_survive_marker_admission ... ok
+test cell_values::validation::shared_traversal_tests::event_bound_admits_main_numeric_grids ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_false_positive_still_uses_authoritative_fallback ... ok
+test cell_values::validation::shared_traversal_tests::lexical_event_bound_matches_direct_ns_reader_edge_oracle ... ok
+test cell_values::validation::shared_traversal_tests::marker_admission_matches_the_authoritative_path_on_every_real_worksheet ... ok
+test cell_values::validation::shared_traversal_tests::provisional_event_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::source_size_cap_falls_back_without_refusing_valid_or_late_failures ... ok
+test cell_values::validation::shared_traversal_tests::exact_text_cap_and_chunk_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 977 filtered out; finished in 4.76s
+
+
+Negative control (not a gate): the same rewrite-only table with
+MceRewriteEquivalence::observe forced to accept -- see tests/negative-control.txt.

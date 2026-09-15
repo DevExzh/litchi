@@ -1,0 +1,8 @@
+sha256 of the `-proj-plain.xlsx` fixtures produced by derive.sh from the
+fixtures at base commit 6c4c1469b, with python3 3.12 zipfile:
+
+bc3bd74b4e5349163fd1863eefae4c7def2a331d1b783a18675af4531ec07f00  FormatConditionTests-proj-plain.xlsx
+b6f2981d5b29e8190517384035b4355504de21f092a1d8e44e5545e8c6700b7b  MatrixFormulaEvalTestData-proj-plain.xlsx
+6f893749f87c91e3046bb462037abfd96af339506bea3a7675b33f1cef03e870  dataValidationTableRange-proj-plain.xlsx
+90c4a48e76aa98812423dace880e6abc4c32c6a19a44c2217fba73a0cad6bafc  no_drawing_patriarch-proj-plain.xlsx
+18641d3700113d9608a6975f32c20e284a3c1fb2f740291254a2043324605f55  sheet-state-show-proj-plain.xlsx

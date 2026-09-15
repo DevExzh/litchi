@@ -1,5 +1,30 @@
 # Performance hotspot inventory
 
+## 0603 — the fused XLSX traversal now admits declaration-only compatibility markers
+
+Change 0587's item XML-3 ranked widening `source_stream_eligible`
+(`raw/worksheet/mod.rs`) so change 0546's fused validate-and-parse traversal
+reaches Excel-produced worksheets. Two of its three widenings are implemented
+and one is frozen. The `x14ac` namespace gate is removed outright and admits
+nothing: 0 of 207 real worksheet parts declare that namespace without also
+declaring the markup-compatibility namespace. The markup-compatibility gate is
+replaced by `SourceAdmission` plus an event-by-event `MceRewriteEquivalence`
+proof, which admits a part whose MCE namespace is only declared, never used —
+because the preprocessor's rewrite then differs from its input in four ways the
+worksheet parser cannot observe (per-element namespace re-declaration, which
+change 0588 froze as load-bearing; `<a/>` expanded to `<a></a>`, which
+`Parser::transition` answers identically; prolog and epilog character data
+dropped, which the parser ignores; and attribute values normalized exactly as
+`unqualified_attribute_value` normalizes them). The rewrite also *adds*
+refusals, and the proof refuses admission for each: with it disabled, 5 of 12
+adversarial synthetics lose a typed refusal. On change 0602's projections the
+preprocessing pass leaves planning entirely, removing 18.2–45.0% of a whole
+plan-and-commit operation (up to 118.0M instructions) and 28.0–60.5% of its
+p50. On real fixtures it removes nothing, because the traversal completes on 0
+of 207 of them, before and after. `performance_claim: none`.
+[Record](0603-xlsx-fused-traversal-marker-admission.md);
+[evidence](results/change-0603/README.md).
+
 ## 0607 — the PPTX slide regeneration is unreachable, and the authored save's whale is the deflate encoder
 
 Change 0587's item SAVE-3 ranked `materialize_presentation`'s rebuild of every

@@ -24,7 +24,7 @@ use crate::cell::{Store, Text};
 use crate::error::{Result, invalid};
 use crate::layout::Defaults;
 use litchi_ooxml_common::mce::{self, process_ooxml};
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
 /// Keep speculative source parsing below the aggregate multi-sheet limit. A
@@ -54,17 +54,51 @@ pub(crate) enum SourceParseAttempt {
     ReaderFailed,
 }
 
-/// Admit only byte-identical, UTF-8, no-MCE/no-x14ac worksheets to the shared
-/// reader. The original source bytes remain owned by `SourcePayload`; this
-/// predicate only decides whether a temporary borrowed traversal is safe.
+/// How the markup-compatibility preprocessor would treat an admitted source.
+///
+/// The authoritative fallback preprocesses the source with [`process_ooxml`]
+/// and parses the *processed* bytes. The shared traversal parses the *source*
+/// bytes, so it is admissible only where the two event streams agree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SourceAdmission {
+    /// The MCE namespace does not occur, so the preprocessor borrows its input
+    /// and the parser sees exactly these bytes on both paths.
+    Borrowed,
+    /// The MCE namespace occurs, so the preprocessor rewrites. Equivalence is
+    /// not lexical, and [`MceRewriteEquivalence`] must prove it event by event.
+    Rewritten,
+}
+
+/// Admit only UTF-8 worksheets without extension values to the shared reader.
+///
+/// The original source bytes remain owned by `SourcePayload`; this predicate
+/// only decides whether a temporary borrowed traversal is safe, and which
+/// evidence the traversal still has to collect.
+///
+/// `dyDescent` stays refused because the fallback captures those values in a
+/// separate x14ac pass and hands them to the parser, which the shared reader
+/// does not do. `AlternateContent` stays refused because the preprocessor
+/// selects one branch and drops the rest.
+pub(crate) fn source_stream_admission(content: &[u8]) -> Option<SourceAdmission> {
+    if content.len() > MAX_SHARED_SOURCE_BYTES
+        || !within_mce_limits(content)
+        || std::str::from_utf8(content).is_err()
+        || contains(content, b"AlternateContent")
+        || contains(content, b"dyDescent")
+    {
+        return None;
+    }
+    Some(if contains(content, mce::NAMESPACE.as_bytes()) {
+        SourceAdmission::Rewritten
+    } else {
+        SourceAdmission::Borrowed
+    })
+}
+
+/// Return whether the shared traversal may be attempted at all.
+#[cfg(test)]
 pub(crate) fn source_stream_eligible(content: &[u8]) -> bool {
-    content.len() <= MAX_SHARED_SOURCE_BYTES
-        && within_mce_limits(content)
-        && std::str::from_utf8(content).is_ok()
-        && !contains(content, mce::NAMESPACE.as_bytes())
-        && !contains(content, b"AlternateContent")
-        && !contains(content, x14ac::NAMESPACE)
-        && !contains(content, b"dyDescent")
+    source_stream_admission(content).is_some()
 }
 
 fn within_mce_limits(content: &[u8]) -> bool {
@@ -74,6 +108,159 @@ fn within_mce_limits(content: &[u8]) -> bool {
 
 fn contains(content: &[u8], marker: &[u8]) -> bool {
     memchr::memmem::find(content, marker).is_some()
+}
+
+/// Cap the namespace declarations a rewritten start tag may carry.
+///
+/// The preprocessor re-declares every in-scope binding on every start tag it
+/// writes and admits up to 4,096 of them, but `quick_xml` refuses more than 256
+/// declarations on one element. A source spread thinly enough over its
+/// ancestors parses, while its rewrite would not, so the shared traversal must
+/// not admit a source past this bound.
+pub(crate) const MAX_REWRITTEN_DECLARATIONS: usize = 256;
+
+/// Grow one source byte to the longest escape the preprocessor can emit.
+const MAX_ESCAPE_GROWTH: usize = 6;
+
+/// Prove, event by event, that preprocessing this source would give the
+/// worksheet parser the same events the source itself gives it.
+///
+/// [`process_ooxml`] re-tokenizes and re-emits any part that mentions the MCE
+/// namespace, so admitting such a part to the shared traversal replaces the
+/// processed event stream with the source event stream. The rewrite differs
+/// from its input in four ways, none of which the worksheet parser can observe:
+///
+/// * it re-declares every in-scope namespace on every emitted start tag. The
+///   parser resolves names through the reader and never reads an `xmlns`
+///   attribute, and re-declaring a binding already in scope resolves alike.
+/// * it expands `<a/>` into `<a></a>`. [`Parser::transition`] answers `Empty`
+///   with the same `start` and `finish` pair that `Start` and `End` run, and
+///   `finish(Context::Worksheet)` is `Ok(())`, so an empty root agrees too.
+/// * it drops character data, CDATA, comments and references outside the root.
+///   The parser has no text target and no leaf context there and ignores all
+///   four.
+/// * it copies text, CDATA, comments and references inside the root verbatim,
+///   and normalizes and re-escapes attribute values with exactly the
+///   normalization `unqualified_attribute_value` applies when the parser reads
+///   one.
+///
+/// What remains are the refusals the rewrite adds. Each is checked below, and a
+/// failed check leaves the traversal through the provisional failure that
+/// repeats the authoritative passes, so a rejected proof costs one fallback and
+/// can never change a result.
+struct MceRewriteEquivalence {
+    max_output_bytes: usize,
+    root_started: bool,
+    declarations: usize,
+    declaration_bytes: usize,
+    emitted_bytes: usize,
+}
+
+impl MceRewriteEquivalence {
+    fn new(content: &[u8]) -> Self {
+        Self {
+            max_output_bytes: mce::Limits::default().max_output_bytes,
+            root_started: false,
+            declarations: 0,
+            declaration_bytes: 0,
+            // Every source byte is copied into the rewrite, escaped.
+            emitted_bytes: content.len().saturating_mul(MAX_ESCAPE_GROWTH),
+        }
+    }
+
+    fn observe(&mut self, event: &Event<'_>) -> bool {
+        match event {
+            // A declaration after the root has opened is refused as late.
+            Event::Decl(_) => !self.root_started,
+            // Both are refused outright, while the parser ignores them.
+            Event::PI(_) | Event::DocType(_) => false,
+            // Only the predefined names and character references survive; any
+            // other reference is refused as a custom entity.
+            Event::GeneralRef(value) => match value.resolve_char_ref() {
+                Ok(Some(_)) => true,
+                Ok(None) => value
+                    .decode()
+                    .is_ok_and(|name| matches!(&*name, "amp" | "lt" | "gt" | "apos" | "quot")),
+                Err(_) => false,
+            },
+            Event::Start(element) | Event::Empty(element) => self.observe_start(element),
+            Event::End(_) | Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Eof => {
+                true
+            },
+        }
+    }
+
+    fn observe_start(&mut self, element: &BytesStart<'_>) -> bool {
+        self.root_started = true;
+        // A prefixed element name can name the MCE vocabulary itself, name a
+        // namespace the rewrite drops or unwraps, or have no binding at all,
+        // which the preprocessor refuses. No worksheet element is prefixed.
+        // The preprocessor also refuses a name the reader accepts but that is
+        // not a qualified name, which for a colon-free name is an NCName.
+        if !is_unprefixed_ncname(element.name().as_ref()) {
+            return false;
+        }
+        for attribute in element.attributes().with_checks(true) {
+            let Ok(attribute) = attribute else {
+                // Duplicate or malformed attributes are refused while reading.
+                return false;
+            };
+            // The preprocessor decodes every attribute value where the parser
+            // decodes only the ones it reads, so an undecodable value is a
+            // refusal the source alone would not produce.
+            if attribute.value.contains(&b'&') {
+                return false;
+            }
+            let key = attribute.key.as_ref();
+            if key == b"xmlns" {
+                if !self.declare(0, attribute.value.len()) {
+                    return false;
+                }
+            } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+                // An empty value or a prefix that is not an NCName is refused
+                // as an invalid namespace, while the reader undeclares or
+                // resolves it.
+                if attribute.value.is_empty()
+                    || !std::str::from_utf8(prefix)
+                        .is_ok_and(litchi_ooxml_common::xml_name::is_ncname)
+                    || !self.declare(prefix.len(), attribute.value.len())
+                {
+                    return false;
+                }
+            } else if key.starts_with(b"xml:") {
+                // The `xml` prefix is bound by definition.
+            } else if !is_unprefixed_ncname(key) {
+                // Any other prefixed attribute may be an MCE directive, may
+                // belong to a namespace the rewrite drops, or may be unbound;
+                // an unprefixed one still has to be a qualified name.
+                return false;
+            }
+        }
+        // Every in-scope declaration is re-emitted on this tag.
+        self.emitted_bytes = self.emitted_bytes.saturating_add(self.declaration_bytes);
+        self.emitted_bytes <= self.max_output_bytes
+    }
+
+    /// Account for one namespace declaration, conservatively treating every
+    /// declaration seen so far as still in scope.
+    fn declare(&mut self, prefix_len: usize, value_len: usize) -> bool {
+        self.declarations = self.declarations.saturating_add(1);
+        if self.declarations > MAX_REWRITTEN_DECLARATIONS {
+            return false;
+        }
+        // ` xmlns:<prefix>="<value>"`, with the value escaped.
+        self.declaration_bytes = self
+            .declaration_bytes
+            .saturating_add(10)
+            .saturating_add(prefix_len)
+            .saturating_add(value_len.saturating_mul(MAX_ESCAPE_GROWTH));
+        true
+    }
+}
+
+/// Return whether this name is a prefix-free qualified name.
+fn is_unprefixed_ncname(name: &[u8]) -> bool {
+    std::str::from_utf8(name).is_ok_and(litchi_ooxml_common::xml_name::is_ncname)
 }
 
 /// Return whether a conservative lexical upper bound fits the provisional
@@ -145,6 +332,7 @@ fn add_shared_event_bound(bound: &mut usize, amount: usize) -> bool {
 
 pub(crate) fn parse_source_with_observer<'a, F, O>(
     content: &[u8],
+    admission: SourceAdmission,
     strings: F,
     observer: O,
 ) -> SourceParseAttempt
@@ -155,15 +343,15 @@ where
     if !shared_event_bound_within_cap(content) {
         return SourceParseAttempt::ProvisionalFailed;
     }
-    codec::parse_source_with_observer(content, strings, observer)
+    codec::parse_source_with_observer(content, admission, strings, observer)
 }
 
 /// Finish a source-backed raw parse while retaining the historical x14ac
 /// retry that follows a plain worksheet parser failure.
 pub(crate) fn complete_source_parse(content: &[u8], parsed: Result<Store>) -> Result<Store> {
     if parsed.is_ok() {
-        // Eligibility already proved that the shared source is marker-free;
-        // a successful completed parse needs no redundant x14ac scan.
+        // Admission already proved that the shared source carries no extension
+        // value; a successful completed parse needs no redundant x14ac scan.
         return parsed;
     }
     let needs_extension_capture = x14ac::may_contain_descent(content);
