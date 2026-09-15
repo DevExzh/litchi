@@ -1,0 +1,68 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0625",
+  "title": "A deterministic storage order for OleWriter::write_to",
+  "decision": "retained as a correctness fix, not an optimization: write_to now visits its storage and storage-CLSID tables in a canonical order derived from the path (depth, then component-wise lexicographic) instead of in hash iteration order",
+  "code_state": "crates/litchi-cfb/src/writer/core.rs, 47 inserted lines and 2 removed, plus the new crates/litchi-cfb/tests/writer_storage_determinism.rs; no other file under crates/ was modified",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0617 reported, without fixing, that OleWriter::write_to iterates self.storages (a HashSet) to call DirectoryBuilder::add_storage_path, which assigns sid = entries.len(), with entries serialized in SID order; Rust seeds a HashSet's hasher per instance, so the directory image and every byte after it depended on the hash seed",
+    "the damage is not only the SID numbering: link_children builds each parent's red-black sibling tree by inserting child_sids in SID order, so the tree's shape and node colours moved too",
+    "ADR 0006 requires 'Serialization is deterministic unless a Clock, actor identity, or cryptographic RNG is explicitly supplied', and OleWriter is supplied none of the three",
+    "the defect requires two storage paths neither of which is a prefix of the other, because add_storage_path creates missing ancestors on the way down a path; streams are unaffected because self.streams is a Vec whose insertion order is a deliberate part of the model",
+    "the chosen order (depth, then component-wise lexicographic order of the stored spellings) is total over the distinct keys of a HashSet, infallible, places every ancestor ahead of its descendants, and is exactly the order litchi-ole-common's Package::render already computed before calling create_storage and OleWriter then discarded",
+    "a content-derived order makes the output a function of the document rather than of the call history, which is the stronger reading of ADR 0006 and is invariant 7 of change 0617's frozen copy-through design",
+    "this is a correctness fix; it costs instructions rather than saving them, and no performance claim is registered"
+  ],
+  "rejected_alternatives": {
+    "ms_cfb_sibling_key_via_canonical_cfb_path": "would order siblings the way DirectoryBuilder::compare_entries does, but canonical_cfb_path re-validates each component and is fallible: an over-long or forbidden storage name that create_storage accepts today and DirectoryEntryBuilder::storage refuses later would be refused earlier in write_to, and for the over-long case with a different message. That moves when a refusal happens, for no gain, since the red-black tree is rebuilt with compare_entries whatever order it is fed",
+    "btreeset_and_btreemap_fields": "a two-word diff, but neither offers try_reserve, so create_storage would lose the allocation-failure path reserve_hash_set_entry exists to provide and would abort instead of returning OleError::Allocation",
+    "insertion_ordered_collection": "would match SequentialOleWriter, which already holds storages: Vec<StorageInput>, and would keep the two writers agreeing for every caller rather than only for callers that sort; rejected because a Vec makes create_storage's duplicate check linear, so registering n storages becomes O(n^2) under adversarial control, and because an insertion order makes the output a function of the call history rather than of the document"
+  },
+  "accepted_evidence": {
+    "determinism_synthetic": "change 0617's document (N explicitly created sibling storages, one Payload stream each) rebuilt 64 times in one process per N, taskset -c 19: before 1, 2, 6 and 64 distinct outputs at N = 1, 2, 3, 8; after 1 at every N; output length identical throughout. Six distinct outputs at three storages is 3!, every permutation of the sibling SIDs",
+    "reproduces_0617": "the before leg reproduces change 0617's determinism.txt digest for digest under 0617's own (mistyped, sixteen-times-the-prime) FNV multiplier: 83490167a5417d81 at one storage, {a56e3d24d2365ac1, 2f58a235b5b05695} at two, and the same six at three, although 0617's base was 8fe9efa55 and this one is 1e41983213dc. Nothing under crates/litchi-cfb/src/writer changed between the two",
+    "corpus_differential": "every file under test-data/ was read; 214 are CFB artifacts by is_ole_file. Each was reduced to its logical model through the public parser and rebuilt through OleWriter 16 times per leg. 211 rebuild, 3 refuse identically on both legs. 8 fixtures have two incomparable storage paths and all 8 were non-deterministic before (2 to 16 distinct digests in 16 rebuilds) and are single-digest after; 203 were already deterministic and are byte-identical after; 0 changed; 0 changed length",
+    "instructions": "callgrind isolation pairs at 2 and 12 rebuilds, differenced and divided by 10, taskset -c 19, release with debug = 1, three repetitions per leg: +78 Ir per rebuild on 54016.xls (0 storages, both legs bit-reproducible) and +1,493 Ir on word_with_embeded.doc (5 storages), the latter inside its own 1,046-1,396 Ir repetition spread",
+    "test_fails_before": "the six new tests run against the unmodified writer with only the test file added: eight_sibling_storages_serialize_to_one_digest_across_hasher_seeds fails with 64 distinct outputs in 64 builds, nested_storages_serialize_to_one_digest_across_hasher_seeds with 38, and storage_declaration_order_does_not_change_the_bytes fails; the byte-identity and conformance tests pass on both legs",
+    "gates": "cargo fmt --all --check clean; cargo clippy -p litchi-cfb --all-targets --locked clean; cargo doc -p litchi-cfb --no-deps --locked clean; cargo test -p litchi-cfb --locked 322 + 13 + 6 + 6 passed with 12 doctests, 1 ignored, 0 failed; cargo test over litchi-xls, litchi-doc and litchi-ppt 3,779 passed, 0 failed, 25 ignored over 145 test binaries; cargo test over litchi-ole-common, litchi-crypto, litchi-vba, litchi-sign and litchi-ograph 312 passed, 0 failed over 21 test binaries"
+  },
+  "accepted_costs": {
+    "adds_work": "two bounded allocations proportional to the storage count and one O(n log n) in-place sort per save; measured at +78 Ir on a storage-free save and about +1,493 Ir on a five-storage one",
+    "changes_bytes_where_they_were_random": "the 8 susceptible fixtures now emit one file each, and for 3 of them that file is not among the 16 outputs the old code produced in the sampled runs; there was no stable output to preserve, since 8 sibling storages admit 40,320 orders",
+    "doc_case_is_inside_its_own_noise": "the five-storage DOC delta of +1,493 Ir is the same size as that case's repetition spread, because the before leg's own hash order is what it is measuring; the exact figure is the storage-free XLS one"
+  },
+  "known_gaps": {
+    "no_timing": "no wall-clock, cycles, allocation, RSS, page-fault, cold-cache or throughput measurement was taken, and no A/A floor was measured, because the change's instruction cost is three to four orders of magnitude below this host's timing floor",
+    "corpus_is_writer_level": "the corpus differential rebuilds each fixture's logical model through OleWriter directly rather than through each format crate's editor; the nine consumer test suites cover the editors but are pass/fail rather than digest-comparing",
+    "encrypted_ooxml_not_observed": "litchi-crypto's ooxml/container.rs registers the two incomparable storages [\\x06DataSpaces, DataSpaceInfo] and [\\x06DataSpaces, TransformInfo], which is exactly the shape the synthetic N = 2 case measures, but no produced encrypted container was digested",
+    "cross_platform": "determinism is shown across processes and hash seeds on this host and toolchain; nothing is claimed about two different builds of the library producing the same bytes",
+    "sequential_writer_parity": "OleWriter and SequentialOleWriter are both deterministic and agree for callers that register storages in (depth, path) order, which Package::render does, but still differ for a caller that declares them in some other order; no test or documented contract requires them to agree"
+  },
+  "withheld": [
+    "any speedup, regression, latency, cycles, peak-RSS, allocation or throughput result",
+    "any statement that a save became cheaper; this change makes it very slightly more expensive",
+    "any claim about formats or code paths outside the CFB writer and the fixtures measured",
+    "any claim of byte-identity for documents that were already non-deterministic"
+  ],
+  "open_items": [
+    "change 0617's second adjacent finding is untouched: no .ppt fixture in this repository can reach a length-changing shape-text edit, so that landed capability still has no corpus",
+    "a digest-comparing differential through each format crate's own editor over the OLE2 corpus, which would upgrade the corpus result from writer-level to save-level",
+    "whether SequentialOleWriter should adopt the same canonical order, which would make the two writers agree for every caller rather than only for callers that sort"
+  ],
+  "provenance": {
+    "base_commit": "1e41983213dc378c13774ed7038c51faf231977f",
+    "branch": "perf/0625-cfb-writer-deterministic-storage-order",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "measured_cpu": 19,
+    "probe_source_sha256": "ff1387372145ebe32db6f45c763b1429464086ae2d682b1a9836d011b02feb9b",
+    "probe_binary_sha256": {
+      "before": "fac2248590bd418eff4cfa8017ad201edf99231ac9243304e34d4788608de5b1",
+      "after": "947519b3556c059fee10d7ff9d7b4ef9f3e045415e9874e3b194f229263fb821"
+    },
+    "evidence": "docs/performance/results/change-0625/README.md",
+    "record": "docs/performance/0625-cfb-writer-deterministic-storage-order.md"
+  }
+}

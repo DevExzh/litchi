@@ -1,0 +1,98 @@
+# OleWriter::write_to determinism: change 0617's synthetic probe document,
+# N explicitly created sibling storages each holding one Payload stream,
+# rebuilt 64 times in one process per N. Every OleWriter::new() constructs a
+# fresh RandomState whose seed advances per construction, so in-process
+# repeats vary the hash order the same way 0617's separate processes did.
+# taskset -c 19. fnv1a is the standard 64-bit prime; fnv1a_0617_multiplier
+# repeats 0617's probe, which multiplied by sixteen times that prime, so the
+# digests below can be matched against results/change-0617/determinism.txt.
+
+## before  (binary: 0625-before)
+{"storages":1,"repeats":64,"bytes":2560,"fnv1a":"b795f367a5417d81","fnv1a_0617_multiplier":"83490167a5417d81"}
+{"storages":1,"repeats":64,"distinct":1}
+{"storages":2,"repeats":64,"bytes":3072,"fnv1a":"6abf5635b5b05695","fnv1a_0617_multiplier":"2f58a235b5b05695"}
+{"storages":2,"repeats":64,"bytes":3072,"fnv1a":"f8d3b324d2365ac1","fnv1a_0617_multiplier":"a56e3d24d2365ac1"}
+{"storages":2,"repeats":64,"distinct":2}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"171004fb116b28fa","fnv1a_0617_multiplier":"413c00fb116b28fa"}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"2179fa9265eb5d3a","fnv1a_0617_multiplier":"b3fc3c9265eb5d3a"}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"2973816429e0f06e","fnv1a_0617_multiplier":"6ce46d6429e0f06e"}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"2c5760d0709ae66a","fnv1a_0617_multiplier":"5fe370d0709ae66a"}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"b34aa0549d263e5a","fnv1a_0617_multiplier":"92168a549d263e5a"}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"c61b57925d6a2abe","fnv1a_0617_multiplier":"1eb7ff925d6a2abe"}
+{"storages":3,"repeats":64,"distinct":6}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"0024004480e98649","fnv1a_0617_multiplier":"54503f4480e98649"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"0c4fa984def465b5","fnv1a_0617_multiplier":"fc09aa84def465b5"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"1161532c03cf07c9","fnv1a_0617_multiplier":"2c51082c03cf07c9"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"14432c1bee023ea9","fnv1a_0617_multiplier":"2649bd1bee023ea9"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"14f136f587833e85","fnv1a_0617_multiplier":"277bf7f587833e85"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"16a43bbf0a6a0729","fnv1a_0617_multiplier":"8ed9a4bf0a6a0729"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"16ee3cdf2b9d7cad","fnv1a_0617_multiplier":"851135df2b9d7cad"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"1f187d7738501939","fnv1a_0617_multiplier":"e3a1387738501939"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"242156850808d395","fnv1a_0617_multiplier":"e951e3850808d395"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"29465203078319e1","fnv1a_0617_multiplier":"986f2b03078319e1"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"2b256daa70017bbd","fnv1a_0617_multiplier":"69cfe4aa70017bbd"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"2ba58b0954c187c5","fnv1a_0617_multiplier":"87e5e20954c187c5"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"2cbda90f42403eb5","fnv1a_0617_multiplier":"34cdb80f42403eb5"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"30c53bd64ec86586","fnv1a_0617_multiplier":"c4530dd64ec86586"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"31da651d3872b01d","fnv1a_0617_multiplier":"90129a1d3872b01d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"3898651dbb9daa66","fnv1a_0617_multiplier":"ed91df1dbb9daa66"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"3a131f43c865f23d","fnv1a_0617_multiplier":"6eb97e43c865f23d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"3fa079ce85e96d7d","fnv1a_0617_multiplier":"ecf580ce85e96d7d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"41e263ff44271946","fnv1a_0617_multiplier":"2fb0b1ff44271946"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"44c565ab514347fd","fnv1a_0617_multiplier":"0547b0ab514347fd"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"467b58e7aa3525d1","fnv1a_0617_multiplier":"6af61be7aa3525d1"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"47cc517874aeae16","fnv1a_0617_multiplier":"feb8e37874aeae16"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"5626fcc1b9e17f09","fnv1a_0617_multiplier":"228787c1b9e17f09"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"5a42ba5d88679169","fnv1a_0617_multiplier":"8db14f5d88679169"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"5a74390eea04424e","fnv1a_0617_multiplier":"f428e10eea04424e"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"5dbe73ba31eac229","fnv1a_0617_multiplier":"f54ff8ba31eac229"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"619129e7f23aaa79","fnv1a_0617_multiplier":"b11d8ae7f23aaa79"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"67a9d69847cecdc2","fnv1a_0617_multiplier":"8ee65e9847cecdc2"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"6acf2e9f174e0fe5","fnv1a_0617_multiplier":"3c469d9f174e0fe5"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"74a80f4d428f4901","fnv1a_0617_multiplier":"ced33a4d428f4901"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"77c9af564496cd21","fnv1a_0617_multiplier":"0993c2564496cd21"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"7827df627e70e205","fnv1a_0617_multiplier":"c3f294627e70e205"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"7ae5c5e1c74b16ed","fnv1a_0617_multiplier":"28e42ee1c74b16ed"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"7d367562be1ecf69","fnv1a_0617_multiplier":"040bd062be1ecf69"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"85230bcc8241493d","fnv1a_0617_multiplier":"a02ac4cc8241493d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"889511133ead63a9","fnv1a_0617_multiplier":"e6f02e133ead63a9"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"89e14444d7997551","fnv1a_0617_multiplier":"d5ce7344d7997551"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"8ab62e7f0346d01a","fnv1a_0617_multiplier":"dd2dca7f0346d01a"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"8dbc289d8823193a","fnv1a_0617_multiplier":"1d04569d8823193a"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"8eaad0e431fccd31","fnv1a_0617_multiplier":"a6c6b9e431fccd31"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"8f5a1e8718fb24b9","fnv1a_0617_multiplier":"6121598718fb24b9"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"9b9c0b6e763f405d","fnv1a_0617_multiplier":"217d346e763f405d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"a281f5d915896895","fnv1a_0617_multiplier":"27fc88d915896895"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"a4f9c9137bb0cb81","fnv1a_0617_multiplier":"49fe98137bb0cb81"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"ac04f2a61806831d","fnv1a_0617_multiplier":"8c286da61806831d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"aee2e83cd2f6f6dd","fnv1a_0617_multiplier":"b398d13cd2f6f6dd"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"b28d51bc1f4003f5","fnv1a_0617_multiplier":"f8ac40bc1f4003f5"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"b3e78a958ab53d49","fnv1a_0617_multiplier":"34eddd958ab53d49"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"b474aa28cfbcedf1","fnv1a_0617_multiplier":"6bbc2f28cfbcedf1"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"b74702f154dc191d","fnv1a_0617_multiplier":"d83693f154dc191d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"be7206a5b571a299","fnv1a_0617_multiplier":"bffd9ba5b571a299"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"c1aba8a0aae08ed1","fnv1a_0617_multiplier":"e4cd09a0aae08ed1"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"c3b8fadf8fdccc5d","fnv1a_0617_multiplier":"ba7c5fdf8fdccc5d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"d2af31454e541b05","fnv1a_0617_multiplier":"5ac92a454e541b05"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"d4b360a7db9aa589","fnv1a_0617_multiplier":"a9ba21a7db9aa589"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"d535bc7608959e11","fnv1a_0617_multiplier":"02ff1f7608959e11"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"d8bbfaaa0b03b139","fnv1a_0617_multiplier":"4840abaa0b03b139"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"d8c4e305a5440169","fnv1a_0617_multiplier":"200c1805a5440169"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"e8e95a877f530a09","fnv1a_0617_multiplier":"5c5d23877f530a09"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"e95764210725f939","fnv1a_0617_multiplier":"cfec81210725f939"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"ed1068e46b073e3d","fnv1a_0617_multiplier":"5dbcd5e46b073e3d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"f2b72d08a1e2a949","fnv1a_0617_multiplier":"44bdc008a1e2a949"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"f8b7c2b36c32e17d","fnv1a_0617_multiplier":"e3471fb36c32e17d"}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"fc31e8256635dd2d","fnv1a_0617_multiplier":"929331256635dd2d"}
+{"storages":8,"repeats":64,"distinct":64}
+
+## after  (binary: 0625-after)
+{"storages":1,"repeats":64,"bytes":2560,"fnv1a":"b795f367a5417d81","fnv1a_0617_multiplier":"83490167a5417d81"}
+{"storages":1,"repeats":64,"distinct":1}
+{"storages":2,"repeats":64,"bytes":3072,"fnv1a":"6abf5635b5b05695","fnv1a_0617_multiplier":"2f58a235b5b05695"}
+{"storages":2,"repeats":64,"distinct":1}
+{"storages":3,"repeats":64,"bytes":3072,"fnv1a":"2179fa9265eb5d3a","fnv1a_0617_multiplier":"b3fc3c9265eb5d3a"}
+{"storages":3,"repeats":64,"distinct":1}
+{"storages":8,"repeats":64,"bytes":4608,"fnv1a":"3fe879bff725b3ba","fnv1a_0617_multiplier":"f18869bff725b3ba"}
+{"storages":8,"repeats":64,"distinct":1}
+

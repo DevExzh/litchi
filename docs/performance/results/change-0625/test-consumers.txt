@@ -1,0 +1,42 @@
+### cargo test -p litchi-ole-common -p litchi-crypto -p litchi-vba -p litchi-sign -p litchi-ograph --locked
+     Running unittests src/lib.rs (target/debug/deps/litchi_crypto-39c4004ab9978ad2)
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/real_office_encryption.rs (target/debug/deps/real_office_encryption-c9a87f2865820824)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/litchi_ograph-c93b607e39e2515f)
+test result: ok. 62 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/framing.rs (target/debug/deps/framing-7970856862736b86)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/real_fixture.rs (target/debug/deps/real_fixture-a6389008c5d566f0)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/litchi_ole_common-8f53433d246b9c12)
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+     Running tests/object.rs (target/debug/deps/object-6d86a4b7416fd919)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/object_link.rs (target/debug/deps/object_link-96ced38d05f3bbcd)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/object_stream_delete.rs (target/debug/deps/object_stream_delete-f6c8775e58edc9d3)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/property_set_editor.rs (target/debug/deps/property_set_editor-2c9fa539bf579d61)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/litchi_sign-0784fdbecfb341af)
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+     Running tests/cfb_signatures.rs (target/debug/deps/cfb_signatures-3a1b979c3fcad121)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.99s
+     Running tests/real_package_signatures.rs (target/debug/deps/real_package_signatures-5f6f62a3e02ce4de)
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running unittests src/lib.rs (target/debug/deps/litchi_vba-f59713e2929c4e08)
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/real_ooxml_fixtures.rs (target/debug/deps/real_ooxml_fixtures-07fe0acf546ff9d0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_crypto
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+   Doc-tests litchi_ograph
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_ole_common
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_sign
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_vba
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

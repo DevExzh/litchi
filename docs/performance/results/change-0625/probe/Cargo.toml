@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name    = "cfb-storage-order-probe"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "cfb_storage_order_probe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-cfb = { path = "<REPO-ROOT>/crates/litchi-cfb" }
+
+[profile.release]
+debug = 1

@@ -1,0 +1,34 @@
+# Instruction counts for one OleWriter rebuild, before and after change 0625.
+#
+# cfb_storage_order_probe rebuild <fixture> N parses the fixture and reads every
+# stream once, then rebuilds the whole container through OleWriter N times.
+# Isolation pair: Ir(N=12) - Ir(N=2), divided by 10, from the callgrind
+# out-file summary line. taskset -c 19, release with debug = 1,
+# valgrind 3.26.0. Three repetitions of every leg; medians below.
+
+case       leg     storages      Ir at N=2     Ir at N=12  Ir per rebuild
+docembed   before         5      3,424,916     14,810,398     1,138,548.2
+docembed   after          5      3,428,382     14,828,790     1,140,040.8
+xls54016   before         0     16,218,848     79,784,938     6,356,609.0
+xls54016   after          0     16,220,879     79,787,750     6,356,687.1
+
+case       storages  delta Ir per rebuild     delta
+docembed          5               1,492.6   0.1311%
+xls54016          0                  78.1   0.0012%
+
+# Repetition spread (max - min over the three repetitions of both levels,
+# divided by 10), which bounds how much of the delta above is measurement:
+  docembed   before     1,046.0 Ir  (0.0919% of Ir per rebuild)
+  docembed   after      1,396.4 Ir  (0.1225% of Ir per rebuild)
+  xls54016   before         0.0 Ir  (0.0000% of Ir per rebuild)
+  xls54016   after          0.0 Ir  (0.0000% of Ir per rebuild)
+
+# docembed = poi/test-data/document/word_with_embeded.doc, 117,248 output bytes,
+#   5 storages with at least one incomparable pair, 33 streams.
+#   The before leg's own spread reflects the hash order it was measuring.
+# xls54016 = poi/test-data/spreadsheet/54016.xls, 984,576 output bytes,
+#   0 storages, 4 streams. Both legs are exactly reproducible across
+#   repetitions, so its +78 Ir is the whole cost of the added code on a
+#   document that has no explicitly created storage at all.
+
+# Raw per-run summary lines: cg-summaries.txt.
