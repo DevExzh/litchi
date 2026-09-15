@@ -2773,6 +2773,108 @@ These selectors take no timing, allocation, physical-I/O or speedup claim.
 They are a descriptive baseline: the first measurement of these scenarios on
 markup-compatibility-bearing input.
 
+## Opt-in OLE2 range-source selectors (change 0627)
+
+Change 0587's evidence gap 4: the program had three independent OOXML
+range-source mechanisms and no OLE2 one. These fourteen selectors close it.
+Seven run the source-backed XLS and PPT read scenarios over the same
+`SimulatedRangeSource` the OPC and XLSX range-source cases use; seven are
+owned-source controls that run the *same* phases over the *same* bytes through
+a plain in-process `ReadAt`, so the transport's cost can be read as a ratio
+against the same reader's ordinary logical reads rather than against a
+differently shaped corpus.
+
+```text
+xls_range_source_open
+xls_range_source_open_list_worksheets
+xls_range_source_open_one_cell
+xls_range_source_open_all_cells
+xls_range_source_open_full_text
+xls_owned_source_control_open
+xls_owned_source_control_open_list_worksheets
+xls_owned_source_control_open_one_cell
+xls_owned_source_control_open_all_cells
+xls_owned_source_control_open_full_text
+ppt_range_source_open
+ppt_range_source_open_one_shape_text
+ppt_owned_source_control_open
+ppt_owned_source_control_open_one_shape_text
+```
+
+The corpus is a caller-named real Office file supplied with `--ole2-file
+PATH`. The flag is repeatable and each file is bound to its format by its CFB
+stream inventory — a `Workbook`/`Book` stream selects the XLS family, a
+`PowerPoint Document` stream the PPT family — so one run can measure an XLS
+and a PPT fixture together. At most one file per format is accepted, the input
+is bounded to 32 MiB, and the corpus identity records the path, the size, the
+SHA-256, the CFB stream count and sector size, and the target stream's name,
+length and SHA-256. Nothing about the file is assumed: the worksheet names,
+the selected cell, the selected slide and shape, and every scenario's frozen
+outcome are derived from the bytes before any sample runs.
+
+Every selector is a complete fresh-open lifecycle — a fresh source, a fresh
+owner, then the operation — which is the shape the existing
+`xls_source_backed_open_list_worksheets` family and the standalone
+`xls_source_attribution` profiler already use. `open` measures
+`SourceBackedWorkbook::from_read_at` or `text_edit::SourceSnapshot::open`;
+`open_list_worksheets` adds `worksheet_names()`; `open_one_cell` adds one
+`cell_value_by_index` at the derived target; `open_all_cells` adds change
+0605's `SourceBackedWorksheet::visit_cells` walk of one worksheet;
+`open_full_text` adds `SourceBackedWorkbook::text()`; `open_one_shape_text`
+adds `read_text` of the derived slide/shape target.
+
+A typed refusal is an outcome, not a reason to abandon the scenario: on a
+fixture whose full text or whose selected shape text the source-backed reader
+declines, the refusal string is frozen as that scenario's oracle and the
+phase is still measured, because a caller paying per request still pays for
+the bytes the reader read before refusing.
+
+Two gates run on every case, both taken from change 0572's frozen set:
+
+- **Observation identity.** Every retained sample must reproduce the oracle
+  derived from the file before the run; the case fails otherwise.
+- **Request-sequence identity.** On the range-source leg the complete ordered
+  `(offset, requested, returned)` sequence is hashed per retained sample and
+  every sample must produce the same digest; the case fails otherwise. The
+  first 32 triples are retained verbatim so a record can quote the offsets a
+  reader asks for without carrying tens of thousands of them.
+
+Each result's `source.ole2_range_source` records the transport and its
+parameters, the timing scope, the per-sample logical read calls and bytes
+(comparable across both legs), the per-sample physical request count and
+bytes, the request-sequence digests and preview, the frozen observation with
+its per-sample digests, and the deterministic simulated service floor — the
+sum of the configured per-request service times over the first retained
+sample's sequence. `source.simulation` carries the ordinary
+`RangeSimulationSummary` (logical and physical counts, sorted request sizes
+and the fixed size buckets) on the range-source leg only.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 20 --samples 50 \
+  --case xls_range_source_open,xls_range_source_open_list_worksheets,xls_range_source_open_one_cell,xls_range_source_open_all_cells,xls_range_source_open_full_text,xls_owned_source_control_open,xls_owned_source_control_open_list_worksheets,xls_owned_source_control_open_one_cell,xls_owned_source_control_open_all_cells,xls_owned_source_control_open_full_text \
+  --ole2-file test-data/ole/xls/WithCustomViews.xls \
+  --range-fixed-latency-us 1000 --range-request-overhead-us 0 \
+  --range-bandwidth-bytes-per-sec 104857600 \
+  --range-max-physical-bytes 65536 --json target/perf/ole2-range-source.json
+```
+
+Those four transport values reproduce change 0572's delayed arm inside this
+harness's four-parameter model: 1 ms of service per request, no separate
+per-request overhead term (0572's model has none), 100 MiB/s and a 64 KiB
+maximum range. One model difference is worth stating: 0572's probe serves a
+capped request as a short read and lets the caller loop, while this simulator
+loops the cap itself; the request counts agree, the call boundaries do not.
+
+Elapsed time on the range-source leg is **modelled, not measured**: it is
+sleep-driven arithmetic over a deterministic request count, and per change
+0447/0448 the retained delay counters are requested targets rather than
+observed sleeping time. These selectors take no timing, allocation,
+physical-I/O, cold-cache, network or speedup claim. They are a descriptive
+baseline: the first measurement of any OLE2 reader over a range source. They
+are absent from `Case::DEFAULT`, and the checked default catalog SHA-256 does
+not move for them.
+
 ## Opt-in PPTX fresh streaming creation
 
 `pptx_streaming_create` exercises public `StreamingPresentationWriter` with
@@ -3912,6 +4014,11 @@ native-Office claim is made.
   logical or physical requests; selected reads must leave every exact
   unselected worksheet compressed range untouched and pass a fresh second-sheet
   deferral probe.
+- `xls_range_source_open` and siblings, `ppt_range_source_open` and its
+  one-shape-text companion, and their `*_owned_source_control_*` pairs: the
+  source-backed XLS and PPT read scenarios over the same simulator, on a
+  caller-named real fixture supplied with `--ole2-file PATH`. See *Opt-in OLE2
+  range-source selectors (change 0627)*.
 - `opc_open_session_scaling`: eager-open every ZIP member with a caller-sized
   `OpenSession` local pool, then verify every generated OPC Part.
 - `cfb_bulk_read_scaling`: use `SharedOleFile::bulk_read` with a caller-sized

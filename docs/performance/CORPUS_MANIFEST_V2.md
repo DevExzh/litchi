@@ -207,3 +207,31 @@ part, the producer-marker census, the `source_stream_eligible` conditions the
 part trips, and the typed refusals the shape proves at construction.  It is a
 harness output, not a catalog document, and does not participate in either
 catalog hash.
+
+## Opt-in OLE2 range-source corpora (change 0627)
+
+Two further generator identifiers exist for the opt-in OLE2 range-source
+selectors, and like `litchi-xlsx-real-file-v1` neither generates anything:
+
+| Generator | Format | Input | Generated |
+|---|---|---|---|
+| `litchi-xls-real-file-v1` | `xls` | a caller-named file (`--ole2-file`) | nothing: the bytes are the file's |
+| `litchi-ppt-real-file-v1` | `ppt` | a caller-named file (`--ole2-file`) | nothing: the bytes are the file's |
+
+`tools/perf-baseline/src/ole2_range_source.rs` is the source for both.  A
+corpus in either family is a real OLE2 document, so its manifest reports the
+CFB rather than a ZIP: `archive_member_count` is the CFB stream count,
+`entry_bytes` the sector size, `target_entry` the `Workbook` or `PowerPoint
+Document` stream path, and `compression` is `none`.  `entry_count` is the
+ordinary worksheet count or the slide count.
+
+Neither is added to the generator family map in
+`tools/generate_corpus_manifest_v2.py` or `corpus_manifest.rs`, for the same
+reason `litchi-xlsx-real-file-v1` is not: that map is the source-audited
+contract for the **default** catalog, and a caller-named file's licensing and
+provenance cannot be asserted by a static map.  These corpora are not in the
+default matrix and not in the checked default catalog, so neither
+`catalog_sha256` nor `content_set_sha256` moves for them.  The archive
+identities measured by change 0627 are recorded in
+[`results/change-0627/`](results/change-0627/README.md) rather than here,
+because the file a caller names is not a repository-fixed corpus.
