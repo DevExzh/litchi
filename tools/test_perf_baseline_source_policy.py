@@ -37,6 +37,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.filesystem = (PERF_BASELINE / "src" / "filesystem.rs").read_text(
             encoding="utf-8"
         )
+        cls.producer_shape = (PERF_BASELINE / "src" / "producer_shape.rs").read_text(
+            encoding="utf-8"
+        )
         cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
             encoding="utf-8"
         )
@@ -188,6 +191,56 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertNotIn("work", json.dumps(policy["metric_classes"]))
         for unrelated in ("copied_bytes", "decompressed_bytes", "recompressed_bytes"):
             self.assertNotIn(unrelated, json.dumps(policy["metric_classes"]))
+
+    def test_producer_shape_module_owns_no_unsafe_or_ambient_surface(self):
+        self.assertIn("mod producer_shape;", self.library)
+        self.assertNotIn("unsafe", self.producer_shape)
+        self.assertNotIn("#[global_allocator]", self.producer_shape)
+        self.assertNotIn("std::env", self.producer_shape)
+        self.assertNotIn("Command", self.producer_shape)
+
+    def test_real_file_selectors_are_opt_in_bounded_and_self_identifying(self):
+        # `--real-file` is the only input in this harness whose bytes come from
+        # outside the process. Keep it bounded, keep its identity in the
+        # corpus, and keep it out of the default matrix.
+        self.assertIn(
+            "const MAX_REAL_FILE_BYTES: u64 = 32 * 1024 * 1024;", self.producer_shape
+        )
+        self.assertIn(
+            "fn build_xlsx_real_file_corpus(path: &Path)", self.producer_shape
+        )
+        self.assertIn("struct RealFileProvenance", self.producer_shape)
+        for field in ("path: String", "bytes: u64", "sha256: String"):
+            self.assertIn(field, self.producer_shape)
+        # Exactly one whole-file read, and it is the bounded one.
+        self.assertEqual(self.producer_shape.count("fs::read("), 1)
+        self.assertIn('"--real-file" => {', self.library)
+        self.assertIn("--real-file PATH", self.library)
+
+    def test_producer_shape_selectors_are_absent_from_the_default_matrix(self):
+        start = self.library.index("const DEFAULT: ")
+        end = self.library.index("];", start)
+        default_matrix = self.library[start:end]
+        for case in (
+            "XlsxProducerMediumSourceOpen",
+            "XlsxProducerMediumSourceSelectedCell",
+            "XlsxProducerMediumSourcePlanning",
+            "XlsxProducerMediumSourceOneEditSave",
+            "XlsxProducerDenseSourceOpen",
+            "XlsxProducerDenseSourceSelectedCell",
+            "XlsxProducerDenseSourcePlanning",
+            "XlsxProducerDenseSourceOneEditSave",
+            "XlsxProducerMediumControlSelectedCell",
+            "XlsxProducerMediumControlPlanning",
+            "XlsxProducerDenseControlSelectedCell",
+            "XlsxProducerDenseControlPlanning",
+            "XlsxRealFileSourceOpen",
+            "XlsxRealFileSourceSelectedCell",
+            "DocxProducerSourceSelectedParagraph",
+            "PptxProducerSourceSelectedSlide",
+        ):
+            self.assertIn(f"Self::{case}", self.library)
+            self.assertNotIn(case, default_matrix)
 
     def test_region_scope_is_static_and_heap_free(self):
         self.assertIn("pub scope: Scope", self.metrics)

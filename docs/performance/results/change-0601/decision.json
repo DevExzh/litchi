@@ -1,0 +1,46 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0601",
+  "title": "A real-producer shape in the harness, and the first baseline on it",
+  "decision": "harness and corpus addition retained, no production change",
+  "code_state": "no file under crates/ was modified by this batch; the change is confined to tools/perf-baseline and docs/",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 finding 1 names the harness corpora as the first prerequisite of the top half of its ranked queue: the generated worksheets carry no markup-compatibility root, no x14ac:dyDescent, no <cols>, no shared-string part and no worksheet relationships, and change 0032 recorded that explicitly",
+    "the new selectors are opt-in, absent from Case::DEFAULT, and add no row to the checked default catalog, so neither catalog_sha256 nor content_set_sha256 moves",
+    "the baseline is descriptive: it is the first measurement of the open, selected-cell, planning and one-cell edit/save scenarios on markup-compatibility-bearing input, taken against a byte-comparable marker-free control in the same run",
+    "the work uncovered a library fact the survey did not have: the source-backed value-only editor refuses five separate parts of the producer signature, so its reach on Excel output is zero rather than reduced; the refusals are proven at corpus construction rather than asserted"
+  ],
+  "accepted_evidence": {
+    "determinism": "two independent release-mode processes emit byte-identical corpora; the marker census sidecars and the extracted corpus identities are diffed and both diffs are empty",
+    "eligibility_parity": "the generated worksheets and a real Excel fixture trip the same source_stream_eligible conditions (markup-compatibility namespace, x14ac namespace, dyDescent) and both carry <cols> and a shared-string part; the census is produced by the same code path for both",
+    "refusal_census": "one typed refusal per producer fact, each witnessed on the smallest archive carrying only that fact, recorded verbatim in the evidence sidecar",
+    "timing": "20 warm-ups and 100 samples per selector, pinned to one CPU, with an A/A pair of identical legs in the same window stating the floor, and a marker-free control selector over the same grid",
+    "real_file": "the same open and selected-cell scenarios over a checked-in Excel fixture through the --real-file opt-in, with the file's path, size and SHA-256 bound into the corpus identity"
+  },
+  "accepted_costs": {
+    "no_production_change": "nothing here makes anything faster; it makes the slow path measurable",
+    "registry_growth": "the selectable case registry grows from 441 to 457; every new case is opt-in",
+    "split_family": "the XLSX family needs three variants per shape because one archive cannot serve both the read and the edit scenarios; the split is recorded as evidence rather than hidden",
+    "shape_deviation": "the measured edit and control variants deliberately omit parts of the producer signature the value-only editor refuses, and the record names each omission and its refusal"
+  },
+  "known_gaps": {
+    "sizes": "the dense shape is 128 x 128 rather than XlsxShape::DenseWide's 256 x 256, because the markup-compatibility codec makes a 256 x 256 sample seconds long and a 100-sample baseline half an hour per selector",
+    "coverage": "no producer-shape selector exists for the DOCX or PPTX edit and save scenarios, for the eager XLSX paths, for file-backed or range sources, or for XLSB",
+    "catalog": "the new generator identities are not added to the schema-2 generator family map, which is the source-audited contract for the default catalog; they retain null algorithm_id and seed_spec",
+    "instruments": "no callgrind pair, no hardware counters and no allocation profile were taken for this batch"
+  },
+  "withheld": [
+    "any speedup, regression, allocation, peak-RSS, cold-cache, physical-I/O, range-source, concurrency or cross-platform result",
+    "any claim that the generated producer shape is representative of the real-producer population beyond the eligibility outcomes it is shown to share with one real fixture"
+  ],
+  "provenance": {
+    "base_commit": "f8cf7d2a1d155615ab97eda6310c3d5ced0b82ae",
+    "branch": "perf/0601-perf-harness-real-producer-shape",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu": 23,
+    "note": "seven other measurement agents were active on the host during the run; the A/A leg in the same window is what states the floor"
+  }
+}

@@ -1,0 +1,9 @@
+host: Linux 7.0.0-1012-aws x86_64
+cpu: 23
+date_utc: 2026-09-15T16:35:06Z
+git_commit: f8cf7d2a1d155615ab97eda6310c3d5ced0b82ae
+git_branch: perf/0601-perf-harness-real-producer-shape
+rustc: rustc 1.95.0 (59807616e 2026-04-14)
+binary_sha256: 216bfbe9560688e3817283c655daa45469658dc68d723747d92445bd5ae5aaad
+binary_bytes: 60111960
+real_file_sha256: e9c4515c22be30487a9ce3c081e74cf58b5143aa42b6dc07e891aa261066fa98

@@ -1,5 +1,29 @@
 # Performance program phase report
 
+## 0601 — a producer-shaped corpus, and what it costs to read one
+
+Record: [0601](0601-perf-harness-real-producer-shape.md).
+
+`tools/perf-baseline` gains a generator that writes what Excel, Word and
+PowerPoint write by default and sixteen opt-in selectors over it, none of them
+in `Case::DEFAULT` and none of them changing an existing corpus identity or the
+checked default catalog SHA-256. The XLSX family needs three variants per shape
+because the source-backed value-only editor refuses five separate parts of the
+producer signature — `mc:Ignorable` on the worksheet, `pageMargins`, the
+shared-string workbook relationship, any worksheet relationship, and
+`mc:Ignorable` on the workbook — so its reach on Excel output is zero rather
+than reduced, and the split lets each refusal be *proven*, untimed, at corpus
+construction rather than asserted. Against a marker-free control of the same
+grid captured in the same run, one selected cell costs 13.31 ms versus 1.89 ms
+(7.04×) at 32 × 32 and 195.54 ms versus 28.80 ms (6.79×) at 128 × 128; value-only
+planning costs 11.54 ms versus 0.62 ms (18.61×) and 168.97 ms versus 8.88 ms
+(19.03×). A source-backed open is unaffected at roughly 100 µs on every variant,
+which is the control that says the cost is worksheet work rather than package
+work. `performance_claim: none`: nothing here is an optimization, and the A/A
+floor (3.0% p50 worst case, 1.09% median, 20 warm-ups and 100 samples per
+selector) is reported so the ratios can be read as measurements rather than
+noise.
+
 ## 0603 — XLSX marker admission, measured on change 0602's projections
 
 Five derived fixtures were regenerated with change 0602's `degate.py` and

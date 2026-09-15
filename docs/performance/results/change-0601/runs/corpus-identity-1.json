@@ -1,0 +1,66 @@
+{
+  "docx-producer-medium": {
+    "archive_bytes": 10439,
+    "archive_member_count": 12,
+    "archive_sha256": "259f9511046c5ed383b54fc078ea33aec8d80fed6cb03400c9e1dbcb9af7087b",
+    "part_bytes": 40147,
+    "target_entry": "paragraph:100",
+    "target_payload_sha256": "08ea83c6e3287e74125f5a70c3ce3a4bdb6de13b7930312a5059060e24e56c14"
+  },
+  "pptx-producer-medium": {
+    "archive_bytes": 42531,
+    "archive_member_count": 61,
+    "archive_sha256": "c4cd7ca569bf47cfbff77d8b1457b110a99d6913698911a297266ddee8c9f9cb",
+    "part_bytes": 4546,
+    "target_entry": "slide:6",
+    "target_payload_sha256": "ab916ac163e37c6ebe6ee81b763a14392d806f4623749d9a2a58021b14daede1"
+  },
+  "xlsx-producer-dense-control": {
+    "archive_bytes": 197093,
+    "archive_member_count": 8,
+    "archive_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+    "part_bytes": 1455169,
+    "target_entry": "Bench01!A65",
+    "target_payload_sha256": "5eb3b5e8b315def42b3d3fcd0d082201ea276f97fe7b8dc72b529dee8009ae02"
+  },
+  "xlsx-producer-dense-edit": {
+    "archive_bytes": 197640,
+    "archive_member_count": 8,
+    "archive_sha256": "b81f85ac44ad021824b2a2dc81f1680347b7ff8a2373c7778f979df83f73c6f0",
+    "part_bytes": 1456543,
+    "target_entry": "Bench01!A65",
+    "target_payload_sha256": "5eb3b5e8b315def42b3d3fcd0d082201ea276f97fe7b8dc72b529dee8009ae02"
+  },
+  "xlsx-producer-dense-read": {
+    "archive_bytes": 204756,
+    "archive_member_count": 11,
+    "archive_sha256": "3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8",
+    "part_bytes": 1471545,
+    "target_entry": "Bench01!D65",
+    "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba"
+  },
+  "xlsx-producer-medium-control": {
+    "archive_bytes": 19787,
+    "archive_member_count": 9,
+    "archive_sha256": "d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60",
+    "part_bytes": 121550,
+    "target_entry": "Bench01!A17",
+    "target_payload_sha256": "f4bed4c49b095db9601fe38736d323f8438326beb3fbf524d7ad08d52a818e80"
+  },
+  "xlsx-producer-medium-edit": {
+    "archive_bytes": 20472,
+    "archive_member_count": 9,
+    "archive_sha256": "7d94095cccf1ccddfb9adcd19f25894fd0a78b126a395271564e5acbbdbbfec5",
+    "part_bytes": 123378,
+    "target_entry": "Bench01!A17",
+    "target_payload_sha256": "f4bed4c49b095db9601fe38736d323f8438326beb3fbf524d7ad08d52a818e80"
+  },
+  "xlsx-producer-medium-read": {
+    "archive_bytes": 22739,
+    "archive_member_count": 12,
+    "archive_sha256": "55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8",
+    "part_bytes": 127499,
+    "target_entry": "Bench01!D17",
+    "target_payload_sha256": "5c61934dd66f51697b07c08c9f4854b8fc88ab5b7648a76f62e27b3384f01dba"
+  }
+}

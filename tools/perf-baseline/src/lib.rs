@@ -40,6 +40,7 @@ pub mod pptx_retention;
 mod pptx_slide_boundaries;
 mod pptx_streaming_create;
 mod process_metrics;
+mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
 mod xls_numeric;
@@ -1374,6 +1375,22 @@ enum Case {
     XlsxSourceRepeatedStoreOversizedReacquisitionControl,
     XlsxBytesOpen,
     XlsxBytesOpenLifecycle,
+    XlsxProducerMediumSourceOpen,
+    XlsxProducerMediumSourceSelectedCell,
+    XlsxProducerMediumSourcePlanning,
+    XlsxProducerMediumSourceOneEditSave,
+    XlsxProducerDenseSourceOpen,
+    XlsxProducerDenseSourceSelectedCell,
+    XlsxProducerDenseSourcePlanning,
+    XlsxProducerDenseSourceOneEditSave,
+    XlsxProducerMediumControlSelectedCell,
+    XlsxProducerMediumControlPlanning,
+    XlsxProducerDenseControlSelectedCell,
+    XlsxProducerDenseControlPlanning,
+    XlsxRealFileSourceOpen,
+    XlsxRealFileSourceSelectedCell,
+    DocxProducerSourceSelectedParagraph,
+    PptxProducerSourceSelectedSlide,
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
@@ -1966,6 +1983,30 @@ impl Case {
             },
             Self::XlsxBytesOpen => "xlsx_bytes_open",
             Self::XlsxBytesOpenLifecycle => "xlsx_bytes_open_lifecycle",
+            Self::XlsxProducerMediumSourceOpen => "xlsx_producer_medium_source_open",
+            Self::XlsxProducerMediumSourceSelectedCell => {
+                "xlsx_producer_medium_source_selected_cell"
+            },
+            Self::XlsxProducerMediumSourcePlanning => "xlsx_producer_medium_source_planning",
+            Self::XlsxProducerMediumSourceOneEditSave => {
+                "xlsx_producer_medium_source_one_edit_save"
+            },
+            Self::XlsxProducerDenseSourceOpen => "xlsx_producer_dense_source_open",
+            Self::XlsxProducerDenseSourceSelectedCell => "xlsx_producer_dense_source_selected_cell",
+            Self::XlsxProducerDenseSourcePlanning => "xlsx_producer_dense_source_planning",
+            Self::XlsxProducerDenseSourceOneEditSave => "xlsx_producer_dense_source_one_edit_save",
+            Self::XlsxProducerMediumControlSelectedCell => {
+                "xlsx_producer_medium_control_selected_cell"
+            },
+            Self::XlsxProducerMediumControlPlanning => "xlsx_producer_medium_control_planning",
+            Self::XlsxProducerDenseControlSelectedCell => {
+                "xlsx_producer_dense_control_selected_cell"
+            },
+            Self::XlsxProducerDenseControlPlanning => "xlsx_producer_dense_control_planning",
+            Self::XlsxRealFileSourceOpen => "xlsx_real_file_source_open",
+            Self::XlsxRealFileSourceSelectedCell => "xlsx_real_file_source_selected_cell",
+            Self::DocxProducerSourceSelectedParagraph => "docx_producer_source_selected_paragraph",
+            Self::PptxProducerSourceSelectedSlide => "pptx_producer_source_selected_slide",
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
@@ -3151,6 +3192,83 @@ impl Case {
         matches!(self, Self::XlsxBytesOpen | Self::XlsxBytesOpenLifecycle)
     }
 
+    /// Opt-in producer-shape selectors (change 0601).  These run the ordinary
+    /// open, selected-cell, planning and one-cell edit/save scenarios over
+    /// corpora that carry what real Office producers write: a markup
+    /// compatibility root, `x14ac:dyDescent`, a `<cols>` block, a
+    /// shared-string part, worksheet relationships, the Word 2013 namespace
+    /// set and `mc:AlternateContent` slides.  None is in `Case::DEFAULT`.
+    const fn is_producer_shape(self) -> bool {
+        self.producer_shape_scenario().is_some()
+    }
+
+    /// Producer-shape selectors whose corpus is a caller-named real file.
+    const fn is_producer_real_file(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxRealFileSourceOpen | Self::XlsxRealFileSourceSelectedCell
+        )
+    }
+
+    const fn producer_shape_scenario(self) -> Option<producer_shape::Scenario> {
+        match self {
+            Self::XlsxProducerMediumSourceOpen
+            | Self::XlsxProducerDenseSourceOpen
+            | Self::XlsxRealFileSourceOpen => Some(producer_shape::Scenario::Open),
+            Self::XlsxProducerMediumSourceSelectedCell
+            | Self::XlsxProducerDenseSourceSelectedCell
+            | Self::XlsxProducerMediumControlSelectedCell
+            | Self::XlsxProducerDenseControlSelectedCell
+            | Self::XlsxRealFileSourceSelectedCell => Some(producer_shape::Scenario::SelectedCell),
+            Self::XlsxProducerMediumSourcePlanning
+            | Self::XlsxProducerDenseSourcePlanning
+            | Self::XlsxProducerMediumControlPlanning
+            | Self::XlsxProducerDenseControlPlanning => Some(producer_shape::Scenario::Planning),
+            Self::XlsxProducerMediumSourceOneEditSave
+            | Self::XlsxProducerDenseSourceOneEditSave => {
+                Some(producer_shape::Scenario::OneEditSave)
+            },
+            Self::DocxProducerSourceSelectedParagraph => {
+                Some(producer_shape::Scenario::SelectedParagraph)
+            },
+            Self::PptxProducerSourceSelectedSlide => Some(producer_shape::Scenario::SelectedSlide),
+            _ => None,
+        }
+    }
+
+    /// Generated producer-shape XLSX selectors, with the package variant the
+    /// scenario needs: the read scenarios take the complete producer
+    /// signature, the planning and edit/save scenarios take the largest
+    /// producer-shaped package the value-only editor admits.
+    const fn producer_xlsx_corpus(
+        self,
+    ) -> Option<(
+        producer_shape::XlsxProducerShape,
+        producer_shape::XlsxProducerVariant,
+    )> {
+        use producer_shape::{XlsxProducerShape as Shape, XlsxProducerVariant as Variant};
+        match self {
+            Self::XlsxProducerMediumSourceOpen | Self::XlsxProducerMediumSourceSelectedCell => {
+                Some((Shape::Medium, Variant::Read))
+            },
+            Self::XlsxProducerMediumSourcePlanning | Self::XlsxProducerMediumSourceOneEditSave => {
+                Some((Shape::Medium, Variant::Edit))
+            },
+            Self::XlsxProducerMediumControlSelectedCell
+            | Self::XlsxProducerMediumControlPlanning => Some((Shape::Medium, Variant::Control)),
+            Self::XlsxProducerDenseControlSelectedCell | Self::XlsxProducerDenseControlPlanning => {
+                Some((Shape::Dense, Variant::Control))
+            },
+            Self::XlsxProducerDenseSourceOpen | Self::XlsxProducerDenseSourceSelectedCell => {
+                Some((Shape::Dense, Variant::Read))
+            },
+            Self::XlsxProducerDenseSourcePlanning | Self::XlsxProducerDenseSourceOneEditSave => {
+                Some((Shape::Dense, Variant::Edit))
+            },
+            _ => None,
+        }
+    }
+
     const fn is_docx_source_edit_save(self) -> bool {
         matches!(self, Self::DocxSourceBackedOneEditSave)
     }
@@ -3461,6 +3579,14 @@ struct Options {
     opc_cache_lock_diagnostics: bool,
     output: Option<PathBuf>,
     corpus_manifest: Option<PathBuf>,
+    /// Caller-named Office file for the opt-in `xlsx_real_file_*` selectors.
+    /// Every other corpus in this harness is produced in process; this is the
+    /// one input whose bytes come from outside it, so the selectors that use
+    /// it are opt-in, absent from `Case::DEFAULT`, and record the file's path,
+    /// size and SHA-256 in their corpus identity.
+    real_file: Option<PathBuf>,
+    /// Sidecar path for the producer-shape marker and refusal census.
+    producer_evidence: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -9144,6 +9270,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_ods_root_file()
                     && !case.is_xlsx_root_file()
                     && !case.is_xlsx_bytes_root_file()
+                    && !case.is_producer_shape()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -10984,6 +11111,103 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // Opt-in producer-shape selectors (change 0601).  Each family builds its
+    // own corpus once; the real-file family needs `--real-file`.
+    if options.cases.iter().any(|case| case.is_producer_shape()) {
+        let mut producer_evidence = Vec::new();
+        for shape in producer_shape::XlsxProducerShape::ALL {
+            for variant in producer_shape::XlsxProducerVariant::ALL {
+                let key = Some((shape, variant));
+                if !options
+                    .cases
+                    .iter()
+                    .any(|case| case.producer_xlsx_corpus() == key)
+                {
+                    continue;
+                }
+                let corpus = producer_shape::build_xlsx_producer_corpus(shape, variant)?;
+                producer_evidence.push(corpus.evidence.clone());
+                for case in options
+                    .cases
+                    .iter()
+                    .copied()
+                    .filter(|case| case.producer_xlsx_corpus() == key)
+                {
+                    let scenario = case
+                        .producer_shape_scenario()
+                        .ok_or("producer-shape case has no scenario")?;
+                    results.push(producer_shape::run_case(
+                        case,
+                        scenario,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?);
+                }
+            }
+        }
+        if options
+            .cases
+            .iter()
+            .any(|case| case.is_producer_real_file())
+        {
+            let path = options
+                .real_file
+                .as_deref()
+                .ok_or("the xlsx_real_file_* selectors require --real-file PATH")?;
+            let corpus = producer_shape::build_xlsx_real_file_corpus(path)?;
+            producer_evidence.push(corpus.evidence.clone());
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_producer_real_file())
+            {
+                let scenario = case
+                    .producer_shape_scenario()
+                    .ok_or("producer-shape case has no scenario")?;
+                results.push(producer_shape::run_case(
+                    case,
+                    scenario,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+        if options
+            .cases
+            .contains(&Case::DocxProducerSourceSelectedParagraph)
+        {
+            let corpus = producer_shape::build_docx_producer_corpus()?;
+            producer_evidence.push(corpus.evidence.clone());
+            results.push(producer_shape::run_case(
+                Case::DocxProducerSourceSelectedParagraph,
+                producer_shape::Scenario::SelectedParagraph,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+        if options
+            .cases
+            .contains(&Case::PptxProducerSourceSelectedSlide)
+        {
+            let corpus = producer_shape::build_pptx_producer_corpus()?;
+            producer_evidence.push(corpus.evidence.clone());
+            results.push(producer_shape::run_case(
+                Case::PptxProducerSourceSelectedSlide,
+                producer_shape::Scenario::SelectedSlide,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+        if let Some(path) = options.producer_evidence.as_deref() {
+            producer_shape::write_evidence(path, &producer_evidence)?;
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -11290,6 +11514,8 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut opc_cache_lock_diagnostics = false;
     let mut output = None;
     let mut corpus_manifest = None;
+    let mut real_file = None;
+    let mut producer_evidence = None;
     let mut arguments = std::env::args().skip(1);
 
     while let Some(argument) = arguments.next() {
@@ -11392,6 +11618,18 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     arguments.next().ok_or("--corpus-manifest requires PATH")?,
                 ));
             },
+            "--real-file" => {
+                real_file = Some(PathBuf::from(
+                    arguments.next().ok_or("--real-file requires PATH")?,
+                ));
+            },
+            "--producer-evidence" => {
+                producer_evidence = Some(PathBuf::from(
+                    arguments
+                        .next()
+                        .ok_or("--producer-evidence requires PATH")?,
+                ));
+            },
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -11420,6 +11658,8 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         opc_cache_lock_diagnostics,
         output,
         corpus_manifest,
+        real_file,
+        producer_evidence,
     })
 }
 
@@ -11890,6 +12130,36 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_bytes_open" => Some(Case::XlsxBytesOpen),
         "xlsx_bytes_open_lifecycle" => Some(Case::XlsxBytesOpenLifecycle),
+        "xlsx_producer_medium_source_open" => Some(Case::XlsxProducerMediumSourceOpen),
+        "xlsx_producer_medium_source_selected_cell" => {
+            Some(Case::XlsxProducerMediumSourceSelectedCell)
+        },
+        "xlsx_producer_medium_source_planning" => Some(Case::XlsxProducerMediumSourcePlanning),
+        "xlsx_producer_medium_source_one_edit_save" => {
+            Some(Case::XlsxProducerMediumSourceOneEditSave)
+        },
+        "xlsx_producer_dense_source_open" => Some(Case::XlsxProducerDenseSourceOpen),
+        "xlsx_producer_dense_source_selected_cell" => {
+            Some(Case::XlsxProducerDenseSourceSelectedCell)
+        },
+        "xlsx_producer_dense_source_planning" => Some(Case::XlsxProducerDenseSourcePlanning),
+        "xlsx_producer_dense_source_one_edit_save" => {
+            Some(Case::XlsxProducerDenseSourceOneEditSave)
+        },
+        "xlsx_producer_medium_control_selected_cell" => {
+            Some(Case::XlsxProducerMediumControlSelectedCell)
+        },
+        "xlsx_producer_medium_control_planning" => Some(Case::XlsxProducerMediumControlPlanning),
+        "xlsx_producer_dense_control_selected_cell" => {
+            Some(Case::XlsxProducerDenseControlSelectedCell)
+        },
+        "xlsx_producer_dense_control_planning" => Some(Case::XlsxProducerDenseControlPlanning),
+        "xlsx_real_file_source_open" => Some(Case::XlsxRealFileSourceOpen),
+        "xlsx_real_file_source_selected_cell" => Some(Case::XlsxRealFileSourceSelectedCell),
+        "docx_producer_source_selected_paragraph" => {
+            Some(Case::DocxProducerSourceSelectedParagraph)
+        },
+        "pptx_producer_source_selected_slide" => Some(Case::PptxProducerSourceSelectedSlide),
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
@@ -12388,6 +12658,22 @@ fn usage_text() -> String {
                                        xlsx_source_repeated_store_oversized,\n\
                                        xlsx_source_repeated_store_oversized_reacquisition_control,\n\
                                        xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
+                                       xlsx_producer_medium_source_open,\n\
+                                       xlsx_producer_medium_source_selected_cell,\n\
+                                       xlsx_producer_medium_source_planning,\n\
+                                       xlsx_producer_medium_source_one_edit_save,\n\
+                                       xlsx_producer_dense_source_open,\n\
+                                       xlsx_producer_dense_source_selected_cell,\n\
+                                       xlsx_producer_dense_source_planning,\n\
+                                       xlsx_producer_dense_source_one_edit_save,\n\
+                                       xlsx_producer_medium_control_selected_cell,\n\
+                                       xlsx_producer_medium_control_planning,\n\
+                                       xlsx_producer_dense_control_selected_cell,\n\
+                                       xlsx_producer_dense_control_planning,\n\
+                                       xlsx_real_file_source_open,\n\
+                                       xlsx_real_file_source_selected_cell,\n\
+                                       docx_producer_source_selected_paragraph,\n\
+                                       pptx_producer_source_selected_slide,\n\
                                        xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
@@ -12510,6 +12796,8 @@ fn usage_text() -> String {
            --json PATH                 Write JSON to PATH; use - or omit for stdout\n\
            --corpus-manifest PATH      Write schema-2 corpus catalog sidecar and\n\
                                        include its additive reference in the report\n\
+           --real-file PATH            Office file for the opt-in xlsx_real_file_* selectors\n\
+           --producer-evidence PATH    Write the producer-shape marker/refusal census\n\
            --help                      Show this help"
     )
 }
@@ -23368,6 +23656,24 @@ fn run_case_with_config(
         },
         Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
             run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxProducerMediumSourceOpen
+        | Case::XlsxProducerMediumSourceSelectedCell
+        | Case::XlsxProducerMediumSourcePlanning
+        | Case::XlsxProducerMediumSourceOneEditSave
+        | Case::XlsxProducerDenseSourceOpen
+        | Case::XlsxProducerDenseSourceSelectedCell
+        | Case::XlsxProducerDenseSourcePlanning
+        | Case::XlsxProducerDenseSourceOneEditSave
+        | Case::XlsxProducerMediumControlSelectedCell
+        | Case::XlsxProducerMediumControlPlanning
+        | Case::XlsxProducerDenseControlSelectedCell
+        | Case::XlsxProducerDenseControlPlanning
+        | Case::XlsxRealFileSourceOpen
+        | Case::XlsxRealFileSourceSelectedCell
+        | Case::DocxProducerSourceSelectedParagraph
+        | Case::PptxProducerSourceSelectedSlide => {
+            Err("producer-shape cases use their own corpus runner".into())
         },
         Case::XlsxStreamingCreate
         | Case::RtfStreamingCreate
@@ -59187,7 +59493,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 441);
+        assert_eq!(selectable_count, 457);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 

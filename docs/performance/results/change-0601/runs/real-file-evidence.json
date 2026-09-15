@@ -1,0 +1,92 @@
+{
+  "corpora": [
+    {
+      "generator": "litchi-xlsx-real-file-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 209931,
+          "cols_block": true,
+          "dy_descent_occurrences": 681,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac",
+          "numeric_cells": 2037,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "5eb91ac80d41a18a7c0910c378261a1ec319a1160cac4fce1fc04e02ef862b29",
+          "shared_string_cells": 3403,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": "xl/worksheets/_rels/sheet1.xml.rels",
+          "worksheet_relationship_targets": [
+            "../printerSettings/printerSettings1.bin"
+          ],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 4092,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/sharedStrings.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "23c753b40856328765c258f33e52692249bd98fe964a2b7a3bb18e32649aab78",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 843,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x15",
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "102823a2c5a30a98f35f9080649306ab8f9bed2e555b7493b86be0902275ae30",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": {
+        "bytes": 47318,
+        "path": "test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx",
+        "sha256": "e9c4515c22be30487a9ce3c081e74cf58b5143aa42b6dc07e891aa261066fa98"
+      },
+      "selected_sheet": 0,
+      "selected_target": "Teams!A1",
+      "selected_target_text": "text:Date",
+      "shape": "real-file",
+      "shape_size": null,
+      "shared_string_cell_percent": 62,
+      "shared_string_part": "xl/sharedStrings.xml",
+      "shared_string_unique_count": 136,
+      "sheet_roles": [],
+      "variant": null
+    }
+  ],
+  "schema": "litchi.perf-baseline.producer-shape-evidence.v1"
+}

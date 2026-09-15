@@ -1,5 +1,30 @@
 # Performance optimization ADR-compliance matrix
 
+## 0601 — no boundary moved, and five that are now documented
+
+Record: [0601](0601-perf-harness-real-producer-shape.md).
+
+No file under `crates/` changed, so no ADR boundary moved: ADR 0005's mandatory
+validation, ADR 0006's preservation and typed-refusal contracts and ADR 0003's
+readback requirement are exactly where change 0595 left them. What this change
+adds to the matrix is evidence about them. The five typed refusals the
+source-backed value-only editor draws from an ordinary Excel package are now
+recorded verbatim, each witnessed on the smallest archive carrying only the one
+producer fact that triggers it, with the enforcing site cited
+(`cell_values/validation.rs:420` for the element whitelist, `:478` for every
+qualified attribute, `cell_values/snapshot.rs:388,444` for worksheet
+relationships and `:1729` for workbook relationships). They are 0362's
+"deliberately narrow" scope working as designed; the compliance observation is
+only that the narrowness is total on real producer output, which is the fact
+survey items XLSX-2 and XML-3 will have to argue against under a frozen design
+record. The one deliberate deviation from Excel's bytes is named in the record:
+the generated parts are compact, with no `\r\n` after the XML declaration,
+because `validate_authored_xml` (`litchi-opc/src/pkgwriter.rs:988`) refuses that
+whitespace for the whole save — 0587's defect 1, unchanged and unaddressed here.
+The `--real-file` opt-in is the only ambient read in the harness; it is bounded,
+opt-in, absent from the default matrix and self-identifying, and a source-policy
+test holds each of those properties.
+
 ## 0603 — a read-side admission decision that moves no refusal
 
 The change is confined to which of two existing paths parses an already-validated
