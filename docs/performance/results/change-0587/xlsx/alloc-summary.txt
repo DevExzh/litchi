@@ -1,0 +1,38 @@
+== source-backed / eager cell-values edit-save (alloc-commit.json); phase metrics = per-sample identical (sample 0 shown)
+xlsx_source_backed_cell_values_one_edit_save medium cells/sheet=48x48 sheets=4 upd=93 p50=6.26ms
+    plan_allocation_metrics            calls=17231 bytes=3013517 realloc=54 region_peak=23139449
+    commit_allocation_metrics          calls=22480 bytes=2598300 realloc=2659 region_peak=22971432
+    commit_core_allocation_metrics     calls=22474 bytes=2572977 realloc=2658 region_peak=22971432
+    publication_allocation_metrics     calls=5022 bytes=1523831 realloc=21 region_peak=23322604
+    other keys: ['staging_allocation_metrics', 'cache_allocation_bypasses']
+xlsx_source_backed_cell_values_one_percent_edit_save medium cells/sheet=48x48 sheets=4 upd=93 p50=24.19ms
+    plan_allocation_metrics            calls=67833 bytes=11412796 realloc=135 region_peak=24714057
+    commit_allocation_metrics          calls=91391 bytes=12436307 realloc=10794 region_peak=26105428
+    commit_core_allocation_metrics     calls=91002 bytes=10536926 realloc=10689 region_peak=26105428
+    publication_allocation_metrics     calls=19246 bytes=4125769 realloc=40 region_peak=26912493
+    other keys: ['staging_allocation_metrics', 'cache_allocation_bypasses']
+xlsx_eager_cell_values_one_edit_save medium cells/sheet=48x48 sheets=4 upd=93 p50=7.28ms
+xlsx_eager_cell_values_one_percent_edit_save medium cells/sheet=48x48 sheets=4 upd=93 p50=26.17ms
+xlsx_source_backed_cell_values_one_edit_save dense-sparse cells/sheet=128x128 sheets=4 upd=178 p50=41.05ms
+    plan_allocation_metrics            calls=116915 bytes=13650801 realloc=56 region_peak=33433495
+    commit_allocation_metrics          calls=151522 bytes=11991930 realloc=17219 region_peak=33262141
+    commit_core_allocation_metrics     calls=151516 bytes=11966607 realloc=17218 region_peak=33262141
+    publication_allocation_metrics     calls=33342 bytes=4184769 realloc=21 region_peak=34742262
+    other keys: ['staging_allocation_metrics', 'cache_allocation_bypasses']
+xlsx_source_backed_cell_values_one_percent_edit_save dense-sparse cells/sheet=128x128 sheets=4 upd=178 p50=45.70ms
+    plan_allocation_metrics            calls=129417 bytes=15203442 realloc=116 region_peak=33492399
+    commit_allocation_metrics          calls=172946 bytes=18258492 realloc=19561 region_peak=34538932
+    commit_core_allocation_metrics     calls=172221 bytes=15342448 realloc=19375 region_peak=34538932
+    publication_allocation_metrics     calls=36622 bytes=5747144 realloc=40 region_peak=35602459
+    other keys: ['staging_allocation_metrics', 'cache_allocation_bypasses']
+xlsx_eager_cell_values_one_edit_save dense-sparse cells/sheet=128x128 sheets=4 upd=178 p50=45.28ms
+xlsx_eager_cell_values_one_percent_edit_save dense-sparse cells/sheet=128x128 sheets=4 upd=178 p50=49.60ms
+== eager Workbook::edit one-cell / one-percent commit+save (alloc-eager-commit.json)
+xlsx_one_cell_commit_save medium cells/sheet=32x32 sheets=4 upd=41 p50=2.64ms
+    keys: []
+xlsx_one_percent_commit_save medium cells/sheet=32x32 sheets=4 upd=41 p50=10.67ms
+    keys: []
+xlsx_one_cell_commit_save dense-wide cells/sheet=256x256 sheets=2 upd=1311 p50=180.15ms
+    keys: []
+xlsx_one_percent_commit_save dense-wide cells/sheet=256x256 sheets=2 upd=1311 p50=364.02ms
+    keys: []

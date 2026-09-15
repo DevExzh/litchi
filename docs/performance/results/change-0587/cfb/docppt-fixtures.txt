@@ -1,0 +1,6 @@
+test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt
+test-data/ole/doc/FloatingPictures.doc
+test-data/ole/ppt/SampleShow.ppt
+test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+test-data/poi/test-data/document/saved-by-table.doc
+test-data/poi/test-data/slideshow/45543.ppt

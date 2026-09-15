@@ -1,0 +1,405 @@
+{
+  "schema": "xlsb-crud-v1",
+  "generator": "litchi-xlsb-semantic-crud-poi-v1",
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/xlsb_crud",
+    "binary_sha256": "90637ba64ca5d3f693a526a8c3ba82a7302bacf5b7c7444db79ceb42de53497a",
+    "binary_bytes": 11607768,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "corpus": {
+    "generator": "litchi-xlsb-semantic-crud-poi-v1",
+    "fixture": "test-data/ooxml/xlsb/cond_format.xlsb",
+    "source_sha256": "801eeac381ebf3e3df0adeaf15020b63ebe9ea8d8326203d0bdf9043147dfc86",
+    "input_bytes": 8253,
+    "worksheet_count": 1,
+    "worksheet_names": [
+      "Sheet1"
+    ],
+    "selected_sheet": 0,
+    "selected_sheet_name": "Sheet1",
+    "selected_coordinate": "E3",
+    "selected_editable_count": 16,
+    "ceil_one_percent_edit_count": 1,
+    "stored_cell_count": 16,
+    "stored_cell_coordinates": [
+      "E3",
+      "E4",
+      "E5",
+      "E6",
+      "E7",
+      "E8",
+      "E9",
+      "E10",
+      "E11",
+      "E12",
+      "E13",
+      "E14",
+      "E15",
+      "E16",
+      "E17",
+      "E18"
+    ],
+    "full_text_sha256": "a08bc6d9cf008048d4d9d8088fbd0a8478c6e3a687aeee153e226c9a140374c5",
+    "full_text_bytes": 114,
+    "package_part_count": 8
+  },
+  "cases": [
+    {
+      "case": "open_identify",
+      "timing_scope": "facade format identification plus XLSB facade open",
+      "input_bytes": 8253,
+      "output_bytes": null,
+      "output_sha256": null,
+      "observed_count": 1,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          126711,
+          122010,
+          119921,
+          119001,
+          117540,
+          116151,
+          125440,
+          116171,
+          116290,
+          116091
+        ],
+        "p50_ns": 117540,
+        "mean_ns": 119532.6,
+        "p95_ns": 126711,
+        "p99_ns": 126711
+      },
+      "gates": {
+        "representative_output_reopen_ok": null,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": null,
+        "unchanged_parts_ok": null,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "worksheet_catalog",
+      "timing_scope": "direct XLSB open plus worksheet count and names",
+      "input_bytes": 8253,
+      "output_bytes": null,
+      "output_sha256": null,
+      "observed_count": 1,
+      "observed_text_bytes": 6,
+      "observed_text_sha256": "c24aa5341413f545faf0f2c4a452a3a5b2567132b36ac061902751b75d0b53cd",
+      "selected_coordinates": [],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          78921,
+          87220,
+          77820,
+          77591,
+          77700,
+          78111,
+          77600,
+          77430,
+          77901,
+          86220
+        ],
+        "p50_ns": 77820,
+        "mean_ns": 79651.4,
+        "p95_ns": 87220,
+        "p99_ns": 87220
+      },
+      "gates": {
+        "representative_output_reopen_ok": null,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": null,
+        "unchanged_parts_ok": null,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "selected_worksheet_cell",
+      "timing_scope": "direct XLSB open plus selected-worksheet snapshot materialization and one cell lookup",
+      "input_bytes": 8253,
+      "output_bytes": null,
+      "output_sha256": null,
+      "observed_count": 1,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [
+        "E3"
+      ],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          79450,
+          80181,
+          79960,
+          79271,
+          78920,
+          79170,
+          79611,
+          78730,
+          78840,
+          78771
+        ],
+        "p50_ns": 79170,
+        "mean_ns": 79290.4,
+        "p95_ns": 80181,
+        "p99_ns": 80181
+      },
+      "gates": {
+        "representative_output_reopen_ok": null,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": null,
+        "unchanged_parts_ok": null,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "full_stored_cell_scan",
+      "timing_scope": "direct XLSB open plus complete source-bound stored-cell scan on the selected worksheet",
+      "input_bytes": 8253,
+      "output_bytes": null,
+      "output_sha256": null,
+      "observed_count": 16,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          79090,
+          79310,
+          79081,
+          79070,
+          78781,
+          79280,
+          78920,
+          78271,
+          86410,
+          79271
+        ],
+        "p50_ns": 79081,
+        "mean_ns": 79748.4,
+        "p95_ns": 86410,
+        "p99_ns": 86410
+      },
+      "gates": {
+        "representative_output_reopen_ok": null,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": null,
+        "unchanged_parts_ok": null,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "full_text",
+      "timing_scope": "facade bytes open plus all-worksheet text extraction",
+      "input_bytes": 8253,
+      "output_bytes": null,
+      "output_sha256": null,
+      "observed_count": 0,
+      "observed_text_bytes": 114,
+      "observed_text_sha256": "a08bc6d9cf008048d4d9d8088fbd0a8478c6e3a687aeee153e226c9a140374c5",
+      "selected_coordinates": [],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          73700,
+          71010,
+          69001,
+          75710,
+          68111,
+          74120,
+          81510,
+          75231,
+          68390,
+          67710
+        ],
+        "p50_ns": 71010,
+        "mean_ns": 72449.3,
+        "p95_ns": 81510,
+        "p99_ns": 81510
+      },
+      "gates": {
+        "representative_output_reopen_ok": null,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": null,
+        "unchanged_parts_ok": null,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "noop_transaction_commit_save",
+      "timing_scope": "direct XLSB open plus exact no-op transaction, commit, publication, and save",
+      "input_bytes": 8253,
+      "output_bytes": 8253,
+      "output_sha256": "801eeac381ebf3e3df0adeaf15020b63ebe9ea8d8326203d0bdf9043147dfc86",
+      "observed_count": null,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          96311,
+          95930,
+          105641,
+          95080,
+          94371,
+          93250,
+          94121,
+          93170,
+          93581,
+          92930
+        ],
+        "p50_ns": 94121,
+        "mean_ns": 95438.5,
+        "p95_ns": 105641,
+        "p99_ns": 105641
+      },
+      "gates": {
+        "representative_output_reopen_ok": true,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": true,
+        "output_matches_across_samples": true,
+        "unchanged_parts_ok": true,
+        "changed_part_names": [],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "edit_one_existing_scalar_save",
+      "timing_scope": "direct XLSB open plus one existing scalar edit, commit, publication, and save",
+      "input_bytes": 8253,
+      "output_bytes": 8237,
+      "output_sha256": "cb80b3733c29f896236fd87b11439e7294e6e94d394bf267fb053c4456fa7b76",
+      "observed_count": null,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [
+        "E3"
+      ],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          209131,
+          182761,
+          189661,
+          183221,
+          170551,
+          168921,
+          180631,
+          168350,
+          165761,
+          165381
+        ],
+        "p50_ns": 170551,
+        "mean_ns": 178436.9,
+        "p95_ns": 209131,
+        "p99_ns": 209131
+      },
+      "gates": {
+        "representative_output_reopen_ok": true,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": true,
+        "unchanged_parts_ok": true,
+        "changed_part_names": [
+          "/xl/worksheets/sheet1.bin"
+        ],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    },
+    {
+      "case": "edit_ceil_one_percent_existing_cells_save",
+      "timing_scope": "direct XLSB open plus deterministic ceil(1%) existing scalar edits on the selected worksheet, commit, publication, and save",
+      "input_bytes": 8253,
+      "output_bytes": 8237,
+      "output_sha256": "cb80b3733c29f896236fd87b11439e7294e6e94d394bf267fb053c4456fa7b76",
+      "observed_count": null,
+      "observed_text_bytes": null,
+      "observed_text_sha256": null,
+      "selected_coordinates": [
+        "E3"
+      ],
+      "statistics": {
+        "warmup": 2,
+        "samples": 10,
+        "samples_ns": [
+          164871,
+          165271,
+          177121,
+          169110,
+          164240,
+          162901,
+          162841,
+          161861,
+          173521,
+          164920
+        ],
+        "p50_ns": 164871,
+        "mean_ns": 166665.7,
+        "p95_ns": 177121,
+        "p99_ns": 177121
+      },
+      "gates": {
+        "representative_output_reopen_ok": true,
+        "semantic_readback_ok": true,
+        "exact_noop_patch": null,
+        "output_matches_across_samples": true,
+        "unchanged_parts_ok": true,
+        "changed_part_names": [
+          "/xl/worksheets/sheet1.bin"
+        ],
+        "malformed_input_refused": true,
+        "tight_limits_refused": true,
+        "tight_cell_limits_refused": true,
+        "sparse_iteration_without_rectangular_expansion": true
+      }
+    }
+  ]
+}

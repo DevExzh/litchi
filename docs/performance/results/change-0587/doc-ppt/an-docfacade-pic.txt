@@ -1,0 +1,17 @@
+== docfacade-pic: total s10=1,019,037 s110=1,019,042 per-op Ir=0
+-- inclusive per-op deltas (top 40)
+             0 640.00%  std::rt::lang_start_internal
+             0 640.00%  (below main)
+             0 320.00%  __libc_start_main@@GLIBC_2.34
+             0 320.00%  docppt_survey::main
+             0 320.00%  main
+             0 320.00%  std::rt::lang_start::{{closure}}
+             0 320.00%  std::sys::backtrace::__rust_begin_short_backtrace
+             0 200.00%  <std::env::Args as core::iter::traits::iterator::Iterator>::next
+             0 200.00%  core::str::converts::from_utf8
+             0 100.00%  0x0000000000023cc0
+             0 100.00%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+-- self per-op deltas (top 25)
+             0 220.00%  docppt_survey::main
+             0 100.00%  core::str::converts::from_utf8
+-- call counts per op (selected)

@@ -1,0 +1,40 @@
+80,541,821 (100.0%)  PROGRAM TOTALS
+59,371,665 (73.72%)  /home/zhuhe/code/litchi/crates/litchi-xlsx/src/raw/worksheet/codec.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+14,258,014 (17.70%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+13,849,335 (17.20%)  /home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+10,081,660 (12.52%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+ 4,718,409 ( 5.86%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 3,773,473 ( 4.69%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 3,623,158 ( 4.50%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+ 1,381,575 ( 1.72%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/xml-substrate/target/release/xmlprobe]
+ 1,032,149 ( 1.28%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::name::NamespaceResolver>::resolve_event
+ 1,019,336 ( 1.27%)  /home/zhuhe/code/litchi/crates/litchi-xlsx/src/workbook/model.rs:<litchi_xlsx::raw::worksheet::model::Parser>::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+   942,949 ( 1.17%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+     1 ( 0.00%)      let content = std::str::from_utf8(processed.as_ref())
+ 2,134 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+14,385 ( 0.02%)              let (namespace, event) = resolver.resolve_event(event);
+80,362 ( 0.10%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (685x)
+     .                       String::from_utf8_lossy(name)
+     .                       String::from_utf8_lossy(name)
+184 ( 0.00%)              let Ok(name) = std::str::from_utf8(raw_name) else {
+2,646 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+  5 ( 0.00%)          let content = std::str::from_utf8(processed.as_ref())
+1,628 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+483 ( 0.00%)              let (namespace, event) = resolver.resolve_event(event);
+3,982 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (23x)
+     32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+    680 ( 0.00%)      let q = str::from_utf8(e.name().as_ref()).map_err(xerr)?.to_string();
+ 12,073 ( 0.01%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (136x)
+  1,004 ( 0.00%)              str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),
+ 23,597 ( 0.03%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (251x)
+     32 ( 0.00%)      process_markup_compatibility(x, &Capabilities::default(), &Limits::default()).map(|x| x.xml)
+13,849,335 (17.20%)  => /home/zhuhe/code/litchi/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility (4x)
+5,334 ( 0.01%)          let (namespace, event) = resolver.resolve_event(event);
+44,589 ( 0.06%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event (254x)
+   69 ( 0.00%)      match std::str::from_utf8(path.as_ref()) {
+2,646 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+    342 ( 0.00%)      fn read_event_impl<'i, B>(&mut self, buf: B) -> Result<Event<'i>>
+ 88,758 ( 0.11%)          let event = self.reader.read_event_impl(buf);
+9,614,574 (11.94%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> (28,586x)
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this
+      .                           // notify next `read_event_impl()` invocation that it needs to pop this

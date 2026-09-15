@@ -1,0 +1,31 @@
+file	bytes	source_pkg	slides	text_edit
+test-data/office-interop/libreoffice-resaved/45543-transition-litchi.ppt	842240	OK	11	OK
+test-data/office-interop/litchi-changed/45543-transition-litchi.ppt	397312	OK	11	OK
+test-data/ole/ppt/SampleShow.ppt	125440	OK	2	OK
+test-data/ole/ppt/empty.ppt	10240	OK	0	OK
+test-data/ole/ppt/empty_textbox.ppt	11776	OK	2	OK
+test-data/ole/ppt/ppt_with_png.ppt	39424	OK	1	OK
+test-data/ole/ppt/text-margins.ppt	44032	OK	1	OK
+test-data/ole/ppt/text_shapes.ppt	11264	OK	1	OK
+test-data/poi/poi-scratchpad/src/main/resources/org/apache/poi/hslf/data/empty.ppt	10240	OK	0	OK
+test-data/poi/test-data/slideshow/41246-1.ppt	275456	OK	36	OK
+test-data/poi/test-data/slideshow/45543.ppt	385024	OK	11	OK
+test-data/poi/test-data/slideshow/54880_chinese.ppt	103936	OK	1	OK
+test-data/poi/test-data/slideshow/Password_Protected-56-hello.ppt	10752	ERR UnsupportedEncryption(CryptoApi)	0	OK
+test-data/poi/test-data/slideshow/Password_Protected-hello.ppt	10752	ERR UnsupportedEncryption(CryptoApi)	0	OK
+test-data/poi/test-data/slideshow/Password_Protected-np-hello.ppt	10752	ERR UnsupportedEncryption(CryptoApi)	0	OK
+test-data/poi/test-data/slideshow/WithComments.ppt	10752	OK	1	OK
+test-data/poi/test-data/slideshow/WithLinks.ppt	20992	OK	2	OK
+test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt	15360	OK	2	OK
+test-data/poi/test-data/slideshow/bug58144-headers-footers-2003.ppt	11776	OK	1	OK
+test-data/poi/test-data/slideshow/bug58144-headers-footers-2007.ppt	142848	OK	1	OK
+test-data/poi/test-data/slideshow/cryptoapi-proc2356.ppt	1341952	ERR UnsupportedEncryption(CryptoApi)	0	OK
+test-data/poi/test-data/slideshow/datetime.ppt	114176	OK	1	OK
+test-data/poi/test-data/slideshow/headers_footers.ppt	12800	OK	2	OK
+test-data/poi/test-data/slideshow/headers_footers_2007.ppt	169472	OK	3	OK
+test-data/poi/test-data/slideshow/incorrect_slide_order.ppt	9728	OK	3	OK
+test-data/poi/test-data/slideshow/ole2-embedding-2003.ppt	40448	OK	1	OK
+test-data/poi/test-data/slideshow/ppt_with_embeded.ppt	180736	OK	1	OK
+test-data/poi/test-data/slideshow/sound.ppt	43520	OK	1	OK
+test-data/poi/test-data/slideshow/testPPT_oleWorkbook.ppt	98304	OK	2	OK
+test-data/poi/test-data/slideshow/text-margins.ppt	44032	OK	1	OK

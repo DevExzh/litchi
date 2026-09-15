@@ -1,0 +1,86 @@
+== pptmid-textedit: total s10=893,187,398 s110=9,009,987,837 per-op Ir=81,168,004
+-- inclusive per-op deltas (top 40)
+   162,336,009 200.00%  (below main)
+   162,336,009 200.00%  std::rt::lang_start_internal
+    81,168,004 100.00%  __libc_start_main@@GLIBC_2.34
+    81,168,004 100.00%  docppt_survey::main
+    81,168,004 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+    81,168,004 100.00%  std::rt::lang_start::{{closure}}
+    81,168,004 100.00%  main
+    81,168,004 100.00%  0x0000000000023cc0
+    81,165,663 100.00%  litchi_ppt::text_edit::SourceSnapshot::open
+    81,165,641 100.00%  litchi_ppt::text_edit::SourceSnapshot::open_with_options
+    81,071,727  99.88%  litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher::plan_splices
+    81,071,724  99.88%  litchi_cfb::splice::<impl litchi_cfb::shared::SharedOleFile>::plan_same_length_stream_splices
+    81,069,839  99.88%  litchi_cfb::overlay::finish_overlay_plan_with_owner
+    80,971,514  99.76%  litchi_cfb::overlay::fingerprints
+    80,194,944  98.80%  sha2::sha256::compress256
+    80,194,896  98.80%  sha2::sha256::soft::unroll::compress
+       791,410   0.98%  __memset_avx2_unaligned_erms
+       188,591   0.23%  litchi_cfb::shared::SharedOleFile::open_source_with_limits
+       182,989   0.23%  litchi_cfb::file::OleFile<R>::open_with_limits
+        92,526   0.11%  litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher::open_with_limits
+        91,954   0.11%  litchi_cfb::shared::SharedOleFile::open_with_limits
+        71,110   0.09%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+        66,067   0.08%  litchi_cfb::file::OleFile<R>::load_directory
+        53,558   0.07%  litchi_cfb::file::SectorChainScratch::collect_exact
+        25,795   0.03%  litchi_cfb::file::OleFile<R>::load_fat
+        22,136   0.03%  litchi_cfb::directory_name::directory_name_data
+        20,112   0.02%  <std::fs::File>::metadata
+        18,052   0.02%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+        12,877   0.02%  __memcpy_avx_unaligned_erms
+        11,746   0.01%  <alloc::string::String>::from_utf16
+        11,282   0.01%  litchi_cfb::file::OleFile<R>::parse_directory_entry
+        10,006   0.01%  litchi_cfb::file::OleFile<R>::build_storage_tree_iterative
+         9,840   0.01%  std::sys::fs::unix::try_statx
+         9,826   0.01%  <litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::version
+         9,721   0.01%  __rustc::__rdl_alloc
+         7,866   0.01%  litchi_cfb::overlay::SourceSnapshot::ensure_length
+         7,680   0.01%  litchi_cfb::file::decode_utf16le
+         7,559   0.01%  litchi_cfb::file::OleFile<R>::read_sector_run_into
+         7,281   0.01%  alloc::raw_vec::RawVecInner<A>::finish_grow
+         6,868   0.01%  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+-- self per-op deltas (top 25)
+    80,194,896  98.80%  sha2::sha256::soft::unroll::compress
+       791,410   0.98%  __memset_avx2_unaligned_erms
+        51,216   0.06%  litchi_cfb::file::SectorChainScratch::collect_exact
+        18,052   0.02%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+        17,168   0.02%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+        12,877   0.02%  __memcpy_avx_unaligned_erms
+        12,516   0.02%  litchi_cfb::directory_name::directory_name_data
+         9,926   0.01%  litchi_cfb::file::OleFile<R>::load_directory
+         6,324   0.01%  litchi_cfb::file::decode_utf16le
+         5,658   0.01%  <alloc::string::String>::from_utf16
+         5,232   0.01%  std::sys::fs::unix::try_statx
+         3,320   0.00%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+         2,683   0.00%  _int_malloc
+         2,448   0.00%  <litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::version
+         2,325   0.00%  free
+         2,004   0.00%  malloc
+         1,776   0.00%  <std::fs::File>::metadata
+         1,640   0.00%  alloc::raw_vec::RawVecInner<A>::finish_grow
+         1,424   0.00%  alloc::vec::Vec<T,A>::extend_trusted
+         1,368   0.00%  litchi_cfb::file::OleFile<R>::parse_directory_entry
+         1,332   0.00%  <u16 as core::slice::cmp::SliceContains>::slice_contains
+         1,200   0.00%  litchi_cfb::file::OleFile<R>::build_storage_tree_iterative
+         1,195   0.00%  _int_free_merge_chunk
+         1,168   0.00%  litchi_core::simd::fmt::hex_encode_avx2
+         1,098   0.00%  litchi_cfb::file::try_push
+-- call counts per op (selected)
+       611.0  __memcpy_avx_unaligned_erms
+        75.0  malloc
+        41.0  alloc::raw_vec::RawVecInner<A>::finish_grow
+        33.0  __memset_avx2_unaligned_erms
+        17.0  _int_malloc
+        12.0  <alloc::string::String>::from_utf16
+        12.0  <alloc::raw_vec::RawVecInner>::finish_grow
+        12.0  <alloc::string::String>::try_reserve
+         8.0  sha2::sha256::compress256
+         8.0  sha2::sha256::soft::unroll::compress
+         3.0  alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+         2.0  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+         2.0  litchi_cfb::file::OleFile<R>::open_with_limits
+         2.0  litchi_cfb::file::collect_sector_chain_exact
+         2.0  litchi_cfb::shared::SharedOleFile::open_source_with_limits
+         2.0  litchi_cfb::file::OleFile<R>::load_directory
+         1.0  litchi_cfb::shared::SharedOleFile::open_with_limits

@@ -1,5 +1,49 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0587: the survey the goal asks for, taken after 586 changes
+
+`docs/GOAL.md`'s DELIVERABLES section requires `HOTSPOTS.md` to carry "ranked
+opportunities by expected total CRUD impact, risk, and ADR compatibility", and
+its REPOSITORY EXPLORATION section requires the complete data path to be mapped
+before it is optimized. The ranked queue this program carried was written before
+change 0190 and headed "provisional until baseline measurements are recorded";
+every later record ranked its own area. [0587](0587-remaining-opportunity-survey.md)
+discharges the deliverable: eleven parallel surveys mapped every OLE2 and OOXML
+area of the path at `2fc5fc657`, screened each candidate against the record set,
+and produced one queue of 36 items with evidence tiers, prerequisites and an ADR
+compliance matrix filled in advance. It authorizes nothing and lands nothing.
+
+**Two findings bear on the goal's evidence rules directly.** The first is that
+the goal's clause "every claim must be scoped to a named scenario, corpus,
+machine, build, and metric" has been honoured to the letter and missed in
+spirit: the corpora were named, and they were synthetic in a way that excludes
+the paths real Office files take. The largest OOXML read cost this program has
+found — the MCE codec's 16.9× expansion of a real Excel worksheet, 12.9× on an
+open plus one cell — is invisible on every generated corpus, and three landed
+optimizations (0525, 0546, the selected-cell stream) are disabled on most real
+files by the same markers. The corpus requirement in PHASE 1, "files from
+multiple real-world producers where licensing permits", is the clause that was
+under-served, and a real-producer shape in the generator is now the first
+prerequisite of the queue. The second is methodological: callgrind runs
+SHA-256 in software, so every profile that could have found the whole-artifact
+hashing in the DOC and PPT snapshots, the PPTX opened transaction and the
+cross-package copy either discounted it as harness cost or was never taken on
+those paths. Hashing must be priced natively, with `perf stat`, the same way
+0579 established for pointer chases.
+
+**What this record does not discharge.** No measurement in it is a paired,
+controlled timing; every fresh figure is a single-leg count or instruction
+profile with the stated caveats, and the top item is measured on one fixture.
+Still required by the goal and unchanged: cold-cache and physical-device
+distributions, real range sources, peak RSS for read paths, concurrency scaling,
+real-producer breadth, cross-platform confirmation, and coverage-guided fuzzing
+on this host — the evidence-gap table in 0587 ranks these by which
+DEFINITION OF DONE clause each blocks, and finds the CI smoke check compares a
+run against a byte-copy of itself.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0585-0586: one hint pays 65.5%, the other pays nothing, and the difference is scope
 
 `docs/GOAL.md`'s DEFINITION OF DONE requires that "selective reads perform work

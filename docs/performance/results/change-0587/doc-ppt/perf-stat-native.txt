@@ -1,0 +1,35 @@
+== ppt-textedit-open n=200
+instructions per-op=4302982
+cycles per-op=3311924
+task-clock per-op=1
+== ppt-source-open n=200
+instructions per-op=616193
+cycles per-op=246882
+task-clock per-op=0
+== doc-snapshot-open n=60
+instructions per-op=46902377
+cycles per-op=36899530
+task-clock per-op=8
+== doc-facade-open n=60
+ per-op=0
+instructions per-op=64480
+cycles per-op=52318
+task-clock per-op=0
+== doc-snapshot-open table-merged-cells.doc n=300
+  instructions per-op=1118082
+  cycles per-op=660581
+== doc-facade-open table-merged-cells.doc n=300
+  instructions per-op=886991
+  cycles per-op=266357
+== doc-snapshot-open noheadfoot-litchi.doc n=300
+  instructions per-op=907415
+  cycles per-op=486617
+== doc-facade-open noheadfoot-litchi.doc n=300
+  instructions per-op=236312
+  cycles per-op=74951
+== doc-facade-open saved-by-table.doc n=200
+  instructions per-op=5903302
+  cycles per-op=1678980
+== doc-facade-open ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc n=200
+  instructions per-op=5685952
+  cycles per-op=2336322

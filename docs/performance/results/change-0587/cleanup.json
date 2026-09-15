@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-15T13:40:00Z",
+  "batch": [
+    "0587-remaining-opportunity-survey"
+  ],
+  "removed": [
+    "the session scratchpad in full: the shared briefing and eleven area briefs, the eleven agents' output directories after their cited files were copied into this packet, the eleven survey reports after copying, the coordinator's drafts (record head and tail, six area-section files, five log-section drafts) and three checker output captures; the scratchpad never exceeded 1 GiB during the batch",
+    "build trees the surveys created: the DOC/PPT driver's 557 MB target (removed by the coordinator as soon as its report arrived), the ZIP/OPC probe's 198 MB target, the XML probe's 805 MB build tree, the XLS type-size scratch target (285 MB) and the litchi-core micro-benchmark target, each deleted by its survey; every raw callgrind.out, perf.data and profiler output behind the retained annotations",
+    "one copy of test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx staged as real.xlsx by the XML survey, dropped from the packet because it is byte-identical to the tracked fixture; the marker-stripped control.xlsx is retained",
+    "two nested duplicate trees produced by a failed first copy of the packet, removed before the packet was checked against every path the record cites",
+    "empty log files from the allocator-harness runs"
+  ],
+  "retained_in_the_repository": [
+    "docs/performance/results/change-0587/: the eleven survey reports verbatim under survey/, and per area every output the reports cite (callgrind annotations, strace captures, request, observation and allocation counts, allocator-harness JSON, type-size summaries, byte-layout censuses, the throwaway driver and probe sources with their manifests, and the XML control fixture with the script that derived it), plus README.md, decision.json and this file"
+  ],
+  "repository_state": "clean after the batch commit; no untracked or modified files remain",
+  "background_tasks": "no measurement process remains; all eleven survey agents completed",
+  "notes": [
+    "the workspace target/ (466 GiB of gitignored build output) is retained as ordinary build state; the XLSX type-size probe was built into it. tools/perf-baseline/target (about 1 GiB) is retained and now also holds the litchi-perf-baseline-alloc and xlsb_crud binaries the XLSX and XLSB surveys built; target/non-iwork-gate is gate output. All are gitignored.",
+    "the first wave of eleven survey agents was terminated by a session usage cap (HTTP 429, 'session limit, resets 7am') before any had read a file. Every agent was relaunched after the reset, in a wave of eight and then a wave of three as slots freed, under a token-economy instruction added to the briefing, and each completed. No evidence was lost because none had been produced. The two lighter audits (evidence gaps, XLSB) ran on a smaller model; the nine code-path surveys on the default model.",
+    "one gate fails and is pre-existing: tools/test_perf_claims.py test_seed_registry_is_structurally_valid expects a fixed set of evidence identifiers and the registry carries two more (abba-0418-pptx-cross-copy-lifecycle, abba-0467-xlsx-cell-attributes-fixed-checkout). Neither the test nor the registry is touched by this batch, so the outcome is identical at 2fc5fc657. The CI invocation of the checker itself passes: check_perf_claims.py --mode strict --evidence-root . validates 10 claims; check_report_claim_classification.py classifies 167 rows; validate_crud_coverage_index.py validates 15 categories and 33 selectors; the report-classification and coverage-index unit tests pass.",
+    "the packet's first copy step used a destination path relative to a changed working directory and produced nested duplicates under two area directories; they were removed and the packet re-checked.",
+    "coordinator hygiene, carried forward from the 0584 packet: each agent had an output directory of its own, the survey reports were retained verbatim rather than paraphrased, the coordinator checked eight cited mechanisms against the source before ranking, and the scratchpad was swept during the batch rather than only at its end."
+  ],
+  "revision": "2fc5fc6572ac322f4aae17f88f90033bcb119f0f",
+  "revision_note": "the base revision the survey measured; this file is committed with the batch rather than after it"
+}

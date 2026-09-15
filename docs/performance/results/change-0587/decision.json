@@ -1,0 +1,43 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0587",
+  "title": "What remains, surveyed across the whole OLE2 and OOXML data path",
+  "decision": "survey retained, no production change",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the ranked work queue in HOTSPOTS.md cited nothing later than change 0190 and no record ranked opportunities across areas; this record replaces it with a 36-item queue screened against all 586 prior records",
+    "every fresh figure is a single-leg count or instruction profile with no A/A control, so no speedup, regression or resource claim is admissible from this batch",
+    "the top-ranked item (MCE codec namespace re-declaration, 12.9x on one real fixture) is sized on one fixture and its breadth is a count of 41 of 60 fixtures, so its corpus-wide size is the first measurement its design record must take",
+    "nothing in the queue is authorized by this record: ten items need a paired measurement, twenty-one a frozen design record, five a proposed ADR or an ADR clarification"
+  ],
+  "accepted_evidence": {
+    "survey_reports": "eleven per-area reports, each with a path map, ranked opportunities carrying record status and an evidence tier (measured, retained, modelled, unknown), a not-an-opportunity list and measurement blockers; retained verbatim",
+    "fresh_counts": "logged positional requests, source observations and allocations for OOXML opens and part reads; strace syscall counts per open for XLS facade, file-source and save routes; xlsb_crud single-leg timings; allocator-harness reports for XLSX commit and read scenarios",
+    "fresh_profiles": "callgrind isolation pairs or single runs for the eager DOC open, the DOC and PPT source snapshot opens, the eager XLSX open-edit-save, the DOCX one-edit save, the PPTX batch edit save and cross copy, and the eager and source-backed XLSX open plus one cell on a real fixture against a marker-stripped control; native perf stat and perf record beside the hashing-dominated ones",
+    "fresh_micro_measurements": "litchi-core source observation, read and budget-charge costs; type sizes for the XLS and XLSX hot types",
+    "fixture_censuses": "MCE marker, cols, shared-string and relationship presence across the real XLSX fixtures; OLE2 corpus byte layout; DOC refusal reasons across all .doc fixtures",
+    "coordinator_verification": "eight cited mechanisms checked against the source before ranking: the codec's per-element namespace emission, the three identity fingerprints per DOC snapshot open, the PPTX fingerprint sites, the per-part .rels audit in the publication plan, the eager error construction in the XLS frame loop, the facade's .doc byte ingress, the per-read ZIP session, the unconditional XLSB reparse"
+  },
+  "accepted_costs": {
+    "single_leg": "every fresh number is one leg on a warm page cache with other agents active on the host; no host-quiescence log",
+    "instruction_counts": "instructions rank work, not latency; rep movsb/stosb are counted per byte; SHA-256 runs in software under valgrind, so hashing shares are about five times their native cycle share",
+    "whole_child_shares": "the DOCX and PPTX callgrind shares are whole-child because no selector times those phases separately",
+    "token_economy": "the first wave of eleven agents was terminated by a session usage cap before reading anything and was relaunched under a reading cap; coverage depth is what each report shows and no deeper"
+  },
+  "known_gaps": {
+    "not_surveyed": "litchi-crypto, litchi-sign and litchi-vba paths; conversion and export sinks; DOCX and PPTX streaming writers beyond 0473-0478; ODF (deferred) and iWork (excluded)",
+    "selectors": "no selector exists for DOC or PPT facade opens, OLE2 length-changing saves, the ordinary OOXML save, XLS full text or all cells, file-backed cold part reads, PPTX phase timers or eager DOCX phases",
+    "corpora": "the harness corpora omit MCE markers, cols, shared strings, worksheet relationships and physical provenance, and every source is in memory; the largest OLE2 fixture is 1.6 MB with no DIFAT, the largest XLSB 22.7 KB, the largest marker-bearing worksheet 210 KB"
+  },
+  "withheld": [
+    "any speedup, regression, cold-cache, physical-device, range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "git_revision": "2fc5fc6572ac322f4aae17f88f90033bcb119f0f",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "note": "all measurements were taken on the shared warm workspace build or scratch projects with path dependencies; no worktree was created and no tracked file was modified by any survey"
+  }
+}

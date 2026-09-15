@@ -1,0 +1,12 @@
+[package]
+name = "xlsx-sizes"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi/crates/litchi-xlsx" }
+litchi-sheet = { path = "/home/zhuhe/code/litchi/crates/litchi-sheet" }
+
+[profile.release]
+lto = true
+panic = "abort"

@@ -1,5 +1,43 @@
 # Performance optimization ADR-compliance matrix
 
+## 0587: survey only, with the compliance matrix filled in advance
+
+[0587](0587-remaining-opportunity-survey.md) modifies nothing under `crates/`
+and requests no exception. It is recorded here because `docs/GOAL.md`
+deliverable 4 asks for an ADR-compliance matrix for every architectural
+optimization, and the record supplies one for each of its 36 ranked items
+*before* any is attempted, so that the next batches start from a stated
+verdict rather than derive one under pressure.
+
+The verdicts fall into four groups. Ten items are **aligned** and need only a
+paired measurement, because they change no byte of output and move no refusal:
+the publication plan's audits of unchanged relationships, the per-member
+Deflate decoder, the XLS frame loop's eager error construction, the lazy DOCX
+paragraph index, the eager DOC open's copies, the XLSB reparse. Twenty-one
+need a **frozen design record** because each moves *when* something happens
+without weakening it: the MCE codec rewrite (a read-side transform whose output
+must be confirmed unpublished), the DOC and PPT snapshot fence (an ADR 0006
+redesign, not a relaxation), the PPTX revision proof format (ADR 0003), the
+XLS lazy index and retained cache (ADR 0005's weighted, evictable caches), and
+the ZIP read-grammar changes gated on 0582's harness. Five need a **proposed
+ADR or clarification**: lazy decode behind the fallible OPC accessors (0581's
+gates), a proof-carrying publication door (0528), the XLS readback owner (ADR
+0006), the OLE2 copy-through writer's physical-layout policy (ADR 0026), and
+the execution context's missing budgets (an ADR 0005 amendment). The rest of
+what a reader of the code would propose is listed against the record or ADR
+that already settles it.
+
+Two findings are for human review rather than for a batch. The ordinary
+documented OOXML save performs **no candidate readback** where ADR 0003
+requires typed readback for staged CRUD and the bounded path pays it (0489); it
+is recorded as a compliance observation, not as an optimization target, and
+it is a cost 0581's C3 would add. And the ordinary DOCX commit compacts
+whitespace across untouched paragraphs, which is either ADR 0006's
+preservation-by-default or a departure from it; the record's DOCX-1(c) waits on
+that answer. One rule-12 item is reported as a defect: MCE output limits are
+enforced on the codec's own 14-17× expansion, so a legitimately sized part can
+be refused as oversized.
+
 ## 0583: a malicious-input defence restored, under rule 12
 
 [0583](0583-zip-local-size-span-bound.md) exists to satisfy `docs/GOAL.md` rule
