@@ -821,6 +821,298 @@ impl ArchiveReadAhead {
     }
 }
 
+/// Hard upper bound for one coalesced structural run read.
+///
+/// A run is fetched by one positional read, so this is the same ceiling the
+/// forward window already puts on a single speculative request.
+pub(super) const MAX_STRUCTURAL_PREFETCH_RUN_BYTES: u64 = MAX_SOURCE_READ_AHEAD_BYTES as u64;
+
+/// Hard upper bound for the bytes one structural prefetch retains at once.
+///
+/// Unlike the forward window, which holds one range, the prefetch holds every
+/// run it admitted until the catalog has been read, because the relationship
+/// walk is a LIFO traversal that revisits runs in no particular order. The
+/// ceiling is measured: across the 533 ZIP containers under `test-data` the
+/// largest run set one package retains is 14,755 bytes and the longest single
+/// run is 9,298 bytes, so neither clamp binds on that corpus and 256 KiB still
+/// bounds the transient allocation at a fraction of one member payload.
+pub(super) const MAX_STRUCTURAL_PREFETCH_BYTES: usize = 256 * 1024;
+
+/// The fewest members a run must hold before one read over it is admitted.
+///
+/// A one-member run trades one request for one request and can only lose: the
+/// member might never be read. Two is the smallest size at which coalescing
+/// can win.
+pub(super) const MIN_STRUCTURAL_PREFETCH_RUN_MEMBERS: usize = 2;
+
+/// One physically contiguous run of structural members.
+///
+/// `start` is the first member's local-header offset and `end` is the furthest
+/// offset any member of the run would read to, so the half-open range is
+/// exactly the union of those members' own first-read spans.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct StructuralRun {
+    start: u64,
+    end: u64,
+    members: usize,
+}
+
+impl StructuralRun {
+    /// The run's first byte.
+    pub(super) const fn start(self) -> u64 {
+        self.start
+    }
+
+    /// The run's length in bytes.
+    pub(super) const fn length(self) -> u64 {
+        self.end.saturating_sub(self.start)
+    }
+}
+
+/// Group per-member first-read spans into the runs one read each can deliver.
+///
+/// `spans` are `(offset, length)` pairs in increasing local-header order, one
+/// per member the caller intends to read. Two neighbours join a run only when
+/// the earlier member's own span already reaches the later member's local
+/// header: that is what makes their union a range with no hole, so every byte
+/// of the run read lies inside some member's own first-read span and no byte
+/// outside those spans is fetched. A member whose span stops short — because a
+/// record the caller did not list sits between them, because the archive has a
+/// gap there, or because the member's declared size clamps its window — starts
+/// a new run instead.
+///
+/// Runs shorter than [`MIN_STRUCTURAL_PREFETCH_RUN_MEMBERS`] and runs longer
+/// than [`MAX_STRUCTURAL_PREFETCH_RUN_BYTES`] are dropped, and admission stops
+/// once [`MAX_STRUCTURAL_PREFETCH_BYTES`] would be exceeded. Dropping a run is
+/// never a refusal: its members keep the grammar they have today.
+pub(super) fn structural_runs<S>(spans: S) -> Result<Vec<StructuralRun>>
+where
+    S: IntoIterator<Item = (u64, u64)>,
+{
+    // The vector is grown fallibly and only when a run is actually admitted,
+    // so a package with no coalescable run allocates nothing at all. The
+    // caller streams its member list in, so nothing is buffered either.
+    let mut runs: Vec<StructuralRun> = Vec::new();
+    let mut retained = 0_usize;
+    let mut current: Option<StructuralRun> = None;
+    let mut previous_offset: Option<u64> = None;
+    for (offset, length) in spans {
+        let Some(end) = offset.checked_add(length) else {
+            // A span that does not fit the address space is not a fact this
+            // layer can act on. Abandon the run and keep the ordinary grammar.
+            current = None;
+            previous_offset = None;
+            continue;
+        };
+        if previous_offset.is_some_and(|previous| offset <= previous) {
+            // Not in increasing local-header order. Refuse to guess.
+            return Ok(Vec::new());
+        }
+        previous_offset = Some(offset);
+        current = match current {
+            Some(run) if run.end >= offset => Some(StructuralRun {
+                start: run.start,
+                end: run.end.max(end),
+                members: run.members.saturating_add(1),
+            }),
+            Some(run) => {
+                push_admitted_run(&mut runs, &mut retained, run)?;
+                Some(StructuralRun {
+                    start: offset,
+                    end,
+                    members: 1,
+                })
+            },
+            None => Some(StructuralRun {
+                start: offset,
+                end,
+                members: 1,
+            }),
+        };
+    }
+    if let Some(run) = current {
+        push_admitted_run(&mut runs, &mut retained, run)?;
+    }
+    Ok(runs)
+}
+
+/// Admit one run, or drop it silently.
+///
+/// Dropping is never a refusal: a run the ceilings exclude, or one too short
+/// to pay for itself, simply leaves its members on the grammar they have
+/// today.
+fn push_admitted_run(
+    runs: &mut Vec<StructuralRun>,
+    retained: &mut usize,
+    run: StructuralRun,
+) -> Result<()> {
+    let Ok(length) = usize::try_from(run.length()) else {
+        return Ok(());
+    };
+    if run.members < MIN_STRUCTURAL_PREFETCH_RUN_MEMBERS
+        || run.length() > MAX_STRUCTURAL_PREFETCH_RUN_BYTES
+        || length == 0
+    {
+        return Ok(());
+    }
+    let Some(total) = retained.checked_add(length) else {
+        return Ok(());
+    };
+    if total > MAX_STRUCTURAL_PREFETCH_BYTES {
+        return Ok(());
+    }
+    runs.try_reserve(1).map_err(|source| OpcError::Allocation {
+        resource: "source-backed OPC structural prefetch runs",
+        source,
+    })?;
+    runs.push(run);
+    *retained = total;
+    Ok(())
+}
+
+/// One run's bytes, as one read delivered them.
+#[derive(Debug)]
+struct PrefetchedRun {
+    base: u64,
+    bytes: Vec<u8>,
+}
+
+/// A bounded, open-scoped prefetch of the structural members' local records.
+///
+/// This is the same kind of object as [`ArchiveReadAhead`] — a buffer of source
+/// bytes below the ZIP substrate — and it is deliberately not the same
+/// mechanism. The forward window guesses forward from wherever the traversal
+/// happens to be; this one is aimed at ranges the caller already knows it will
+/// read, and it never fetches anything else.
+///
+/// It is a cache of source bytes and nothing else. No value is trusted because
+/// it came from here: every byte is parsed, bounded and verified by exactly the
+/// code that parses, bounds and verifies it when each read goes to the source
+/// separately, in the same order, with the same limits charged.
+pub(super) struct StructuralPrefetch {
+    /// Whether any run is retained. Checked before the lock so a package that
+    /// primed nothing, or whose prefetch has been released, pays one relaxed
+    /// load per read and no synchronization.
+    active: AtomicBool,
+    runs: Mutex<Vec<PrefetchedRun>>,
+}
+
+impl StructuralPrefetch {
+    pub(super) fn new() -> Self {
+        Self {
+            active: AtomicBool::new(false),
+            runs: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Fetch every admitted run, one positional read each.
+    ///
+    /// This is best effort in the precise sense that a failure leaves the
+    /// package exactly as it would have been without it: nothing is retained,
+    /// every member read goes to the source as it does today, and the failure
+    /// is observed again by whichever read actually needs those bytes. That is
+    /// invariant 5 of change 0577's frozen design, and it is right here for the
+    /// reason change 0611 gave for refusing it one member wide — this read
+    /// spans several members and belongs to none of them, so abandoning it
+    /// cannot give any member read a second refusal.
+    ///
+    /// A short read is retained as far as it reached. The members it covers in
+    /// full are served from it; every other read reaches the source at exactly
+    /// the offset and length it reaches today.
+    pub(super) fn prime(&self, snapshot: &super::SourceSnapshot, runs: &[StructuralRun]) {
+        if runs.is_empty() {
+            return;
+        }
+        if snapshot.context_ref().is_some() {
+            // A managed open reserves and commits `Resource::InputBytes` per
+            // read and observes cancellation around it. A speculative read
+            // spanning several members would move where those observations
+            // land and how soon a finite input budget is exhausted, which is
+            // not a trade this change makes on a caller's behalf. Managed
+            // opens keep the exact grammar; the caller already gates on this,
+            // and the check is repeated here so the property is local.
+            return;
+        }
+        let mut retained: Vec<PrefetchedRun> = Vec::new();
+        if retained.try_reserve_exact(runs.len()).is_err() {
+            return;
+        }
+        for run in runs {
+            let Ok(length) = usize::try_from(run.length()) else {
+                return;
+            };
+            let mut bytes = Vec::new();
+            if bytes.try_reserve_exact(length).is_err() {
+                return;
+            }
+            bytes.resize(length, 0);
+            let Ok(read) = super::read_source_at_with_context(
+                snapshot,
+                snapshot.context_ref(),
+                run.start(),
+                &mut bytes,
+                "structural prefetch",
+            ) else {
+                return;
+            };
+            if read == 0 {
+                return;
+            }
+            bytes.truncate(read);
+            retained.push(PrefetchedRun {
+                base: run.start(),
+                bytes,
+            });
+        }
+        let mut held = self.lock_runs();
+        *held = retained;
+        drop(held);
+        self.active.store(true, Ordering::Release);
+    }
+
+    /// Answer `output` when one retained run holds every byte of it.
+    ///
+    /// Only a wholly covered, non-empty read is answered. A partly covered one
+    /// would be served in different-sized pieces than the source would have
+    /// delivered, which change 0611 measured moving which of two refusals a
+    /// malformed member reaches; and a zero-length read has nothing to answer
+    /// with, so it keeps the provider trace it has today.
+    pub(super) fn serve(&self, offset: u64, output: &mut [u8]) -> Option<usize> {
+        if output.is_empty() || !self.active.load(Ordering::Acquire) {
+            return None;
+        }
+        let end = offset.checked_add(u64::try_from(output.len()).ok()?)?;
+        let runs = self.lock_runs();
+        let run = runs.iter().find(|run| {
+            let run_end = run
+                .base
+                .saturating_add(u64::try_from(run.bytes.len()).unwrap_or(u64::MAX));
+            run.base <= offset && end <= run_end
+        })?;
+        let start = usize::try_from(offset - run.base).ok()?;
+        let slice = run.bytes.get(start..start.checked_add(output.len())?)?;
+        output.copy_from_slice(slice);
+        Some(output.len())
+    }
+
+    /// Release every retained run.
+    ///
+    /// The prefetch exists for the catalog phase only. Once that phase is over
+    /// the package keeps no speculative bytes, and every later read behaves
+    /// exactly as it does without this mechanism.
+    pub(super) fn clear(&self) {
+        self.active.store(false, Ordering::Release);
+        let taken = std::mem::take(&mut *self.lock_runs());
+        drop(taken);
+    }
+
+    fn lock_runs(&self) -> MutexGuard<'_, Vec<PrefetchedRun>> {
+        self.runs
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
 fn checked_end(start: u64, length: usize) -> Result<u64> {
     start
         .checked_add(
@@ -1795,5 +2087,102 @@ mod tests {
         assert_eq!(read_ahead.read_at(&snap, 0, &mut output).unwrap(), 4);
         assert_eq!(output, [0, 1, 2, 3]);
         assert!(!read_ahead.diagnostics().unwrap().enabled);
+    }
+}
+
+#[cfg(test)]
+mod structural_run_tests {
+    use super::{
+        MAX_STRUCTURAL_PREFETCH_BYTES, MAX_STRUCTURAL_PREFETCH_RUN_BYTES, StructuralRun,
+        structural_runs,
+    };
+
+    fn ranges(runs: &[StructuralRun]) -> Vec<(u64, u64)> {
+        runs.iter().map(|run| (run.start, run.end)).collect()
+    }
+
+    #[test]
+    fn adjoining_spans_join_one_run_and_a_gap_starts_another() {
+        // Members 0-2 adjoin; member 3 starts after a hole; members 3-4 adjoin.
+        let spans = [(0, 100), (100, 100), (200, 100), (400, 100), (500, 100)];
+        let runs = structural_runs(spans).expect("runs");
+        assert_eq!(ranges(&runs), vec![(0, 300), (400, 600)]);
+    }
+
+    #[test]
+    fn a_run_covers_the_union_of_its_members_spans_with_no_hole() {
+        // A span that overruns its neighbour's header — the descriptor room a
+        // member's own first read already fetches — must not extend the run
+        // past the last member's own end.
+        let spans = [(0, 124), (100, 124), (200, 100)];
+        let runs = structural_runs(spans).expect("runs");
+        assert_eq!(ranges(&runs), vec![(0, 300)]);
+    }
+
+    #[test]
+    fn a_single_member_run_is_not_admitted() {
+        let spans = [(0, 100), (500, 100), (1000, 100)];
+        assert!(structural_runs(spans).expect("runs").is_empty());
+    }
+
+    #[test]
+    fn runs_are_disjoint_and_strictly_increasing() {
+        let spans = [
+            (0, 50),
+            (50, 50),
+            (300, 40),
+            (340, 40),
+            (380, 40),
+            (900, 10),
+            (910, 10),
+        ];
+        let runs = structural_runs(spans).expect("runs");
+        assert_eq!(ranges(&runs), vec![(0, 100), (300, 420), (900, 920)]);
+        let mut previous_end = 0;
+        for run in &runs {
+            assert!(run.start >= previous_end, "runs overlap: {runs:?}");
+            previous_end = run.end;
+        }
+    }
+
+    #[test]
+    fn a_run_above_the_single_read_ceiling_is_dropped() {
+        let long = MAX_STRUCTURAL_PREFETCH_RUN_BYTES;
+        let spans = [(0, long), (long, 100)];
+        assert!(structural_runs(spans).expect("runs").is_empty());
+        let spans = [(0, long - 100), (long - 100, 100)];
+        let runs = structural_runs(spans).expect("runs");
+        assert_eq!(ranges(&runs), vec![(0, long)]);
+    }
+
+    #[test]
+    fn admission_stops_at_the_retained_ceiling() {
+        let run_bytes = MAX_STRUCTURAL_PREFETCH_RUN_BYTES;
+        let mut spans = Vec::new();
+        let mut offset = 0u64;
+        // Ten maximum-size runs, separated by holes, is four times the ceiling.
+        for _ in 0..10 {
+            spans.push((offset, run_bytes / 2));
+            spans.push((offset + run_bytes / 2, run_bytes / 2));
+            offset += run_bytes * 2;
+        }
+        let runs = structural_runs(spans).expect("runs");
+        let retained: u64 = runs.iter().map(|run| run.end - run.start).sum();
+        assert!(
+            retained <= MAX_STRUCTURAL_PREFETCH_BYTES as u64,
+            "retained {retained} exceeds the ceiling"
+        );
+        assert_eq!(runs.len(), 4);
+    }
+
+    #[test]
+    fn spans_out_of_order_admit_nothing() {
+        let spans = [(100, 100), (0, 100)];
+        assert!(structural_runs(spans).expect("runs").is_empty());
+    }
+
+    #[test]
+    fn an_empty_member_list_admits_nothing() {
+        assert!(structural_runs([]).expect("runs").is_empty());
     }
 }

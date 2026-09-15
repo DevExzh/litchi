@@ -1,5 +1,37 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
+
+Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
+
+Change 0623 is the first change in this programme to land a frozen design
+written by an earlier record without amending it, and the reason is worth
+recording: 0577 froze not just the mechanism but the *invariants*, and two of
+them turned out to do all the work. Invariant 1 — "every byte read lies inside a
+structural member's own local record" — was written before change 0611 existed,
+and after 0611 it has a sharper form that can be *computed* rather than argued:
+join two members into a run only when the earlier member's own first-read span
+already reaches the later member's local header. That single rule makes the run
+the union of spans the archive already reads, which is why the measured byte
+totals are identical rather than 15% higher as 0577 modelled, and why no
+container in the corpus reads a byte the before leg did not. Invariant 5 — "a
+run read that fails falls back to per-member reads" — is the invariant change
+0611 explicitly *refused* for its own one-member read, and both records are
+right: a read that is a member's own first contact with the source must not be
+retried, and a read that belongs to no member must be abandonable. A design
+record that states its invariants precisely enough to be contradicted by a later
+change is more useful than one that states a mechanism.
+
+The second lesson is about where an optimization is allowed to apply. This one
+is gated to the ordinary unmanaged, exact-policy open. A speculative read
+spanning several members is reserved and committed against
+`Resource::InputBytes` and observed for cancellation as a unit, so under an
+`ExecutionContext` it would move where those observations land — and change
+0611's justification for accepting that class of movement (its span read *was*
+the member read, one for one) is not available here. Declining to apply a saving
+on the managed path is a cheaper answer than sixteen corrected test triggers,
+and it is the honest one: the mechanism genuinely is not invisible there.
+
 ## 0631 — "exact no-ops stay exact" restored in three crates, and the limits of what the corpus can prove
 
 Record: [0631](0631-ooxml-relationship-order-verdict-sites.md).

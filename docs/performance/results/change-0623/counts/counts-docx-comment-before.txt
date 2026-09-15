@@ -1,0 +1,14 @@
+fixture=test-data/ooxml/docx/comment.docx bytes=4926 members=10 cd_offset=4269 cd_size=635 eocd=4904
+  [open] allocs=402 alloc_bytes=430848 version_calls=4
+  open: requests=6 bytes=1690 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/635B local-window(<=640)=3/987B
+  [first read of /word/document.xml (1264 B decoded)] allocs=24 alloc_bytes=83337 version_calls=4
+  first read of /word/document.xml (1264 B decoded): requests=1 bytes=571 :: local-window(<=640)=1/571B
+  [second read of same part] allocs=5 alloc_bytes=235 version_calls=2
+  second read of same part: requests=0 bytes=0 :: 
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 7 parts, physical order (after open)] allocs=461 alloc_bytes=1080816 version_calls=32
+  all 7 parts, physical order (after open): requests=7 bytes=3498 :: local-window(<=640)=5/2007B member-span=2/1491B
+  [all 7 parts, reverse physical order (after open)] allocs=450 alloc_bytes=1000185 version_calls=32
+  all 7 parts, reverse physical order (after open): requests=7 bytes=3498 :: member-span=2/1491B local-window(<=640)=5/2007B
+  [stream_to of /word/document.xml (1264 B)] allocs=400 alloc_bytes=501343 version_calls=36
+  stream_to of /word/document.xml (1264 B): requests=12 bytes=782 :: local-window(<=640)=1/39B payload=2/501B descriptor=2/32B local-fixed(30)=7/210B

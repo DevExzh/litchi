@@ -1,0 +1,1264 @@
+381c381
+< open-cost requests=9 bytes=4250 versions=4
+---
+> open-cost requests=6 bytes=4250 versions=4
+415c415
+< open-cost requests=10 bytes=5046 versions=4
+---
+> open-cost requests=6 bytes=5046 versions=4
+479c479
+< open-cost requests=7 bytes=4049 versions=4
+---
+> open-cost requests=5 bytes=4049 versions=4
+523c523
+< open-cost requests=19 bytes=9021 versions=4
+---
+> open-cost requests=6 bytes=9021 versions=4
+606c606
+< open-cost requests=20 bytes=9305 versions=4
+---
+> open-cost requests=6 bytes=9305 versions=4
+690c690
+< open-cost requests=11 bytes=5578 versions=4
+---
+> open-cost requests=7 bytes=5578 versions=4
+753c753
+< open-cost requests=6 bytes=3346 versions=4
+---
+> open-cost requests=5 bytes=3346 versions=4
+799c799
+< open-cost requests=9 bytes=4442 versions=4
+---
+> open-cost requests=5 bytes=4442 versions=4
+839c839
+< open-cost requests=6 bytes=4214 versions=4
+---
+> open-cost requests=5 bytes=4214 versions=4
+903c903
+< open-cost requests=7 bytes=2371 versions=4
+---
+> open-cost requests=6 bytes=2371 versions=4
+937c937
+< open-cost requests=6 bytes=3547 versions=4
+---
+> open-cost requests=5 bytes=3547 versions=4
+977c977
+< open-cost requests=9 bytes=4398 versions=4
+---
+> open-cost requests=6 bytes=4398 versions=4
+1015c1015
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=4 bytes=2995 versions=4
+1040c1040
+< open-cost requests=7 bytes=3601 versions=4
+---
+> open-cost requests=5 bytes=3601 versions=4
+1074c1074
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=4 bytes=2995 versions=4
+1099c1099
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=4 bytes=2995 versions=4
+1124c1124
+< open-cost requests=6 bytes=1753 versions=4
+---
+> open-cost requests=5 bytes=1729 versions=4
+1149c1149
+< open-cost requests=7 bytes=3557 versions=4
+---
+> open-cost requests=5 bytes=3557 versions=4
+1212c1212
+< open-cost requests=8 bytes=4253 versions=4
+---
+> open-cost requests=6 bytes=4253 versions=4
+1270c1270
+< open-cost requests=7 bytes=3366 versions=4
+---
+> open-cost requests=6 bytes=3366 versions=4
+1305c1305
+< open-cost requests=7 bytes=3519 versions=4
+---
+> open-cost requests=5 bytes=3519 versions=4
+1339c1339
+< open-cost requests=6 bytes=3167 versions=4
+---
+> open-cost requests=4 bytes=3167 versions=4
+1373c1373
+< open-cost requests=6 bytes=2987 versions=4
+---
+> open-cost requests=5 bytes=2987 versions=4
+1398c1398
+< open-cost requests=6 bytes=3073 versions=4
+---
+> open-cost requests=4 bytes=3073 versions=4
+1429c1429
+< open-cost requests=6 bytes=3056 versions=4
+---
+> open-cost requests=4 bytes=3056 versions=4
+1460c1460
+< open-cost requests=7 bytes=3526 versions=4
+---
+> open-cost requests=6 bytes=3526 versions=4
+1519c1519
+< open-cost requests=6 bytes=2796 versions=4
+---
+> open-cost requests=4 bytes=2796 versions=4
+1541c1541
+< open-cost requests=13 bytes=6474 versions=4
+---
+> open-cost requests=7 bytes=6474 versions=4
+1611c1611
+< open-cost requests=10 bytes=5781 versions=4
+---
+> open-cost requests=6 bytes=5781 versions=4
+1682c1682
+< open-cost requests=7 bytes=3336 versions=4
+---
+> open-cost requests=6 bytes=3336 versions=4
+1707c1707
+< open-cost requests=7 bytes=3536 versions=4
+---
+> open-cost requests=6 bytes=3536 versions=4
+1738c1738
+< open-cost requests=7 bytes=3435 versions=4
+---
+> open-cost requests=6 bytes=3435 versions=4
+1766c1766
+< open-cost requests=7 bytes=2306 versions=4
+---
+> open-cost requests=4 bytes=2306 versions=4
+1797c1797
+< open-cost requests=10 bytes=6028 versions=4
+---
+> open-cost requests=7 bytes=6028 versions=4
+1851c1851
+< open-cost requests=6 bytes=3066 versions=4
+---
+> open-cost requests=4 bytes=3066 versions=4
+1882c1882
+< open-cost requests=7 bytes=3336 versions=4
+---
+> open-cost requests=6 bytes=3336 versions=4
+1907c1907
+< open-cost requests=7 bytes=3681 versions=4
+---
+> open-cost requests=6 bytes=3681 versions=4
+1937c1937
+< open-cost requests=7 bytes=4290 versions=4
+---
+> open-cost requests=5 bytes=4290 versions=4
+1992c1992
+< open-cost requests=19 bytes=8897 versions=4
+---
+> open-cost requests=6 bytes=8897 versions=4
+2079c2079
+< open-cost requests=20 bytes=9557 versions=4
+---
+> open-cost requests=9 bytes=9557 versions=4
+2169c2169
+< open-cost requests=48 bytes=21758 versions=4
+---
+> open-cost requests=9 bytes=20822 versions=4
+2379c2379
+< open-cost requests=27 bytes=15067 versions=4
+---
+> open-cost requests=10 bytes=15067 versions=4
+2513c2513
+< open-cost requests=20 bytes=11092 versions=4
+---
+> open-cost requests=12 bytes=11092 versions=4
+2652c2652
+< open-cost requests=20 bytes=9760 versions=4
+---
+> open-cost requests=7 bytes=9760 versions=4
+2747c2747
+< open-cost requests=22 bytes=9319 versions=4
+---
+> open-cost requests=9 bytes=9007 versions=4
+2845c2845
+< open-cost requests=8 bytes=4701 versions=4
+---
+> open-cost requests=6 bytes=4701 versions=4
+2898c2898
+< open-cost requests=8 bytes=4737 versions=4
+---
+> open-cost requests=6 bytes=4737 versions=4
+2948c2948
+< open-cost requests=6 bytes=3326 versions=4
+---
+> open-cost requests=4 bytes=3326 versions=4
+2982c2982
+< open-cost requests=6 bytes=1482 versions=4
+---
+> open-cost requests=5 bytes=1482 versions=4
+2996c2996
+< open-cost requests=9 bytes=5533 versions=4
+---
+> open-cost requests=7 bytes=5533 versions=4
+3066c3066
+< open-cost requests=7 bytes=4166 versions=4
+---
+> open-cost requests=5 bytes=4166 versions=4
+3123c3123
+< open-cost requests=7 bytes=4634 versions=4
+---
+> open-cost requests=6 bytes=4634 versions=4
+3188c3188
+< open-cost requests=11 bytes=5702 versions=4
+---
+> open-cost requests=7 bytes=5702 versions=4
+3248c3248
+< open-cost requests=8 bytes=5127 versions=4
+---
+> open-cost requests=5 bytes=5127 versions=4
+3334c3334
+< open-cost requests=6 bytes=3919 versions=4
+---
+> open-cost requests=4 bytes=3919 versions=4
+3392c3392
+< open-cost requests=6 bytes=3271 versions=4
+---
+> open-cost requests=5 bytes=3271 versions=4
+3426c3426
+< open-cost requests=7 bytes=3855 versions=4
+---
+> open-cost requests=5 bytes=3855 versions=4
+3472c3472
+< open-cost requests=12 bytes=7412 versions=4
+---
+> open-cost requests=7 bytes=7412 versions=4
+3571c3571
+< open-cost requests=6 bytes=2653 versions=4
+---
+> open-cost requests=4 bytes=2653 versions=4
+3605c3605
+< open-cost requests=8 bytes=4831 versions=4
+---
+> open-cost requests=7 bytes=4831 versions=4
+3657c3657
+< open-cost requests=6 bytes=3552 versions=4
+---
+> open-cost requests=5 bytes=3552 versions=4
+3903c3903
+< open-cost requests=24 bytes=10052 versions=4
+---
+> open-cost requests=9 bytes=9692 versions=4
+4006c4006
+< open-cost requests=6 bytes=1782 versions=4
+---
+> open-cost requests=5 bytes=1758 versions=4
+4031c4031
+< open-cost requests=6 bytes=1958 versions=4
+---
+> open-cost requests=5 bytes=1934 versions=4
+4062c4062
+< open-cost requests=24 bytes=10556 versions=4
+---
+> open-cost requests=23 bytes=10532 versions=4
+4171c4171
+< open-cost requests=6 bytes=3302 versions=4
+---
+> open-cost requests=4 bytes=3302 versions=4
+4205c4205
+< open-cost requests=6 bytes=3332 versions=4
+---
+> open-cost requests=4 bytes=3332 versions=4
+4242c4242
+< open-cost requests=6 bytes=3498 versions=4
+---
+> open-cost requests=4 bytes=3498 versions=4
+4285c4285
+< open-cost requests=6 bytes=3093 versions=4
+---
+> open-cost requests=4 bytes=3093 versions=4
+4339c4339
+< open-cost requests=6 bytes=3190 versions=4
+---
+> open-cost requests=4 bytes=3190 versions=4
+4370c4370
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+4398c4398
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+4426c4426
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+4454c4454
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+4482c4482
+< open-cost requests=6 bytes=4402 versions=4
+---
+> open-cost requests=4 bytes=4402 versions=4
+4554c4554
+< open-cost requests=7 bytes=4024 versions=4
+---
+> open-cost requests=5 bytes=4024 versions=4
+4594c4594
+< open-cost requests=7 bytes=4024 versions=4
+---
+> open-cost requests=5 bytes=4024 versions=4
+4634c4634
+< open-cost requests=6 bytes=3676 versions=4
+---
+> open-cost requests=4 bytes=3676 versions=4
+4683c4683
+< open-cost requests=7 bytes=3737 versions=4
+---
+> open-cost requests=5 bytes=3737 versions=4
+4779c4779
+< open-cost requests=7 bytes=4024 versions=4
+---
+> open-cost requests=5 bytes=4024 versions=4
+4819c4819
+< open-cost requests=7 bytes=3844 versions=4
+---
+> open-cost requests=5 bytes=3844 versions=4
+4862c4862
+< open-cost requests=19 bytes=9390 versions=4
+---
+> open-cost requests=8 bytes=9390 versions=4
+4957c4957
+< open-cost requests=23 bytes=11111 versions=4
+---
+> open-cost requests=7 bytes=11111 versions=4
+5070c5070
+< open-cost requests=22 bytes=10582 versions=4
+---
+> open-cost requests=6 bytes=10582 versions=4
+5177c5177
+< open-cost requests=19 bytes=8897 versions=4
+---
+> open-cost requests=6 bytes=8897 versions=4
+5257c5257
+< open-cost requests=19 bytes=8897 versions=4
+---
+> open-cost requests=6 bytes=8897 versions=4
+5337c5337
+< open-cost requests=19 bytes=8897 versions=4
+---
+> open-cost requests=6 bytes=8897 versions=4
+5417c5417
+< open-cost requests=20 bytes=9424 versions=4
+---
+> open-cost requests=7 bytes=9424 versions=4
+5503c5503
+< open-cost requests=20 bytes=9503 versions=4
+---
+> open-cost requests=7 bytes=9503 versions=4
+5589c5589
+< open-cost requests=20 bytes=9424 versions=4
+---
+> open-cost requests=7 bytes=9424 versions=4
+5675c5675
+< open-cost requests=19 bytes=9087 versions=4
+---
+> open-cost requests=9 bytes=9087 versions=4
+5759c5759
+< open-cost requests=20 bytes=9424 versions=4
+---
+> open-cost requests=7 bytes=9424 versions=4
+5845c5845
+< open-cost requests=19 bytes=8861 versions=4
+---
+> open-cost requests=6 bytes=8861 versions=4
+5925c5925
+< open-cost requests=9 bytes=4439 versions=4
+---
+> open-cost requests=6 bytes=4439 versions=4
+5965c5965
+< open-cost requests=29 bytes=13363 versions=4
+---
+> open-cost requests=8 bytes=12859 versions=4
+6099c6099
+< open-cost requests=19 bytes=8861 versions=4
+---
+> open-cost requests=6 bytes=8861 versions=4
+6179c6179
+< open-cost requests=19 bytes=8989 versions=4
+---
+> open-cost requests=6 bytes=8989 versions=4
+6262c6262
+< open-cost requests=24 bytes=11191 versions=4
+---
+> open-cost requests=6 bytes=11191 versions=4
+6368c6368
+< open-cost requests=19 bytes=9519 versions=4
+---
+> open-cost requests=8 bytes=9519 versions=4
+6463c6463
+< open-cost requests=21 bytes=10958 versions=4
+---
+> open-cost requests=8 bytes=10958 versions=4
+6590c6590
+< open-cost requests=19 bytes=9486 versions=4
+---
+> open-cost requests=8 bytes=9486 versions=4
+6685c6685
+< open-cost requests=19 bytes=9390 versions=4
+---
+> open-cost requests=8 bytes=9390 versions=4
+6780c6780
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+6872c6872
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+6964c6964
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+7056c7056
+< open-cost requests=19 bytes=9283 versions=4
+---
+> open-cost requests=7 bytes=9283 versions=4
+7145c7145
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+7237c7237
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+7329c7329
+< open-cost requests=9 bytes=5015 versions=4
+---
+> open-cost requests=7 bytes=5015 versions=4
+7384c7384
+< open-cost requests=19 bytes=9495 versions=4
+---
+> open-cost requests=8 bytes=9495 versions=4
+7479c7479
+< open-cost requests=19 bytes=9519 versions=4
+---
+> open-cost requests=8 bytes=9519 versions=4
+7574c7574
+< open-cost requests=19 bytes=9284 versions=4
+---
+> open-cost requests=7 bytes=9284 versions=4
+7663c7663
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+7755c7755
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+7847c7847
+< open-cost requests=19 bytes=10107 versions=4
+---
+> open-cost requests=6 bytes=10107 versions=4
+7963c7963
+< open-cost requests=19 bytes=9414 versions=4
+---
+> open-cost requests=8 bytes=9414 versions=4
+8058c8058
+< open-cost requests=20 bytes=10018 versions=4
+---
+> open-cost requests=8 bytes=10018 versions=4
+8159c8159
+< open-cost requests=19 bytes=9519 versions=4
+---
+> open-cost requests=8 bytes=9519 versions=4
+8254c8254
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+8346c8346
+< open-cost requests=12 bytes=6535 versions=4
+---
+> open-cost requests=8 bytes=6535 versions=4
+8415c8415
+< open-cost requests=19 bytes=9386 versions=4
+---
+> open-cost requests=7 bytes=9386 versions=4
+8507c8507
+< open-cost requests=19 bytes=9519 versions=4
+---
+> open-cost requests=8 bytes=9519 versions=4
+8602c8602
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+8694c8694
+< open-cost requests=21 bytes=10430 versions=4
+---
+> open-cost requests=7 bytes=10430 versions=4
+8801c8801
+< open-cost requests=19 bytes=9390 versions=4
+---
+> open-cost requests=8 bytes=9390 versions=4
+8896c8896
+< open-cost requests=19 bytes=9438 versions=4
+---
+> open-cost requests=8 bytes=9438 versions=4
+8991c8991
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+9083c9083
+< open-cost requests=19 bytes=9386 versions=4
+---
+> open-cost requests=7 bytes=9386 versions=4
+9175c9175
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+9267c9267
+< open-cost requests=19 bytes=9517 versions=4
+---
+> open-cost requests=7 bytes=9517 versions=4
+9365c9365
+< open-cost requests=21 bytes=10127 versions=4
+---
+> open-cost requests=8 bytes=10127 versions=4
+9464c9464
+< open-cost requests=22 bytes=10901 versions=4
+---
+> open-cost requests=10 bytes=10901 versions=4
+9574c9574
+< open-cost requests=19 bytes=10441 versions=4
+---
+> open-cost requests=8 bytes=10441 versions=4
+9669c9669
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+9761c9761
+< open-cost requests=19 bytes=9385 versions=4
+---
+> open-cost requests=7 bytes=9385 versions=4
+9853c9853
+< open-cost requests=19 bytes=9495 versions=4
+---
+> open-cost requests=8 bytes=9495 versions=4
+9948c9948
+< open-cost requests=19 bytes=8861 versions=4
+---
+> open-cost requests=6 bytes=8861 versions=4
+10028c10028
+< open-cost requests=9 bytes=4461 versions=4
+---
+> open-cost requests=7 bytes=4461 versions=4
+10068c10068
+< open-cost requests=7 bytes=3445 versions=4
+---
+> open-cost requests=5 bytes=3445 versions=4
+10096c10096
+< open-cost requests=9 bytes=4456 versions=4
+---
+> open-cost requests=7 bytes=4456 versions=4
+10136c10136
+< open-cost requests=8 bytes=4134 versions=4
+---
+> open-cost requests=7 bytes=4134 versions=4
+10174c10174
+< open-cost requests=9 bytes=4683 versions=4
+---
+> open-cost requests=6 bytes=4683 versions=4
+10220c10220
+< open-cost requests=7 bytes=3505 versions=4
+---
+> open-cost requests=5 bytes=3505 versions=4
+10248c10248
+< open-cost requests=7 bytes=3351 versions=4
+---
+> open-cost requests=5 bytes=3351 versions=4
+10273c10273
+< open-cost requests=7 bytes=3502 versions=4
+---
+> open-cost requests=5 bytes=3502 versions=4
+10302c10302
+< open-cost requests=10 bytes=5052 versions=4
+---
+> open-cost requests=7 bytes=5052 versions=4
+10346c10346
+< open-cost requests=9 bytes=4973 versions=4
+---
+> open-cost requests=6 bytes=4973 versions=4
+10398c10398
+< open-cost requests=8 bytes=4460 versions=4
+---
+> open-cost requests=6 bytes=4460 versions=4
+10447c10447
+< open-cost requests=45 bytes=26066 versions=4
+---
+> open-cost requests=10 bytes=26066 versions=4
+10774c10774
+< open-cost requests=8 bytes=4413 versions=4
+---
+> open-cost requests=5 bytes=4413 versions=4
+10823c10823
+< open-cost requests=7 bytes=3592 versions=4
+---
+> open-cost requests=5 bytes=3592 versions=4
+10860c10860
+< open-cost requests=7 bytes=3592 versions=4
+---
+> open-cost requests=5 bytes=3592 versions=4
+10897c10897
+< open-cost requests=7 bytes=3836 versions=4
+---
+> open-cost requests=5 bytes=3836 versions=4
+10937c10937
+< open-cost requests=6 bytes=1567 versions=4
+---
+> open-cost requests=5 bytes=1567 versions=4
+10959c10959
+< open-cost requests=6 bytes=3169 versions=4
+---
+> open-cost requests=4 bytes=3169 versions=4
+10990c10990
+< open-cost requests=6 bytes=3169 versions=4
+---
+> open-cost requests=4 bytes=3169 versions=4
+11021c11021
+< open-cost requests=13 bytes=6382 versions=4
+---
+> open-cost requests=7 bytes=6382 versions=4
+11078c11078
+< open-cost requests=7 bytes=3540 versions=4
+---
+> open-cost requests=5 bytes=3540 versions=4
+11112c11112
+< open-cost requests=6 bytes=3153 versions=4
+---
+> open-cost requests=4 bytes=3153 versions=4
+11146c11146
+< open-cost requests=6 bytes=3169 versions=4
+---
+> open-cost requests=4 bytes=3169 versions=4
+11177c11177
+< open-cost requests=6 bytes=3066 versions=4
+---
+> open-cost requests=4 bytes=3066 versions=4
+11208c11208
+< open-cost requests=7 bytes=3507 versions=4
+---
+> open-cost requests=5 bytes=3507 versions=4
+11239c11239
+< open-cost requests=6 bytes=3067 versions=4
+---
+> open-cost requests=5 bytes=3067 versions=4
+11292c11292
+< open-cost requests=7 bytes=3526 versions=4
+---
+> open-cost requests=5 bytes=3526 versions=4
+11323c11323
+< open-cost requests=7 bytes=3532 versions=4
+---
+> open-cost requests=5 bytes=3532 versions=4
+11354c11354
+< open-cost requests=6 bytes=3157 versions=4
+---
+> open-cost requests=4 bytes=3157 versions=4
+11385c11385
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11423c11423
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11461c11461
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11499c11499
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11537c11537
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11575c11575
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11613c11613
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11651c11651
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11689c11689
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11727c11727
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11765c11765
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=7 bytes=4462 versions=4
+11803c11803
+< open-cost requests=6 bytes=2965 versions=4
+---
+> open-cost requests=4 bytes=2965 versions=4
+11831c11831
+< open-cost requests=6 bytes=3172 versions=4
+---
+> open-cost requests=4 bytes=3172 versions=4
+11862c11862
+< open-cost requests=12 bytes=5741 versions=4
+---
+> open-cost requests=5 bytes=5741 versions=4
+11914c11914
+< open-cost requests=6 bytes=3189 versions=4
+---
+> open-cost requests=4 bytes=3189 versions=4
+11945c11945
+< open-cost requests=7 bytes=3587 versions=4
+---
+> open-cost requests=5 bytes=3587 versions=4
+11982c11982
+< open-cost requests=7 bytes=3409 versions=4
+---
+> open-cost requests=6 bytes=3409 versions=4
+12010c12010
+< open-cost requests=6 bytes=3062 versions=4
+---
+> open-cost requests=5 bytes=3062 versions=4
+12038c12038
+< open-cost requests=7 bytes=3582 versions=4
+---
+> open-cost requests=5 bytes=3582 versions=4
+12072c12072
+< open-cost requests=16 bytes=7989 versions=4
+---
+> open-cost requests=6 bytes=7989 versions=4
+12152c12152
+< open-cost requests=18 bytes=9057 versions=4
+---
+> open-cost requests=6 bytes=9057 versions=4
+12249c12249
+< open-cost requests=9 bytes=4391 versions=4
+---
+> open-cost requests=5 bytes=4391 versions=4
+12289c12289
+< open-cost requests=7 bytes=3603 versions=4
+---
+> open-cost requests=5 bytes=3603 versions=4
+12323c12323
+< open-cost requests=6 bytes=2982 versions=4
+---
+> open-cost requests=4 bytes=2982 versions=4
+12351c12351
+< open-cost requests=6 bytes=2982 versions=4
+---
+> open-cost requests=4 bytes=2982 versions=4
+12379c12379
+< open-cost requests=7 bytes=3538 versions=4
+---
+> open-cost requests=5 bytes=3538 versions=4
+12410c12410
+< open-cost requests=7 bytes=3538 versions=4
+---
+> open-cost requests=5 bytes=3538 versions=4
+12466c12466
+< open-cost requests=6 bytes=3084 versions=4
+---
+> open-cost requests=5 bytes=3084 versions=4
+12494c12494
+< open-cost requests=10 bytes=4712 versions=4
+---
+> open-cost requests=5 bytes=4712 versions=4
+12537c12537
+< open-cost requests=7 bytes=3435 versions=4
+---
+> open-cost requests=5 bytes=3435 versions=4
+12565c12565
+< open-cost requests=11 bytes=5584 versions=4
+---
+> open-cost requests=5 bytes=5584 versions=4
+12642c12642
+< open-cost requests=7 bytes=3423 versions=4
+---
+> open-cost requests=5 bytes=3423 versions=4
+12670c12670
+< open-cost requests=6 bytes=2894 versions=4
+---
+> open-cost requests=4 bytes=2894 versions=4
+12692c12692
+< open-cost requests=6 bytes=2978 versions=4
+---
+> open-cost requests=4 bytes=2978 versions=4
+12717c12717
+< open-cost requests=7 bytes=3517 versions=4
+---
+> open-cost requests=5 bytes=3517 versions=4
+12748c12748
+< open-cost requests=7 bytes=3435 versions=4
+---
+> open-cost requests=5 bytes=3435 versions=4
+12776c12776
+< open-cost requests=7 bytes=3435 versions=4
+---
+> open-cost requests=5 bytes=3435 versions=4
+12847c12847
+< open-cost requests=6 bytes=2160 versions=4
+---
+> open-cost requests=5 bytes=2160 versions=4
+12928c12928
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=4 bytes=2995 versions=4
+12953c12953
+< open-cost requests=20 bytes=11665 versions=4
+---
+> open-cost requests=9 bytes=11665 versions=4
+13050c13050
+< open-cost requests=10 bytes=4837 versions=4
+---
+> open-cost requests=7 bytes=4837 versions=4
+13091c13091
+< open-cost requests=7 bytes=3606 versions=4
+---
+> open-cost requests=6 bytes=3606 versions=4
+13123c13123
+< open-cost requests=7 bytes=3614 versions=4
+---
+> open-cost requests=5 bytes=3614 versions=4
+13157c13157
+< open-cost requests=6 bytes=1867 versions=4
+---
+> open-cost requests=5 bytes=1843 versions=4
+13188c13188
+< open-cost requests=6 bytes=3103 versions=4
+---
+> open-cost requests=4 bytes=3103 versions=4
+13216c13216
+< open-cost requests=8 bytes=3777 versions=4
+---
+> open-cost requests=5 bytes=3777 versions=4
+13245c13245
+< open-cost requests=7 bytes=3342 versions=4
+---
+> open-cost requests=5 bytes=3342 versions=4
+13271c13271
+< open-cost requests=7 bytes=3448 versions=4
+---
+> open-cost requests=5 bytes=3448 versions=4
+13300c13300
+< open-cost requests=7 bytes=3410 versions=4
+---
+> open-cost requests=5 bytes=3410 versions=4
+13331c13331
+< open-cost requests=6 bytes=1600 versions=4
+---
+> open-cost requests=5 bytes=1576 versions=4
+13353c13353
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=5 bytes=2995 versions=4
+13378c13378
+< open-cost requests=6 bytes=2894 versions=4
+---
+> open-cost requests=4 bytes=2894 versions=4
+13400c13400
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=5 bytes=4462 versions=4
+13465c13465
+< open-cost requests=7 bytes=3436 versions=4
+---
+> open-cost requests=5 bytes=3436 versions=4
+13496c13496
+< open-cost requests=7 bytes=3352 versions=4
+---
+> open-cost requests=6 bytes=3352 versions=4
+13523c13523
+< open-cost requests=6 bytes=3242 versions=4
+---
+> open-cost requests=4 bytes=3242 versions=4
+13585c13585
+< open-cost requests=6 bytes=3056 versions=4
+---
+> open-cost requests=4 bytes=3056 versions=4
+13616c13616
+< open-cost requests=6 bytes=2965 versions=4
+---
+> open-cost requests=4 bytes=2965 versions=4
+13644c13644
+< open-cost requests=6 bytes=2966 versions=4
+---
+> open-cost requests=4 bytes=2966 versions=4
+13672c13672
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=5 bytes=2995 versions=4
+13697c13697
+< open-cost requests=8 bytes=4033 versions=4
+---
+> open-cost requests=6 bytes=4033 versions=4
+13734c13734
+< open-cost requests=6 bytes=1812 versions=4
+---
+> open-cost requests=5 bytes=1812 versions=4
+13759c13759
+< open-cost requests=6 bytes=3066 versions=4
+---
+> open-cost requests=4 bytes=3066 versions=4
+13790c13790
+< open-cost requests=7 bytes=3500 versions=4
+---
+> open-cost requests=6 bytes=3500 versions=4
+13821c13821
+< open-cost requests=7 bytes=3630 versions=4
+---
+> open-cost requests=5 bytes=3630 versions=4
+13855c13855
+< open-cost requests=7 bytes=3525 versions=4
+---
+> open-cost requests=5 bytes=3525 versions=4
+13886c13886
+< open-cost requests=7 bytes=2261 versions=4
+---
+> open-cost requests=6 bytes=2237 versions=4
+13917c13917
+< open-cost requests=8 bytes=4548 versions=4
+---
+> open-cost requests=6 bytes=4548 versions=4
+13969c13969
+< open-cost requests=8 bytes=5298 versions=4
+---
+> open-cost requests=6 bytes=5298 versions=4
+14036c14036
+< open-cost requests=6 bytes=3302 versions=4
+---
+> open-cost requests=4 bytes=3302 versions=4
+14070c14070
+< open-cost requests=6 bytes=2099 versions=4
+---
+> open-cost requests=5 bytes=2075 versions=4
+14104c14104
+< open-cost requests=6 bytes=3147 versions=4
+---
+> open-cost requests=4 bytes=3147 versions=4
+14135c14135
+< open-cost requests=6 bytes=3147 versions=4
+---
+> open-cost requests=4 bytes=3147 versions=4
+14166c14166
+< open-cost requests=6 bytes=3219 versions=4
+---
+> open-cost requests=4 bytes=3219 versions=4
+14197c14197
+< open-cost requests=6 bytes=3190 versions=4
+---
+> open-cost requests=4 bytes=3190 versions=4
+14228c14228
+< open-cost requests=7 bytes=3622 versions=4
+---
+> open-cost requests=6 bytes=3598 versions=4
+14310c14310
+< open-cost requests=7 bytes=3844 versions=4
+---
+> open-cost requests=5 bytes=3844 versions=4
+14353c14353
+< open-cost requests=6 bytes=3906 versions=4
+---
+> open-cost requests=4 bytes=3906 versions=4
+14411c14411
+< open-cost requests=9 bytes=4940 versions=4
+---
+> open-cost requests=5 bytes=4940 versions=4
+14468c14468
+< open-cost requests=6 bytes=2744 versions=4
+---
+> open-cost requests=5 bytes=2744 versions=4
+14530c14530
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14558c14558
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14586c14586
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14614c14614
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14642c14642
+< open-cost requests=5 bytes=1696 versions=4
+---
+> open-cost requests=4 bytes=2290 versions=4
+14645c14645
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14673c14673
+< open-cost requests=6 bytes=3076 versions=4
+---
+> open-cost requests=4 bytes=3076 versions=4
+14701c14701
+< open-cost requests=6 bytes=3283 versions=4
+---
+> open-cost requests=4 bytes=3283 versions=4
+14704c14704
+< open-cost requests=9 bytes=4342 versions=4
+---
+> open-cost requests=7 bytes=4342 versions=4
+14744c14744
+< open-cost requests=5 bytes=2484 versions=4
+---
+> open-cost requests=5 bytes=2816 versions=4
+14747c14747
+< open-cost requests=45 bytes=21816 versions=4
+---
+> open-cost requests=13 bytes=21816 versions=4
+14971c14971
+< open-cost requests=24 bytes=12886 versions=4
+---
+> open-cost requests=12 bytes=12886 versions=4
+15102c15102
+< open-cost requests=19 bytes=9075 versions=4
+---
+> open-cost requests=8 bytes=9075 versions=4
+15189c15189
+< open-cost requests=19 bytes=9076 versions=4
+---
+> open-cost requests=8 bytes=9076 versions=4
+15276c15276
+< open-cost requests=52 bytes=90765 versions=4
+---
+> open-cost requests=12 bytes=90765 versions=4
+15558c15558
+< open-cost requests=14 bytes=8448 versions=4
+---
+> open-cost requests=10 bytes=8448 versions=4
+15648c15648
+< open-cost requests=11 bytes=5935 versions=4
+---
+> open-cost requests=8 bytes=5935 versions=4
+15717c15717
+< open-cost requests=12 bytes=6129 versions=4
+---
+> open-cost requests=7 bytes=6129 versions=4
+15777c15777
+< open-cost requests=15 bytes=7541 versions=4
+---
+> open-cost requests=6 bytes=7541 versions=4
+15856c15856
+< open-cost requests=9 bytes=7824 versions=4
+---
+> open-cost requests=5 bytes=7824 versions=4
+16022c16022
+< open-cost requests=9 bytes=7824 versions=4
+---
+> open-cost requests=5 bytes=7824 versions=4
+16188c16188
+< open-cost requests=6 bytes=1496 versions=4
+---
+> open-cost requests=4 bytes=1448 versions=4
+16207c16207
+< open-cost requests=6 bytes=2970 versions=4
+---
+> open-cost requests=4 bytes=2970 versions=4
+16254c16254
+< open-cost requests=7 bytes=3441 versions=4
+---
+> open-cost requests=5 bytes=3441 versions=4
+16282c16282
+< open-cost requests=7 bytes=3687 versions=4
+---
+> open-cost requests=5 bytes=3687 versions=4
+16319c16319
+< open-cost requests=6 bytes=3157 versions=4
+---
+> open-cost requests=4 bytes=3157 versions=4
+16350c16350
+< open-cost requests=6 bytes=2864 versions=4
+---
+> open-cost requests=4 bytes=2864 versions=4
+16375c16375
+< open-cost requests=6 bytes=2894 versions=4
+---
+> open-cost requests=4 bytes=2894 versions=4
+16397c16397
+< open-cost requests=7 bytes=3445 versions=4
+---
+> open-cost requests=5 bytes=3445 versions=4
+16425c16425
+< open-cost requests=7 bytes=3526 versions=4
+---
+> open-cost requests=5 bytes=3526 versions=4
+16456c16456
+< open-cost requests=7 bytes=1981 versions=4
+---
+> open-cost requests=5 bytes=1933 versions=4
+16478c16478
+< open-cost requests=7 bytes=3507 versions=4
+---
+> open-cost requests=5 bytes=3507 versions=4
+16509c16509
+< open-cost requests=45 bytes=26066 versions=4
+---
+> open-cost requests=10 bytes=26066 versions=4
+16836c16836
+< open-cost requests=7 bytes=3592 versions=4
+---
+> open-cost requests=5 bytes=3592 versions=4
+16873c16873
+< open-cost requests=7 bytes=3836 versions=4
+---
+> open-cost requests=5 bytes=3836 versions=4
+16913c16913
+< open-cost requests=6 bytes=1567 versions=4
+---
+> open-cost requests=5 bytes=1567 versions=4
+16935c16935
+< open-cost requests=7 bytes=3344 versions=4
+---
+> open-cost requests=5 bytes=3344 versions=4
+16963c16963
+< open-cost requests=13 bytes=6382 versions=4
+---
+> open-cost requests=7 bytes=6382 versions=4
+17020c17020
+< open-cost requests=10 bytes=5751 versions=4
+---
+> open-cost requests=8 bytes=5751 versions=4
+17070c17070
+< open-cost requests=7 bytes=3704 versions=4
+---
+> open-cost requests=5 bytes=3704 versions=4
+17107c17107
+< open-cost requests=16 bytes=7989 versions=4
+---
+> open-cost requests=6 bytes=7989 versions=4
+17187c17187
+< open-cost requests=6 bytes=3087 versions=4
+---
+> open-cost requests=4 bytes=3087 versions=4
+17215c17215
+< open-cost requests=21 bytes=9912 versions=4
+---
+> open-cost requests=8 bytes=9912 versions=4
+17302c17302
+< open-cost requests=8 bytes=4423 versions=4
+---
+> open-cost requests=5 bytes=4423 versions=4
+17351c17351
+< open-cost requests=9 bytes=4484 versions=4
+---
+> open-cost requests=7 bytes=4484 versions=4
+17391c17391
+< open-cost requests=8 bytes=4208 versions=4
+---
+> open-cost requests=6 bytes=4208 versions=4
+17432c17432
+< open-cost requests=8 bytes=4014 versions=4
+---
+> open-cost requests=5 bytes=4014 versions=4
+17472c17472
+< open-cost requests=8 bytes=4582 versions=4
+---
+> open-cost requests=6 bytes=4582 versions=4
+17518c17518
+< open-cost requests=20 bytes=9986 versions=4
+---
+> open-cost requests=11 bytes=9986 versions=4
+17627c17627
+< open-cost requests=6 bytes=3103 versions=4
+---
+> open-cost requests=4 bytes=3103 versions=4
+17655c17655
+< open-cost requests=7 bytes=2196 versions=4
+---
+> open-cost requests=6 bytes=2172 versions=4
+17681c17681
+< open-cost requests=8 bytes=2358 versions=4
+---
+> open-cost requests=6 bytes=2358 versions=4
+17709c17709
+< open-cost requests=8 bytes=4513 versions=4
+---
+> open-cost requests=6 bytes=4513 versions=4
+17758c17758
+< open-cost requests=9 bytes=4462 versions=4
+---
+> open-cost requests=5 bytes=4462 versions=4
+17801c17801
+< open-cost requests=7 bytes=3436 versions=4
+---
+> open-cost requests=5 bytes=3436 versions=4
+17832c17832
+< open-cost requests=6 bytes=1812 versions=4
+---
+> open-cost requests=5 bytes=1812 versions=4
+17857c17857
+< open-cost requests=6 bytes=3087 versions=4
+---
+> open-cost requests=5 bytes=3087 versions=4
+17885c17885
+< open-cost requests=6 bytes=3157 versions=4
+---
+> open-cost requests=4 bytes=3157 versions=4
+17916c17916
+< open-cost requests=9 bytes=5144 versions=4
+---
+> open-cost requests=5 bytes=5144 versions=4
+17973c17973
+< open-cost requests=7 bytes=3435 versions=4
+---
+> open-cost requests=5 bytes=3435 versions=4
+18001c18001
+< open-cost requests=6 bytes=2995 versions=4
+---
+> open-cost requests=4 bytes=2995 versions=4
+18026c18026
+< open-cost requests=7 bytes=3707 versions=4
+---
+> open-cost requests=5 bytes=3707 versions=4
+18069c18069
+< open-cost requests=6 bytes=3346 versions=4
+---
+> open-cost requests=5 bytes=3346 versions=4
+18140c18140
+< open-cost requests=7 bytes=3628 versions=4
+---
+> open-cost requests=5 bytes=3628 versions=4
+18177c18177
+< open-cost requests=7 bytes=3546 versions=4
+---
+> open-cost requests=5 bytes=3546 versions=4
+18211c18211
+< open-cost requests=20 bytes=9420 versions=4
+---
+> open-cost requests=7 bytes=9420 versions=4
+18297c18297
+< open-cost requests=7 bytes=3604 versions=4
+---
+> open-cost requests=5 bytes=3604 versions=4
+18337c18337
+< open-cost requests=7 bytes=3685 versions=4
+---
+> open-cost requests=5 bytes=3685 versions=4
+18374c18374
+< open-cost requests=20 bytes=9393 versions=4
+---
+> open-cost requests=7 bytes=9393 versions=4
+18460c18460
+< open-cost requests=7 bytes=3635 versions=4
+---
+> open-cost requests=5 bytes=3635 versions=4

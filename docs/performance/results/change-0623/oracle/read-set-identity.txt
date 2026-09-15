@@ -1,0 +1,8 @@
+Every read of the open logged on both legs; the byte SETS compared.
+
+container                                                       before  after  after-only B  before-only B
+test-data/ooxml/docx/comment.docx                                    6      6             0              0
+test-data/ooxml/pptx/shape-soft-edges.pptx                          29      8             0              0
+test-data/ooxml/pptx/shapes.pptx                                    24      6             0              0
+test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx              45     10             0              0
+test-data/poi/test-data/slideshow/bug62513.pptx                     52     12             0              0

@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0623",
+  "title": "One read per contiguous run of structural members, and the read-side local-span accessor it needs",
+  "decision": "retained, implemented as change 0577's candidate (c) was frozen, including its invariants and its intra-run error-precedence decision; no amendment to that design was needed",
+  "code_state": "crates/soapberry-zip/src/office.rs (additive only: LocalSpanHint and IndexedArchive::local_span_hint; no existing line changed) and crates/soapberry-zip/tests/member_span_read.rs; crates/litchi-opc/src/source_backed.rs, crates/litchi-opc/src/source_backed/read_ahead.rs, one visibility change in crates/litchi-opc/src/pkgreader.rs, and a new crates/litchi-opc/tests/structural_prefetch.rs. No existing test was modified",
+  "implements": "ZIP-5 of change 0587 (rank 15), which change 0577 froze as candidate (c) and could not implement because the read-side accessor did not exist",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "claim_authorized": false,
+  "reason_codes": [
+    "the OOXML open must read every relationship part (change 0577 settled that against ADR 0005 and ADR 0006) but they sit in a handful of physically contiguous runs, while the relationship walk visits them in LIFO order, so a forward window cannot help and an aimed one can",
+    "IndexedArchive::local_span_hint reports one offset and one length per member -- exactly the span change 0611's read path already fetches -- so litchi-opc can group members into runs whose bytes are the union of those spans with no hole, and fetch each run in one read",
+    "two members join a run only when the earlier member's own span already reaches the later member's local header; that rule is what makes the run read fetch exactly the bytes the per-member reads fetch and no others, which is measured as an identical byte set on five packages",
+    "runs shorter than two members are dropped, because coalescing one member trades one request for one request and can only lose",
+    "measured on change 0587's own probe: open 45 -> 10 requests on the 132-member workbook and 24 -> 6 on shapes.pptx, both at identical bytes; change 0577 modelled 10 on the workbook",
+    "across all 533 ZIP containers under test-data the open costs 4,160 -> 2,569 requests with zero containers costing more, and the corpus reads 1,522 bytes fewer in total",
+    "the mechanism is gated to the ordinary unmanaged, exact-policy open: a multi-member speculative read is reserved, committed and cancellation-observed as a unit, so under an ExecutionContext it would move where a managed refusal fires",
+    "a failed run read is abandoned rather than reported -- change 0577's invariant 5 -- which is right here for the reason change 0611 gave for refusing invariant 5 one member wide: this read belongs to no member"
+  ],
+  "accepted_evidence": {
+    "counts": "change 0587's probe, in the form change 0611 left it plus one classify clause naming a multi-member read run-span, re-run verbatim on both legs against three fixtures; the before leg reproduces change 0611's retained after-counts exactly",
+    "differential": "an open differential over all 533 ZIP containers under test-data, both legs: the open's verdict, its request/byte/source-observation cost, every package and part relationship with id, type, target and mode, every admitted Part with its content type and relationship count, every non-part member with its reason, and the decoded length and CRC-32 of every Part. 18,494 lines per report; the two differ on 316 lines, every one of them an open-cost requests= line",
+    "read_set": "every read of both legs logged on five real packages and the byte sets compared: zero bytes read only by the after leg and zero read only by the before leg, on all five",
+    "model": "a script reimplementing the accessor and the run arithmetic from package bytes alone, used to set both ceilings and validated against the oracle's measured request saving on 530 of the 532 containers both tools read",
+    "timing_transport": "paired A1 B1 B2 A2 with an A/A floor A3 A4 in the same window, 30 samples and 5 warmups per case per leg, taskset -c 17. On the simulated 1 ms-per-request transport of changes 0493 and 0572: -19.93%/-19.90%, -16.59%/-16.56% and -14.14%/-14.18% at p50 on the harness's three range-source opens (one request each, the most those synthetic corpora can coalesce), and -76.58%/-76.56% (-36.92 ms), -74.15%/-74.15% (-18.99 ms) and -71.55%/-71.55% (-22.17 ms) on ConditionalFormattingSamples.xlsx, shapes.pptx and shape-soft-edges.pptx through the same transport. Every A/A floor is at most 0.05% at p50",
+    "falsification": "change 0577 set 'falsified if the delayed-transport open saving is under 20 ms on the 132-member workbook'; the measured saving is 36.92 ms",
+    "tests": "13 integration tests in litchi-opc covering one read per run, no run read touching an ordinary payload, malformed/duplicate-ID/budget refusals at the start, middle and end of a run each compared against the same package with the run read refused, change 0577's e4/e5 admission pair, the fallback, a scattered package, release after the catalog, a managed open, a forward window, source observations, and a guard that the fixtures really coalesce; 8 unit tests for the run arithmetic; 3 tests in soapberry-zip for the accessor",
+    "gates": "thirteen sections, all exit 0: formatting; clippy for soapberry-zip, litchi-opc and litchi-opc --all-features; rustdoc for both crates; a --no-default-features check; the soapberry-zip suite (613 passed, 2 ignored), the litchi-opc suite (707 passed, 1 ignored) and again under --all-features; and the consumer suites litchi-xlsx/litchi-docx/litchi-pptx (3,634 passed, 33 ignored), the litchi facade and litchi-ooxml-common/litchi-core (477 passed)"
+  },
+  "accepted_costs": {
+    "bytes": "zero on the three probe fixtures and negative across the corpus (-1,522 bytes over 533 containers). Two containers read more, both named rather than averaged: OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx +594 B and PackageRelsHasEntities.ooxml +332 B, both packages whose open refuses part-way through a run the prefetch had already fetched, with identical typed errors before and after",
+    "local_cpu": "on a warm local file source the open costs a few microseconds more: +2.86%/+2.38% at p50 on pptx_file_source_open. A third binary, built from the after tree with the member test forced to false so the mechanism is linked but never fires, carries +3.73%/+3.12% of that, and the mechanism itself measures -0.84%/-0.72%. The difference is litchi-opc's compiled size, not the prefetch running. opc_file_source_open showed +12.39%/+6.74% in the four-case window, above the programme's 5% review trigger, and is reported as such; its own A/A floor in the controlled window is -7.41%/+5.92%, larger than every delta in its row, so that case cannot resolve an effect of this size on this host",
+    "retained_memory": "one buffer per admitted run, held only until the catalog call returns, bounded by a named 64 KiB per run and 256 KiB in total; measured largest retained set across the corpus 14,755 bytes and longest run 9,298 bytes",
+    "superset": "the member list is built from names alone, so a relationship part the walk never reaches is still fetched when it sits inside a run. No container in the corpus costs an extra request; a package whose entire contiguous run of relationship parts is unreachable would cost one",
+    "host_contention": "seven other agents were building and measuring on the host throughout; every timing window carries its own A/A floor"
+  },
+  "known_gaps": {
+    "not_measured": "cold page cache, real devices, peak RSS, allocation profiles, instruction counts, syscall counts, concurrency scaling and non-Linux platforms",
+    "transport": "the latency-bearing result is a deterministic simulated transport, a fixed service time per physical request, not a network or filesystem measurement; what it prices is the request count, which is measured deterministically",
+    "managed": "managed opens and explicitly configured forward windows keep the exact grammar by design; no measurement of either is offered",
+    "differential_scope": "change 0582's read-grammar differential was not re-run. It builds soapberry-zip against a slice source and never enters litchi-opc, and the soapberry-zip half of this change is additive with no existing line altered, so that harness would test an unchanged grammar. The grammar that changes is the sequence of reads litchi-opc issues, and the 533-container open differential is the oracle for it",
+    "main_part": "the format crates' main-part read (xl/workbook.xml, ppt/presentation.xml) happens after the catalog, when the prefetch has been released, and is not coalesced"
+  },
+  "withheld": [
+    "any registered speedup claim",
+    "any claim at all on a local or in-process source",
+    "any cold-cache, real-device, peak-RSS, allocation-profile, instruction-count or cross-platform result",
+    "any claim for xlsx_range_source_first_cell, whose 10 requests are identical on both legs",
+    "any claim about managed opens or about an explicitly configured forward read-ahead window"
+  ],
+  "provenance": {
+    "base_commit": "3156bff3bd37d7d282891e8257944bb967566ff7",
+    "branch": "perf/0623-zip-structural-span-accessor-and-prefetch",
+    "before_checkout": "/home/zhuhe/code/litchi-worktrees/before-3156bff3b",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "build": "cargo build --release --locked; workspace [profile.release] lto = true, panic = \"abort\"",
+    "pinning": "taskset -c 17 for every measured process"
+  }
+}

@@ -1,5 +1,29 @@
 # Performance program phase report
 
+## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
+
+Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
+
+**0623 — one read per contiguous run of structural members.** Retained,
+implemented in `soapberry-zip` (`office.rs`, additive only: `LocalSpanHint` and
+`IndexedArchive::local_span_hint`) and `litchi-opc` (`source_backed.rs`,
+`source_backed/read_ahead.rs`), `performance_claim: none`. This is change
+0577's candidate (c), implemented as frozen, including its intra-run
+error-precedence decision. Deterministic counts on change 0587's probe: open 45
+→ 10 requests on the 132-member workbook and 24 → 6 on `shapes.pptx`, both at
+**identical bytes**; `comment.docx` unchanged at 6, its runs being degenerate.
+Across 533 ZIP containers: 4,160 → 2,569 open requests, 0 costing more, 16
+reading fewer bytes, 2 reading more (+332 B and +594 B, both packages whose open
+*refuses* part-way through a prefetched run), and source observations unchanged
+on every one. Correctness: an open differential over all 533 containers,
+comparing the open's verdict, every package and part relationship, every
+admitted Part with its content type, every non-part member and the decoded
+length and CRC of every Part — the two reports differ on **nothing but the
+request count**. Paired ABBA timing on the 1 ms-per-request simulated transport
+of changes 0493 and 0572, 30 samples per leg, CPU 17, A/A floor under 0.1% at
+p50. Nineteen new tests in `litchi-opc` and three in `soapberry-zip`; no existing
+test was changed. Gates: thirteen sections, all exit 0.
+
 ## 0631 — the same document, the same answer
 
 Change 0631 fixes the three sites change 0628 verified and reported: the places in `litchi-xlsx`, `litchi-pptx` and `litchi-docx` where relationship hash order reached a verdict or a public value rather than only a diagnostic string. Each was proved before it was fixed, with a test that repeats the operation **128 times** in one process — every `Relationships::new()` draws a fresh `RandomState` from a per-thread counter, so repeating a load varies the visit order exactly as separate processes do. The XLSX proof: an exact no-op value-only patch captured from a source-backed editor, refused against a reload of the same bytes with `Error::PatchConflict` at attempt 0 of 128. The DOCX proof: an exact no-op content-control package patch refused with *"package signature topology is stale"* at attempt 0 of 128. The PPTX proof is three proofs, because that site has three independently reachable uses, and they were separated by sorting one call site at a time: unfixed gives **two distinct public revisions** from one graph (`{8992939072292297219, 17722918605690345713}`) and *"ActiveX control patch source is stale"*; sorting `load_binary`'s array alone stabilises the revision and exposes *"ActiveX binary part relationships are stale"*; sorting `ensure_binary_part`'s too exposes *"ActiveX descriptor relationship lifecycle does not match the patch target"*; sorting inside `relationship_states` passes everything. Ten tests in three files, six passing and four failing before, ten passing after, with three negative controls that pass on both legs: a single-auxiliary workbook, a single-relationship control graph, a once-signed package, plus genuine differences that must still be refused. The corpus differential runs each repaired path against **321 OOXML fixtures eight times each** and reports the set of distinct verdicts. Before: one fixture unstable — `poi/test-data/xmldsign/hello-world-signed-twice.docx`, whose `origin.sigs.rels` lists `rId2` before `rId1`, returning both "applied" and "stale" across eight publications of the same no-op. After: zero. Diffing the two runs on the verdict columns gives exactly that one fixture line and the two summary lines counting it. The same probe republishes every fixture through `litchi-opc`: **312 of 312** published packages byte-identical across the legs, with the same two open refusals and seven save refusals — none of the three sites is on a publication path and this is the check that says so. `cargo test --no-fail-fast` on both legs, reduced to one line per test binary and diffed, differs in **3 of 189 binaries**, all three the new determinism binaries. Instruction counts, callgrind isolation pairs at N = 1 and N = 11, one fixture per crate: XLSX **+1,472.1 (+0.029%)**, PPTX **+8,216.4 (+0.068%)**, DOCX **−31,696.9 (−0.059%)**. Three independent builds of identical XLSX probe code spread **16,429 Ir** at N = 11, so the first two sit at or under this measurement's own layout floor, and the per-symbol tables are the signal: the sort itself is about **293 Ir per round**, and the DOCX reduction is named symbol by symbol — `core::slice::ascii` −291,024, `is_signature_relationship` −54,538, `root_signature_relationship` −43,362, `PackURI::from_rel_ref` −29,106 — by the `relationship_count != 0` guard that skips a second pass over the root relationships for every unsigned package. Ten gates: `cargo fmt --all --check` plus clippy, doc and test for each of the three crates, all clean, no pre-existing failure on either leg. `performance_claim: none`: the DOCX reduction is reported on one fixture, not registered. [Change and limitations](0631-ooxml-relationship-order-verdict-sites.md); [retained evidence](results/change-0631/README.md).

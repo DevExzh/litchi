@@ -1583,6 +1583,48 @@ impl Metadata {
     }
 }
 
+/// The byte span one indexed member's first read covers.
+///
+/// This is a fact about the caller's own positional source — where a member's
+/// local record begins and how far the read that materializes it reaches — and
+/// carries no ZIP framing across the crate boundary: no header, no field, and
+/// no interpretation of either. A caller uses it to fetch bytes this archive
+/// would fetch anyway, in a shape of its own choosing; it can never be used to
+/// parse a member, because it says nothing about what the bytes mean.
+///
+/// See [`IndexedArchive::local_span_hint`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalSpanHint {
+    offset: u64,
+    length: u64,
+}
+
+impl LocalSpanHint {
+    /// The member's local-header offset, where its first read begins.
+    #[inline]
+    #[must_use]
+    pub const fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    /// How many bytes that first read covers.
+    #[inline]
+    #[must_use]
+    pub const fn length(&self) -> u64 {
+        self.length
+    }
+
+    /// The exclusive end of the span.
+    ///
+    /// The span is bounded by the located central directory and by a named
+    /// ceiling, so this cannot overflow.
+    #[inline]
+    #[must_use]
+    pub const fn end(&self) -> u64 {
+        self.offset.saturating_add(self.length)
+    }
+}
+
 /// Fixed scratch capacity used by [`IndexedArchive::with_verified_entry_reader`].
 ///
 /// The callback reader never allocates a payload-sized buffer.  A callback may
@@ -3991,6 +4033,37 @@ where
             compressed_size: entry.info.wayfinder.compressed_size_hint(),
             uncompressed_size: entry.info.uncompressed_size,
             directory: false,
+        })
+    }
+
+    /// Return the byte span this member's *first* read will cover, or `None`
+    /// when the member keeps the historical two-read grammar.
+    ///
+    /// This reports a fact about the caller's own byte source — one offset and
+    /// one length — and no ZIP framing: no header, no field and no
+    /// interpretation of one crosses the crate boundary, so a caller can act
+    /// on the archive's physical layout without owning the grammar that
+    /// produced it.
+    ///
+    /// The span is exactly the one [`Self::read_entry`] reads for this
+    /// member's first read. A caller that fetches it by some other route, and
+    /// answers the member read from what it fetched, therefore causes no byte
+    /// to be read that this archive would not have read itself. Two members
+    /// whose spans meet — `a.end() >= b.offset()` for the member at the next
+    /// local header — cover a byte range with no hole, which is what makes a
+    /// run of such members fetchable as one range.
+    ///
+    /// Nothing here is a promise about the member's contents. The span is
+    /// computed from the central directory alone, so it is a bound rather than
+    /// a measurement of the local record, and reading it neither validates the
+    /// member nor changes what reading the member validates.
+    #[must_use]
+    pub fn local_span_hint(&self, entry_id: EntryId) -> Option<LocalSpanHint> {
+        let entry = self.indexed_entry(entry_id).ok()?;
+        let length = self.member_span_length(&entry.info.wayfinder)?;
+        Some(LocalSpanHint {
+            offset: entry.info.wayfinder.local_header_offset(),
+            length: length as u64,
         })
     }
 

@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
+
+Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
+
+**ZIP-5 is closed, and with it change 0577.** The OOXML open must read every
+relationship part — 0577 settled that, against ADR 0005 and ADR 0006, and its
+`e4`/`e5` pair showed the admission verdict has no later point to move to. What
+0577 could not do was reduce their *shape*, because the primitive it needed did
+not exist: the read path held no way to ask where a member's local record is.
+`IndexedArchive::local_span_hint` is that primitive — one offset and one length,
+facts the index already holds and no ZIP framing — and `litchi-opc` now uses it
+to fetch each physically contiguous run of structural members in one read before
+a walk that will revisit them in an order of its own. Measured on change 0587's
+own probe: a source-backed open of the 132-member workbook falls from **45
+requests to 10** and `shapes.pptx` from **24 to 6**, both for **exactly the same
+bytes** — the run read is the union of the per-member spans change 0611 already
+reads, so no byte is fetched that was not fetched before. 0577 modelled 10 on
+the workbook and 10 is what it costs. Across all 533 ZIP containers under
+`test-data` the open's requests fall 4,160 → 2,569 (−38.2%; −45.2% over the 321
+OOXML-extension containers) with **zero** containers costing more requests, and
+the corpus reads 1,522 bytes *fewer* in total. `comment.docx` does not move: its
+three structural members sit in three separate runs, which is the degenerate
+case 0577's admission gates required be shown to cost no more. The remaining ZIP
+item on the 0587 queue is **ZIP-6**, the tail-window locate, whose three
+locator reads are now 30% of what a workbook open costs.
+
 ## 0631 — the three consumer-crate sites where OOXML relationship order reached a verdict, closed
 
 Not a hotspot: the three findings change [0628](0628-opc-relationship-iteration-order.md) verified and reported but did not fix, now fixed. 0628 established that inside `litchi-opc` relationship hash order reaches no published byte and no admission verdict, and listed three places in the consumer crates where it reaches something a caller can see. All three are repaired the same way, on the key their neighbours already use — **rId byte order**, the order `Relationships::to_xml` emits the `.rels` member in. **XLSX**: `capture_auxiliary` and `capture_auxiliary_source` (`cell_values/snapshot.rs`) built the styles-and-theme `PartState` array from a `HashMap` walk while `SourceState::same_owner` compares two such arrays with slice `==`, so on the ordinary shape — one styles relationship and one theme relationship, which is nearly every workbook — an **exact no-op** value-only patch captured against one load was refused against another load of the same bytes as `Error::PatchConflict`; a new `auxiliary_relationships` helper orders the two candidates in a `SmallVec` with two inline slots, so the fix allocates nothing. **PPTX**: `relationship_states` ended in a bare `.collect()`, and three of its five uses are compared or hashed — `load_binary`'s array is folded into the **public** `Snapshot::revision()` through `fingerprint` and compared by value in `same_source`, while `install_patch` and `ensure_binary_part` compare a rebuilt unsorted array with `!=` against a target `Snapshot::from_parts` had already sorted; sorting inside `relationship_states` fixes all three and is an idempotent no-op for the two that were already sorted downstream. **DOCX**: `signature_token` sorts its part names but emitted each relationship record straight from a `HashMap` walk, so the returned `Arc<[u8]>` staleness token differed byte-for-byte between loads whenever the root or a signature part owned two relationships; this repository's corpus holds one such document (`poi/test-data/xmldsign/hello-world-signed-twice.docx`), and before the fix eight publications of its exact no-op content-control patch returned two different outcomes — accepted, and refused as *"package signature topology is stale"* — and after it only the first. Cost: **+1,472.1 Ir (+0.029%)** per XLSX open+edit+save and **+8,216.4 (+0.068%)** per PPTX round, both at or under this measurement's own **16,429 Ir** code-layout floor, of which the sort itself is about 293 Ir per round by per-symbol attribution; DOCX is **−31,696.9 (−0.059%)** because the `relationship_count != 0` guard skips a whole second scan of the root relationships for every unsigned package. All 312 republished corpus packages are byte-identical across the legs and 3 of 189 crate test binaries changed status, all three the new determinism binaries. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0631-ooxml-relationship-order-verdict-sites.md); [retained evidence](results/change-0631/README.md).

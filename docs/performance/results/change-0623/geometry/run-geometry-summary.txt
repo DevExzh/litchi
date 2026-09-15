@@ -1,0 +1,2 @@
+# largest retained total: 14755 B (test-data/poi/test-data/slideshow/bug62513.pptx)
+# longest single run: 9298 B (test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx)

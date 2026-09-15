@@ -275,7 +275,7 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for SessionedArchive<'_, R> {
 }
 
 /// Reserved ZIP item name of the content types stream (ECMA-376 Part 2 §10.1.2.2).
-const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+pub(crate) const CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
 
 /// Serialized part with its content and relationships.
 ///

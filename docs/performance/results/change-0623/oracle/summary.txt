@@ -1,0 +1,22 @@
+containers                       533
+open requests                    4160 -> 2569  (-38.2%)
+open requests, 321 OOXML-ext     3440 -> 1886  (-45.2%)
+open bytes                       2392913 -> 2391391  (-1522)
+containers with fewer requests   315
+containers with MORE requests    0
+containers reading fewer bytes   16
+containers reading more bytes    2
+    +332 B   2484 -> 2816   test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml
+    +594 B   1696 -> 2290   test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx
+containers whose version() count changed  0
+request ratio over the 315 that moved: min 0.188 median 0.667 max 0.958
+
+largest absolute savings:
+     52 ->  12  (-40)  test-data/poi/test-data/slideshow/bug62513.pptx
+     48 ->   9  (-39)  test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+     45 ->  10  (-35)  test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx
+     45 ->  10  (-35)  test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx
+     45 ->  13  (-32)  test-data/poi/test-data/slideshow/45545_Comment.pptx
+     29 ->   8  (-21)  test-data/ooxml/pptx/shape-soft-edges.pptx
+     24 ->   6  (-18)  test-data/ooxml/pptx/shapes.pptx
+     27 ->  10  (-17)  test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx

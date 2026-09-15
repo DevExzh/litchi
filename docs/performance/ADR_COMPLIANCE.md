@@ -1,5 +1,37 @@
 # Performance optimization ADR-compliance matrix
 
+## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
+
+Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
+
+**ADR 0005 (bounded resources, caching semantically invisible).** Two named
+ceilings, both measured rather than guessed against the 533 containers under
+`test-data`: `MAX_STRUCTURAL_PREFETCH_RUN_BYTES` = 64 KiB against a longest
+observed run of 9,298 bytes, and `MAX_STRUCTURAL_PREFETCH_BYTES` = 256 KiB
+against a largest observed retained set of 14,755 bytes. Every buffer is
+reserved with `try_reserve_exact` and released when the catalog call returns, on
+every path. "Cache behaviour is semantically invisible" is measured, not
+asserted: the open differential over all 533 containers reports identical
+verdicts, relationships, part catalogs, non-part members and decoded payload
+CRCs. **ADR 0006 (validation, fail-closed).** Every check keeps its position and
+its identity; only the fetch is reordered, never the walk. The `e4`/`e5`
+admission pair change 0577 made decisive is pinned as a regression test, as are
+a malformed relationship part, a duplicate relationship ID and a relationship
+budget refusal at the start, the middle and the end of a coalesced run, each
+shown to reach the same verdict with the coalesced fetch and with it refused.
+**ADR 0011 (ownership).** `soapberry-zip` stays the ZIP grammar owner. What
+crosses the boundary is an offset and a length in the caller's own byte source —
+where bytes are, not what they mean — which is the ownership-respecting addition
+change 0577 said the design needed. The `soapberry-zip` diff is additive: no
+existing line changes, so no read path in that crate can have moved. **Change
+0317 (error precedence).** Unchanged: the prefetch is a separate read that
+belongs to no member, and a failure of it is abandoned rather than reported, so
+every member read keeps exactly one refusal, one cancellation observation and
+one resource reservation. **One stated scope limit.** The mechanism is off for
+a managed open and for an explicitly configured forward window, because a
+multi-member speculative read is budgeted and observed as a unit and would move
+where a managed refusal fires.
+
 ## 0631 — ADR 0006's determinism clause and ADR 0003's conflict rule restored in the OOXML consumer crates
 
 Record: [0631](0631-ooxml-relationship-order-verdict-sites.md).
