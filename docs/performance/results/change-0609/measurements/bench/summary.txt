@@ -1,0 +1,26 @@
+== noheadfoot-litchi (ns per operation, 32 samples x 40 ops per leg) ==
+  A1   n=32 p50=    26118 mean=     26134 p95=    26410 p99=    26844
+  B1   n=32 p50=   165225 mean=    165336 p95=   166023 p99=   168645
+  B2   n=32 p50=   164413 mean=    164379 p95=   164704 p99=   164764
+  A2   n=32 p50=    26262 mean=     26285 p95=    26656 p99=    27085
+  AA1  n=32 p50=    26311 mean=     26327 p95=    26631 p99=    26754
+  AA2  n=32 p50=    26081 mean=     26046 p95=    26498 p99=    26619
+  A (facade-para0) pooled p50=26160 mean=26209 p95=26656 p99=26844
+  B (snap-para0)   pooled p50=164779 mean=164857 p95=165686 p99=166060
+  B vs A at p50: 6.30x  (+529.9%)
+  A vs B at p50: 0.16x  (-84.1%)
+  A/A floor p50 0.9%  p99 0.5%
+
+== documentProperties (ns per operation, 32 samples x 40 ops per leg) ==
+  A1   n=32 p50=    16372 mean=     16318 p95=    16485 p99=    16895
+  B1   n=32 p50=   162050 mean=    162229 p95=   163159 p99=   164151
+  B2   n=32 p50=   161357 mean=    161348 p95=   161902 p99=   162038
+  A2   n=32 p50=    16296 mean=     16308 p95=    16663 p99=    16681
+  AA1  n=32 p50=    16183 mean=     16148 p95=    16372 p99=    16473
+  AA2  n=32 p50=    16179 mean=     16221 p95=    16628 p99=    16790
+  A (facade-para0) pooled p50=16337 mean=16313 p95=16663 p99=16681
+  B (snap-para0)   pooled p50=161768 mean=161788 p95=162772 p99=163351
+  B vs A at p50: 9.90x  (+890.2%)
+  A vs B at p50: 0.10x  (-89.9%)
+  A/A floor p50 0.0%  p99 1.9%
+

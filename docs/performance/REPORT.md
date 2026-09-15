@@ -1,5 +1,26 @@
 # Performance program phase report
 
+## 0609: the facade's `.doc` slurp is the cheaper route — routing it to the source-backed DOC reader would cost 2-5× the cycles and admit four artifacts the eager reader refuses
+
+- [`0609-facade-doc-source-route-design.md`](0609-facade-doc-source-route-design.md)
+  — the facade's `.doc` route, sized against the source-backed DOC reader and
+  frozen as a design. Retained, design only, `performance_claim: none`, **no
+  file under `crates/` changed**. Survey item CORE-1 is closed as falsified on
+  both halves of its own test. Over all 57 `.doc` fixtures the eager facade
+  route admits 42 and `SourceSnapshot::open` admits 8, with four admitted by the
+  snapshot and refused by the facade, so the routes' refusal sets are not
+  nested and a source-first route would admit four artifacts the library calls
+  corrupt. On the four fixtures both admit the snapshot open costs 2.12× to
+  5.07× the native cycles, 7.9× to 15.7× the instructions, 15× the `read_at`
+  calls and about 7× the bytes; on the one query both answer identically it is
+  6.30× and 9.90× slower at p50 against an A/A floor of p50 ≤0.9% and p99
+  ≤1.9%. It wins only on allocator peak (−47.9% to −83.8%) and retained bytes
+  (−80.1% to −97.3%). The record also states why the capability does not exist
+  — the snapshot serves one of the DOC arm's eight queries, on 2 of 57 fixtures,
+  and reaches 31 of one fixture's 134 text bytes — and prices the fallback shape
+  at +25.8% to +245.4%. The oracle is an admission census and a value comparison
+  over all 57 fixtures, both retained.
+
 ## 0610 — a proposed ADR for lazy OPC part decode, with the design frozen and sized
 
 No file under `crates/` changed. Three documents are added: the **proposed, not

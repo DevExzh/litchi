@@ -1,0 +1,101 @@
+=== noheadfoot-litchi snap-open (12 operations, callgrind --cache-sim=no) ===
+43,924,014 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+38,630,304 (87.95%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+
+=== noheadfoot-litchi facade-open (12 operations, callgrind --cache-sim=no) ===
+3,758,412 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                file:function
+--------------------------------------------------------------------------------
+343,584 ( 9.14%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+262,933 ( 7.00%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+161,616 ( 4.30%)  ???:litchi_cfb::directory_name::directory_name_data [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+129,872 ( 3.46%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+112,344 ( 2.99%)  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+104,167 ( 2.77%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 88,476 ( 2.35%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 82,752 ( 2.20%)  ???:litchi_doc::parts::text::TextExtractor::new [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+ 61,522 ( 1.64%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+=== documentProperties snap-open (12 operations, callgrind --cache-sim=no) ===
+41,932,629 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+36,711,072 (87.55%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+
+=== documentProperties facade-open (12 operations, callgrind --cache-sim=no) ===
+3,001,740 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                file:function
+--------------------------------------------------------------------------------
+249,805 ( 8.32%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+210,667 ( 7.02%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+161,616 ( 5.38%)  ???:litchi_cfb::directory_name::directory_name_data [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+107,460 ( 3.58%)  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+101,577 ( 3.38%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 75,043 ( 2.50%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 63,964 ( 2.13%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 60,122 ( 2.00%)  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+ 53,292 ( 1.78%)  ???:litchi_cfb::file::OleFile<R>::open_stream [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+=== table-merged-cells snap-open (12 operations, callgrind --cache-sim=no) ===
+71,163,894 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+65,499,552 (92.04%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+
+=== table-merged-cells facade-open (12 operations, callgrind --cache-sim=no) ===
+9,275,207 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+1,551,962 (16.73%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  486,852 ( 5.25%)  ???:litchi_doc::sprm::parse_sprms [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+  458,676 ( 4.95%)  ???:litchi_doc::parts::pap_bin_table::PapBinTable::parse [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+  433,117 ( 4.67%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  420,704 ( 4.54%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  347,652 ( 3.75%)  ???:<litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+  307,267 ( 3.31%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  258,584 ( 2.79%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  249,984 ( 2.70%)  ???:litchi_doc::parts::tap_parser::codec::definitions::<impl litchi_doc::parts::tap_parser::TapParser>::parse_table_definition [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+=== picture snap-open (6 operations) ===
+2,760,789,955 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+2,714,877,936 (98.34%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+
+=== kwsymphony facade-open (6 operations) ===
+35,618,242 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+11,730,203 (32.93%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+10,360,377 (29.09%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,356,792 ( 3.81%)  ???:litchi_doc::sprm::parse_sprms [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+   709,770 ( 1.99%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   644,724 ( 1.81%)  ???:litchi_cfb::file::collect_sector_chain [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+   642,324 ( 1.80%)  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+   512,203 ( 1.44%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   480,294 ( 1.35%)  ???:litchi_doc::parts::chp_bin_table::ChpBinTable::parse [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+   449,808 ( 1.26%)  ???:litchi_doc::parts::text::TextExtractor::new [/home/zhuhe/code/litchi-worktrees/targets/0609-probe/release/facade_doc_route]
+
+--------------------------------------------------------------------------------

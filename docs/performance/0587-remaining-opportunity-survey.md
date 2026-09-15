@@ -1331,6 +1331,13 @@ gate (0586) and DOC-1's hashing cost must fall first or the route is slower.
 Risk high; frozen design record. Falsified if on the eight admitted fixtures the
 source-backed open is not lower in both instructions and peak RSS, or widening
 admission requires weakening a validation the eager path performs.
+**Falsified by change 0609 on both halves:** the two readers' refusal sets are
+not nested (the snapshot admits four files the eager reader correctly refuses as
+corrupt stylesheets), the snapshot serves one of the facade's eight queries, and
+its identity fences still make six complete artifact reads, so it costs 6.3× to
+9.9× the eager route's latency on the one identical query; only allocator peak
+favours it. The modelled "whole-file read retained for the document's lifetime"
+was also wrong: the slurped `Vec` drops with the package. Designed, not built.
 
 **CORE-2. Collapse the 25 per-open `version()` fences on a file-backed XLS open
 to one per operation boundary** (step 2). ADR 0005 requires observing before

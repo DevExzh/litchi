@@ -1,0 +1,198 @@
+### noheadfoot-litchi snap-open
+mode	snap-open
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+ok	true
+read_calls	30
+read_bytes	75741
+version_calls	116
+len_calls	35
+file_bytes	10240
+### noheadfoot-litchi snap-para0
+mode	snap-para0
+file	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+ok	true
+read_calls	59
+read_bytes	169217
+version_calls	257
+len_calls	77
+file_bytes	10240
+### documentProperties snap-open
+mode	snap-open
+file	test-data/ole/doc/documentProperties.doc
+ok	true
+read_calls	30
+read_bytes	72669
+version_calls	116
+len_calls	35
+file_bytes	9728
+### documentProperties snap-para0
+mode	snap-para0
+file	test-data/ole/doc/documentProperties.doc
+ok	true
+read_calls	59
+read_bytes	161825
+version_calls	257
+len_calls	77
+file_bytes	9728
+### table-merged-cells snap-open
+mode	snap-open
+file	test-data/ole/doc/table-merged-cells.doc
+ok	true
+read_calls	30
+read_bytes	118749
+version_calls	116
+len_calls	35
+file_bytes	17408
+### table-merged-cells snap-para0
+mode	snap-para0
+file	test-data/ole/doc/table-merged-cells.doc
+ok	true
+read_calls	43
+read_bytes	193671
+version_calls	185
+len_calls	56
+file_bytes	17408
+### lists-margins snap-open
+mode	snap-open
+file	test-data/ole/doc/lists-margins.doc
+ok	true
+read_calls	30
+read_bytes	78813
+version_calls	116
+len_calls	35
+file_bytes	10752
+### lists-margins snap-para0
+mode	snap-para0
+file	test-data/ole/doc/lists-margins.doc
+ok	true
+read_calls	59
+read_bytes	176467
+version_calls	257
+len_calls	77
+file_bytes	10752
+### duplicate-style-names snap-open
+mode	snap-open
+file	test-data/ole/doc/duplicate-style-names.doc
+ok	true
+read_calls	31
+read_bytes	401149
+version_calls	116
+len_calls	35
+file_bytes	64512
+### duplicate-style-names snap-para0
+mode	snap-para0
+file	test-data/ole/doc/duplicate-style-names.doc
+ok	true
+read_calls	60
+read_bytes	929113
+version_calls	257
+len_calls	77
+file_bytes	64512
+### endingnote snap-open
+mode	snap-open
+file	test-data/ole/doc/endingnote.doc
+ok	true
+read_calls	30
+read_bytes	72669
+version_calls	116
+len_calls	35
+file_bytes	9728
+### endingnote snap-para0
+mode	snap-para0
+file	test-data/ole/doc/endingnote.doc
+ok	true
+read_calls	43
+read_bytes	116739
+version_calls	185
+len_calls	56
+file_bytes	9728
+### footnote snap-open
+mode	snap-open
+file	test-data/ole/doc/footnote.doc
+ok	true
+read_calls	30
+read_bytes	72669
+version_calls	116
+len_calls	35
+file_bytes	9728
+### footnote snap-para0
+mode	snap-para0
+file	test-data/ole/doc/footnote.doc
+ok	true
+read_calls	43
+read_bytes	116727
+version_calls	185
+len_calls	56
+file_bytes	9728
+### picture snap-open
+mode	snap-open
+file	test-data/ole/doc/picture.doc
+ok	true
+read_calls	46
+read_bytes	8761309
+version_calls	140
+len_calls	35
+file_bytes	1448448
+### picture snap-para0
+mode	snap-para0
+file	test-data/ole/doc/picture.doc
+ok	true
+read_calls	68
+read_bytes	14586293
+version_calls	225
+len_calls	56
+file_bytes	1448448
+### saved-by-table snap-open
+mode	snap-open
+file	test-data/poi/test-data/document/saved-by-table.doc
+ok	false
+read_calls	14
+read_bytes	137728
+version_calls	46
+len_calls	15
+file_bytes	65024
+### saved-by-table snap-para0
+mode	snap-para0
+file	test-data/poi/test-data/document/saved-by-table.doc
+ok	false
+read_calls	14
+read_bytes	137728
+version_calls	46
+len_calls	15
+file_bytes	65024
+### FloatingPictures snap-open
+mode	snap-open
+file	test-data/ole/doc/FloatingPictures.doc
+ok	false
+read_calls	29
+read_bytes	689152
+version_calls	56
+len_calls	15
+file_bytes	335360
+### FloatingPictures snap-para0
+mode	snap-para0
+file	test-data/ole/doc/FloatingPictures.doc
+ok	false
+read_calls	29
+read_bytes	689152
+version_calls	56
+len_calls	15
+file_bytes	335360
+### kwsymphony snap-open
+mode	snap-open
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+ok	false
+read_calls	18
+read_bytes	3285078
+version_calls	52
+len_calls	15
+file_bytes	1619457
+### kwsymphony snap-para0
+mode	snap-para0
+file	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc
+ok	false
+read_calls	18
+read_bytes	3285078
+version_calls	52
+len_calls	15
+file_bytes	1619457

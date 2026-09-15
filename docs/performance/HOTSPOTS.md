@@ -1,5 +1,44 @@
 # Performance hotspot inventory
 
+## 0609: the facade's `.doc` slurp is the cheaper route — routing it to the source-backed DOC reader would cost 2-5× the cycles and admit four artifacts the eager reader refuses
+
+**The facade's `.doc` ingress, sized and closed (item CORE-1 of change 0587).**
+Change [0609](../../0609-facade-doc-source-route-design.md) is a frozen design
+record with no production change. `litchi::Document::open(path)` for `.doc`
+reads the whole file once (`read_path_source_bytes`,
+`crates/litchi/src/detection_smart/detected.rs:1198`) and parses it eagerly;
+CORE-1 proposed routing it to `litchi_doc::body_text::source::SourceSnapshot`.
+It is falsified on both halves of 0587's own test. **Measured** over all 57
+`.doc` fixtures: the snapshot admits 8 and the facade 42, but the two
+populations are not nested — **four artifacts the snapshot admits are refused by
+the facade** with `CorruptedFile("invalid stylesheet: style names and aliases
+must be unique")`, a validation the snapshot never performs, so a source-first
+route would widen the facade's admitted population. **Measured** cost, native
+`perf stat` isolation pairs pinned to CPU 29: the snapshot open is 342,797 to
+435,287 cycles against the facade's 67,643 to 205,021 on the four fixtures both
+admit (2.12× to 5.07×), 3.46 M to 5.90 M Ir against 0.22 M to 0.74 M (7.9× to
+15.7×), 30 `read_at` calls against 2 and 153 `statx` against 11, and 6.30× to
+9.90× the p50 latency of the one query both answer identically, against an A/A
+floor of p50 ≤0.9% and p99 ≤1.9%. The mechanism is that `identity_fingerprint`
+(`crates/litchi-doc/src/body_text/source.rs:2089`) reaches
+`finish_overlay_plan_with_owner`, which fingerprints **twice** for a generic
+`ReadAt`, and `SourceSnapshot::open` takes three identity passes: **six complete
+artifact reads per open**, 6.05× to 7.47× the file. Change 0589 halved the
+hashers driven over those reads, not the reads. The snapshot's cost therefore
+fits `217,274 + 12.90 × file_bytes` cycles (+1.5% and +0.4% on two held-out
+fixtures) while the eager open's tracks text units and formatting entries
+(change 0596), so the source-backed route is worst precisely where a positional
+reader should win: `picture.doc` (1.45 MB) costs 18.9 M cycles to open, 6.5×
+what the facade spends opening the larger 1.62 MB kwsymphony form, and then
+refuses `paragraph(0)` with `StructuralContent`. The snapshot wins on one axis
+only: allocator peak 47.9% to 83.8% lower, retained bytes 80.1% to 97.3% lower.
+Two 0587 entries are corrected: CORE-1's modelled "whole-file read retained for
+the document's lifetime" is wrong — the slurped `Vec` drops with the package, so
+the 1.62 MB fixture retains 1,090,299 bytes — and the DOC/PPT area's "routing
+the facade to `SourceSnapshot` ... is slower than the eager open today" now has
+the numbers. What remains open in this area is not this route: it is the
+snapshot's own per-byte term, which would have to disappear rather than shrink.
+
 ## 0610 — an XLSX open-edit-save reads one part of ninety
 
 Design only, implementing 0587's SAVE-5 and drafting the proposed ADR that gate

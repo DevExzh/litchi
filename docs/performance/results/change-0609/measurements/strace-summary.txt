@@ -1,0 +1,12 @@
+noheadfoot-litchi	facade-open	pread=2.0	pread_bytes=10244	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+noheadfoot-litchi	snap-open	pread=30.0	pread_bytes=75741	read=0.0	read_bytes=0	statx=153.0	openat=1.0	lseek=0.0
+documentProperties	facade-open	pread=2.0	pread_bytes=9732	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+documentProperties	snap-open	pread=30.0	pread_bytes=72669	read=0.0	read_bytes=5	statx=153.0	openat=1.0	lseek=0.0
+table-merged-cells	facade-open	pread=2.0	pread_bytes=17412	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+table-merged-cells	snap-open	pread=30.0	pread_bytes=118749	read=0.0	read_bytes=0	statx=153.0	openat=1.0	lseek=0.0
+kwsymphony	facade-open	pread=2.0	pread_bytes=1619461	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+kwsymphony	snap-open	pread=0.0	pread_bytes=0	read=0.0	read_bytes=0	statx=0.0	openat=0.0	lseek=0.0
+FloatingPictures	facade-open	pread=2.0	pread_bytes=335364	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+FloatingPictures	snap-open	pread=0.0	pread_bytes=0	read=0.0	read_bytes=0	statx=0.0	openat=0.0	lseek=0.0
+saved-by-table	facade-open	pread=2.0	pread_bytes=65028	read=0.0	read_bytes=0	statx=11.0	openat=1.0	lseek=0.0
+saved-by-table	snap-open	pread=0.0	pread_bytes=0	read=0.0	read_bytes=0	statx=0.0	openat=0.0	lseek=0.0
