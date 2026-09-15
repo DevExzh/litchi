@@ -1,5 +1,38 @@
 # Performance program phase report
 
+## Change 0591: the ordinary DOCX edit scans the main part twice
+
+Change 0591 removes two of the four whole-part scans in the `litchi-docx`
+ordinary edit-and-save lifecycle. `Patch::target_for_exact_unmanaged_source`
+(`document/transaction.rs`) reproduces what `Patch::apply` decides when its
+source is the snapshot `document_snapshot` would have built — no source
+identity, equal length, then pointer identity or a byte comparison — and returns
+the patch's own retained target, so `Package::apply_document_patch`
+(`package/package/document.rs`) no longer copies and rescans the main part to
+answer a `memcmp`; `document_patch_source` checks package staleness and main-part
+resolution first, in the original order, and routes everything the byte proof
+does not settle back through `document_snapshot` and `Patch::apply` unchanged.
+`Snapshot::with_spliced_paragraphs` derives the post-rewrite layout for
+`replace_paragraph_text` and `replace_body_paragraph_texts` instead of rescanning,
+accepting a splice only when its range is exactly one direct-body paragraph and
+`preserves_body_child_shape` proves the replacement fragment keeps every
+whole-document verdict the scanner reaches, and falling back to the full rescan
+otherwise. Validation passed `litchi-docx` `1,457/1,457` across 51 test binaries
+with nine new tests: a rescan differential over 297 accepted paragraph rewrites
+on 53 DOCX fixtures and over the generated 24/200/10,000-paragraph corpora, both
+asserting their own coverage; eight shape-changing replacements and three
+off-boundary splices declining the derivation; a declined splice still producing
+a byte- and layout-identical snapshot; and an exact no-op keeping the main part's
+payload `Arc`, a mismatched source still returning `StaleSource`, and an
+unparsable main part still returning `TransactionError::Document`. **Measured**,
+callgrind isolation pair on CPU 11: `Snapshot::from_xml` 12 → 6 calls and
+280.51 M → 140.48 M Ir per `docx_semantic_one_edit_save` lifecycle, and
+−33.27% Ir in the isolated timed region of its largest shape. The paired native
+timings — p50 −18.64% to −49.95% over all nine scenarios — are reported beside
+this host's A/A floor of 2.06% p50 in the same window and are not a speedup
+claim. See [Change 0591](0591-docx-edit-single-scan.md);
+`performance_claim: none`.
+
 ## Change 0590: PPTX opened-transaction revision reuse
 
 Change 0590 removes two of the four complete-package hashes in the

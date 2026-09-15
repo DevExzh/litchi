@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0591",
+  "title": "The ordinary DOCX edit scans the main part twice, not four times",
+  "decision": "retained, implemented",
+  "code_state": "crates/litchi-docx only: document/transaction.rs, package/package/document.rs, package/tests/graph.rs",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": "parts (a) and (b) of item DOCX-1 in the change 0587 queue (rank 4); part (c) is not implemented",
+  "reason_codes": [
+    "Patch::apply reads nothing from its source snapshot but an exact byte comparison, so apply_document_patch was copying and rescanning the whole main part to answer a memcmp; the patch now answers it from main.blob() and hands back its own retained target",
+    "a same-structure direct-body paragraph rewrite determines the new layout exactly - the rewritten paragraph resizes and every later direct-body range shifts by the same delta - so the rescan it triggered rebuilt a layout that was already known",
+    "both reuses are conditional and fall back to the unchanged route, so every refusal, typed error and error identity stays where it was",
+    "the layout derivation is accepted only against a paragraph-sized proof that the replacement fragment keeps every whole-document verdict scan_document reaches: one balanced element, no more nodes, no more depth, a byte-identical root start tag"
+  ],
+  "accepted_evidence": {
+    "deterministic_counts": "callgrind isolation pair (--samples 3 minus --samples 1, halved) on the three DOCX selectors, both legs, CPU 11: Snapshot::from_xml 12 -> 6 calls per one-edit lifecycle (280.51 M -> 140.48 M inclusive Ir) and 6 -> 3 per no-op lifecycle (140.49 M -> 70.18 M); apply_document_patch inclusive 72.91 M -> 1.66 M; whole harness iteration -19.58%, -19.34% and -16.26%",
+    "timed_region_counts": "a retained probe opens a constant four packages and runs edit_document..to_stream on `measured` of them, so the same isolation pair differences two timed regions exactly: -13.96% to -33.27% on the one-edit shapes, -14.07% to -32.75% on one-percent, -43.88% to -49.73% on the no-op",
+    "paired_timing": "order A1 B1 B2 A2 in one window, 100 samples per pooled leg, pinned to CPU 11: p50 -18.64% to -49.95% across all nine case/shape scenarios, with p95, p99 and mean moving the same way",
+    "floor": "A/A p50 within 2.06% and B/B p50 within 1.67% in the same window, against the roughly 4% p50 this host records",
+    "differential_tests": "the derived layout is compared against a full scan_document rescan on 297 accepted single rewrites across 53 DOCX fixtures (all 297 took the incremental route) and 4 batch rewrites, plus the 24/200/10,000-paragraph generated corpora at three positions and three replacement texts each, their 1% batch and their committed snapshots; the coverage counts are asserted",
+    "fallback_tests": "shape-changing replacements (extra element, extra depth, different root, two roots, processing instruction, unbalanced, padded), splices off a paragraph boundary by one byte, and a declined splice producing a snapshot byte- and layout-identical to Snapshot::from_xml",
+    "patch_tests": "exact no-op keeps the main part payload Arc pointer-identical; a mismatched source returns StaleSource and leaves the package untouched; the inverse still reaches the original bytes; an unparsable main part still returns TransactionError::Document rather than StaleSource",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-docx --all-targets, cargo test -p litchi-docx (1457 passed, 0 failed, 31 ignored across 51 binaries, 9 new), cargo doc -p litchi-docx --no-deps"
+  },
+  "accepted_costs": {
+    "fragment_proof": "two paragraph-sized quick-xml passes per accepted rewrite: 18,126 Ir over 6 calls on the one-edit case and 620,948 Ir over 206 calls on the one-percent case, against the 140 M of scanning removed",
+    "shared_host": "seven other agents built and measured on the same 32-core host throughout; the A/A and B/B floors are reported as what that amounted to",
+    "synthetic_corpus": "the timed scenarios use the harness's generated DOCX corpora; the fixture corpus enters only through the correctness differential",
+    "instruction_counts": "instructions rank work, not latency"
+  },
+  "known_gaps": {
+    "part_c": "compaction still rewrites the whole main part on every changed commit (62.5 M Ir per one-edit lifecycle) and its rescan is the second remaining scan; compacting only the replacement fragment changes output bytes for documents whose untouched paragraphs carry compactable whitespace, so it needs the owner's answer to 0587's ADR 0006 observation, then a frozen design record and preservation tests",
+    "other_rewrite_sites": "eleven Edit call sites of with_rewritten_xml still rescan; several rewrite a paragraph inside a table or a block content control, which the derivation declines outright because it accepts only an exact direct-body paragraph range",
+    "document_snapshot_copy": "document_snapshot still builds from main.blob().to_vec(), so the pointer half of the reuse proof never hits on the eager route and the byte comparison runs in full; handing the part's Arc to Snapshot::from_shared_xml would remove both, and is named as the next measurement rather than folded in",
+    "docx_2": "DocumentPart::from_part still builds its paragraph index eagerly on every document() call; that is a separate 0587 item on a separate route"
+  },
+  "withheld": [
+    "any registered speedup, any cold-cache, physical-device, real-producer, peak-RSS, allocation-profile, concurrency-scaling or cross-platform result, and any claim about DOCX operations other than a direct-body paragraph text rewrite and the patch application that publishes it"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "change_branch": "perf/0591-docx-edit-single-scan",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "builds": "cargo build --release --locked on both legs with identical flags; before leg from the shared read-only checkout at the base commit with its own CARGO_TARGET_DIR",
+    "binary_sha256": {
+      "litchi-perf-baseline-before": "dab64c26373072ab9d88883c64cce710df29aa8a36255d751dbcf3d72f2521a1",
+      "litchi-perf-baseline-after": "e177bfcf89a86e15270cadd4339c4898e6c729b7105f470dad5e548b1e55ed75",
+      "docx-edit-region-before": "559d3a4240de38f15bfd6e4a2640823fb6acd60d9c8158e9739c5ab34d860d0b",
+      "docx-edit-region-after": "8ad99f718b370bc8308b854d44ad97bb9e1b3705a864a1ae0780ab6f6239debd"
+    }
+  }
+}

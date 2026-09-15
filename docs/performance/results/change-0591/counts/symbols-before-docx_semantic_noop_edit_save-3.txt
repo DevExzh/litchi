@@ -1,0 +1,6 @@
+5,248,911,364 (100.0%)  PROGRAM TOTALS
+  427,758,340 ( 8.15%)  ???:litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_snapshot [/home/zhuhe/code/litchi-worktrees/targets/0591-before/release/litchi-perf-baseline]
+  421,294,870 ( 8.03%)  ???:litchi_docx::document::transaction::Snapshot::from_xml [/home/zhuhe/code/litchi-worktrees/targets/0591-before/release/litchi-perf-baseline]
+  420,799,558 ( 8.02%)  ???:litchi_docx::document::transaction::scan_document_with_context [/home/zhuhe/code/litchi-worktrees/targets/0591-before/release/litchi-perf-baseline]
+  215,264,735 ( 4.10%)  ???:litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::apply_document_patch [/home/zhuhe/code/litchi-worktrees/targets/0591-before/release/litchi-perf-baseline]
+   63,686,267 ( 1.21%)  ???:litchi_docx::writer::doc::codec::compact_changed_document_xml [/home/zhuhe/code/litchi-worktrees/targets/0591-before/release/litchi-perf-baseline]

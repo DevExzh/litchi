@@ -1,5 +1,33 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0591 compliance update
+
+Change 0591 keeps ADR 0003's transaction boundary exactly: `commit()` still
+returns the same `Commit` with the same snapshot, reversible patch and
+diagnostics; snapshots remain immutable and cheap to share; and a patch is still
+applied only against the exact source bytes it was produced against. Part (a)
+changes what that exact-source proof is compared against — the opened package's
+retained main part rather than a throwaway copy of it — not whether it is
+compared, and the snapshot it returns is byte-equal and identity-equal to the one
+`Patch::apply` would have cloned. ADR 0005's mandatory validation is intact: no
+check is removed, weakened, reordered or made conditional; the semantic readback
+after every paragraph rewrite runs against the incrementally built snapshot
+exactly as it ran against the rescanned one; and where a whole-document rescan
+previously re-established `MAX_DOCUMENT_NODES`, `MAX_DOCUMENT_DEPTH`,
+well-formedness and the DTD and processing-instruction refusals, a
+paragraph-sized fragment proof now establishes that none of those verdicts can
+have changed, with a full rescan as the fallback for everything it does not
+settle. The `MAX_DOCUMENT_XML_BYTES` limit keeps its identity because oversized
+input is routed to `Snapshot::from_xml`, which raises it. ADR 0006 preservation
+is intact because no output byte changes: `compact_changed_document_xml` and its
+rescan are untouched, and the 0587 observation that ordinary commit compaction
+rewrites whitespace in untouched paragraphs is left exactly where it was, as an
+owner question that item DOCX-1(c) depends on. No `unsafe`, no weakened limit or
+malformed-input defence, no new ambient I/O, no global pool, and no public
+leakage of archive types, locks or executors; the managed and source-backed
+routes are not reached by either reuse. See
+[Change 0591](0591-docx-edit-single-scan.md); `performance_claim: none`.
+
 ## Change 0590 compliance update
 
 Change 0590 keeps ADR 0003's revision binding exactly: the complete-package
