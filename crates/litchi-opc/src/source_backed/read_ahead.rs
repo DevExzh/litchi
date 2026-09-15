@@ -865,7 +865,7 @@ mod tests {
             source,
             version,
             length,
-            monitor_reads: Arc::new(AtomicBool::new(false)),
+            monitor_reads: Arc::new(crate::source_backed::MonitoredReadDepth::new(0)),
             lineage: super::super::SourceLineage(Arc::new(())),
             context,
             input_reservation_failures: None,

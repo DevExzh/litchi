@@ -1,0 +1,53 @@
+Paired timing through the retained scratch probe, in-process, file source,
+10 warmups then 40 timed samples per leg, CPU 22, order A1 B1 B2 A2.
+Positive percent = the after leg is faster. A/A is |A1-A2|/A1 in the same window.
+
+scenario                    stat            A1          B1          B2          A2   A1->B1 %   A2->B2 %    A/A %
+xlsx-open                   p50         521183      507983      514933      524163       2.53       1.76     0.57
+xlsx-open                   mean        522945      507887      514348      526802       2.88       2.36     0.74
+xlsx-open                   p95         537083      527173      527803      547363       1.85       3.57     1.91
+xlsx-open                   p99         546043      529152      534202      554613       3.09       3.68     1.57
+xlsx-open                   n               40          40          40          40
+
+xlsx-cold_read              p50           9330        9050        8880        9190       3.00       3.37     1.50
+xlsx-cold_read              mean          9624        9097        8997        9245       5.48       2.68     3.94
+xlsx-cold_read              p95          10420        9700        9630       10040       6.91       4.08     3.65
+xlsx-cold_read              p99          19090        9990        9880       10150      47.67       2.66    46.83
+xlsx-cold_read              n               40          40          40          40
+
+xlsx-reads_after_stream     p50         942335      819865      819054      940805      13.00      12.94     0.16
+xlsx-reads_after_stream     mean        942285      819761      818477      940368      13.00      12.96     0.20
+xlsx-reads_after_stream     p95         946705      826034      824104      944275      12.75      12.73     0.26
+xlsx-reads_after_stream     p99         948955      838845      836435      946375      11.60      11.62     0.27
+xlsx-reads_after_stream     n               40          40          40          40
+
+xlsx-reads_no_stream        p50         837865      820164      819124      837724       2.11       2.22     0.02
+xlsx-reads_no_stream        mean        839258      821599      819712      836900       2.10       2.05     0.28
+xlsx-reads_no_stream        p95         841385      831405      825304      841195       1.19       1.89     0.02
+xlsx-reads_no_stream        p99         912844      870855      844134      842775       4.60      -0.16     7.68
+xlsx-reads_no_stream        n               40          40          40          40
+
+docx-open                   p50          36830       35320       35040       36920       4.10       5.09     0.24
+docx-open                   mean         37060       35522       35487       37502       4.15       5.37     1.19
+docx-open                   p95          37830       35831       36841       38250       5.28       3.68     1.11
+docx-open                   p99          44860       44420       49600       49630       0.98       0.06    10.63
+docx-open                   n               40          40          40          40
+
+docx-cold_read              p50           5000        4780        4750        5000       4.40       5.00     0.00
+docx-cold_read              mean          5000        4766        4749        5247       4.67       9.48     4.94
+docx-cold_read              p95           5150        4881        4920        5160       5.22       4.65     0.19
+docx-cold_read              p99           5220        4930        4980       14770       5.56      66.28   182.95
+docx-cold_read              n               40          40          40          40
+
+docx-reads_after_stream     p50          42101       30910       30930       41441      26.58      25.36     1.57
+docx-reads_after_stream     mean         42262       30889       32365       41978      26.91      22.90     0.67
+docx-reads_after_stream     p95          42330       31100       35641       49080      26.53      27.38    15.95
+docx-reads_after_stream     p99          50270       31280       78170       49480      37.78     -57.98     1.57
+docx-reads_after_stream     n               40          40          40          40
+
+docx-reads_no_stream        p50          32121       31621       31120       31840       1.56       2.26     0.87
+docx-reads_no_stream        mean         32756       31840       31396       32213       2.80       2.54     1.66
+docx-reads_no_stream        p95          38110       32100       31680       32360      15.77       2.10    15.09
+docx-reads_no_stream        p99          45400       38820       39390       40410      14.49       2.52    10.99
+docx-reads_no_stream        n               40          40          40          40
+

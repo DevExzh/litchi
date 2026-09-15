@@ -1,0 +1,75 @@
+### xlsx/ConditionalFormattingSamples.xlsx
+fixture=test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx bytes=654688 members=132 cd_offset=644942 cd_size=9724 eocd=654666
+  [open] allocs=5250 alloc_bytes=2284285 version_calls=4
+  open: requests=87 bytes=22546 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/9724B local-fixed(30)=42/1260B payload=42/11494B
+  [first read of /xl/worksheets/sheet1.xml (4381 B decoded)] allocs=27 alloc_bytes=86291 version_calls=4
+  first read of /xl/worksheets/sheet1.xml (4381 B decoded): requests=2 bytes=1281 :: local-fixed(30)=1/30B payload=1/1251B
+  [second read of same part] allocs=7 alloc_bytes=282 version_calls=2
+  second read of same part: requests=0 bytes=0 :: 
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 90 parts, physical order (after open)] allocs=5809 alloc_bytes=8684189 version_calls=364
+  all 90 parts, physical order (after open): requests=208 bytes=625408 :: local-fixed(30)=90/2700B payload=118/622708B
+  [all 90 parts, reverse physical order (after open)] allocs=5633 alloc_bytes=8594530 version_calls=364
+  all 90 parts, reverse physical order (after open): requests=208 bytes=625408 :: local-fixed(30)=90/2700B payload=118/622708B
+  [stream_to of /xl/worksheets/sheet1.xml (4381 B)] allocs=5125 alloc_bytes=1683479 version_calls=54
+  stream_to of /xl/worksheets/sheet1.xml (4381 B): requests=21 bytes=1875 :: local-window(<=640)=1/54B local-fixed(30)=19/570B payload=1/1251B
+  [8 cold part reads after stream_to (same package)] allocs=72 alloc_bytes=642438 version_calls=32
+  8 cold part reads after stream_to (same package): requests=23 bytes=158695 :: local-fixed(30)=8/240B payload=15/158455B
+  [open (control package for phase B)] allocs=5109 alloc_bytes=1593639 version_calls=4
+  open (control package for phase B): requests=87 bytes=22546 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/9724B local-fixed(30)=42/1260B payload=42/11494B
+  [8 cold part reads, no preceding stream (control)] allocs=67 alloc_bytes=642352 version_calls=32
+  8 cold part reads, no preceding stream (control): requests=23 bytes=158695 :: local-fixed(30)=8/240B payload=15/158455B
+  [open (control package for phase C)] allocs=5108 alloc_bytes=938951 version_calls=4
+  open (control package for phase C): requests=87 bytes=22546 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/9724B local-fixed(30)=42/1260B payload=42/11494B
+  [one isolated cold part read of /xl/workbook.xml] allocs=26 alloc_bytes=83472 version_calls=4
+  one isolated cold part read of /xl/workbook.xml: requests=2 bytes=715 :: local-fixed(30)=1/30B payload=1/685B
+### pptx/shapes.pptx
+fixture=test-data/ooxml/pptx/shapes.pptx bytes=68822 members=48 cd_offset=65116 cd_size=3684 eocd=68800
+  [open] allocs=1951 alloc_bytes=589973 version_calls=4
+  open: requests=45 bytes=9104 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/3684B local-fixed(30)=21/630B payload=21/4722B
+  [first read of /ppt/slides/slide1.xml (20740 B decoded)] allocs=25 alloc_bytes=102505 version_calls=4
+  first read of /ppt/slides/slide1.xml (20740 B decoded): requests=2 bytes=4786 :: local-fixed(30)=1/30B payload=1/4756B
+  [second read of same part] allocs=7 alloc_bytes=282 version_calls=2
+  second read of same part: requests=0 bytes=0 :: 
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 27 parts, physical order (after open)] allocs=2117 alloc_bytes=2753234 version_calls=112
+  all 27 parts, physical order (after open): requests=56 bytes=56456 :: local-fixed(30)=27/810B payload=29/55646B
+  [all 27 parts, reverse physical order (after open)] allocs=2067 alloc_bytes=2670296 version_calls=112
+  all 27 parts, reverse physical order (after open): requests=56 bytes=56456 :: local-fixed(30)=27/810B payload=29/55646B
+  [stream_to of /ppt/slides/slide1.xml (20740 B)] allocs=1912 alloc_bytes=644562 version_calls=46
+  stream_to of /ppt/slides/slide1.xml (20740 B): requests=16 bytes=5227 :: local-window(<=640)=1/51B local-fixed(30)=14/420B payload=1/4756B
+  [8 cold part reads after stream_to (same package)] allocs=77 alloc_bytes=678421 version_calls=32
+  8 cold part reads after stream_to (same package): requests=16 bytes=7722 :: local-fixed(30)=8/240B payload=8/7482B
+  [open (control package for phase B)] allocs=1896 alloc_bytes=512127 version_calls=4
+  open (control package for phase B): requests=45 bytes=9104 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/3684B local-fixed(30)=21/630B payload=21/4722B
+  [8 cold part reads, no preceding stream (control)] allocs=71 alloc_bytes=678285 version_calls=32
+  8 cold part reads, no preceding stream (control): requests=16 bytes=7722 :: local-fixed(30)=8/240B payload=8/7482B
+  [open (control package for phase C)] allocs=1895 alloc_bytes=443305 version_calls=4
+  open (control package for phase C): requests=45 bytes=9104 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/3684B local-fixed(30)=21/630B payload=21/4722B
+  [one isolated cold part read of /ppt/presentation.xml] allocs=25 alloc_bytes=85155 version_calls=4
+  one isolated cold part read of /ppt/presentation.xml: requests=2 bytes=651 :: local-fixed(30)=1/30B payload=1/621B
+### docx/comment.docx
+fixture=test-data/ooxml/docx/comment.docx bytes=4926 members=10 cd_offset=4269 cd_size=635 eocd=4904
+  [open] allocs=397 alloc_bytes=430089 version_calls=4
+  open: requests=12 bytes=1584 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/635B local-fixed(30)=3/90B payload=3/743B descriptor=3/48B
+  [first read of /word/document.xml (1264 B decoded)] allocs=27 alloc_bytes=83091 version_calls=4
+  first read of /word/document.xml (1264 B decoded): requests=3 bytes=530 :: local-fixed(30)=1/30B payload=1/484B descriptor=1/16B
+  [second read of same part] allocs=9 alloc_bytes=352 version_calls=2
+  second read of same part: requests=0 bytes=0 :: 
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 7 parts, physical order (after open)] allocs=444 alloc_bytes=1077387 version_calls=32
+  all 7 parts, physical order (after open): requests=21 bytes=3213 :: local-fixed(30)=7/210B payload=7/2891B descriptor=7/112B
+  [all 7 parts, reverse physical order (after open)] allocs=435 alloc_bytes=996798 version_calls=32
+  all 7 parts, reverse physical order (after open): requests=21 bytes=3213 :: local-fixed(30)=7/210B payload=7/2891B descriptor=7/112B
+  [stream_to of /word/document.xml (1264 B)] allocs=398 alloc_bytes=505564 version_calls=36
+  stream_to of /word/document.xml (1264 B): requests=12 bytes=782 :: local-window(<=640)=1/39B payload=2/501B descriptor=2/32B local-fixed(30)=7/210B
+  [6 cold part reads after stream_to (same package)] allocs=65 alloc_bytes=493816 version_calls=24
+  6 cold part reads after stream_to (same package): requests=18 bytes=2683 :: local-fixed(30)=6/180B payload=6/2407B descriptor=6/96B
+  [open (control package for phase B)] allocs=384 alloc_bytes=422122 version_calls=4
+  open (control package for phase B): requests=12 bytes=1584 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/635B local-fixed(30)=3/90B payload=3/743B descriptor=3/48B
+  [6 cold part reads, no preceding stream (control)] allocs=61 alloc_bytes=493774 version_calls=24
+  6 cold part reads, no preceding stream (control): requests=18 bytes=2683 :: local-fixed(30)=6/180B payload=6/2407B descriptor=6/96B
+  [open (control package for phase C)] allocs=383 alloc_bytes=417196 version_calls=4
+  open (control package for phase C): requests=12 bytes=1584 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/635B local-fixed(30)=3/90B payload=3/743B descriptor=3/48B
+  [one isolated cold part read of /docProps/app.xml] allocs=27 alloc_bytes=82344 version_calls=4
+  one isolated cold part read of /docProps/app.xml: requests=3 bytes=331 :: local-fixed(30)=1/30B payload=1/285B descriptor=1/16B

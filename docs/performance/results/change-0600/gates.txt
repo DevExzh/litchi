@@ -1,0 +1,100 @@
+# Gates for change 0600
+
+Run in /home/zhuhe/code/litchi-worktrees/0600 on branch perf/0600-opc-cold-read-observations-and-name-lookup.
+Exit codes: all zero.
+
+## cargo fmt --all --check
+```
+(no output; exit 0)
+```
+
+## cargo clippy -p soapberry-zip --all-targets
+```
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0600/crates/soapberry-zip)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.24s
+```
+
+## cargo clippy -p litchi-opc --all-targets
+```
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0600/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.91s
+```
+
+## cargo doc -p soapberry-zip --no-deps
+```
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0600/crates/soapberry-zip)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.22s
+   Generated /home/zhuhe/code/litchi-worktrees/0600/target/doc/soapberry_zip/index.html
+```
+
+## cargo doc -p litchi-opc --no-deps
+```
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0600/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s
+   Generated /home/zhuhe/code/litchi-worktrees/0600/target/doc/litchi_opc/index.html
+```
+
+## cargo test -p soapberry-zip
+```
+aggregate over all test binaries: 592 passed, 0 failed, 2 ignored
+--- tail ---
+
+test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.50s
+
+```
+
+## cargo test -p litchi-opc
+```
+aggregate over all test binaries: 679 passed, 0 failed, 1 ignored
+--- tail ---
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.41s; merged doctests compilation took 0.40s
+```
+
+## cargo test -p litchi-xlsx (dependent)
+```
+aggregate over all test binaries: 1297 passed, 0 failed, 0 ignored
+--- tail ---
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.41s; merged doctests compilation took 0.40s
+```
+
+## cargo test -p litchi-docx (dependent)
+```
+aggregate over all test binaries: 1462 passed, 0 failed, 31 ignored
+--- tail ---
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 3.05s; merged doctests compilation took 3.02s
+```
+
+## cargo test -p litchi-pptx (dependent)
+```
+aggregate over all test binaries: 867 passed, 0 failed, 2 ignored
+--- tail ---
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+all doctests ran in 4.86s; merged doctests compilation took 4.57s
+```
+
+## cargo test -p litchi-xlsb (dependent)
+```
+aggregate over all test binaries: 730 passed, 0 failed, 11 ignored
+--- tail ---
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+all doctests ran in 2.81s; merged doctests compilation took 2.55s
+```
+
+## Differential and probe checks the record cites
+```
+corpus_digest before (run 1) vs before (run 2) vs after: byte-identical
+98ad10ae309d274d53c981bfb6cffe711f7fb7b3c675dba0c52b1c0e46d242ee  digest-before1.txt
+98ad10ae309d274d53c981bfb6cffe711f7fb7b3c675dba0c52b1c0e46d242ee  digest-before2.txt
+98ad10ae309d274d53c981bfb6cffe711f7fb7b3c675dba0c52b1c0e46d242ee  digest-after.txt
+98ad10ae309d274d53c981bfb6cffe711f7fb7b3c675dba0c52b1c0e46d242ee  digest-after-v2.txt
+
+probe count phases: diff of every 'requests=' line between the legs is empty
+```

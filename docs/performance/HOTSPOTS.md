@@ -1,5 +1,30 @@
 # Performance hotspot inventory
 
+## 0600 — one fewer observation per cold Part read, a bounded monitored-read scope, and an allocation-free member lookup
+
+Items ZIP-3 and ZIP-4 of the [0587 queue](0587-remaining-opportunity-survey.md)
+are implemented. ZIP-4 is the larger half: `lookup_member_name` allocated and
+re-normalized a `String` on every `contains`, `metadata`, `read` and session
+admission, at least twice per structural member, and a name that is already
+canonical — no `:`, no `\`, no empty, `.` or `..` segment, no trailing `/` — is
+now decided by one byte pass and looked up as a borrowed `&str`.
+`normalize_str_fallibly` falls 71%, the `rfind(':')` 23%, and open-plus-one-part
+instructions fall **3.45%, 2.58% and 2.56%** on a 132-member XLSX, a 48-member
+PPTX and a 10-member DOCX, with allocations per open down 6.32%, 5.93% and 6.59%.
+ZIP-3's per-site analysis reached only one of the five observations a cold
+`part().data()` takes — the pre-publication one, a strict subset of the fence
+that follows the provisional publication and can roll it back — so the count is
+5 → 4, not the 5 → 2 the survey hoped for, and the record says which four sites
+survive and why. The sticky `monitor_reads` flag is the item with the real
+reach: one `stream_to` used to convert every later positional read on that
+package into two `version()` calls for the package's lifetime, and eight cold
+Part reads after a stream cost **102 observations against 40 on an identical
+package that had not streamed**; a counted RAII scope over the fifteen sites
+that set the flag brings both to 32. ZIP-2 (the span model) and ZIP-5 (the
+accessor 0577 is blocked on) remain the next items on this path.
+[Change and limitations](0600-opc-cold-read-observations-and-name-lookup.md);
+[evidence](results/change-0600/README.md).
+
 ## 0612 — the XLS globals skip fires on real fixtures and still loses; XLS-6 declined, and the coefficient that ranked it corrected
 
 The 0587 queue ranked XLS-6 (skip never-interpreted globals payloads, frame once) at 24 on a retained figure of "about 30% of the flagship open Ir" against "+46 requests", and singled it out from the untestable worksheet gate of change 0568 because *its* density gate could fire on a real fixture. Both halves are now measured, and they point opposite ways. The gate **does** fire: a per-record rule at 1 KiB reaches **19 of 123** modellable `.xls`/`.xlt` fixtures, and on `ConditionalFormattingSamples.xls` a source-backed open falls from **565,201 to 82,867 read bytes, −85.34%**, for +48 positional reads and +56 source observations, with `WithCustomViews.xls` and `54016.xls` identical on every counter, every operation, both source modes. The change is nevertheless **falsified**: natively that open is **+5.54% in cycles on an owned in-memory source and +17.22% on a file source**, +8.94% in instructions, and +5.91%/+6.45% and +16.93%/+16.35% at p50 in paired wall clock in both directions, against an A/A floor **under 1%** measured in the same window. Callgrind says the opposite — −15.33% — and the reconciliation is the standing caution of this program: **412,826 of the 356,962-instruction "saving" is `__memcpy_avx_unaligned_erms` priced one instruction per byte**, and callgrind's delta outside `memcpy` and `memset` (+84,374) has the same sign and four fifths of the magnitude of the native instruction *rise* (+105,415). The deeper correction is to the sizing: change 0574's **53.4 ns per KiB** of globals payload, a corpus-regression coefficient, predicted **−19.6 µs** net for this schedule (−25.2 µs of bytes against +5.6 µs of requests) where the measured open moved **+4,300 ns** on an owned source and **+15,410 ns** on a file source; priced instead at change 0604's measured 0.0165 cycles per byte for this very buffer, the skipped bytes are about **1.7 µs**, some fifteen times smaller — because a cross-fixture regression attributes to bytes everything that scales with them, none of which is removed by not reading them. Three further findings for the queue: change 0568's cumulative running-mean gate is **inert** here (fires on 0 of 123, saves 3.0% of bytes against 59.0% for a per-record rule plus a fill-target reset), because the skippable mass is one dense run inside an otherwise sparse stream; a per-record kind test in the globals frame loop costs **16.8–17.5 instructions per record whether or not it fires**, which is the whole of `54016.xls`'s +1.08%; and **change 0574 opportunity 3 (a retained globals cursor), ranked and never measured, regresses on its own** at +10.90%/+9.37% of the flagship open in cycles, because `SharedOleStreamCursor`'s per-fill state machine costs +150,272 Ir against the −97,145 it saves now that `read_stream_range_hinted` carries a chain hint. `performance_claim: none`; no production change. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0612-xls-skip-uninterpreted-globals-design.md); [retained evidence](results/change-0612/README.md).

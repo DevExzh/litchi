@@ -89,8 +89,8 @@ impl SourceBackedPackage {
                 "managed restore output counter is unavailable",
             ));
         }
-        self.source.monitor_publication();
-        retained.monitor_publication();
+        let _monitored_current = self.source.monitor_publication();
+        let _monitored_retained = retained.monitor_publication();
         let _workspace = context
             .as_ref()
             .map(|context| {

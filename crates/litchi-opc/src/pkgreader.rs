@@ -1467,7 +1467,18 @@ impl PackageReader {
             for child_srel in &part_srels {
                 Self::enqueue_target(child_srel, &mut visited, &mut work_queue, limits)?;
             }
-            visited.insert(partname.to_string(), part_srels);
+            // `enqueue_target` is the only producer of this queue and it inserts
+            // the node before pushing it, so the slot already exists and the
+            // graph does not have to allocate a second copy of the name to find
+            // it. The fallback keeps the original `insert` for the unreachable
+            // case where the node is absent, so the map is populated the same
+            // way either path is taken.
+            match visited.get_mut(partname.as_str()) {
+                Some(slot) => *slot = part_srels,
+                None => {
+                    visited.insert(partname.to_string(), part_srels);
+                },
+            }
         }
 
         Ok(visited)
@@ -1503,7 +1514,9 @@ impl PackageReader {
         work_queue
             .try_reserve(1)
             .map_err(|source| allocation("OPC relationship work queue", source))?;
-        visited.insert(partname.to_string(), SmallVec::new());
+        // `to_string()` here would route the name through `Display`; the key is
+        // exactly `PackURI::as_str`, so copy it directly.
+        visited.insert(partname.as_str().to_owned(), SmallVec::new());
         work_queue.push(partname);
         Ok(())
     }

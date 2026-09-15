@@ -1,0 +1,15 @@
+# Binary SHA-256 for change 0600
+
+## before leg (worktree /home/zhuhe/code/litchi-worktrees/before-8fe9efa55, CARGO_TARGET_DIR=.../targets/0600-before and .../0600-probe-before)
+d0d8f34e1b3a9f7d2fc02abef665d373940f5e685d70786405892cedac76423f  /home/zhuhe/code/litchi-worktrees/targets/0600-before/release/litchi-perf-baseline
+3b35411e5da65e43f1f6502b2b71229de8cb9771b7d31122614f28510528bf52  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-before/release/zip-opc-read-probe
+fa2db49b61c568121e0f17f559334f97d7f6e03ef3bc3323e31ec6c672534771  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-before/release/corpus_digest
+b5fe09d44fc26c75f043e8496b06a365ef9218dd3446e6fccf42678de795c57e  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-before/release/open_part_loop
+bad925b81ac7c8d723dae3044fdb69c74c54b33428b12b6b884ce2b68f6f52c6  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-before/release/file_source_time
+
+## after leg (worktree /home/zhuhe/code/litchi-worktrees/0600)
+cbfe440a35c0ffbc32e21c8880048f0e6292e109a3833feb473e20351fc4d124  /home/zhuhe/code/litchi-worktrees/0600/tools/perf-baseline/target/release/litchi-perf-baseline
+462fc815e246391870359267e83a01684be36434b9be43296eaa00276a36e742  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-after/release/zip-opc-read-probe
+fa2caf0682f3c7379e63cd3441129979f2ce9837b66206cebffba32dfe861e2e  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-after/release/corpus_digest
+5197ebb41235baf07def46c5d7282976516308fc39e782758a6568b2a82bb4ff  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-after/release/open_part_loop
+f31e590ff1b4a6cb8c2fb2656dae103cfae1424f58f8618b405544c4f92aef17  /home/zhuhe/code/litchi-worktrees/targets/0600-probe-after/release/file_source_time

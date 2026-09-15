@@ -1,5 +1,27 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0600 — one fewer observation per cold Part read, a bounded monitored-read scope, and an allocation-free member lookup
+
+`docs/GOAL.md` puts unnecessary work ahead of I/O and unnecessary allocation
+ahead of layout and algorithms, and this change takes only those two steps: not
+one positional request, not one requested byte and not one output byte moves on
+any measured phase, on any of three real fixtures, in either read order. The
+"exact no-ops stay exact" rule is what bounds the design — the observation
+removed is the only one of five that a strict-subset argument reaches, and the
+relocation onto the failed-publication branch keeps change 0317's precedence
+rather than trading it for a count. The `monitor_reads` bound was allowed only
+after checking that change 0327's publication protocol never reads the flag: its
+fences are direct `ensure_current()` calls, so bounding the flag cannot weaken
+them, and what the flag does guarantee — a per-chunk fence *during* an
+incremental copy — is now scoped to exactly the operation that needs it. The
+audit's standing caveat that instructions rank work rather than latency applies
+to the 3.45% figure and is stated in the record; `performance_claim: none` and
+no claim-registry entry. The pre-existing non-determinism found on the way — the
+relationship iteration order of `Relationships::iter()` varies per process
+because it walks a `HashMap` — is reported, not fixed.
+[Change and limitations](0600-opc-cold-read-observations-and-name-lookup.md);
+[evidence](results/change-0600/README.md).
+
 ## 0612 — a `docs/GOAL.md` step-1 candidate closed by measuring the cost it trades into, not the work it removes
 
 Record: [0612](0612-xls-skip-uninterpreted-globals-design.md).

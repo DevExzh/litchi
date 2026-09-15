@@ -49,6 +49,7 @@ use crate::{
 use flate2::read::DeflateDecoder;
 use flate2::{Decompress, FlushDecompress, Status};
 use rayon::prelude::*;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::io::{self, BufRead, Cursor, Read, Write};
 use std::mem::size_of;
@@ -2507,7 +2508,7 @@ impl<'data> ArchiveReader<'data> {
         let Ok(lookup) = lookup_member_name(name) else {
             return false;
         };
-        !lookup.explicit_directory && self.index.contains_key(&lookup.name)
+        !lookup.explicit_directory && self.index.contains_key(lookup.key())
     }
 
     /// Return declared metadata for a normalized member name.
@@ -2517,7 +2518,7 @@ impl<'data> ArchiveReader<'data> {
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
         let lookup = lookup_member_name(name)?;
         if !lookup.explicit_directory {
-            if let Some(info) = self.index.get(&lookup.name) {
+            if let Some(info) = self.index.get(lookup.key()) {
                 return Ok(Metadata {
                     compressed_size: info.wayfinder.compressed_size_hint(),
                     uncompressed_size: info.uncompressed_size,
@@ -2526,9 +2527,9 @@ impl<'data> ArchiveReader<'data> {
             }
         }
         self.directories
-            .get(&lookup.name)
+            .get(lookup.key())
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))
     }
 
     /// Get an iterator over all file names in the archive.
@@ -2546,9 +2547,9 @@ impl<'data> ArchiveReader<'data> {
         let lookup = lookup_member_name(name)?;
         let info = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
         Ok(info.compression_method == CompressionMethod::Store)
     }
 
@@ -2580,9 +2581,9 @@ impl<'data> ArchiveReader<'data> {
 
         let info = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
 
         let entry = self.archive.get_entry(info.wayfinder)?;
         let data = entry.data();
@@ -2739,9 +2740,9 @@ impl<'data> ArchiveReader<'data> {
 
         let info = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
         if info.flags & ((1 << 0) | (1 << 6)) != 0 {
             return Err(Error::from(ErrorKind::InvalidInput {
                 msg: "borrowed access refuses encrypted entries".to_string(),
@@ -2878,9 +2879,9 @@ impl<'data> ArchiveReader<'data> {
         let lookup = lookup_member_name(name)?;
         let info = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
 
         match info.compression_method {
             CompressionMethod::Store | CompressionMethod::Deflate => {},
@@ -3092,9 +3093,9 @@ impl<'archive, 'data> ArchiveReadSession<'archive, 'data> {
         let info = self
             .archive
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
 
         let entry = self.archive.archive.get_entry_borrowed(info.wayfinder)?;
         let data = entry.data();
@@ -3802,21 +3803,21 @@ where
         if lookup.explicit_directory {
             return None;
         }
-        self.index.get(&lookup.name).copied()
+        self.index.get(lookup.key()).copied()
     }
 
     /// Return declared metadata for a member without payload access.
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
         let lookup = lookup_member_name(name)?;
         if !lookup.explicit_directory {
-            if let Some(entry_id) = self.index.get(&lookup.name).copied() {
+            if let Some(entry_id) = self.index.get(lookup.key()).copied() {
                 return self.metadata_for(entry_id);
             }
         }
         self.directories
-            .get(&lookup.name)
+            .get(lookup.key())
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))
     }
 
     /// Return declared metadata for one indexed file entry.
@@ -3842,10 +3843,10 @@ where
         let lookup = lookup_member_name(name)?;
         let entry_id = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
         Ok(self.indexed_entry(entry_id)?.info.compression_method == CompressionMethod::Store)
     }
 
@@ -3969,10 +3970,10 @@ where
     fn entry_id_for_name(&self, name: &str) -> Result<EntryId, Error> {
         let lookup = lookup_member_name(name)?;
         self.index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))
     }
 
     /// Run a callback against one verified indexed member without retaining
@@ -4634,10 +4635,10 @@ where
         let lookup = lookup_member_name(name)?;
         let entry_id = self
             .index
-            .get(&lookup.name)
+            .get(lookup.key())
             .filter(|_| !lookup.explicit_directory)
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
         self.read_entry_to_with_accounting(entry_id, sink, accounting)
     }
 
@@ -4711,9 +4712,19 @@ impl<R> std::fmt::Debug for IndexedArchive<R> {
 }
 
 #[derive(Debug)]
-struct LookupMemberName {
-    name: String,
+struct LookupMemberName<'name> {
+    /// The normalized, canonical lookup key. It borrows the caller's name when
+    /// that name is already exactly what normalization would produce.
+    name: Cow<'name, str>,
     explicit_directory: bool,
+}
+
+impl LookupMemberName<'_> {
+    /// The lookup key as the borrowed `&str` every index is keyed by.
+    #[inline]
+    fn key(&self) -> &str {
+        &self.name
+    }
 }
 
 fn normalized_member_name(
@@ -4767,13 +4778,60 @@ fn normalize_str_fallibly(name: &str, resource: &'static str) -> Result<String, 
     Ok(normalized)
 }
 
-fn lookup_member_name(name: &str) -> Result<LookupMemberName, Error> {
+/// Whether one `/`-separated segment survives normalization unchanged.
+///
+/// [`normalize_str_fallibly`] drops empty and `.` segments and pops the
+/// previous segment for `..`; every other segment is copied verbatim.
+#[inline]
+fn is_verbatim_member_segment(segment: &[u8]) -> bool {
+    !matches!(segment, b"" | b"." | b"..")
+}
+
+/// Whether `name` is already byte-identical to its own lookup key.
+///
+/// The key a lookup uses is `canonical_member_name(normalize_str_fallibly(..))`,
+/// which (a) drops everything up to and including the last `:`, (b) treats `\`
+/// as a separator, (c) drops empty and `.` segments, (d) resolves `..`, and
+/// (e) trims trailing `/`. A name with no `:`, no `\`, no empty, `.` or `..`
+/// segment and no trailing `/` is fixed by all five steps, so the key is the
+/// name itself and no `String` has to be built to find it.
+fn is_canonical_member_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    let mut segment_start = 0usize;
+    for (offset, byte) in bytes.iter().enumerate() {
+        match byte {
+            b':' | b'\\' => return false,
+            b'/' => {
+                if !is_verbatim_member_segment(&bytes[segment_start..offset]) {
+                    return false;
+                }
+                segment_start = offset + 1;
+            },
+            _ => {},
+        }
+    }
+    is_verbatim_member_segment(&bytes[segment_start..])
+}
+
+fn lookup_member_name(name: &str) -> Result<LookupMemberName<'_>, Error> {
+    if is_canonical_member_name(name) {
+        // A canonical name is its own key: normalization would copy it byte for
+        // byte, and it can end in neither `/` nor `\`, so the explicit-directory
+        // test below is false by construction.
+        return Ok(LookupMemberName {
+            name: Cow::Borrowed(name),
+            explicit_directory: false,
+        });
+    }
     let explicit_directory = name
         .as_bytes()
         .last()
         .is_some_and(|byte| matches!(byte, b'/' | b'\\'));
     Ok(LookupMemberName {
-        name: canonical_member_name(normalize_str_fallibly(name, "archive lookup name")?),
+        name: Cow::Owned(canonical_member_name(normalize_str_fallibly(
+            name,
+            "archive lookup name",
+        )?)),
         explicit_directory,
     })
 }
@@ -7803,9 +7861,9 @@ impl<'data> LazyArchiveReader<'data> {
         }
         let lookup = lookup_member_name(name)?;
         if lookup.explicit_directory {
-            return Err(ErrorKind::FileNotFound(lookup.name).into());
+            return Err(ErrorKind::FileNotFound(lookup.name.into_owned()).into());
         }
-        let normalized = lookup.name;
+        let normalized = lookup.name.into_owned();
         if normalized.len() > self.cache_limits.max_flight_key_bytes() {
             return Err(lazy_flight_key_limit_error(
                 normalized.len(),
@@ -15774,5 +15832,250 @@ mod tests {
         let entry = archive.get_entry(record.wayfinder()).unwrap();
         let (start, end) = entry.compressed_data_range();
         bytes[usize::try_from(start).unwrap()..usize::try_from(end).unwrap()].to_vec()
+    }
+}
+
+#[cfg(test)]
+mod lookup_member_name_tests {
+    use super::*;
+
+    /// The pre-0600 lookup: always normalize into a fresh `String`.
+    fn normalizing_lookup(name: &str) -> (String, bool) {
+        let explicit_directory = name
+            .as_bytes()
+            .last()
+            .is_some_and(|byte| matches!(byte, b'/' | b'\\'));
+        (
+            canonical_member_name(normalize_str_fallibly(name, "archive lookup name").unwrap()),
+            explicit_directory,
+        )
+    }
+
+    fn assert_same_lookup(name: &str) {
+        let lookup = lookup_member_name(name).unwrap();
+        let (expected_name, expected_directory) = normalizing_lookup(name);
+        assert_eq!(lookup.key(), expected_name, "lookup key for {name:?}");
+        assert_eq!(
+            lookup.explicit_directory, expected_directory,
+            "explicit-directory verdict for {name:?}"
+        );
+    }
+
+    #[test]
+    fn the_fast_path_agrees_with_normalization_on_every_short_name() {
+        // Exhaustive over the alphabet that drives every branch of
+        // `normalize_str_fallibly`: an ordinary byte, both separators, the
+        // dot that builds `.` and `..` segments, and the drive-letter colon.
+        const ALPHABET: [u8; 5] = [b'a', b'/', b'\\', b'.', b':'];
+        let mut buffer = Vec::new();
+        for length in 0..=4usize {
+            let total = ALPHABET.len().pow(u32::try_from(length).unwrap());
+            for encoded in 0..total {
+                buffer.clear();
+                let mut remaining = encoded;
+                for _ in 0..length {
+                    buffer.push(ALPHABET[remaining % ALPHABET.len()]);
+                    remaining /= ALPHABET.len();
+                }
+                assert_same_lookup(std::str::from_utf8(&buffer).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn the_fast_path_agrees_with_normalization_on_real_member_names() {
+        for name in [
+            "[Content_Types].xml",
+            "_rels/.rels",
+            "word/document.xml",
+            "word/_rels/document.xml.rels",
+            "xl/worksheets/sheet1.xml",
+            "ppt/media/image1.png",
+            "word/document.xml/",
+            "word/document.xml\\",
+            "/word/document.xml",
+            "word//document.xml",
+            "word/./document.xml",
+            "word/../document.xml",
+            "C:\\word\\document.xml",
+            "file:word/document.xml",
+            "word/..document.xml",
+            "word/.../document.xml",
+            "wörd/döcument.xml",
+            "word/\u{1f600}.xml",
+        ] {
+            assert_same_lookup(name);
+        }
+    }
+
+    fn ooxml_corpus() -> Vec<std::path::PathBuf> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ooxml");
+        let mut stack = vec![root];
+        let mut fixtures = Vec::new();
+        while let Some(directory) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                if path
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| {
+                        matches!(
+                            extension.to_ascii_lowercase().as_str(),
+                            "docx"
+                                | "docm"
+                                | "dotx"
+                                | "xlsx"
+                                | "xlsm"
+                                | "xlsb"
+                                | "xltx"
+                                | "pptx"
+                                | "pptm"
+                                | "potx"
+                                | "ppsx"
+                                | "thmx"
+                                | "zip"
+                        )
+                    })
+                {
+                    fixtures.push(path);
+                }
+            }
+        }
+        fixtures.sort();
+        fixtures
+    }
+
+    /// Spellings that must all resolve to the same member as `name` does, plus
+    /// one that must not: they drive the `:`, `\\`, `.`, `..`, empty-segment
+    /// and trailing-separator branches the fast path declines to take.
+    fn probe_spellings(name: &str) -> Vec<String> {
+        vec![
+            name.to_string(),
+            format!("./{name}"),
+            format!("/{name}"),
+            format!("a/../{name}"),
+            format!("pack://x:{name}"),
+            name.replace('/', "\\"),
+            format!("{name}/"),
+            format!("{name}//"),
+        ]
+    }
+
+    #[test]
+    fn every_ooxml_corpus_member_resolves_identically_on_both_lookup_paths() {
+        let fixtures = ooxml_corpus();
+        assert!(
+            fixtures.len() >= 100,
+            "expected the OOXML corpus, found {} packages",
+            fixtures.len()
+        );
+        let mut packages = 0usize;
+        let mut members = 0usize;
+        let mut spellings = 0usize;
+        let mut payload_comparisons = 0usize;
+        for path in fixtures {
+            let bytes = std::fs::read(&path).unwrap();
+            let length = bytes.len() as u64;
+            let Ok(archive) = IndexedArchive::from_reader(Cursor::new(bytes), length) else {
+                // A package that does not index refuses before any lookup runs.
+                continue;
+            };
+            packages += 1;
+            let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+            // Bound the payload comparisons so the whole corpus stays fast in a
+            // debug build; the lookup comparison itself runs on every member.
+            let payload_budget = 8usize;
+            for name in &names {
+                members += 1;
+                let canonical = archive.read(name);
+                for (index, spelling) in probe_spellings(name).into_iter().enumerate() {
+                    spellings += 1;
+                    let lookup = lookup_member_name(&spelling).unwrap();
+                    let (expected_key, expected_directory) = normalizing_lookup(&spelling);
+                    assert_eq!(
+                        lookup.key(),
+                        expected_key,
+                        "{}: lookup key for {spelling:?}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        lookup.explicit_directory,
+                        expected_directory,
+                        "{}: explicit-directory verdict for {spelling:?}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        format!("{:?}", archive.metadata(&spelling)),
+                        format!(
+                            "{:?}",
+                            if expected_directory || expected_key != *name {
+                                archive.metadata(&expected_key).and_then(|metadata| {
+                                    if expected_directory && !metadata.is_directory() {
+                                        Err(Error::from(ErrorKind::FileNotFound(
+                                            expected_key.clone(),
+                                        )))
+                                    } else {
+                                        Ok(metadata)
+                                    }
+                                })
+                            } else {
+                                archive.metadata(name)
+                            }
+                        ),
+                        "{}: metadata for {spelling:?}",
+                        path.display()
+                    );
+                    if !expected_directory && expected_key == *name && index < payload_budget {
+                        payload_comparisons += 1;
+                        assert_eq!(
+                            format!("{:?}", archive.read(&spelling)),
+                            format!("{canonical:?}"),
+                            "{}: payload for {spelling:?}",
+                            path.display()
+                        );
+                    }
+                }
+            }
+        }
+        assert!(
+            members >= 1000 && packages >= 100,
+            "corpus too small: {packages} packages, {members} members"
+        );
+        println!(
+            "packages={packages} members={members} spellings={spellings} \
+             payload_comparisons={payload_comparisons}"
+        );
+    }
+
+    #[test]
+    fn a_canonical_name_is_looked_up_without_building_a_key() {
+        let lookup = lookup_member_name("xl/worksheets/sheet1.xml").unwrap();
+        assert!(
+            matches!(lookup.name, Cow::Borrowed(_)),
+            "a canonical member name must be looked up by reference"
+        );
+        assert!(
+            matches!(
+                lookup_member_name("xl/../xl/worksheets/sheet1.xml")
+                    .unwrap()
+                    .name,
+                Cow::Owned(_)
+            ),
+            "a name that normalization rewrites must still build its key"
+        );
+        assert!(
+            matches!(
+                lookup_member_name("xl/sheet1.xml/").unwrap().name,
+                Cow::Owned(_)
+            ),
+            "an explicit directory name must still build its key"
+        );
     }
 }
