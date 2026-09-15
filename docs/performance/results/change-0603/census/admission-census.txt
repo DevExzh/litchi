@@ -1,0 +1,8 @@
+files	95
+worksheet_parts	207
+admission_refused	105
+admission_borrowed	71
+admission_rewritten	31
+fused_completed_before	0
+fused_completed_after	0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 987 filtered out; finished in 0.20s

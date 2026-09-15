@@ -196,10 +196,14 @@ impl Validator {
 /// complete source, parser materialization is carried as a `Complete` result;
 /// the caller finishes validation before forwarding that result through the
 /// raw facade. No speculative diagnostic escapes the established error order.
-pub(super) fn worksheet_xml_and_parse_source(content: &[u8]) -> Result<crate::cell::Store> {
+pub(super) fn worksheet_xml_and_parse_source(
+    content: &[u8],
+    admission: raw::worksheet::SourceAdmission,
+) -> Result<crate::cell::Store> {
     let mut validator = Validator::new(XmlOwner::Worksheet);
     let attempt = raw::worksheet::parse_source_with_observer(
         content,
+        admission,
         || Ok(None),
         |namespace, event| validator.observe(namespace, event),
     );

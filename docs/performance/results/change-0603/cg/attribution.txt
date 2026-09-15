@@ -1,0 +1,146 @@
+### fct before
+# pair fct-n1.incl -> fct-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                  11865305        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many         8190113         69.03%
+both  mce::codec::process_markup_compatibility <-process_ooxml        6303903         53.13%
+both  raw::worksheet::parse <-from_source_selected          3720885         31.36%
+cmt   MultiSourceEdit::commit <-main                        3650921         30.77%
+cmt   rewrite_value_only_with_provenance <-commit            422893          3.56%
+cmt   Snapshot::from_rewritten_value_source <-commit        2297167         19.36%
+cmt   reduced_readback <-from_rewritten_value_source            794          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source           5925          0.05%
+cmt   Snapshot::invalidated_workbook_xml <-commit            862168          7.27%
+
+### dvtr before
+# pair dvtr-n1.incl -> dvtr-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                  56687954        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many        43457762         76.66%
+both  mce::codec::process_markup_compatibility <-process_ooxml       29980454         52.89%
+both  raw::worksheet::parse <-from_source_selected         26488191         46.73%
+cmt   MultiSourceEdit::commit <-main                       13109449         23.13%
+cmt   rewrite_value_only_with_provenance <-commit           3930500          6.93%
+cmt   Snapshot::from_rewritten_value_source <-commit        8588379         15.15%
+cmt   reduced_readback <-from_rewritten_value_source           2792          0.00%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source         134430          0.24%
+cmt   Snapshot::invalidated_workbook_xml <-commit            532779          0.94%
+
+### sss before
+# pair sss-n1.incl -> sss-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                 267542005        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many       212447119         79.41%
+both  mce::codec::process_markup_compatibility <-process_ooxml      153800553         57.49%
+both  raw::worksheet::parse <-from_source_selected        176971458         66.15%
+cmt   MultiSourceEdit::commit <-main                       54875209         20.51%
+cmt   rewrite_value_only_with_provenance <-commit          34483229         12.89%
+cmt   Snapshot::from_rewritten_value_source <-commit       19793852          7.40%
+cmt   reduced_readback <-from_rewritten_value_source           2891          0.00%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source        1853193          0.69%
+cmt   Snapshot::invalidated_workbook_xml <-commit            542591          0.20%
+
+### mfe before
+# pair mfe-n1.incl -> mfe-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                  96998758        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many        72582998         74.83%
+both  mce::codec::process_markup_compatibility <-process_ooxml       48198051         49.69%
+both  raw::worksheet::parse <-from_source_selected         65898028         67.94%
+cmt   MultiSourceEdit::commit <-main                       24161086         24.91%
+cmt   rewrite_value_only_with_provenance <-commit           9146574          9.43%
+cmt   Snapshot::from_rewritten_value_source <-commit       14487661         14.94%
+cmt   reduced_readback <-from_rewritten_value_source           7643          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source         297226          0.31%
+cmt   Snapshot::invalidated_workbook_xml <-commit            474581          0.49%
+
+### ndp before
+# pair ndp-n1.incl -> ndp-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                4106291095        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many      1965506410         47.87%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected     1939182544         47.22%
+both  mce::codec::process_markup_compatibility <-process_ooxml      166834244          4.06%
+both  raw::worksheet::parse <-worksheet_xml_and_parse_source     1263608471         30.77%
+cmt   MultiSourceEdit::commit <-main                     2121613195         51.67%
+cmt   rewrite_value_only_with_provenance <-commit        1269138442         30.91%
+cmt   Snapshot::from_rewritten_value_source <-commit      852270951         20.76%
+cmt   reduced_readback <-from_rewritten_value_source         387641          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source       20553857          0.50%
+cmt   Snapshot::invalidated_workbook_xml <-commit            159742          0.00%
+
+### fct after
+# pair fct-n1.incl -> fct-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                   8605157        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many         4935873         57.36%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected         643510          7.48%
+both  mce::codec::process_markup_compatibility <-process_ooxml        4140642         48.12%
+both  raw::worksheet::parse <-from_rewritten_value_source        2108304         24.50%
+cmt   MultiSourceEdit::commit <-main                        3644655         42.35%
+cmt   rewrite_value_only_with_provenance <-commit            421133          4.89%
+cmt   Snapshot::from_rewritten_value_source <-commit        2292488         26.64%
+cmt   reduced_readback <-from_rewritten_value_source            822          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source           5909          0.07%
+cmt   Snapshot::invalidated_workbook_xml <-commit            862770         10.03%
+
+### dvtr after
+# pair dvtr-n1.incl -> dvtr-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                  33595897        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many        20363499         60.61%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected        5206759         15.50%
+both  mce::codec::process_markup_compatibility <-process_ooxml       13921216         41.44%
+both  raw::worksheet::parse <-from_rewritten_value_source        6668488         19.85%
+cmt   MultiSourceEdit::commit <-main                       13112176         39.03%
+cmt   rewrite_value_only_with_provenance <-commit           3926553         11.69%
+cmt   Snapshot::from_rewritten_value_source <-commit        8596924         25.59%
+cmt   reduced_readback <-from_rewritten_value_source           3838          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source         132774          0.40%
+cmt   Snapshot::invalidated_workbook_xml <-commit            530629          1.58%
+
+### sss after
+# pair sss-n1.incl -> sss-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                 112075548        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many        57047964         50.90%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected       33430677         29.83%
+both  mce::codec::process_markup_compatibility <-process_ooxml       23476129         20.95%
+both  raw::worksheet::parse <-from_rewritten_value_source        6037418          5.39%
+cmt   MultiSourceEdit::commit <-main                       54808165         48.90%
+cmt   rewrite_value_only_with_provenance <-commit          34403548         30.70%
+cmt   Snapshot::from_rewritten_value_source <-commit       19805980         17.67%
+cmt   reduced_readback <-from_rewritten_value_source           2948          0.00%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source        1853380          1.65%
+cmt   Snapshot::invalidated_workbook_xml <-commit            543222          0.48%
+
+### mfe after
+# pair mfe-n1.incl -> mfe-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                  38004903        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many        13521850         35.58%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected       11451162         30.13%
+both  mce::codec::process_markup_compatibility <-process_ooxml        4597299         12.10%
+both  raw::worksheet::parse <-from_rewritten_value_source        9616985         25.30%
+cmt   MultiSourceEdit::commit <-main                       24227735         63.75%
+cmt   rewrite_value_only_with_provenance <-commit           9130318         24.02%
+cmt   Snapshot::from_rewritten_value_source <-commit       14569339         38.34%
+cmt   reduced_readback <-from_rewritten_value_source          10375          0.03%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source         295042          0.78%
+cmt   Snapshot::invalidated_workbook_xml <-commit            475745          1.25%
+
+### ndp after
+# pair ndp-n1.incl -> ndp-n4.incl, M=3 operations
+function (inclusive, per operation)                           Ir/op        % of op
+TOTAL (one plan + commit)                                4100975500        100.00%
+plan  MultiSnapshot::load_source_backed <-edit_many      1961978346         47.84%
+plan  validation::worksheet_xml_and_parse_source <-from_source_selected     1938228130         47.26%
+both  mce::codec::process_markup_compatibility <-process_ooxml      166834244          4.07%
+both  raw::worksheet::parse <-worksheet_xml_and_parse_source     1262603836         30.79%
+cmt   MultiSourceEdit::commit <-main                     2119826891         51.69%
+cmt   rewrite_value_only_with_provenance <-commit        1267574708         30.91%
+cmt   Snapshot::from_rewritten_value_source <-commit      852047590         20.78%
+cmt   reduced_readback <-from_rewritten_value_source         387659          0.01%
+cmt   Store::merge_omitted_cells <-from_rewritten_value_source       20556566          0.50%
+cmt   Snapshot::invalidated_workbook_xml <-commit            160473          0.00%
+
