@@ -165,7 +165,7 @@ area sections below.
 | 20 | PPT-1 | record tree copies bytes once per nesting level and retains the stream | 2-3 | memcpy 30% of a PPT open; copy factor 1.3-2×, **measured** | every PPT open and edit | medium | design (public field) |
 | 21 | SAVE-5 | C2′: lazy decode behind the fallible package accessors | 2 | `load_parts_eager` 49% of an edit operation, **measured**; 3.58× retention, **retained** (0581) | every eager OOXML open, edit, save | medium | proposed ADR (0581 gates) |
 | 22 | CFB-1 | append-style reads so the whole-stream zero-fill never exists | 2 | 9-32% of DOC/PPT open Ir, **retained** upper bound; in-memory sources only | eager DOC, PPT and XLS opens | medium | frozen design; cycles A/B, may fall inside the floor |
-| 23 | XLS-2 | lazy SST indexing | 1 | 49.5% of the `54016` open, **retained**; moves when a malformed SST is refused | XLS open and list with strings | high | frozen design (0576) |
+| 23 | XLS-2 | lazy SST indexing — **declined, 0608**: 35.73% of the `54016` open on this base, but a prefix index is driven to its last entry on 94 of 94 fixtures | 1 | 49.5% of the `54016` open, **retained**; moves when a malformed SST is refused | XLS open and list with strings | high | frozen design (0576) |
 | 24 | XLS-6 | skip never-interpreted globals payloads, frame once | 2 | ~30% of the flagship open Ir, **retained**; +46 requests, modelled | XLS open | medium-high | frozen design with the density gate |
 | 25 | XLSX-1 | compact per-cell source facts from planning into commit | 1-2 | ≤25% of a one-percent edit interval, modelled from 0550/0520 | XLSX source-backed edit | high | 0551's design plus its differential oracle |
 | 26 | XLSX-3 | reuse the publication audit of the unchanged original | 2 | ≤28% of publication, modelled from 0528 | XLSX publication | medium | memo: design; proof door: proposed ADR |
@@ -1058,6 +1058,23 @@ segment (direct indexing instead of `read_exact` into a 2-byte `copy_from_slice`
 `read_formatting_runs` without its per-string `Vec` (`:824-830`). Modelled at up
 to half the 49.5%; 0576's differential harness proves error identity; no design
 record. Falsified if segment-boundary logic dominates.
+**Resolved by change 0608:** the 49.5% is a pre-0595 figure; on the current base
+the walk is 35.73% of the `54016` open in instructions, 30.99% in cycles, and
+18.27%/18.32% and 3.19%/2.99% on `WithCustomViews.xls` and the flagship. The
+saving condition "only when few strings are resolved" is falsified by a census
+of every `.xls` and `.xlt` fixture: a deferred index is a *prefix* index, and on
+**94 of 94** fixtures carrying shared strings the highest SST index any cell
+references is the last entry, so a full text or an all-cells read drives it to
+completion everywhere and open-and-list is the only scenario that saves the whole
+walk. Two further findings the item did not anticipate: the walked bytes are
+dropped when open returns, so the deferred walk must re-read the SST region from
+the CFB (up to +70.9% of the open's read bytes on `54016`); and preserving the
+`SST entry locator` allocation message forces `try_reserve_exact(unique)` on the
+first extension, so no retention is saved once one string is read. The one form
+in which no refusal moves — validate eagerly, store lazily — is 0.30-2.09% of an
+open in instructions and 0.44-3.13% in cycles against a floor of ±1.7% at p50,
+and doubles the walk on every string-resolving path. XLS-2 is declined and the
+design frozen; XLS-2b landed as change 0595.
 
 **XLS-3. A snapshot-scoped retained sheet index and a whole-sheet iterator**
 (step 4). The first validated scan records per cell its stream offset,

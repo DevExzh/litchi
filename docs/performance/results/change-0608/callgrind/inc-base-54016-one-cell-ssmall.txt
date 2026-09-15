@@ -1,0 +1,145 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/tmp/cg-base-54016-one-cell-ssmall.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 86871913
+Trigger: Program termination
+Profiled target:  /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base --input /home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls --mode owned-readat --operation one-cell --worksheet-index 0 --warmups 2 --samples 5 (PID 2235462, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.9
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+856,356,739 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+856,356,739 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+856,093,153 (99.97%)  ???:(below main) [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+856,093,141 (99.97%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+856,092,960 (99.97%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+856,091,166 (99.97%)  ???:main [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+856,091,155 (99.97%)  ???:std::rt::lang_start_internal [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+855,988,223 (99.96%)  ???:std::rt::lang_start::{{closure}} [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+855,988,202 (99.96%)  ???:std::sys::backtrace::__rust_begin_short_backtrace [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+855,988,198 (99.96%)  ???:xls_source_attribution::main [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+855,904,126 (99.95%)  ???:xls_source_attribution::run [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+569,378,835 (66.49%)  ???:xls_source_attribution::sha256_hex [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+569,325,831 (66.48%)  ???:sha2::sha256::compress256 [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+569,325,752 (66.48%)  ???:sha2::sha256::soft::unroll::compress [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+466,821,536 (54.51%)  ???:xls_source_attribution::binary_identity [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+127,500,942 (14.89%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::new [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+127,337,855 (14.87%)  ???:litchi_xls::workbook::package::<impl litchi_xls::workbook::model::Workbook<R>>::parse_workbook [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+110,903,057 (12.95%)  ???:litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+105,617,973 (12.33%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::cell_value_by_index [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+105,617,661 (12.33%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::cell_by_index [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+105,615,736 (12.33%)  ???:litchi_xls::workbook::source::query_cell [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 52,765,144 ( 6.16%)  ???:litchi_xls::workbook::codec::semantic::worksheet::add_cell [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 42,353,666 ( 4.95%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 42,353,506 ( 4.95%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 41,082,129 ( 4.80%)  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 32,895,305 ( 3.84%)  ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 28,311,863 ( 3.31%)  ???:litchi_xls::workbook::source::WorksheetScan::next_frame [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 26,654,240 ( 3.11%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 19,947,245 ( 2.33%)  ???:litchi_xls::workbook::source::process_cell [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 17,475,388 ( 2.04%)  ???:litchi_xls::workbook::source::WorksheetScan::read_payload [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 15,248,597 ( 1.78%)  ???:litchi_xls::records::scan_shared_string_records [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 13,337,064 ( 1.56%)  ???:litchi_xls::records::walk_one_shared_string [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 11,785,595 ( 1.38%)  ???:litchi_xls::workbook::source::GlobalsBuffer::ensure [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 11,683,203 ( 1.36%)  ???:litchi_xls::workbook::source::WorksheetScan::fill [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 11,456,048 ( 1.34%)  ???:litchi_xls::records::SharedStringTable::parse_from_records [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 11,455,627 ( 1.34%)  ???:litchi_xls::records::SharedStringTable::parse_segments [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+ 10,033,568 ( 1.17%)  ???:litchi_xls::records::CellRecord::visit_mul_blank [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  9,638,417 ( 1.13%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  9,591,414 ( 1.12%)  ???:litchi_xls::records::SstCursor::read_characters [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  8,967,537 ( 1.05%)  ???:core::ptr::drop_in_place<litchi_xls::workbook::model::Workbook<std::io::cursor::Cursor<alloc::vec::Vec<u8>>>> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  8,308,758 ( 0.97%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  8,058,454 ( 0.94%)  ???:litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  8,040,645 ( 0.94%)  ???:litchi_xls::records::CellRecord::parse [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,946,271 ( 0.93%)  ???:<alloc::string::String>::from_utf16 [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,824,850 ( 0.91%)  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::validate_cell_xf [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,796,546 ( 0.91%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,505,103 ( 0.88%)  ???:<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,429,230 ( 0.87%)  ???:core::ptr::drop_in_place<litchi_xls::worksheet::Worksheet> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  7,171,237 ( 0.84%)  ???:litchi_core::source::ReadAt::read_exact_at [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,997,338 ( 0.82%)  ???:litchi_xls::cell::Cell::from_record_with_formula_context [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,738,792 ( 0.79%)  ???:__rustc::__rust_realloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,737,333 ( 0.79%)  ???:__rustc::__rdl_realloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,706,046 ( 0.78%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  6,620,373 ( 0.77%)  ???:litchi_xls::number_format::codec::parse_xf [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,601,034 ( 0.77%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  6,382,575 ( 0.75%)  ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  6,311,542 ( 0.74%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+  6,310,094 ( 0.74%)  ???:0x0000000004ee9680 [???]
+  6,072,784 ( 0.71%)  ???:<litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  5,349,242 ( 0.62%)  ???:__rustc::__rust_alloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  5,308,358 ( 0.62%)  ???:__rustc::__rdl_alloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,976,551 ( 0.58%)  ???:__rustc::__rust_dealloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,941,659 ( 0.58%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  4,935,668 ( 0.58%)  ???:__rustc::__rdl_dealloc [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,895,322 ( 0.57%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  4,688,838 ( 0.55%)  ???:core::ptr::drop_in_place<litchi_xls::records::CellRecord> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,672,944 ( 0.55%)  ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,220,901 ( 0.49%)  ???:litchi_xls::layout::Collector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  4,033,441 ( 0.47%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,684,284 ( 0.43%)  ???:alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Dying,K,V,NodeType>,alloc::collections::btree::node::marker::KV>::drop_key_val [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  3,667,483 ( 0.43%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,621,420 ( 0.42%)  ???:litchi_xls::border_fill::parse_xf_border_fill [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  3,529,834 ( 0.41%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,206,506 ( 0.37%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,014,678 ( 0.35%)  ???:alloc::collections::btree::map::IntoIter<K,V,A>::dying_next [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  3,001,118 ( 0.35%)  ???:litchi_cfb::shared::SharedOleFile::read_stream_range_hinted [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  2,477,154 ( 0.29%)  ???:core::ptr::drop_in_place<litchi_core::sheet::types::CellValue> [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  2,405,972 ( 0.28%)  ???:<alloc::string::String as core::clone::Clone>::clone [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  2,389,466 ( 0.28%)  ???:litchi_xls::scenario::ScenarioCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  2,297,546 ( 0.27%)  ???:litchi_xls::hyperlinks::package::HyperlinkCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,945,608 ( 0.23%)  ???:litchi_cfb::file::OleFile<R>::open_stream [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,944,288 ( 0.23%)  ???:litchi_cfb::file::OleFile<R>::read_stream_from_fat [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,706,764 ( 0.20%)  ???:litchi_xls::conditional_format::codec::Collector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,706,691 ( 0.20%)  ???:litchi_xls::comments::codec::CommentCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,560,137 ( 0.18%)  ???:alloc::sync::Arc<T,A>::drop_slow [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,326,544 ( 0.15%)  ???:litchi_xls::records::SstCursor::walk_formatting_runs [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,310,168 ( 0.15%)  ???:litchi_xls::workbook::source::WorksheetScan::skip_payload [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,269,837 ( 0.15%)  ???:litchi_cfb::shared::SharedOleFile::open_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,269,781 ( 0.15%)  ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,267,974 ( 0.15%)  ???:litchi_xls::hyperlinks::codec::parse_hlink_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,260,790 ( 0.15%)  ???:litchi_cfb::file::OleFile<R>::open_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,213,712 ( 0.14%)  ???:litchi_xls::pivot_table::package::PivotTableCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,154,580 ( 0.13%)  ???:litchi_xls::records::CellRecord::packed_cell_range [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,140,636 ( 0.13%)  ???:litchi_xls::consolidation::ConsolidationCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,136,341 ( 0.13%)  ???:alloc::boxed::Box<T,A>::new_uninit_in [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,130,354 ( 0.13%)  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,114,073 ( 0.13%)  ???:litchi_xls::hyperlinks::codec::decode_terminated_utf16 [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,101,736 ( 0.13%)  ???:litchi_xls::page_setup::PageSetupCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,061,984 ( 0.12%)  ???:litchi_xls::sort_data::SortDataCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+  1,026,192 ( 0.12%)  ???:litchi_xls::view::codec::ViewCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    986,136 ( 0.12%)  ???:litchi_xls::list_object::package::collector::ListObjectCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    951,763 ( 0.11%)  ???:litchi_cfb::file::OleFile<R>::read_sectors_batched [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    948,200 ( 0.11%)  ???:litchi_xls::query_table::validation::QueryTableCollector::feed_record [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    936,814 ( 0.11%)  ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    910,296 ( 0.11%)  ???:litchi_xls::scenario::ScenarioCollector::finish_pending [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    895,941 ( 0.10%)  ???:litchi_xls::number_format::codec::parse_number_format [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    891,453 ( 0.10%)  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    860,459 ( 0.10%)  ???:litchi_xls::records::CellRecord::parse_mul_blank [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    859,320 ( 0.10%)  ???:litchi_xls::alignment::CellAlignment::parse [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+    843,226 ( 0.10%)  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0608/bin/xsa-base]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./csu/../csu/libc-start.c
+  ./csu/../sysdeps/nptl/libc_start_call_main.h
+  ./malloc/../string/bits/string_fortified.h
+  ./malloc/./malloc/malloc.c
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+

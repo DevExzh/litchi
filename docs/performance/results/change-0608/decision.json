@@ -1,0 +1,57 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0608",
+  "title": "The XLS shared-string walk re-priced on this base, the prefix a deferred index would have to walk, and the frozen design",
+  "decision": "design retained, implementation declined on the measured corpus census and the measured size of the one form that moves no refusal",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 ranked XLS-2 at 49.5% of the 54016.xls open; that is a pre-0595 figure, and on this base the walk is 35.73% of that open in callgrind instructions, 30.99% in native cycles and 31.1% to 31.7% at p50 in wall clock, against 18.27%/18.32%/20.4% on WithCustomViews.xls and 3.19%/2.99%/3.5% on the flagship",
+    "a deferred index is a prefix index: entry k is known only after entries 0..k-1 have been framed, so the item's reach is decided by the highest index a scenario resolves, not by how many strings it resolves",
+    "measured over every .xls and .xlt fixture in the repository: on 94 of 94 fixtures that carry both an SST and a LabelSst cell, the highest SST index any cell references is the LAST entry, so a full text or an all-cells read drives a prefix index to completion and the saving on those scenarios is exactly zero",
+    "the deferred walk cannot resume over the bytes it walked, because GlobalsBuffer's payload is dropped when open returns and ParsedGlobals retains offsets only; the design must therefore re-read the SST region from the CFB on the resolve path, which on 54016.xls is up to +70.9% of the open's read bytes -- a range-source regression bought with an open-time instruction saving",
+    "preserving the Allocation { resource: \"SST entry locator\", requested } message forces try_reserve_exact(unique) on the first extension, so the retained weight is unchanged from the first resolved string onward and deferral saves memory only for callers that never read a string",
+    "the one form in which no refusal moves -- validate every string at open, store no entries until first use -- saves 0.30% to 2.09% of the open in callgrind instructions, 0.44% to 3.13% in native cycles and -1.10% to +1.39% in wall clock on the flagship, and it makes every string-resolving scenario pay the walk twice plus a re-read; it is declined",
+    "no fixture in the repository is refused by the per-string walk (the four SST refusals in the corpus are all header refusals), so every refusal this design moves fires on zero fixtures and the differential that would prove the move safe has to be built from synthetic malformed SSTs that do not exist"
+  ],
+  "accepted_evidence": {
+    "counters": "eighteen deterministic counter cells per leg (3 fixtures x 2 in-memory modes x open/list/one-cell); every open and list cell is identical across all three legs at 53/565,201/29, 16/110,242/22 and 40/317,171/25, reproducing the retained figures of changes 0565, 0574, 0576 and 0595 and proving the SST bytes are read at open under every index shape",
+    "callgrind": "isolation pairs at small and large sample counts, differenced and divided by the extra operations, with both a self-cost and an --inclusive=yes annotation from each raw profile; scan_shared_string_records inclusive is 74,236 / 147,687 / 1,906,053 Ir per open, 3.19% / 18.27% / 35.73% of the operation, and 241.5 Ir per shared string on 54016.xls against the 454 change 0587 retained for the pre-0595 scan",
+    "scaffold_split": "two measurement scaffolds differing from the base only in crates/litchi-xls/src/records.rs isolate the walk from the storage: base - nowalk is 74,108 / 146,246 / 1,907,192 Ir (3.18% / 18.09% / 35.75%), base - nostore is 6,950 / 9,884 / 111,236 Ir (0.30% / 1.22% / 2.09%); MeasuredText::consume, walk_one_shared_string and walk_formatting_runs are exactly zero in nowalk on all three fixtures and every symbol outside the walk is identical across the three legs",
+    "native_cycles": "perf stat isolation pairs, median of five repetitions per leg: base - nowalk is 10,302 / 23,577 / 271,026 cycles (2.99% / 18.32% / 30.99%), base - nostore is 1,504 / 4,025 / 26,989 (0.44% / 3.13% / 3.09%)",
+    "floors": "two A/A legs built by copying the base binary and run through the identical pipeline: -0.17% to +0.66% on the isolation-pair cycle metric and -0.10% to +0.00% on native instructions; a paired A1 B1 B2 A2 wall clock of 400 samples per round puts the same-binary floor at -1.75% to +1.70% at p50 over 24 comparisons",
+    "corpus_census": "an independent pure-arithmetic probe over all 126 .xls and .xlt fixtures: 123 carry an SST, 4 are refused by header checks (naming which check each fails, matching change 0576's four refusals exactly), 119 are indexed at open, 94 declare at least one shared string and all 94 carry LabelSst cells; 17,434 entries and 30,316 LabelSst cells; idx_max == unique - 1 on 94 of 94; a uniformly chosen string cell needs a median 63.88% of the table; the probe reproduces change 0576's corpus totals exactly -- 17,434 entries to the unit, the same 3 SST-less fixtures and the same 4 refusals, with 123 and 119 against 0576's 121 and 117 plus the two fixtures litchi-cfb refuses before any SST is reachable -- from code that shares nothing with the scan",
+    "probe_cross_check": "the probe predicts isst 3 for the flagship's harness cell, which the scaffold legs report as 'Invalid SST index: 3 (max: 0)' and the base leg resolves to string:4:Date; it predicts no string at the harness cell of 54016.xls and WithCustomViews.xls, and those legs' counters are identical",
+    "gates": "cargo fmt --all --check clean, cargo clippy -p litchi-xls --all-targets clean, cargo test -p litchi-xls 72 binaries 1,382 passed 0 failed 1 ignored (a pre-existing #[ignore] doctest), cargo doc -p litchi-xls --no-deps clean, all on the clean worktree at the base commit"
+  },
+  "accepted_costs": {
+    "ceiling_not_delta": "base - nowalk removes the walk without paying for anything a real deferral would pay for -- the lock, the memoised refusal, the re-read of the SST bytes, the growth reservations -- so it bounds the item rather than measuring it; the realisable saving is strictly smaller and is not measured, because nothing was implemented",
+    "scaffolds_are_not_candidates": "both scaffolds return an empty entries vector and therefore break shared-string resolution by construction; the flagship's one-cell on those legs reports Invalid SST index, which is what makes them a control rather than a candidate",
+    "callgrind_artifact": "the nostore leg's __memcpy_avx_unaligned_erms rises 47,026 Ir on 54016.xls because dropping the entries reservation changes the heap layout; callgrind charges rep movsb per byte, and 111,236 + 47,026 = 158,262 against the native instruction saving of 158,478, a 0.14% reconciliation",
+    "in_memory_sources_only": "every XLS source in this harness wraps bytes or a staged immutable file, so the design's cost -- a second read pass over the SST on the resolve path -- is modelled from byte counts and never measured; that is the weakest part of this evidence",
+    "shared_host": "eight measurement agents shared the 32-core host throughout; quiescence is not established and both floors are measured rather than assumed"
+  },
+  "known_gaps": {
+    "selectors": "xls_source_attribution supports open, list and one-cell only; no full-text, all-cells or from-path-observation selector exists, so the scenarios the design would make worse cannot be timed at all (change 0587's standing XLS measurement blocker)",
+    "corpus": "no fixture in the repository is refused by the per-string SST walk, so the synthetic malformed-SST differential that the design's admission gates require does not exist and cannot be derived from this corpus",
+    "census_scope": "the census counts LabelSst (0x00FD) records; RString (0x00D6) and other legacy string records are not counted, which could only make the item's reach smaller, never larger, because idx_max is already the last entry everywhere",
+    "not_sized": "the contiguity observation -- entries are adjacent by construction, so the index is derivable from a Vec<u32> of starts plus one final end, a 4x cut in retained weight -- is recorded as a mechanism with no measurement, and belongs with item XLS-10 rather than with XLS-2"
+  },
+  "withheld": [
+    "any speedup, any regression, any range-source, cold-cache, physical-device, peak-RSS, allocation-count, concurrency-scaling, real-producer or cross-platform result",
+    "any statement about XLS full text or all cells beyond the census's counts, because no selector can measure either",
+    "any conclusion about XLS-3, XLS-6, XLS-9, XLS-10 or the other items change 0587 ranks near this one"
+  ],
+  "provenance": {
+    "base_commit": "818e58bee9dd50e6a064ba7cd0a9a7abbf44e82a",
+    "branch": "perf/0608-xls-lazy-sst-index-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0, perf 7.0.14",
+    "measured_cpu": 28,
+    "base_binary_sha256": "8fa24d70e4833aa3a855e7734b979124c037b1b0713a9c00adadd09c9bea8971",
+    "nostore_binary_sha256": "ee47c51d506d3da5b79ebe805bcc5faa7b381a368a386988e0c226d62f19615a",
+    "nowalk_binary_sha256": "f385c38b0509725ecb3249d5ff71cd39b070adc8706b3e00c90c44c4d4f4cea5",
+    "note": "all work was done in a detached worktree with its own target directory; the two measurement scaffolds were applied, built, measured and reverted, and git status was verified clean before the gates and the commit"
+  }
+}

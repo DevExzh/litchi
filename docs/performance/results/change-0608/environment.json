@@ -1,0 +1,65 @@
+{
+  "change_id": "0608",
+  "title": "Lazy XLS shared-string indexing: sizing, corpus census and frozen design",
+  "disposition": "design only; no file under crates/ was modified",
+  "base_commit": "818e58bee9dd50e6a064ba7cd0a9a7abbf44e82a",
+  "branch": "perf/0608-xls-lazy-sst-index-design",
+  "worktree": "/home/zhuhe/code/litchi-worktrees/0608 (detached from the shared checkout; the shared repository was neither built in nor modified)",
+  "host": {
+    "cpu": "AMD EPYC 9R45, 32 cores",
+    "memory_gib": 123,
+    "kernel": "Linux 7.0.0-1012-aws",
+    "measured_cpu": 28,
+    "pinning": "setarch x86_64 -R (ASLR off), taskset -c 28, single-threaded, RAYON_NUM_THREADS=1",
+    "quiescence": "NOT established; eight measurement agents shared this host and the load average ran between 6.1 and 10.8 on 32 cores across the capture window. Both floors below are measured, not assumed."
+  },
+  "toolchain": {
+    "rustc": "1.95.0 (59807616e 2026-04-14)",
+    "cargo": "1.95.0 (f2d3ce0bd 2026-03-21)",
+    "valgrind": "3.26.0",
+    "perf": "7.0.14",
+    "python": "3 (standard library only)"
+  },
+  "legs": [
+    {
+      "name": "base",
+      "what": "the unmodified base commit",
+      "binary": "tools/perf-baseline xls_source_attribution, --release --locked --features xls-source-attribution",
+      "sha256": "8fa24d70e4833aa3a855e7734b979124c037b1b0713a9c00adadd09c9bea8971"
+    },
+    {
+      "name": "nostore",
+      "what": "MEASUREMENT SCAFFOLD, not a candidate: walks every shared string exactly as production does, reserves nothing and records nothing. Prices the storage alone.",
+      "patch": "scripts/scaffold-nostore.patch",
+      "sha256": "ee47c51d506d3da5b79ebe805bcc5faa7b381a368a386988e0c226d62f19615a"
+    },
+    {
+      "name": "nowalk",
+      "what": "MEASUREMENT SCAFFOLD, not a candidate: builds the segments and runs every SST header check, then skips the per-string walk entirely. Prices the ceiling of full deferral at open.",
+      "patch": "scripts/scaffold-nowalk.patch",
+      "sha256": "f385c38b0509725ecb3249d5ff71cd39b070adc8706b3e00c90c44c4d4f4cea5"
+    },
+    {
+      "name": "aa / bb",
+      "what": "byte-for-byte copies of the base binary, run through the identical pipeline to measure the floor in the same window",
+      "sha256": "8fa24d70e4833aa3a855e7734b979124c037b1b0713a9c00adadd09c9bea8971"
+    }
+  ],
+  "differing_files_between_legs": ["crates/litchi-xls/src/records.rs"],
+  "fixtures": {
+    "test-data/ole/xls/ConditionalFormattingSamples.xls": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "test-data/ole/xls/WithCustomViews.xls": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+    "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+  },
+  "census_corpus": "every .xls and .xlt file under test-data, 126 of them, listed in fixtures.txt",
+  "harness_scope": {
+    "mode": "owned-readat and file-source; both wrap staged bytes or a staged immutable file, so no cold or physical I/O is measured",
+    "operations": "open, list, one-cell; xls_source_attribution has no full-text and no all-cells selector, which is change 0587's standing XLS measurement blocker",
+    "one_cell_target": "row 1, column 0 of the worksheet index given per fixture (1, 1 and 0 respectively)"
+  },
+  "floors_measured_in_window": {
+    "isolation_pair_cycles": "-0.17% to +0.66% over six same-binary comparisons",
+    "isolation_pair_instructions": "-0.10% to +0.00%",
+    "wall_clock_p50": "-1.75% to +1.70% over 24 same-binary comparisons"
+  }
+}

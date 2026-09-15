@@ -1,0 +1,54 @@
+base flagship owned-readat open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+base flagship owned-readat list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+base flagship owned-readat one-cell IDENTICAL {'read_calls': 61, 'read_bytes': 603115, 'version_calls': 42, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="string:4:Date"
+base flagship file-source open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+base flagship file-source list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+base flagship file-source one-cell IDENTICAL {'read_calls': 61, 'read_bytes': 603115, 'version_calls': 42, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="string:4:Date"
+base cv owned-readat open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base cv owned-readat list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base cv owned-readat one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base cv file-source open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base cv file-source list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base cv file-source one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+base 54016 owned-readat open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+base 54016 owned-readat list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+base 54016 owned-readat one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
+base 54016 file-source open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+base 54016 file-source list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+base 54016 file-source one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
+nostore flagship owned-readat open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nostore flagship owned-readat list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nostore flagship owned-readat one-cell IDENTICAL {'read_calls': 60, 'read_bytes': 603108, 'version_calls': 38, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="error:29:Invalid SST index: 3 (max: 0)"
+nostore flagship file-source open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nostore flagship file-source list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nostore flagship file-source one-cell IDENTICAL {'read_calls': 60, 'read_bytes': 603108, 'version_calls': 38, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="error:29:Invalid SST index: 3 (max: 0)"
+nostore cv owned-readat open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore cv owned-readat list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore cv owned-readat one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore cv file-source open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore cv file-source list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore cv file-source one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nostore 54016 owned-readat open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nostore 54016 owned-readat list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nostore 54016 owned-readat one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
+nostore 54016 file-source open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nostore 54016 file-source list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nostore 54016 file-source one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
+nowalk flagship owned-readat open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nowalk flagship owned-readat list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nowalk flagship owned-readat one-cell IDENTICAL {'read_calls': 60, 'read_bytes': 603108, 'version_calls': 38, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="error:29:Invalid SST index: 3 (max: 0)"
+nowalk flagship file-source open IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nowalk flagship file-source list IDENTICAL {'read_calls': 53, 'read_bytes': 565201, 'version_calls': 29, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell=null
+nowalk flagship file-source one-cell IDENTICAL {'read_calls': 60, 'read_bytes': 603108, 'version_calls': 38, 'len_calls': 1, 'seek_calls': 0} sheets=16 cell="error:29:Invalid SST index: 3 (max: 0)"
+nowalk cv owned-readat open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk cv owned-readat list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk cv owned-readat one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk cv file-source open IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk cv file-source list IDENTICAL {'read_calls': 16, 'read_bytes': 110242, 'version_calls': 22, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk cv file-source one-cell IDENTICAL {'read_calls': 17, 'read_bytes': 110656, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=3 cell=null
+nowalk 54016 owned-readat open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nowalk 54016 owned-readat list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nowalk 54016 owned-readat one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
+nowalk 54016 file-source open IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nowalk 54016 file-source list IDENTICAL {'read_calls': 40, 'read_bytes': 317171, 'version_calls': 25, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell=null
+nowalk 54016 file-source one-cell IDENTICAL {'read_calls': 65, 'read_bytes': 932993, 'version_calls': 43, 'len_calls': 1, 'seek_calls': 0} sheets=1 cell="float:4024000000000000"
