@@ -1,0 +1,1055 @@
+{
+  "cells": [
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 8590,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 760
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 9340,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 730
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "owned-readat",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 9370,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 730
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 9111,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 710
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "owned-readat",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 603115,
+          "read_calls": 61,
+          "read_ns": 9870,
+          "seek_calls": 0,
+          "version_calls": 42,
+          "version_ns": 1100
+        },
+        "after_cell": {
+          "selected_cell": "string:4:Date",
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 603115,
+          "read_calls": 61,
+          "read_ns": 9970,
+          "seek_calls": 0,
+          "version_calls": 42,
+          "version_ns": 1070
+        },
+        "before_cell": {
+          "selected_cell": "string:4:Date",
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "owned-readat",
+      "operation": "one-cell"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 231,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 39380,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 6310
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 21310,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 5930
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "file-source",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 170,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 21030,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 5870
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 565201,
+          "read_calls": 53,
+          "read_ns": 20730,
+          "seek_calls": 0,
+          "version_calls": 29,
+          "version_ns": 5960
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "file-source",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 603115,
+          "read_calls": 61,
+          "read_ns": 22110,
+          "seek_calls": 0,
+          "version_calls": 42,
+          "version_ns": 8450
+        },
+        "after_cell": {
+          "selected_cell": "string:4:Date",
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 603115,
+          "read_calls": 61,
+          "read_ns": 23390,
+          "seek_calls": 0,
+          "version_calls": 42,
+          "version_ns": 8610
+        },
+        "before_cell": {
+          "selected_cell": "string:4:Date",
+          "worksheet_count": 16,
+          "worksheet_names": [
+            "Home",
+            "Products1",
+            "Products2",
+            "Book tour",
+            "Grades",
+            "Customers1",
+            "Quarters",
+            "Bike rating",
+            "FY months",
+            "Regional sales",
+            "Mountains",
+            "Category sales",
+            "Banded rows",
+            "Compare to totals",
+            "Products3",
+            "Customers2"
+          ]
+        }
+      },
+      "fixture": "flagship",
+      "mode": "file-source",
+      "operation": "one-cell"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 1260,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 540
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 1230,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 580
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "owned-readat",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 30,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 1260,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 580
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 1210,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 550
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "owned-readat",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110656,
+          "read_calls": 17,
+          "read_ns": 1290,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 660
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110656,
+          "read_calls": 17,
+          "read_ns": 1270,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 590
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "owned-readat",
+      "operation": "one-cell"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 4630,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 4460
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 190,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 5180,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 4390
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "file-source",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 5460,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 4460
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 170,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110242,
+          "read_calls": 16,
+          "read_ns": 4270,
+          "seek_calls": 0,
+          "version_calls": 22,
+          "version_ns": 4460
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "file-source",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110656,
+          "read_calls": 17,
+          "read_ns": 4880,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 5040
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 170,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 110656,
+          "read_calls": 17,
+          "read_ns": 4460,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 4990
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 3,
+          "worksheet_names": [
+            "Plan1",
+            "Plan2",
+            "Plan3"
+          ]
+        }
+      },
+      "fixture": "cv",
+      "mode": "file-source",
+      "operation": "one-cell"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 5670,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 610
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 5030,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 690
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "owned-readat",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 5590,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 660
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 5030,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 660
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "owned-readat",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 932993,
+          "read_calls": 65,
+          "read_ns": 15260,
+          "seek_calls": 0,
+          "version_calls": 43,
+          "version_ns": 1120
+        },
+        "after_cell": {
+          "selected_cell": "float:4024000000000000",
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 20,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 932993,
+          "read_calls": 65,
+          "read_ns": 14050,
+          "seek_calls": 0,
+          "version_calls": 43,
+          "version_ns": 1160
+        },
+        "before_cell": {
+          "selected_cell": "float:4024000000000000",
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "owned-readat",
+      "operation": "one-cell"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 190,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 15340,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 5170
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 13100,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 5100
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "file-source",
+      "operation": "open"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 13770,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 5150
+        },
+        "after_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 170,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 317171,
+          "read_calls": 40,
+          "read_ns": 12980,
+          "seek_calls": 0,
+          "version_calls": 25,
+          "version_ns": 5220
+        },
+        "before_cell": {
+          "selected_cell": null,
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "file-source",
+      "operation": "list"
+    },
+    {
+      "cell": {
+        "after": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 932993,
+          "read_calls": 65,
+          "read_ns": 3076589,
+          "seek_calls": 0,
+          "version_calls": 43,
+          "version_ns": 11340
+        },
+        "after_cell": {
+          "selected_cell": "float:4024000000000000",
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        },
+        "before": {
+          "len_calls": 1,
+          "len_ns": 180,
+          "mutex_ns": 0,
+          "range_union_bytes": 0,
+          "range_union_ns": 0,
+          "read_bytes": 932993,
+          "read_calls": 65,
+          "read_ns": 32882,
+          "seek_calls": 0,
+          "version_calls": 43,
+          "version_ns": 8990
+        },
+        "before_cell": {
+          "selected_cell": "float:4024000000000000",
+          "worksheet_count": 1,
+          "worksheet_names": [
+            "Sheet1"
+          ]
+        }
+      },
+      "fixture": "54016",
+      "mode": "file-source",
+      "operation": "one-cell"
+    }
+  ],
+  "note": "one representative record per cell; every sample in a cell carries identical logical counters, which counters_raw asserts"
+}

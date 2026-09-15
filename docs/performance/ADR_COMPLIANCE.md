@@ -1,5 +1,37 @@
 # Performance optimization ADR-compliance matrix
 
+## 0595 — retained lean XLS frame loop and cheaper eager SST walk
+
+ADR 0005 is the governing record and is satisfied unchanged: every
+`ResourceLimit` still identifies its resource, observed value and ceiling, and
+`max_worksheet_scan_records`, `max_worksheet_scan_bytes`, `max_global_records`,
+`max_text_bytes` and `max_text_cells` are compared against the same values at
+the same points — only the moment at which the error *value* is constructed
+moved, from unconditionally to on the path that returns it. ADR 0006's
+preservation clause is not engaged (nothing here is on a write path) and ADR
+0003's transaction boundary is not engaged. No new `unsafe`, no weakened
+malformed-input defence, no hidden global Rayon pool, no ambient I/O, no public
+leakage of archive types, raw locks or executors; no public API changed. Source
+freshness fences are unchanged and counted: `version()` observations are
+identical between the legs in all 18 cells. **One behavioural difference is
+recorded rather than left to be discovered:** the source-backed shared-string
+walk no longer attempts `try_reserve_exact` for formatting runs, so under
+allocator exhaustion it no longer produces that typed allocation refusal, and on
+a string whose runs are also malformed the run check now wins where the
+allocation message used to. The reservation guarded a `Vec` the walk discarded —
+at most 65,535 runs × 4 bytes — nothing newly unbounded is retained, and the
+eager `SharedStringTable`, which keeps its runs, still takes the reservation and
+still refuses. It is a bounded allocation that no longer happens, not a ceiling
+that was relaxed, and no input decides it. No
+input-dependent refusal moves: the SST index is byte-identical over the 121
+fixtures that carry an SST
+against a digest captured on the untouched base commit, and change 0576's corpus
+differential still compares 17,434 entries and four identical refusals with
+identical messages. OLE2/OOXML optimization remains active; ODF is deferred
+until completion and iWork excluded. [Change and
+limitations](0595-xls-frame-loop-and-sst-walk.md); [retained
+evidence](results/change-0595/README.md).
+
 ## 0592: aligned, and the one line where it stops
 
 [0592](0592-docx-lazy-paragraph-index.md) is the first of the ten items 0587's

@@ -1,0 +1,125 @@
+# SST index over the XLS corpus, AFTER leg (branch perf/0595-xls-frame-loop-and-sst-walk)
+# cargo test -p litchi-xls --lib the_sst_index_over_the_corpus_is_pinned -- --nocapture
+
+sst-index: fixtures=121 digest=0x9cb14f5daa02eebc
+sst-index: libreoffice-core/chart2/qa/extras/data/xls/chart.xls: segments=1 entries=3 body=c486aef4df8919b5
+sst-index: libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls: segments=1 entries=2 body=2f74fe39cee25126
+sst-index: libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls: segments=1 entries=15 body=2ab8d5b899b898f1
+sst-index: libreoffice-core/sc/qa/unit/data/xls/cellformat.xls: segments=1 entries=1 body=89e9ff336ced249f
+sst-index: libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls: segments=1 entries=6 body=9bf175074e98f786
+sst-index: libreoffice-core/sc/qa/unit/data/xls/formats.xls: segments=1 entries=18 body=9e98c677f37e683a
+sst-index: libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls: segments=1 entries=11 body=69f0f0826e847731
+sst-index: libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls: segments=1 entries=489 body=5f6b4753dbe46905
+sst-index: libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls: segments=1 entries=15 body=7f90491c17283ee5
+sst-index: libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls: segments=1 entries=7 body=4cc8bb8ad7e4e39f
+sst-index: libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls: segments=1 entries=3 body=cf1ac50851c3be69
+sst-index: libreoffice-core/sc/qa/unit/data/xls/validation.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: office-interop/libreoffice-resaved/tdf78897-litchi.xls: segments=1 entries=2 body=2f74fe39cee25126
+sst-index: office-interop/litchi-changed/tdf78897-litchi.xls: segments=1 entries=2 body=2f74fe39cee25126
+sst-index: ole/xls/ComplexFunctionTestCaseData.xls: segments=1 entries=27 body=7ebe69421aed7eb1
+sst-index: ole/xls/ConditionalFormattingSamples copy.xls: segments=1 entries=303 body=0597caad1e726579
+sst-index: ole/xls/ConditionalFormattingSamples.xls: segments=1 entries=303 body=0597caad1e726579
+sst-index: ole/xls/DateFormats.xls: segments=1 entries=2 body=c5455773ad02be4c
+sst-index: ole/xls/DateTimeToNumberTestCases.xls: segments=1 entries=17 body=28633dc1ba2bb527
+sst-index: ole/xls/FormulaEvalTestData.xls: segments=2 entries=1249 body=eab5d25b28fdf3ea
+sst-index: ole/xls/FormulaRefs.xls: segments=1 entries=5 body=e1676396b86f375d
+sst-index: ole/xls/FormulaSheetRange.xls: segments=1 entries=14 body=517c0f5cc7bb78f6
+sst-index: ole/xls/HyperlinksOnManySheets.xls: segments=1 entries=15 body=5162b05252659079
+sst-index: ole/xls/Simple.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: ole/xls/SimpleChart.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleMacro.xls: segments=1 entries=1 body=7ebb16259095c6ad
+sst-index: ole/xls/SimpleMultiCell.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleScatterChart.xls: segments=1 entries=2 body=62538610b5b0982a
+sst-index: ole/xls/SimpleWithAutofilter copy.xls: segments=1 entries=6 body=64c9878cf4f0d5b4
+sst-index: ole/xls/SimpleWithAutofilter.xls: segments=1 entries=6 body=64c9878cf4f0d5b4
+sst-index: ole/xls/SimpleWithChoose copy.xls: segments=1 entries=1 body=4bb4e90d8c67a54f
+sst-index: ole/xls/SimpleWithChoose.xls: segments=1 entries=1 body=4bb4e90d8c67a54f
+sst-index: ole/xls/SimpleWithColours copy.xls: segments=1 entries=5 body=192babe37a3ee5af
+sst-index: ole/xls/SimpleWithColours.xls: segments=1 entries=5 body=192babe37a3ee5af
+sst-index: ole/xls/SimpleWithComments copy.xls: segments=1 entries=3 body=1c3f6fe23e8b3f13
+sst-index: ole/xls/SimpleWithComments.xls: segments=1 entries=3 body=1c3f6fe23e8b3f13
+sst-index: ole/xls/SimpleWithDataFormat copy.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithDataFormat.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithFormula copy.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: ole/xls/SimpleWithFormula.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: ole/xls/SimpleWithImages copy.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithImages-mac copy.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithImages-mac.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithImages.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/SimpleWithPageBreaks copy.xls: segments=1 entries=1 body=b374c85c91c601cd
+sst-index: ole/xls/SimpleWithPageBreaks.xls: segments=1 entries=1 body=b374c85c91c601cd
+sst-index: ole/xls/SimpleWithPrintArea copy.xls: segments=1 entries=1 body=f9c3fc5b8c6e5025
+sst-index: ole/xls/SimpleWithPrintArea.xls: segments=1 entries=1 body=f9c3fc5b8c6e5025
+sst-index: ole/xls/SimpleWithSkip copy.xls: segments=1 entries=2 body=07b5763cd2ae630c
+sst-index: ole/xls/SimpleWithSkip.xls: segments=1 entries=2 body=07b5763cd2ae630c
+sst-index: ole/xls/SimpleWithStyling copy.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: ole/xls/SimpleWithStyling.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: ole/xls/SingleLetterRanges.xls: segments=1 entries=3 body=22ee7e3a21806501
+sst-index: ole/xls/WeekNumFunctionTestCaseData.xls: segments=1 entries=25 body=e32c434dbe3eb819
+sst-index: ole/xls/WeekNumFunctionTestCaseData2013.xls: segments=1 entries=25 body=8059ef54537ad829
+sst-index: ole/xls/WithChart.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/WithCheckBoxes.xls: segments=1 entries=1 body=62f98eba7b2936f7
+sst-index: ole/xls/WithConditionalFormatting.xls: segments=1 entries=9 body=f983b50f5856c719
+sst-index: ole/xls/WithCustomViews.xls: segments=13 entries=474 body=90fb747df8bbeb07
+sst-index: ole/xls/WithEmbeddedObjects.xls: segments=1 entries=1 body=7b2f49a4ecbe1085
+sst-index: ole/xls/WithExtendedStyles.xls: segments=1 entries=3 body=9168c37517583bbf
+sst-index: ole/xls/WithFormattedGraphTitle.xls: segments=1 entries=4 body=52e6893f894ca898
+sst-index: ole/xls/WithHyperlink.xls: segments=1 entries=5 body=a4317ef710e61b11
+sst-index: ole/xls/WithThreeCharts.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/WithTwoCharts.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/WithTwoHyperLinks.xls: segments=1 entries=7 body=ad5a5ac525140695
+sst-index: ole/xls/empty.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: ole/xls/password.xls: refused=invalid SST counts must be non-negative signed integers
+sst-index: poi/test-data/hpsf/TestUnicode.xls: segments=1 entries=1 body=218791cabf965b6d
+sst-index: poi/test-data/spreadsheet/15228.xls: segments=2 entries=243 body=a961a7498493f49c
+sst-index: poi/test-data/spreadsheet/24207.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/29942.xls: segments=3 entries=4516 body=766af21ef0947e57
+sst-index: poi/test-data/spreadsheet/35897-type4.xls: refused=invalid SST counts must be non-negative signed integers
+sst-index: poi/test-data/spreadsheet/41139.xls: segments=1 entries=55 body=2b320c493de7cdcd
+sst-index: poi/test-data/spreadsheet/44010-TwoCharts.xls: segments=1 entries=19 body=b1e1ee7cd6297043
+sst-index: poi/test-data/spreadsheet/45365-2.xls: segments=3 entries=603 body=d0c64f8428e22dcf
+sst-index: poi/test-data/spreadsheet/45365.xls: segments=1 entries=1 body=83af6e754d74f9b7
+sst-index: poi/test-data/spreadsheet/45492.xls: segments=1 entries=5 body=ab4569bdd192193f
+sst-index: poi/test-data/spreadsheet/45761.xls: segments=1 entries=3 body=7020ad511984116f
+sst-index: poi/test-data/spreadsheet/46136-NoWarnings.xls: segments=1 entries=1 body=10b17ec6979dd61f
+sst-index: poi/test-data/spreadsheet/48968.xls: segments=1 entries=27 body=a5e31ed260b27be1
+sst-index: poi/test-data/spreadsheet/50939.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/53109.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/54016.xls: segments=28 entries=7893 body=341fc9558f6d9829
+sst-index: poi/test-data/spreadsheet/55341_CellStyleBorder.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/57456.xls: refused=invalid SST total count is smaller than its unique count
+sst-index: poi/test-data/spreadsheet/59858.xls: segments=2 entries=334 body=a601460fd930d298
+sst-index: poi/test-data/spreadsheet/ConditionalFormattingSamples.xls: segments=1 entries=303 body=0597caad1e726579
+sst-index: poi/test-data/spreadsheet/DBCSHeader.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/DateFormats.xls: segments=1 entries=2 body=c5455773ad02be4c
+sst-index: poi/test-data/spreadsheet/DrawingAndComments.xls: segments=1 entries=7 body=587b9ed53a7187b9
+sst-index: poi/test-data/spreadsheet/Formatting.xls: segments=1 entries=12 body=611a603df4ad0cce
+sst-index: poi/test-data/spreadsheet/HyperlinksOnManySheets.xls: segments=1 entries=15 body=5162b05252659079
+sst-index: poi/test-data/spreadsheet/MRExtraLines.xls: segments=1 entries=33 body=56321c95efda3717
+sst-index: poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls: segments=1 entries=20 body=40742efe66657bf2
+sst-index: poi/test-data/spreadsheet/SharedFormulaTest.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/ShrinkToFit.xls: segments=1 entries=1 body=88b37274b0e77237
+sst-index: poi/test-data/spreadsheet/Simple.xls: segments=1 entries=1 body=8ea7cd7dd0349719
+sst-index: poi/test-data/spreadsheet/SimpleMacro.xls: segments=1 entries=1 body=7ebb16259095c6ad
+sst-index: poi/test-data/spreadsheet/SimpleScatterChart.xls: segments=1 entries=2 body=62538610b5b0982a
+sst-index: poi/test-data/spreadsheet/SimpleWithColours.xls: segments=1 entries=5 body=192babe37a3ee5af
+sst-index: poi/test-data/spreadsheet/SimpleWithComments.xls: segments=1 entries=3 body=1c3f6fe23e8b3f13
+sst-index: poi/test-data/spreadsheet/SimpleWithPageBreaks.xls: segments=1 entries=1 body=b374c85c91c601cd
+sst-index: poi/test-data/spreadsheet/SimpleWithPrintArea.xls: segments=1 entries=1 body=f9c3fc5b8c6e5025
+sst-index: poi/test-data/spreadsheet/TwoSheetsOneHidden.xls: segments=1 entries=2 body=3d98d9286d7260dc
+sst-index: poi/test-data/spreadsheet/UncalcedRecord.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/WithConditionalFormatting.xls: segments=1 entries=9 body=f983b50f5856c719
+sst-index: poi/test-data/spreadsheet/WithTwoHyperLinks.xls: segments=1 entries=7 body=ad5a5ac525140695
+sst-index: poi/test-data/spreadsheet/XRefCalc.xls: segments=1 entries=6 body=35a38c42f93ccbde
+sst-index: poi/test-data/spreadsheet/colwidth.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/comments.xls: segments=1 entries=3 body=3ee5978deb65384f
+sst-index: poi/test-data/spreadsheet/duprich1.xls: segments=1 entries=78 body=ac1ff5768d48047a
+sst-index: poi/test-data/spreadsheet/duprich2.xls: segments=1 entries=6 body=7be3d18680d26bae
+sst-index: poi/test-data/spreadsheet/dvEmpty.xls: segments=1 entries=1 body=090799696881ffb7
+sst-index: poi/test-data/spreadsheet/externalFunctionExample.xls: segments=1 entries=2 body=3d98d9286d7260dc
+sst-index: poi/test-data/spreadsheet/external_name.xls: segments=1 entries=91 body=c5e918aa474bff49
+sst-index: poi/test-data/spreadsheet/namedinput.xls: segments=1 entries=0 body=304ad887a5733a2c
+sst-index: poi/test-data/spreadsheet/testNames.xls: segments=1 entries=1 body=d5ab7677030c45ff
+sst-index: poi/test-data/spreadsheet/unicodeNameRecord.xls: segments=1 entries=8 body=a9349d942535c40c
+sst-index: poi/test-data/spreadsheet/xor-encryption-abc.xls: refused=invalid SST counts must be non-negative signed integers

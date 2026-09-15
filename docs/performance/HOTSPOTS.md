@@ -1,5 +1,32 @@
 # Performance hotspot inventory
 
+## 0595 — retained lean XLS frame loop and cheaper eager SST walk
+
+Retains change 0587 items XLS-1 (rank 9, change 0584's never-landed candidate 2)
+and XLS-2b (rank 17). Five `ok_or` sites that built and dropped a 48-byte
+`SourceBackedError::ResourceLimit` on every worksheet frame, every global record
+and every extracted text cell became `let ... else`; `WorksheetScan::ensure`
+split into an inlined resident test and an outlined `fill`; `check_execution`
+inlined its uncancellable case; `frame_header` takes one bounds check; the
+`SstCursor` maintains its logical position instead of re-summing every segment
+behind it; fixed-width shared-string header fields are read by direct indexing
+instead of a per-field `memcpy`; and the formatting-run walk is parameterised on
+a sink so the source-backed walk stops allocating a `Vec` per string it
+discards. One `54016.xls` open falls 253,317 → 193,739 ns (−23.5%), 7,240,329 →
+5,375,911 Ir (−25.8%) and 1,165,313 → 869,124 cycles (−25.4%); one-cell falls
+1,011,306 → 832,605 ns (−17.7%) and 24,676,105 → 18,602,879 Ir (−24.6%);
+`WithCustomViews.xls` falls 6.2–13.0% at p50 on every operation and mode.
+`drop_in_place<SourceBackedError>` and `SstCursor::read_exact` are exactly zero
+on all three fixtures after the change. The flagship moves only 2–5% in counts
+and its wall clock sits inside the measured ±3.1% floor, so no speedup is
+claimed for it. Framing overhead on the `54016` one-cell query falls from 46.3%
+of the operation to 38.5% and remains the largest single term; XLS-2 (lazy SST
+indexing) and XLS-3 (retained sheet index, whole-sheet iterator) still require
+their own frozen design records. OLE2/OOXML optimization remains active; ODF is
+deferred until completion and iWork excluded. [Change and
+limitations](0595-xls-frame-loop-and-sst-walk.md); [retained
+evidence](results/change-0595/README.md).
+
 ## 0592 — DOCX-2 implemented: the paragraph index is built by the first paragraph query
 
 Rank 10 of the 0587 queue (DOCX-2, step 1, "build the paragraph index lazily")
