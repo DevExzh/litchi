@@ -1,0 +1,48 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0590",
+  "title": "One complete-package hash per opened PPTX commit, and the publication stops re-deriving the snapshot it was handed",
+  "decision": "retained: 0587 item PPTX-1 parts (a) and (b) implemented; part (c) written up as a design prerequisite and not implemented; part (d) examined and rejected",
+  "code_state": "crates/litchi-pptx only: opened/model.rs, opened/patch.rs, opened/transaction.rs, opened/mod.rs, package/model.rs, opened/tests.rs",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "an opened PPTX lifecycle hashed the complete package six times and captured it five times; two of those hashes were of content the caller had already hashed or already captured in the same lifecycle",
+    "the reuse in Transaction::commit is conditional on OpcPackage::is_signed, which is true whenever unsign could rewrite any input package_fingerprint feeds, so a signature-stripping commit is re-hashed exactly as before",
+    "the reuse in apply_opened_presentation_commit is conditional on packages_equal, a direct comparison of exactly the fingerprint inputs; a false result falls back to the ordinary capture, so drift outside the patch write set still produces a snapshot of the real package",
+    "no revision value changes, so the durable LPRM0001 and LPCP0002 patch encodings that carry complete-package revisions are bit-identical and previously serialized patches still apply",
+    "0587 item (c) redefines the revision itself and therefore breaks those two durable encodings; it needs a frozen design record and a magic bump before any code"
+  ],
+  "accepted_evidence": {
+    "call_counts": "callgrind call counts per callee for package_fingerprint, the capture entry point, notes::load_snapshot, packages_equal and Snapshot::rebound_to, both legs, four selectors, at --warmup 0 --samples 1",
+    "isolation_pair": "callgrind at --samples 1 and --samples 3 on pptx_eager_batch_edit_save, differenced over two samples: per lifecycle 12,679,371,772 -> 10,680,374,116 Ir (-15.77%), six hashes and five captures -> four and four",
+    "whole_child_instructions": "pptx_eager_batch_edit_save 39,612,371,219 -> 33,611,197,006 Ir (-15.15%); pptx_eager_multi_slide_batch_edit_save -15.12%; pptx_slide_remove_boundary_save -1.80%; pptx_slide_move_boundary_save -2.57%",
+    "symbol_shares": "package_fingerprint inclusive 34.94% -> 24.76%, the capture entry point 33.30% -> 21.38%, software sha2::compress256 51.77% -> 44.60%; the harness's own sha256_hex and every deflate symbol are unchanged to within seven instructions, which is the output-identity cross-check",
+    "paired_timing": "four legs in A1 B1 B2 A2 order, 30 measured samples after 3 warmups each, taskset -c 10, with the A/A (A1 vs A2) and B/B (B1 vs B2) floors from the repeated legs in the same window",
+    "correctness": "cargo test -p litchi-pptx: 860 tests pass, six new; cargo fmt --all --check, cargo clippy -p litchi-pptx --all-targets and cargo doc -p litchi-pptx --no-deps all clean"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency; callgrind runs SHA-256 in software because valgrind masks the SHA CPUID bit, so every hashing share here is about five times its native cycle share",
+    "corpora": "the eager PPTX corpora are built through Package::from_opc_package, which sets physical_source_provenance = false, so every eager save re-deflates all media; the timed region is dominated by deflate work this change does not touch",
+    "host_load": "seven other agents of the same wave were building and measuring on the other 31 cores throughout; the in-window A/A and B/B floors are the only statement about that",
+    "debug_assert": "capture_with_revision and Snapshot::rebound_to re-verify their precondition in debug and test builds only, which roughly doubles the hashing the crate's own test suite performs"
+  },
+  "known_gaps": {
+    "remaining_hashes": "four complete-package hashes per lifecycle remain; removing them needs 0587 item PPTX-1(c), a durable revision-format change",
+    "untouched_paths": "the cross-package slide copy (0587 item PPTX-2), the per-call presentation.xml reparse (PPTX-3) and the eager save's whole-deck regeneration (SAVE-3)",
+    "notes_memo": "0587 item (d)'s notes-index cache has no owner to hold the memo and its invalidation rule is an ADR 0013 correctness contract, so it is deferred to a design record",
+    "measurement": "no allocation, RSS, cold-cache, range-source, concurrency or cross-platform measurement was taken, and no selector times PPTX capture, commit, apply and publication separately"
+  },
+  "withheld": [
+    "any registered speedup, regression, RSS, allocation, cold-cache, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0590-pptx-opened-transaction-revision-reuse",
+    "before_binary_sha256": "6cb5c84f88b8ee27fcc85099065bb79ec034e3b7abbfce601b4bb7c072d62c95",
+    "after_binary_sha256": "b1c0e1be7b2efde61340dc9fc3cf42e749abd2aba5b9baf06f003635aba08f3f",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "pinning": "taskset -c 10 for every measured process"
+  }
+}

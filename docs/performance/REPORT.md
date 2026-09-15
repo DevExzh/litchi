@@ -1,5 +1,32 @@
 # Performance program phase report
 
+## Change 0590: PPTX opened-transaction revision reuse
+
+Change 0590 removes two of the four complete-package hashes in the
+`litchi-pptx` opened-presentation lifecycle. `Transaction::commit`
+(`opened/transaction.rs`) retains the revision it computes to decide
+`unsign()` and passes it to the recapture through a new
+`capture_with_revision`, recomputing only when `OpcPackage::is_signed` reports
+that stripping may have rewritten a fingerprint input; every structural, limit
+and notes-topology check in the capture still runs unconditionally, and a
+`debug_assert!` re-hashes in debug builds. `Package::apply_opened_presentation_commit`
+(`package/model.rs`) now forwards `commit.snapshot` to the publication helper,
+which reuses that capture only when a new `packages_equal` — a direct comparison
+of exactly the inputs `package_fingerprint` feeds, short-circuiting on blob
+`Arc` identity — proves the built candidate byte-identical, and otherwise
+captures it exactly as before. Validation passed `litchi-pptx` library
+`556/556` plus integration and doc tests, 860 in total, with six new tests
+covering a signature-stripping commit, the revision binding of an ordinary
+commit, snapshot equality with a fresh capture on both the changed and no-op
+routes, drift outside the patch write set, a stale write set, and the
+exhaustiveness of the package comparison. **Measured**, callgrind isolation pair
+on CPU 10: −15.77% Ir per `pptx_eager_batch_edit_save` lifecycle, with the six
+hashes and five captures per lifecycle becoming four and four. The paired native
+timings are reported beside this host's A/A floor and are not a speedup claim;
+the eager corpora re-deflate all media on save. See
+[Change 0590](0590-pptx-opened-transaction-revision-reuse.md);
+`performance_claim: none`.
+
 ## 0589 — an empty overlay hashes the artifact once
 
 Retained, partially implemented. With no physical span the CFB overlay is the

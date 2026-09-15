@@ -1,5 +1,29 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0590 — PPTX opened-transaction revision reuse
+
+Record: [0590](0590-pptx-opened-transaction-revision-reuse.md).
+
+`docs/GOAL.md`'s first optimization step — eliminate unnecessary work — applied
+to the PPTX opened-document CRUD route that 0587 ranked third. Two of the four
+complete-package SHA-256 passes per lifecycle are removed by reusing values
+already computed on identical content: the commit's own unsign-check revision,
+and the commit's own capture, which the facade had been discarding in favour of
+re-deriving it. Both reuses are conditional and fall back to the original path,
+so no refusal, no output byte, no limit and no validation moved; ADR 0003's
+complete-package revision binding is preserved because the fingerprint
+definition is untouched and the durable patch encodings that carry revisions are
+bit-identical. **Measured** −15.77% Ir per lifecycle on `pptx_eager_batch_edit_save`
+with exact before/after call counts (six hashes and five captures per lifecycle
+before, four and four after). What stays open: the remaining four hashes need
+0587's item PPTX-1(c), which redefines the durable revision and therefore needs
+a frozen design record and a magic bump for `LPRM0001` and `LPCP0002` before any
+code; the notes-index memo of item (d) needs an owner for the memo and an
+ADR 0013 invalidation rule; the cross-package copy path (PPTX-2) is untouched;
+and no eager PPTX save timing is believable until the `open`/`from_vec` corpus
+variant 0587 asks for exists, because the present corpora re-deflate all media.
+No speedup, RSS, allocation, cold-cache or real-producer claim follows.
+
 ## 0589: an empty overlay hashes the artifact once, not twice — DOC and PPT source-backed opens lose half their SHA-256 work
 
 Record: [0589](0589-ole2-snapshot-fingerprint-passes.md).

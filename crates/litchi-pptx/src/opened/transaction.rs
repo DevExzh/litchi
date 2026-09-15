@@ -4,7 +4,9 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid, package_fingerprint};
+use super::model::{
+    Slide, SlideNameIndex, Snapshot, capture, capture_with_revision, invalid, package_fingerprint,
+};
 use super::patch::Patch;
 use crate::{Error, Result};
 
@@ -1195,8 +1197,19 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         let mut working = self.working;
         compact_changed_slides(&mut working, self.source.package.as_ref(), &self.slides)?;
-        if package_fingerprint(&working)? != self.source.revision {
+        let mut revision = package_fingerprint(&working)?;
+        if revision != self.source.revision {
+            // `unsign` rewrites fingerprint inputs only when signature
+            // infrastructure is present: it strips signature parts and the
+            // relationships that reach them, and leaves every other resource
+            // exactly as staged. A package that carries none is re-hashed to
+            // the same revision, so the one just computed still binds the
+            // complete staged package and the recapture below reuses it.
+            let signed = working.is_signed();
             working.unsign();
+            if signed {
+                revision = package_fingerprint(&working)?;
+            }
         }
         let patch = Patch::capture(
             self.source.package.as_ref(),
@@ -1210,10 +1223,11 @@ impl Transaction {
                 patch,
             });
         }
-        let snapshot = capture(
+        let snapshot = capture_with_revision(
             &working,
             self.source.limits,
             self.source.physical_source_provenance,
+            revision,
         )?;
         Ok(Commit { snapshot, patch })
     }

@@ -1,0 +1,47 @@
+# Gates for change 0590, run in /home/zhuhe/code/litchi-worktrees/0590 at branch perf/0590-pptx-opened-transaction-revision-reuse
+# Host: AMD EPYC 9R45, Linux 7.0.0-1012-aws, rustc 1.95.0. Base 08d968f8ec7db27cf1187d01911fd08b9d014d91.
+
+$ cargo fmt --all --check
+exit=0
+
+$ cargo clippy -p litchi-pptx --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.58s
+exit=0
+
+$ cargo test -p litchi-pptx
+aggregate over all test binaries: 860 passed, 0 failed, 2 ignored
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+all doctests ran in 0.43s; merged doctests compilation took 0.37s
+exit=0
+
+$ cargo doc -p litchi-pptx --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+   Generated /home/zhuhe/code/litchi-worktrees/0590/target/doc/litchi_pptx/index.html
+exit=0
+
+$ cargo test -p litchi-pptx --lib -- --list | grep <the six new tests>
+test opened::tests::commit_revision_binds_the_staged_package_without_a_signature_graph ... ok
+test opened::tests::commit_rehashes_a_package_whose_unsign_strips_signature_bytes ... ok
+test opened::tests::commit_publication_captures_a_package_that_drifted_outside_the_write_set ... ok
+test opened::tests::packages_equal_tracks_every_fingerprint_input ... ok
+test opened::tests::published_commit_snapshot_equals_a_fresh_capture ... ok
+test opened::tests::stale_write_set_still_refuses_a_committed_publication ... ok
+exit=0
+
+$ differential check: published output_sha256 across all four timing legs of all four selectors
+pptx_eager_batch_edit_save             identical=True  8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755
+pptx_eager_multi_slide_batch_edit_save identical=True  23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9
+pptx_slide_remove_boundary_save        identical=True  a23546ab442dc283f51e3eb0bd245a0ae0bc23291535b57f37dedf80993da28d
+pptx_slide_move_boundary_save          identical=True  57734a7dfe4dc03bece571bd38f3e1ec9c3234af5e048202fafe0d44087408fe
+exit=0
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit=0
+# this record adds no claim-registry entry; the gate is run because the batch adds a docs/performance record
+
+$ python3 tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0

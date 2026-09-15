@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{Limits, Snapshot, capture, invalid};
+use super::model::{Limits, Snapshot, capture, invalid, packages_equal};
 use crate::{Error, Result};
 
 const MAGIC: &[u8; 8] = b"LPTX0002";
@@ -755,7 +755,28 @@ pub(crate) fn apply(
     patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None, physical_source_provenance)
+    apply_with_revision(package, patch, None, None, physical_source_provenance)
+}
+
+/// Apply a patch whose committing transaction already captured the staged
+/// result, reusing that capture when the candidate this application builds
+/// carries identical content.
+///
+/// `committed` is only ever an optimization: the candidate is built, validated
+/// and assigned exactly as [`apply`] builds it, and the committed snapshot is
+/// consulted after that candidate exists. When the candidate differs from the
+/// committed package in any fingerprint input — because the destination
+/// package moved on outside the patch write set, or because the caller's
+/// physical-source provenance or resource limits differ — the candidate is
+/// captured from scratch, so no refusal, no snapshot field and no published
+/// byte depends on the reuse.
+pub(crate) fn apply_committed(
+    package: &mut OpcPackage,
+    patch: &Patch,
+    committed: Option<&Snapshot>,
+    physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    apply_with_revision(package, patch, None, committed, physical_source_provenance)
 }
 
 pub(crate) fn apply_exact_revision(
@@ -768,8 +789,27 @@ pub(crate) fn apply_exact_revision(
         package,
         patch,
         Some(result_revision),
+        None,
         physical_source_provenance,
     )
+}
+
+/// Capture `candidate`, reusing an already validated snapshot of identical
+/// content when the committing transaction supplied one.
+fn capture_candidate(
+    candidate: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    committed: Option<&Snapshot>,
+) -> Result<Snapshot> {
+    if let Some(committed) = committed
+        && committed.limits == limits
+        && committed.physical_source_provenance == physical_source_provenance
+        && packages_equal(committed.package.as_ref(), candidate)
+    {
+        return Ok(committed.rebound_to(candidate));
+    }
+    capture(candidate, limits, physical_source_provenance)
 }
 
 /// Validate a detached candidate already constructed from a freshly proven
@@ -806,6 +846,7 @@ fn apply_with_revision(
     package: &mut OpcPackage,
     patch: &Patch,
     result_revision: Option<[u8; 32]>,
+    committed: Option<&Snapshot>,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
@@ -819,7 +860,8 @@ fn apply_with_revision(
     }
     validate_before(package, patch)?;
     if patch.is_empty() {
-        let snapshot = capture(package, patch.limits, physical_source_provenance)?;
+        let snapshot =
+            capture_candidate(package, patch.limits, physical_source_provenance, committed)?;
         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
             return Err(invalid(
                 "opened-presentation candidate has an unexpected complete-package revision",
@@ -858,7 +900,12 @@ fn apply_with_revision(
             },
         }
     }
-    let snapshot = capture(&candidate, patch.limits, physical_source_provenance)?;
+    let snapshot = capture_candidate(
+        &candidate,
+        patch.limits,
+        physical_source_provenance,
+        committed,
+    )?;
     validate_after(&candidate, patch)?;
     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
         return Err(invalid(

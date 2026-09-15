@@ -414,8 +414,12 @@ impl Package {
         &mut self,
         commit: crate::opened::Commit,
     ) -> Result<crate::opened::Snapshot> {
-        let (_snapshot, patch) = commit.into_parts();
-        self.apply_opened_presentation_patch(&patch)
+        // The commit already captured and validated the staged result. The
+        // candidate is still built, validated and assigned exactly as for a
+        // bare patch; that capture is reused only when the candidate carries
+        // byte-identical complete-package content.
+        let (snapshot, patch) = commit.into_parts();
+        self.publish_opened_presentation_patch(&patch, Some(&snapshot))
     }
 
     /// Publish one durable opened-presentation patch atomically.
@@ -427,6 +431,19 @@ impl Package {
     pub fn apply_opened_presentation_patch(
         &mut self,
         patch: &crate::opened::Patch,
+    ) -> Result<crate::opened::Snapshot> {
+        self.publish_opened_presentation_patch(patch, None)
+    }
+
+    /// Shared publication for opened-presentation patches, with the optional
+    /// already-captured snapshot of the committing transaction.
+    ///
+    /// Every policy refusal keeps the `apply_opened_presentation_patch`
+    /// operation identity both routes reported before.
+    fn publish_opened_presentation_patch(
+        &mut self,
+        patch: &crate::opened::Patch,
+        committed: Option<&crate::opened::Snapshot>,
     ) -> Result<crate::opened::Snapshot> {
         self.ensure_graph_current("apply_opened_presentation_patch")?;
         if self.mutable_pres.is_some() {
@@ -440,7 +457,12 @@ impl Package {
         // The opened owner validates and captures a detached complete candidate
         // before one assignment, so the facade's clone-and-rollback wrapper
         // would only duplicate the entire OPC graph without adding atomicity.
-        let snapshot = crate::opened::apply(&mut self.opc, patch, self.physical_source_provenance)?;
+        let snapshot = crate::opened::apply_committed(
+            &mut self.opc,
+            patch,
+            committed,
+            self.physical_source_provenance,
+        )?;
         if changed {
             self.mutable_pres = None;
         }
