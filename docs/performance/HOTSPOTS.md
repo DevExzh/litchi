@@ -1,5 +1,32 @@
 # Performance hotspot inventory
 
+## 0601 — the harness can finally see the real-producer path
+
+Record: [0601](0601-perf-harness-real-producer-shape.md).
+
+Retained harness and corpus work against 0587's finding 1, the first
+prerequisite of its top-ranked items. Every generated worksheet this program has
+measured since change 0032 carries no markup-compatibility root, no
+`x14ac:dyDescent`, no `<cols>`, no shared-string part and no worksheet
+relationships, so items XML-1, XML-2, XML-3 and XLSX-2 had no corpus to be
+priced on. `tools/perf-baseline/src/producer_shape.rs` adds one, in three XLSX
+variants per shape plus a DOCX Word-2013 shape and an `mc:AlternateContent`
+PPTX shape, by rewriting only the parts under test in a package the production
+writers produced. The first baseline, 20 warm-ups and 100 samples per selector
+with an A/A floor of 3.0% at p50 at worst and 1.09% median, prices the producer
+signature at **7.04× (medium) and 6.79× (dense)** on a selected cell and
+**18.61× and 19.03×** on value-only planning, against the byte-comparable
+marker-free control captured in the same run. The planning ratio is what the
+namespace *declarations* and the `<cols>` block cost on their own: they are
+enough to send the whole part through the MCE codec's rewrite and to take
+0546's fused traversal off the table, and the ratio is flat across a 16× change
+in worksheet size, so it is a per-byte constant. A real Excel worksheet —
+`Excel_file_with_trash_item.xlsx`, the 209,931-byte sheet the survey profiled —
+costs 53.63 ms for one cell through the same public API against 122.9 µs to
+open the workbook, and the generated shape trips exactly the same three
+`source_stream_eligible` conditions. Nothing was optimized; the ranked items
+now have a corpus and a number to beat.
+
 ## 0603 — the fused XLSX traversal now admits declaration-only compatibility markers
 
 Change 0587's item XML-3 ranked widening `source_stream_eligible`

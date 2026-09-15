@@ -2646,6 +2646,133 @@ The corpus contains deterministic numeric cells and untouched media members;
 the row-visibility evidence does not reuse the multi-sheet scalar-cell CRUD
 shape or make a claim about broad worksheet/row structural editing.
 
+## Opt-in real-producer shapes (change 0601)
+
+Every other generated corpus in this harness is *marker free*. The XLSX
+generator writes worksheets with no Markup Compatibility root, no
+`x14ac:dyDescent`, no `<cols>` block, no shared-string part and no worksheet
+relationships; change 0032 recorded that explicitly, and the
+[0587 survey](../../docs/performance/0587-remaining-opportunity-survey.md)
+measured that the difference is the largest single term in the OOXML read
+path. These selectors add corpora that carry what Excel, Word and PowerPoint
+write by default, so the candidates the survey ranks `XML-1`, `XML-2`, `XML-3`
+and `XLSX-2` can be priced on the path real files take.
+
+Each corpus is built by rewriting a package the production writers themselves
+produced: only the parts whose markup is under test are authored here, so the
+surrounding package is exactly as valid as the corpora that already exist.
+Generation is a pure function of the shape — no clock, no PRNG, no ambient
+state — and the byte identity of every archive is recorded in
+[`CORPUS_MANIFEST_V2.md`](../../docs/performance/CORPUS_MANIFEST_V2.md).
+
+| Shape | Worksheets | Rows × columns | Worksheet roles |
+|---|---:|---:|---|
+| `producer-medium` | 4 | 32 × 32 | markup, markup+shared-strings, markup+worksheet-relationship, markup |
+| `producer-dense` | 3 | 128 × 128 | markup, markup+shared-strings, markup+worksheet-relationship |
+
+Each shape is built in three variants, because one archive cannot serve every
+scenario. The value-only editor refuses five separate parts of the producer
+signature before it reaches a cell, so the family is split and the refusals are
+proven instead of assumed:
+
+| Variant | Carries | Used by |
+|---|---|---|
+| `read` | the complete producer signature | open, selected cell |
+| `edit` | the namespace declarations and `<cols>` — the largest subset the value-only editor admits | planning, one-cell edit/save |
+| `control` | none of it: the marker-free counterpart | the control selectors |
+
+The `read` variant proves, once and untimed at construction, one typed refusal
+per producer fact, each on the smallest archive that carries only that fact
+(the gates fire in package-then-part order, so an archive carrying several can
+only witness the first):
+
+| Producer fact | Typed refusal |
+|---|---|
+| `mc:Ignorable` / `x14ac:dyDescent` on the worksheet | `value-only edits refuse attribute 'mc:Ignorable' on 'worksheet'` |
+| `pageMargins` | `value-only edits refuse element 'pageMargins' in this XML context` |
+| the shared-string part | `value-only edits refuse workbook relationship '…/sharedStrings'` |
+| a worksheet relationship | `value-only edits refuse worksheet relationships` |
+| `mc:Ignorable` on the workbook | `value-only edits refuse attribute 'mc:Ignorable' on 'workbook'` |
+
+Every generated worksheet carries:
+
+- a root with `mc:Ignorable="x14ac xr xr2 xr3"` and the matching `xmlns:mc`,
+  `xmlns:x14ac`, `xmlns:xr`, `xmlns:xr2` and `xmlns:xr3` declarations, plus an
+  `xr:uid`;
+- `x14ac:dyDescent` on `sheetFormatPr` and on every `<row>`;
+- a `<cols>` block before `sheetData`;
+- `pageMargins`, and `pageSetup r:id` on the relationship-bearing role.
+
+The *shared-strings* role stores 40% of its cells as `t="s"` references into
+`xl/sharedStrings.xml` (64 unique entries, `count`/`uniqueCount` as Excel
+writes them). The *worksheet-relationship* role carries
+`xl/worksheets/_rels/sheetN.xml.rels` pointing at a fixed 1,024-byte
+`xl/printerSettings/printerSettings1.bin`. The roles are deliberately on
+separate worksheets because the value-only editor refuses a
+relationship-bearing worksheet *before* it parses and a shared-string worksheet
+*while* it parses, so a worksheet carrying both can only witness the first
+refusal.
+
+The DOCX shape rewrites `word/document.xml` to the Word 2013 root namespace set
+(17 declarations) with `mc:Ignorable="w14 w15 wp14"` and gives every `<w:p>` the
+`w14:paraId`, `w14:textId` and `w:rsidR` attributes Word writes. The PPTX shape
+gives every slide one `mc:AlternateContent` wrapper of the kind PowerPoint
+emits for a chart or 3D-text shape: an `mc:Choice xmlns:a14=… Requires="a14"`
+branch and an `mc:Fallback` branch, both built from a shape the production
+writer itself authored.
+
+Selectors (all opt-in; none is in the default matrix and none changes an
+existing corpus identity):
+
+- `xlsx_producer_medium_source_open` / `xlsx_producer_dense_source_open`:
+  `SourceBackedWorkbook::from_read_at` over the producer-shape package.
+- `xlsx_producer_medium_source_selected_cell` /
+  `xlsx_producer_dense_source_selected_cell`: one middle cell of the
+  shared-strings worksheet. Opening the owner and resolving the worksheet are
+  outside timing; only `SourceWorksheet::cell` is timed.
+- `xlsx_producer_medium_source_planning` /
+  `xlsx_producer_dense_source_planning`: exactly the interval
+  `xlsx_planning_guard` measures — `SourceBackedEditor::edit_sheets` over the
+  markup worksheet, with opening, the exact no-op commit and the
+  source-unchanged check outside the clock.
+- `xlsx_producer_medium_source_one_edit_save` /
+  `xlsx_producer_dense_source_one_edit_save`: plan one worksheet, set one cell,
+  commit, and publish to a bounded counting sink. Output digests must agree
+  across every retained sample and the source bytes must not change.
+- `docx_producer_source_selected_paragraph`: one middle paragraph through
+  `document().paragraph(index)`, with the package and the document outside
+  timing.
+- `pptx_producer_source_selected_slide`: `text_and_name()` of one middle slide,
+  with the presentation and the slide outside timing.
+- `xlsx_producer_medium_control_selected_cell` /
+  `xlsx_producer_dense_control_selected_cell` /
+  `xlsx_producer_medium_control_planning` /
+  `xlsx_producer_dense_control_planning`: the same two scenarios over the
+  *marker-free* counterpart of the same grid — no namespace declarations, no
+  `<cols>`, no shared strings, no relationships. The control worksheet is
+  `source_stream_eligible`, so 0546's fused traversal applies and the
+  selected-cell stream stays eligible. It exists so the producer-shape numbers
+  can be read as a ratio against a byte-comparable marker-free package rather
+  than against a differently shaped corpus.
+- `xlsx_real_file_source_open` / `xlsx_real_file_source_selected_cell`: the same
+  open and selected-cell flows over a caller-named file supplied with
+  `--real-file PATH`. This is the only input in this harness whose bytes come
+  from outside the process, so both selectors are opt-in, absent from
+  `Case::DEFAULT`, bounded to 32 MiB, and record the file's path, size and
+  SHA-256 in their corpus identity. The target cell and its expected value are
+  derived from the file, not assumed.
+
+`--producer-evidence PATH` writes the marker and refusal census for every
+producer corpus the run builds: per part, which producer markers it carries,
+which `source_stream_eligible` conditions it trips, and the exact typed
+refusals the shape proves at construction. This is the first-class census the
+0587 survey's evidence gap 3 asks for, instead of each record re-deriving the
+counts by hand.
+
+These selectors take no timing, allocation, physical-I/O or speedup claim.
+They are a descriptive baseline: the first measurement of these scenarios on
+markup-compatibility-bearing input.
+
 ## Opt-in PPTX fresh streaming creation
 
 `pptx_streaming_create` exercises public `StreamingPresentationWriter` with

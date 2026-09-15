@@ -144,3 +144,66 @@ case/corpus rows, the harness must regenerate both schema-1 identity artifacts
 and the schema-2 catalog while preserving every prior row and recording the new
 hashes.  Metadata changes alone do not authorize a new latency claim; the
 existing comparator still gates the exact schema-1 case/corpus keys.
+
+## Opt-in real-producer-shape corpora (change 0601)
+
+These corpora are **not** in the default matrix and are **not** in the checked
+default catalog, so neither `catalog_sha256` nor `content_set_sha256` above
+moves for them.  They are recorded here because a corpus identity is a
+repository fact even when the selector that uses it is opt-in, and because
+change 0601 is the first family whose point is what the *bytes* contain.
+
+Every other generated family in this document is marker free: change 0032
+recorded that the generated worksheets carry neither `dyDescent` nor MCE
+markup, and the
+[0587 survey](0587-remaining-opportunity-survey.md) measured that this is the
+largest single difference between the measured path and the path real files
+take.  The producer-shape families close that gap.  Each is built by rewriting
+a package the production writers produced, so only the parts under test are
+authored by the generator.
+
+| Generator ID | Family | Built from | What it adds |
+|---|---|---|---|
+| `litchi-xlsx-producer-shape-v1` | `xlsx` | `build_xlsx_workbook` output | worksheet `mc:Ignorable="x14ac xr xr2 xr3"` roots with the `mc`/`x14ac`/`xr`/`xr2`/`xr3` declarations, `x14ac:dyDescent`, `<cols>`, `pageMargins`, a shared-string part with 40% string cells, a `printerSettings` worksheet relationship, and an `mc:Ignorable` workbook root |
+| `litchi-docx-producer-shape-v1` | `docx` | `semantic_docx_bytes(Medium)` | the Word 2013 root namespace set (17 declarations) with `mc:Ignorable="w14 w15 wp14"`, and `w14:paraId`/`w14:textId`/`w:rsidR` on every paragraph |
+| `litchi-pptx-producer-shape-v1` | `pptx` | `semantic_pptx_bytes(Medium)` | one `mc:AlternateContent` wrapper per slide, with an `mc:Choice … Requires="a14"` branch and an `mc:Fallback` branch |
+| `litchi-xlsx-real-file-v1` | `xlsx` | a caller-named file (`--real-file`) | nothing: the bytes are the file's |
+
+`tools/perf-baseline/src/producer_shape.rs` is the generator source for all
+four.  None of the four is added to the generator family map in
+`tools/generate_corpus_manifest_v2.py` or `corpus_manifest.rs`: that map is the
+source-audited contract for the **default** catalog, and every entry in it is
+asserted to appear there.  An unmapped generator identifier retains null
+`algorithm_id` and `seed_spec`, which is the correct record for an opt-in
+corpus and the only honest record for `litchi-xlsx-real-file-v1`, whose
+licensing and provenance cannot be asserted by a static map.
+
+The XLSX family is built in three variants per shape, because the value-only
+editor refuses five separate parts of the producer signature before it reaches
+a cell.  `read` carries the complete signature, `edit` carries the largest
+subset the editor admits (the namespace declarations and `<cols>`), and
+`control` carries none of it.  The archive identities are:
+
+| Corpus | Shape | Archive SHA-256 |
+|---|---|---|
+| `xlsx-producer-medium-read` | 4 x 32 x 32 | `55e0901c093c27d80bcd4e5fef888f00798654cdef8c0d79d130a2ce7cbe0ae8` |
+| `xlsx-producer-medium-edit` | 4 x 32 x 32 | `7d94095cccf1ccddfb9adcd19f25894fd0a78b126a395271564e5acbbdbbfec5` |
+| `xlsx-producer-medium-control` | 4 x 32 x 32 | `d4db82db66d8c25cd3c667b78396d0c5772213c6fee9491af15d9a6daf5a4e60` |
+| `xlsx-producer-dense-read` | 3 x 128 x 128 | `3734cf101df8e215207c9f121efbd9cfde76180532436f6eb0fa8afd5d9b70b8` |
+| `xlsx-producer-dense-edit` | 3 x 128 x 128 | `b81f85ac44ad021824b2a2dc81f1680347b7ff8a2373c7778f979df83f73c6f0` |
+| `xlsx-producer-dense-control` | 3 x 128 x 128 | `5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d` |
+| `docx-producer-medium` | 200 paragraphs | `259f9511046c5ed383b54fc078ea33aec8d80fed6cb03400c9e1dbcb9af7087b` |
+| `pptx-producer-medium` | 12 slides | `c4cd7ca569bf47cfbff77d8b1457b110a99d6913698911a297266ddee8c9f9cb` |
+
+Corpus IDs follow the ordinary rule, `xlsx-opc-zip:sha256:<archive hash>` and
+`docx-opc-zip:sha256:<archive hash>` / `pptx-opc-zip:sha256:<archive hash>`.
+The hashes are reproduced by two independent release-mode processes in
+[`results/change-0601/`](results/change-0601/README.md); that packet's
+`determinism.diff` and `corpus-identity.diff` are both empty.
+
+`--producer-evidence PATH` writes a sidecar under the schema
+`litchi.perf-baseline.producer-shape-evidence.v1` carrying, per corpus and per
+part, the producer-marker census, the `source_stream_eligible` conditions the
+part trips, and the typed refusals the shape proves at construction.  It is a
+harness output, not a catalog document, and does not participate in either
+catalog hash.

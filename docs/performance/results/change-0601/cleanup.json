@@ -1,0 +1,22 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0601",
+  "scratch_directory": "session scratchpad, agents/0601",
+  "removed": [
+    "warm-build.log — the initial warm `cargo build --release` transcript; superseded by the gate tails",
+    "readme-section.md — a staging copy of the README section, now in tools/perf-baseline/README.md",
+    "smoke-evidence.json — a 2-sample smoke census taken while wiring the selectors; superseded by runs/evidence-1.json",
+    "realfile-evidence.json — a 3-sample smoke census of the real fixture; superseded by runs/real-file-evidence.json",
+    "realfile.log, baseline.log, gates.log, gates.sh — capture transcripts and the gate driver; the gate tails they produced are retained in gates.txt",
+    "python-sweep.txt, python-sweep-before.txt — the full tools/test_*.py sweeps on this branch and on the untouched before checkout; both are reproduced verbatim in gates.txt"
+  ],
+  "retained_outside_the_repository": [
+    "/home/zhuhe/code/litchi-worktrees/0601 — the worktree, removed after the commit",
+    "tools/perf-baseline/target inside that worktree — about 3 GiB of build output, removed with the worktree; no shared CARGO_TARGET_DIR was created for this change because it needed no before leg"
+  ],
+  "not_created": [
+    "no before-leg build directory under litchi-worktrees/targets: this change modifies no production code, so there is no before/after pair to build",
+    "no profiler output: no callgrind or perf run was taken for this batch"
+  ]
+}

@@ -1,0 +1,901 @@
+{
+  "corpora": [
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 29940,
+          "cols_block": true,
+          "dy_descent_occurrences": 33,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "6d6f51745a54e5303e6f0880d674d5386a49aa74555de78dd2af4c0226b10c12",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 32728,
+          "cols_block": true,
+          "dy_descent_occurrences": 33,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 614,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup-shared-strings",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "dd2f9d2cc0168282b789347110199c888da5a2e91743cfe4ec95d55f51b96c94",
+          "shared_string_cells": 410,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 32449,
+          "cols_block": true,
+          "dy_descent_occurrences": 33,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup-worksheet-relationship",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "b9f8827253aed3bed4185893fa05aa3b2d19b7944fc0b64d2786fc87b2c192b0",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": "xl/worksheets/_rels/sheet3.xml.rels",
+          "worksheet_relationship_targets": [
+            "../printerSettings/printerSettings1.bin"
+          ],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 32382,
+          "cols_block": true,
+          "dy_descent_occurrences": 33,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet4.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "66a0c690d3205e75a2a20d4335ab3136c57048336541cf20b2cbd5cebdd01ed9",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 3233,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/sharedStrings.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "d11aa43ab731e0c0d0c1f5f69cbb9b54f4551778bcebceb6cec0452b0e045cbc",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 1016,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x15 xr xr6 xr10 xr2",
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "bfaf7791a1f8225caf21fe8443cb42d7477b7e11ecaf40099f2a9a7d18252578",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'worksheet'",
+          "role": "producer-worksheet-mc-attributes",
+          "scenario": "value-only-planning-worksheet-markup-attributes",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'pageMargins'",
+          "role": "producer-page-setup",
+          "scenario": "value-only-planning-page-setup",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'",
+          "role": "producer-shared-strings",
+          "scenario": "value-only-planning-workbook-shared-string-relationship",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse worksheet relationships",
+          "role": "producer-worksheet-relationship",
+          "scenario": "value-only-planning-worksheet-relationship",
+          "sheet": 2
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'workbook'",
+          "role": "producer-workbook-root",
+          "scenario": "value-only-planning-workbook-root-markers",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'workbook'",
+          "role": "producer-complete",
+          "scenario": "value-only-planning-complete-producer-signature",
+          "sheet": 0
+        }
+      ],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!D17",
+      "selected_target_text": "text:litchi-perf-producer-shared-0003",
+      "shape": "producer-medium-read",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": 40,
+      "shared_string_part": "xl/sharedStrings.xml",
+      "shared_string_unique_count": 64,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup-shared-strings",
+        "producer-markup-worksheet-relationship",
+        "producer-markup"
+      ],
+      "variant": "read"
+    },
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 29013,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "b762bdb1dc86e3acd1f2450e93dc8de483ae759ed86efac90454ddc60669fca2",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 31455,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "1235e68d2dc751c34b38629e972eda112e200c1ae41ac24ef2aeee4c115b4248",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 31455,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "ee6109a3479f7b200f4c8a8b7f9568546d9182bd9176953733eb23babf7f104c",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 31455,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet4.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "9f952d366998a0d61ea9228b37053f6cc40064313a94f54191fbca383ceab972",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 527,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!A17",
+      "selected_target_text": "number:1016147",
+      "shape": "producer-medium-edit",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": 0,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup",
+        "producer-markup",
+        "producer-markup"
+      ],
+      "variant": "edit"
+    },
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 28556,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "b29020cb37e5283a87557ffa3c4a3c7407989703d1696d0f20d5c226e780b32b",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 30998,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "ac5c143a9ba401589fb2f06cbf95bb01b615cc72e62ddd84e50c7adb1d450ea8",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 30998,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "d4a3d95d4e2fa83a93c7cbd0244f25b595945baaa30e2237abe3ef1ab6cb3aae",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 30998,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 1024,
+          "part": "xl/worksheets/sheet4.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "7a79dc100370d012c80fe389825ec782e16850b6d32533e8146e4cd330e24805",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 527,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "8c3344a56da551b6a987331cec7c4e672ffef2150bf27c5f0f2aaa9cb366bf88",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!A17",
+      "selected_target_text": "number:1016147",
+      "shape": "producer-medium-control",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": 0,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup",
+        "producer-markup",
+        "producer-markup"
+      ],
+      "variant": "control"
+    },
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 468194,
+          "cols_block": true,
+          "dy_descent_occurrences": 129,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "17a7cba72da508920da2b0415acc7c84c4292736dd2cc4f221dbac28f9ba9277",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 504407,
+          "cols_block": true,
+          "dy_descent_occurrences": 129,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 9830,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup-shared-strings",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "93335128b45212139bd01f574032aac4aef046cb50ca984d197117e7d4762b9d",
+          "shared_string_cells": 6554,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 498944,
+          "cols_block": true,
+          "dy_descent_occurrences": 129,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x14ac xr xr2 xr3",
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup-worksheet-relationship",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "1eb404b024246882653c704926046cdbc29e033ea6fee8b4b27ef3e3ed9c5da1",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace",
+            "dy-descent"
+          ],
+          "worksheet_relationship_part": "xl/worksheets/_rels/sheet3.xml.rels",
+          "worksheet_relationship_targets": [
+            "../printerSettings/printerSettings1.bin"
+          ],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 3234,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/sharedStrings.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "3a77f722cd55692eb2518386905c9ee05c2c79d3aa75d7b6082660435dd7daca",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 969,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "x15 xr xr6 xr10 xr2",
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "e9d2efa35b5bd738b317b771f9143953fa8ea41ea4cdba407a6456746fb9e1f7",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'worksheet'",
+          "role": "producer-worksheet-mc-attributes",
+          "scenario": "value-only-planning-worksheet-markup-attributes",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'pageMargins'",
+          "role": "producer-page-setup",
+          "scenario": "value-only-planning-page-setup",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'",
+          "role": "producer-shared-strings",
+          "scenario": "value-only-planning-workbook-shared-string-relationship",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse worksheet relationships",
+          "role": "producer-worksheet-relationship",
+          "scenario": "value-only-planning-worksheet-relationship",
+          "sheet": 2
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'workbook'",
+          "role": "producer-workbook-root",
+          "scenario": "value-only-planning-workbook-root-markers",
+          "sheet": 0
+        },
+        {
+          "message": "invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'workbook'",
+          "role": "producer-complete",
+          "scenario": "value-only-planning-complete-producer-signature",
+          "sheet": 0
+        }
+      ],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!D65",
+      "selected_target_text": "text:litchi-perf-producer-shared-0003",
+      "shape": "producer-dense-read",
+      "shape_size": "producer-dense",
+      "shared_string_cell_percent": 40,
+      "shared_string_part": "xl/sharedStrings.xml",
+      "shared_string_unique_count": 64,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup-shared-strings",
+        "producer-markup-worksheet-relationship"
+      ],
+      "variant": "read"
+    },
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 465059,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "cd2cd4efc61d19328cf6d978e9847a0f476ee57022f940d1a2d7982eeff1ed21",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 495742,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "638d2ca0464718f5af82b1e10cc87f67a42838964505ec32982dd25de3ee70d4",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 495742,
+          "cols_block": true,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": true,
+          "sha256": "ea6333ec33f4d3172dbeb34f2b4bcbd469c889b8e4ace497f8102ed2e725853d",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "x14ac-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": true
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 480,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "d8aec5fc709ba43d57a5660742cf3a160810dd040fad6751b06954d4c2eaad9f",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!A65",
+      "selected_target_text": "number:1064579",
+      "shape": "producer-dense-edit",
+      "shape_size": "producer-dense",
+      "shared_string_cell_percent": 0,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup",
+        "producer-markup"
+      ],
+      "variant": "edit"
+    },
+    {
+      "generator": "litchi-xlsx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 464601,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet1.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "10c3e15b072f4668ae005598a0bc7b1f5d6253e3f4a69d4a1b010fe8aba90ac1",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 495284,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet2.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "dbd1e11fbfc18d1250762dde1e3e758b694000231635f447b98e2072a0de2501",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 495284,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 16384,
+          "part": "xl/worksheets/sheet3.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "b0fe401f762acbe333cb9d64d6d8f1e1ad7ec716e081f989eaa0e31279970f4a",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        },
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 480,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": false,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "xl/workbook.xml",
+          "role": null,
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "d8aec5fc709ba43d57a5660742cf3a160810dd040fad6751b06954d4c2eaad9f",
+          "shared_string_cells": 0,
+          "source_stream_eligible": true,
+          "source_stream_ineligible_reasons": [],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 1,
+      "selected_target": "Bench01!A65",
+      "selected_target_text": "number:1064579",
+      "shape": "producer-dense-control",
+      "shape_size": "producer-dense",
+      "shared_string_cell_percent": 0,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [
+        "producer-markup",
+        "producer-markup",
+        "producer-markup"
+      ],
+      "variant": "control"
+    },
+    {
+      "generator": "litchi-docx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 0,
+          "bytes": 40147,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": "w14 w15 wp14",
+          "numeric_cells": 0,
+          "part": "word/document.xml",
+          "role": "producer-markup",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "add8dd1a6e5c2a8daf0fd194b3643f1baaea3995d0469ba65eb0be5d975f6809",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 100,
+      "selected_target": "paragraph:100",
+      "selected_target_text": "litchi-perf-baseline-docx-semantic-v1-source-00100",
+      "shape": "producer-medium",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": null,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [],
+      "variant": null
+    },
+    {
+      "generator": "litchi-pptx-producer-shape-v1",
+      "parts": [
+        {
+          "alternate_content_occurrences": 1,
+          "bytes": 4546,
+          "cols_block": false,
+          "dy_descent_occurrences": 0,
+          "markup_compatibility_namespace": true,
+          "mc_ignorable": null,
+          "numeric_cells": 0,
+          "part": "ppt/slides/slide7.xml",
+          "role": "producer-alternate-content",
+          "selected_cell_stream_ineligible_on_cols": false,
+          "sha256": "e6385d1b8501f2d74e404ab13dfc25663369748561f88000f0e25b09fb126dd5",
+          "shared_string_cells": 0,
+          "source_stream_eligible": false,
+          "source_stream_ineligible_reasons": [
+            "markup-compatibility-namespace",
+            "alternate-content"
+          ],
+          "worksheet_relationship_part": null,
+          "worksheet_relationship_targets": [],
+          "x14ac_namespace": false
+        }
+      ],
+      "planning_sheet": 0,
+      "proven_refusals": [],
+      "real_file": null,
+      "selected_sheet": 6,
+      "selected_target": "slide:6",
+      "selected_target_text": "litchi-perf-baseline-pptx-semantic-v1-source-006-000\nlitchi-perf-baseline-pptx-semantic-v1-source-006-001\nlitchi-perf-baseline-pptx-semantic-v1-source-006-002\nlitchi-perf-baseline-pptx-semantic-v1-source-006-003\nlitchi-perf-baseline-pptx-semantic-v1-source-006-004\nlitchi-perf-baseline-pptx-semantic-v1-source-006-005\nlitchi-perf-baseline-pptx-semantic-v1-source-006-006\nlitchi-perf-baseline-pptx-semantic-v1-source-006-007\nlitchi-perf-baseline-pptx-semantic-v1-source-006-000",
+      "shape": "producer-medium",
+      "shape_size": "producer-medium",
+      "shared_string_cell_percent": null,
+      "shared_string_part": null,
+      "shared_string_unique_count": null,
+      "sheet_roles": [],
+      "variant": null
+    }
+  ],
+  "schema": "litchi.perf-baseline.producer-shape-evidence.v1"
+}

@@ -1,5 +1,34 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0601 — reproducible baselines on the corpus class the audit was missing
+
+Record: [0601](0601-perf-harness-real-producer-shape.md).
+
+Retained against the audit's standing "corpus classes including multi-producer"
+and DEFINITION OF DONE clause (a) rows. The audit has carried "most real
+DOC/PPT and a chunk of real XLS/XLSX/DOCX/PPTX fixtures can't reach the measured
+path" as a gap since the 0587 entry; this change closes the generator half of
+it for OOXML. The new corpora are deterministic — two independent release-mode
+processes produce byte-identical archives, and both the census diff and the
+corpus-identity diff are empty — and they are shown to trip the same library
+gates a real Excel file trips, part for part, through the same code path. The
+`--real-file PATH` opt-in adds the other half for XLSX reads: the only input in
+this harness whose bytes come from outside the process, bounded to 32 MiB,
+absent from the default matrix, with the file's path, size and SHA-256 bound
+into the corpus identity. `--producer-evidence PATH` makes the marker and
+refusal census a first-class harness output, which is the audit's evidence-gap
+3 ("a tracked refusal census instead of narrative repetition per record").
+**What this batch does not discharge**: the selector gap is untouched for DOCX
+and PPTX edit/save, the eager XLSX paths, file-backed and range sources and
+XLSB; the dense shape is 128 × 128 rather than 256 × 256 because the codec makes
+the larger size seconds per sample; the CI smoke job still compares against
+itself; and no instruction-level attribution was taken, so the numbers rank
+latency on one host, not work. One standing failure was confirmed on the way and
+not fixed: `xls_source_backed_lifecycle_selectors_are_matched_and_local` asserts
+`open_reads_zero_worksheet_payload == [true]` and gets `[false]`, identically on
+the untouched checkout at `f8cf7d2a1`, and its panic poisons the shared
+allocation-metrics mutex so six later tests fail as cascades.
+
 ## 0603 — the value-only worksheet vocabulary, not the marker gates, is what excludes real producers
 
 Record: [0603](0603-xlsx-fused-traversal-marker-admission.md).
