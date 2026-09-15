@@ -1,0 +1,14 @@
+[package]
+name = "docx-edit-region"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "LITCHI_ROOT/crates/litchi-core" }
+litchi-docx = { path = "LITCHI_ROOT/crates/litchi-docx" }
+
+[profile.release]
+debug = false
+lto = false
+codegen-units = 16

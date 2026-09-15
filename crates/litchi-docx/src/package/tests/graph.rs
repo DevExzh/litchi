@@ -981,3 +981,73 @@ fn raw_opc_transaction_rejects_pending_managed_state() {
         })
     ));
 }
+
+#[test]
+fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
+    let source_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&document_uri)?
+                .set_blob(source_xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
+
+    // An exact no-op publishes the retained source without replacing the
+    // main-part payload allocation.
+    let main_before = package.opc.main_document_part().unwrap().blob_arc();
+    let noop = package.edit_document().unwrap().commit().unwrap();
+    assert!(!noop.patch().changed());
+    let published = package.apply_document_patch(noop.patch()).unwrap();
+    let main_after_noop = package.opc.main_document_part().unwrap().blob_arc();
+    assert!(std::sync::Arc::ptr_eq(&main_before, &main_after_noop));
+    assert_eq!(published.xml_bytes(), source_xml);
+    assert_eq!(
+        published
+            .paragraph(litchi_core::Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "before"
+    );
+
+    // A patch whose source no longer matches the package still conflicts, and
+    // leaves the package untouched.
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
+        .unwrap();
+    let commit = package.publish_document_edit(edit).unwrap();
+    let republished = package.opc.main_document_part().unwrap().blob().to_vec();
+    assert!(matches!(
+        package.apply_document_patch(commit.patch()),
+        Err(crate::document::TransactionError::StaleSource)
+    ));
+    assert_eq!(
+        package.opc.main_document_part().unwrap().blob(),
+        republished
+    );
+
+    // Reapplying the inverse still reaches the exact original bytes through the
+    // reuse proof.
+    package
+        .apply_document_patch(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(package.opc.main_document_part().unwrap().blob(), source_xml);
+
+    // When the main part no longer parses, the byte proof declines and the full
+    // snapshot route decides, so the scan error keeps its identity instead of
+    // becoming a stale-source refusal.
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&document_uri)?
+                .set_blob(b"<w:document>".to_vec());
+            Ok(())
+        })
+        .unwrap();
+    assert!(matches!(
+        package.apply_document_patch(commit.patch()),
+        Err(crate::document::TransactionError::Document(_))
+    ));
+}

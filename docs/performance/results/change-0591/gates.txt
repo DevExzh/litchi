@@ -1,0 +1,42 @@
+# Gates for change 0591, run in the 0591 worktree at branch perf/0591-docx-edit-single-scan
+# base 08d968f8ec7db27cf1187d01911fd08b9d014d91, rustc 1.95.0 (workspace pin), 2026-09-15
+
+## cargo fmt --all --check
+(no output: clean, exit 0)
+
+## cargo clippy -p litchi-docx --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+
+## cargo test -p litchi-docx --locked (tail)
+test crates/litchi-docx/src/package/model.rs - package::model::Package::custom_props_mut (line 875) - compile ... ok
+
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+all doctests ran in 1.72s; merged doctests compilation took 1.69s
+
+### aggregate of every 'test result' line from that run
+1457 passed, 0 failed, 31 ignored across 51 test binaries
+
+### the differential tests this record cites
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/litchi_docx-767b7bcdab0e6c59)
+
+running 9 tests
+test document::transaction::tests::body_child_shape_measures_one_balanced_element_and_refuses_anything_else ... ok
+test document::transaction::tests::a_shape_changing_replacement_declines_the_incremental_layout ... ok
+test document::transaction::tests::a_splice_that_is_not_a_whole_paragraph_declines_the_incremental_layout ... ok
+test document::transaction::tests::declining_the_incremental_layout_still_rescans_the_spliced_document ... ok
+test document::transaction::tests::incremental_paragraph_layout_tracks_tables_controls_and_the_final_section ... ok
+test package::tests::graph::exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors ... ok
+test package::tests::graph::document_patch_publishes_atomically_and_reopens ... ok
+test document::transaction::tests::incremental_paragraph_layout_equals_a_rescan_across_the_docx_fixture_corpus ... ok
+test document::transaction::tests::incremental_paragraph_layout_equals_a_rescan_on_the_generated_corpora ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 936 filtered out; finished in 1.51s
+
+
+## cargo doc -p litchi-docx --no-deps --locked (tail)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0591/crates/litchi-drawingml)
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0591/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.07s
+   Generated /home/zhuhe/code/litchi-worktrees/0591/target/doc/litchi_docx/index.html

@@ -5,6 +5,16 @@ use super::transfer::{
     apply_transfer_graph, relationship_graph_digest, relationship_graph_digest_opc,
 };
 
+/// How `apply_document_patch` obtained the snapshot it publishes.
+enum DocumentPatchSource {
+    /// The opened package still retains the patch's exact source bytes, so the
+    /// patch handed back its own retained target and no snapshot was built.
+    Reused(crate::document::Snapshot),
+    /// The byte proof did not hold; this is the freshly scanned current
+    /// snapshot that `Patch::apply` must decide against.
+    Rescanned(crate::document::Snapshot),
+}
+
 impl Package {
     /// Start the ordinary immutable main-document edit directly from this
     /// opened package.
@@ -33,6 +43,30 @@ impl Package {
         crate::document::Snapshot::from_xml(main.blob().to_vec())
     }
 
+    /// Answer `Patch::apply`'s exact-source proof from the retained main part
+    /// when it can be answered from the bytes alone.
+    ///
+    /// `document_snapshot` copies the whole main part and rescans its layout;
+    /// on the ordinary edit-and-save route that snapshot exists only to feed
+    /// the patch's byte comparison and is dropped in the same statement. The
+    /// comparison needs the bytes alone, so this proves it against
+    /// `main.blob()` directly. Package staleness and main-part resolution are
+    /// checked first, in the order `document_snapshot` checks them, so a stale
+    /// or malformed package still fails the same way; anything the byte proof
+    /// does not settle falls through to the unchanged snapshot route, which
+    /// decides every refusal exactly as before.
+    fn document_patch_source(
+        &self,
+        patch: &crate::document::Patch,
+    ) -> std::result::Result<DocumentPatchSource, crate::document::TransactionError> {
+        self.ensure_story_opc_current("document_snapshot")?;
+        let main = self.opc.main_document_part().map_err(Error::from)?;
+        if let Some(candidate) = patch.target_for_exact_unmanaged_source(main.blob()) {
+            return Ok(DocumentPatchSource::Reused(candidate));
+        }
+        Ok(DocumentPatchSource::Rescanned(self.document_snapshot()?))
+    }
+
     /// Apply a main-document patch atomically to its exact source package.
     ///
     /// A stale patch leaves the package untouched. An exact no-op preserves
@@ -47,10 +81,13 @@ impl Package {
         &mut self,
         patch: &crate::document::Patch,
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
-        let current = self.document_snapshot()?;
+        let source = self.document_patch_source(patch)?;
         self.validate_transfer_operations(patch.operations())?;
         let graph_transition = transfer_graph_transition(patch.operations())?;
-        let candidate = patch.apply(&current)?;
+        let candidate = match source {
+            DocumentPatchSource::Reused(candidate) => candidate,
+            DocumentPatchSource::Rescanned(current) => patch.apply(&current)?,
+        };
         if !patch.changed() {
             return Ok(candidate);
         }

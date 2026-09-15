@@ -1,5 +1,41 @@
 # Performance hotspot inventory
 
+## 0591 — the ordinary DOCX edit scans the main part twice
+
+Item DOCX-1(a)/(b) of the 0587 queue is implemented. An ordinary one-paragraph
+edit and save scanned the whole main document four times — the snapshot, the
+rewrite's rescan, the rescan after whole-part compaction, and a second
+`document_snapshot` built only to feed `Patch::apply`'s byte comparison — and an
+exact no-op scanned it twice. It now scans twice and once. `Patch` gains
+`target_for_exact_unmanaged_source`, which answers that byte comparison from
+`main.blob()` and hands back its own retained target, and
+`Package::apply_document_patch` falls back to the unchanged snapshot route
+whenever the byte proof does not hold, so every refusal and error identity stays
+put. `Snapshot::with_spliced_paragraphs` replaces `with_rewritten_xml` at the two
+direct-body paragraph rewrite sites: it resizes the rewritten paragraphs, shifts
+every later direct-body range and `content_end` by the running delta, keeps the
+table and block-control `Arc`s no splice reaches, and accepts the derivation only
+against a paragraph-sized proof that the replacement fragment is one balanced
+element with no more nodes, no more depth and a byte-identical root start tag —
+the four things `scan_document` concludes about the inside of a body child.
+**Measured** on the isolation pair (`--samples 3` minus `--samples 1`, callgrind,
+CPU 11): `Snapshot::from_xml` 12 → 6 calls per `docx_semantic_one_edit_save`
+lifecycle, 280,511,387 → 140,478,384 Ir, with `apply_document_patch` inclusive
+72,914,944 → 1,657,943; 6 → 3 calls on the no-op. A retained probe isolates the
+harness's timed region and measures −33.27% Ir on the 10,000-paragraph one-edit
+and −49.73% on its no-op. Paired timing, 100 samples per leg, order A1 B1 B2 A2:
+p50 −36.98% large, −32.48% medium, −18.64% tiny on the one-edit selector, the
+same shape on one-percent, and −49.95%/−48.93%/−41.90% on the no-op, against an
+A/A floor of 2.06% p50 in the same window; no scenario regressed. 1,457
+`litchi-docx` tests pass, nine of them new, including a rescan differential over
+297 accepted rewrites on 53 DOCX fixtures and the 24/200/10,000-paragraph
+corpora. Item (c) — compact only the replacement fragment — changes output bytes
+for untouched paragraphs and remains a frozen-design prerequisite with an open
+owner question. `performance_claim: none`.
+[Change and limitations](0591-docx-edit-single-scan.md);
+[evidence](results/change-0591/README.md). OLE2/OOXML remain active; ODF is
+deferred until completion and iWork excluded.
+
 ## 0590 — PPTX opened-transaction revision reuse
 
 Item PPTX-1(a)/(b) of the 0587 queue is implemented. An opened PPTX lifecycle

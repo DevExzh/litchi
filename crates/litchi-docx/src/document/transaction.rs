@@ -942,6 +942,165 @@ impl Snapshot {
         }
     }
 
+    /// Rewrite the retained XML after an exact splice of whole direct-body
+    /// paragraphs, deriving the new layout instead of rescanning the part.
+    ///
+    /// [`Self::with_rewritten_xml`] rebuilds the layout with a full
+    /// [`scan_document`] pass over the complete main document, which is the
+    /// dominant cost of an ordinary one-paragraph edit. Every splice accepted
+    /// here replaces one whole direct-body paragraph with a fragment of the
+    /// same structural shape, so the new layout is the old one with those
+    /// paragraphs resized and everything after them shifted, and every
+    /// whole-document verdict the scanner reaches is unchanged (see
+    /// [`preserves_body_child_shape`]). Anything the proof does not establish
+    /// falls back to the full rescan, so the incremental path is never the only
+    /// thing between unproven bytes and a snapshot.
+    fn with_spliced_paragraphs(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+    ) -> TransactionResult<Self> {
+        match self.spliced_layout(xml.len(), splices)? {
+            Some(layout) => Ok(self.with_spliced_layout(xml, layout)),
+            None => self.with_rewritten_xml(xml),
+        }
+    }
+
+    /// Derive the layout that [`scan_document`] would produce for the spliced
+    /// XML, or `None` when the splices are not provably layout-preserving.
+    ///
+    /// `None` is never a refusal: it routes the caller back to the full rescan,
+    /// which keeps every typed error, limit and refusal exactly where it was.
+    fn spliced_layout(
+        &self,
+        xml_len: usize,
+        splices: &[ParagraphSplice<'_>],
+    ) -> TransactionResult<Option<SplicedLayout>> {
+        if splices.is_empty() || xml_len > MAX_DOCUMENT_XML_BYTES {
+            return Ok(None);
+        }
+        let source = self.xml.bytes();
+        let mut bounds = Vec::new();
+        bounds
+            .try_reserve_exact(splices.len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "document paragraph splice bounds",
+                source,
+            })?;
+        let mut previous_end = 0usize;
+        for splice in splices {
+            if splice.start < previous_end || splice.start > splice.end {
+                return Ok(None);
+            }
+            let Some(before) = source.get(splice.start..splice.end) else {
+                return Ok(None);
+            };
+            if !preserves_body_child_shape(before, splice.replacement) {
+                return Ok(None);
+            }
+            let (Ok(start), Ok(end), Ok(length)) = (
+                u32::try_from(splice.start),
+                u32::try_from(splice.end),
+                u32::try_from(splice.replacement.len()),
+            ) else {
+                return Ok(None);
+            };
+            bounds.push(SpliceBound { start, end, length });
+            previous_end = splice.end;
+        }
+
+        let mut paragraphs = Vec::new();
+        paragraphs
+            .try_reserve_exact(self.paragraphs.len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "spliced document paragraph ranges",
+                source,
+            })?;
+        let mut index = 0usize;
+        let mut delta = 0i64;
+        for range in self.paragraphs.iter() {
+            let Some(start) = shifted_offset(range.start, delta) else {
+                return Ok(None);
+            };
+            match bounds.get(index) {
+                Some(bound) if bound.start == range.start => {
+                    if range.start.checked_add(range.length) != Some(bound.end) {
+                        return Ok(None);
+                    }
+                    let Some(next) = bound.accumulate(delta) else {
+                        return Ok(None);
+                    };
+                    paragraphs.push(Range {
+                        start,
+                        length: bound.length,
+                    });
+                    delta = next;
+                    index = index.saturating_add(1);
+                },
+                _ => paragraphs.push(Range {
+                    start,
+                    length: range.length,
+                }),
+            }
+        }
+        if index != bounds.len() {
+            return Ok(None);
+        }
+
+        let (Some(tables), Some(block_controls)) = (
+            shift_sibling_ranges(&self.tables, &bounds)?,
+            shift_sibling_ranges(&self.block_controls, &bounds)?,
+        ) else {
+            return Ok(None);
+        };
+        // Every direct-body child ends at or before the body-final section
+        // properties, and at or before `</w:body>` when there are none, so the
+        // insertion offset always sits after the last rewritten paragraph and
+        // moves by the total length change.
+        let Some(last) = bounds.last() else {
+            return Ok(None);
+        };
+        if self.content_end < last.end {
+            return Ok(None);
+        }
+        let Some(content_end) = shifted_offset(self.content_end, delta) else {
+            return Ok(None);
+        };
+        if usize::try_from(content_end).is_ok_and(|offset| offset > xml_len) {
+            return Ok(None);
+        }
+        Ok(Some(SplicedLayout {
+            paragraphs: paragraphs.into(),
+            tables,
+            block_controls,
+            content_end,
+        }))
+    }
+
+    /// Retain spliced XML under a layout that was derived rather than scanned.
+    ///
+    /// The storage variant, the conformance and the absent managed admission
+    /// are exactly what [`Self::with_rewritten_xml`] would have produced for
+    /// the same bytes; only the layout arrives by a different route. The
+    /// document-size limit is checked by [`Self::spliced_layout`], which sends
+    /// oversized input to the rescan so the typed limit error keeps its
+    /// identity.
+    fn with_spliced_layout(&self, xml: Vec<u8>, layout: SplicedLayout) -> Self {
+        let xml = Arc::new(xml);
+        Self {
+            xml: match self.source_identity() {
+                Some(identity) => XmlStorage::OwnedWithIdentity { xml, identity },
+                None => XmlStorage::Owned(xml),
+            },
+            paragraphs: layout.paragraphs,
+            tables: layout.tables,
+            block_controls: layout.block_controls,
+            content_end: layout.content_end,
+            conformance: self.conformance,
+            admission: None,
+        }
+    }
+
     pub(crate) fn from_managed_part(
         data: PartData,
         lineage: SourceLineage,
@@ -1248,6 +1407,25 @@ impl Snapshot {
             XmlStorage::Managed(xml) => Some(Arc::clone(&xml.identity)),
             XmlStorage::Source { identity, .. } => Some(Arc::clone(identity)),
         }
+    }
+
+    /// Whether this snapshot retains exactly `bytes` and carries no source
+    /// identity.
+    ///
+    /// [`Package::document_snapshot`] builds an owned, identity-free snapshot
+    /// over a copy of the opened main part, so `same_source` against such a
+    /// snapshot reduces to exactly this test: equal bytes, and `None` on both
+    /// identity sides. The retained bytes are immutable, so pointer identity
+    /// is an exact equality proof; distinct allocations still receive the full
+    /// byte comparison.
+    ///
+    /// [`Package::document_snapshot`]: crate::Package::document_snapshot
+    fn retains_exact_unmanaged_xml(&self, bytes: &[u8]) -> bool {
+        if self.xml.identity().is_some() {
+            return false;
+        }
+        let retained = self.xml.bytes();
+        retained.len() == bytes.len() && (retained.as_ptr() == bytes.as_ptr() || retained == bytes)
     }
 }
 
@@ -1888,7 +2066,14 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected.with_spliced_paragraphs(
+            xml,
+            &[ParagraphSplice {
+                start: paragraph_start,
+                end: paragraph_end,
+                replacement: &replacement,
+            }],
+        )?;
         let readback = candidate
             .paragraph(position)
             .ok_or(TransactionError::OutOfBounds {
@@ -2562,9 +2747,24 @@ impl Edit {
             *self = candidate;
             return Ok(self);
         }
-        let projected = candidate
-            .projected
-            .with_rewritten_xml(replace_ranges(candidate.projected.xml_bytes(), &ranges)?)?;
+        let mut splices = Vec::new();
+        splices
+            .try_reserve_exact(ranges.len())
+            .map_err(|allocation_error| crate::Error::Allocation {
+                resource: "document paragraph splice plan",
+                source: allocation_error,
+            })?;
+        splices.extend(
+            ranges
+                .iter()
+                .map(|(start, end, replacement)| ParagraphSplice {
+                    start: *start,
+                    end: *end,
+                    replacement: replacement.as_slice(),
+                }),
+        );
+        let xml = replace_ranges(candidate.projected.xml_bytes(), &ranges)?;
+        let projected = candidate.projected.with_spliced_paragraphs(xml, &splices)?;
         for operation in &candidate.operations[first_operation..] {
             let Operation::ReplaceParagraphText {
                 position, after, ..
@@ -4701,6 +4901,32 @@ impl Patch {
             source.clone()
         })
     }
+
+    /// Reuse the retained target when `bytes` are already the exact,
+    /// identity-free source this patch was produced against.
+    ///
+    /// [`Self::apply`] reads nothing from its `source` argument except that
+    /// exact-source comparison and, for an unchanged patch, the source value
+    /// it hands back. An opened package can therefore answer it from the main
+    /// part blob it already retains, instead of copying and rescanning the
+    /// whole part into a snapshot that is discarded immediately afterwards.
+    /// The returned snapshot is the value `apply` would have returned: for an
+    /// unchanged patch, `before` is byte-equal and identity-equal to the
+    /// snapshot `apply` would have cloned, so the two are the same value.
+    ///
+    /// `None` means the cheap proof did not hold. It is not a refusal: the
+    /// caller falls back to the full snapshot route, which keeps every
+    /// refusal, error identity and ordering unchanged.
+    pub(crate) fn target_for_exact_unmanaged_source(&self, bytes: &[u8]) -> Option<Snapshot> {
+        if !self.before.retains_exact_unmanaged_xml(bytes) {
+            return None;
+        }
+        Some(if self.changed() {
+            self.after.clone()
+        } else {
+            self.before.clone()
+        })
+    }
 }
 
 fn build_inverse_operations(
@@ -4870,6 +5096,216 @@ fn managed_operation_memory_bytes(operation_count: usize) -> TransactionResult<u
 struct Range {
     start: u32,
     length: u32,
+}
+
+/// One accepted rewrite of a whole direct-body paragraph.
+///
+/// `start` and `end` are the exact byte range the rewrite replaced in the
+/// previous XML; the incremental layout only accepts a range that is exactly
+/// one entry of the retained paragraph layout.
+struct ParagraphSplice<'a> {
+    start: usize,
+    end: usize,
+    replacement: &'a [u8],
+}
+
+/// One accepted splice reduced to the offsets the layout works in.
+#[derive(Clone, Copy)]
+struct SpliceBound {
+    start: u32,
+    end: u32,
+    length: u32,
+}
+
+impl SpliceBound {
+    /// Add this splice's length change to a running offset delta.
+    fn accumulate(self, delta: i64) -> Option<i64> {
+        delta
+            .checked_add(i64::from(self.length))?
+            .checked_add(i64::from(self.start))?
+            .checked_sub(i64::from(self.end))
+    }
+}
+
+/// A layout derived from an existing one by resizing rewritten paragraphs and
+/// shifting every later direct-body range.
+struct SplicedLayout {
+    paragraphs: Arc<[Range]>,
+    tables: Arc<[Range]>,
+    block_controls: Arc<[Range]>,
+    content_end: u32,
+}
+
+/// The structural shape of one direct-body child element.
+#[derive(Clone, Copy)]
+struct BodyChildShape {
+    nodes: usize,
+    max_depth: usize,
+    root_tag_len: usize,
+}
+
+/// Shift direct-body sibling ranges across the accepted paragraph splices.
+///
+/// Direct body children never overlap, so a table or block content control is
+/// either entirely before a rewritten paragraph or entirely after it. `None`
+/// reports an overlap that only a full rescan can resolve.
+fn shift_sibling_ranges(
+    ranges: &Arc<[Range]>,
+    bounds: &[SpliceBound],
+) -> TransactionResult<Option<Arc<[Range]>>> {
+    let (Some(first), Some(last)) = (bounds.first(), ranges.last()) else {
+        return Ok(Some(Arc::clone(ranges)));
+    };
+    let Some(last_end) = last.start.checked_add(last.length) else {
+        return Ok(None);
+    };
+    if last_end <= first.start {
+        // Every sibling ends before the first rewritten paragraph, so the
+        // retained range list is still exact and can stay shared.
+        return Ok(Some(Arc::clone(ranges)));
+    }
+    let mut shifted = Vec::new();
+    shifted
+        .try_reserve_exact(ranges.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "spliced document sibling ranges",
+            source,
+        })?;
+    let mut index = 0usize;
+    let mut delta = 0i64;
+    for range in ranges.iter() {
+        let Some(end) = range.start.checked_add(range.length) else {
+            return Ok(None);
+        };
+        while let Some(bound) = bounds.get(index) {
+            if bound.end > range.start {
+                break;
+            }
+            let Some(next) = bound.accumulate(delta) else {
+                return Ok(None);
+            };
+            delta = next;
+            index = index.saturating_add(1);
+        }
+        if bounds.get(index).is_some_and(|bound| bound.start < end) {
+            return Ok(None);
+        }
+        let Some(start) = shifted_offset(range.start, delta) else {
+            return Ok(None);
+        };
+        shifted.push(Range {
+            start,
+            length: range.length,
+        });
+    }
+    Ok(Some(shifted.into()))
+}
+
+/// Move one layout offset by a signed length change.
+fn shifted_offset(offset: u32, delta: i64) -> Option<u32> {
+    u32::try_from(i64::from(offset).checked_add(delta)?).ok()
+}
+
+/// Whether splicing `after` in place of `before` leaves every verdict of
+/// [`scan_document`] unchanged.
+///
+/// The scanner reaches only four kinds of conclusion about the inside of a
+/// direct body child: how the child itself is classified (from the resolved
+/// namespace and local name of its root element), the running element count
+/// against `MAX_DOCUMENT_NODES`, the nesting depth against
+/// `MAX_DOCUMENT_DEPTH`, and the refusals for DTDs, processing instructions
+/// and unbalanced nesting. Nothing else inside a body child reaches the
+/// layout.
+///
+/// So when both fragments are exactly one balanced element that starts at
+/// their first byte and ends at their last, their root start tags are
+/// byte-identical, and the replacement introduces no additional element and no
+/// additional nesting, the spliced document classifies that child identically,
+/// cannot exceed a total it was already under, and gains no refusal. The bytes
+/// around the splice are untouched, so the namespace bindings in scope at the
+/// root are the same on both sides and the identical start tag therefore
+/// resolves identically.
+fn preserves_body_child_shape(before: &[u8], after: &[u8]) -> bool {
+    let (Some(previous), Some(next)) = (body_child_shape(before), body_child_shape(after)) else {
+        return false;
+    };
+    next.nodes <= previous.nodes
+        && next.max_depth <= previous.max_depth
+        && next.root_tag_len == previous.root_tag_len
+        && before.get(..previous.root_tag_len) == after.get(..next.root_tag_len)
+}
+
+/// Measure one direct-body child fragment, or decline to measure it.
+///
+/// `None` means the fragment is not exactly one balanced element spanning all
+/// of its bytes, or that it carries markup [`scan_document`] forbids. Callers
+/// treat that as "fall back to the full rescan", never as a document refusal.
+fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
+    let mut reader = Reader::from_reader(fragment);
+    let mut shape = BodyChildShape {
+        nodes: 0,
+        max_depth: 0,
+        root_tag_len: 0,
+    };
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    loop {
+        let event_start = usize::try_from(reader.buffer_position()).ok()?;
+        let event = reader.read_event().ok()?;
+        let event_end = usize::try_from(reader.buffer_position()).ok()?;
+        match event {
+            Event::Start(_) => {
+                if root_closed {
+                    return None;
+                }
+                depth = depth.checked_add(1)?;
+                shape.nodes = shape.nodes.checked_add(1)?;
+                shape.max_depth = shape.max_depth.max(depth);
+                if !root_seen {
+                    if event_start != 0 {
+                        return None;
+                    }
+                    shape.root_tag_len = event_end;
+                    root_seen = true;
+                }
+            },
+            Event::Empty(_) => {
+                if root_closed {
+                    return None;
+                }
+                shape.nodes = shape.nodes.checked_add(1)?;
+                shape.max_depth = shape.max_depth.max(depth.checked_add(1)?);
+                if !root_seen {
+                    if event_start != 0 {
+                        return None;
+                    }
+                    shape.root_tag_len = event_end;
+                    root_seen = true;
+                    root_closed = true;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    root_closed = true;
+                }
+            },
+            Event::Text(text) => {
+                if (!root_seen || root_closed) && !text.is_empty() {
+                    return None;
+                }
+            },
+            Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
+                if !root_seen || root_closed {
+                    return None;
+                }
+            },
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => return None,
+            Event::Eof => break,
+        }
+    }
+    (root_seen && root_closed && depth == 0).then_some(shape)
 }
 
 struct Layout {
@@ -7281,6 +7717,348 @@ mod tests {
     use super::*;
 
     const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+    /// Compare a snapshot's retained layout with a full rescan of its own
+    /// bytes.
+    ///
+    /// The incremental splice path must be indistinguishable from
+    /// [`Snapshot::from_xml`], so this is the differential the corpus tests
+    /// assert on every rewrite they accept.
+    fn layout_matches_rescan(snapshot: &Snapshot) -> bool {
+        fn ranges_equal(retained: &[Range], scanned: &[Range]) -> bool {
+            retained.len() == scanned.len()
+                && retained
+                    .iter()
+                    .zip(scanned)
+                    .all(|(left, right)| left.start == right.start && left.length == right.length)
+        }
+
+        let Ok(layout) = scan_document(snapshot.xml_bytes()) else {
+            return false;
+        };
+        ranges_equal(&snapshot.paragraphs, &layout.paragraphs)
+            && ranges_equal(&snapshot.tables, &layout.tables)
+            && ranges_equal(&snapshot.block_controls, &layout.block_controls)
+            && snapshot.content_end == layout.content_end
+            && snapshot.conformance.namespace() == layout.conformance.namespace()
+    }
+
+    fn paragraph_bytes(snapshot: &Snapshot, index: usize) -> (usize, usize) {
+        let range = snapshot.paragraphs[index];
+        let start = usize::try_from(range.start).unwrap();
+        (start, start + usize::try_from(range.length).unwrap())
+    }
+
+    /// Assert the differential for one rewrite, and report whether the
+    /// incremental layout was the route that produced it.
+    fn rewrite_matches_rescan(base: &Snapshot, index: usize, text: &str) -> Option<bool> {
+        let mut edit = base.edit();
+        edit.replace_paragraph_text(Position::new(index), text)
+            .ok()?;
+        let projected = edit.projected();
+        assert!(
+            layout_matches_rescan(projected),
+            "incremental layout differs from a rescan after rewriting paragraph {index}"
+        );
+        let (start, end) = paragraph_bytes(base, index);
+        let (replacement_start, replacement_end) = paragraph_bytes(projected, index);
+        let replacement = &projected.xml_bytes()[replacement_start..replacement_end];
+        Some(
+            base.spliced_layout(
+                projected.xml_bytes().len(),
+                &[ParagraphSplice {
+                    start,
+                    end,
+                    replacement,
+                }],
+            )
+            .unwrap()
+            .is_some(),
+        )
+    }
+
+    fn sampled_positions(count: usize, wanted: usize) -> Vec<usize> {
+        if count == 0 || wanted == 0 {
+            return Vec::new();
+        }
+        let step = count.div_ceil(wanted).max(1);
+        (0..count).step_by(step).collect()
+    }
+
+    fn docx_fixture_paths() -> Vec<std::path::PathBuf> {
+        let mut paths = Vec::new();
+        let mut stack = vec![
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+                .join("test-data"),
+        ];
+        while let Some(directory) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("docx"))
+                {
+                    paths.push(path);
+                }
+            }
+        }
+        paths.sort();
+        paths
+    }
+
+    fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
+        let mut package = crate::Package::new().unwrap();
+        {
+            let document = package.document_mut().unwrap();
+            for index in 0..paragraphs {
+                document.add_paragraph_with_text(&format!(
+                    "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"
+                ));
+            }
+        }
+        let mut output = std::io::Cursor::new(Vec::new());
+        package.to_stream(&mut output).unwrap();
+        crate::Package::from_reader(std::io::Cursor::new(output.into_inner()))
+            .unwrap()
+            .document_snapshot()
+            .unwrap()
+    }
+
+    #[test]
+    fn incremental_paragraph_layout_equals_a_rescan_across_the_docx_fixture_corpus() {
+        let mut fixtures = 0usize;
+        let mut rewrites = 0usize;
+        let mut incremental = 0usize;
+        let mut batches = 0usize;
+        for path in docx_fixture_paths() {
+            let Ok(archive) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(package) = crate::Package::from_reader(std::io::Cursor::new(archive)) else {
+                continue;
+            };
+            let Ok(base) = package.document_snapshot() else {
+                continue;
+            };
+            fixtures += 1;
+            let positions = sampled_positions(base.paragraph_count(), 16);
+            for index in &positions {
+                for text in ["s", "", "a much longer replacement paragraph body"] {
+                    if let Some(spliced) = rewrite_matches_rescan(&base, *index, text) {
+                        rewrites += 1;
+                        incremental += usize::from(spliced);
+                    }
+                }
+            }
+            if positions.len() > 1 {
+                let replacements = positions
+                    .iter()
+                    .map(|index| {
+                        ParagraphTextReplacement::new(
+                            Position::new(*index),
+                            format!("batch {index} replacement"),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut edit = base.edit();
+                if edit.replace_body_paragraph_texts(&replacements).is_ok() {
+                    batches += 1;
+                    assert!(
+                        layout_matches_rescan(edit.projected()),
+                        "the incremental batch layout differs from a rescan for {}",
+                        path.display()
+                    );
+                }
+            }
+        }
+        assert!(
+            fixtures >= 50,
+            "the DOCX fixture corpus should reach this test: {fixtures} snapshot-able fixtures"
+        );
+        assert!(
+            rewrites >= 200 && batches >= 2,
+            "the differential should accept real rewrites: {rewrites} single, {batches} batched"
+        );
+        assert!(
+            incremental * 10 >= rewrites * 9,
+            "the incremental layout should carry the fixture rewrites: {incremental}/{rewrites}"
+        );
+    }
+
+    #[test]
+    fn incremental_paragraph_layout_equals_a_rescan_on_the_generated_corpora() {
+        for paragraphs in [24usize, 200, 10_000] {
+            let base = generated_corpus_snapshot(paragraphs);
+            assert_eq!(base.paragraph_count(), paragraphs);
+            for index in [0, paragraphs / 2, paragraphs - 1] {
+                for text in [
+                    "",
+                    "short",
+                    "a replacement that is longer than the source text",
+                ] {
+                    let spliced = rewrite_matches_rescan(&base, index, text)
+                        .expect("a generated paragraph rewrite is always accepted");
+                    assert!(
+                        spliced,
+                        "the incremental layout should carry the {paragraphs}-paragraph corpus"
+                    );
+                }
+            }
+            let updates = paragraphs.div_ceil(100);
+            let replacements = (0..updates)
+                .map(|update| {
+                    let index = update * paragraphs / updates;
+                    ParagraphTextReplacement::new(
+                        Position::new(index),
+                        format!("litchi-perf-baseline-docx-semantic-v1-updated-{index:05}"),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut edit = base.edit();
+            edit.replace_body_paragraph_texts(&replacements).unwrap();
+            assert!(
+                layout_matches_rescan(edit.projected()),
+                "the incremental batch layout differs from a rescan on {paragraphs} paragraphs"
+            );
+            let commit = edit.commit().unwrap();
+            assert!(layout_matches_rescan(commit.snapshot()));
+        }
+    }
+
+    #[test]
+    fn incremental_paragraph_layout_tracks_tables_controls_and_the_final_section() {
+        let xml = document(concat!(
+            "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+            "<w:p><w:r><w:t>one</w:t></w:r></w:p>",
+            "<w:sdt><w:sdtContent><w:p><w:r><w:t>control</w:t></w:r></w:p></w:sdtContent></w:sdt>",
+            "<w:p><w:r><w:t>two</w:t></w:r></w:p>",
+            "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>tail</w:t></w:r></w:p></w:tc></w:tr></w:tbl>",
+        ));
+        let base = Snapshot::from_xml(xml).unwrap();
+        assert_eq!(base.paragraph_count(), 2);
+        assert_eq!(base.table_count(), 2);
+        assert_eq!(base.block_content_control_count(), 1);
+        for index in [0usize, 1] {
+            for text in ["", "x", "a considerably longer paragraph body than before"] {
+                let spliced = rewrite_matches_rescan(&base, index, text)
+                    .expect("a direct-body paragraph rewrite is accepted here");
+                assert!(
+                    spliced,
+                    "paragraph {index} should take the incremental route"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_shape_changing_replacement_declines_the_incremental_layout() {
+        let xml = document("<w:p><w:r><w:t>a</w:t></w:r></w:p>");
+        let base = Snapshot::from_xml(xml).unwrap();
+        let (start, end) = paragraph_bytes(&base, 0);
+        let source = &base.xml_bytes()[start..end];
+        for replacement in [
+            // One more element than the fragment it replaces.
+            &b"<w:p><w:r><w:t>a</w:t><w:t>b</w:t></w:r></w:p>"[..],
+            // One level deeper than the fragment it replaces.
+            &b"<w:p><w:r><w:smartTag><w:t>a</w:t></w:smartTag></w:r></w:p>"[..],
+            // A different root element.
+            &b"<w:tbl><w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"[..],
+            // Two roots rather than one.
+            &b"<w:p><w:r><w:t>a</w:t></w:r></w:p><w:p/>"[..],
+            // Markup the document scanner refuses.
+            &b"<w:p><?target instruction?></w:p>"[..],
+            // Not balanced.
+            &b"<w:p><w:r><w:t>a</w:t></w:r>"[..],
+            // Padded rather than exactly the element.
+            &b" <w:p><w:r><w:t>a</w:t></w:r></w:p>"[..],
+            &b"<w:p><w:r><w:t>a</w:t></w:r></w:p> "[..],
+        ] {
+            assert!(
+                !preserves_body_child_shape(source, replacement),
+                "a shape-changing replacement must decline the incremental layout"
+            );
+            let spliced = base
+                .spliced_layout(
+                    base.xml_bytes().len() + replacement.len() - (end - start),
+                    &[ParagraphSplice {
+                        start,
+                        end,
+                        replacement,
+                    }],
+                )
+                .unwrap();
+            assert!(spliced.is_none());
+        }
+    }
+
+    #[test]
+    fn declining_the_incremental_layout_still_rescans_the_spliced_document() {
+        let xml = document("<w:p><w:r><w:t>a</w:t></w:r></w:p><w:p><w:r><w:t>b</w:t></w:r></w:p>");
+        let base = Snapshot::from_xml(xml).unwrap();
+        let (start, end) = paragraph_bytes(&base, 0);
+        let replacement = &b"<w:p><w:r><w:t>a</w:t></w:r><w:r><w:t>grown</w:t></w:r></w:p>"[..];
+        let spliced = replace_range(base.xml_bytes(), start, end, replacement).unwrap();
+        let expected = Snapshot::from_xml(spliced.clone()).unwrap();
+        let candidate = base
+            .with_spliced_paragraphs(
+                spliced,
+                &[ParagraphSplice {
+                    start,
+                    end,
+                    replacement,
+                }],
+            )
+            .unwrap();
+        assert!(layout_matches_rescan(&candidate));
+        assert_eq!(candidate.paragraph_count(), expected.paragraph_count());
+        assert_eq!(candidate.xml_bytes(), expected.xml_bytes());
+    }
+
+    #[test]
+    fn a_splice_that_is_not_a_whole_paragraph_declines_the_incremental_layout() {
+        let xml = document("<w:p><w:r><w:t>a</w:t></w:r></w:p>");
+        let base = Snapshot::from_xml(xml).unwrap();
+        let (start, end) = paragraph_bytes(&base, 0);
+        let replacement = &b"<w:p><w:r><w:t>a</w:t></w:r></w:p>"[..];
+        for (start, end) in [(start + 1, end), (start, end - 1), (start, end + 1)] {
+            assert!(
+                base.spliced_layout(
+                    base.xml_bytes().len(),
+                    &[ParagraphSplice {
+                        start,
+                        end,
+                        replacement,
+                    }],
+                )
+                .unwrap()
+                .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn body_child_shape_measures_one_balanced_element_and_refuses_anything_else() {
+        let shape = body_child_shape(b"<w:p><w:r><w:t>a</w:t></w:r></w:p>").unwrap();
+        assert_eq!(shape.nodes, 3);
+        assert_eq!(shape.max_depth, 3);
+        assert_eq!(shape.root_tag_len, "<w:p>".len());
+        let empty = body_child_shape(b"<w:p/>").unwrap();
+        assert_eq!(empty.nodes, 1);
+        assert_eq!(empty.max_depth, 1);
+        assert_eq!(empty.root_tag_len, "<w:p/>".len());
+        assert!(body_child_shape(b"<!DOCTYPE w:p><w:p/>").is_none());
+        assert!(body_child_shape(b"<?xml version=\"1.0\"?><w:p/>").is_none());
+        assert!(body_child_shape(b"<w:p></w:r>").is_none());
+        assert!(body_child_shape(b"").is_none());
+        assert!(body_child_shape(b"text").is_none());
+    }
 
     fn document(body: &str) -> Vec<u8> {
         format!("<w:document xmlns:w=\"{WORD}\"><w:body>{body}<w:sectPr/></w:body></w:document>")

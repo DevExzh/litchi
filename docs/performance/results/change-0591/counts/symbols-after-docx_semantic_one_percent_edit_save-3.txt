@@ -1,0 +1,8 @@
+5,686,418,591 (100.0%)  PROGRAM TOTALS
+  420,757,352 ( 7.40%)  ???:litchi_docx::document::transaction::Snapshot::from_xml [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+  420,261,739 ( 7.39%)  ???:litchi_docx::document::transaction::scan_document_with_context [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+  252,485,708 ( 4.44%)  ???:litchi_docx::writer::doc::codec::compact_changed_document_xml [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+  213,551,682 ( 3.76%)  ???:litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::document_snapshot [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+    4,939,956 ( 0.09%)  ???:litchi_docx::package::package::document::<impl litchi_docx::package::model::Package>::apply_document_patch [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+    3,128,146 ( 0.06%)  ???:litchi_docx::document::transaction::Snapshot::with_spliced_paragraphs [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]
+    1,863,712 ( 0.03%)  ???:litchi_docx::document::transaction::body_child_shape [/home/zhuhe/code/litchi-worktrees/targets/0591-after/release/litchi-perf-baseline]

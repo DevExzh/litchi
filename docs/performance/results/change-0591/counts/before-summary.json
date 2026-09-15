@@ -1,0 +1,131 @@
+{
+ "docx_semantic_one_edit_save": {
+  "whole_child_ir_n1": 4656920030,
+  "whole_child_ir_n3": 6083533307,
+  "per_lifecycle_ir": 713306638,
+  "symbols": {
+   "from_xml": {
+    "incl_ir_per_lifecycle": 280511386.5,
+    "calls_per_lifecycle": 12.0,
+    "incl_ir_n1": 280628272,
+    "calls_n1": 12
+   },
+   "scan_document_with_context": {
+    "incl_ir_per_lifecycle": 280180609.0,
+    "calls_per_lifecycle": 12.0,
+    "incl_ir_n1": 280298805,
+    "calls_n1": 12
+   },
+   "body_child_shape": {
+    "incl_ir_per_lifecycle": 0.0,
+    "calls_per_lifecycle": 0.0,
+    "incl_ir_n1": 0,
+    "calls_n1": 0
+   },
+   "document_snapshot": {
+    "incl_ir_per_lifecycle": 142422109.5,
+    "calls_per_lifecycle": 6.0,
+    "incl_ir_n1": 142485256,
+    "calls_n1": 6
+   },
+   "apply_document_patch": {
+    "incl_ir_per_lifecycle": 72914943.5,
+    "calls_per_lifecycle": 3.0,
+    "incl_ir_n1": 72892394,
+    "calls_n1": 3
+   },
+   "compact_changed_document_xml": {
+    "incl_ir_per_lifecycle": 62584905.5,
+    "calls_per_lifecycle": 3.0,
+    "incl_ir_n1": 126238693,
+    "calls_n1": 6
+   }
+  }
+ },
+ "docx_semantic_one_percent_edit_save": {
+  "whole_child_ir_n1": 4662870307,
+  "whole_child_ir_n3": 6107972108,
+  "per_lifecycle_ir": 722550900,
+  "symbols": {
+   "from_xml": {
+    "incl_ir_per_lifecycle": 280660422.5,
+    "calls_per_lifecycle": 12.0,
+    "incl_ir_n1": 280537615,
+    "calls_n1": 12
+   },
+   "scan_document_with_context": {
+    "incl_ir_per_lifecycle": 280329605.0,
+    "calls_per_lifecycle": 12.0,
+    "incl_ir_n1": 280207144,
+    "calls_n1": 12
+   },
+   "body_child_shape": {
+    "incl_ir_per_lifecycle": 0.0,
+    "calls_per_lifecycle": 0.0,
+    "incl_ir_n1": 0,
+    "calls_n1": 0
+   },
+   "document_snapshot": {
+    "incl_ir_per_lifecycle": 142506138.0,
+    "calls_per_lifecycle": 6.0,
+    "incl_ir_n1": 142485867,
+    "calls_n1": 6
+   },
+   "apply_document_patch": {
+    "incl_ir_per_lifecycle": 72883258.5,
+    "calls_per_lifecycle": 3.0,
+    "incl_ir_n1": 72881568,
+    "calls_n1": 3
+   },
+   "compact_changed_document_xml": {
+    "incl_ir_per_lifecycle": 62969511.0,
+    "calls_per_lifecycle": 3.0,
+    "incl_ir_n1": 126571022,
+    "calls_n1": 6
+   }
+  }
+ },
+ "docx_semantic_noop_edit_save": {
+  "whole_child_ir_n1": 4376319304,
+  "whole_child_ir_n3": 5248911364,
+  "per_lifecycle_ir": 436296030,
+  "symbols": {
+   "from_xml": {
+    "incl_ir_per_lifecycle": 140489591.5,
+    "calls_per_lifecycle": 6.0,
+    "incl_ir_n1": 140315687,
+    "calls_n1": 6
+   },
+   "scan_document_with_context": {
+    "incl_ir_per_lifecycle": 140324564.5,
+    "calls_per_lifecycle": 6.0,
+    "incl_ir_n1": 140150429,
+    "calls_n1": 6
+   },
+   "body_child_shape": {
+    "incl_ir_per_lifecycle": 0.0,
+    "calls_per_lifecycle": 0.0,
+    "incl_ir_n1": 0,
+    "calls_n1": 0
+   },
+   "document_snapshot": {
+    "incl_ir_per_lifecycle": 142644084.5,
+    "calls_per_lifecycle": 6.0,
+    "incl_ir_n1": 142470171,
+    "calls_n1": 6
+   },
+   "apply_document_patch": {
+    "incl_ir_per_lifecycle": 71803608.0,
+    "calls_per_lifecycle": 3.0,
+    "incl_ir_n1": 71657519,
+    "calls_n1": 3
+   },
+   "compact_changed_document_xml": {
+    "incl_ir_per_lifecycle": 12204.5,
+    "calls_per_lifecycle": 0.0,
+    "incl_ir_n1": 63661858,
+    "calls_n1": 3
+   }
+  }
+ }
+}

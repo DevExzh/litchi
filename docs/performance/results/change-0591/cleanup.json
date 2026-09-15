@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-15T13:25:00Z",
+  "batch": [
+    "0591-docx-edit-single-scan"
+  ],
+  "removed": [
+    "48 raw callgrind.out files (13 MB) written to /home/zhuhe/code/litchi-worktrees/targets/0591-cg, kept on disk rather than in the RAM-backed scratchpad, and deleted once the inclusive annotations and the cfn/calls counts had been extracted into this packet",
+    "the two timed-region probe build trees, /home/zhuhe/code/litchi-worktrees/targets/0591-probe-{before,after} (658 MB each), including the generated per-leg copies of the probe whose LITCHI_ROOT placeholder had been substituted; the probe source is retained here",
+    "the two harness build trees, /home/zhuhe/code/litchi-worktrees/targets/0591-{before,after} (1.1 GB each); their binary sha256s are recorded in README.md and in each retained timing report's binary_identity block",
+    "the change worktree /home/zhuhe/code/litchi-worktrees/0591 with its 9.6 GB gitignored target/ and the Cargo.lock copied into it (Cargo.lock is gitignored in this repository and was never staged); the branch perf/0591-docx-edit-single-scan is kept",
+    "the session scratchpad directory scratchpad/agents/0591 (4.5 MB): build logs, the gate test log, the drafted Rust fragments, the untruncated annotations, the harness probe JSON and one transaction.rs backup taken while extracting the differential's coverage counts"
+  ],
+  "retained_in_the_repository": [
+    "docs/performance/0591-docx-edit-single-scan.md",
+    "docs/performance/results/change-0591/: the top-200 inclusive annotations and per-symbol extracts for both legs at both sample counts, the two count summaries, the capture script and the isolation-pair extractor, the timed-region probe source with its 36 valgrind tails and summary, the four paired-timing reports with their script and analysis, paired-summary.json, gates.txt, log-sections.md, README.md, decision.json and this file"
+  ],
+  "repository_state": "the shared working copy /home/zhuhe/code/litchi was never edited, built or tested by this change; all work happened in the change worktree",
+  "background_tasks": "no measurement process remains",
+  "notes": [
+    "the annotations are truncated to the top 200 inclusive rows because the full tables are about 200 KB each and every symbol the record cites sits inside the top 70; the head -200 command is stated in README.md and the symbols-*.txt extracts carry the cited lines verbatim",
+    "the scratchpad was swept during the batch, not only at its end: callgrind raw output went to disk rather than to the 62 GiB tmpfs from the first capture onward, and never exceeded 5 MB in the scratchpad",
+    "the probe was first built on the host default toolchain (1.98.1) and rebuilt on the workspace pin (1.95.0) for both legs before the retained measurements were taken, so the probe figures are comparable with the harness figures; the discarded 1.98.1 pair agreed within 0.7 percentage points on every shape"
+  ],
+  "revision": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+  "revision_note": "the base revision both legs were measured against; this file is committed with the change rather than after it"
+}

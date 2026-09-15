@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0591 — the ordinary DOCX edit scans the main part twice
+
+Record: [0591](0591-docx-edit-single-scan.md).
+
+`docs/GOAL.md`'s first optimization step — eliminate unnecessary work — applied
+to the DOCX opened-document CRUD route that 0587 ranked fourth. Two of the four
+whole-part scans per edit are removed because neither produced information the
+caller did not already hold: one existed to feed a byte comparison that needs
+only the bytes, and one rebuilt a layout that the splice determines exactly.
+Both reuses are conditional and fall back to the original route, so no refusal,
+no output byte, no limit and no validation moved; the semantic readback after
+every paragraph rewrite and the `same_source` check on every patch application
+both still run, which is what ADR 0005's mandatory validation requires, and ADR
+0006 preservation is untouched because compaction — the part that would change
+untouched bytes — was deliberately left alone. **Measured** with exact before and
+after call counts (four scans and two `document_snapshot` builds per edit
+lifecycle before, two and one after) and −33.27% instructions in the isolated
+timed region of the 10,000-paragraph one-edit, matched by −36.98% p50 against a
+2.06% A/A floor. What stays open: item DOCX-1(c) removes the last removable scan
+but rewrites whitespace in paragraphs the edit never touched, so it needs the
+owner's answer to 0587's ADR 0006 observation before a design record exists;
+eleven other `with_rewritten_xml` sites still rescan, several of them rewriting a
+paragraph inside a table or a block control, a case the derivation declines
+outright; `document_snapshot` still copies the main part instead of sharing its
+`Arc`, so the reuse proof still pays a full byte comparison; and DOCX-2's eager
+paragraph index is untouched. No speedup, RSS, allocation, cold-cache or
+real-producer claim follows.
+
 ## 0590 — PPTX opened-transaction revision reuse
 
 Record: [0590](0590-pptx-opened-transaction-revision-reuse.md).
