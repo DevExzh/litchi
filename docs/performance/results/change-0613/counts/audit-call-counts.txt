@@ -1,0 +1,38 @@
+=== one-edit-n1 (summary: 24967935465) ===
+xml_minifier::audit::verify_authored: 86
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 24
+xml_minifier::audit::package::is_xml_part: 1548
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1356
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 12
+
+=== one-edit-n3 (summary: 31286673618) ===
+xml_minifier::audit::verify_authored: 102
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 40
+xml_minifier::audit::package::is_xml_part: 2116
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1916
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 20
+
+=== after-one-edit-n1 (summary: 24961271149) ===
+xml_minifier::audit::verify_authored: 86
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 12
+    from litchi_opc::source_backed::SourceBackedPackage::validate_original_part_xml: 12
+xml_minifier::audit::package::is_xml_part: 1548
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1356
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 12
+
+=== after-one-edit-n3 (summary: 31280738665) ===
+xml_minifier::audit::verify_authored: 102
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::SourceBackedPackage::validate_original_part_xml: 20
+    from litchi_opc::source_backed::validate_overlay_xml: 20
+xml_minifier::audit::package::is_xml_part: 2116
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1916
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 20
+

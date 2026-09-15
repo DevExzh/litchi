@@ -1,0 +1,26 @@
+=== one-edit-n1 ===
+   591,626,450 ( 2.37%)  ???:litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+   589,644,657 ( 2.36%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+   542,751,316 ( 2.17%)  ???:xml_minifier::audit::verify_authored
+   311,080,779 ( 1.25%)  ???:litchi_opc::source_backed::validate_overlay_xml
+
+=== one-edit-n3 ===
+   969,338,905 ( 3.10%)  ???:litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+   966,286,352 ( 3.09%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+   750,142,182 ( 2.40%)  ???:xml_minifier::audit::verify_authored
+   518,472,693 ( 1.66%)  ???:litchi_opc::source_backed::validate_overlay_xml
+
+=== after-one-edit-n1 ===
+   592,416,549 ( 2.37%)  ???:litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+   590,435,185 ( 2.37%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+   542,749,102 ( 2.17%)  ???:xml_minifier::audit::verify_authored
+   155,549,292 ( 0.62%)  ???:litchi_opc::source_backed::validate_overlay_xml
+   155,533,021 ( 0.62%)  ???:litchi_opc::source_backed::SourceBackedPackage::validate_original_part_xml
+
+=== after-one-edit-n3 ===
+   969,279,920 ( 3.10%)  ???:litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+   966,228,249 ( 3.09%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+   750,141,979 ( 2.40%)  ???:xml_minifier::audit::verify_authored
+   259,254,353 ( 0.83%)  ???:litchi_opc::source_backed::validate_overlay_xml
+   259,221,381 ( 0.83%)  ???:litchi_opc::source_backed::SourceBackedPackage::validate_original_part_xml
+

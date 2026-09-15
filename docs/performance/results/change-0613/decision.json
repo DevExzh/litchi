@@ -1,0 +1,46 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0613",
+  "title": "The publication audit of the original bytes is 27.6% of a source-backed XLSX save, and the memo that would reuse it can never be read",
+  "decision": "rejected, not implemented; the implementation is retained as a patch",
+  "code_state": "no file under crates/ is modified by this change",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the item's premise is false: every public and private publication entry point on SourceBackedPackage takes self by value, so one package publishes at most once and a memo held inside it is destroyed with the only publication that could populate it",
+    "within one publication every audited original is a distinct Part, because SourceTopologyPlan::replace_part and write_part_overlays_impl refuse a duplicate part name with OpcError::DuplicatePartName before any audit runs",
+    "measured: verify_authored is called 8 times per harness iteration in both legs, 4 originals and 4 replacements, with 0 memo hits; the memo is not slow, it is never read",
+    "the memo's only measurable effect is its cost, +753.5 Ir per iteration at audit scope (+0.0007%), so it is speculative complexity and is reverted",
+    "making it reachable needs either a non-consuming publication door or a caller-owned cross-lineage memo with a digest key, both contract changes for human review, and both bounded by change 0602's D0: on real producer packages the first original audit refuses and there is no second publication to serve"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs (--samples 1 against --samples 3) on both legs; verify_authored and is_xml_part call counts attributed per caller from the raw calls= lines; 8 audits per iteration before and after, split 4 originals and 4 replacements in the after leg",
+    "instructions": "per-iteration inclusive Ir for the whole case, for write_topology_to_stream and for each audit half; original audit 51,844,180 Ir = 27.59% of publication, replacement 51,852,530 Ir = 27.60%, pair 55.19%, reproducing change 0528's 56.2257% on a different base and corpus",
+    "timing": "six legs ordered A1 B1 B2 A2 A3 A4, 30 samples each after 3 warm-ups, pinned to CPU 9 in one window; medium -2.02% against a 2.18% A/A floor, dense-sparse -0.60% against a 3.03% floor; both inside the floor in both directions",
+    "byte_identity": "one output SHA-256 per corpus shape across all six legs (medium 9b7b66a0..., dense-sparse 6bcafbdb...), plus the harness's per-iteration output, semantic and untouched-member digest oracles",
+    "tests": "5 internal memo tests and 3 public-contract tests added by the patch; cargo test -p litchi-opc -p xml-minifier 737 passed 0 failed 2 ignored; cargo test -p litchi-xlsx -p litchi-docx -p litchi-pptx 3,629 passed 0 failed 33 ignored",
+    "gates": "cargo fmt --all --check, cargo clippy -p litchi-opc -p xml-minifier --all-targets, cargo doc -p litchi-opc -p xml-minifier --no-deps, all passing on the candidate"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency (change 0579: 1.24% of instructions against 6.19% of cycles); callgrind runs SHA-256 in software and counts rep movsb per byte, so the hashing and copying around publication are inflated",
+    "noise": "the publication-scope and whole-program per-iteration deltas have opposite signs and are two to three orders of magnitude larger than the audit-scope delta; they are code-layout noise, not effects",
+    "single_host": "one host, one base, one build, two corpus shapes, with seven other agents active on the machine"
+  },
+  "known_gaps": {
+    "corpus": "the harness XLSX corpora are litchi-written and compact, which is why they publish at all; the 27.59% share is unknown for a package whose original audit refuses, because publication stops at the first refusal",
+    "scenarios": "the managed sibling selector and the multi-Part overlay doors were not timed; they are unaffected for the same structural reason, which is argued from source rather than measured",
+    "not_decided": "change 0602's D0 (whether the audit of original bytes may stop asserting authored compactness) is untouched; the proof-carrying replacement door remains a proposed-ADR item"
+  },
+  "withheld": [
+    "any speedup, regression, allocation, peak-RSS, cold-cache, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "2d6fbeaed2083de104bbb0b52b2990ce69ac7274",
+    "branch": "perf/0613-opc-original-audit-memo",
+    "before_binary_sha256": "1e94ec13b829ef44d5bfc7027cb3fb3ba3b1c14955bd1df8b622995950ba671e",
+    "after_binary_sha256": "f1e42adeb2b20ac6ae92726e55b12e8fb8815981f4ad63e1ae03327c284ca04f",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws x86_64, rustc 1.98.1, valgrind 3.26.0",
+    "cpu_pin": 9
+  }
+}

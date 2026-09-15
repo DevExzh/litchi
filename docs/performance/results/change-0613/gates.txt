@@ -1,0 +1,64 @@
+Gates for change 0613.
+
+Every gate below was run in the worktree at /home/zhuhe/code/litchi-worktrees/0613
+on the CANDIDATE tree — that is, with patch/0613-original-audit-memo.patch applied.
+The candidate was gated as if it were landing so that the retained patch is
+adoptable verbatim. The committed tree reverts it and changes no file under
+crates/; its own gate run is at the end.
+
+=== cargo fmt --all --check (candidate) ===
+exit 0
+
+=== cargo clippy -p litchi-opc -p xml-minifier --all-targets (candidate) ===
+    Checking p256 v0.13.2
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0613/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0613/crates/litchi-core)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0613/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.49s
+exit 0 (workspace lints are deny; no warning was emitted)
+
+=== cargo test -p litchi-opc -p xml-minifier (candidate) ===
+running 20 tests
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+TOTAL: 737 passed, 0 failed, 2 ignored
+exit 0
+
+--- the tests this change adds ---
+test source_backed::original_audit_memo_tests::a_payload_the_memo_did_not_audit_takes_a_fresh_audit ... ok
+test source_backed::original_audit_memo_tests::a_repeated_audit_of_one_source_part_reproduces_the_acceptance ... ok
+test source_backed::original_audit_memo_tests::a_repeated_audit_reproduces_the_exact_refusal ... ok
+test source_backed::original_audit_memo_tests::the_memoized_verdict_is_the_one_publication_reports ... ok
+test source_backed::original_audit_memo_tests::the_memo_records_one_verdict_for_each_source_part ... ok
+test a_source_that_changed_is_refused_before_any_recorded_verdict ... ok
+test two_publications_of_a_refused_original_report_the_identical_refusal ... ok
+test two_publications_from_one_source_produce_identical_bytes ... ok
+
+=== cargo doc -p litchi-opc -p xml-minifier --no-deps (candidate) ===
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0613/crates/soapberry-zip)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0613/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.25s
+   Generated /home/zhuhe/code/litchi-worktrees/0613/target/doc/litchi_opc/index.html and 1 other file
+exit 0
+
+=== cargo test -p litchi-xlsx -p litchi-docx -p litchi-pptx (candidate, differential) ===
+TOTAL: 3629 passed, 0 failed, 33 ignored
+exit 0
+
+=== committed tree (docs only; crates/ reverted to the base) ===
+$ git status --short
+?? docs/performance/0613-opc-original-audit-memo.md
+?? docs/performance/results/change-0613/
+
+$ git apply --check docs/performance/results/change-0613/patch/0613-original-audit-memo.patch
+(no output: the retained patch applies cleanly to the committed tree)
+
+$ cargo fmt --all --check
+exit 0
+
+$ cargo test -p litchi-opc -p xml-minifier
+TOTAL: 729 passed, 0 failed, 2 ignored (the 8 tests the patch adds are absent, as expected)
+exit 0

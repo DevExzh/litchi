@@ -1,5 +1,26 @@
 # Performance hotspot inventory
 
+## 0613 — the original-bytes publication audit, priced and its memo declined
+
+A callgrind isolation pair on `xlsx_source_backed_cell_values_one_edit_save`
+splits change 0528's combined publication-audit figure into halves: the audit of
+the **original** Part bytes is 51,844,180 Ir, **27.59%** of source-backed
+publication, the audit of the replacement 51,852,530 Ir (27.60%), and the pair
+55.19% — an independent reproduction of 0528's 56.2257% on a different base and
+corpus. The memo 0587 item XLSX-3 proposed was implemented and declined: it
+fires **zero** times, because every publication entry point on
+`SourceBackedPackage` takes `self` by value (so one package publishes at most
+once and a lineage-keyed memo dies with it) and duplicate part names are refused
+with `OpcError::DuplicatePartName` before any audit inside one publication. Its
+only measurable effect was its cost, +753.5 Ir per iteration at audit scope
+(+0.0007%); paired timing moved −2.02% (`medium`) and −0.60% (`dense-sparse`) at
+p50 against A/A floors of 2.18% and 3.03% in the same window, so nothing is
+claimed. The 27.59% is the size of change 0602's **D0** prize, not of the memo's:
+on real producer packages the first original audit refuses 94 of 95 fixtures and
+there is no second publication to serve. No production change and no speedup is
+claimed. [Change and limitations](0613-opc-original-audit-memo.md);
+[evidence](results/change-0613/README.md).
+
 ## 0624 — deflate is the largest term in a save, and SAVE-6's threshold is wrong in both directions
 
 Frozen design plus the gate measurement item CORE-4 / SAVE-6 of change 0587

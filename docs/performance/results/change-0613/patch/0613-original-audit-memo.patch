@@ -1,0 +1,637 @@
+diff --git a/crates/litchi-opc/src/original_audit_memo_tests.rs b/crates/litchi-opc/src/original_audit_memo_tests.rs
+new file mode 100644
+index 000000000..593877e31
+--- /dev/null
++++ b/crates/litchi-opc/src/original_audit_memo_tests.rs
+@@ -0,0 +1,195 @@
++//! Internal coverage for the publication memo of original-Part audit verdicts.
++//!
++//! The public integration tests show that two publications from one source
++//! produce identical bytes and identical refusals. These tests live under
++//! `source_backed` so they can reach the memo directly and show that the
++//! verdict it reproduces is the verdict the auditor produced: the same
++//! acceptance, and the same refusal value, offset and message.
++
++#![allow(
++    clippy::expect_used,
++    clippy::indexing_slicing,
++    clippy::panic,
++    clippy::unwrap_used,
++    reason = "focused internal memo tests deliberately panic on fixture errors"
++)]
++
++use super::*;
++use soapberry_zip::office::StreamingArchiveWriter;
++
++const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
++const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
++const OFFICE_DOCUMENT_REL: &str =
++    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
++const DOCUMENT_MEMBER: &str = "word/document.xml";
++const DOCUMENT_URI: &str = "/word/document.xml";
++const SECOND_MEMBER: &str = "word/settings.xml";
++const SECOND_URI: &str = "/word/settings.xml";
++/// A compact authored payload, the shape litchi itself writes.
++const COMPACT: &[u8] = b"<document><body/></document>";
++/// The shape a real producer writes: indented, so the authored compactness
++/// audit refuses it. Change 0602 measured that refusal on 94 of 95 real
++/// packages; this fixture reproduces it in one part.
++const INDENTED: &[u8] = b"<document>\n  <body/>\n</document>";
++
++fn archive_bytes(document: &[u8], second: &[u8]) -> Vec<u8> {
++    let content_types = format!(
++        r#"<Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#
++    );
++    let relationships = format!(
++        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
++    );
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("[Content_Types].xml", content_types.as_bytes())
++        .expect("content types fixture must be writable");
++    writer
++        .write_stored("_rels/.rels", relationships.as_bytes())
++        .expect("relationships fixture must be writable");
++    writer
++        .write_stored(DOCUMENT_MEMBER, document)
++        .expect("document fixture must be writable");
++    writer
++        .write_stored(SECOND_MEMBER, second)
++        .expect("settings fixture must be writable");
++    writer
++        .finish_to_bytes()
++        .expect("archive fixture must finish")
++}
++
++fn open_package(document: &[u8], second: &[u8]) -> SourceBackedPackage {
++    SourceBackedPackage::from_vec(archive_bytes(document, second))
++        .expect("fixture package must open")
++}
++
++fn part_index(package: &SourceBackedPackage, uri: &str) -> usize {
++    package
++        .part(&PackURI::new(uri).expect("fixture URI must be valid"))
++        .expect("fixture part must exist")
++        .index
++}
++
++fn memo_len(package: &SourceBackedPackage) -> usize {
++    package
++        .original_audits
++        .entries
++        .lock()
++        .expect("memo lock must not be poisoned")
++        .len()
++}
++
++#[test]
++fn a_repeated_audit_of_one_source_part_reproduces_the_acceptance() {
++    let package = open_package(COMPACT, COMPACT);
++    let index = part_index(&package, DOCUMENT_URI);
++    assert_eq!(memo_len(&package), 0);
++
++    package
++        .validate_original_part_xml(index, DOCUMENT_URI, COMPACT)
++        .expect("a compact original must be accepted");
++    assert_eq!(memo_len(&package), 1);
++    package
++        .validate_original_part_xml(index, DOCUMENT_URI, COMPACT)
++        .expect("the memoized verdict must reproduce the acceptance");
++    assert_eq!(memo_len(&package), 1);
++}
++
++#[test]
++fn a_repeated_audit_reproduces_the_exact_refusal() {
++    let package = open_package(INDENTED, COMPACT);
++    let index = part_index(&package, DOCUMENT_URI);
++
++    let first = package
++        .validate_original_part_xml(index, DOCUMENT_URI, INDENTED)
++        .expect_err("an indented original must be refused");
++    let second = package
++        .validate_original_part_xml(index, DOCUMENT_URI, INDENTED)
++        .expect_err("the memoized verdict must reproduce the refusal");
++
++    let (
++        OpcError::XmlPublication {
++            part: first_part,
++            source: first_source,
++        },
++        OpcError::XmlPublication {
++            part: second_part,
++            source: second_source,
++        },
++    ) = (&first, &second)
++    else {
++        panic!("both refusals must be publication audit failures: {first:?}, {second:?}");
++    };
++    assert_eq!(first_part, second_part);
++    assert_eq!(first_source, second_source);
++    assert_eq!(first.to_string(), second.to_string());
++    assert_eq!(format!("{first:?}"), format!("{second:?}"));
++}
++
++#[test]
++fn the_memoized_verdict_is_the_one_publication_reports() {
++    // Replace the recorded verdict with a distinguishable one. The audit of
++    // these bytes accepts them, so a second acceptance would prove only that
++    // the auditor ran again. Reporting the planted verdict proves that the
++    // memo — not a fresh audit — answered.
++    let package = open_package(COMPACT, COMPACT);
++    let index = part_index(&package, DOCUMENT_URI);
++    package
++        .validate_original_part_xml(index, DOCUMENT_URI, COMPACT)
++        .expect("a compact original must be accepted");
++
++    let planted = xml_minifier::audit::Error::Doctype { offset: 17 };
++    package
++        .original_audits
++        .remember(index, COMPACT.len(), &Err(planted.clone()));
++
++    let error = package
++        .validate_original_part_xml(index, DOCUMENT_URI, COMPACT)
++        .expect_err("the memo must answer instead of the auditor");
++    let OpcError::XmlPublication { part, source } = &error else {
++        panic!("a memoized refusal must stay a publication audit failure: {error:?}");
++    };
++    assert_eq!(part, DOCUMENT_URI);
++    assert_eq!(source, &planted);
++}
++
++#[test]
++fn a_payload_the_memo_did_not_audit_takes_a_fresh_audit() {
++    // The memo is keyed on the source Part *and* the audited length. A
++    // payload of a different length is not the payload whose verdict was
++    // recorded, so it is audited on its own merits.
++    let package = open_package(COMPACT, COMPACT);
++    let index = part_index(&package, DOCUMENT_URI);
++    package.original_audits.remember(
++        index,
++        COMPACT.len() + 1,
++        &Err(xml_minifier::audit::Error::Doctype { offset: 0 }),
++    );
++
++    package
++        .validate_original_part_xml(index, DOCUMENT_URI, COMPACT)
++        .expect("a length the memo did not record must be audited afresh");
++}
++
++#[test]
++fn the_memo_records_one_verdict_for_each_source_part() {
++    let package = open_package(COMPACT, INDENTED);
++    let document = part_index(&package, DOCUMENT_URI);
++    let second = part_index(&package, SECOND_URI);
++    assert_ne!(document, second);
++
++    package
++        .validate_original_part_xml(document, DOCUMENT_URI, COMPACT)
++        .expect("a compact original must be accepted");
++    package
++        .validate_original_part_xml(second, SECOND_URI, INDENTED)
++        .expect_err("an indented original must be refused");
++    assert_eq!(memo_len(&package), 2);
++
++    // Each Part keeps its own verdict; neither answers for the other.
++    package
++        .validate_original_part_xml(document, DOCUMENT_URI, COMPACT)
++        .expect("the document's acceptance must not be displaced");
++    package
++        .validate_original_part_xml(second, SECOND_URI, INDENTED)
++        .expect_err("the settings refusal must not be displaced");
++}
+diff --git a/crates/litchi-opc/src/source_backed.rs b/crates/litchi-opc/src/source_backed.rs
+index a6badd901..598f7b5b3 100644
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -58,6 +58,9 @@ pub use batch::PartBatch;
+ 
+ const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+ 
++#[cfg(test)]
++#[path = "original_audit_memo_tests.rs"]
++mod original_audit_memo_tests;
+ #[cfg(test)]
+ #[path = "source_xml_hint_tests.rs"]
+ mod source_xml_hint_tests;
+@@ -5300,6 +5303,10 @@ pub struct SourceBackedPackage {
+     casefold_order: Option<Vec<usize>>,
+     non_part_members: Vec<NonPartMember>,
+     cache: PartCache,
++    /// Authored-compactness verdicts already computed for this lineage's
++    /// immutable source Parts. Publication never audits the same original
++    /// bytes twice.
++    original_audits: OriginalAuditMemo,
+     catalog_object_reservation: Option<Arc<Reservation>>,
+ }
+ 
+@@ -5455,6 +5462,7 @@ impl SourceBackedPackage {
+             casefold_order,
+             non_part_members,
+             cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
++            original_audits: OriginalAuditMemo::default(),
+             catalog_object_reservation: None,
+         })
+     }
+@@ -5851,6 +5859,7 @@ impl SourceBackedPackage {
+             casefold_order,
+             non_part_members,
+             cache,
++            original_audits: OriginalAuditMemo::default(),
+             catalog_object_reservation,
+         })
+     }
+@@ -5866,6 +5875,37 @@ impl SourceBackedPackage {
+             .transpose()
+     }
+ 
++    /// Audit the immutable original bytes of one replaced source Part.
++    ///
++    /// The audit itself is exactly [`validate_overlay_xml`]: the same auditor,
++    /// the same limits, the same error. What changes is how often it runs. A
++    /// source Part's bytes are immutable for the lifetime of its lineage, so
++    /// the first audit of one Part records its verdict and every later
++    /// publication of that same Part in the same lineage reproduces it,
++    /// acceptance or refusal, without parsing the bytes again.
++    ///
++    /// Only the *original* is eligible. A replacement payload is authored by
++    /// the caller and is audited in full every time: change 0528 requires both
++    /// the original and the replacement audit to stay.
++    fn validate_original_part_xml(&self, index: usize, part: &str, bytes: &[u8]) -> Result<()> {
++        let verdict = match self.original_audits.recall(index, bytes.len()) {
++            Some(verdict) => verdict,
++            None => {
++                let verdict = xml_minifier::audit::verify_authored(
++                    bytes,
++                    xml_minifier::audit::Limits::default(),
++                )
++                .map(|_report| ());
++                self.original_audits.remember(index, bytes.len(), &verdict);
++                verdict
++            },
++        };
++        verdict.map_err(|source| OpcError::XmlPublication {
++            part: part.to_string(),
++            source,
++        })
++    }
++
+     fn disable_read_ahead_for_publication(&self) -> Result<()> {
+         if let Some(read_ahead) = &self.read_ahead {
+             read_ahead.disable_for_exact_publication(&self.source)?;
+@@ -7742,7 +7782,11 @@ impl SourceBackedPackage {
+                     part.partname.as_str(),
+                     &part.content_type,
+                 ) {
+-                    validate_overlay_xml(part.partname.as_str(), original.as_bytes())?;
++                    self.validate_original_part_xml(
++                        replacement.target,
++                        part.partname.as_str(),
++                        original.as_bytes(),
++                    )?;
+                     validate_overlay_xml(part.partname.as_str(), &replacement.replacement)?;
+                 }
+                 changed.push(ChangedOverlay {
+@@ -8177,7 +8221,11 @@ impl SourceBackedPackage {
+             target_part.partname.as_str(),
+             &target_part.content_type,
+         ) {
+-            validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
++            self.validate_original_part_xml(
++                target,
++                target_part.partname.as_str(),
++                original.as_bytes(),
++            )?;
+             validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+         }
+         // Changed publication re-reads unchanged source records and only
+@@ -8290,7 +8338,11 @@ impl SourceBackedPackage {
+             target_part.partname.as_str(),
+             &target_part.content_type,
+         ) {
+-            validate_overlay_xml(target_part.partname.as_str(), original_part.as_bytes())?;
++            self.validate_original_part_xml(
++                target,
++                target_part.partname.as_str(),
++                original_part.as_bytes(),
++            )?;
+             validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+         }
+         validate_overlay_xml(relationship_uri.as_str(), &original_relationships)?;
+@@ -8511,7 +8563,11 @@ impl SourceBackedPackage {
+                 target_part.partname.as_str(),
+                 &target_part.content_type,
+             ) {
+-                validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
++                self.validate_original_part_xml(
++                    overlay.target,
++                    target_part.partname.as_str(),
++                    original.as_bytes(),
++                )?;
+                 validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+             }
+             if original.as_bytes() != overlay.replacement.as_slice() {
+@@ -8759,7 +8815,11 @@ impl SourceBackedPackage {
+                 target_part.partname.as_str(),
+                 &target_part.content_type,
+             ) {
+-                validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
++                self.validate_original_part_xml(
++                    overlay.target,
++                    target_part.partname.as_str(),
++                    original.as_bytes(),
++                )?;
+                 validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+             }
+             drop(original);
+@@ -10971,6 +11031,97 @@ fn copy_relationships(from: &Relationships, to: &mut Relationships) -> Result<()
+     Ok(())
+ }
+ 
++/// Authored-compactness verdicts already computed for immutable source Parts.
++///
++/// The original bytes of an admitted Part cannot change while one source
++/// lineage lives: every publication re-checks the source revision and refuses
++/// [`OpcError::SourceChanged`] before any audit runs, and the catalog is
++/// immutable. `verify_authored` is a pure function of those bytes and the
++/// package's own [`ReadLimits`], so the verdict computed for one Part is the
++/// verdict every later audit of the same Part in the same lineage computes.
++///
++/// The memo never observes a replacement payload. It is keyed on the catalog
++/// index of the *source* Part and checked against the audited byte length, so
++/// a payload this lineage did not audit always takes a fresh audit.
++#[derive(Debug, Default)]
++struct OriginalAuditMemo {
++    /// At most one entry per admitted ordinary Part, so the retained set is
++    /// bounded by [`ReadLimits::max_parts`]. One publication replaces at most
++    /// `MAX_SOURCE_OVERLAY_PARTS` Parts, so the scan is over a bounded set.
++    entries: Mutex<Vec<OriginalAuditMemoEntry>>,
++}
++
++#[derive(Debug)]
++struct OriginalAuditMemoEntry {
++    /// Catalog position of the immutable source Part.
++    part: usize,
++    /// Length of the audited original payload.
++    len: usize,
++    /// The verdict `verify_authored` returned for those exact bytes.
++    verdict: std::result::Result<(), xml_minifier::audit::Error>,
++}
++
++impl OriginalAuditMemo {
++    /// Return the verdict this lineage already computed for one source Part.
++    fn recall(
++        &self,
++        part: usize,
++        len: usize,
++    ) -> Option<std::result::Result<(), xml_minifier::audit::Error>> {
++        let entries = self
++            .entries
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner());
++        entries
++            .iter()
++            .find(|entry| entry.part == part && entry.len == len)
++            .map(|entry| match &entry.verdict {
++                Ok(()) => Ok(()),
++                Err(error) => Err(clone_audit_error(error)),
++            })
++    }
++
++    /// Record one verdict. A memo that cannot be retained only costs a later
++    /// audit, so an allocation failure here never fails a publication.
++    fn remember(
++        &self,
++        part: usize,
++        len: usize,
++        verdict: &std::result::Result<(), xml_minifier::audit::Error>,
++    ) {
++        let recorded = OriginalAuditMemoEntry {
++            part,
++            len,
++            verdict: match verdict {
++                Ok(()) => Ok(()),
++                Err(error) => Err(clone_audit_error(error)),
++            },
++        };
++        let mut entries = self
++            .entries
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner());
++        if let Some(existing) = entries.iter_mut().find(|entry| entry.part == part) {
++            *existing = recorded;
++            return;
++        }
++        if entries.try_reserve(1).is_err() {
++            return;
++        }
++        entries.push(recorded);
++    }
++}
++
++/// Reproduce one audit refusal without re-running the audit.
++///
++/// The audit error is a bounded owned value: its only allocation is the
++/// parser diagnostic, whose length the auditor already bounds. Reproducing it
++/// preserves the error identity `verify_authored` produced for these exact
++/// bytes, so a memoized refusal is indistinguishable from a fresh one.
++fn clone_audit_error(error: &xml_minifier::audit::Error) -> xml_minifier::audit::Error {
++    error.clone()
++}
++
+ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
+     xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+         .map(|_report| ())
+diff --git a/crates/litchi-opc/tests/source_backed_original_audit.rs b/crates/litchi-opc/tests/source_backed_original_audit.rs
+new file mode 100644
+index 000000000..a1a463466
+--- /dev/null
++++ b/crates/litchi-opc/tests/source_backed_original_audit.rs
+@@ -0,0 +1,175 @@
++#![allow(
++    clippy::cast_possible_truncation,
++    clippy::expect_used,
++    clippy::indexing_slicing,
++    clippy::panic,
++    clippy::unwrap_used,
++    reason = "focused publication-audit tests deliberately panic on fixture errors"
++)]
++
++//! Publication audits the original bytes of every replaced XML Part.
++//!
++//! Those bytes are immutable for one source lineage, so publication records
++//! the verdict it computed and reproduces it instead of parsing them again.
++//! These tests keep the observable contract fixed: two publications from one
++//! source produce identical bytes, an original the audit refuses is refused
++//! identically every time, and a source that changed underneath the package
++//! is refused before any recorded verdict is consulted.
++
++use std::io;
++use std::sync::{
++    Arc, RwLock,
++    atomic::{AtomicU64, Ordering},
++};
++
++use litchi_core::{ReadAt, SourceVersion};
++use litchi_opc::{OpcError, PackURI, SourceBackedPackage};
++use soapberry_zip::office::StreamingArchiveWriter;
++
++const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
++const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
++const OFFICE_DOCUMENT_REL: &str =
++    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
++const DOCUMENT_MEMBER: &str = "word/document.xml";
++const DOCUMENT_URI: &str = "/word/document.xml";
++/// A compact authored payload, the shape litchi itself writes.
++const COMPACT: &[u8] = b"<document><body/></document>";
++/// A real producer's shape: indented, which the authored compactness audit
++/// refuses. Change 0602 measured that refusal on 94 of 95 real packages.
++const INDENTED: &[u8] = b"<document>\n  <body/>\n</document>";
++const REPLACEMENT: &[u8] = b"<document><body><p/></body></document>";
++
++#[derive(Debug)]
++struct MutableSource {
++    bytes: RwLock<Vec<u8>>,
++    revision: AtomicU64,
++}
++
++impl MutableSource {
++    fn new(bytes: Vec<u8>) -> Self {
++        Self {
++            bytes: RwLock::new(bytes),
++            revision: AtomicU64::new(0),
++        }
++    }
++
++    fn replace_bytes(&self, bytes: Vec<u8>) {
++        *self.bytes.write().expect("mutable source lock must work") = bytes;
++        self.revision.fetch_add(1, Ordering::Release);
++    }
++}
++
++impl ReadAt for MutableSource {
++    fn len(&self) -> io::Result<u64> {
++        Ok(self
++            .bytes
++            .read()
++            .expect("mutable source lock must work")
++            .len() as u64)
++    }
++
++    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
++        let bytes = self.bytes.read().expect("mutable source lock must work");
++        let start = usize::try_from(offset).map_err(|_| io::Error::other("offset overflow"))?;
++        if start >= bytes.len() {
++            return Ok(0);
++        }
++        let count = output.len().min(bytes.len() - start);
++        output[..count].copy_from_slice(&bytes[start..start + count]);
++        Ok(count)
++    }
++
++    fn version(&self) -> io::Result<SourceVersion> {
++        Ok(SourceVersion::new(
++            0x4f50_435f_4849_4e54,
++            self.revision.load(Ordering::Acquire),
++        ))
++    }
++}
++
++fn archive_bytes(document: &[u8]) -> Vec<u8> {
++    let content_types = format!(
++        r#"<Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#
++    );
++    let relationships = format!(
++        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
++    );
++    let mut writer = StreamingArchiveWriter::new();
++    writer
++        .write_stored("[Content_Types].xml", content_types.as_bytes())
++        .expect("content types fixture must be writable");
++    writer
++        .write_stored("_rels/.rels", relationships.as_bytes())
++        .expect("relationships fixture must be writable");
++    writer
++        .write_stored(DOCUMENT_MEMBER, document)
++        .expect("document fixture must be writable");
++    writer
++        .finish_to_bytes()
++        .expect("archive fixture must finish")
++}
++
++fn document_uri() -> PackURI {
++    PackURI::new(DOCUMENT_URI).expect("fixture URI must be valid")
++}
++
++fn publish(source: &Arc<dyn ReadAt>) -> Result<Vec<u8>, OpcError> {
++    let package = SourceBackedPackage::from_read_at(Arc::clone(source))?;
++    let mut output = Vec::new();
++    package.write_part_overlay_to_stream(&mut output, &document_uri(), REPLACEMENT.to_vec())?;
++    Ok(output)
++}
++
++#[test]
++fn two_publications_from_one_source_produce_identical_bytes() {
++    let source: Arc<dyn ReadAt> = Arc::new(MutableSource::new(archive_bytes(COMPACT)));
++    let first = publish(&source).expect("the first publication must succeed");
++    let second = publish(&source).expect("the second publication must succeed");
++    assert_eq!(first, second);
++    assert!(!first.is_empty());
++}
++
++#[test]
++fn two_publications_of_a_refused_original_report_the_identical_refusal() {
++    let source: Arc<dyn ReadAt> = Arc::new(MutableSource::new(archive_bytes(INDENTED)));
++    let first = publish(&source).expect_err("an indented original must be refused");
++    let second = publish(&source).expect_err("the refusal must not depend on the attempt");
++
++    let (
++        OpcError::XmlPublication {
++            part: first_part,
++            source: first_source,
++        },
++        OpcError::XmlPublication {
++            part: second_part,
++            source: second_source,
++        },
++    ) = (&first, &second)
++    else {
++        panic!("both refusals must be publication audit failures: {first:?}, {second:?}");
++    };
++    assert_eq!(first_part, DOCUMENT_URI);
++    assert_eq!(first_part, second_part);
++    assert_eq!(first_source, second_source);
++    assert_eq!(first.to_string(), second.to_string());
++}
++
++#[test]
++fn a_source_that_changed_is_refused_before_any_recorded_verdict() {
++    let mutable = Arc::new(MutableSource::new(archive_bytes(COMPACT)));
++    let source: Arc<dyn ReadAt> = mutable.clone();
++    let package = SourceBackedPackage::from_read_at(source).expect("fixture package must open");
++
++    // The audited original is now stale: publication must refuse the changed
++    // source, never publish an earlier lineage's verdict over new bytes.
++    mutable.replace_bytes(archive_bytes(INDENTED));
++
++    let mut output = Vec::new();
++    let error = package
++        .write_part_overlay_to_stream(&mut output, &document_uri(), REPLACEMENT.to_vec())
++        .expect_err("a changed source must be refused");
++    assert!(
++        matches!(error, OpcError::SourceChanged { .. }),
++        "expected SourceChanged, found {error:?}"
++    );
++}
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index fb1ee700a..d469e6758 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -460,7 +460,7 @@ impl Violation {
+ }
+ 
+ /// Failure to parse or verify a compact XML document.
+-#[derive(Debug, Eq, PartialEq)]
++#[derive(Clone, Debug, Eq, PartialEq)]
+ #[non_exhaustive]
+ pub enum Error {
+     /// A finite audit budget was exceeded.
