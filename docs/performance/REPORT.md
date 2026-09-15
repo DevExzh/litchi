@@ -1,5 +1,55 @@
 # Performance program phase report
 
+## 0626 — what the smoke job now compares, and what it had been failing to compare
+
+Change 0626 closes evidence gap 1 of change 0587 and, in doing so, repairs a
+silent CI failure the survey had classified as working. The `full` job gains one
+step — the same bounded allocator capture the smoke job already runs, written to
+`target/perf/allocator-baseline.json` with an
+`allocator-baseline-descriptor.json` beside it, both added to the existing
+`container-performance-baseline-<run id>` artifact — and the smoke job gains
+four: a best-effort `gh run list` / `gh run download` of the newest successful
+run on `main` that published one, a selection step, a comparison step that
+captures the comparator's exit status instead of failing on it, and a reporting
+step that classifies the verdict and writes the job summary. All of the decision
+logic lives in `tools/perf_smoke_baseline.py` (five subcommands) rather than in
+workflow heredocs, and `tools/test_perf_smoke_baseline.py` covers every branch
+with 121 tests across thirteen classes, nine of which assert the workflow's own
+wiring textually. Verification used two **real** release
+`litchi-perf-baseline-alloc` reports, each captured on a clean worktree pinned to
+CPU 21 at a distinct revision — `7082a1a3f` standing in for a prior full run and
+`77220b62b` for the commit under test — driven through the whole pipeline by a
+retained script, once per scenario: no artifact fetched → `self_comparison`,
+comparator pass, `plumbing_pass`, job exit 0; a compatible reference →
+`fetched_reference`, comparator pass, `reference_pass`, job exit 0; the current
+report's allocation counters raised 10% → comparator **regression**, exit 1,
+`reference_regression`, **job exit 0** because enforcement is advisory; the
+reference runner's CPU model changed → comparator invalid, exit 2,
+`reference_environment_drift`, job exit 0; a reference captured over another
+corpus → rejected before comparison, naming `36f44718…` against the policy's
+`debb7009…`, and falling back. Over the two real legs the comparator reports
+pass, 2 matched results, 20 compared metrics, 0 regressions,
+`latency_claims: withheld_instrumentation`, 0 latency results compared and 2
+excluded. Against the base commit's own copy of the allocator policy the same
+pair is rejected outright — `ComparisonInputError: baseline.tool does not match
+the policy tool identity` — which is what the CI step has been doing since
+`126c4a8b2` added `tool.allocator_counter_revision` to the harness while the
+policy stayed markerless; the fix pins `serialized_region_peak_v3`, the value the
+harness source emits, and a test ties the two together. Gates: `cargo fmt --all
+--check` clean; the workflow parses under PyYAML 6.0.3; 466 tests across the nine
+modules the smoke job runs, OK; `tools.test_perf_baseline_source_policy` 14 OK;
+`check_perf_claims.py --mode strict` 10 claims;
+`check_report_claim_classification.py` 167 rows;
+`validate_crud_coverage_index.py` 15 categories and 33 selectors;
+`non_iwork_gate.py verify` 45 bulk tree roots and 35 facade safe trees. One
+pre-existing failure, reproduced unchanged at the base commit:
+`tools.test_perf_claims`'s registry structural test names two ABBA evidence ids
+its expected set omits. `actionlint` is not installed on this host and the
+workflow was not linted by it. `performance_claim: none`; no file under
+`crates/` or `tools/perf-baseline/` changed.
+[Change and limitations](0626-perf-ci-smoke-baseline-fetch.md);
+[retained evidence](results/change-0626/README.md).
+
 ## 0628 — the same package, the same rId
 
 Change 0628 answers the question change 0600 left open and fixes the one thing it found. Inside `litchi-opc`, relationship iteration order reaches no published `.rels` byte, no `[Content_Types].xml` byte, no published member order, no catalog admission verdict, no signature digest and no `.rels` read order — every one of those paths sorts, looks up by key, aggregates or requires uniqueness, and the record cites each by file and line. It did reach one thing: `Relationships::get_or_add` and `get_or_add_ext_rel` reused whichever matching relationship the hash order visited first, and the caller writes the returned identifier into part markup. The fix is 43 inserted and 20 removed lines in one file — one private `reuse_candidate` helper that takes the smallest matching rId in byte order, the order the serialized `.rels` member already uses — plus a seven-test file that is the oracle. Four of those seven fail on the unmodified crate and three pass on both legs, because they encode what must not change: reuse of a unique match, a fresh target still taking the next free identifier, and an external duplicate not satisfying an internal reuse. The corpus evidence is two probes over all **336 OOXML fixtures**. The first opens and republishes each one and digests the output: both legs give `opened=334 published=327 open_refused=2 save_refused=7`, and `diff` of the two 336-line digest listings is **empty** — all 327 published packages byte-identical, the nine refusals identical with the same messages. The second probes every **5,258** (owner, type, target, mode) triple with 16 opens each: **4** triples returned more than one identifier before, **0** after, and the four are exactly the four a static scan of 2,218 `.rels` parts predicted. Deterministic counts on four fixtures — positional source requests and bytes for a source-backed open, allocations for the source-backed open, the eager open and the save, and the published byte count — `diff` **empty** across the legs. A callgrind isolation pair at N = 1 and N = 11 on `ConditionalFormattingSamples.xlsx` gives **194,662,395.8 Ir** per open+save before and **194,669,991.4** after, **+7,595.6 or +0.0039%**; the per-symbol tables attribute it to `__memcpy_avx_unaligned_erms`, the `PlannedPart` quicksort and libc malloc internals with cancelling signs, and none of the three changed functions appears in either profile, because neither open nor save calls them. No wall-clock measurement was taken and none would resolve 0.0039% against this host's A/A floor of about p50 4%. Gates: `cargo fmt --all --check` clean, Clippy clean on `litchi-opc` with all targets, `cargo doc` clean, and `cargo test -p litchi-opc --no-fail-fast` green across 428 unit tests and 23 integration binaries apart from one pre-existing cancellation race in `tests/source_backed_batch.rs`, reproduced in all three invocation shapes on the untouched base checkout at `2d6fbeaed`. `performance_claim: none`: this change costs instructions rather than saving them. [Change and limitations](0628-opc-relationship-iteration-order.md); [retained evidence](results/change-0628/README.md).

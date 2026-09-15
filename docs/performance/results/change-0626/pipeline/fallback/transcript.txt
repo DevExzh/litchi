@@ -1,0 +1,31 @@
+# scenario: fallback
+
+$ perf_smoke_baseline.py fetch-status --out docs/performance/results/change-0626/pipeline/fallback/fetch-status.json --reason no successful full run has published a reference artifact
+reference fetch: no successful full run has published a reference artifact
+exit status 0
+
+$ perf_smoke_baseline.py select --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --comparator-policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fallback/current.json --reference-dir /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fallback/reference --fetch-status docs/performance/results/change-0626/pipeline/fallback/fetch-status.json --runner-labels ubuntu-latest --current-run-id 22222222 --baseline-out /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fallback/baseline.json --selection-out docs/performance/results/change-0626/pipeline/fallback/selection.json
+self_comparison: plumbing check only: today's report compared against itself, which cannot detect a regression
+  fallback reason: reference_fetched: no successful full run has published a reference artifact
+exit status 0
+
+$ perf_compare.py --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --baseline /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fallback/baseline.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fallback/current.json --json-out docs/performance/results/change-0626/pipeline/fallback/comparison.json --summary-out docs/performance/results/change-0626/pipeline/fallback/comparison.txt
+PASS: 2 matched results, 20 metrics, 0 regressions
+Latency comparison excluded for 2 evidence-only result(s)
+exit status 0
+
+$ perf_smoke_baseline.py report --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --selection docs/performance/results/change-0626/pipeline/fallback/selection.json --comparison docs/performance/results/change-0626/pipeline/fallback/comparison.json --comparator-exit-status 0 --classification-out docs/performance/results/change-0626/pipeline/fallback/classification.json --summary-out docs/performance/results/change-0626/pipeline/fallback/outcome.md --step-summary docs/performance/results/change-0626/pipeline/fallback/step-summary.md
+::notice title=Performance smoke: plumbing check only::plumbing check only: today's report compared against itself, which cannot detect a regression | fallback because reference_fetched: no successful full run has published a reference artifact
+## Performance smoke comparison
+
+- Mode: `self_comparison` — plumbing check only: today's report compared against itself, which cannot detect a regression
+- Detects regressions: **no**
+- Comparator status: `pass`
+- Outcome: `plumbing_pass`
+- Enforcement: `advisory` (advisory)
+
+Why the fetched reference was not used:
+
+- reference_fetched: no successful full run has published a reference artifact
+exit status 0
+

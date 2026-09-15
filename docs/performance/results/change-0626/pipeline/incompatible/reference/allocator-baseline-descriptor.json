@@ -1,0 +1,32 @@
+{
+  "comparator_policy_id": "litchi-hosted-allocator-filesystem-v1",
+  "environment": {
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "cargo_build_target": null,
+    "cpu_model": "AMD EPYC 9R45",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "logical_cpus_available": 1,
+    "os": "linux",
+    "page_size_bytes": 4096,
+    "perf_event_paranoid": "1",
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "rustflags": null,
+    "total_memory_bytes": 132553797632
+  },
+  "event": "schedule",
+  "git_revision": "7082a1a3f480589c0025aad8925cae315a4cfd4b",
+  "harness_binary_profile": "release",
+  "policy_id": "litchi-ci-smoke-baseline-v1",
+  "report_name": "allocator-baseline.json",
+  "result_key_manifest_sha256": "36f44718f1b92b87552969e26702d6f54a964c781905a90051cb3eadb1153f8a",
+  "run_attempt": 1,
+  "run_id": "11111111",
+  "runner_labels": [
+    "ubuntu-latest"
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-smoke-baseline",
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,2 @@
+PASS: 2 matched results, 20 metrics, 0 regressions
+Latency comparison excluded for 2 evidence-only result(s)

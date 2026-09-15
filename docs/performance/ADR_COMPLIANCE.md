@@ -1,5 +1,43 @@
 # Performance optimization ADR-compliance matrix
 
+## 0626 — no boundary is engaged; what the checked policy identity now pins, and why that is the strict direction
+
+Record: [0626](0626-perf-ci-smoke-baseline-fetch.md).
+
+No ADR is engaged and no accepted hash changes: the change is confined to a CI
+workflow, two `tools/*.py` files, one new policy document, one pinned field in
+an existing policy document and one documentation file, and `git diff 7082a1a3f
+-- crates/ tools/perf-baseline/` is empty. No contract, limit, refusal, output
+byte, public type or `unsafe` boundary moves, and `tools/perf_compare.py` — the
+fail-closed comparator itself — is not modified; what changed is what the smoke
+job does with its verdict. The one compliance-shaped decision is the pin of
+`tool_identity.allocator_counter_revision` to `serialized_region_peak_v3` in
+`perf-regression-policy-allocator-v1.json`. It narrows rather than widens: a
+report captured by an allocator binary older than `126c4a8b2` can no longer be
+compared under that policy, which is what change 0421 prescribed —
+"legacy markerless policies can still replay historical pairs… both sides must be
+freshly captured with corrected instrumentation before a policy opts into the
+new identity" — for the one policy where both sides always *are* freshly
+captured. `perf-regression-policy-xlsx-allocator-v1.json` and
+`perf-regression-policy-opc-source-materialize-allocator-v1.json` are
+deliberately left markerless, because retained evidence reads them and changing
+them would reinterpret that evidence in retrospect. Three further properties are
+worth recording because a CI wiring change is easy to assume harmless: the
+fetched artifact is **not trusted on its own word** — the case/corpus key
+manifest digest is recomputed from the fetched report and must match both the
+policy's `expected_result_keys_sha256` and the descriptor's copy, and the
+descriptor's run id must equal the run the artifact was downloaded from, so a
+stale or mixed download cannot be compared; the fetch step cannot fail the job,
+carrying `continue-on-error: true`, running under `set +e` and recording its
+outcome in a typed status document rather than an exit code, so a GitHub API
+outage degrades to the labelled plumbing check instead of a red build; and the
+advisory enforcement has exactly one exception, a broken self-comparison, which
+fails the job under either setting because a comparator that cannot compare a
+report with itself is a tooling defect and not a measurement. The manual
+`reference-regression` job's fail-closed behaviour on a regression or identity
+defect is unchanged. `performance_claim: none`. OLE2/OOXML remain active; ODF is
+deferred until completion and iWork excluded.
+
 ## 0628 — ADR 0006 checked across the OPC surface, ADR 0005's invisible cache confirmed, one clause restored
 
 Record: [0628](0628-opc-relationship-iteration-order.md).

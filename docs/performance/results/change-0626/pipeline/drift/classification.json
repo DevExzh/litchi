@@ -1,0 +1,17 @@
+{
+  "blocking": false,
+  "comparator_exit_status": 2,
+  "comparator_status": "invalid",
+  "detail": [
+    "build identity mismatch for 'cpu_model': 'Intel(R) Xeon(R) Platinum 8370C CPU' != 'AMD EPYC 9R45'"
+  ],
+  "enforcement": "advisory",
+  "exit_status": 0,
+  "mode": "fetched_reference",
+  "outcome": "reference_environment_drift",
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-smoke-baseline",
+    "version": "0.1.0"
+  }
+}

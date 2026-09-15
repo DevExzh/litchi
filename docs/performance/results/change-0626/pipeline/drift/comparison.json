@@ -1,0 +1,20 @@
+{
+  "comparisons": [],
+  "errors": [
+    "build identity mismatch for 'cpu_model': 'Intel(R) Xeon(R) Platinum 8370C CPU' != 'AMD EPYC 9R45'"
+  ],
+  "regressions": [],
+  "schema_version": 1,
+  "status": "invalid",
+  "summary": {
+    "compared_metrics": 0,
+    "latency_compared_results": 0,
+    "latency_excluded_results": 0,
+    "matched_results": 0,
+    "regressions": 0
+  },
+  "tool": {
+    "name": "litchi-perf-compare",
+    "version": "1.4.0"
+  }
+}

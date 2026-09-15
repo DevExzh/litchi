@@ -1,0 +1,35 @@
+# scenario: fetched
+
+$ perf_smoke_baseline.py descriptor --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --comparator-policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --report /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/full-run-report.json --runner-labels ubuntu-latest --run-id 11111111 --event schedule --out /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/reference/allocator-baseline-descriptor.json
+reference descriptor for run 11111111 at 7082a1a3f480589c0025aad8925cae315a4cfd4b
+exit status 0
+
+$ perf_smoke_baseline.py fetch-status --out docs/performance/results/change-0626/pipeline/fetched/fetch-status.json --reason downloaded the baseline artifact of run 11111111 --fetched --run-id 11111111
+reference fetch: downloaded the baseline artifact of run 11111111
+exit status 0
+
+$ perf_smoke_baseline.py select --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --comparator-policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/current.json --reference-dir /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/reference --fetch-status docs/performance/results/change-0626/pipeline/fetched/fetch-status.json --runner-labels ubuntu-latest --current-run-id 22222222 --baseline-out /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/baseline.json --selection-out docs/performance/results/change-0626/pipeline/fetched/selection.json
+fetched_reference: regression comparison against the last successful full run (11111111, schedule)
+exit status 0
+
+$ perf_compare.py --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-regression-policy-allocator-v1.json --baseline /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/baseline.json --current /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0626/pipeline-work/fetched/current.json --json-out docs/performance/results/change-0626/pipeline/fetched/comparison.json --summary-out docs/performance/results/change-0626/pipeline/fetched/comparison.txt
+PASS: 2 matched results, 20 metrics, 0 regressions
+Latency comparison excluded for 2 evidence-only result(s)
+exit status 0
+
+$ perf_smoke_baseline.py report --policy /home/zhuhe/code/litchi-worktrees/0626/docs/performance/perf-smoke-baseline-policy-v1.json --selection docs/performance/results/change-0626/pipeline/fetched/selection.json --comparison docs/performance/results/change-0626/pipeline/fetched/comparison.json --comparator-exit-status 0 --classification-out docs/performance/results/change-0626/pipeline/fetched/classification.json --summary-out docs/performance/results/change-0626/pipeline/fetched/outcome.md --step-summary docs/performance/results/change-0626/pipeline/fetched/step-summary.md
+::notice title=Performance smoke: no regression against the last full run::regression comparison against the last successful full run (11111111, schedule) | 2 matched results, 20 metrics, no regression | advisory: reported, not enforced (docs/GOAL.md deliverable 8)
+## Performance smoke comparison
+
+- Mode: `fetched_reference` — regression comparison against the last successful full run (11111111, schedule)
+- Detects regressions: yes
+- Reference: run `11111111` at revision `7082a1a3f480589c0025aad8925cae315a4cfd4b`
+- Comparator status: `pass`
+- Outcome: `reference_pass`
+- Enforcement: `advisory` (advisory)
+
+Detail:
+
+- 2 matched results, 20 metrics, no regression
+exit status 0
+

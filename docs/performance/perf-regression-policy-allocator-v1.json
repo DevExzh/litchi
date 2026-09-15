@@ -22,7 +22,8 @@
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
-    "instrumentation": "system_allocator_operation_scoped"
+    "instrumentation": "system_allocator_operation_scoped",
+    "allocator_counter_revision": "serialized_region_peak_v3"
   },
   "build_identity_fields": [
     "rustc_version",

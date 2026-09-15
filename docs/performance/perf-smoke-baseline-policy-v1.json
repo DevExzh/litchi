@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "policy_id": "litchi-ci-smoke-baseline-v1",
+  "comparator_policy": "docs/performance/perf-regression-policy-allocator-v1.json",
+  "comparator_policy_id": "litchi-hosted-allocator-filesystem-v1",
+  "reference_workflow": "perf-baseline.yml",
+  "reference_branch": "main",
+  "reference_events": [
+    "schedule",
+    "workflow_dispatch"
+  ],
+  "reference_artifact_prefix": "container-performance-baseline-",
+  "reference_report_name": "allocator-baseline.json",
+  "reference_descriptor_name": "allocator-baseline-descriptor.json",
+  "max_reference_runs": 10,
+  "enforcement": "advisory",
+  "enforcement_reason": "docs/GOAL.md deliverable 8 forbids making noisy cloud-hosted microbenchmarks a hard merge gate until variance is understood. The program host's measured A/A floor is about 4% at p50 and 14% at p99, and a shared GitHub-hosted runner is noisier still, so a fetched-reference comparison reports and annotates instead of failing the job. Set enforcement to 'blocking' only once hosted-runner variance for these counters has been measured and recorded.",
+  "require_runner_label_match": true,
+  "require_result_key_manifest_match": true,
+  "self_comparison_expectations": {
+    "status": "pass",
+    "matched_results": 2,
+    "regressions": 0,
+    "latency_claims": "withheld_instrumentation",
+    "latency_compared_results": 0,
+    "latency_excluded_results": 2,
+    "compared_metrics": 20
+  }
+}

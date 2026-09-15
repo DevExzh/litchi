@@ -1,0 +1,17 @@
+{
+  "blocking": false,
+  "comparator_exit_status": 0,
+  "comparator_status": "pass",
+  "detail": [
+    "2 matched results, 20 metrics, no regression"
+  ],
+  "enforcement": "advisory",
+  "exit_status": 0,
+  "mode": "fetched_reference",
+  "outcome": "reference_pass",
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-smoke-baseline",
+    "version": "0.1.0"
+  }
+}

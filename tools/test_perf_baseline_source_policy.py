@@ -137,16 +137,40 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             "--samples 15",
             "--case opc_file_eager_open",
             "--filesystem-cache warm,cold-requested",
-            "--json target/perf/allocator-smoke/current.json",
+            '--json "$LITCHI_SMOKE_DIR/current.json"',
         ):
             self.assertIn(argument, self.workflow)
+        self.assertIn("LITCHI_SMOKE_DIR: target/perf/allocator-smoke", self.workflow)
         self.assertIn("tools/perf_compare.py", self.workflow)
         self.assertIn(
+            "LITCHI_ALLOCATOR_POLICY: "
             "docs/performance/perf-regression-policy-allocator-v1.json",
             self.workflow,
         )
-        self.assertIn('"withheld_instrumentation"', self.workflow)
-        self.assertIn('"compared_metrics"] == 20', self.workflow)
+        # Change 0626 moved the comparison's expected shape out of an inline
+        # workflow heredoc and into the checked smoke policy, where
+        # tools/perf_smoke_baseline.py reads it and a unit suite covers it.
+        import json
+
+        smoke_policy = json.loads(
+            (ROOT / "docs/performance/perf-smoke-baseline-policy-v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn(
+            "LITCHI_SMOKE_POLICY: "
+            "docs/performance/perf-smoke-baseline-policy-v1.json",
+            self.workflow,
+        )
+        self.assertEqual(
+            smoke_policy["comparator_policy"],
+            "docs/performance/perf-regression-policy-allocator-v1.json",
+        )
+        expectations = smoke_policy["self_comparison_expectations"]
+        self.assertEqual(expectations["latency_claims"], "withheld_instrumentation")
+        self.assertEqual(expectations["compared_metrics"], 20)
+        self.assertEqual(expectations["matched_results"], 2)
+        self.assertEqual(expectations["regressions"], 0)
 
     def test_allocator_manifest_selects_filesystem_case_and_pinned_corpus(self):
         import json

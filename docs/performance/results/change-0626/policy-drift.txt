@@ -1,0 +1,22 @@
+# The checked allocator policy against a freshly captured allocator report
+
+Both legs are real reports from the release `litchi-perf-baseline-alloc`
+harness, captured on a clean worktree; see reports/ for the inputs.
+
+report.tool = {"allocator_counter_revision": "serialized_region_peak_v3", "binary": "litchi-perf-baseline-alloc", "instrumentation": "system_allocator_operation_scoped", "name": "litchi-perf-baseline", "profile": "release", "target_arch": "x86_64", "target_os": "linux", "version": "0.1.0"}
+
+## base commit 7082a1a3f (docs/performance/perf-regression-policy-allocator-v1.json as checked in)
+policy.tool_identity = {"binary": "litchi-perf-baseline-alloc", "instrumentation": "system_allocator_operation_scoped", "name": "litchi-perf-baseline", "profile": "release", "target_arch": "x86_64", "target_os": "linux", "version": "0.1.0"}
+comparator: ComparisonInputError: baseline.tool does not match the policy tool identity
+workflow step: the self-comparison exits 2 and fails the smoke job
+
+## this change (the same policy with the harness counter revision pinned)
+policy.tool_identity = {"allocator_counter_revision": "serialized_region_peak_v3", "binary": "litchi-perf-baseline-alloc", "instrumentation": "system_allocator_operation_scoped", "name": "litchi-perf-baseline", "profile": "release", "target_arch": "x86_64", "target_os": "linux", "version": "0.1.0"}
+comparator status: pass
+comparator summary: {"compared_metrics": 20, "latency_claims": "withheld_instrumentation", "latency_compared_results": 0, "latency_excluded_results": 2, "matched_results": 2, "regressions": 0}
+
+## the same policy over the two distinct real legs
+baseline revision: 7082a1a3f480589c0025aad8925cae315a4cfd4b
+current  revision: 77220b62b9c149001a5ee18116412291370b2979
+comparator status: pass
+comparator summary: {"compared_metrics": 20, "latency_claims": "withheld_instrumentation", "latency_compared_results": 0, "latency_excluded_results": 2, "matched_results": 2, "regressions": 0}
