@@ -1,0 +1,15 @@
+diff --git a/tools/perf-baseline/Cargo.toml b/tools/perf-baseline/Cargo.toml
+index 387b713af..0a33307a9 100644
+--- a/tools/perf-baseline/Cargo.toml
++++ b/tools/perf-baseline/Cargo.toml
+@@ -14,6 +14,10 @@ name = "litchi-perf-baseline-alloc"
+ path = "src/bin/litchi-perf-baseline-alloc.rs"
+ required-features = ["allocator-metrics"]
+ 
++[[bin]]
++name = "ole_doc_ppt_profile"
++path = "src/bin/ole_doc_ppt_profile.rs"
++
+ [[bin]]
+ name = "docx_plain_paragraph_tail_append"
+ path = "src/bin/docx_plain_paragraph_tail_append.rs"

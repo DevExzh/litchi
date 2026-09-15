@@ -1,0 +1,435 @@
+
+====================================================================================================
+flagship/open   whole-operation Ir/sample = 2,379,097   (sum of shown self = 2,378,964)
+====================================================================================================
+  1.     681,454  28.64%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  2.     556,916  23.41%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  3.      93,714   3.94%  litchi_cfb::file::SectorChainScratch::collect_exact
+  4.      87,158   3.66%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  5.      56,687   2.38%  ./malloc/./malloc/malloc.c:_int_malloc
+  6.      52,567   2.21%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+  7.      50,376   2.12%  litchi_cfb::shared::next_chain_sector
+  8.      42,243   1.78%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  9.      39,057   1.64%  litchi_xls::xf_ext::XfExt::parse
+ 10.      37,740   1.59%  litchi_xls::border_fill::parse_xf_border_fill
+ 11.      33,339   1.40%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 12.      32,870   1.38%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+ 13.      32,199   1.35%  litchi_xls::records::walk_one_shared_string
+ 14.      31,484   1.32%  litchi_xls::number_format::codec::parse_xf
+ 15.      31,131   1.31%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 16.      27,573   1.16%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+ 17.      27,075   1.14%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 18.      26,984   1.13%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 19.      25,596   1.08%  litchi_xls::records::SstCursor::read_exact
+ 20.      24,380   1.02%  litchi_cfb::directory_name::directory_name_data
+ 21.      23,783   1.00%  ./malloc/./malloc/malloc.c:free
+ 22.      17,933   0.75%  ./malloc/./malloc/malloc.c:malloc
+ 23.      14,432   0.61%  litchi_xls::differential_format::codec::<impl litchi_xls::differential_format::XfProperties>::parse
+ 24.      13,839   0.58%  litchi_xls::records::scan_shared_string_records
+ 25.      13,625   0.57%  litchi_xls::number_format::codec::parse_number_format
+
+====================================================================================================
+flagship/one-cell   whole-operation Ir/sample = 2,616,858   (sum of shown self = 2,616,190)
+====================================================================================================
+  1.     710,181  27.14%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  2.     591,449  22.60%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  3.     106,272   4.06%  litchi_cfb::shared::next_chain_sector
+  4.      93,714   3.58%  litchi_cfb::file::SectorChainScratch::collect_exact
+  5.      87,160   3.33%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  6.      57,393   2.19%  ./malloc/./malloc/malloc.c:_int_malloc
+  7.      52,567   2.01%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+  8.      42,243   1.61%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  9.      39,057   1.49%  litchi_xls::xf_ext::XfExt::parse
+ 10.      37,740   1.44%  litchi_xls::border_fill::parse_xf_border_fill
+ 11.      34,533   1.32%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 12.      32,870   1.26%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+ 13.      32,199   1.23%  litchi_xls::records::walk_one_shared_string
+ 14.      31,494   1.20%  litchi_cfb::shared::SharedOleFile::stream_cursor_at
+ 15.      31,484   1.20%  litchi_xls::number_format::codec::parse_xf
+ 16.      31,131   1.19%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 17.      27,573   1.05%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+ 18.      27,075   1.03%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 19.      26,981   1.03%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 20.      25,675   0.98%  litchi_xls::records::SstCursor::read_exact
+ 21.      25,582   0.98%  litchi_cfb::directory_name::directory_name_data
+ 22.      24,261   0.93%  ./malloc/./malloc/malloc.c:free
+ 23.      19,824   0.76%  litchi_xls::workbook::source::WorksheetScan::next_frame
+ 24.      18,360   0.70%  ./malloc/./malloc/malloc.c:malloc
+ 25.      14,432   0.55%  litchi_xls::differential_format::codec::<impl litchi_xls::differential_format::XfProperties>::parse
+
+====================================================================================================
+cv/open   whole-operation Ir/sample = 915,526   (sum of shown self = 915,580)
+====================================================================================================
+  1.     231,728  25.31%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  2.     108,579  11.86%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  3.      73,007   7.97%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+  4.      51,442   5.62%  litchi_xls::records::scan_shared_string_records
+  5.      51,011   5.57%  litchi_xls::records::walk_one_shared_string
+  6.      46,294   5.06%  litchi_xls::records::SstCursor::read_exact
+  7.      30,941   3.38%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  8.      23,812   2.60%  litchi_xls::number_format::codec::parse_number_format
+  9.      23,088   2.52%  litchi_xls::border_fill::parse_xf_border_fill
+ 10.      19,692   2.15%  litchi_xls::number_format::codec::parse_xf
+ 11.      18,271   2.00%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 12.      16,315   1.78%  litchi_xls::records::SstCursor::read_formatting_runs
+ 13.      14,839   1.62%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 14.      13,468   1.47%  litchi_cfb::directory_name::directory_name_data
+ 15.      12,458   1.36%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 16.      12,035   1.31%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 17.      11,597   1.27%  ./malloc/./malloc/malloc.c:_int_malloc
+ 18.      11,089   1.21%  litchi_cfb::file::SectorChainScratch::collect_exact
+ 19.      10,575   1.16%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+ 20.      10,108   1.10%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 21.       8,631   0.94%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 22.       8,064   0.88%  litchi_cfb::shared::next_chain_sector
+ 23.       7,589   0.83%  core::hash::BuildHasher::hash_one
+ 24.       6,681   0.73%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 25.       5,202   0.57%  ./malloc/./malloc/malloc.c:free
+
+====================================================================================================
+cv/one-cell   whole-operation Ir/sample = 937,487   (sum of shown self = 937,369)
+====================================================================================================
+  1.     232,165  24.76%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  2.     108,624  11.59%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  3.      73,007   7.79%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+  4.      51,442   5.49%  litchi_xls::records::scan_shared_string_records
+  5.      51,011   5.44%  litchi_xls::records::walk_one_shared_string
+  6.      46,294   4.94%  litchi_xls::records::SstCursor::read_exact
+  7.      30,941   3.30%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  8.      23,812   2.54%  litchi_xls::number_format::codec::parse_number_format
+  9.      23,088   2.46%  litchi_xls::border_fill::parse_xf_border_fill
+ 10.      19,692   2.10%  litchi_xls::number_format::codec::parse_xf
+ 11.      18,271   1.95%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 12.      16,315   1.74%  litchi_xls::records::SstCursor::read_formatting_runs
+ 13.      15,096   1.61%  litchi_cfb::shared::next_chain_sector
+ 14.      14,839   1.58%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 15.      14,069   1.50%  litchi_cfb::directory_name::directory_name_data
+ 16.      12,458   1.33%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 17.      12,035   1.28%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 18.      11,581   1.24%  ./malloc/./malloc/malloc.c:_int_malloc
+ 19.      11,089   1.18%  litchi_cfb::file::SectorChainScratch::collect_exact
+ 20.      10,575   1.13%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+ 21.      10,108   1.08%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 22.       8,687   0.93%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 23.       7,589   0.81%  core::hash::BuildHasher::hash_one
+ 24.       6,721   0.72%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 25.       5,268   0.56%  ./malloc/./malloc/malloc.c:free
+
+====================================================================================================
+54016/open   whole-operation Ir/sample = 7,239,535   (sum of shown self = 7,233,746)
+====================================================================================================
+  1.   1,258,256  17.38%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  2.   1,164,269  16.08%  litchi_xls::records::scan_shared_string_records
+  3.     836,795  11.56%  litchi_xls::records::walk_one_shared_string
+  4.     719,535   9.94%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+  5.     624,100   8.62%  litchi_xls::records::SstCursor::read_exact
+  6.     463,320   6.40%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  7.     378,510   5.23%  litchi_xls::border_fill::parse_xf_border_fill
+  8.     309,237   4.27%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  9.     297,066   4.10%  litchi_xls::number_format::codec::parse_xf
+ 10.     236,890   3.27%  litchi_xls::records::SstCursor::read_formatting_runs
+ 11.     232,643   3.21%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 12.     138,591   1.91%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 13.     126,197   1.74%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 14.      65,214   0.90%  litchi_cfb::file::SectorChainScratch::collect_exact
+ 15.      44,473   0.61%  core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError>
+ 16.      29,130   0.40%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+ 17.      26,640   0.37%  litchi_cfb::shared::next_chain_sector
+ 18.      25,917   0.36%  litchi_xls::number_format::codec::parse_number_format
+ 19.      23,870   0.33%  litchi_xls::border_fill::FillPattern::from_bits
+ 20.      23,078   0.32%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+ 21.      21,457   0.30%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 22.      18,327   0.25%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 23.      16,000   0.22%  ./malloc/./malloc/malloc.c:_int_malloc
+ 24.      15,019   0.21%  litchi_cfb::directory_name::directory_name_data
+ 25.      13,302   0.18%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+
+====================================================================================================
+54016/one-cell   whole-operation Ir/sample = 24,525,331   (sum of shown self = 24,512,572)
+====================================================================================================
+  1.   4,248,048  17.32%  litchi_xls::workbook::source::WorksheetScan::next_frame
+  2.   2,616,297  10.67%  litchi_xls::workbook::source::query_cell
+  3.   1,912,950   7.80%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.   1,758,790   7.17%  litchi_xls::workbook::source::WorksheetScan::ensure
+  5.   1,636,087   6.67%  litchi_xls::workbook::source::process_cell
+  6.   1,488,468   6.07%  litchi_xls::workbook::source::WorksheetScan::read_payload
+  7.   1,164,269   4.75%  litchi_xls::records::scan_shared_string_records
+  8.   1,030,627   4.20%  core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError>
+  9.     921,984   3.76%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+ 10.     893,405   3.64%  litchi_xls::records::CellRecord::parse
+ 11.     856,900   3.49%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::validate_cell_xf
+ 12.     836,795   3.41%  litchi_xls::records::walk_one_shared_string
+ 13.     719,535   2.93%  <litchi_xls::records::MeasuredText as litchi_xls::records::SharedStringText>::consume
+ 14.     624,100   2.54%  litchi_xls::records::SstCursor::read_exact
+ 15.     516,628   2.11%  litchi_xls::records::CellRecord::visit_mul_blank
+ 16.     503,336   2.05%  core::ptr::drop_in_place<litchi_xls::records::CellRecord>
+ 17.     463,320   1.89%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+ 18.     378,510   1.54%  litchi_xls::border_fill::parse_xf_border_fill
+ 19.     297,066   1.21%  litchi_xls::number_format::codec::parse_xf
+ 20.     236,890   0.97%  litchi_xls::records::SstCursor::read_formatting_runs
+ 21.     232,643   0.95%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 22.     161,572   0.66%  litchi_xls::workbook::source::WorksheetScan::skip_payload
+ 23.     138,591   0.57%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 24.     126,189   0.51%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 25.     115,458   0.47%  litchi_xls::records::CellRecord::packed_cell_range
+
+====================================================================================================
+mid-images/open   whole-operation Ir/sample = 335,079   (sum of shown self = 334,948)
+====================================================================================================
+  1.      86,909  25.94%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  2.      75,482  22.53%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  3.      13,216   3.94%  litchi_cfb::directory_name::directory_name_data
+  4.      12,489   3.73%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  5.       9,438   2.82%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+  6.       8,114   2.42%  litchi_xls::number_format::codec::parse_number_format
+  7.       7,128   2.13%  litchi_cfb::shared::next_chain_sector
+  8.       6,546   1.95%  litchi_cfb::file::SectorChainScratch::collect_exact
+  9.       6,248   1.86%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 10.       5,659   1.69%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 11.       5,153   1.54%  ./malloc/./malloc/malloc.c:_int_malloc
+ 12.       4,708   1.41%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 13.       4,662   1.39%  litchi_xls::border_fill::parse_xf_border_fill
+ 14.       4,234   1.26%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 15.       4,174   1.25%  litchi_cfb::file::OleFile<R>::load_directory
+ 16.       4,004   1.19%  litchi_cfb::shared::SharedOleFile::find_entry
+ 17.       3,816   1.14%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 18.       3,634   1.08%  litchi_xls::number_format::codec::parse_xf
+ 19.       3,523   1.05%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 20.       3,361   1.00%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 21.       3,187   0.95%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 22.       3,045   0.91%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 23.       2,989   0.89%  ./malloc/./malloc/malloc.c:free
+ 24.       2,612   0.78%  ./malloc/./malloc/malloc.c:malloc
+ 25.       2,595   0.77%  serde_core::ser::SerializeMap::serialize_entry'2
+
+====================================================================================================
+mid-images/one-cell   whole-operation Ir/sample = 351,604   (sum of shown self = 351,425)
+====================================================================================================
+  1.      86,945  24.73%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  2.      76,259  21.69%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  3.      13,817   3.93%  litchi_cfb::directory_name::directory_name_data
+  4.      12,489   3.55%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  5.      11,184   3.18%  litchi_cfb::shared::next_chain_sector
+  6.       9,438   2.68%  litchi_cfb::shared::SharedOleFile::read_stream_range_hinted
+  7.       8,114   2.31%  litchi_xls::number_format::codec::parse_number_format
+  8.       6,546   1.86%  litchi_cfb::file::SectorChainScratch::collect_exact
+  9.       6,248   1.78%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 10.       5,659   1.61%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 11.       5,489   1.56%  ./malloc/./malloc/malloc.c:_int_malloc
+ 12.       4,708   1.34%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 13.       4,662   1.33%  litchi_xls::border_fill::parse_xf_border_fill
+ 14.       4,290   1.22%  litchi_cfb::shared::SharedOleFile::find_entry
+ 15.       4,234   1.20%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 16.       4,174   1.19%  litchi_cfb::file::OleFile<R>::load_directory
+ 17.       3,983   1.13%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 18.       3,634   1.03%  litchi_xls::number_format::codec::parse_xf
+ 19.       3,564   1.01%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 20.       3,401   0.97%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 21.       3,187   0.91%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 22.       3,081   0.88%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 23.       3,055   0.87%  ./malloc/./malloc/malloc.c:free
+ 24.       3,024   0.86%  litchi_xls::workbook::source::WorksheetScan::next_frame
+ 25.       2,639   0.75%  ./malloc/./malloc/malloc.c:malloc
+
+====================================================================================================
+mini-colours/open   whole-operation Ir/sample = 157,577   (sum of shown self = 157,542)
+====================================================================================================
+  1.      11,941   7.58%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  2.       9,609   6.10%  litchi_cfb::directory_name::directory_name_data
+  3.       9,243   5.87%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.       7,590   4.82%  litchi_xls::number_format::codec::parse_number_format
+  5.       5,994   3.80%  litchi_xls::border_fill::parse_xf_border_fill
+  6.       5,412   3.43%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+  7.       5,387   3.42%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  8.       4,844   3.07%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  9.       4,798   3.04%  litchi_xls::number_format::codec::parse_xf
+ 10.       4,020   2.55%  ./malloc/./malloc/malloc.c:_int_malloc
+ 11.       3,943   2.50%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 12.       3,750   2.38%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 13.       3,579   2.27%  litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted
+ 14.       3,457   2.19%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 15.       3,264   2.07%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 16.       3,244   2.06%  litchi_cfb::file::OleFile<R>::load_directory
+ 17.       3,081   1.95%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 18.       3,045   1.93%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 19.       2,922   1.85%  ./malloc/./malloc/malloc.c:free
+ 20.       2,619   1.66%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 21.       2,595   1.65%  serde_core::ser::SerializeMap::serialize_entry'2
+ 22.       2,563   1.63%  ./malloc/./malloc/malloc.c:malloc
+ 23.       2,429   1.54%  core::hash::BuildHasher::hash_one
+ 24.       2,394   1.52%  litchi_cfb::shared::SharedOleFile::minifat_physical_range
+ 25.       2,230   1.42%  litchi_cfb::file::SectorChainScratch::collect_exact
+
+====================================================================================================
+mini-checkboxes/open   whole-operation Ir/sample = 216,033   (sum of shown self = 215,965)
+====================================================================================================
+  1.      16,889   7.82%  litchi_cfb::directory_name::directory_name_data
+  2.      15,848   7.34%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  3.      11,568   5.35%  litchi_cfb::file::OleFile<R>::load_directory
+  4.      11,264   5.21%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  5.       8,114   3.76%  litchi_xls::number_format::codec::parse_number_format
+  6.       7,549   3.49%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  7.       7,301   3.38%  litchi_cfb::file::SectorChainScratch::collect_exact
+  8.       6,540   3.03%  ./malloc/./malloc/malloc.c:_int_malloc
+  9.       6,248   2.89%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 10.       5,684   2.63%  litchi_cfb::file::decode_utf16le
+ 11.       5,276   2.44%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 12.       5,068   2.35%  <alloc::string::String>::from_utf16
+ 13.       5,047   2.34%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 14.       4,678   2.17%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 15.       4,662   2.16%  litchi_xls::border_fill::parse_xf_border_fill
+ 16.       4,234   1.96%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 17.       4,037   1.87%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 18.       3,848   1.78%  ./malloc/./malloc/malloc.c:free
+ 19.       3,743   1.73%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 20.       3,634   1.68%  litchi_xls::number_format::codec::parse_xf
+ 21.       3,304   1.53%  ./malloc/./malloc/malloc.c:malloc
+ 22.       3,281   1.52%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 23.       3,084   1.43%  litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted
+ 24.       3,079   1.43%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 25.       3,045   1.41%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+
+====================================================================================================
+mini-checkboxes/one-cell   whole-operation Ir/sample = 227,087   (sum of shown self = 227,038)
+====================================================================================================
+  1.      17,490   7.70%  litchi_cfb::directory_name::directory_name_data
+  2.      16,066   7.07%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  3.      11,568   5.09%  litchi_cfb::file::OleFile<R>::load_directory
+  4.      11,264   4.96%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  5.       8,114   3.57%  litchi_xls::number_format::codec::parse_number_format
+  6.       7,586   3.34%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  7.       7,301   3.22%  litchi_cfb::file::SectorChainScratch::collect_exact
+  8.       6,419   2.83%  ./malloc/./malloc/malloc.c:_int_malloc
+  9.       6,248   2.75%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+ 10.       5,684   2.50%  litchi_cfb::file::decode_utf16le
+ 11.       5,276   2.32%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 12.       5,068   2.23%  <alloc::string::String>::from_utf16
+ 13.       5,047   2.22%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+ 14.       4,845   2.13%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 15.       4,662   2.05%  litchi_xls::border_fill::parse_xf_border_fill
+ 16.       4,234   1.86%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 17.       3,974   1.75%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 18.       3,914   1.72%  ./malloc/./malloc/malloc.c:free
+ 19.       3,743   1.65%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 20.       3,634   1.60%  litchi_xls::number_format::codec::parse_xf
+ 21.       3,365   1.48%  ./malloc/./malloc/malloc.c:malloc
+ 22.       3,321   1.46%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 23.       3,084   1.36%  litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted
+ 24.       3,081   1.36%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 25.       3,078   1.36%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+
+====================================================================================================
+mini-extstyles/open   whole-operation Ir/sample = 124,516   (sum of shown self = 124,689)
+====================================================================================================
+  1.      10,726   8.61%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  2.       9,959   8.00%  litchi_cfb::directory_name::directory_name_data
+  3.       9,585   7.70%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.       5,550   4.46%  litchi_xls::border_fill::parse_xf_border_fill
+  5.       4,783   3.84%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  6.       4,775   3.83%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  7.       4,643   3.73%  litchi_cfb::file::OleFile<R>::load_directory
+  8.       4,366   3.51%  litchi_xls::number_format::codec::parse_xf
+  9.       3,462   2.78%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 10.       3,045   2.45%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 11.       2,730   2.19%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 12.       2,696   2.17%  ./malloc/./malloc/malloc.c:_int_malloc
+ 13.       2,595   2.08%  serde_core::ser::SerializeMap::serialize_entry'2
+ 14.       2,592   2.08%  litchi_cfb::file::decode_utf16le
+ 15.       2,480   1.99%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 16.       2,428   1.95%  ./malloc/./malloc/malloc.c:free
+ 17.       2,316   1.86%  <alloc::string::String>::from_utf16
+ 18.       2,166   1.74%  litchi_cfb::file::SectorChainScratch::collect_exact
+ 19.       2,111   1.70%  ./malloc/./malloc/malloc.c:malloc
+ 20.       2,071   1.66%  litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted
+ 21.       2,041   1.64%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 22.       1,856   1.49%  litchi_cfb::shared::SharedOleFile::find_entry
+ 23.       1,671   1.34%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 24.       1,542   1.24%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 25.       1,470   1.18%  litchi_cfb::file::OleFile<R>::load_minifat
+
+====================================================================================================
+mini-extstyles/one-cell   whole-operation Ir/sample = 136,645   (sum of shown self = 136,745)
+====================================================================================================
+  1.      10,726   7.85%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  2.      10,560   7.73%  litchi_cfb::directory_name::directory_name_data
+  3.       9,902   7.25%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.       5,550   4.06%  litchi_xls::border_fill::parse_xf_border_fill
+  5.       4,812   3.52%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  6.       4,775   3.49%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  7.       4,643   3.40%  litchi_cfb::file::OleFile<R>::load_directory
+  8.       4,366   3.20%  litchi_xls::number_format::codec::parse_xf
+  9.       3,462   2.53%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 10.       3,136   2.30%  litchi_xls::workbook::source::WorksheetScan::next_frame
+ 11.       3,081   2.25%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 12.       2,897   2.12%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 13.       2,776   2.03%  ./malloc/./malloc/malloc.c:_int_malloc
+ 14.       2,592   1.90%  litchi_cfb::file::decode_utf16le
+ 15.       2,584   1.89%  serde_core::ser::SerializeMap::serialize_entry'2
+ 16.       2,494   1.83%  ./malloc/./malloc/malloc.c:free
+ 17.       2,480   1.81%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 18.       2,316   1.69%  <alloc::string::String>::from_utf16
+ 19.       2,171   1.59%  ./malloc/./malloc/malloc.c:malloc
+ 20.       2,166   1.59%  litchi_cfb::file::SectorChainScratch::collect_exact
+ 21.       2,088   1.53%  litchi_cfb::shared::SharedOleFile::find_entry
+ 22.       2,081   1.52%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 23.       2,071   1.52%  litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted
+ 24.       1,671   1.22%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+ 25.       1,656   1.21%  litchi_cfb::shared::next_chain_sector
+
+====================================================================================================
+small-simple/open   whole-operation Ir/sample = 138,556   (sum of shown self = 138,674)
+====================================================================================================
+  1.      10,724   7.74%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  2.       9,008   6.50%  litchi_cfb::directory_name::directory_name_data
+  3.       8,680   6.26%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.       8,114   5.86%  litchi_xls::number_format::codec::parse_number_format
+  5.       6,248   4.51%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+  6.       4,775   3.45%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  7.       4,662   3.36%  litchi_xls::border_fill::parse_xf_border_fill
+  8.       4,635   3.35%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  9.       4,326   3.12%  ./malloc/./malloc/malloc.c:_int_malloc
+ 10.       4,234   3.06%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 11.       3,634   2.62%  litchi_xls::number_format::codec::parse_xf
+ 12.       3,462   2.50%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 13.       3,246   2.34%  litchi_cfb::file::OleFile<R>::load_directory
+ 14.       3,045   2.20%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 15.       3,030   2.19%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 16.       2,939   2.12%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 17.       2,724   1.97%  ./malloc/./malloc/malloc.c:free
+ 18.       2,721   1.96%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 19.       2,595   1.87%  serde_core::ser::SerializeMap::serialize_entry'2
+ 20.       2,452   1.77%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 21.       2,429   1.75%  core::hash::BuildHasher::hash_one
+ 22.       2,397   1.73%  ./malloc/./malloc/malloc.c:malloc
+ 23.       2,288   1.65%  litchi_cfb::shared::SharedOleFile::find_entry
+ 24.       2,128   1.54%  litchi_cfb::file::decode_utf16le
+ 25.       1,904   1.37%  <alloc::string::String>::from_utf16
+
+====================================================================================================
+small-simple/one-cell   whole-operation Ir/sample = 147,114   (sum of shown self = 147,192)
+====================================================================================================
+  1.      10,724   7.29%  litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits
+  2.       9,609   6.53%  litchi_cfb::directory_name::directory_name_data
+  3.       8,817   5.99%  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms
+  4.       8,114   5.52%  litchi_xls::number_format::codec::parse_number_format
+  5.       6,248   4.25%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+  6.       4,775   3.25%  <litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next
+  7.       4,671   3.18%  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms
+  8.       4,662   3.17%  litchi_xls::border_fill::parse_xf_border_fill
+  9.       4,234   2.88%  <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+ 10.       4,203   2.86%  ./malloc/./malloc/malloc.c:_int_malloc
+ 11.       3,634   2.47%  litchi_xls::number_format::codec::parse_xf
+ 12.       3,462   2.35%  litchi_xls::workbook::source::GlobalsBuffer::ensure
+ 13.       3,246   2.21%  litchi_cfb::file::OleFile<R>::load_directory
+ 14.       3,081   2.09%  <&mut serde_json::ser::Serializer<W,F> as serde_core::ser::Serializer>::serialize_str
+ 15.       3,031   2.06%  litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals
+ 16.       2,870   1.95%  ./malloc/./malloc/malloc.c:_int_free_merge_chunk
+ 17.       2,800   1.90%  litchi_xls::workbook::source::WorksheetScan::next_frame
+ 18.       2,790   1.90%  ./malloc/./malloc/malloc.c:free
+ 19.       2,761   1.88%  alloc::raw_vec::RawVecInner<A>::finish_grow
+ 20.       2,619   1.78%  <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+ 21.       2,584   1.76%  serde_core::ser::SerializeMap::serialize_entry'2
+ 22.       2,574   1.75%  litchi_cfb::shared::SharedOleFile::find_entry
+ 23.       2,463   1.67%  ./malloc/./malloc/malloc.c:malloc
+ 24.       2,429   1.65%  core::hash::BuildHasher::hash_one
+ 25.       2,128   1.45%  litchi_cfb::file::decode_utf16le

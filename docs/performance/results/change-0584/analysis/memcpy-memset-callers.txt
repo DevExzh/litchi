@@ -1,0 +1,216 @@
+
+### docbig/open -- memcpy/memset by CALLER (whole op = 4,962,445 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+    1,595,476  32.15%       3.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+      697,843  14.06%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       76,959   1.55%   4,747.0  memcpy  litchi_doc::sprm::parse_sprms
+       73,244   1.48%   1,075.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+       62,080   1.25%      54.0  memcpy  0x0000000004ab9680
+       41,571   0.84%     447.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       18,538   0.37%     175.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       15,700   0.32%     242.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       12,864   0.26%       2.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+       12,826   0.26%     242.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+       12,818   0.26%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+       12,193   0.25%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+       10,725   0.22%     165.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+        4,634   0.09%     370.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+  (other edges) 34,014 Ir/op ; attributed total 2,681,484 Ir/op = 54.04% of the whole operation
+
+### docbig/text -- memcpy/memset by CALLER (whole op = 4,946,963 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+    1,595,476  32.25%       3.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+      697,843  14.11%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       76,959   1.56%   4,747.0  memcpy  litchi_doc::sprm::parse_sprms
+       73,244   1.48%   1,075.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+       46,189   0.93%      52.7  memcpy  0x0000000004ab9680
+       41,571   0.84%     447.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       18,538   0.37%     175.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       15,700   0.32%     242.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       12,867   0.26%       2.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+       12,826   0.26%     242.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+       12,818   0.26%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+       12,193   0.25%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+       10,725   0.22%     165.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+        4,634   0.09%     370.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+  (other edges) 34,190 Ir/op ; attributed total 2,665,773 Ir/op = 53.89% of the whole operation
+
+### docmid/open -- memcpy/memset by CALLER (whole op = 3,457,522 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      315,712   9.13%       3.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+      102,506   2.96%   1,515.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+       71,332   2.06%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+       64,339   1.86%      45.5  memcpy  0x0000000004ab9680
+       59,427   1.72%     639.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       38,767   1.12%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       33,186   0.96%   2,096.0  memcpy  litchi_doc::sprm::parse_sprms
+       24,541   0.71%     221.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       16,994   0.49%     262.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       14,691   0.42%     231.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+       13,886   0.40%     262.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+        7,564   0.22%     488.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        6,408   0.19%     455.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+        4,115   0.12%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+  (other edges) 22,968 Ir/op ; attributed total 796,436 Ir/op = 23.03% of the whole operation
+
+### docmid/text -- memcpy/memset by CALLER (whole op = 3,468,253 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      315,712   9.10%       3.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+      102,506   2.96%   1,515.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+       71,330   2.06%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+       64,931   1.87%      46.5  memcpy  0x0000000004ab9680
+       59,427   1.71%     639.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       38,777   1.12%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       33,186   0.96%   2,096.0  memcpy  litchi_doc::sprm::parse_sprms
+       24,541   0.71%     221.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       16,995   0.49%     262.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       14,691   0.42%     231.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+       13,886   0.40%     262.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+        9,094   0.26%       7.0  memcpy  <alloc::string::String as core::clone::Clone>::clone
+        7,564   0.22%     488.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        6,408   0.18%     455.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+  (other edges) 27,007 Ir/op ; attributed total 806,056 Ir/op = 23.24% of the whole operation
+
+### docsmall/open -- memcpy/memset by CALLER (whole op = 5,398,535 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      229,900   4.26%   3,321.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+      218,014   4.04%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+      124,155   2.30%   1,335.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       52,880   0.98%       2.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+       51,655   0.96%      41.6  memcpy  0x0000000004ab9680
+       50,285   0.93%     445.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       40,830   0.76%   2,440.0  memcpy  litchi_doc::sprm::parse_sprms
+       39,980   0.74%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       35,642   0.66%     550.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+       15,700   0.29%     242.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       11,639   0.22%     103.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::paragraph_styl
+        9,593   0.18%     181.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+        8,737   0.16%     548.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+        6,833   0.13%     445.0  memcpy  litchi_doc::parts::fkp::PapxFkp::parse
+  (other edges) 22,784 Ir/op ; attributed total 918,627 Ir/op = 17.02% of the whole operation
+
+### docsmall/text -- memcpy/memset by CALLER (whole op = 5,426,545 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      229,900   4.24%   3,321.0  memcpy  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+      218,014   4.02%       1.0  memcpy  alloc::sync::Arc<T,A>::from_box_in
+      124,155   2.29%   1,335.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_s
+       52,880   0.97%       2.0  memset  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+       51,655   0.95%      41.6  memcpy  0x0000000004ab9680
+       50,285   0.93%     445.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_cont
+       40,830   0.75%   2,440.0  memcpy  litchi_doc::sprm::parse_sprms
+       39,980   0.74%       1.0  memcpy  litchi_doc::parts::fib::FileInformationBlock::parse_at
+       35,642   0.66%     550.0  memcpy  <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+       27,635   0.51%      23.0  memcpy  <alloc::string::String as core::clone::Clone>::clone
+       15,700   0.29%     242.0  memcpy  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+       11,639   0.21%     103.0  memcpy  litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::paragraph_styl
+        9,593   0.18%     181.0  memcpy  litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+        8,737   0.16%     548.0  memcpy  <[V] as alloc::slice::Concat<T>>::concat
+  (other edges) 29,302 Ir/op ; attributed total 945,947 Ir/op = 17.43% of the whole operation
+
+### pptbig/open -- memcpy/memset by CALLER (whole op = 949,401 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      205,066  21.60%       1.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+      158,068  16.65%      32.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+       12,022   1.27%     336.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        5,487   0.58%     354.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,817   0.51%       4.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+        4,626   0.49%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+        4,115   0.43%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        2,372   0.25%      42.0  memcpy  0x0000000004ab9680
+        1,200   0.13%      40.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          840   0.09%      28.0  memcpy  <std::fs::File>::metadata
+          336   0.04%      24.0  memcpy  <alloc::string::String as core::fmt::Write>::write_str
+          270   0.03%       9.0  memcpy  alloc::vec::Vec<T,A>::resize
+          240   0.03%       8.0  memcpy  litchi_cfb::file::try_push
+          161   0.02%       9.0  memset  litchi_cfb::file::SectorChainScratch::collect_exact
+  (other edges) 996 Ir/op ; attributed total 400,616 Ir/op = 42.20% of the whole operation
+
+### pptbig/text -- memcpy/memset by CALLER (whole op = 1,364,463 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      205,066  15.03%       1.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+      161,303  11.82%      44.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+       19,126   1.40%     512.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        6,369   0.47%     165.9  memcpy  0x0000000004ab9680
+        5,487   0.40%     354.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,821   0.35%       4.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+        4,626   0.34%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+        4,115   0.30%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        1,200   0.09%      40.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          840   0.06%      28.0  memcpy  <std::fs::File>::metadata
+          552   0.04%      26.0  memcpy  litchi_ppt::odraw::codec::text_from_ppt_records
+          406   0.03%      11.0  memcpy  litchi_ppt::presentation::model::Presentation::text
+          399   0.03%      11.0  memcpy  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+          399   0.03%      11.0  memcpy  alloc::str::join_generic_copy
+  (other edges) 2,046 Ir/op ; attributed total 416,753 Ir/op = 30.54% of the whole operation
+
+### pptmid/open -- memcpy/memset by CALLER (whole op = 1,180,448 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      315,656  26.74%       2.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+      252,092  21.36%      33.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+       95,767   8.11%     334.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        5,115   0.43%     330.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,115   0.35%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        3,091   0.26%       1.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+        3,090   0.26%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+        2,642   0.22%      48.6  memcpy  0x0000000004ab9680
+        1,080   0.09%      36.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          840   0.07%      28.0  memcpy  <std::fs::File>::metadata
+          336   0.03%      24.0  memcpy  <alloc::string::String as core::fmt::Write>::write_str
+          270   0.02%       9.0  memcpy  alloc::vec::Vec<T,A>::resize
+          240   0.02%       8.0  memcpy  litchi_cfb::file::try_push
+          148   0.01%       3.0  memcpy  litchi_cfb::shared::SharedOleFile::open_source_with_limits
+  (other edges) 917 Ir/op ; attributed total 685,399 Ir/op = 58.06% of the whole operation
+
+### pptmid/text -- memcpy/memset by CALLER (whole op = 1,572,305 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+      315,656  20.08%       2.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+      279,861  17.80%      45.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+      122,981   7.82%     482.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        5,435   0.35%     114.6  memcpy  0x0000000004ab9680
+        5,115   0.33%     330.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,115   0.26%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        3,091   0.20%       1.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+        3,090   0.20%       1.0  memset  litchi_cfb::file::OleFile<R>::sector_batch_scratch
+        1,080   0.07%      36.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          840   0.05%      28.0  memcpy  <std::fs::File>::metadata
+          552   0.04%      26.0  memcpy  litchi_ppt::odraw::codec::text_from_ppt_records
+          466   0.03%      17.0  memcpy  alloc::str::join_generic_copy
+          406   0.03%      11.0  memcpy  litchi_ppt::presentation::model::Presentation::text
+          406   0.03%      11.0  memcpy  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+  (other edges) 1,889 Ir/op ; attributed total 744,983 Ir/op = 47.38% of the whole operation
+
+### pptsmall/open -- memcpy/memset by CALLER (whole op = 369,287 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+       62,417  16.90%       1.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+       53,896  14.59%      10.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+       30,396   8.23%     147.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        4,867   1.32%     314.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,115   1.11%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        1,020   0.28%      34.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          845   0.23%      15.7  memcpy  0x0000000004ab9680
+          840   0.23%      28.0  memcpy  <std::fs::File>::metadata
+          270   0.07%       9.0  memcpy  alloc::vec::Vec<T,A>::resize
+          240   0.06%       8.0  memcpy  litchi_cfb::file::try_push
+          164   0.04%       3.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+          148   0.04%       3.0  memcpy  litchi_cfb::shared::SharedOleFile::open_source_with_limits
+           90   0.02%       3.0  memcpy  litchi_ppt::package::source::SourceBackedPackage::from_read_at_with_limits
+           84   0.02%       6.0  memcpy  <alloc::string::String as core::fmt::Write>::write_str
+  (other edges) 763 Ir/op ; attributed total 160,154 Ir/op = 43.37% of the whole operation
+
+### pptsmall/text -- memcpy/memset by CALLER (whole op = 444,281 Ir)
+        Ir/op  %whole  calls/op  fn      caller
+       62,417  14.05%       1.0  memset  litchi_cfb::shared::SharedOleFile::read_fat_stream
+       54,650  12.30%      13.0  memcpy  litchi_ppt::records::record::Record::parse_impl
+       31,860   7.17%     199.0  memcpy  litchi_ppt::records::record::Record::parse_impl'2
+        4,867   1.10%     314.0  memcpy  litchi_cfb::directory_name::directory_name_data
+        4,115   0.93%       1.0  memset  litchi_cfb::file::OleFile<R>::load_fat
+        1,409   0.32%      34.0  memcpy  0x0000000004ab9680
+        1,020   0.23%      34.0  memcpy  litchi_cfb::file::OleFile<R>::load_directory
+          840   0.19%      28.0  memcpy  <std::fs::File>::metadata
+          270   0.06%       9.0  memcpy  alloc::vec::Vec<T,A>::resize
+          240   0.05%       8.0  memcpy  litchi_cfb::file::try_push
+          178   0.04%       3.0  memset  litchi_cfb::file::OleFile<R>::read_sector_run_into
+          169   0.04%      11.0  memcpy  alloc::str::join_generic_copy
+          148   0.03%       3.0  memcpy  litchi_cfb::shared::SharedOleFile::open_source_with_limits
+           90   0.02%       3.0  memcpy  litchi_ppt::package::source::SourceBackedPackage::from_read_at_with_limits
+  (other edges) 991 Ir/op ; attributed total 163,264 Ir/op = 36.75% of the whole operation

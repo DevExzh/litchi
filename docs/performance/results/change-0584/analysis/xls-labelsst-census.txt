@@ -1,0 +1,4 @@
+ConditionalFormattingSamples.xls: Workbook=1314225 bytes, sector_size=512, FAT sectors=2567
+   LabelSst(0x00FD)=658  SST(0x00FC)=1  Continue(0x003C)=260  BOF=17
+54016.xls: Workbook=927178 bytes, sector_size=512, FAT sectors=1811
+   LabelSst(0x00FD)=16055  SST(0x00FC)=1  Continue(0x003C)=27  BOF=2

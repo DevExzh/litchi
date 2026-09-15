@@ -1,0 +1,15 @@
+fixtures measured: 8   refused by the library: 49
+digest mismatches: 0   <-- must be 0
+paragraph-walk chain links: 3,991 -> 3,991   (0.0% removed)
+fixtures with zero saving: 8 of 8
+fixtures that got worse:   0
+
+fixture                                        paras   unhinted     hinted    saved
+noheadfoot-litchi.doc                              1        261        261     0.0%
+documentProperties.doc                             1        233        233     0.0%
+duplicate-style-names.doc                         15      2,388      2,388     0.0%
+endingnote.doc                                     0         90         90     0.0%
+footnote.doc                                       0        103        103     0.0%
+lists-margins.doc                                  4        796        796     0.0%
+picture.doc                                        0         50         50     0.0%
+table-merged-cells.doc                             0         70         70     0.0%

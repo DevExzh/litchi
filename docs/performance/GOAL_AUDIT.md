@@ -1,5 +1,102 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0585-0586: one hint pays 65.5%, the other pays nothing, and the difference is scope
+
+`docs/GOAL.md`'s DEFINITION OF DONE requires that "selective reads perform work
+proportional to mandatory metadata plus accessed content". On the OLE2 side the
+shared-string path violated that in a way no record had named: a source-backed
+XLS text extraction rewalked the `Workbook` allocation chain from its first
+sector **once per string cell**, so the work was proportional to
+*strings × chain depth* rather than to the strings read.
+[0585](0585-cfb-resumable-cursor-construction.md) removes **65.5%** of those
+links corpus-wide, measured, with byte-identical output on all 86 measurable
+fixtures.
+
+The two records together answer a question the program had not asked explicitly:
+**when does change 0579's mechanism pay?** 0585 pays because one text extraction
+resolves hundreds or thousands of strings through a document-scoped resolver.
+[0586](0586-doc-paragraph-hint-rejected.md) pays *exactly nothing* — 3,991 chain
+links before and after, on every measurable fixture — because its hint was scoped
+to a single `resolve_paragraph` call, and one call issues too few reads for a
+prefix to exist. Same mechanism, same crate boundary, opposite outcome, decided
+by the hint's lifetime rather than by the format. That is the reusable lesson,
+and it is why 0586 is retained as a rejection rather than discarded.
+
+**Two methodological points are worth carrying forward.**
+
+The first is that the measurement validated itself before its result was
+believed. The instrumented counter carries a `pre-0579` control leg that
+reproduces change 0579's published pre-change figure of 5,796 chain links
+exactly, and a `0579-only` leg that reproduces its published post-change 2,099
+exactly. A switch that reproduces a previously published number on both sides is
+measuring what it claims to. Without that control, `pre-0579 → this-change` would
+have credited 0585 with 0579's saving.
+
+The second is that a prediction was superseded rather than confirmed. Change
+0584's byte-layout model forecast 74.4% corpus-wide against the 65.5% measured;
+on the largest fixture its naive SST walker had decoded only 829 of 16,055
+entries, so its backward-step distribution came from a 5% sample. The model was
+useful for *targeting* and wrong for *sizing*, and the record says so rather than
+quoting whichever number is larger.
+
+**What this batch does not discharge.** No timing, cycle, cache-counter,
+allocation, peak-RSS, cold-cache, range-source, concurrency or cross-platform
+measurement was taken for 0585. Chain links are a count of dependent loads, and
+`GOAL_AUDIT`'s own standing note — that 0579 removed 1.24% of instructions and
+6.19% of cycles on one fixture — means the relationship between 65.5% and any
+wall-clock figure is unknown in both directions. The per-sheet cursor term
+(28,143 links on a 16-sheet fixture, ~91% resumable) is priced and unimplemented.
+`ConditionalFormattingSamples.xls` could not be measured end to end because the
+library refuses its text extraction, so 0584's 703,937-link prediction for it
+describes a scan that is not reachable on that file.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded.
+
+## 0584: the OLE2 ranking is refreshed, and two long-standing coverage gaps close
+
+`docs/GOAL.md`'s REPOSITORY EXPLORATION section requires the complete data path
+to be mapped before it is optimized, and its DELIVERABLES section requires
+`HOTSPOTS.md` to carry confirmed bottlenecks, disproven hypotheses and ranked
+opportunities. [0584](0584-ole2-profile-at-head.md) refreshes that ranking for
+OLE2 at `e927e139c` and closes two gaps the program had carried for a long time.
+
+**The first is DOC and PPT.** Change 0574 states plainly that "no DOC or PPT
+scenario was measured at all", and that remained true through change 0583. It is
+now false. The result is not yet actionable — DOC cost is not proportional to
+document size, a 65 KB fixture costing 9% more per open than a 1.6 MB one, and no
+single symbol is large enough to explain it — but the question is now posed with
+numbers behind it rather than absent.
+
+**The second is that the profile now attributes per caller, not merely per
+operation.** 0579 could count chain links per open; 0584 splits a flagship
+one-cell query's 4,428 links into 2,099 from `read_stream_range_hinted`, 2,238
+from `stream_cursor_at` and 91 from `normalize_state`. That split is what makes
+0579's own open question answerable.
+
+**One methodological point is worth carrying forward.** The record's ranking
+would have been wrong in three of five rows without screening each candidate
+against the existing record set first. Lazy SST indexing looks like the single
+largest OLE2 opportunity in the profile at 49.5% of one fixture's open, and
+change 0576 has already deferred it because it moves *when* a malformed SST is
+refused. Skipping uninterpreted globals bytes looks like 34% of the flagship
+open, and its density gate is the one change 0568 recorded as untestable on any
+real fixture in this corpus. A profile ranks work; only the record set says
+whether that work is available.
+
+The record also restates the standing measurement caveat in measured form:
+instruction counts rank work, not latency, and callgrind's per-byte `rep`
+accounting makes bulk-copy shares upper bounds. `performance_claim: none`, and
+no candidate it names is authorized by it.
+
+Still required by the goal and unchanged by this record: cycles, cache and branch
+counters for these scenarios, cold-cache and physical-device distributions, peak
+RSS for read paths, concurrency scaling, real-producer breadth, cross-platform
+confirmation, and coverage-guided fuzzing on this host.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded.
+
 ## 0577-0583: the OOXML selective-read goal is met, and the approval flow is corrected
 
 This batch closes the OOXML half of the goal's definition-of-done clause that

@@ -1,0 +1,3 @@
+ConditionalFormattingSamples.xls         sheets= 16 ordinals=1076..2477 links_today=  28143 links_hinted=  2477 saving= 91.2%
+54016.xls                                sheets=  1 ordinals=599..599 links_today=    599 links_hinted=   599 saving=  0.0%
+HyperlinksOnManySheets.xls               sheets=  3 ordinals=3..6 links_today=     14 links_hinted=     6 saving= 57.1%

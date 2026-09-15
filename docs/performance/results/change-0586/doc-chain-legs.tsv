@@ -1,0 +1,114 @@
+unhinted	test-data/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	OPEN_REFUSED
+hinted	test-data/libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	OPEN_REFUSED
+unhinted	test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc	OPEN_REFUSED
+hinted	test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc	OPEN_REFUSED
+unhinted	test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	OPEN_REFUSED
+hinted	test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	OPEN_REFUSED
+unhinted	test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	OPEN_REFUSED
+hinted	test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc	OPEN_REFUSED
+unhinted	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc	open=67	total=261	paras=1	fnv=3eba959c2ca71f52
+hinted	test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc	open=67	total=261	paras=1	fnv=3eba959c2ca71f52
+unhinted	test-data/office-interop/litchi-changed/noheadfoot-litchi.doc	OPEN_REFUSED
+hinted	test-data/office-interop/litchi-changed/noheadfoot-litchi.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/3endnotes.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/3endnotes.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/DiffFirstPageHeadFoot.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/DiffFirstPageHeadFoot.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/FancyFoot.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/FancyFoot.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/FloatingPictures.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/FloatingPictures.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/HeaderFooterProblematic.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/HeaderFooterProblematic.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/HeaderFooterUnicode.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/HeaderFooterUnicode.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/Lists.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/Lists.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/NoHeadFoot.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/NoHeadFoot.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/PasswordProtected.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/PasswordProtected.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/PngPicture.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/PngPicture.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/ThreeColFoot.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/ThreeColFoot.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/ThreeColHead.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/ThreeColHead.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/ThreeColHeadFoot.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/ThreeColHeadFoot.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cfb-truncated-final-sector.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cfb-truncated-final-sector.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cjklist30.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cjklist30.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cjklist31.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cjklist31.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cjklist34.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cjklist34.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/cjklist35.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/cjklist35.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/commented-table.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/commented-table.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/documentProperties.doc	open=49	total=233	paras=1	fnv=bc225096c6ddd87b
+hinted	test-data/ole/doc/documentProperties.doc	open=49	total=233	paras=1	fnv=bc225096c6ddd87b
+unhinted	test-data/ole/doc/duplicate-style-names.doc	open=68	total=2388	paras=15	fnv=6253c0fd77ccee42
+hinted	test-data/ole/doc/duplicate-style-names.doc	open=68	total=2388	paras=15	fnv=6253c0fd77ccee42
+unhinted	test-data/ole/doc/empty.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/empty.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/endingnote.doc	open=58	total=90	paras=0	fnv=cbf29ce484222325
+hinted	test-data/ole/doc/endingnote.doc	open=58	total=90	paras=0	fnv=cbf29ce484222325
+unhinted	test-data/ole/doc/equation.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/equation.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/first-header-footer.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/first-header-footer.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/footnote.doc	open=71	total=103	paras=0	fnv=cbf29ce484222325
+hinted	test-data/ole/doc/footnote.doc	open=71	total=103	paras=0	fnv=cbf29ce484222325
+unhinted	test-data/ole/doc/hyperlink.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/hyperlink.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/image-comment-at-char.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/image-comment-at-char.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/inline-endnote-and-footnote.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/inline-endnote-and-footnote.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/lists-margins.doc	open=91	total=796	paras=4	fnv=4263ab862d232f9f
+hinted	test-data/ole/doc/lists-margins.doc	open=91	total=796	paras=4	fnv=4263ab862d232f9f
+unhinted	test-data/ole/doc/picture.doc	open=40	total=50	paras=0	fnv=cbf29ce484222325
+hinted	test-data/ole/doc/picture.doc	open=40	total=50	paras=0	fnv=cbf29ce484222325
+unhinted	test-data/ole/doc/pictures_escher.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/pictures_escher.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/table-merged-cells.doc	open=66	total=70	paras=0	fnv=cbf29ce484222325
+hinted	test-data/ole/doc/table-merged-cells.doc	open=66	total=70	paras=0	fnv=cbf29ce484222325
+unhinted	test-data/ole/doc/tdf71749_with_footnote.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/tdf71749_with_footnote.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/testPictures.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/testPictures.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/watermark.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/watermark.doc	OPEN_REFUSED
+unhinted	test-data/ole/doc/word6-no-table-stream.doc	OPEN_REFUSED
+hinted	test-data/ole/doc/word6-no-table-stream.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/47950_normal.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/47950_normal.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/Bug53453Section.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/Bug53453Section.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/password_password_cryptoapi.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/password_password_cryptoapi.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/password_tika_binaryrc4.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/password_tika_binaryrc4.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/saved-by-table.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/saved-by-table.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/test.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/test.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/document/word_with_embeded.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/document/word_with_embeded.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/hpsf/TestBug52117.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/hpsf/TestBug52117.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/hpsf/TestGermanWord90.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/hpsf/TestGermanWord90.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/hpsf/TestMickey.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/hpsf/TestMickey.doc	OPEN_REFUSED
+unhinted	test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc	OPEN_REFUSED
+hinted	test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc	OPEN_REFUSED
