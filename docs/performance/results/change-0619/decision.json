@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0619",
+  "title": "The standing XLS lifecycle failure is change 0565's, and it is an assertion the record already superseded",
+  "decision": "retained, harness-only correction and attribution",
+  "code_state": "no file under crates/ was modified; one #[cfg(test)] function in tools/perf-baseline/src/lib.rs was corrected",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the first bad commit is c1d2caf856fdbfa3b60b6de6cb2e85dc9ee9abab (change 0565): the single harness test passes at its parent 6b13261e5 and fails at it, and at every commit measured since",
+    "change 0595 (c1503db2b) and change 0605 (117bdf4c3) are exonerated: the failure predates both, so neither record's unchanged-reads statement is contradicted and neither needs a correction",
+    "no library behaviour regressed: the 93 bytes of unselected worksheet body an open reads are the over-read change 0565 designed, documented in prose and measured to the same byte on this same corpus",
+    "the gate validate_xls_source_locality was bounded by 0565 and still passes on every sample; what stayed strict is the pair of published booleans and the three unit-test assertion groups that read them",
+    "the published field definitions are deliberately not changed: their names state the strict property, false is the honest value, and results/change-0412/verify-capture.py plus retained packets read open_reads_zero_worksheet_payload by name"
+  ],
+  "accepted_evidence": {
+    "bisect": "eight detached checkouts, each built with cargo test --release --locked and its own external CARGO_TARGET_DIR, running only tests::xls_source_backed_lifecycle_selectors_are_matched_and_local; transcripts retained per leg",
+    "attribution_trace": "every InstrumentedSource::read_at of one XlsSourceBackedOpen at 1e4198321, with each read's overlap against the five XLS classification range sets; probe retained as trace-probe.patch",
+    "after": "the same single test at 1e4198321 with the corrected assertions: ok, 1 passed, 0 failed",
+    "gates": "cargo fmt --check, clippy --all-targets, doc --no-deps and the full test suite of tools/perf-baseline, tails retained in gates.txt"
+  },
+  "accepted_costs": {
+    "published_booleans": "the harness continues to publish open_reads_zero_worksheet_payload: false for a source-backed XLS open on this corpus and selected_query_reads_only_selected_worksheet: false for its one-cell query; honest under the names, but not the invariant the library guarantees",
+    "single_run_legs": "one run per bisect leg; the test is deterministic, but the legs establish only where the assertion started failing, not that nothing else changed at those commits"
+  },
+  "known_gaps": {
+    "schema": "renaming the two booleans to state the bounded invariant, and migrating results/change-0412/verify-capture.py with the rename, is left open",
+    "breadth": "whether any fixture outside this corpus and change 0565's 104-fixture survey drives the over-read above 3,949 bytes is unknown",
+    "python_gates": "the four pre-existing tools/test_*.py failures change 0601 reported are untouched"
+  },
+  "withheld": [
+    "any speedup, regression, allocation, peak-RSS, cold-cache, physical-device, range-source or cross-platform result",
+    "any statement that change 0595 or change 0605 changed a read, byte or observation count"
+  ],
+  "provenance": {
+    "base_commit": "1e41983213dc378c13774ed7038c51faf231977f",
+    "branch": "perf/0619-harness-xls-lifecycle-assertion",
+    "first_bad_commit": "c1d2caf856fdbfa3b60b6de6cb2e85dc9ee9abab",
+    "last_good_commit": "6b13261e54727724c5f794417bbfb92c83e91add",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "note": "eight bisect legs and the trace built in detached worktrees under /home/zhuhe/code/litchi-worktrees with per-leg CARGO_TARGET_DIR; the host carried eight concurrent agents, which affects wall time only and no counter reported here"
+  }
+}

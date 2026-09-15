@@ -1,0 +1,9 @@
+# leg 93a610ded
+running 1 test
+thread 'tests::xls_source_backed_lifecycle_selectors_are_matched_and_local' (2747343) panicked at src/lib.rs:60589:9:
+assertion `left == right` failed
+  left: [false]
+ right: [true]
+test tests::xls_source_backed_lifecycle_selectors_are_matched_and_local ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 498 filtered out; finished in 0.11s
+EXIT=101

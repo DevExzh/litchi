@@ -1,0 +1,94 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 8b6257b2f..63a395f65 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -61,7 +61,7 @@ use std::{
+     process::Command,
+     sync::{
+         Arc, Barrier, Condvar, Mutex,
+-        atomic::{AtomicU64, Ordering},
++        atomic::{AtomicBool, AtomicU64, Ordering},
+         mpsc,
+     },
+     thread::JoinHandle,
+@@ -6342,6 +6342,8 @@ struct AtomicRangeCounter {
+     read_bytes: AtomicU64,
+ }
+ 
++static TRACE_0619: AtomicBool = AtomicBool::new(false);
++
+ #[derive(Debug)]
+ struct InstrumentedSource {
+     bytes: Arc<Vec<u8>>,
+@@ -7877,6 +7879,18 @@ impl ReadAt for InstrumentedSource {
+             .observe(range_overlap_bytes(&self.odf_ranges.untouched, offset, end));
+         self.odf_pictures
+             .observe(range_overlap_bytes(&self.odf_ranges.pictures, offset, end));
++        if TRACE_0619.load(Ordering::SeqCst) {
++            eprintln!(
++                "0619-read offset={offset} request={request} count={count} end={end} cfb={cfb} globals={globals} selected={selected} unselected={unselected} opaque={opaque}",
++                request = output.len(),
++                cfb = range_overlap_bytes(&self.xls_ranges.cfb_structural, offset, end),
++                globals = range_overlap_bytes(&self.xls_ranges.workbook_global, offset, end),
++                selected = range_overlap_bytes(&self.xls_ranges.selected_worksheet, offset, end),
++                unselected =
++                    range_overlap_bytes(&self.xls_ranges.unselected_worksheets, offset, end),
++                opaque = range_overlap_bytes(&self.xls_ranges.opaque_payload, offset, end),
++            );
++        }
+         Ok(count)
+     }
+ 
+@@ -60934,6 +60948,52 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn zzz_0619_trace_source_backed_open_reads() {
++        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
++        let corpus = build_xls_comments_edit_corpus().unwrap();
++        let layout = super::build_xls_source_layout(&corpus).unwrap();
++        eprintln!("0619-layout archive_bytes={}", corpus.archive.len());
++        eprintln!(
++            "0619-layout workbook_stream_bytes={}",
++            corpus.target_payload.len()
++        );
++        for (label, ranges) in [
++            ("cfb_structural", &layout.ranges.cfb_structural),
++            ("workbook_global", &layout.ranges.workbook_global),
++            ("selected_worksheet", &layout.ranges.selected_worksheet),
++            ("unselected_worksheets", &layout.ranges.unselected_worksheets),
++        ] {
++            let total: u64 = ranges.iter().map(|range| range.end - range.start).sum();
++            eprintln!(
++                "0619-layout {label} runs={} bytes={total} first={:?} last={:?}",
++                ranges.len(),
++                ranges.first(),
++                ranges.last()
++            );
++        }
++        let source = std::sync::Arc::new(InstrumentedSource::new_xls(
++            corpus.archive.clone(),
++            layout.ranges.clone(),
++        ));
++        let read_at: std::sync::Arc<dyn ReadAt> = source.clone();
++        super::TRACE_0619.store(true, std::sync::atomic::Ordering::SeqCst);
++        let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(read_at).unwrap();
++        let count = workbook.worksheet_count().unwrap();
++        super::TRACE_0619.store(false, std::sync::atomic::Ordering::SeqCst);
++        let metrics = source.snapshot();
++        eprintln!(
++            "0619-open worksheet_count={count} cfb={} globals={} selected={} unselected={} opaque={} read_calls={} read_bytes={}",
++            metrics.xls.cfb_structural.read_bytes,
++            metrics.xls.workbook_global.read_bytes,
++            metrics.xls.selected_worksheet.read_bytes,
++            metrics.xls.unselected_worksheets.read_bytes,
++            metrics.xls.opaque_payload.read_bytes,
++            metrics.read_calls,
++            metrics.read_bytes,
++        );
++    }
++
+     #[test]
+     fn xls_source_family_dispatch_is_dedicated_and_rejects_overrides() {
+         let selected = [

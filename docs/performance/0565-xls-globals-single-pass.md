@@ -106,6 +106,24 @@ it was written to catch, since the corpus worksheets are far larger than one
 window. Both measurement binaries were rebuilt from trees carrying that identical
 gate, so the two legs differ only in the library change.
 
+**Correction (change [0619](0619-harness-xls-lifecycle-assertion.md)).** A
+fourth site held the old contract and was not updated. The gate
+`validate_xls_source_locality` was bounded here, but the two published
+evidence booleans it sits beside — `open_reads_zero_worksheet_payload` and
+`selected_query_reads_only_selected_worksheet` — are still computed with the
+strict `== 0`, and `tests::xls_source_backed_lifecycle_selectors_are_matched_and_local`
+asserted the pre-change contract at three sites through them. That test went
+red at this commit (`c1d2caf85`; it passes at the parent `6b13261e5`) and
+stayed red for 54 records, its panic poisoning the shared allocation-metrics
+mutex so six further harness tests failed as cascades. Change 0601 reported
+the failure as pre-existing and pointed at change 0595's area; change 0619
+bisected it back to here and measured the cause to be exactly the 93-byte
+over-read this record already documents — no library read moved. This record's
+measured effect, its counters and its correctness evidence are unaffected. The
+gap was structural: `tools/perf-baseline` is a separate Cargo project, so the
+gate list used here — 1,351 `litchi-xls` tests and one facade test — could not
+reach the harness's own suite.
+
 ## Measured effect
 
 Corpus `test-data/ole/xls/ConditionalFormattingSamples.xls`, 1,402,368 bytes.

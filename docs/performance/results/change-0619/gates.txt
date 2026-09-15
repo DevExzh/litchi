@@ -1,0 +1,58 @@
+# Change 0619 gates
+#
+# Worktree : /home/zhuhe/code/litchi-worktrees/0619
+# Branch   : perf/0619-harness-xls-lifecycle-assertion
+# Base     : 1e41983213dc378c13774ed7038c51faf231977f
+# Target   : CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0619-fix
+# Host     : AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0
+#
+# tools/perf-baseline is a separate Cargo project; no file under crates/ was
+# modified, so no production crate's clippy, test or doc gate is in scope.
+
+=== cargo fmt --all --check --manifest-path tools/perf-baseline/Cargo.toml ===
+EXIT=0
+
+=== cargo clippy --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets ===
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0619/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0619/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0619/crates/litchi)
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0619/tools/perf-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.66s
+EXIT=0
+
+=== cargo doc --locked --manifest-path tools/perf-baseline/Cargo.toml --no-deps ===
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0619/tools/perf-baseline)
+ Documenting litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0619/tools/perf-baseline)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.94s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0619-fix/doc/litchi_perf_baseline/index.html and 14 other files
+EXIT=0
+
+=== cargo test --locked --release --manifest-path tools/perf-baseline/Cargo.toml ===
+--- lib unit tests (the suite change 0601 reported as 501 passed / 7 failed) ---
+3:     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/0619-fix/release/deps/litchi_perf_baseline-ddca57f704bb5e99)
+4-
+5-running 509 tests
+test result: ok. 508 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 82.27s
+--- grep -c FAILED over the whole run ---
+0
+--- final lines ---
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+EXIT=0
+
+=== single-test legs (bisect; see bisect/ for each transcript) ===
+cargo test --manifest-path <leg>/tools/perf-baseline/Cargo.toml --release --locked \
+  xls_source_backed_lifecycle_selectors_are_matched_and_local
+6b13261e5    ok
+c1d2caf85    FAILED
+2391a3462    FAILED
+93a610ded    FAILED
+08d968f8e    FAILED
+c1503db2b    FAILED
+f8cf7d2a1    FAILED
+1e4198321    FAILED
+
+=== after the correction, same single test at 1e4198321 in the branch worktree ===
+test tests::xls_source_backed_lifecycle_selectors_are_matched_and_local ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 508 filtered out; finished in 0.11s
