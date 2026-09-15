@@ -1,0 +1,20 @@
+### test-data/ooxml/xlsx/sharedhyperlink.xlsx
+  source_bytes=9080
+  [source-backed open] requests=11 request_bytes=1957 distinct_offsets=10 parts=7 allocs=422 alloc_bytes=498750
+  [eager open] parts=7 pkg_rels=3 part_rels=6 allocs=509 alloc_bytes=466188
+  [save] out_bytes=7040 allocs=278 alloc_bytes=483005
+### test-data/ooxml/docx/drawing.docx
+  source_bytes=95247
+  [source-backed open] requests=9 request_bytes=3040 distinct_offsets=8 parts=19 allocs=972 alloc_bytes=524237
+  [eager open] parts=19 pkg_rels=3 part_rels=27 allocs=1150 alloc_bytes=862145
+  [save] out_bytes=73702 allocs=574 alloc_bytes=1180449
+### test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx
+  source_bytes=654688
+  [source-backed open] requests=87 request_bytes=22546 distinct_offsets=86 parts=90 allocs=5099 alloc_bytes=936537
+  [eager open] parts=90 pkg_rels=4 part_rels=139 allocs=6213 alloc_bytes=5271280
+  [save] out_bytes=629881 allocs=3310 alloc_bytes=2919932
+### test-data/poi/test-data/openxml4j/50154.xlsx
+  source_bytes=13583
+  [source-backed open] requests=15 request_bytes=3576 distinct_offsets=14 parts=15 allocs=869 alloc_bytes=752494
+  [eager open] parts=15 pkg_rels=3 part_rels=20 allocs=1036 alloc_bytes=731669
+  [save] out_bytes=11667 allocs=566 alloc_bytes=589713

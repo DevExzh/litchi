@@ -1,0 +1,6 @@
+UNSTABLE	libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	owner=/word/settings.xml	mode=External	target=file:///D:\bug\data%20source.xls	selected=["rId1", "rId2"]	type=http://schemas.openxmlformats.org/officeDocument/2006/relationships/mailMergeSource
+UNSTABLE	ooxml/docx/drawing.docx	owner=/word/document.xml	mode=External	target=http://www.regnum.ru/	selected=["rId21", "rId23"]	type=http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink
+UNSTABLE	ooxml/xlsx/sharedhyperlink.xlsx	owner=/xl/worksheets/sheet1.xml	mode=External	target=http://www.apache.org/	selected=["rId1", "rId2"]	type=http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink
+UNSTABLE	poi/test-data/openxml4j/50154.xlsx	owner=/xl/worksheets/sheet1.xml	mode=External	target=..\..\..\..\..\..\..\cygwin\home\yegor\dinom\%5baccess%5d.2010-10-26.log	selected=["rId2", "rId3"]	type=http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink
+
+files=336 triples_probed=5258 unstable_triples=4 repeats=16

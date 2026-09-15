@@ -1,0 +1,121 @@
+Gates for change 0628, run in /home/zhuhe/code/litchi-worktrees/0628 on branch
+perf/0628-opc-relationship-iteration-order (base 2d6fbeaed), every process
+pinned to CPU 22 with taskset. Tails only; the full outputs were reproduced
+from these commands.
+
+================================================================================
+$ cargo fmt --all --check
+exit=0  (no output means clean)
+
+================================================================================
+$ cargo clippy -p litchi-opc --all-targets --offline
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
+exit=0
+
+================================================================================
+$ cargo doc -p litchi-opc --no-deps --offline
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0628/crates/soapberry-zip)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0628/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.05s
+   Generated /home/zhuhe/code/litchi-worktrees/0628/target/doc/litchi_opc/index.html
+exit=0
+
+================================================================================
+$ cargo test -p litchi-opc --offline --no-fail-fast
+
+428 unit tests and 23 integration binaries. Every result line:
+     Running unittests src/lib.rs (target/debug/deps/litchi_opc-e2d0d8ed5a364cd6)
+test result: ok. 428 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.46s
+     Running tests/digital_signatures.rs (target/debug/deps/digital_signatures-638c76fd3babd52e)
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/external_zip64_source.rs (target/debug/deps/external_zip64_source-6e5010829f14d823)
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/forced_zip64_failures.rs (target/debug/deps/forced_zip64_failures-05b6c7997fe86876)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/non_part_classification.rs (target/debug/deps/non_part_classification-726bb526a49225d2)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/operation_accounting.rs (target/debug/deps/operation_accounting-5b40df6fff595524)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/package_catalog_probe.rs (target/debug/deps/package_catalog_probe-669b1779f77f01d7)
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/phys_pkg_borrowed.rs (target/debug/deps/phys_pkg_borrowed-d496b0a2f73c8185)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/python_zip64_source.rs (target/debug/deps/python_zip64_source-dc1a981e1f3e4bee)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/relationship_selection_determinism.rs (target/debug/deps/relationship_selection_determinism-8b207b5b63800bda)
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+     Running tests/source_artifact_restore.rs (target/debug/deps/source_artifact_restore-55cb062025532d09)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+     Running tests/source_backed_batch.rs (target/debug/deps/source_backed_batch-fb28fe88d7493653)
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s
+     Running tests/source_backed_batch_reuse.rs (target/debug/deps/source_backed_batch_reuse-9581d0caeb97e4c6)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/source_backed_path.rs (target/debug/deps/source_backed_path-c0bb3503d3340403)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/source_backed_reader.rs (target/debug/deps/source_backed_reader-9215b133ac7ed24e)
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/source_backed_topology.rs (target/debug/deps/source_backed_topology-002563ff0251c2f7)
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/source_part_splice.rs (target/debug/deps/source_part_splice-3bfea6ea94f0e032)
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+     Running tests/source_part_splice_replay.rs (target/debug/deps/source_part_splice_replay-af2c970189c9aef7)
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/source_part_transfer.rs (target/debug/deps/source_part_transfer-baf4fbd936731711)
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+     Running tests/source_read_ahead.rs (target/debug/deps/source_read_ahead-d2ca116ed8bf615a)
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/source_xml_hint.rs (target/debug/deps/source_xml_hint-fedc2350f6f9807f)
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/source_xml_publication.rs (target/debug/deps/source_xml_publication-29d882c2dca42fd9)
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/tolerated_archive_junk.rs (target/debug/deps/tolerated_archive_junk-53c99b9c34ca8226)
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/validation.rs (target/debug/deps/validation-1606c894cf772c31)
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0
+
+--------------------------------------------------------------------------------
+PRE-EXISTING FAILURE, reproduced on the untouched base checkout
+
+tests/source_backed_batch.rs::batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers
+fails with `assertion failed: matches!(result, Err(OpcError::Cancelled))` at
+crates/litchi-opc/tests/source_backed_batch.rs:1243. It is a cancellation race
+that resolves either way depending on how the worker pool is scheduled: the
+whole-package run above happened to win it, and every run of the test binary on
+its own loses it.
+
+It is not caused by this change, which touches only Relationships::get_or_add
+and get_or_add_ext_rel and nothing the batch loader calls. Reproduced on the
+shared read-only base checkout /home/zhuhe/code/litchi-worktrees/before-2d6fbeaed
+(commit 2d6fbeaed, no edits), with its own CARGO_TARGET_DIR:
+
+  $ cargo test -p litchi-opc --offline --test source_backed_batch      # x3
+  test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+  test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+  test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+
+  $ cargo test -p litchi-opc --offline --no-fail-fast
+  thread 'batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers'
+    panicked at crates/litchi-opc/tests/source_backed_batch.rs:1243:5
+  test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+
+The same three invocation shapes on this branch give the same outcomes, so the
+branch neither introduces nor repairs it.
+
+================================================================================
+DIFFERENTIAL AND DETERMINISM CHECKS CITED BY THE RECORD
+
+$ open_save_iters / corpus_roundtrip / reuse_selection / open_save_counts
+  (probe sources in probe/, outputs in this packet)
+
+corpus round trip over 336 OOXML fixtures, both legs:
+  files=336 opened=334 published=327 open_refused=2 save_refused=7
+  diff of the two 336-line digest listings: empty (0 lines)
+
+relationship reuse selection over 336 OOXML fixtures, 16 opens each:
+  before: files=336 triples_probed=5258 unstable_triples=4  repeats=16
+  after:  files=336 triples_probed=5258 unstable_triples=0  repeats=16
+
+deterministic counts on four fixtures, both legs:
+  diff of counts-before.txt and counts-after.txt: empty
