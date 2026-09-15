@@ -1,0 +1,62 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0627",
+  "title": "The OLE2 readers get a range source, and the first price list for one",
+  "decision": "harness change retained, first descriptive baseline retained, no production change",
+  "code_state": "no file under crates/ was modified by this change; tools/perf-baseline and docs only",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's evidence gap 4 recorded three independent OOXML range-source mechanisms and no OLE2 one, and recorded that closing it is harness plumbing because the CFB readers already take litchi_core::ReadAt",
+    "docs/GOAL.md names caller-supplied remote and range sources as a benchmarked dimension for both priority formats, so the programme could rank an OLE2 change on instructions, cycles, bytes and allocations but not on what it costs a caller who pays per request",
+    "change 0587 ranks XLS-6 partly on '+46 requests, a range-source regression' and had to call that cost modelled; this record supplies the denominator, 53 requests and a 58.39 ms modelled service floor for the flagship open, so the same change adds 78.8% to the open's modelled request cost while removing at most 30% of its instructions",
+    "the fourteen selectors are opt-in and absent from Case::DEFAULT, so no existing selector, corpus identity or default-matrix row changes and the checked default catalog SHA-256 does not move"
+  ],
+  "accepted_evidence": {
+    "deterministic_counts": "logical read calls and bytes, physical request count and bytes, and the sorted request-size distribution with fixed buckets, for 17 fixture/scenario pairs over 4 real OLE2 fixtures; identical on all 50 retained samples of both transports",
+    "request_sequence_identity": "SHA-256 of the complete ordered (offset, requested, returned) sequence per retained sample; one digest per range-source leg across its 50 samples, on every leg, which is change 0572's determinism property applied per selector",
+    "cross_transport_identity": "for every fixture and scenario the range-source and owned-source legs agree on logical read calls, logical read bytes and the observation; scripts/summarize.py fails the summary otherwise",
+    "paired_timing": "p50/p95/p99/mean per leg over 50 retained samples, 20 warm-ups, CPU 20, one window",
+    "aa_floor": "the 17 owned-source control legs repeated back to back in the same window; worst |delta| at p50 is 1.71% and all 17 rows are inside it",
+    "typed_refusals": "two refusals frozen as scenario oracles and measured rather than dropped: ConditionalFormattingSamples.xls full text after 394 requests and 790,147 bytes, and 45543.ppt one-shape text after 73 logical reads and 792,661 bytes"
+  },
+  "accepted_costs": {
+    "modelled_elapsed": "range-source elapsed is sleep-driven arithmetic over a deterministic request count; the modelled service floor is 86.7% to 94.8% of the range leg's median, so these rows price the configured transport model and not a network",
+    "delay_counters_are_targets": "per changes 0447 and 0448 the retained delay counters are requested targets, not observed sleeping time; OS sleep granularity adds oversleep that is never subtracted and the per-call model implements no shared-link scheduler",
+    "in_memory_sources": "every source is in-memory bytes, so nothing here measures the page cache, a filesystem, a device or the fstat per source observation that change 0587 identified on the from_path route",
+    "shared_host": "the owned-source control legs are CPU-bound and were taken with seven other agents active; their A/A floor is reported and is the only basis on which their medians should be read",
+    "one_transport_point": "a single (1 ms, 100 MiB/s, 64 KiB) point; nothing is claimed about another latency, bandwidth or range cap",
+    "model_difference_from_0572": "0572's probe serves a capped request as a short read and lets the caller loop; this simulator loops the cap inside one read_at. Request counts agree; call boundaries do not. 0572's model has no per-request overhead term, so the overhead parameter is set to zero"
+  },
+  "known_gaps": {
+    "formats": "change 0587's gap 4 names CFB, XLS, DOC and PPT; this record covers XLS and PPT. No DOC facade selector and no CFB-level range-source selector was added",
+    "corpus": "four fixtures, the largest 1.4 MB, none with a DIFAT or 4,096-byte sectors; the caller-named file is not a repository-fixed corpus and is not in the schema-2 catalog",
+    "refusal_breadth": "the two typed refusals are observed on the fixtures measured and on four further PPT decks spot-checked by hand; no corpus-wide refusal rate is derived, which is change 0587's evidence gap 3 and not this record's",
+    "scenarios": "the all-cells and full-text scenarios walk one worksheet, not the whole workbook; no save, edit or publication scenario runs over a range source"
+  },
+  "withheld": [
+    "any speedup, regression, cold-cache, physical-device, network, page-cache, allocation, peak-RSS, instruction-count, syscall, concurrency-scaling or cross-platform result",
+    "any statement that the measured range-source elapsed times are latencies rather than a transport model's arithmetic",
+    "any corpus-wide statement about how often the XLS full-text or PPT one-shape-text paths refuse"
+  ],
+  "gates": {
+    "cargo_fmt": "clean",
+    "cargo_clippy": "clean, 0 warnings, --release --locked --all-targets on tools/perf-baseline",
+    "cargo_test": "513 passed, 0 failed, 1 ignored in the library; 12 + 2 + 4 passed across binary targets; 0 failed anywhere",
+    "cargo_doc": "clean, --no-deps, rustdoc lints deny",
+    "python_unittest": "23 of 26 tools/test_*.py modules OK; 3 pre-existing failures reproduced with this change's tracked edits stashed at the base commit",
+    "default_catalog": "test_corpus_manifest_v2 and test_crud_coverage_index both pass, so the checked catalog_sha256 and content_set_sha256 did not move",
+    "registry_count": "selectable Case names 457 -> 471; Case::DEFAULT.len() stays 41"
+  },
+  "provenance": {
+    "git_revision": "344ed0298fdabe42c2596a4309db8c7a11eaf355",
+    "branch": "perf/0627-ole2-range-source-selectors",
+    "binary_sha256": "d40979be2b58a1823b28dc4d12e144e36a9862171a1dfd8ce2820766b8728fd1",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu_pin": 20,
+    "window_utc": "18:36:52-19:20:28",
+    "iterations": "20 warm-ups, 50 retained samples per case",
+    "note": "a first capture was discarded because a concurrent cargo test relinked the release binary in place and the in-flight leg died with ENOENT; the capture script now takes a staged binary path and rebuilding reproduced the same SHA-256"
+  }
+}

@@ -1,0 +1,129 @@
+Change 0627 gates. Worktree /home/zhuhe/code/litchi-worktrees/0627, branch
+perf/0627-ole2-range-source-selectors, base 344ed0298fdabe42c2596a4309db8c7a11eaf355.
+Host: AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0.
+Scope: only tools/perf-baseline was touched, so only that package is gated.
+
+=== cargo fmt --all -- --check (tools/perf-baseline) ===
+fmt exit=0
+
+=== cargo clippy --release --locked --all-targets (tools/perf-baseline) ===
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Checking litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0627/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 20.21s
+clippy exit=0
+
+=== cargo test --release --locked (tools/perf-baseline) ===
+running 514 tests
+test result: ok. 513 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 80.36s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+... (17 further targets, each 0 tests)
+test-result lines reporting ok: 19
+test-result lines reporting FAILED: 0
+test exit=0
+
+The five new unit tests, by name:
+test ole2_range_source::tests::every_ole2_range_source_case_is_opt_in_and_round_trips ... ok
+test ole2_range_source::tests::scenarios_and_transports_describe_themselves ... ok
+test ole2_range_source::tests::xls_corpus_derives_its_targets_from_the_file ... ok
+test ole2_range_source::tests::ppt_corpus_selects_a_text_shape_and_freezes_its_outcome ... ok
+test ole2_range_source::tests::xls_range_source_and_owned_legs_agree_on_logical_reads ... ok
+
+=== cargo doc --release --locked --no-deps (tools/perf-baseline) ===
+    Finished `release` profile [optimized] target(s) in 1.19s
+   Generated /home/zhuhe/code/litchi-worktrees/0627/tools/perf-baseline/target/doc/litchi_perf_baseline/index.html and 14 other files
+doc exit=0
+
+=== python3 -m unittest, every tools/test_*.py module ===
+tools.test_check_crate_boundaries                    Ran 1104 tests in 20.694s FAILED (failures=1)
+tools.test_check_example_targets                     Ran 12 tests in 0.008s   OK
+tools.test_check_iwork_leaf_public_api               Ran 13 tests in 0.002s   OK
+tools.test_check_iwork_public_api                    Ran 10 tests in 0.002s   OK
+tools.test_check_numbers_public_dependencies         Ran 3 tests in 0.098s    OK
+tools.test_corpus_manifest_v2                        Ran 12 tests in 0.011s   OK
+tools.test_crud_coverage_index                       Ran 41 tests in 0.300s   OK
+tools.test_native_odf_resave                         Ran 7 tests in 0.012s    FAILED (errors=3)
+tools.test_non_iwork_gate                            Ran 51 tests in 0.357s   OK
+tools.test_perf_abba_package                         Ran 18 tests in 0.234s   OK
+tools.test_perf_abba_summary                         Ran 89 tests in 1.545s   OK
+tools.test_perf_baseline_source_policy               Ran 17 tests in 0.011s   OK
+tools.test_perf_claims                               Ran 49 tests in 76.030s  FAILED (failures=1)
+tools.test_perf_compare                              Ran 98 tests in 0.410s   OK
+tools.test_perf_corpus_binding                       Ran 9 tests in 0.024s    OK
+tools.test_perf_opc_overlay_abba_summary             Ran 10 tests in 13.827s  OK
+tools.test_perf_resource_profile                     Ran 54 tests in 0.141s   OK
+tools.test_perf_workflow_policy                      Ran 18 tests in 0.018s   OK
+tools.test_report_claim_classification               Ran 31 tests in 0.409s   OK
+tools.test_summarize_crud_baseline                   Ran 10 tests in 0.104s   OK
+tools.test_validate_opc_overlay_allocator_abba       Ran 22 tests in 0.522s   OK
+tools.test_validate_opc_serial_eager_allocator_abba  Ran 18 tests in 0.147s   OK
+tools.test_validate_opc_serial_eager_latency_abba    Ran 13 tests in 0.409s   OK
+tools.test_validate_perf_allocator_abba              Ran 16 tests in 0.092s   OK
+tools.test_validate_perf_allocator_abba_0401         Ran 20 tests in 0.000s   OK (skipped=20)
+tools.test_xls_source_attribution_abba               Ran 15 tests in 0.002s   OK
+
+Three modules fail, all pre-existing at the base commit. Reproduced with
+this change's tracked edits stashed (git stash push of lib.rs, README.md,
+test_perf_baseline_source_policy.py and CORPUS_MANIFEST_V2.md), same three:
+  tools.test_check_crate_boundaries   FAILED (failures=1)
+  tools.test_native_odf_resave        FAILED (errors=3)
+  tools.test_perf_claims              FAILED (failures=1)
+
+  * test_check_crate_boundaries: test_iwa_package_edge_is_archive_owned_and_host_edge_cannot_return
+    asserts len(all_policy_edges) == 240 and observes 241. An iWork crate-boundary
+    edge count; iWork is excluded from this programme and untouched here.
+  * test_native_odf_resave: three tests read a LibreOffice primary filter registry
+    that is not installed on this host; they error with FileNotFoundError.
+  * test_perf_claims: test_seed_registry_is_structurally_valid compares the claim
+    registry's evidence key set against a literal; a pre-existing mismatch.
+
+=== documentation gates ===
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json \
+      --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+exit=0
+
+$ python3 tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+$ python3 tools/validate_crud_coverage_index.py
+validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)
+exit=0
+
+$ python3 tools/non_iwork_gate.py verify
+workspace_packages=64
+excluded_packages=18
+bulk_packages=45
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit=0
+
+This change registers no claim, adds no REPORT claim row and maps no new
+selector into the CRUD coverage index, so all four gates are unchanged-state
+checks; they are run to prove that.
+
+=== baseline run ===
+[18:36:52] owned-withcustomviews
+[18:36:53] owned-conditionalformatting
+[18:36:53] owned-54016
+[18:36:56] owned-45543
+[18:36:56] aa-owned-withcustomviews
+[18:36:57] aa-owned-conditionalformatting
+[18:36:57] aa-owned-54016
+[18:37:00] aa-owned-45543
+[18:37:00] range-45543
+[18:37:09] range-withcustomviews
+[18:39:28] range-conditionalformatting
+[18:40:21] range-54016
+[19:20:28] done

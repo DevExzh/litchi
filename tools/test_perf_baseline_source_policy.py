@@ -40,6 +40,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.producer_shape = (PERF_BASELINE / "src" / "producer_shape.rs").read_text(
             encoding="utf-8"
         )
+        cls.ole2_range_source = (
+            PERF_BASELINE / "src" / "ole2_range_source.rs"
+        ).read_text(encoding="utf-8")
         cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
             encoding="utf-8"
         )
@@ -262,6 +265,51 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             "XlsxRealFileSourceSelectedCell",
             "DocxProducerSourceSelectedParagraph",
             "PptxProducerSourceSelectedSlide",
+        ):
+            self.assertIn(f"Self::{case}", self.library)
+            self.assertNotIn(case, default_matrix)
+
+    def test_ole2_range_source_module_owns_no_unsafe_or_ambient_surface(self):
+        self.assertIn("mod ole2_range_source;", self.library)
+        self.assertNotIn("unsafe", self.ole2_range_source)
+        self.assertNotIn("#[global_allocator]", self.ole2_range_source)
+        self.assertNotIn("std::env", self.ole2_range_source)
+        self.assertNotIn("Command", self.ole2_range_source)
+
+    def test_ole2_file_selectors_are_opt_in_bounded_and_self_identifying(self):
+        # `--ole2-file` is the second input whose bytes come from outside the
+        # process. Keep it bounded, keep its identity in the corpus, and keep
+        # it out of the default matrix.
+        self.assertIn(
+            "const MAX_OLE2_FILE_BYTES: u64 = 32 * 1024 * 1024;",
+            self.ole2_range_source,
+        )
+        self.assertIn("fn build_xls_corpus(path: &Path)", self.ole2_range_source)
+        self.assertIn("fn build_ppt_corpus(path: &Path)", self.ole2_range_source)
+        # Exactly one whole-file read, and it is the bounded one.
+        self.assertEqual(self.ole2_range_source.count("fs::read("), 1)
+        self.assertIn('"--ole2-file" => {', self.library)
+        self.assertIn("--ole2-file PATH", self.library)
+
+    def test_ole2_range_source_selectors_are_absent_from_the_default_matrix(self):
+        start = self.library.index("const DEFAULT: ")
+        end = self.library.index("];", start)
+        default_matrix = self.library[start:end]
+        for case in (
+            "XlsRangeSourceOpen",
+            "XlsRangeSourceOpenListWorksheets",
+            "XlsRangeSourceOpenOneCell",
+            "XlsRangeSourceOpenAllCells",
+            "XlsRangeSourceOpenFullText",
+            "XlsOwnedSourceControlOpen",
+            "XlsOwnedSourceControlOpenListWorksheets",
+            "XlsOwnedSourceControlOpenOneCell",
+            "XlsOwnedSourceControlOpenAllCells",
+            "XlsOwnedSourceControlOpenFullText",
+            "PptRangeSourceOpen",
+            "PptRangeSourceOpenOneShapeText",
+            "PptOwnedSourceControlOpen",
+            "PptOwnedSourceControlOpenOneShapeText",
         ):
             self.assertIn(f"Self::{case}", self.library)
             self.assertNotIn(case, default_matrix)

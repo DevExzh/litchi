@@ -27,6 +27,7 @@ mod odp_existing_append;
 mod odp_source_tail_append;
 mod odp_streaming_create;
 mod odt_streaming_create;
+mod ole2_range_source;
 mod opc_part_add;
 mod operation_metrics;
 mod parallel_metrics;
@@ -1304,6 +1305,16 @@ enum Case {
     XlsOwnedSourceOpen,
     XlsOwnedSourceOpenListWorksheets,
     XlsOwnedSourceOpenOneCell,
+    XlsRangeSourceOpen,
+    XlsRangeSourceOpenListWorksheets,
+    XlsRangeSourceOpenOneCell,
+    XlsRangeSourceOpenAllCells,
+    XlsRangeSourceOpenFullText,
+    XlsOwnedSourceControlOpen,
+    XlsOwnedSourceControlOpenListWorksheets,
+    XlsOwnedSourceControlOpenOneCell,
+    XlsOwnedSourceControlOpenAllCells,
+    XlsOwnedSourceControlOpenFullText,
     XlsbSemanticOpen,
     XlsbSemanticListWorksheets,
     XlsbSemanticOneCell,
@@ -1331,6 +1342,10 @@ enum Case {
     PptSourceBackedRepeatedShapeText,
     PptSemanticFreshOpenOneShapeText,
     PptSourceBackedFreshOpenOneShapeText,
+    PptRangeSourceOpen,
+    PptRangeSourceOpenOneShapeText,
+    PptOwnedSourceControlOpen,
+    PptOwnedSourceControlOpenOneShapeText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
     PptTextEditOneEditSave,
@@ -1896,6 +1911,18 @@ impl Case {
             Self::XlsOwnedSourceOpen => "xls_owned_source_open",
             Self::XlsOwnedSourceOpenListWorksheets => "xls_owned_source_open_list_worksheets",
             Self::XlsOwnedSourceOpenOneCell => "xls_owned_source_open_one_cell",
+            Self::XlsRangeSourceOpen => "xls_range_source_open",
+            Self::XlsRangeSourceOpenListWorksheets => "xls_range_source_open_list_worksheets",
+            Self::XlsRangeSourceOpenOneCell => "xls_range_source_open_one_cell",
+            Self::XlsRangeSourceOpenAllCells => "xls_range_source_open_all_cells",
+            Self::XlsRangeSourceOpenFullText => "xls_range_source_open_full_text",
+            Self::XlsOwnedSourceControlOpen => "xls_owned_source_control_open",
+            Self::XlsOwnedSourceControlOpenListWorksheets => {
+                "xls_owned_source_control_open_list_worksheets"
+            },
+            Self::XlsOwnedSourceControlOpenOneCell => "xls_owned_source_control_open_one_cell",
+            Self::XlsOwnedSourceControlOpenAllCells => "xls_owned_source_control_open_all_cells",
+            Self::XlsOwnedSourceControlOpenFullText => "xls_owned_source_control_open_full_text",
             Self::XlsbSemanticOpen => "xlsb_semantic_open",
             Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
             Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
@@ -1932,6 +1959,12 @@ impl Case {
             Self::PptSemanticFreshOpenOneShapeText => "ppt_semantic_fresh_open_one_shape_text",
             Self::PptSourceBackedFreshOpenOneShapeText => {
                 "ppt_source_backed_fresh_open_one_shape_text"
+            },
+            Self::PptRangeSourceOpen => "ppt_range_source_open",
+            Self::PptRangeSourceOpenOneShapeText => "ppt_range_source_open_one_shape_text",
+            Self::PptOwnedSourceControlOpen => "ppt_owned_source_control_open",
+            Self::PptOwnedSourceControlOpenOneShapeText => {
+                "ppt_owned_source_control_open_one_shape_text"
             },
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
@@ -3202,6 +3235,56 @@ impl Case {
         self.producer_shape_scenario().is_some()
     }
 
+    /// Opt-in OLE2 range-source selectors (change 0627).  Seven run the
+    /// source-backed XLS and PPT read scenarios over `SimulatedRangeSource`
+    /// with 0572's transport parameters; seven are owned-source controls for
+    /// the same phases over the same caller-named fixture.  None is in
+    /// `Case::DEFAULT`, and every one needs `--ole2-file PATH`.
+    const fn is_ole2_range_source(self) -> bool {
+        self.ole2_range_source_plan().is_some()
+    }
+
+    const fn ole2_range_source_plan(
+        self,
+    ) -> Option<(ole2_range_source::Scenario, ole2_range_source::Transport)> {
+        use ole2_range_source::{Scenario, Transport};
+        match self {
+            Self::XlsRangeSourceOpen => Some((Scenario::XlsOpen, Transport::RangeSource)),
+            Self::XlsRangeSourceOpenListWorksheets => {
+                Some((Scenario::XlsListWorksheets, Transport::RangeSource))
+            },
+            Self::XlsRangeSourceOpenOneCell => Some((Scenario::XlsOneCell, Transport::RangeSource)),
+            Self::XlsRangeSourceOpenAllCells => {
+                Some((Scenario::XlsAllCells, Transport::RangeSource))
+            },
+            Self::XlsRangeSourceOpenFullText => {
+                Some((Scenario::XlsFullText, Transport::RangeSource))
+            },
+            Self::XlsOwnedSourceControlOpen => Some((Scenario::XlsOpen, Transport::OwnedSource)),
+            Self::XlsOwnedSourceControlOpenListWorksheets => {
+                Some((Scenario::XlsListWorksheets, Transport::OwnedSource))
+            },
+            Self::XlsOwnedSourceControlOpenOneCell => {
+                Some((Scenario::XlsOneCell, Transport::OwnedSource))
+            },
+            Self::XlsOwnedSourceControlOpenAllCells => {
+                Some((Scenario::XlsAllCells, Transport::OwnedSource))
+            },
+            Self::XlsOwnedSourceControlOpenFullText => {
+                Some((Scenario::XlsFullText, Transport::OwnedSource))
+            },
+            Self::PptRangeSourceOpen => Some((Scenario::PptOpen, Transport::RangeSource)),
+            Self::PptRangeSourceOpenOneShapeText => {
+                Some((Scenario::PptOneShapeText, Transport::RangeSource))
+            },
+            Self::PptOwnedSourceControlOpen => Some((Scenario::PptOpen, Transport::OwnedSource)),
+            Self::PptOwnedSourceControlOpenOneShapeText => {
+                Some((Scenario::PptOneShapeText, Transport::OwnedSource))
+            },
+            _ => None,
+        }
+    }
+
     /// Producer-shape selectors whose corpus is a caller-named real file.
     const fn is_producer_real_file(self) -> bool {
         matches!(
@@ -3587,6 +3670,11 @@ struct Options {
     real_file: Option<PathBuf>,
     /// Sidecar path for the producer-shape marker and refusal census.
     producer_evidence: Option<PathBuf>,
+    /// Caller-named OLE2 fixtures for the opt-in `*_range_source_*` and
+    /// `*_owned_source_control_*` selectors of change 0627.  The flag is
+    /// repeatable and each file is bound to its format by its CFB stream
+    /// inventory, so one run can measure an XLS and a PPT fixture together.
+    ole2_files: Vec<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -4535,6 +4623,8 @@ struct SourceSummary {
     xls_visibility: Option<XlsVisibilitySourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     simulation: Option<RangeSimulationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ole2_range_source: Option<Box<ole2_range_source::Ole2RangeSourceSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -9271,6 +9361,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_root_file()
                     && !case.is_xlsx_bytes_root_file()
                     && !case.is_producer_shape()
+                    && !case.is_ole2_range_source()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -11208,6 +11299,75 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.is_ole2_range_source()) {
+        if options.ole2_files.is_empty() {
+            return Err(
+                "the OLE2 range-source selectors require --ole2-file PATH (repeatable)".into(),
+            );
+        }
+        let mut xls_path = None;
+        let mut ppt_path = None;
+        for path in &options.ole2_files {
+            let slot = match ole2_range_source::classify(path)? {
+                ole2_range_source::Format::Xls => &mut xls_path,
+                ole2_range_source::Format::Ppt => &mut ppt_path,
+            };
+            if slot.is_some() {
+                return Err(format!(
+                    "--ole2-file accepts at most one file per format; {} is the second",
+                    path.display()
+                )
+                .into());
+            }
+            *slot = Some(path.as_path());
+        }
+        let mut xls_corpus = None;
+        let mut ppt_corpus = None;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ole2_range_source())
+        {
+            let (scenario, transport) = case
+                .ole2_range_source_plan()
+                .ok_or("OLE2 range-source case has no scenario")?;
+            let corpus = match scenario.format() {
+                ole2_range_source::Format::Xls => {
+                    if xls_corpus.is_none() {
+                        let path = xls_path.ok_or(
+                            "the XLS range-source selectors require an --ole2-file XLS fixture",
+                        )?;
+                        xls_corpus = Some(ole2_range_source::build_xls_corpus(path)?);
+                    }
+                    xls_corpus
+                        .as_ref()
+                        .ok_or("XLS range-source corpus is absent")?
+                },
+                ole2_range_source::Format::Ppt => {
+                    if ppt_corpus.is_none() {
+                        let path = ppt_path.ok_or(
+                            "the PPT range-source selectors require an --ole2-file PPT fixture",
+                        )?;
+                        ppt_corpus = Some(ole2_range_source::build_ppt_corpus(path)?);
+                    }
+                    ppt_corpus
+                        .as_ref()
+                        .ok_or("PPT range-source corpus is absent")?
+                },
+            };
+            results.push(ole2_range_source::run_case(
+                case,
+                scenario,
+                transport,
+                corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -11516,6 +11676,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut corpus_manifest = None;
     let mut real_file = None;
     let mut producer_evidence = None;
+    let mut ole2_files: Vec<PathBuf> = Vec::new();
     let mut arguments = std::env::args().skip(1);
 
     while let Some(argument) = arguments.next() {
@@ -11630,6 +11791,11 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                         .ok_or("--producer-evidence requires PATH")?,
                 ));
             },
+            "--ole2-file" => {
+                ole2_files.push(PathBuf::from(
+                    arguments.next().ok_or("--ole2-file requires PATH")?,
+                ));
+            },
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -11660,6 +11826,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         corpus_manifest,
         real_file,
         producer_evidence,
+        ole2_files,
     })
 }
 
@@ -12041,6 +12208,18 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_owned_source_open" => Some(Case::XlsOwnedSourceOpen),
         "xls_owned_source_open_list_worksheets" => Some(Case::XlsOwnedSourceOpenListWorksheets),
         "xls_owned_source_open_one_cell" => Some(Case::XlsOwnedSourceOpenOneCell),
+        "xls_range_source_open" => Some(Case::XlsRangeSourceOpen),
+        "xls_range_source_open_list_worksheets" => Some(Case::XlsRangeSourceOpenListWorksheets),
+        "xls_range_source_open_one_cell" => Some(Case::XlsRangeSourceOpenOneCell),
+        "xls_range_source_open_all_cells" => Some(Case::XlsRangeSourceOpenAllCells),
+        "xls_range_source_open_full_text" => Some(Case::XlsRangeSourceOpenFullText),
+        "xls_owned_source_control_open" => Some(Case::XlsOwnedSourceControlOpen),
+        "xls_owned_source_control_open_list_worksheets" => {
+            Some(Case::XlsOwnedSourceControlOpenListWorksheets)
+        },
+        "xls_owned_source_control_open_one_cell" => Some(Case::XlsOwnedSourceControlOpenOneCell),
+        "xls_owned_source_control_open_all_cells" => Some(Case::XlsOwnedSourceControlOpenAllCells),
+        "xls_owned_source_control_open_full_text" => Some(Case::XlsOwnedSourceControlOpenFullText),
         "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
         "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
         "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
@@ -12077,6 +12256,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_semantic_fresh_open_one_shape_text" => Some(Case::PptSemanticFreshOpenOneShapeText),
         "ppt_source_backed_fresh_open_one_shape_text" => {
             Some(Case::PptSourceBackedFreshOpenOneShapeText)
+        },
+        "ppt_range_source_open" => Some(Case::PptRangeSourceOpen),
+        "ppt_range_source_open_one_shape_text" => Some(Case::PptRangeSourceOpenOneShapeText),
+        "ppt_owned_source_control_open" => Some(Case::PptOwnedSourceControlOpen),
+        "ppt_owned_source_control_open_one_shape_text" => {
+            Some(Case::PptOwnedSourceControlOpenOneShapeText)
         },
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
@@ -12582,6 +12767,16 @@ fn usage_text() -> String {
                                        xls_owned_source_open,\n\
                                        xls_owned_source_open_list_worksheets,\n\
                                        xls_owned_source_open_one_cell,\n\
+                                       xls_range_source_open,\n\
+                                       xls_range_source_open_list_worksheets,\n\
+                                       xls_range_source_open_one_cell,\n\
+                                       xls_range_source_open_all_cells,\n\
+                                       xls_range_source_open_full_text,\n\
+                                       xls_owned_source_control_open,\n\
+                                       xls_owned_source_control_open_list_worksheets,\n\
+                                       xls_owned_source_control_open_one_cell,\n\
+                                       xls_owned_source_control_open_all_cells,\n\
+                                       xls_owned_source_control_open_full_text,\n\
                                        xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
                                        xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
                                        xls_comments_eager_edit_save,\n\
@@ -12605,6 +12800,10 @@ fn usage_text() -> String {
                                        ppt_source_backed_repeated_shape_text,\n\
                                        ppt_semantic_fresh_open_one_shape_text,\n\
                                        ppt_source_backed_fresh_open_one_shape_text,\n\
+                                       ppt_range_source_open,\n\
+                                       ppt_range_source_open_one_shape_text,\n\
+                                       ppt_owned_source_control_open,\n\
+                                       ppt_owned_source_control_open_one_shape_text,\n\
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
@@ -12798,6 +12997,9 @@ fn usage_text() -> String {
                                        include its additive reference in the report\n\
            --real-file PATH            Office file for the opt-in xlsx_real_file_* selectors\n\
            --producer-evidence PATH    Write the producer-shape marker/refusal census\n\
+           --ole2-file PATH            OLE2 file for the opt-in *_range_source_* and\n\
+                                       *_owned_source_control_* selectors; repeatable,\n\
+                                       at most one XLS and one PPT per run\n\
            --help                      Show this help"
     )
 }
@@ -23674,6 +23876,22 @@ fn run_case_with_config(
         | Case::DocxProducerSourceSelectedParagraph
         | Case::PptxProducerSourceSelectedSlide => {
             Err("producer-shape cases use their own corpus runner".into())
+        },
+        Case::XlsRangeSourceOpen
+        | Case::XlsRangeSourceOpenListWorksheets
+        | Case::XlsRangeSourceOpenOneCell
+        | Case::XlsRangeSourceOpenAllCells
+        | Case::XlsRangeSourceOpenFullText
+        | Case::XlsOwnedSourceControlOpen
+        | Case::XlsOwnedSourceControlOpenListWorksheets
+        | Case::XlsOwnedSourceControlOpenOneCell
+        | Case::XlsOwnedSourceControlOpenAllCells
+        | Case::XlsOwnedSourceControlOpenFullText
+        | Case::PptRangeSourceOpen
+        | Case::PptRangeSourceOpenOneShapeText
+        | Case::PptOwnedSourceControlOpen
+        | Case::PptOwnedSourceControlOpenOneShapeText => {
+            Err("OLE2 range-source cases use their own corpus runner".into())
         },
         Case::XlsxStreamingCreate
         | Case::RtfStreamingCreate
@@ -59493,7 +59711,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 457);
+        assert_eq!(selectable_count, 471);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 
