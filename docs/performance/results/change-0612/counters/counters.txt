@@ -1,0 +1,40 @@
+# change 0612 deterministic counters
+# host ip-172-31-39-190, CPU 8, 2026-09-15T17:46:57Z
+
+leg        fixture mode      operation    reads      bytes  version sheets
+base       flagship file-source open            53     565201       29     16
+skip       flagship file-source open           101      82867       85     16
+base       flagship file-source list            53     565201       29     16
+skip       flagship file-source list           101      82867       85     16
+base       flagship file-source one-cell        61     603115       42     16
+skip       flagship file-source one-cell       109     120781       98     16
+base       flagship owned-readat open            53     565201       29     16
+skip       flagship owned-readat open           101      82867       85     16
+base       flagship owned-readat list            53     565201       29     16
+skip       flagship owned-readat list           101      82867       85     16
+base       flagship owned-readat one-cell        61     603115       42     16
+skip       flagship owned-readat one-cell       109     120781       98     16
+base       cv     file-source open            16     110242       22      3
+skip       cv     file-source open            16     110242       22      3
+base       cv     file-source list            16     110242       22      3
+skip       cv     file-source list            16     110242       22      3
+base       cv     file-source one-cell        17     110656       25      3
+skip       cv     file-source one-cell        17     110656       25      3
+base       cv     owned-readat open            16     110242       22      3
+skip       cv     owned-readat open            16     110242       22      3
+base       cv     owned-readat list            16     110242       22      3
+skip       cv     owned-readat list            16     110242       22      3
+base       cv     owned-readat one-cell        17     110656       25      3
+skip       cv     owned-readat one-cell        17     110656       25      3
+base       54016  file-source open            40     317171       25      1
+skip       54016  file-source open            40     317171       25      1
+base       54016  file-source list            40     317171       25      1
+skip       54016  file-source list            40     317171       25      1
+base       54016  file-source one-cell        65     932993       43      1
+skip       54016  file-source one-cell        65     932993       43      1
+base       54016  owned-readat open            40     317171       25      1
+skip       54016  owned-readat open            40     317171       25      1
+base       54016  owned-readat list            40     317171       25      1
+skip       54016  owned-readat list            40     317171       25      1
+base       54016  owned-readat one-cell        65     932993       43      1
+skip       54016  owned-readat one-cell        65     932993       43      1

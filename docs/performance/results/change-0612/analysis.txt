@@ -1,0 +1,604 @@
+==============================================================================
+1. Per-operation instructions, callgrind isolation pairs (owned source)
+==============================================================================
+fixture                            op                 base          skip       skipcur        cursor     base-skip    share
+ConditionalFormattingSamples.xls   open          2,328,670     1,971,708     1,994,683     2,375,880       356,962   15.33%
+ConditionalFormattingSamples.xls   one-cell      2,551,158     2,202,623             -             -       348,535   13.66%
+WithCustomViews.xls                open            809,190       812,997       813,328       810,294        -3,807   -0.47%
+WithCustomViews.xls                one-cell        828,806       832,369             -             -        -3,563   -0.43%
+54016.xls                          open          5,315,124     5,372,720     5,396,037     5,338,542       -57,596   -1.08%
+54016.xls                          one-cell     18,605,033    18,662,759             -             -       -57,726   -0.31%
+
+==============================================================================
+2. The globals pass, INCLUSIVE Ir per operation and its share
+==============================================================================
+fixture                            op        leg     parse_globals    share    range read    share
+ConditionalFormattingSamples.xls   open      base          398,547   17.11%       674,442   28.96%
+ConditionalFormattingSamples.xls   open      skip          398,926   20.23%       214,102   10.86%
+ConditionalFormattingSamples.xls   open      skipcur        398,556   19.98%             0    0.00%
+ConditionalFormattingSamples.xls   open      cursor        398,049   16.75%             0    0.00%
+ConditionalFormattingSamples.xls   one-cell  base          397,371   15.58%       674,922   26.46%
+ConditionalFormattingSamples.xls   one-cell  skip          399,055   18.12%       214,134    9.72%
+WithCustomViews.xls                open      base          164,875   20.38%       133,884   16.55%
+WithCustomViews.xls                open      skip          165,230   20.32%       133,884   16.47%
+WithCustomViews.xls                open      skipcur        164,576   20.23%             0    0.00%
+WithCustomViews.xls                open      cursor        164,903   20.35%             0    0.00%
+WithCustomViews.xls                one-cell  base          165,033   19.91%       133,836   16.15%
+WithCustomViews.xls                one-cell  skip          164,851   19.81%       133,836   16.08%
+54016.xls                          open      base        1,096,883   20.64%       375,743    7.07%
+54016.xls                          open      skip        1,096,859   20.42%       375,743    6.99%
+54016.xls                          open      skipcur      1,096,868   20.33%             0    0.00%
+54016.xls                          open      cursor      1,096,858   20.55%             0    0.00%
+54016.xls                          one-cell  base        1,097,078    5.90%       375,704    2.02%
+54016.xls                          one-cell  skip        1,097,072    5.88%       375,704    2.01%
+
+==============================================================================
+3. Self Ir per operation, symbols above 0.3% of the base open
+==============================================================================
+
+-- ConditionalFormattingSamples.xls  open  (base total 2,328,670 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+__memcpy_avx_unaligned_erms                                     675,789      262,963      250,681      671,107     +412,826
+__memset_avx2_unaligned_erms                                    556,885      528,375      528,353      556,794      +28,510
+litchi_cfb::file::SectorChainScratch::collect_exact              93,714       93,714       93,714       93,714           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s       81,556       92,070       92,570       81,555      -10,514
+_int_malloc                                                      56,403       56,840       57,116       56,258         -437
+litchi_cfb::shared::SharedOleFile::read_stream_range_hinte       52,567       36,059            0            0      +16,508
+litchi_cfb::shared::next_chain_sector                            50,376       29,040       25,824       25,824      +21,336
+<litchi_biff::stream::Records as core::iter::traits::itera       42,243       42,243       42,243       42,243           +0
+litchi_xls::xf_ext::XfExt::parse                                 39,057       39,057       39,057       39,057           +0
+litchi_xls::border_fill::parse_xf_border_fill                    37,740       37,740       37,740       37,740           +0
+_int_free_merge_chunk                                            33,489       33,970       33,832       33,281         -481
+litchi_cfb::file::OleFile<R>::validate_physical_sector_lay       32,870       32,870       32,870       32,870           +0
+litchi_cfb::file::OleFile<R>::validate_stream_allocations        31,131       31,131       31,131       31,131           +0
+<litchi_xls::records::MeasuredText as litchi_xls::records:       29,088       29,088       29,088       29,088           +0
+litchi_xls::records::walk_one_shared_string                      28,557       28,557       28,557       28,557           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure              27,075       32,571       32,063       26,959       -5,496
+litchi_xls::number_format::codec::<impl litchi_xls::number       26,984       26,985       26,985       26,986           -1
+litchi_xls::number_format::codec::parse_xf                       25,738       25,738       25,738       25,738           +0
+free                                                             24,701       24,705       24,688       24,692           -4
+litchi_cfb::directory_name::directory_name_data                  24,380       58,036       12,961       12,961      -33,656
+malloc                                                           17,840       17,844       17,819       17,852           -4
+litchi_xls::differential_format::codec::<impl litchi_xls::       14,432       14,432       14,432       14,432           +0
+litchi_xls::number_format::codec::parse_number_format            13,625       13,625       13,625       13,625           +0
+alloc::raw_vec::RawVecInner<A>::finish_grow                      12,201       16,961       16,961       12,201       -4,760
+realloc                                                          10,799       19,521       19,481       10,788       -8,722
+_int_free_maybe_trim                                             10,224       10,391       10,339       10,162         -167
+<alloc::string::String as core::iter::traits::collect::Fro       10,150       10,150       13,811       10,150           +0
+core::hash::BuildHasher::hash_one                                 9,916        9,916        9,916        9,916           +0
+litchi_xls::alignment::CellAlignment::parse                       9,520        9,520        9,520        9,520           +0
+litchi_xls::records::scan_shared_string_records                   9,290        9,290        9,290        9,290           +0
+litchi_xls::differential_format::validation::validate_prop        8,916        8,840        8,916        8,840          +76
+<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop             8,884        8,884        8,884        8,884           +0
+litchi_cfb::file::OleFile<R>::load_directory                      8,676        8,676        8,676        8,676           +0
+unlink_chunk.isra.0                                               8,664        8,767        8,822        8,547         -103
+<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::        7,968        7,968        7,968        7,968           +0
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_ha        7,777        7,777        7,777        7,777           +0
+litchi_xls::differential_format::codec::<impl litchi_xls::        7,460        7,282        7,460        7,282         +178
+_int_free_chunk                                                   7,228        7,347        7,310        7,184         -119
+
+-- ConditionalFormattingSamples.xls  one-cell  (base total 2,551,158 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+__memcpy_avx_unaligned_erms                                     704,648      296,036            0            0     +408,612
+__memset_avx2_unaligned_erms                                    591,449      562,980            0            0      +28,469
+litchi_cfb::shared::next_chain_sector                           106,272       84,936            0            0      +21,336
+litchi_cfb::file::SectorChainScratch::collect_exact              93,714       93,714            0            0           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s       81,554       92,070            0            0      -10,516
+_int_malloc                                                      57,109       59,558            0            0       -2,449
+litchi_cfb::shared::SharedOleFile::read_stream_range_hinte       52,567       36,059            0            0      +16,508
+<litchi_biff::stream::Records as core::iter::traits::itera       42,243       42,243            0            0           +0
+litchi_xls::xf_ext::XfExt::parse                                 39,057       39,057            0            0           +0
+litchi_xls::border_fill::parse_xf_border_fill                    37,740       37,740            0            0           +0
+_int_free_merge_chunk                                            34,325       35,591            0            0       -1,265
+litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted       33,786       33,786            0            0           +0
+litchi_cfb::file::OleFile<R>::validate_physical_sector_lay       32,870       32,870            0            0           +0
+litchi_cfb::file::OleFile<R>::validate_stream_allocations        31,131       31,131            0            0           +0
+<litchi_xls::records::MeasuredText as litchi_xls::records:       29,088       29,088            0            0           +0
+litchi_xls::records::walk_one_shared_string                      28,557       28,557            0            0           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure              27,075       32,571            0            0       -5,496
+litchi_xls::number_format::codec::<impl litchi_xls::number       26,986       26,983            0            0           +3
+litchi_xls::number_format::codec::parse_xf                       25,738       25,738            0            0           +0
+litchi_cfb::directory_name::directory_name_data                  25,582       59,238            0            0      -33,656
+free                                                             25,171       25,205            0            0          -34
+malloc                                                           18,278       18,145            0            0         +133
+litchi_xls::differential_format::codec::<impl litchi_xls::       14,432       14,432            0            0           +0
+litchi_xls::number_format::codec::parse_number_format            13,625       13,625            0            0           +0
+litchi_xls::workbook::source::WorksheetScan::next_frame          13,338       13,338            0            0           +0
+alloc::raw_vec::RawVecInner<A>::finish_grow                      12,601       17,361            0            0       -4,760
+realloc                                                          11,175       19,941            0            0       -8,766
+_int_free_maybe_trim                                             10,540       10,932            0            0         -392
+litchi_xls::workbook::source::query_cell                         10,167       10,167            0            0           +0
+<alloc::string::String as core::iter::traits::collect::Fro       10,150       10,150            0            0           +0
+core::hash::BuildHasher::hash_one                                 9,916        9,916            0            0           +0
+litchi_xls::alignment::CellAlignment::parse                       9,520        9,520            0            0           +0
+litchi_xls::records::scan_shared_string_records                   9,290        9,290            0            0           +0
+litchi_xls::differential_format::validation::validate_prop        8,916        8,840            0            0          +76
+<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop             8,884        8,884            0            0           +0
+unlink_chunk.isra.0                                               8,778        9,440            0            0         -662
+litchi_cfb::file::OleFile<R>::load_directory                      8,676        8,676            0            0           +0
+<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::        7,968        7,968            0            0           +0
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_ha        7,777        7,777            0            0           +0
+
+-- WithCustomViews.xls  open  (base total 809,190 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+__memcpy_avx_unaligned_erms                                     221,572      221,537      218,592      218,625          +35
+__memset_avx2_unaligned_erms                                    108,573      108,573      108,573      108,573           +0
+<litchi_xls::records::MeasuredText as litchi_xls::records:       75,431       75,431       75,431       75,431           +0
+litchi_xls::records::walk_one_shared_string                      45,281       45,281       45,281       45,281           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s       29,002       32,425       32,324       29,001       -3,423
+litchi_xls::number_format::codec::parse_number_format            23,812       23,812       23,812       23,812           +0
+litchi_xls::border_fill::parse_xf_border_fill                    23,088       23,088       23,088       23,088           +0
+<alloc::string::String as core::iter::traits::collect::Fro       18,271       18,271       18,676       18,271           +0
+litchi_xls::number_format::codec::parse_xf                       16,216       16,216       16,216       16,216           +0
+litchi_xls::records::scan_shared_string_records                  14,948       14,948       14,948       14,948           +0
+<litchi_biff::stream::Records as core::iter::traits::itera       14,839       14,839       14,839       14,839           +0
+litchi_cfb::directory_name::directory_name_data                  13,468       13,468        6,256        6,256           +0
+<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::       12,458       12,458       12,458       12,458           +0
+litchi_xls::number_format::codec::<impl litchi_xls::number       12,028       12,030       12,018       12,026           -1
+_int_malloc                                                      11,703       11,990       11,610       11,688         -287
+litchi_xls::records::SstCursor::walk_formatting_runs             11,279       11,279       11,279       11,279           +0
+litchi_cfb::file::SectorChainScratch::collect_exact              11,089       11,089       11,089       11,089           +0
+litchi_cfb::shared::SharedOleFile::read_stream_range_hinte       10,575       10,575            0            0           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure              10,108       10,108       10,041       10,041           +0
+_int_free_merge_chunk                                             8,551        8,591        8,569        8,641          -40
+litchi_cfb::shared::next_chain_sector                             8,064        8,064        5,016        5,016           +0
+core::hash::BuildHasher::hash_one                                 7,589        7,589        7,589        7,589           +0
+litchi_xls::alignment::CellAlignment::parse                       5,824        5,824        5,824        5,824           +0
+alloc::raw_vec::RawVecInner<A>::finish_grow                       5,561        5,561        5,561        5,561           +0
+realloc                                                           5,462        5,459        5,461        5,462           +2
+_int_realloc                                                      4,917        4,915        4,914        4,920           +2
+litchi_cfb::shared::SharedOleFile::find_entry                     4,760        4,760          680          680           +0
+free                                                              4,410        4,411        4,396        4,396           -1
+litchi_cfb::file::OleFile<R>::load_directory                      4,315        4,315        4,315        4,315           +0
+litchi_cfb::file::OleFile<R>::validate_physical_sector_lay        3,890        3,890        3,890        3,890           +0
+litchi_cfb::file::OleFile<R>::validate_stream_allocations         3,869        3,869        3,869        3,869           +0
+malloc                                                            3,689        3,689        3,689        3,677           +0
+<smallvec::SmallVec<A> as core::iter::traits::collect::Ext        3,677        3,677        1,673        1,673           +0
+<&mut serde_json::ser::Serializer<W,F> as serde_core::ser:        3,338        3,338        3,338        3,338           +0
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_ha        3,133        3,133        3,133        3,133           +0
+<core::hash::sip::Hasher<S> as core::hash::Hasher>::write         3,012        3,012        3,012        3,012           +0
+serde_core::ser::SerializeMap::serialize_entry'2                  2,855        2,855        2,855        2,855           -0
+_int_free_maybe_trim                                              2,744        2,755        2,750        2,772          -10
+litchi_cfb::file::decode_utf16le                                  2,540        2,540        2,540        2,540           +0
+
+-- WithCustomViews.xls  one-cell  (base total 828,806 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+__memcpy_avx_unaligned_erms                                     221,726      221,781            0            0          -55
+__memset_avx2_unaligned_erms                                    108,616      108,625            0            0           -9
+<litchi_xls::records::MeasuredText as litchi_xls::records:       75,431       75,431            0            0           +0
+litchi_xls::records::walk_one_shared_string                      45,281       45,281            0            0           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s       29,002       32,425            0            0       -3,423
+litchi_xls::number_format::codec::parse_number_format            23,812       23,812            0            0           +0
+litchi_xls::border_fill::parse_xf_border_fill                    23,088       23,088            0            0           +0
+<alloc::string::String as core::iter::traits::collect::Fro       18,271       18,271            0            0           +0
+litchi_xls::number_format::codec::parse_xf                       16,216       16,216            0            0           +0
+litchi_cfb::shared::next_chain_sector                            15,096       15,096            0            0           +0
+litchi_xls::records::scan_shared_string_records                  14,948       14,948            0            0           +0
+<litchi_biff::stream::Records as core::iter::traits::itera       14,839       14,839            0            0           +0
+litchi_cfb::directory_name::directory_name_data                  14,069       14,069            0            0           +0
+<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::       12,458       12,458            0            0           +0
+litchi_xls::number_format::codec::<impl litchi_xls::number       12,020       12,028            0            0           -8
+_int_malloc                                                      11,789       11,703            0            0          +86
+litchi_xls::records::SstCursor::walk_formatting_runs             11,279       11,279            0            0           +0
+litchi_cfb::file::SectorChainScratch::collect_exact              11,089       11,089            0            0           +0
+litchi_cfb::shared::SharedOleFile::read_stream_range_hinte       10,575       10,575            0            0           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure              10,108       10,108            0            0           +0
+_int_free_merge_chunk                                             8,655        8,806            0            0         -151
+core::hash::BuildHasher::hash_one                                 7,589        7,589            0            0           +0
+litchi_xls::alignment::CellAlignment::parse                       5,824        5,824            0            0           +0
+alloc::raw_vec::RawVecInner<A>::finish_grow                       5,601        5,601            0            0           +0
+realloc                                                           5,462        5,462            0            0           +0
+litchi_cfb::shared::SharedOleFile::find_entry                     5,100        5,100            0            0           +0
+_int_realloc                                                      4,927        4,914            0            0          +12
+litchi_cfb::shared::SharedOleFile::stream_cursor_at_hinted        4,488        4,488            0            0           +0
+free                                                              4,475        4,483            0            0           -7
+litchi_cfb::file::OleFile<R>::load_directory                      4,315        4,315            0            0           +0
+litchi_cfb::file::OleFile<R>::validate_physical_sector_lay        3,890        3,890            0            0           +0
+litchi_cfb::file::OleFile<R>::validate_stream_allocations         3,869        3,869            0            0           +0
+<smallvec::SmallVec<A> as core::iter::traits::collect::Ext        3,844        3,844            0            0           +0
+malloc                                                            3,754        3,752            0            0           +2
+<&mut serde_json::ser::Serializer<W,F> as serde_core::ser:        3,374        3,374            0            0           +0
+alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_ha        3,133        3,133            0            0           +0
+<core::hash::sip::Hasher<S> as core::hash::Hasher>::write         3,012        3,012            0            0           +0
+serde_core::ser::SerializeMap::serialize_entry'2                  2,844        2,844            0            0           +0
+_int_free_maybe_trim                                              2,779        2,826            0            0          -47
+litchi_cfb::file::decode_utf16le                                  2,540        2,540            0            0           +0
+
+-- 54016.xls  open  (base total 5,315,124 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+__memcpy_avx_unaligned_erms                                   1,048,285    1,048,285    1,044,553    1,044,553           +0
+<litchi_xls::records::MeasuredText as litchi_xls::records:      759,098      759,098      759,098      759,098           +0
+litchi_xls::records::walk_one_shared_string                     742,217      742,217      742,217      742,217           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s      432,586      490,227      490,054      432,585      -57,641
+litchi_xls::border_fill::parse_xf_border_fill                   378,510      378,510      378,510      378,510           +0
+__memset_avx2_unaligned_erms                                    309,244      309,244      309,244      309,244           +0
+litchi_xls::records::scan_shared_string_records                 238,178      238,178      238,178      238,178           +0
+litchi_xls::number_format::codec::parse_xf                      237,737      237,737      237,737      237,737           +0
+<litchi_biff::stream::Records as core::iter::traits::itera      232,643      232,643      232,643      232,643           +0
+litchi_xls::records::SstCursor::walk_formatting_runs            165,818      165,818      165,818      165,818           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure             138,591      138,571      138,483      138,503          +20
+litchi_xls::number_format::codec::<impl litchi_xls::number      126,210      126,185      126,195      126,185          +25
+litchi_xls::alignment::CellAlignment::parse                      95,480       95,480       95,480       95,480           +0
+litchi_cfb::file::SectorChainScratch::collect_exact              65,214       65,214       65,214       65,214           +0
+litchi_cfb::shared::SharedOleFile::read_stream_range_hinte       29,130       29,130            0            0           +0
+litchi_cfb::shared::next_chain_sector                            26,640       26,640       14,376       14,376           +0
+litchi_xls::number_format::codec::parse_number_format            25,917       25,917       25,917       25,917           +0
+litchi_xls::border_fill::FillPattern::from_bits                  23,870       23,870       23,870       23,870           +0
+litchi_cfb::file::OleFile<R>::validate_physical_sector_lay       23,078       23,078       23,078       23,078           +0
+litchi_cfb::file::OleFile<R>::validate_stream_allocations        21,457       21,457       21,457       21,457           +0
+<alloc::string::String as core::iter::traits::collect::Fro       18,327       18,327       18,481       18,327           +0
+_int_malloc                                                      16,293       16,293       16,293       16,293           +0
+
+-- 54016.xls  one-cell  (base total 18,605,033 Ir)
+symbol                                                             base         skip      skipcur       cursor        delta
+litchi_xls::workbook::source::query_cell                      2,983,554    2,983,554            0            0           +0
+litchi_xls::workbook::source::WorksheetScan::next_frame       2,844,765    2,844,765            0            0           +0
+__memcpy_avx_unaligned_erms                                   1,771,045    1,771,045            0            0           +0
+<litchi_xls::workbook::source::TargetCell as litchi_xls::w    1,675,037    1,675,037            0            0           +0
+litchi_xls::workbook::source::WorksheetScan::read_payload     1,488,528    1,488,528            0            0           +0
+__memset_avx2_unaligned_erms                                    921,962      921,962            0            0           +0
+litchi_xls::records::CellRecord::parse                          893,405      893,405            0            0           +0
+litchi_xls::number_format::codec::<impl litchi_xls::number      856,900      856,900            0            0           +0
+<litchi_xls::records::MeasuredText as litchi_xls::records:      759,098      759,098            0            0           +0
+litchi_xls::records::walk_one_shared_string                     742,217      742,217            0            0           +0
+core::ptr::drop_in_place<litchi_xls::records::CellRecord>       662,150      662,150            0            0           +0
+litchi_xls::workbook::source::SourceBackedWorkbook::from_s      432,586      490,227            0            0      -57,641
+litchi_xls::border_fill::parse_xf_border_fill                   378,510      378,510            0            0           +0
+litchi_xls::records::scan_shared_string_records                 238,178      238,178            0            0           +0
+litchi_xls::number_format::codec::parse_xf                      237,737      237,737            0            0           +0
+<litchi_biff::stream::Records as core::iter::traits::itera      232,643      232,643            0            0           +0
+litchi_xls::workbook::source::WorksheetScan::skip_payload       183,852      183,852            0            0           +0
+litchi_xls::records::SstCursor::walk_formatting_runs            165,818      165,818            0            0           +0
+litchi_xls::workbook::source::GlobalsBuffer::ensure             138,591      138,571            0            0          +20
+litchi_xls::records::CellRecord::packed_cell_range              126,454      126,454            0            0           +0
+litchi_xls::number_format::codec::<impl litchi_xls::number      126,204      126,198            0            0           +5
+litchi_xls::alignment::CellAlignment::parse                      95,480       95,480            0            0           +0
+litchi_cfb::shared::next_chain_sector                            70,080       70,080            0            0           +0
+litchi_cfb::shared::SharedOleStreamCursor::read_exact            66,520       66,520            0            0           +0
+litchi_cfb::file::SectorChainScratch::collect_exact              65,214       65,214            0            0           +0
+
+==============================================================================
+4. Native perf stat, isolation pairs, median of repetitions [perf]
+==============================================================================
+fixture                            op        leg          cycles   instructions    IPC  reps
+54016.xls                          open      aa          871,476      4,034,458   4.63     5
+WithCustomViews.xls                open      aa          129,802        513,038   3.95     5
+ConditionalFormattingSamples.xls   open      aa          345,908      1,179,774   3.41     5
+54016.xls                          open      base        875,353      4,033,613   4.61     5
+WithCustomViews.xls                open      base        129,806        512,938   3.95     5
+ConditionalFormattingSamples.xls   open      base        348,468      1,179,292   3.38     5
+54016.xls                          open      bb          876,771      4,033,631   4.60     5
+WithCustomViews.xls                open      bb          129,361        513,728   3.97     5
+ConditionalFormattingSamples.xls   open      bb          342,610      1,179,804   3.44     5
+54016.xls                          open      cursor      901,029      4,056,546   4.50     5
+WithCustomViews.xls                open      cursor      134,613        513,538   3.81     5
+ConditionalFormattingSamples.xls   open      cursor      386,455      1,226,769   3.17     5
+54016.xls                          open      skip        886,157      4,091,292   4.62     5
+WithCustomViews.xls                open      skip        127,982        516,798   4.04     5
+ConditionalFormattingSamples.xls   open      skip        367,770      1,284,707   3.49     5
+54016.xls                          open      skipcur      906,683      4,114,089   4.54     5
+WithCustomViews.xls                open      skipcur      133,234        517,078   3.88     5
+ConditionalFormattingSamples.xls   open      skipcur      403,425      1,299,062   3.22     5
+
+Pairs (positive = the first leg costs more):
+fixture                            op        comparison            cycles    share            Ir    share
+ConditionalFormattingSamples.xls   open      base-skip            -19,302   -5.54%      -105,415   -8.94%
+ConditionalFormattingSamples.xls   open      base-skipcur         -54,957  -15.77%      -119,771  -10.16%
+ConditionalFormattingSamples.xls   open      base-cursor          -37,987  -10.90%       -47,477   -4.03%
+ConditionalFormattingSamples.xls   open      aa-bb                  3,298    0.95%           -31   -0.00%
+ConditionalFormattingSamples.xls   open      base-aa                2,560    0.73%          -482   -0.04%
+ConditionalFormattingSamples.xls   open      bb-base               -5,858   -1.71%           512    0.04%
+WithCustomViews.xls                open      base-skip              1,824    1.41%        -3,860   -0.75%
+WithCustomViews.xls                open      base-skipcur          -3,428   -2.64%        -4,140   -0.81%
+WithCustomViews.xls                open      base-cursor           -4,806   -3.70%          -600   -0.12%
+WithCustomViews.xls                open      aa-bb                    440    0.34%          -690   -0.13%
+WithCustomViews.xls                open      base-aa                    4    0.00%          -100   -0.02%
+WithCustomViews.xls                open      bb-base                 -445   -0.34%           790    0.15%
+54016.xls                          open      base-skip            -10,803   -1.23%       -57,679   -1.43%
+54016.xls                          open      base-skipcur         -31,329   -3.58%       -80,476   -2.00%
+54016.xls                          open      base-cursor          -25,675   -2.93%       -22,933   -0.57%
+54016.xls                          open      aa-bb                 -5,295   -0.61%           827    0.02%
+54016.xls                          open      base-aa                3,878    0.44%          -845   -0.02%
+54016.xls                          open      bb-base                1,417    0.16%            18    0.00%
+
+==============================================================================
+4. Native perf stat, isolation pairs, median of repetitions [perf-file]
+==============================================================================
+fixture                            op        leg          cycles   instructions    IPC  reps
+54016.xls                          open      base        948,237      4,172,770   4.40     5
+WithCustomViews.xls                open      base        171,631        594,084   3.46     5
+ConditionalFormattingSamples.xls   open      base        438,220      1,360,230   3.10     5
+54016.xls                          open      cursor      967,366      4,195,747   4.34     5
+WithCustomViews.xls                open      cursor      173,077        594,801   3.44     5
+ConditionalFormattingSamples.xls   open      cursor      479,271      1,407,309   2.94     5
+54016.xls                          open      skip        961,462      4,230,349   4.40     5
+WithCustomViews.xls                open      skip        173,637        597,925   3.44     5
+ConditionalFormattingSamples.xls   open      skip        513,667      1,582,668   3.08     5
+54016.xls                          open      skipcur      979,092      4,253,198   4.34     5
+WithCustomViews.xls                open      skipcur      172,650        598,256   3.47     5
+ConditionalFormattingSamples.xls   open      skipcur      541,401      1,594,916   2.95     5
+
+Pairs (positive = the first leg costs more):
+fixture                            op        comparison            cycles    share            Ir    share
+ConditionalFormattingSamples.xls   open      base-skip            -75,447  -17.22%      -222,438  -16.35%
+ConditionalFormattingSamples.xls   open      base-skipcur        -103,181  -23.55%      -234,686  -17.25%
+ConditionalFormattingSamples.xls   open      base-cursor          -41,051   -9.37%       -47,078   -3.46%
+WithCustomViews.xls                open      base-skip             -2,006   -1.17%        -3,841   -0.65%
+WithCustomViews.xls                open      base-skipcur          -1,019   -0.59%        -4,172   -0.70%
+WithCustomViews.xls                open      base-cursor           -1,446   -0.84%          -717   -0.12%
+54016.xls                          open      base-skip            -13,225   -1.39%       -57,579   -1.38%
+54016.xls                          open      base-skipcur         -30,855   -3.25%       -80,428   -1.93%
+54016.xls                          open      base-cursor          -19,129   -2.02%       -22,977   -0.55%
+
+
+==============================================================================
+1. Corpus composition: what a source-backed open reads and what it uses
+==============================================================================
+  fixtures scanned                     126
+  modelled                             123
+  refused (encrypted/no BOF)             3
+
+  globals bytes framed           3,969,111   100.00%
+  four-byte record headers         103,880     2.62%
+  consumed record payloads         876,542    22.08%
+  touched closure                  980,422    24.70%
+  payloads never interpreted     2,988,689    75.30%
+
+  fixtures consuming over half their globals    101 / 123
+  fixtures with a skipped payload >= 1 KiB       25 / 123
+  fixtures with a skipped payload >= 4 KiB       13 / 123
+  fixtures with a skipped payload >= 8 KiB       12 / 123
+
+==============================================================================
+2. Concentration: where the skippable bytes live
+==============================================================================
+  90% of all skippable bytes live in 13 of 123 fixtures
+
+  fixture                                               skippable   globals   share
+  test-data/poi/test-data/spreadsheet/59858.xls            724658    772760   93.8%
+  t-data/ole/xls/ConditionalFormattingSamples copy.xls     530960    551377   96.3%
+  test-data/ole/xls/ConditionalFormattingSamples.xls       530960    551377   96.3%
+  st-data/spreadsheet/ConditionalFormattingSamples.xls     530960    551377   96.3%
+  test-data/ole/xls/SimpleWithImages-mac copy.xls           84278     85452   98.6%
+  test-data/ole/xls/SimpleWithImages-mac.xls                84278     85452   98.6%
+  test-data/poi/test-data/spreadsheet/50939.xls             68367     74548   91.7%
+  test-data/ole/xls/SimpleWithImages copy.xls               35420     36566   96.9%
+  test-data/ole/xls/SimpleWithImages.xls                    35420     36566   96.9%
+  test-data/poi/test-data/spreadsheet/54016.xls             33075    306931   10.8%
+  test-data/ole/xls/WithEmbeddedObjects.xls                 13987     21122   66.2%
+  test-data/poi/test-data/spreadsheet/15228.xls             10244     28184   36.3%
+
+==============================================================================
+3. Today's schedule, replayed from the source
+==============================================================================
+  fixture                                               fills      bytes records
+  test-data/poi/test-data/spreadsheet/59858.xls            23     772760    1166
+  t-data/ole/xls/ConditionalFormattingSamples copy.xls     20     551377     621
+  test-data/ole/xls/ConditionalFormattingSamples.xls       20     551377     621
+  st-data/spreadsheet/ConditionalFormattingSamples.xls     20     551377     621
+  test-data/poi/test-data/spreadsheet/54016.xls            16     306931    3421
+  test-data/ole/xls/WithCustomViews.xls                    13     107170     218
+  test-data/ole/xls/SimpleWithImages-mac copy.xls          13      85452      83
+  test-data/ole/xls/SimpleWithImages-mac.xls               13      85452      83
+  test-data/poi/test-data/spreadsheet/50939.xls            13      74548     322
+  test-data/ole/xls/SimpleWithImages copy.xls              11      36566      76
+
+  corpus total: 1,141 fills, 4,057,480 bytes
+
+==============================================================================
+4. Candidate schedules: the read-for-bytes trade, corpus totals
+==============================================================================
+  gate         reads   delta        bytes    saved%    seeks  fx.seek      net ns
+  ungated      39533  +38392       980422     75.8%    11909      123    +4293008
+  mean1k        1139      -2      3933729      3.0%       69       19       -6685
+  g1k           1412    +271      1661684     59.0%      322       19      -93501
+  g2k           1412    +271      1661684     59.0%      322       19      -93501
+  g4k           1412    +271      1671990     58.8%      314       13      -92964
+  g8k           1412    +271      1713122     57.8%      307       12      -90819
+
+  gate definitions:
+    ungated   skip_min=0      dense_mean=-1                   reset_target_on_skip=True
+    mean1k    skip_min=1024   dense_mean=1024                 reset_target_on_skip=False
+    g1k       skip_min=1024   dense_mean=off                  reset_target_on_skip=True
+    g2k       skip_min=2048   dense_mean=off                  reset_target_on_skip=True
+    g4k       skip_min=4096   dense_mean=off                  reset_target_on_skip=True
+    g8k       skip_min=8192   dense_mean=off                  reset_target_on_skip=True
+
+  net ns = delta_reads x 116 ns + delta_bytes / 1024 x 53.4 ns, a FILE source.
+  Negative is faster. An owned in-memory source pays no per-read syscall,
+  so its trade is strictly better; a range source pays far more.
+
+==============================================================================
+5. Every fixture the recommended gate (g1k) touches
+==============================================================================
+  fixture                                         r.now  r.new      b.now      b.new     net ns
+  test-data/poi/test-data/spreadsheet/59858.xls      23    101     772760     124924     -24736
+  /ole/xls/ConditionalFormattingSamples copy.xls     20     76     551377      69043     -18657
+  -data/ole/xls/ConditionalFormattingSamples.xls     20     76     551377      69043     -18657
+  a/spreadsheet/ConditionalFormattingSamples.xls     20     76     551377      69043     -18657
+  est-data/ole/xls/SimpleWithImages-mac copy.xls     13     20      85452       9772      -3135
+  test-data/ole/xls/SimpleWithImages-mac.xls         13     20      85452       9772      -3135
+  test-data/poi/test-data/spreadsheet/50939.xls      13     18      74548      19543      -2288
+  test-data/ole/xls/SimpleWithImages copy.xls        11     12      36566       3671      -1599
+  test-data/ole/xls/SimpleWithImages.xls             11     12      36566       3671      -1599
+  office-core/sc/qa/unit/data/xls/cellformat.xls      9      8       9433       1605       -524
+  fice-core/sc/qa/unit/data/xls/cell-borders.xls     10     10      11486       4653       -356
+  test-data/ole/xls/WithEmbeddedObjects.xls          11     12      21122      16755       -112
+  unit/data/xls/pivottable_bool_field_filter.xls     11     11      17785      15956        -95
+  ta/ole/xls/WeekNumFunctionTestCaseData2013.xls     11     11      17357      15956        -73
+  a/unit/data/xls/pivottable_number_grouping.xls     11     11      16580      15956        -33
+  test-data/poi/test-data/spreadsheet/57456.xls      11     11      16226      15956        -14
+  /sc/qa/unit/data/xls/pivottable_empty_item.xls     11     11      16010      15956         -3
+  ta/poi/test-data/spreadsheet/external_name.xls     11     13      21679      18836        +84
+  test-data/poi/test-data/spreadsheet/15228.xls      11     13      28184      25430        +88
+
+  19 fixtures take at least one seek; 104 are byte-for-byte and read-for-read unchanged.
+  2 fixtures are modelled net worse on a file source:
+    test-data/poi/test-data/spreadsheet/15228.xls      +2 reads, -2754 bytes, +88 ns
+    t-data/poi/test-data/spreadsheet/external_name.xls +2 reads, -2843 bytes, +84 ns
+
+==============================================================================
+6. The three profiled fixtures
+==============================================================================
+  flagship (test-data/ole/xls/ConditionalFormattingSamples.xls)
+    globals 551,377 B over 621 records; closure 20,417 B (3.70%)
+    skippable 530,960 B; largest skipped payload 8,224 B; 64 payloads >= 1 KiB holding 524,583 B
+    top skipped kinds: [['Continue', 508135], ['MsoDrawingGroup', 16448], ['StyleExt', 3447], ['Font', 1156], ['Style', 734]]
+    continuation bytes by owning record: [['MsoDrawingGroup', 508135]]
+    today:  20 fills, 551,377 bytes
+    ungated  1000 fills (+980),     20417 bytes (-530960), 238 seeks, net +85991 ns
+    mean1k     20 fills (+0),    543522 bytes (-7855), 9 seeks, net -410 ns
+    g1k        76 fills (+56),     69043 bytes (-482334), 63 seeks, net -18657 ns
+    g2k        76 fills (+56),     69043 bytes (-482334), 63 seeks, net -18657 ns
+    g4k        76 fills (+56),     69043 bytes (-482334), 63 seeks, net -18657 ns
+    g8k        76 fills (+56),     75006 bytes (-476371), 62 seeks, net -18346 ns
+
+  WithCustomViews (test-data/ole/xls/WithCustomViews.xls)
+    globals 107,170 B over 218 records; closure 105,123 B (98.09%)
+    skippable 2,047 B; largest skipped payload 482 B; 0 payloads >= 1 KiB holding 0 B
+    top skipped kinds: [['Font', 1012], ['ExtSST', 482], ['Lbl', 134], ['WriteAccess', 112], ['MsoDrawingGroup', 90]]
+    continuation bytes by owning record: [['SST', 92849]]
+    today:  13 fills, 107,170 bytes
+    ungated   367 fills (+354),    105123 bytes (-2047), 65 seeks, net +40957 ns
+    mean1k     13 fills (+0),    107170 bytes (+0), 0 seeks, net +0 ns
+    g1k        13 fills (+0),    107170 bytes (+0), 0 seeks, net +0 ns
+    g2k        13 fills (+0),    107170 bytes (+0), 0 seeks, net +0 ns
+    g4k        13 fills (+0),    107170 bytes (+0), 0 seeks, net +0 ns
+    g8k        13 fills (+0),    107170 bytes (+0), 0 seeks, net +0 ns
+
+  54016 (test-data/poi/test-data/spreadsheet/54016.xls)
+    globals 306,931 B over 3,421 records; closure 273,856 B (89.22%)
+    skippable 33,075 B; largest skipped payload 1,026 B; 1 payloads >= 1 KiB holding 1,026 B
+    top skipped kinds: [['Style', 27949], ['StyleExt', 2048], ['Font', 1386], ['ExtSST', 1026], ['Palette', 226]]
+    continuation bytes by owning record: [['SST', 216678]]
+    today:  16 fills, 306,931 bytes
+    ungated  5188 fills (+5172),    273856 bytes (-33075), 1650 seeks, net +598227 ns
+    mean1k     16 fills (+0),    306931 bytes (+0), 0 seeks, net +0 ns
+    g1k        16 fills (+0),    306931 bytes (+0), 0 seeks, net +0 ns
+    g2k        16 fills (+0),    306931 bytes (+0), 0 seeks, net +0 ns
+    g4k        16 fills (+0),    306931 bytes (+0), 0 seeks, net +0 ns
+    g8k        16 fills (+0),    306931 bytes (+0), 0 seeks, net +0 ns
+
+==============================================================================
+7. Fixtures not modelled
+==============================================================================
+  test-data/ole/xls/password.xls                           encrypted (FilePass)
+  test-data/poi/test-data/spreadsheet/35897-type4.xls      encrypted (FilePass)
+  st-data/poi/test-data/spreadsheet/xor-encryption-abc.xls encrypted (FilePass)
+
+
+
+==============================================================================
+Paired wall clock, A = base, B = aa, operation open
+==============================================================================
+fixture                            mode          stat          A1         B1         B2         A2    B1/A1    B2/A2    A2/A1
+ConditionalFormattingSamples.xls   owned-readat  p50       72,420     71,710     72,530     72,490   -0.98%   +0.06%   +0.10%
+ConditionalFormattingSamples.xls   owned-readat  mean      73,272     72,374     73,237     73,149   -1.23%   +0.12%   -0.17%
+ConditionalFormattingSamples.xls   owned-readat  p95       80,340     78,530     79,840     79,310   -2.25%   +0.67%   -1.28%
+ConditionalFormattingSamples.xls   owned-readat  p99       86,780     80,500     81,390     81,571   -7.24%   -0.22%   -6.00%
+
+ConditionalFormattingSamples.xls   file-source   p50       90,811     90,391     91,141     90,281   -0.46%   +0.95%   -0.58%
+ConditionalFormattingSamples.xls   file-source   mean      91,676     91,174     91,992     91,074   -0.55%   +1.01%   -0.66%
+ConditionalFormattingSamples.xls   file-source   p95       98,261     97,961     98,470     97,471   -0.31%   +1.02%   -0.80%
+ConditionalFormattingSamples.xls   file-source   p99       99,581     99,691    100,050     99,590   +0.11%   +0.46%   +0.01%
+
+WithCustomViews.xls                owned-readat  p50       27,600     27,730     27,581     27,630   +0.47%   -0.18%   +0.11%
+WithCustomViews.xls                owned-readat  mean      27,832     27,997     27,822     27,855   +0.59%   -0.12%   +0.09%
+WithCustomViews.xls                owned-readat  p95       28,130     28,320     28,140     28,050   +0.68%   +0.32%   -0.28%
+WithCustomViews.xls                owned-readat  p99       33,940     34,530     33,940     34,290   +1.74%   -1.02%   +1.03%
+
+WithCustomViews.xls                file-source   p50       35,640     35,420     35,310     35,430   -0.62%   -0.34%   -0.59%
+WithCustomViews.xls                file-source   mean      35,989     35,778     35,648     35,767   -0.59%   -0.33%   -0.62%
+WithCustomViews.xls                file-source   p95       36,881     36,370     36,251     36,241   -1.39%   +0.03%   -1.74%
+WithCustomViews.xls                file-source   p99       43,460     43,441     42,561     43,610   -0.04%   -2.41%   +0.35%
+
+54016.xls                          owned-readat  p50      193,620    192,461    192,901    193,251   -0.60%   -0.18%   -0.19%
+54016.xls                          owned-readat  mean     196,004    194,590    194,909    195,663   -0.72%   -0.39%   -0.17%
+54016.xls                          owned-readat  p95      202,931    200,511    202,071    203,111   -1.19%   -0.51%   +0.09%
+54016.xls                          owned-readat  p99      206,341    204,361    204,511    205,991   -0.96%   -0.72%   -0.17%
+
+54016.xls                          file-source   p50      210,201    209,921    210,031    209,771   -0.13%   +0.12%   -0.20%
+54016.xls                          file-source   mean     209,532    209,540    209,447    209,368   +0.00%   +0.04%   -0.08%
+54016.xls                          file-source   p95      217,101    217,351    216,891    216,951   +0.12%   -0.03%   -0.07%
+54016.xls                          file-source   p99      220,041    218,421    217,781    219,601   -0.74%   -0.83%   -0.20%
+
+
+  B1/A1 and B2/A2 are the paired deltas in the two directions;
+  A2/A1 is the same binary against itself in the same window, the floor.
+
+==============================================================================
+Paired wall clock, A = base, B = skip, operation open
+==============================================================================
+fixture                            mode          stat          A1         B1         B2         A2    B1/A1    B2/A2    A2/A1
+ConditionalFormattingSamples.xls   owned-readat  p50       72,810     77,110     77,230     72,550   +5.91%   +6.45%   -0.36%
+ConditionalFormattingSamples.xls   owned-readat  mean      73,512     77,890     77,970     73,295   +5.95%   +6.38%   -0.30%
+ConditionalFormattingSamples.xls   owned-readat  p95       80,020     84,410     84,750     79,711   +5.49%   +6.32%   -0.39%
+ConditionalFormattingSamples.xls   owned-readat  p99       81,551     86,490     86,831     81,750   +6.06%   +6.22%   +0.24%
+
+ConditionalFormattingSamples.xls   file-source   p50       91,031    106,441    106,461     91,500  +16.93%  +16.35%   +0.52%
+ConditionalFormattingSamples.xls   file-source   mean      91,920    107,293    107,375     92,455  +16.72%  +16.14%   +0.58%
+ConditionalFormattingSamples.xls   file-source   p95       98,091    114,180    114,701     99,581  +16.40%  +15.18%   +1.52%
+ConditionalFormattingSamples.xls   file-source   p99       99,141    115,651    116,140    101,940  +16.65%  +13.93%   +2.82%
+
+WithCustomViews.xls                owned-readat  p50       27,820     27,120     27,220     27,791   -2.52%   -2.05%   -0.10%
+WithCustomViews.xls                owned-readat  mean      28,077     27,310     27,471     28,060   -2.73%   -2.10%   -0.06%
+WithCustomViews.xls                owned-readat  p95       28,240     27,540     27,650     28,430   -2.48%   -2.74%   +0.67%
+WithCustomViews.xls                owned-readat  p99       35,500     34,311     35,370     35,840   -3.35%   -1.31%   +0.96%
+
+WithCustomViews.xls                file-source   p50       36,711     34,980     35,000     35,540   -4.72%   -1.52%   -3.19%
+WithCustomViews.xls                file-source   mean      37,029     35,299     35,376     35,899   -4.67%   -1.46%   -3.05%
+WithCustomViews.xls                file-source   p95       38,600     35,750     35,910     36,740   -7.38%   -2.26%   -4.82%
+WithCustomViews.xls                file-source   p99       43,871     42,120     44,230     43,450   -3.99%   +1.80%   -0.96%
+
+54016.xls                          owned-readat  p50      193,891    195,471    195,241    193,461   +0.81%   +0.92%   -0.22%
+54016.xls                          owned-readat  mean     196,135    197,949    197,695    195,700   +0.93%   +1.02%   -0.22%
+54016.xls                          owned-readat  p95      203,141    204,861    204,841    202,671   +0.85%   +1.07%   -0.23%
+54016.xls                          owned-readat  p99      207,151    209,471    208,811    205,981   +1.12%   +1.37%   -0.56%
+
+54016.xls                          file-source   p50      212,081    214,002    215,271    211,521   +0.91%   +1.77%   -0.26%
+54016.xls                          file-source   mean     211,251    213,488    214,020    211,148   +1.06%   +1.36%   -0.05%
+54016.xls                          file-source   p95      220,001    221,581    222,741    219,241   +0.72%   +1.60%   -0.35%
+54016.xls                          file-source   p99      221,891    223,072    223,671    221,111   +0.53%   +1.16%   -0.35%
+
+
+  B1/A1 and B2/A2 are the paired deltas in the two directions;
+  A2/A1 is the same binary against itself in the same window, the floor.
+
+==============================================================================
+Paired wall clock, A = base, B = skipcur, operation open
+==============================================================================
+fixture                            mode          stat          A1         B1         B2         A2    B1/A1    B2/A2    A2/A1
+ConditionalFormattingSamples.xls   owned-readat  p50       71,930     85,370     83,980     72,400  +18.68%  +15.99%   +0.65%
+ConditionalFormattingSamples.xls   owned-readat  mean      72,666     85,776     84,812     72,883  +18.04%  +16.37%   +0.30%
+ConditionalFormattingSamples.xls   owned-readat  p95       79,521     92,300     91,820     79,510  +16.07%  +15.48%   -0.01%
+ConditionalFormattingSamples.xls   owned-readat  p99       82,020     93,860     93,470     81,141  +14.44%  +15.19%   -1.07%
+
+ConditionalFormattingSamples.xls   file-source   p50       90,201    111,971    113,741     90,451  +24.13%  +25.75%   +0.28%
+ConditionalFormattingSamples.xls   file-source   mean      91,374    112,898    114,823     91,138  +23.56%  +25.99%   -0.26%
+ConditionalFormattingSamples.xls   file-source   p95       99,060    119,930    121,911     97,831  +21.07%  +24.61%   -1.24%
+ConditionalFormattingSamples.xls   file-source   p99      109,971    121,641    122,850    100,131  +10.61%  +22.69%   -8.95%
+
+WithCustomViews.xls                owned-readat  p50       27,600     28,240     28,251     27,680   +2.32%   +2.06%   +0.29%
+WithCustomViews.xls                owned-readat  mean      27,841     28,533     28,509     27,934   +2.48%   +2.06%   +0.33%
+WithCustomViews.xls                owned-readat  p95       28,180     28,900     28,780     28,280   +2.56%   +1.77%   +0.35%
+WithCustomViews.xls                owned-readat  p99       35,910     36,111     35,950     35,160   +0.56%   +2.25%   -2.09%
+
+WithCustomViews.xls                file-source   p50       35,640     35,430     35,460     35,440   -0.59%   +0.06%   -0.56%
+WithCustomViews.xls                file-source   mean      36,087     35,797     35,807     35,806   -0.80%   +0.00%   -0.78%
+WithCustomViews.xls                file-source   p95       37,790     36,690     36,111     36,710   -2.91%   -1.63%   -2.86%
+WithCustomViews.xls                file-source   p99       44,500     42,480     43,480     43,500   -4.54%   -0.05%   -2.25%
+
+54016.xls                          owned-readat  p50      192,471    200,871    201,370    194,531   +4.36%   +3.52%   +1.07%
+54016.xls                          owned-readat  mean     194,691    202,935    203,626    196,592   +4.23%   +3.58%   +0.98%
+54016.xls                          owned-readat  p95      201,981    209,131    210,451    202,591   +3.54%   +3.88%   +0.30%
+54016.xls                          owned-readat  p99      204,971    211,801    215,041    206,591   +3.33%   +4.09%   +0.79%
+
+54016.xls                          file-source   p50      209,651    217,721    219,231    210,081   +3.85%   +4.36%   +0.21%
+54016.xls                          file-source   mean     209,328    217,185    218,634    209,514   +3.75%   +4.35%   +0.09%
+54016.xls                          file-source   p95      216,991    225,191    226,372    217,421   +3.78%   +4.12%   +0.20%
+54016.xls                          file-source   p99      217,991    227,101    227,571    218,391   +4.18%   +4.20%   +0.18%
+
+
+  B1/A1 and B2/A2 are the paired deltas in the two directions;
+  A2/A1 is the same binary against itself in the same window, the floor.
+

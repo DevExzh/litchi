@@ -1,0 +1,175 @@
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index ba97b6c66..811232dfa 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -78,6 +78,48 @@ const WORKSHEET_MAX_WINDOW_BYTES: u64 = 64 * 1024;
+ /// windows; above it each fill covers only the bytes the current record needs.
+ const WORKSHEET_DENSE_FRAME_BYTES: u64 = 1024;
+ 
++// ---------------------------------------------------------------------------
++// MEASUREMENT SCAFFOLD for change 0612. NOT A CANDIDATE. Applied, built,
++// measured and reverted; see docs/performance/results/change-0612/.
++//
++// It changes only *which stream bytes are read* by the globals scan. The
++// buffer keeps today's shape -- one contiguous `[0, global_end)` allocation,
++// zero-filled in full -- so the allocation, the zero-fill, the framing and
++// every semantic output are byte-identical to the base. A payload the
++// semantic pass never interprets, at or above the gate, is simply not
++// fetched; the buffer keeps zeros there and nothing ever reads them.
++//
++// So this prices the read term exactly (fewer bytes copied out of the CFB,
++// more read requests) and prices *none* of the three further savings a real
++// candidate would take: the zero-fill of the skipped bytes, the retained
++// allocation, and the second framing of the skipped records. It is a lower
++// bound on the benefit and an exact price of the cost.
++/// Smallest uninterpreted payload the scaffold passes without reading.
++const GLOBALS_SKIP_MIN_PAYLOAD: u64 = 1024;
++
++/// Whether the semantic globals pass reads this record's payload.
++///
++/// `parse_globals` consumes `BOF`, `EOF`, `FilePass`, `CodePage`,
++/// `BoundSheet8`, `SST` and the `Continue` run that follows an `SST`;
++/// `Formatting::parse_globals` consumes `Date1904`, `Format`, `XF`, `XFCRC`,
++/// `XFExt` and `DXF`.
++const fn globals_payload_is_consumed(kind: u16, in_sst_run: bool) -> bool {
++    matches!(
++        kind,
++        BOF | EOF
++            | FILEPASS
++            | CODEPAGE
++            | BOUND_SHEET
++            | SST
++            | 0x0022
++            | 0x041E
++            | 0x00E0
++            | 0x087C
++            | 0x087D
++            | 0x088D
++    ) || (kind == CONTINUE && in_sst_run)
++}
++
+ /// Limits for one source-backed XLS owner.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub struct SourceBackedLimits {
+@@ -1594,6 +1636,10 @@ struct GlobalsBuffer<'a> {
+     /// Allocation-chain position for the next fill. Empty before the first
+     /// fill; a hint that does not apply to a fill is ignored by the reader.
+     chain: StreamChainHint<'a>,
++    /// MEASUREMENT SCAFFOLD (change 0612): one retained cursor in place of the
++    /// per-fill range read, which is change 0574 opportunity 3. Built lazily so
++    /// no cursor exists for a workbook whose globals scan never fills.
++    cursor: Option<SharedOleStreamCursor<'a>>,
+     /// Size of the next window fill, before clamping.
+     window: u64,
+     /// Smallest `lbPlyPos` seen in a `BoundSheet8` payload framed *so far*.
+@@ -1617,6 +1663,7 @@ impl<'a> GlobalsBuffer<'a> {
+             bytes: Vec::new(),
+             filled: 0,
+             chain: cfb.chain_hint(),
++            cursor: None,
+             window: GLOBALS_FIRST_WINDOW_BYTES,
+             min_sheet_start: None,
+             sheet_clamp_active: true,
+@@ -1694,15 +1741,63 @@ impl<'a> GlobalsBuffer<'a> {
+                 requested: finish as u64,
+             })?;
+         self.bytes.resize(finish, 0);
++        // MEASUREMENT SCAFFOLD (change 0612): one cursor, opened once and
++        // carried forward, in place of one `read_stream_range_hinted` per
++        // fill. The range reader resolves the directory entry by path on every
++        // call; the cursor resolves it once.
+         let cfb: &'a SharedOleFile = self.cfb;
+-        cfb.read_stream_range_hinted(
+-            self.refs,
+-            self.filled,
+-            &mut self.bytes[start..finish],
+-            &mut self.chain,
+-        )
+-        .map_err(SourceBackedError::from)?;
++        if self.cursor.is_none() {
++            self.cursor = Some(
++                cfb.stream_cursor_at_hinted(self.refs, self.filled, &mut self.chain)
++                    .map_err(SourceBackedError::from)?,
++            );
++        }
++        let Some(cursor) = self.cursor.as_mut() else {
++            return Err(SourceBackedError::InvalidData(
++                "BIFF global cursor is absent".into(),
++            ));
++        };
++        cursor
++            .read_exact(&mut self.bytes[start..finish])
++            .map_err(SourceBackedError::from)?;
++        self.filled = end;
++        Ok(())
++    }
++
++    /// MEASUREMENT SCAFFOLD (change 0612): makes `[0, end)` addressable
++    /// without fetching `[filled, end)`.
++    ///
++    /// The allocation and the zero-fill are exactly what `ensure` would have
++    /// done; only the `read_stream_range_hinted` call is skipped, and the
++    /// fill target resets so the next window does not read straight back over
++    /// the payload that follows.
++    fn advance_without_reading(&mut self, end: u64) -> Result<()> {
++        if end <= self.filled {
++            return Ok(());
++        }
++        let finish = usize::try_from(end).map_err(|_error| SourceBackedError::ResourceLimit {
++            resource: "global address space",
++            observed: end,
++            maximum: usize::MAX as u64,
++        })?;
++        let resident = self.bytes.len();
++        self.bytes
++            .try_reserve_exact(finish - resident)
++            .map_err(|_error| SourceBackedError::Allocation {
++                resource: "workbook globals buffer",
++                requested: finish as u64,
++            })?;
++        self.bytes.resize(finish, 0);
++        // MEASUREMENT SCAFFOLD (change 0612): the cursor walks the chain past
++        // the skipped payload, publishing no bytes and taking no source
++        // observation.
++        if let Some(cursor) = self.cursor.as_mut() {
++            cursor
++                .skip_forward(end.saturating_sub(self.filled))
++                .map_err(SourceBackedError::from)?;
++        }
+         self.filled = end;
++        self.window = GLOBALS_FIRST_WINDOW_BYTES;
+         Ok(())
+     }
+ 
+@@ -1746,6 +1841,8 @@ fn parse_globals(
+     let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+     let mut offset = 0_u64;
+     let mut record_count = 0_usize;
++    // MEASUREMENT SCAFFOLD (change 0612).
++    let mut in_sst_run = false;
+     let mut globals = GlobalsBuffer::new(cfb, &refs, stream_len, limits.max_global_bytes);
+ 
+     // One pass frames the globals and retains the bytes the semantic pass
+@@ -1842,7 +1939,21 @@ fn parse_globals(
+         } else {
+             end
+         };
+-        globals.ensure(need, exact)?;
++        // MEASUREMENT SCAFFOLD (change 0612): the gate, applied only outside
++        // the exact prologue so the FilePass refusal keeps its read shape.
++        if kind == SST {
++            in_sst_run = true;
++        } else if kind != CONTINUE {
++            in_sst_run = false;
++        }
++        if !exact
++            && !globals_payload_is_consumed(kind, in_sst_run)
++            && payload_len as u64 >= GLOBALS_SKIP_MIN_PAYLOAD
++        {
++            globals.advance_without_reading(need)?;
++        } else {
++            globals.ensure(need, exact)?;
++        }
+         if kind == BOUND_SHEET && payload_len >= 4 {
+             let payload = header_end as usize;
+             globals.note_sheet_start(u64::from(u32::from_le_bytes([

@@ -1,0 +1,65 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0612",
+  "title": "The XLS globals skip measured on this base, the density gate shown to fire on real fixtures, and the design frozen unimplemented",
+  "decision": "design retained, implementation declined on a measured regression that exceeds the floor by five to twenty-five times on the only fixture the gate reaches",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 set the falsification criterion for XLS-6 as 'the dense-globals fixtures regress in cycles more than the sparse ones gain'; measured, the sparse-globals fixture does not gain at all -- the flagship open is +5.54% in native cycles on an owned source and +17.22% on a file source, and +5.91%/+6.45% and +16.93%/+16.35% at p50 in paired wall clock in both directions, against an A/A floor under 1% at p50 in the same window",
+    "the gate does fire on real fixtures, which is what distinguished this item from the untestable worksheet gate of change 0568: 19 of 123 modellable fixtures take at least one seek under a 1 KiB rule and the flagship open falls from 565,201 to 82,867 read bytes, -85.34%, with 29 -> 85 source observations and 53 -> 101 reads",
+    "the 53.4 ns per KiB coefficient change 0574 used to size the opportunity, and change 0587 carried forward as 'about 30% of the flagship open', predicted -19.6 us net for this schedule (-25.2 us of bytes against +5.6 us for 48 requests) where the measured open moved +4,300 ns on an owned source and +15,410 ns on a file source; priced at change 0604's measured 0.0165 cycles per byte for this very buffer the skipped bytes are about 1.7 us, some fifteen times smaller; a corpus regression attributes to bytes everything that scales with them, none of which is removed by not reading them",
+    "callgrind says the flagship open falls 15.33% and native perf says its instructions rise 8.94%; 412,826 of the 356,962-instruction callgrind saving is __memcpy_avx_unaligned_erms priced per byte, which is the rep movsb artefact changes 0574 and 0604 both named, and callgrind's delta outside memcpy and memset (+84,374) has the same sign and four fifths of the magnitude of the native instruction rise (+105,415)",
+    "the cost sites are named: read_stream_range_hinted resolves the CFB directory entry by path on every call, so 48 extra reads cost +33,656 Ir in directory_name_data, +16,016 in find_entry and +9,352 in the SmallVec path vector, plus +20,055 in the realloc family and +10,514 in the gate test itself",
+    "the retained cursor that would remove the per-call path lookup -- change 0574 opportunity 3, ranked and never measured -- regresses on its own: +10.90% and +9.37% of the flagship open in cycles and +2.93%/+2.02% on 54016.xls, because SharedOleStreamCursor's per-fill normalize_state, physical_span and advance_within cost +150,272 Ir against the -97,145 it saves",
+    "the per-record gate test costs 16.8 to 17.5 callgrind instructions per globals record whether or not it ever fires, so the record-dense 54016.xls is +1.08% in instructions and +1.23%/+1.39% in cycles with identical counters",
+    "change 0568's cumulative running-mean gate cannot be ported: the skippable mass is one dense run inside an otherwise sparse stream, so the flagship's cumulative mean skipped bytes per record is 855 against a 1 KiB threshold and the rule fires on zero of 123 fixtures, saving 3.0% of the bytes read against 59.0% for the per-record rule plus a fill-target reset"
+  ],
+  "accepted_evidence": {
+    "schedule_model": "a byte-exact replay of today's parse_globals fill schedule and of five candidate schedules over all 126 .xls and .xlt fixtures, from a pure-arithmetic CFB/BIFF8 walk that shares no code with litchi-xls; it reproduces change 0574's closure share (75.30% here against 75.08% there, the difference being the three encrypted fixtures 0574 counted) and predicts the flagship's measured byte saving of 482,334 to the byte",
+    "gate_census": "of 123 modellable fixtures, 101 consume over half their globals, 90% of all skippable bytes live in 13 of them, and the largest skipped payload is >= 1 KiB on 25, >= 4 KiB on 13 and >= 8 KiB on 12; the recommended rule reaches 19 fixtures (15 distinct globals shapes), leaves 104 unchanged read-for-read and byte-for-byte, and is modelled net worse on 2 by +84 and +88 ns",
+    "composition_correction": "the flagship's skippable mass is 64 payloads at or above 1 KiB holding 524,583 bytes, almost all at the 8,224-byte BIFF maximum -- one MsoDrawingGroup of 16,448 bytes in two frames plus about 62 maximal Continue records -- not the 'about 261 records, about 2 KiB per record' change 0587 describes; every Continue byte was attributed to the record its run continues",
+    "counters": "36 deterministic cells (2 legs x 3 fixtures x 2 source modes x open/list/one-cell), each identical across the five samples of its child; the flagship open goes 53 -> 101 reads, 565,201 -> 82,867 bytes, 29 -> 85 observations, and WithCustomViews.xls and 54016.xls are identical on every counter, every operation, both modes -- the control that makes their timing attributable to the gate test alone",
+    "callgrind": "isolation pairs at small and large sample counts for four legs, with both self and --inclusive=yes annotations from each raw profile; the globals pass (parse_globals inclusive) is 17.11%, 20.38% and 20.64% of the base open on the three fixtures and the CFB range reader inside it a further 28.96%, 16.55% and 7.07%",
+    "native_cycles": "perf stat isolation pairs at 100 against 1,100 samples, median of five repetitions per leg, on both an owned in-memory source and a file source; base 348,468 / 129,806 / 875,353 cycles owned and 438,220 / 171,631 / 948,237 file",
+    "floors": "two A/A legs built by copying the base binary: aa - bb is +0.95%, +0.34%, -0.61% on the isolation-pair cycle metric and -0.00%, -0.13%, +0.02% on native instructions; an A1 B1 B2 A2 wall clock with a byte-identical B leg puts the same-binary floor at -0.98% to +0.47% at p50 over twelve comparisons, with self-floors -0.59% to +0.11%",
+    "oracle": "xls_source_attribution builds an independent eager-parser projection per run; the worksheet count and names (16, 3, 1) and the selected cell (string:4:Date, float:4024000000000000, none) are identical across base, skip and skipcur on all three fixtures, which is what makes the scaffolds controls rather than candidates",
+    "contract_finding": "RecordRef::offset() feeds SharedStringSstSegment::source_offset (records.rs:1315), which the source-backed resolve path uses with SharedOleStreamCursor::skip_to to fetch a shared string's bytes at query time (source.rs:3261-3266); a RecordRef framed out of a compacted globals buffer would carry the compacted offset, so the design must carry each retained record's stream offset separately",
+    "gates": "cargo fmt --all --check clean, cargo clippy -p litchi-xls --all-targets clean, cargo doc -p litchi-xls --no-deps clean, cargo test -p litchi-xls 72 binaries 1,390 passed 0 failed 1 ignored, all on the clean worktree at the base commit"
+  },
+  "accepted_costs": {
+    "scaffold_is_a_lower_bound": "the skip scaffold changes only which stream bytes are fetched and keeps the buffer's shape, so it takes none of the three further savings a real candidate would take -- the zero-fill of the skipped bytes (about 8,760 cycles on the flagship from change 0604's measured 0.0165 cycles per byte), the smaller retained allocation, the second framing of 530,960 bytes -- and pays nothing a candidate would pay beyond them; neither side is measured because nothing was implemented, and the measured deficit is 19,302 cycles owned and 75,447 file-source",
+    "harness_instrumentation": "xls_source_attribution times every read call, so the skip leg pays 96 extra clock_gettime pairs per open that production would not: +12,168 Ir in callgrind, about 14% of the non-memcpy cost and roughly 2,900 native cycles of the 19,302-cycle deficit; it is named and sized rather than subtracted",
+    "model_vs_implementation_read_counts": "the model counts logical fills (20 -> 76 on the flagship) and the harness counts positional reads at the source, where a logical range splits into contiguous sector runs (53 -> 101); the deltas differ (+56 against +48) because smaller ranges split less, and the two are reported side by side rather than reconciled",
+    "one_threshold_timed": "1 KiB and 2 KiB are indistinguishable on this corpus because no fixture carries a skippable payload between them; 4 KiB and 8 KiB are modelled but not timed",
+    "layout_noise": "WithCustomViews.xls is 2.05% to 2.52% faster on the skip leg at p50 on an owned source with byte-identical counters and no mechanism, and 2.06% to 2.32% slower on the skipcur leg; that pair bounds what code layout can do in these cells and is reported rather than explained away",
+    "shared_host": "seven other measurement agents shared the 32-core host throughout; quiescence is not established and both floors are measured rather than assumed",
+    "cursor_result_is_one_shape": "the cursor regression is measured for stream_cursor_at_hinted once plus read_exact per fill; it is not a claim that no cursor shape could win"
+  },
+  "known_gaps": {
+    "range_sources": "a range or remote source is the only source kind on which this design could win, and this repository has none; its trade is modelled from change 0564's 116 ns per request and never measured",
+    "selectors": "xls_source_attribution supports open, list and one-cell only; XLS full text and all-cells cannot be timed at all (change 0587's standing XLS measurement blocker), and both would make the flagship regression larger, not smaller, because both re-enter the same open",
+    "encrypted_fixtures": "password.xls, 35897-type4.xls and xor-encryption-abc.xls carry a FilePass and are refused inside the exact prologue, so no schedule exists past it and they are excluded from the model",
+    "corpus_duplication": "the 19 fixtures the gate reaches are 15 distinct globals shapes; four are byte-identical copies of two originals",
+    "not_decided_here": "XLS-7 (the globals zero-fill) shares the corrected coefficient but is not decided by this record; 0574 opportunity 5 (frame the globals once) is not falsified here -- it is entangled with the buffer shape only because the skip changes that shape, and on its own it is 1.51% of the flagship open with none of this change's read cost"
+  },
+  "withheld": [
+    "any speedup, any cold-cache, physical-device, range-source, peak-RSS, allocation-count, concurrency-scaling, real-producer or cross-platform result",
+    "any statement about XLS full text or all cells, because no selector can measure either",
+    "any conclusion about XLS-3, XLS-7, XLS-9 or the other items change 0587 ranks near this one"
+  ],
+  "provenance": {
+    "base_commit": "1e41983213dc378c13774ed7038c51faf231977f",
+    "base_commit_short": "1e4198321",
+    "branch": "perf/0612-xls-skip-uninterpreted-globals-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0, perf 7.0.14",
+    "measured_cpu": 8,
+    "base_binary_sha256": "f60f3a02ffa016fb7b05fea607fb8806dbcfbba9c211097ff72f942d868b03f0",
+    "skip_binary_sha256": "585edbc3c7879f725503c222ea87cc679e0d9f048d223e828a1678c80863f193",
+    "cursor_binary_sha256": "c7ebdb38e382e43df6bf577d77b241a50a993d58eabc7e7ca140197838a27a40",
+    "skipcur_binary_sha256": "c1c5995e2b8a10394e0b50290ab6556d02d317ec8732980b99279ede743a9883",
+    "note": "all work was done in a detached worktree with its own target directory; the three measurement scaffolds were applied, built, measured and reverted, and git status was verified clean before the gates and the commit"
+  }
+}

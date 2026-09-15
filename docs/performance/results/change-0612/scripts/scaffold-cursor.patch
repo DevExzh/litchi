@@ -1,0 +1,53 @@
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index ba97b6c66..68de4237e 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -1594,6 +1594,9 @@ struct GlobalsBuffer<'a> {
+     /// Allocation-chain position for the next fill. Empty before the first
+     /// fill; a hint that does not apply to a fill is ignored by the reader.
+     chain: StreamChainHint<'a>,
++    /// MEASUREMENT SCAFFOLD (change 0612): one retained cursor in place of the
++    /// per-fill range read. This is change 0574 opportunity 3 alone.
++    cursor: Option<SharedOleStreamCursor<'a>>,
+     /// Size of the next window fill, before clamping.
+     window: u64,
+     /// Smallest `lbPlyPos` seen in a `BoundSheet8` payload framed *so far*.
+@@ -1617,6 +1620,7 @@ impl<'a> GlobalsBuffer<'a> {
+             bytes: Vec::new(),
+             filled: 0,
+             chain: cfb.chain_hint(),
++            cursor: None,
+             window: GLOBALS_FIRST_WINDOW_BYTES,
+             min_sheet_start: None,
+             sheet_clamp_active: true,
+@@ -1694,14 +1698,23 @@ impl<'a> GlobalsBuffer<'a> {
+                 requested: finish as u64,
+             })?;
+         self.bytes.resize(finish, 0);
++        // MEASUREMENT SCAFFOLD (change 0612): one cursor, opened once and
++        // carried forward, in place of one `read_stream_range_hinted` per fill.
+         let cfb: &'a SharedOleFile = self.cfb;
+-        cfb.read_stream_range_hinted(
+-            self.refs,
+-            self.filled,
+-            &mut self.bytes[start..finish],
+-            &mut self.chain,
+-        )
+-        .map_err(SourceBackedError::from)?;
++        if self.cursor.is_none() {
++            self.cursor = Some(
++                cfb.stream_cursor_at_hinted(self.refs, self.filled, &mut self.chain)
++                    .map_err(SourceBackedError::from)?,
++            );
++        }
++        let Some(cursor) = self.cursor.as_mut() else {
++            return Err(SourceBackedError::InvalidData(
++                "BIFF global cursor is absent".into(),
++            ));
++        };
++        cursor
++            .read_exact(&mut self.bytes[start..finish])
++            .map_err(SourceBackedError::from)?;
+         self.filled = end;
+         Ok(())
+     }
