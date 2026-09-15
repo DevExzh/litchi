@@ -1,0 +1,9 @@
+The run model's predicted request saving (members covered by a run, minus
+the number of runs) against the oracle's measured saving, per container.
+
+containers modelled           533
+containers compared           532
+saving reproduced exactly     530
+mismatched                    2
+    predicted -2, measured -1    test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx
+    predicted -1, measured -0    test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml

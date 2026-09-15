@@ -1,0 +1,44 @@
+== docx_file_source_full_text [docx-source-backed-media]
+   A1  p50=196.2us mean=197.8us p95=212.8us p99=216.8us
+   B1  p50=194.5us mean=206.3us p95=232.8us p99=419.9us
+   B2  p50=197.0us mean=199.5us p95=213.3us p99=213.3us
+   A2  p50=196.0us mean=199.2us p95=216.3us p99=216.5us
+   A3  p50=196.4us mean=200.7us p95=218.7us p99=219.5us
+   A4  p50=195.8us mean=198.7us p95=213.2us p99=216.5us
+   paired A1->B1: p50=-0.84% mean=+4.30% p95=+9.42% p99=+93.65%
+   paired A2->B2: p50=+0.50% mean=+0.14% p95=-1.36% p99=-1.47%
+   floor  A3->A4: p50=-0.32% mean=-1.02% p95=-2.52% p99=-1.35%
+   floor  A1->A2: p50=-0.08% mean=+0.71% p95=+1.65% p99=-0.15%
+== docx_file_source_open [docx-source-backed-media]
+   A1  p50=268.6us mean=273.0us p95=297.6us p99=297.8us
+   B1  p50=277.4us mean=281.1us p95=307.1us p99=309.1us
+   B2  p50=279.6us mean=280.9us p95=305.1us p99=315.0us
+   A2  p50=266.5us mean=270.4us p95=292.8us p99=298.6us
+   A3  p50=273.8us mean=274.4us p95=298.5us p99=299.8us
+   A4  p50=271.3us mean=274.3us p95=301.4us p99=316.2us
+   paired A1->B1: p50=+3.28% mean=+2.99% p95=+3.20% p99=+3.80%
+   paired A2->B2: p50=+4.91% mean=+3.87% p95=+4.21% p99=+5.47%
+   floor  A3->A4: p50=-0.94% mean=-0.04% p95=+0.97% p99=+5.49%
+   floor  A1->A2: p50=-0.78% mean=-0.92% p95=-1.63% p99=+0.27%
+== opc_file_source_open [few-large-incompressible]
+   A1  p50=161.7us mean=159.8us p95=177.0us p99=178.5us
+   B1  p50=181.8us mean=182.9us p95=194.8us p99=196.1us
+   B2  p50=184.8us mean=185.7us p95=201.8us p99=202.2us
+   A2  p50=173.2us mean=176.1us p95=188.5us p99=190.1us
+   A3  p50=173.5us mean=174.4us p95=187.8us p99=196.0us
+   A4  p50=170.0us mean=171.8us p95=187.2us p99=197.4us
+   paired A1->B1: p50=+12.39% mean=+14.51% p95=+10.08% p99=+9.85%
+   paired A2->B2: p50=+6.74% mean=+5.46% p95=+7.03% p99=+6.32%
+   floor  A3->A4: p50=-2.04% mean=-1.48% p95=-0.31% p99=+0.72%
+   floor  A1->A2: p50=+7.07% mean=+10.23% p95=+6.53% p99=+6.49%
+== pptx_file_source_open [pptx-source-backed-media]
+   A1  p50=2655.4us mean=2661.5us p95=2720.8us p99=2733.9us
+   B1  p50=2780.1us mean=2779.3us p95=2816.0us p99=2837.0us
+   B2  p50=2720.1us mean=2721.9us p95=2758.8us p99=2764.7us
+   A2  p50=2676.6us mean=2674.8us p95=2713.9us p99=2749.9us
+   A3  p50=2708.7us mean=2706.7us p95=2762.7us p99=2816.7us
+   A4  p50=2717.0us mean=2711.4us p95=2747.0us p99=2748.5us
+   paired A1->B1: p50=+4.70% mean=+4.43% p95=+3.50% p99=+3.77%
+   paired A2->B2: p50=+1.62% mean=+1.76% p95=+1.66% p99=+0.54%
+   floor  A3->A4: p50=+0.31% mean=+0.17% p95=-0.57% p99=-2.42%
+   floor  A1->A2: p50=+0.80% mean=+0.50% p95=-0.26% p99=+0.59%

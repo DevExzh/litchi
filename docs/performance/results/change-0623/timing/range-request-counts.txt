@@ -1,0 +1,24 @@
+Physical request and byte counts per timed iteration, from the harness's
+own source counters. Deterministic: min and max agree across all 30
+samples of every leg.
+
+== leg A1 (0623-before)
+  opc_range_source_open                  requests=5..5 bytes=1011..1011
+  opc_range_source_open_main_read        requests=6..6 bytes=1166..1166
+  xlsx_range_source_open                 requests=7..7 bytes=1899..1899
+  xlsx_range_source_first_cell           requests=10..10 bytes=666..666
+== leg B1 (0623-after)
+  opc_range_source_open                  requests=4..4 bytes=987..987
+  opc_range_source_open_main_read        requests=5..5 bytes=1142..1142
+  xlsx_range_source_open                 requests=6..6 bytes=1875..1875
+  xlsx_range_source_first_cell           requests=10..10 bytes=666..666
+== leg B2 (0623-after)
+  opc_range_source_open                  requests=4..4 bytes=987..987
+  opc_range_source_open_main_read        requests=5..5 bytes=1142..1142
+  xlsx_range_source_open                 requests=6..6 bytes=1875..1875
+  xlsx_range_source_first_cell           requests=10..10 bytes=666..666
+== leg A2 (0623-before)
+  opc_range_source_open                  requests=5..5 bytes=1011..1011
+  opc_range_source_open_main_read        requests=6..6 bytes=1166..1166
+  xlsx_range_source_open                 requests=7..7 bytes=1899..1899
+  xlsx_range_source_first_cell           requests=10..10 bytes=666..666

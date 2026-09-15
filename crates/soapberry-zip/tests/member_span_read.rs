@@ -600,3 +600,84 @@ fn a_payload_the_window_cannot_cover_is_read_from_the_source() {
         source.reads()
     );
 }
+
+// ---------------------------------------------------------------------------
+// Change 0623: the read-side local-span accessor.
+//
+// `local_span_hint` reports the span this archive's own first read covers, so a
+// caller can fetch those bytes by another route. These tests pin the two
+// properties that make such a fetch sound: the hint agrees with the read the
+// archive actually issues, and adjoining hints leave no hole between them.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_local_span_hint_is_the_read_the_member_actually_issues() {
+    let raw = seekable_archive(&[
+        Member::deflated("one.xml", compressible(1, 900)),
+        Member::deflated("two.xml", compressible(2, 900)),
+        Member::stored("three.bin", compressible(3, 400)),
+    ]);
+    let (archive, source) = open(raw);
+    for name in ["one.xml", "two.xml", "three.bin"] {
+        let entry = archive.entry_id(name).expect("indexed member");
+        let hint = archive.local_span_hint(entry).expect("a hinted member");
+        source.clear();
+        archive.read(name).expect("member reads");
+        let reads = source.reads();
+        assert_eq!(reads[0].0, hint.offset(), "{name}: first read offset");
+        assert_eq!(
+            reads[0].1 as u64,
+            hint.length(),
+            "{name}: first read length"
+        );
+        assert_eq!(hint.end(), hint.offset() + hint.length());
+    }
+}
+
+#[test]
+fn adjoining_local_span_hints_leave_no_hole() {
+    let raw = seekable_archive(&[
+        Member::deflated("a.xml", compressible(4, 700)),
+        Member::deflated("b.xml", compressible(5, 700)),
+        Member::deflated("c.xml", compressible(6, 700)),
+    ]);
+    let directory = directory_offset(&raw);
+    let (archive, _source) = open(raw);
+    let mut hints = Vec::new();
+    for name in ["a.xml", "b.xml", "c.xml"] {
+        let entry = archive.entry_id(name).expect("indexed member");
+        hints.push(archive.local_span_hint(entry).expect("a hinted member"));
+    }
+    for window in hints.windows(2) {
+        assert!(
+            window[0].end() >= window[1].offset(),
+            "hints {:?} and {:?} leave a hole",
+            window[0],
+            window[1]
+        );
+    }
+    for hint in &hints {
+        assert!(
+            hint.end() <= directory + 24,
+            "hint {hint:?} reaches past the central directory at {directory}"
+        );
+    }
+}
+
+#[test]
+fn a_member_the_window_does_not_admit_has_no_local_span_hint() {
+    // A member whose own local record is larger than the ceiling keeps the
+    // historical grammar, and the accessor must say so rather than describe a
+    // read that will not happen.
+    let raw = seekable_archive(&[Member::stored("big.bin", vec![b'z'; 96 * 1024])]);
+    let (archive, source) = open(raw);
+    let entry = archive.entry_id("big.bin").expect("indexed member");
+    assert!(archive.local_span_hint(entry).is_none());
+    source.clear();
+    archive.read("big.bin").expect("member reads");
+    assert_eq!(
+        source.reads()[0].1,
+        30,
+        "an unhinted member still begins with the 30-byte fixed header"
+    );
+}

@@ -1,0 +1,48 @@
+Delayed-transport open, change 0572's simulated transport
+(1 ms fixed service per physical request, 100 MiB/s, 64 KiB max range).
+Leg order A1 B1 B2 A2, A/A floor A3 A4. taskset -c 17, 5 warmups, 30 samples.
+
+== test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx
+   A1  p50=48208.6us mean=48197.0 p95=48251.2 p99=48334.6  requests=45 bytes=26066
+   B1  p50=11292.7us mean=11285.3 p95=11298.5 p99=11307.8  requests=10 bytes=26066
+   B2  p50=11297.1us mean=11323.4 p95=11349.6 p99=12145.6  requests=10 bytes=26066
+   A2  p50=48193.4us mean=48185.0 p95=48251.5 p99=48273.4  requests=45 bytes=26066
+   A3  p50=48212.0us mean=48206.8 p95=48293.9 p99=48589.1  requests=45 bytes=26066
+   A4  p50=48213.0us mean=48316.1 p95=49370.3 p99=50017.2  requests=45 bytes=26066
+   paired A1->B1: p50=-76.58%  (-36.92 ms)
+   paired A2->B2: p50=-76.56%  (-36.90 ms)
+   floor  A3->A4: p50=+0.00%
+   floor  A1->A2: p50=-0.03%
+== test-data/ooxml/pptx/shapes.pptx
+   A1  p50=25610.3us mean=25605.6 p95=25634.6 p99=25640.9  requests=24 bytes=11191
+   B1  p50=6621.1us mean=6617.5 p95=6636.9 p99=6639.4  requests=6 bytes=11191
+   B2  p50=6621.1us mean=6615.4 p95=6632.9 p99=6637.0  requests=6 bytes=11191
+   A2  p50=25615.5us mean=25603.3 p95=25629.1 p99=25629.2  requests=24 bytes=11191
+   A3  p50=25609.6us mean=25605.2 p95=25630.2 p99=25636.7  requests=24 bytes=11191
+   A4  p50=25612.7us mean=25607.2 p95=25633.9 p99=25637.7  requests=24 bytes=11191
+   paired A1->B1: p50=-74.15%  (-18.99 ms)
+   paired A2->B2: p50=-74.15%  (-18.99 ms)
+   floor  A3->A4: p50=+0.01%
+   floor  A1->A2: p50=+0.02%
+== test-data/ooxml/pptx/shape-soft-edges.pptx
+   A1  p50=30989.0us mean=30994.0 p95=31013.5 p99=31262.7  requests=29 bytes=13363
+   B1  p50=8816.1us mean=8839.1 p95=8879.6 p99=9602.7  requests=8 bytes=12859
+   B2  p50=8816.2us mean=8810.5 p95=8827.9 p99=8840.6  requests=8 bytes=12859
+   A2  p50=30988.0us mean=31098.2 p95=31933.4 p99=32461.9  requests=29 bytes=13363
+   A3  p50=30988.7us mean=30994.2 p95=31039.0 p99=31128.7  requests=29 bytes=13363
+   A4  p50=30987.3us mean=31042.5 p95=31371.3 p99=32265.2  requests=29 bytes=13363
+   paired A1->B1: p50=-71.55%  (-22.17 ms)
+   paired A2->B2: p50=-71.55%  (-22.17 ms)
+   floor  A3->A4: p50=-0.00%
+   floor  A1->A2: p50=-0.00%
+== test-data/ooxml/docx/comment.docx
+   A1  p50=6381.5us mean=6375.7 p95=6387.3 p99=6391.3  requests=6 bytes=1690
+   B1  p50=6383.7us mean=6383.9 p95=6397.7 p99=6644.2  requests=6 bytes=1690
+   B2  p50=6382.0us mean=6373.5 p95=6385.7 p99=6388.8  requests=6 bytes=1690
+   A2  p50=6381.4us mean=6373.5 p95=6384.6 p99=6385.6  requests=6 bytes=1690
+   A3  p50=6381.3us mean=6373.7 p95=6386.1 p99=6389.1  requests=6 bytes=1690
+   A4  p50=6381.2us mean=6374.7 p95=6386.1 p99=6389.2  requests=6 bytes=1690
+   paired A1->B1: p50=+0.03%  (+0.00 ms)
+   paired A2->B2: p50=+0.01%  (+0.00 ms)
+   floor  A3->A4: p50=-0.00%
+   floor  A1->A2: p50=-0.00%

@@ -45,7 +45,7 @@ use std::time::Duration;
 mod artifact_restore;
 pub use artifact_restore::SourceArtifactRestoreProof;
 mod read_ahead;
-use read_ahead::ArchiveReadAhead;
+use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
 pub use read_ahead::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
 mod splice;
 pub use splice::{
@@ -2643,6 +2643,10 @@ impl CacheCounters {
 struct SourceReader {
     snapshot: SourceSnapshot,
     read_ahead: Option<Arc<ArchiveReadAhead>>,
+    /// Bytes the open already fetched for the structural members it is about
+    /// to read. Present only for an ordinary unmanaged, exact-policy open, and
+    /// released as soon as the catalog has been read.
+    prefetch: Option<Arc<StructuralPrefetch>>,
 }
 
 /// Typed marker used while a positional source reports a version change
@@ -2709,6 +2713,15 @@ impl Drop for MonitoredReads {
 
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        // A read the structural prefetch holds in full is answered from bytes
+        // this package already fetched from the source. Everything else —
+        // every partly covered read, every zero-length read, and every read at
+        // all once the catalog is built — takes exactly the path below.
+        if let Some(prefetch) = &self.prefetch {
+            if let Some(count) = prefetch.serve(offset, output) {
+                return Ok(count);
+            }
+        }
         let result = match &self.read_ahead {
             Some(read_ahead) => read_ahead.read_at(&self.snapshot, offset, output),
             None => read_source_at_with_context(
@@ -5342,10 +5355,12 @@ impl SourceBackedPackage {
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let prefetch = Arc::new(StructuralPrefetch::new());
         let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
                 read_ahead: None,
+                prefetch: Some(Arc::clone(&prefetch)),
             },
             length,
             limits.zip_limits(),
@@ -5369,10 +5384,11 @@ impl SourceBackedPackage {
         // read session lets a single Deflate decoder be reset between the
         // content-types member and each `.rels` member instead of being built
         // per member; every read is otherwise the archive's own.
-        let catalog = match PackageReader::source_catalog_for_validation(
-            &SessionedArchive::new(&archive),
-            limits,
-        ) {
+        prefetch.prime(&snapshot, &structural_prefetch_runs(&archive));
+        let catalog_result =
+            PackageReader::source_catalog_for_validation(&SessionedArchive::new(&archive), limits);
+        prefetch.clear();
+        let catalog = match catalog_result {
             Ok(catalog) => catalog,
             Err(ValidationCatalogError {
                 phase: stage,
@@ -5700,10 +5716,21 @@ impl SourceBackedPackage {
                 source_read_policy,
             )?))
         };
+        // The structural prefetch is the default open's mechanism and only the
+        // default open's. A caller that asked for a forward window gets that
+        // window's grammar and counters undisturbed, and a managed open keeps
+        // the exact grammar so no `Resource::InputBytes` reservation, no
+        // cancellation observation and no refusal moves.
+        let prefetch = if context.is_none() && read_ahead.is_none() {
+            Some(Arc::new(StructuralPrefetch::new()))
+        } else {
+            None
+        };
         let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
                 read_ahead: read_ahead.clone(),
+                prefetch: prefetch.clone(),
             },
             length,
             limits.zip_limits(),
@@ -5743,9 +5770,22 @@ impl SourceBackedPackage {
         } else {
             None
         };
+        // Fetch the structural members' local records in their own physical
+        // order, one read per contiguous run, before a walk that will revisit
+        // them in an order of its own. Nothing is parsed here and nothing is
+        // decided by it: the reads below take the bytes from this buffer
+        // instead of the source, in the same order, with the same limits
+        // charged and the same verdicts reached.
+        if let Some(prefetch) = prefetch.as_deref() {
+            prefetch.prime(&snapshot, &structural_prefetch_runs(&archive));
+        }
         // One sequential structural admission pass, one reset Deflate decoder.
-        let catalog = match PackageReader::source_catalog(&SessionedArchive::new(&archive), limits)
-        {
+        let catalog_result =
+            PackageReader::source_catalog(&SessionedArchive::new(&archive), limits);
+        if let Some(prefetch) = prefetch.as_deref() {
+            prefetch.clear();
+        }
+        let catalog = match catalog_result {
             Ok(catalog) => catalog,
             Err(error) => {
                 let mapped = map_source_backed_error(error);
@@ -11431,6 +11471,59 @@ fn write_exact_snapshot_with_accounting<W: Write>(
         Err(error) => Err(error),
         Ok(()) => accounting_error.map_or(Ok(()), Err),
     }
+}
+
+/// Whether a member name is one the open reads before it parses anything.
+///
+/// The open reads `[Content_Types].xml`, the package `_rels/.rels`, and every
+/// `*/_rels/*.rels` relationship part the relationship walk or its orphan
+/// fallback reaches (change 0577 establishes that those reads are mandatory and
+/// measures that all 1,237 relationship parts of the 167-package OOXML corpus
+/// are read at open). The test is on the name alone: no member is read, parsed
+/// or classified to apply it, which is what lets it run before the catalog
+/// exists.
+///
+/// It is deliberately a superset in one direction and exact in the other. A
+/// relationship part the walk never reaches is still named here, and the only
+/// cost of that is bytes already adjacent to parts that *are* read. A member
+/// whose name differs in case is *not* named here, because
+/// `PackURI::rels_uri` builds the exact name the walk looks up, so a
+/// differently-cased member is never read at open either.
+fn is_structural_member_name(name: &str) -> bool {
+    if name.eq_ignore_ascii_case(crate::pkgreader::CONTENT_TYPES_MEMBER) {
+        return true;
+    }
+    let Some((directory, file)) = name.rsplit_once('/') else {
+        return false;
+    };
+    if !file.ends_with(".rels") {
+        return false;
+    }
+    directory
+        .rsplit_once('/')
+        .map_or(directory, |(_, last)| last)
+        == "_rels"
+}
+
+/// The runs one read each can deliver for the members this open will read.
+///
+/// The spans come from the archive's own read path
+/// (`IndexedArchive::local_span_hint`), so a run read fetches exactly the bytes
+/// the per-member reads would have fetched, and never a byte outside them.
+/// Anything the archive declines to hint, and any member that does not adjoin
+/// its neighbour, simply keeps the grammar it has today.
+fn structural_prefetch_runs<R>(archive: &IndexedArchive<R>) -> Vec<read_ahead::StructuralRun>
+where
+    R: ZipReaderAt,
+{
+    let spans = archive.file_names().filter_map(|name| {
+        if !is_structural_member_name(name) {
+            return None;
+        }
+        let hint = archive.local_span_hint(archive.entry_id(name)?)?;
+        Some((hint.offset(), hint.length()))
+    });
+    read_ahead::structural_runs(spans).unwrap_or_default()
 }
 
 /// Reserve a bounded positional-read window, retry interrupted reads, and

@@ -1,0 +1,33 @@
+Controlled local-source experiment. A = before; N = the after tree with
+is_structural_member_name forced to False, so every line of the mechanism
+is compiled and linked but no run is ever admitted; B = after.
+30 samples, 5 warmups, taskset -c 17, warm filesystem cache.
+
+== opc_file_source_open
+   A1  p50=163.7us  mean=166.6us
+   N1  p50=180.2us  mean=181.9us
+   B1  p50=170.4us  mean=171.8us
+   B2  p50=181.4us  mean=181.8us
+   N2  p50=170.1us  mean=171.2us
+   A2  p50=173.3us  mean=175.0us
+   A3  p50=174.3us  mean=175.5us
+   A4  p50=161.3us  mean=164.2us
+   code size only  A1->N1 p50=+10.12%   A2->N2 p50=-1.84%
+   mechanism       N1->B1 p50=-5.43%   N2->B2 p50=+6.59%
+   total           A1->B1 p50=+4.15%   A2->B2 p50=+4.63%
+   floor           A3->A4 p50=-7.41%   A1->A2 p50=+5.92%
+
+== pptx_file_source_open
+   A1  p50=2712.8us  mean=2709.0us
+   N1  p50=2813.9us  mean=2808.2us
+   B1  p50=2790.4us  mean=2788.9us
+   B2  p50=2785.8us  mean=2774.0us
+   N2  p50=2805.9us  mean=2802.9us
+   A2  p50=2721.1us  mean=2717.9us
+   A3  p50=2728.4us  mean=2715.5us
+   A4  p50=2706.1us  mean=2721.4us
+   code size only  A1->N1 p50=+3.73%   A2->N2 p50=+3.12%
+   mechanism       N1->B1 p50=-0.84%   N2->B2 p50=-0.72%
+   total           A1->B1 p50=+2.86%   A2->B2 p50=+2.38%
+   floor           A3->A4 p50=-0.82%   A1->A2 p50=+0.31%
+
