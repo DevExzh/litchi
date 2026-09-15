@@ -793,3 +793,102 @@ fn malformed_source_document_errors_at_first_semantic_read() {
         .unwrap();
     assert!(matches!(cell.v_merge(), Err(Error::InvalidFormat(_))));
 }
+
+fn source_paragraph_texts(document: &source_backed::Document) -> Vec<String> {
+    document
+        .paragraphs()
+        .unwrap()
+        .iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect()
+}
+
+#[test]
+fn source_paragraph_queries_are_order_and_thread_independent() {
+    let bytes = semantic_fixture();
+    let source = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+    // A caller that extracts text first and a caller that selects paragraphs
+    // first must observe exactly the same paragraph projection: the unmanaged
+    // index is built on the first paragraph query, not at `document()`.
+    let text_first = source.document().unwrap();
+    let text = text_first.extract_text().unwrap();
+    let after_text = (
+        text_first.paragraph_count().unwrap(),
+        source_paragraph_texts(&text_first),
+        text_first.paragraph_text(0).unwrap(),
+        text_first
+            .paragraph(0)
+            .unwrap()
+            .map(|paragraph| paragraph.text().unwrap()),
+    );
+
+    let paragraph_first = source.document().unwrap();
+    let before_text = (
+        paragraph_first.paragraph_count().unwrap(),
+        source_paragraph_texts(&paragraph_first),
+        paragraph_first.paragraph_text(0).unwrap(),
+        paragraph_first
+            .paragraph(0)
+            .unwrap()
+            .map(|paragraph| paragraph.text().unwrap()),
+    );
+    assert_eq!(after_text, before_text);
+    assert_eq!(paragraph_first.extract_text().unwrap(), text);
+    assert_eq!(after_text.0, 4);
+    assert_eq!(after_text.3.as_deref(), Some("fallback"));
+
+    // Repeating every query on one document answers from the cached ranges.
+    assert_eq!(
+        (
+            text_first.paragraph_count().unwrap(),
+            source_paragraph_texts(&text_first),
+            text_first.paragraph_text(0).unwrap(),
+        ),
+        (after_text.0, after_text.1.clone(), after_text.2.clone())
+    );
+
+    // Concurrent first queries on one shared view agree on one index.
+    let shared = source.document().unwrap();
+    let shared = &shared;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                scope.spawn(move || {
+                    (
+                        shared.paragraph_count().unwrap(),
+                        source_paragraph_texts(shared),
+                        shared.paragraph_text(0).unwrap(),
+                    )
+                })
+            })
+            .collect();
+        for handle in handles {
+            let observed = handle.join().unwrap();
+            assert_eq!(
+                observed,
+                (after_text.0, after_text.1.clone(), after_text.2.clone())
+            );
+        }
+    });
+}
+
+#[test]
+fn managed_source_paragraph_queries_keep_their_eager_index() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p></w:body></w:document>"#
+    );
+    let managed = managed_raw_document(document.as_bytes());
+    let view = managed.document().unwrap();
+
+    assert_eq!(view.paragraph_count().unwrap(), 2);
+    assert_eq!(view.paragraph_text(0).unwrap().as_deref(), Some("one"));
+    assert_eq!(view.paragraph_text(1).unwrap().as_deref(), Some("two"));
+    assert_eq!(view.paragraph_text(2).unwrap(), None);
+    assert_eq!(view.extract_text().unwrap(), "onetwo");
+    // Arc-backed selective views stay refused on the managed route.
+    assert!(matches!(
+        view.paragraphs().unwrap_err(),
+        Error::UnsafeEdit { .. }
+    ));
+}

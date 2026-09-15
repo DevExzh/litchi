@@ -1,5 +1,32 @@
 # Performance optimization ADR-compliance matrix
 
+## 0592: aligned, and the one line where it stops
+
+[0592](0592-docx-lazy-paragraph-index.md) is the first of the ten items 0587's
+matrix called **aligned**, and it is aligned for the reason the matrix gave: it
+changes no byte of output and moves no refusal. ADR 0005 is not merely permissive
+here, it is prescriptive — "semantic payloads load lazily into thread-safe
+weighted caches […] cache behavior is semantically invisible" — and the eager
+build was the part that did not match. The index's error was already swallowed
+with `.ok()`, so deferring the same expression to the first consumer leaves the
+same operations able to observe the same failure; the pre-existing malformed-XML
+tests on both facades pin that and were not touched. No exception is requested.
+
+**The compliance line this record found is a budget one, and it is the reason the
+change stops short of the whole path.** On the budget-managed source-backed
+route the index is not free of the ADR: `DocumentIndexAdmission` reserves memory
+and objects for it and is retained for the view's lifetime, and the query-parser
+admission reserves memory, objects and depth and *consumes* `Work` for the scan.
+ADR 0005 requires every operation to charge its budget, so deferring the scan
+while keeping those reservations would run it with fewer live reservations than
+the route established, and re-admitting at the deferred site would charge `Work`
+twice and could refuse a document that is accepted today. Either is a contract
+change. That branch therefore keeps its eager scan, and the record says so in
+*What was changed* rather than in a footnote. If it is ever wanted lazily, it
+needs a frozen design record that states what the admission covers and when it is
+reserved — which is the same shape of prerequisite 0587 attached to twenty-one of
+its other items.
+
 ## Change 0591 compliance update
 
 Change 0591 keeps ADR 0003's transaction boundary exactly: `commit()` still

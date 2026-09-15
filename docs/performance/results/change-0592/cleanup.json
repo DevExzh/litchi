@@ -1,0 +1,30 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0592",
+  "removed_during_the_turn": [
+    {
+      "path": "scratchpad/agents/0592/cg/*.out and *.log",
+      "what": "178 raw callgrind output files from two capture passes, about 41 MB per pass",
+      "when": "after the per-run `summary:` totals were extracted into counts/callgrind-totals.txt, once per pass"
+    },
+    {
+      "path": "scratchpad/agents/0592/out/trial.json, trial2.json",
+      "what": "two throwaway harness probes used to find the selectors' timer boundaries",
+      "when": "not copied into the packet"
+    }
+  ],
+  "removed_at_the_end": [
+    "/home/zhuhe/code/litchi-worktrees/0592 (the git worktree, removed with `git worktree remove --force`; the branch is kept)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0592-before (the before harness build)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0592-after (the after harness build)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0592-probe-before and 0592-probe-after (the probe builds, about 732 MB each)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0592-fsroot (the filesystem harness's sample root)",
+    "/tmp/claude-1001/.../scratchpad/agents/0592 (the whole scratch directory, about 2.4 MB after the callgrind sweeps)"
+  ],
+  "kept": [
+    "the branch perf/0592-docx-lazy-paragraph-index",
+    "everything under docs/performance/results/change-0592/ that the record cites"
+  ],
+  "note": "The shared before checkout /home/zhuhe/code/litchi-worktrees/before-08d968f8e has no tracked file modified. A gitignored Cargo.lock, byte-identical to the working copy's, was placed there so that the `crates/` workspace resolves offline for the probe; it is left in place because seven other agents share that checkout and were building from it."
+}

@@ -1,5 +1,45 @@
 # Performance hotspot inventory
 
+## 0592 — DOCX-2 implemented: the paragraph index is built by the first paragraph query
+
+Rank 10 of the 0587 queue (DOCX-2, step 1, "build the paragraph index lazily")
+is implemented and can be struck from the table.
+`DocumentPart::from_part` and the unmanaged branch of the source-backed
+`Package::document()` no longer run `scan_word_element_ranges` to build
+`ParagraphIndex`; a `OnceLock` fills on the first `paragraph_count`,
+`paragraphs`, `paragraph(i)` or `paragraph_text(i)`. The MCE visibility pass
+stays. **Measured** by callgrind isolation pairs on a 10,000-paragraph document:
+`document()` alone −69.30% Ir (64.96 M → 19.94 M), `document()` + `text()`
+−34.88%, + `write_text_to` −19.47%, + `tables()` −40.99%; the removed scan is
+45.01 M Ir and **70.5% of the text-extraction pass itself**, which reproduces the
+survey's "about 75%" on a different fixture. `document()` allocates 342,735 fewer
+bytes and 25 fewer blocks. Paragraph queries are unchanged in allocation and
+0.6-0.7% cheaper in instructions: the scan is moved, not removed, for them.
+Warm paired timing, order `A1 B1 B2 A2` on CPU 12: `docx_file_eager_full_text`
+**−40.22%** at p50 against a 1.52% A/A floor and `docx_file_source_full_text`
+**−32.37%** against 0.66%. Two regressions are reported rather than averaged
+away: `docx_semantic_one_paragraph` and `docx_semantic_list_paragraphs` move by
+×2.2 × 10⁴ and +1,836% because those selectors build the view before starting
+the clock, so the scan they used to do untimed now lands inside the interval;
+and `docx_file_eager_paragraph_count` regresses **+5.49%** pooled (floor 0.78%,
+both orders agreeing) although the same operation pair is 0.69% cheaper in native
+cycles and takes the same page faults — that one is recorded as an open
+question, not explained. The budget-managed
+source-backed route is deliberately unchanged, because its index carries an
+execution-budget charge; deferring that is a contract change needing its own
+record. `performance_claim: none`. [Change and limitations](0592-docx-lazy-paragraph-index.md);
+[evidence](results/change-0592/README.md).
+
+**Two entries for the queue, found while measuring, not acted on.** DOCX-3's
+second pass is now bounded from above: after 0592, `write_text_to` costs 101.9 M
+Ir and about 90,000 allocations more than `text()` on the same 10,000-paragraph
+document — nine allocations per paragraph — but the difference contains the
+streaming parse and the sink as well as `preflight_semantic_xml`, so it is a gap,
+not an attribution. And the harness has no selector that times a DOCX
+`document()`: three of the four `docx_semantic_*` read selectors construct the
+view before starting the clock, which is why DOCX-2's gain is invisible to them
+and why this batch needed a scratch probe.
+
 ## 0591 — the ordinary DOCX edit scans the main part twice
 
 Item DOCX-1(a)/(b) of the 0587 queue is implemented. An ordinary one-paragraph

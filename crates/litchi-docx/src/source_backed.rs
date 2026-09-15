@@ -99,7 +99,7 @@ use std::borrow::Cow;
 use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// A DOCX package that leaves ordinary part bodies cold at open.
 pub struct Package {
@@ -650,16 +650,22 @@ impl Package {
                 })?;
                 let index_admission = DocumentIndexAdmission::new(&context, data.as_bytes().len())?;
                 let _parser = admit_document_query_parser(Some(&context), data.as_bytes().len())?;
+                // Budget-managed opens keep the eager scan. Its parser
+                // admission is reserved and its work consumed here, so
+                // deferring only the scan would run it with fewer live
+                // reservations than the managed contract established.
                 let paragraph_index = ParagraphIndex::from_xml(data.as_bytes()).ok().map(Arc::new);
                 (
                     DocumentPayload::Managed(data),
-                    paragraph_index,
+                    OnceLock::from(paragraph_index),
                     Some(index_admission),
                 )
             } else {
+                // Unmanaged opens reserve nothing for the index and swallow
+                // its failure, so the scan is deferred to the first paragraph
+                // query that can use it.
                 let xml = visible_document_xml(data.into_arc()?)?;
-                let paragraph_index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
-                (DocumentPayload::Owned(xml), paragraph_index, None)
+                (DocumentPayload::Owned(xml), OnceLock::new(), None)
             };
             let source_version = self.package.source_version()?;
             Ok(Document {
@@ -2925,14 +2931,34 @@ fn admit_document_query_parser(
 #[derive(Clone)]
 pub struct Document {
     xml: DocumentPayload,
-    /// Bounded offsets into the pinned XML, admitted separately from its payload.
-    paragraph_index: Option<Arc<ParagraphIndex>>,
+    /// Bounded offsets into the pinned XML, admitted separately from its
+    /// payload. Managed opens fill this during [`Package::document`]; unmanaged
+    /// opens fill it on the first paragraph query.
+    paragraph_index: OnceLock<Option<Arc<ParagraphIndex>>>,
     _index_admission: Option<Arc<DocumentIndexAdmission>>,
     source_version: SourceVersion,
     execution: Option<ExecutionContext>,
 }
 
 impl Document {
+    /// Borrow the bounded paragraph offsets for this pinned view.
+    ///
+    /// Managed opens fill the cell inside [`Package::document`], under the
+    /// admission reserved there, so this never scans for them. Unmanaged opens
+    /// reserve nothing for the index and swallow its failure with `.ok()`, so
+    /// the scan is deferred to the first paragraph query: the same operations
+    /// can observe the same swallowed failure, and text, table, block and
+    /// element reads - which never consult the index - no longer pay for it.
+    fn paragraph_ranges(&self) -> Option<&ParagraphIndex> {
+        self.paragraph_index
+            .get_or_init(|| {
+                ParagraphIndex::from_xml(self.xml.as_bytes())
+                    .ok()
+                    .map(Arc::new)
+            })
+            .as_deref()
+    }
+
     fn check_execution(&self) -> Result<()> {
         let Some(context) = self.execution.as_ref() else {
             return Ok(());
@@ -2976,7 +3002,7 @@ impl Document {
     /// Count visible paragraphs in the pinned document.
     pub fn paragraph_count(&self) -> Result<usize> {
         self.check_execution()?;
-        if let Some(index) = self.paragraph_index.as_deref() {
+        if let Some(index) = self.paragraph_ranges() {
             return Ok(index.len());
         }
         let _parser =
@@ -2992,7 +3018,7 @@ impl Document {
     /// semantic output, not a hidden payload alias.
     pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
         self.check_execution()?;
-        let selected = self.paragraph_index.as_deref().and_then(|paragraph_index| {
+        let selected = self.paragraph_ranges().and_then(|paragraph_index| {
             paragraph_index
                 .get(index)
                 .map(|range| (range.start, range.length))
@@ -3040,7 +3066,7 @@ impl Document {
         let DocumentPayload::Owned(xml) = &self.xml else {
             unreachable!("managed document payload rejected above")
         };
-        if let Some(index) = self.paragraph_index.as_deref() {
+        if let Some(index) = self.paragraph_ranges() {
             return document_paragraphs_from_index(Arc::clone(xml), index);
         }
         document_paragraphs(Arc::clone(xml))
@@ -3061,7 +3087,7 @@ impl Document {
         let DocumentPayload::Owned(xml) = &self.xml else {
             unreachable!("managed document payload rejected above")
         };
-        if let Some(paragraph_index) = self.paragraph_index.as_deref() {
+        if let Some(paragraph_index) = self.paragraph_ranges() {
             return Ok(document_paragraph_from_index(
                 Arc::clone(xml),
                 paragraph_index,

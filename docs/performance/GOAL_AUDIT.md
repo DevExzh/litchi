@@ -1,5 +1,39 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0592: the first item off the 0587 queue, and what the harness could not see
+
+`docs/GOAL.md`'s optimization order puts "eliminate unnecessary work" first, and
+[0592](0592-docx-lazy-paragraph-index.md) is that step applied to the smallest
+aligned item the 0587 survey found: a cache built on every DOCX main-document
+open for the benefit of three of its dozen readers. It is retained on
+deterministic evidence — callgrind isolation pairs and allocation counts on two
+document shapes, plus a 332-document differential whose signature files are
+byte-identical between legs — and `performance_claim: none`.
+
+**The batch confirms one of the survey's falsification conditions rather than
+refuting it.** 0587 wrote that DOCX-2 would be "falsified if the full-text
+harness timer starts after `document()`, in which case the gain is invisible to
+the selector". It does, and it is: `docx_semantic_full_text` moves −1.83% and
++0.10% across the two orders against an A/A floor of −0.80%. The gain is real and
+is measured by the file-backed selectors, whose timed region does contain
+`document()` (−40.22% at p50 on `docx_file_eager_full_text`, A/A floor 1.52%),
+and by the instruction counts. The lesson for the goal's evidence rules is the one 0587
+already recorded in another form: **a selector's timer boundary is part of the
+claim's scope**, and three of the four `docx_semantic_*` DOCX read selectors
+exclude the open from the interval they time. Anything that changes `document()`
+must be measured with a probe or with the file-backed lifecycle selectors, and
+this record says so rather than quoting the semantic selector's flat result as
+"no effect".
+
+**The A/A floor in this window was not the host's usual one.** With eight agents
+building and measuring concurrently, the same-binary floor at p50 reached
+**17.34%** on `docx_semantic_open` and **8.54%** on
+`docx_file_eager_open_full_text_lifecycle`, so neither of those two carries a
+result here; sub-microsecond selectors (`docx_semantic_one_paragraph` times a
+130 ns array lookup) are below the clock's usable resolution entirely. The
+counts, not the timings, carry this record's result, and the record says which is
+which.
+
 ## 0591 — the ordinary DOCX edit scans the main part twice
 
 Record: [0591](0591-docx-edit-single-scan.md).

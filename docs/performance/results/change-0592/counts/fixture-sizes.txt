@@ -1,0 +1,2 @@
+operation=eager_document paragraphs=200 reps=0 archive_bytes=1532 allocations=1040 allocated_bytes=1965530
+operation=eager_document paragraphs=10000 reps=0 archive_bytes=29624 allocations=30449 allocated_bytes=7782113

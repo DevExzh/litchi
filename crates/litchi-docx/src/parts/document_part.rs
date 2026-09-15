@@ -22,7 +22,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Maximum number of paragraph ranges retained by the reusable semantic
 /// index.  Documents beyond this bound continue to use the established
@@ -146,10 +146,11 @@ pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
-    /// Best-effort cache built from the validated visible XML. A malformed
-    /// or over-bound payload leaves this empty so the legacy query path keeps
-    /// reporting the same error at query time.
-    paragraph_index: Option<Arc<ParagraphIndex>>,
+    /// Best-effort cache built from the validated visible XML on the first
+    /// paragraph query. A malformed or over-bound payload leaves the cached
+    /// value empty so the legacy query path keeps reporting the same error at
+    /// query time.
+    paragraph_index: OnceLock<Option<Arc<ParagraphIndex>>>,
 }
 
 /// Select markup-compatibility branches for a main-document payload.
@@ -575,16 +576,30 @@ impl<'a> DocumentPart<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let xml = visible_document_xml(part.blob_arc())?;
-        // Index construction is deliberately best-effort. `DocumentPart`
-        // historically deferred structural XML errors until the first
-        // paragraph query; preserving that timing is more important than
-        // caching a malformed payload.
-        let paragraph_index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
         Ok(Self {
             part,
             xml,
-            paragraph_index,
+            paragraph_index: OnceLock::new(),
         })
+    }
+
+    /// Borrow the bounded paragraph offsets, scanning the visible XML once on
+    /// the first paragraph query.
+    ///
+    /// Index construction is deliberately best-effort and deliberately
+    /// deferred. `DocumentPart` has always reported structural XML errors from
+    /// the paragraph selectors rather than from construction, so a swallowed
+    /// index failure keeps the legacy scanner - and its error - on exactly the
+    /// same operations as before. Text, table, block and element reads never
+    /// consult the index, so they no longer pay for a scan they cannot use.
+    fn paragraph_ranges(&self) -> Option<&ParagraphIndex> {
+        self.paragraph_index
+            .get_or_init(|| {
+                ParagraphIndex::from_xml(self.xml.as_slice())
+                    .ok()
+                    .map(Arc::new)
+            })
+            .as_deref()
     }
 
     /// Get the shared Arc of XML bytes (zero-copy from Part).
@@ -625,7 +640,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
-        if let Some(index) = self.paragraph_index.as_deref() {
+        if let Some(index) = self.paragraph_ranges() {
             return Ok(index.len());
         }
         document_paragraph_count(self.xml_bytes())
@@ -659,7 +674,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
-        if let Some(index) = self.paragraph_index.as_deref() {
+        if let Some(index) = self.paragraph_ranges() {
             return document_paragraphs_from_index(self.get_xml_arc(), index);
         }
         document_paragraphs(self.get_xml_arc())
@@ -672,7 +687,7 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the document XML is malformed or exceeds bounds.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
-        if let Some(paragraph_index) = self.paragraph_index.as_deref() {
+        if let Some(paragraph_index) = self.paragraph_ranges() {
             return Ok(document_paragraph_from_index(
                 self.get_xml_arc(),
                 paragraph_index,
@@ -824,6 +839,110 @@ mod tests {
         assert!(document.paragraphs().is_err());
         assert!(document.paragraph(0).is_err());
         assert!(document.elements().is_err());
+    }
+
+    #[test]
+    fn text_and_block_reads_never_build_the_paragraph_index() {
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wp:body><wp:p><wp:r><wp:t>outer</wp:t></wp:r></wp:p><wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl><wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p></wp:body></wp:document>"#;
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+
+        assert!(
+            document.paragraph_index.get().is_none(),
+            "construction must not scan for paragraph ranges"
+        );
+        assert_eq!(document.extract_text().unwrap(), "outercelltail");
+        assert_eq!(document.table_count().unwrap(), 1);
+        assert_eq!(document.tables().unwrap().len(), 1);
+        assert_eq!(document.elements().unwrap().len(), 3);
+        assert_eq!(document.blocks().unwrap().len(), 3);
+        assert_eq!(document.xml_bytes(), xml);
+        assert!(
+            document.paragraph_index.get().is_none(),
+            "text, table, element and block reads must not build the index"
+        );
+
+        assert_eq!(document.paragraph_count().unwrap(), 3);
+        assert!(
+            document.paragraph_index.get().is_some(),
+            "the first paragraph query builds the index once"
+        );
+    }
+
+    #[test]
+    fn deferred_index_answers_every_paragraph_query_like_the_streaming_scan() {
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wp:body><wp:p><wp:r><wp:t>outer</wp:t></wp:r></wp:p><wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl><wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p><wp:p/></wp:body></wp:document>"#;
+        let source = Arc::new(xml.to_vec());
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+
+        let expected_count = document_paragraph_count(xml).unwrap();
+        let expected: Vec<String> = document_paragraphs(Arc::clone(&source))
+            .unwrap()
+            .iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect();
+
+        assert_eq!(document.paragraph_count().unwrap(), expected_count);
+        let observed: Vec<String> = document
+            .paragraphs()
+            .unwrap()
+            .iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect();
+        assert_eq!(observed, expected);
+        for position in 0..=expected_count {
+            let streamed = document_paragraph(Arc::clone(&source), position)
+                .unwrap()
+                .map(|paragraph| paragraph.text().unwrap());
+            let selected = document
+                .paragraph(position)
+                .unwrap()
+                .map(|paragraph| paragraph.text().unwrap());
+            assert_eq!(selected, streamed, "paragraph {position} differs");
+        }
+        // The second round runs entirely off the cached ranges.
+        assert_eq!(document.paragraph_count().unwrap(), expected_count);
+        assert_eq!(
+            document.paragraph(0).unwrap().unwrap().text().unwrap(),
+            expected[0]
+        );
+    }
+
+    #[test]
+    fn concurrent_first_paragraph_queries_agree_on_one_index() {
+        const fn assert_shared<T: Send + Sync>() {}
+        assert_shared::<DocumentPart<'_>>();
+
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wp:body><wp:p><wp:r><wp:t>outer</wp:t></wp:r></wp:p><wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p></wp:body></wp:document>"#;
+        let part = document_part(xml);
+        let document = DocumentPart::from_part(&part).unwrap();
+        let shared = &document;
+
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| {
+                    scope.spawn(move || {
+                        let count = shared.paragraph_count().unwrap();
+                        let first = shared.paragraph(0).unwrap().unwrap().text().unwrap();
+                        let all: Vec<String> = shared
+                            .paragraphs()
+                            .unwrap()
+                            .iter()
+                            .map(|paragraph| paragraph.text().unwrap())
+                            .collect();
+                        (count, first, all)
+                    })
+                })
+                .collect();
+            for handle in handles {
+                let (count, first, all) = handle.join().unwrap();
+                assert_eq!(count, 2);
+                assert_eq!(first, "outer");
+                assert_eq!(all, vec!["outer".to_owned(), "tail".to_owned()]);
+            }
+        });
+        assert!(document.paragraph_index.get().is_some());
     }
 
     #[test]

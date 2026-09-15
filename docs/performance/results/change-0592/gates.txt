@@ -1,0 +1,65 @@
+Gates for change 0592, run in /home/zhuhe/code/litchi-worktrees/0592 on branch
+perf/0592-docx-lazy-paragraph-index (base 08d968f8e). rustc 1.95.0.
+Only litchi-docx was modified, so the per-crate gates are scoped to it.
+
+=== cargo fmt --all --check ===
+exit=0  (clean; no output)
+
+=== cargo clippy -p litchi-docx --all-targets ===
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0592/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0592/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.28s
+exit=0  (workspace lints are deny; no warning emitted)
+
+=== cargo test -p litchi-docx ===
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+--- totals across all 50 binaries ---
+passed=1454  failed=0  ignored=31
+exit=0
+
+=== cargo doc -p litchi-docx --no-deps ===
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0592/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.58s
+   Generated /home/zhuhe/code/litchi-worktrees/0592/target/doc/litchi_docx/index.html
+exit=0  (rustdoc lints are deny)
+
+=== python3 tools/non_iwork_gate.py check ===
+    Checking clap v4.4.18
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0592/crates/litchi)
+    Finished `dev` profile [unoptimized] target(s) in 1m 43s
+exit=0
+
+=== python3 tools/check_crate_boundaries.py ===
+crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+ordered migration debt:
+exit=0
+
+=== python3 tools/check_report_claim_classification.py ===
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+=== python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural ===
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+exit=2  -- PRE-EXISTING, unrelated to this change.
+Reproduced verbatim on the untouched before checkout
+(/home/zhuhe/code/litchi-worktrees/before-08d968f8e, clean at 08d968f8e):
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+exit=2
+This change registers no claim and does not touch claim-registry-v1.json,
+claim-0251 or any litchi-xlsx file.
+
+=== differential corpus checks cited by the record ===
+corpus0592 over test-data/ (62 .docx), both legs:
+c7c6730b43b82fedd0e22dc68cd114aa738cc26946cde70a1753556326d956a1  docs/performance/results/change-0592/corpus/testdata-before.txt
+c7c6730b43b82fedd0e22dc68cd114aa738cc26946cde70a1753556326d956a1  docs/performance/results/change-0592/corpus/testdata-after.txt
+corpus0592 over docs/performance/results/ (270 .docx), both legs:
+ca50c7abb7e2433c6fc38e3c3b5cd1adfe3945b29589b0d322fd82cd35303cf6  docs/performance/results/change-0592/corpus/fuzz-before.txt
+ca50c7abb7e2433c6fc38e3c3b5cd1adfe3945b29589b0d322fd82cd35303cf6  docs/performance/results/change-0592/corpus/fuzz-after.txt
+diff before/after: (empty means identical)
+  test-data: IDENTICAL
+  fuzz corpus: IDENTICAL

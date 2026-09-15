@@ -1,0 +1,647 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0592-after/release/litchi-perf-baseline",
+    "binary_sha256": "f34f4f650209281a209683ca4106f6919dad2dd1a6f11f400eff1c72799df020",
+    "binary_bytes": 60080072,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "docx_semantic_full_text",
+      "docx_semantic_one_paragraph",
+      "docx_semantic_list_paragraphs",
+      "docx_semantic_open"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "docx_semantic_full_text",
+        "corpus_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "docx_semantic_one_paragraph",
+        "corpus_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "docx_semantic_list_paragraphs",
+        "corpus_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "docx_semantic_open",
+        "corpus_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "docx_semantic_full_text",
+      "corpus": {
+        "name": "docx-semantic-large",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 500000,
+        "archive_bytes": 37327,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          3093116,
+          3094726,
+          3095546,
+          3099876,
+          3101666,
+          3105176,
+          3105346,
+          3106226,
+          3109487,
+          3109507,
+          3111686,
+          3111846,
+          3112096,
+          3119447,
+          3122426,
+          3127456,
+          3130206,
+          3130216,
+          3130356,
+          3131497,
+          3138866,
+          3140366,
+          3145647,
+          3145847,
+          3154086,
+          3156367,
+          3156466,
+          3158746,
+          3169187,
+          3211437
+        ],
+        "sample_order": [
+          20,
+          29,
+          23,
+          26,
+          4,
+          24,
+          11,
+          12,
+          25,
+          21,
+          18,
+          22,
+          16,
+          6,
+          28,
+          3,
+          17,
+          14,
+          7,
+          9,
+          2,
+          1,
+          19,
+          0,
+          15,
+          8,
+          13,
+          10,
+          5,
+          27
+        ],
+        "min": 3093116,
+        "p50": 3124941,
+        "p95": 3169187,
+        "p99": 3211437,
+        "max": 3211437,
+        "mean": 3127497.3000000003,
+        "standard_deviation": 26754.99924815859,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3117507.9408412864,
+          "upper": 3137486.659158714
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "docx_semantic_one_paragraph",
+      "corpus": {
+        "name": "docx-semantic-large",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 500000,
+        "archive_bytes": 37327,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          2786604,
+          2795005,
+          2798155,
+          2803994,
+          2805964,
+          2807555,
+          2808575,
+          2808935,
+          2809874,
+          2811035,
+          2811055,
+          2812305,
+          2812794,
+          2813235,
+          2813545,
+          2815645,
+          2816675,
+          2817155,
+          2818545,
+          2818744,
+          2819764,
+          2820115,
+          2821094,
+          2822535,
+          2824025,
+          2825825,
+          2829055,
+          2833764,
+          2835375,
+          2836815
+        ],
+        "sample_order": [
+          4,
+          13,
+          27,
+          29,
+          3,
+          5,
+          17,
+          23,
+          12,
+          28,
+          25,
+          2,
+          18,
+          20,
+          14,
+          8,
+          10,
+          26,
+          1,
+          6,
+          11,
+          16,
+          19,
+          24,
+          22,
+          21,
+          0,
+          7,
+          9,
+          15
+        ],
+        "min": 2786604,
+        "p50": 2814595,
+        "p95": 2835375,
+        "p99": 2836815,
+        "max": 2836815,
+        "mean": 2815125.366666666,
+        "standard_deviation": 11321.524274381345,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2810898.314699596,
+          "upper": 2819352.4186337367
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "docx_semantic_list_paragraphs",
+      "corpus": {
+        "name": "docx-semantic-large",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 500000,
+        "archive_bytes": 37327,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          2969925,
+          2978485,
+          2982125,
+          2986756,
+          2989145,
+          2991065,
+          2994386,
+          3000036,
+          3002955,
+          3005266,
+          3005346,
+          3007166,
+          3007565,
+          3008225,
+          3012505,
+          3012816,
+          3013245,
+          3013626,
+          3015966,
+          3017306,
+          3018186,
+          3018996,
+          3021716,
+          3022436,
+          3025265,
+          3027696,
+          3031816,
+          3036926,
+          3155587,
+          3205186
+        ],
+        "sample_order": [
+          1,
+          5,
+          3,
+          2,
+          8,
+          7,
+          6,
+          23,
+          0,
+          16,
+          19,
+          4,
+          14,
+          13,
+          22,
+          15,
+          28,
+          25,
+          12,
+          18,
+          20,
+          29,
+          11,
+          24,
+          17,
+          27,
+          26,
+          10,
+          9,
+          21
+        ],
+        "min": 2969925,
+        "p50": 3012660,
+        "p95": 3155587,
+        "p99": 3205186,
+        "max": 3205186,
+        "mean": 3019257.3333333335,
+        "standard_deviation": 47050.92139471817,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 3001690.2032354847,
+          "upper": 3036824.4634311823
+        }
+      },
+      "sink": null
+    },
+    {
+      "case": "docx_semantic_open",
+      "corpus": {
+        "name": "docx-semantic-large",
+        "generator": "litchi-docx-semantic-v1",
+        "package_format": "DOCX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 12,
+        "entry_bytes": 50,
+        "uncompressed_payload_bytes": 500000,
+        "archive_bytes": 37327,
+        "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 50,
+        "target_payload_sha256": "f2b71254e77a4e85864ec0ddf8838e579181a508f11faf77d521eabd9ffa7ad1",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          300652,
+          302841,
+          304892,
+          306282,
+          306832,
+          307132,
+          307501,
+          307902,
+          308081,
+          309812,
+          311751,
+          312782,
+          314502,
+          314992,
+          315881,
+          316521,
+          316831,
+          317001,
+          317811,
+          320002,
+          320472,
+          320642,
+          321861,
+          323411,
+          325112,
+          329422,
+          332632,
+          333002,
+          334731,
+          385302
+        ],
+        "sample_order": [
+          21,
+          25,
+          24,
+          22,
+          26,
+          20,
+          23,
+          27,
+          1,
+          28,
+          0,
+          5,
+          6,
+          4,
+          19,
+          2,
+          29,
+          9,
+          16,
+          18,
+          17,
+          15,
+          10,
+          3,
+          11,
+          14,
+          12,
+          7,
+          8,
+          13
+        ],
+        "min": 300652,
+        "p50": 316201,
+        "p95": 334731,
+        "p99": 385302,
+        "max": 385302,
+        "mean": 318219.6,
+        "standard_deviation": 15587.912314265877,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 312399.6314327253,
+          "upper": 324039.56856727466
+        }
+      },
+      "sink": null
+    }
+  ]
+}
