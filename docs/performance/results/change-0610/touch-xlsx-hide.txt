@@ -1,0 +1,180 @@
+# test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx xlsx-hide 27708 11 112296 1 2297
+test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx xlsx-hide 29373 20 85359 1 2955
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/office-interop/litchi-changed/date-autofilter-litchi.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx xlsx-hide 654688 90 1020366 1 1671
+test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx xlsx-hide 14979 15 37236 1 1099
+# test-data/ooxml/xlsx/CustomXMLMappings.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/DataValidationEvaluations.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/DataValidationListTooLong.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/ooxml/xlsx/DateFormatNumberTests.xlsx xlsx-hide 10981 9 22756 1 1869
+test-data/ooxml/xlsx/DateFormatTests.xlsx xlsx-hide 12394 9 32903 1 1864
+test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx xlsx-hide 19460 17 29482 1 1914
+# test-data/ooxml/xlsx/ExcelTables.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/ooxml/xlsx/FormatChoiceTests.xlsx xlsx-hide 46589 10 74250 1 838
+test-data/ooxml/xlsx/FormatConditionTests.xlsx xlsx-hide 14577 9 53478 1 1869
+# test-data/ooxml/xlsx/Formatting.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/InlineString.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/InlineStrings.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/NewlineInFormulas.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/Pivot1_Row.xlsx xlsx-hide 12707 11 19485 1 2557
+# test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet2.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx xlsx-hide 12845 11 20318 1 2557
+test-data/ooxml/xlsx/Pivot2_Row.xlsx xlsx-hide 12590 11 18928 1 2557
+test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx xlsx-hide 12877 11 20092 1 2489
+test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx xlsx-hide 12615 11 19045 1 2557
+test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx xlsx-hide 12670 11 19470 1 2557
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx xlsx-hide 12656 11 19352 1 2557
+test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx xlsx-hide 12677 11 19409 1 2557
+test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx xlsx-hide 12716 11 19703 1 2557
+test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx xlsx-hide 12734 11 19723 1 2557
+# test-data/ooxml/xlsx/SimpleMultiCell.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/SimpleNormal.xlsx xlsx-hide 8871 9 13413 1 602
+# test-data/ooxml/xlsx/SimpleScatterChart.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/chartsheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/SimpleStrict.xlsx xlsx-hide 9225 9 14186 1 1231
+# test-data/ooxml/xlsx/SimpleWithComments.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/SingleCellTable.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/Sparklines.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/StructuredReferences.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx xlsx-hide 325446 25 2684014 1 2399
+# test-data/ooxml/xlsx/Tables.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx xlsx-hide 11359 12 15228 1 661
+# test-data/ooxml/xlsx/TextColor.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx xlsx-hide 7962 8 11428 1 623
+# test-data/ooxml/xlsx/autofilter-colors-fg.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/autofilter-colors.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/autofilter.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/autofilternamedrange.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/cell-borders.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/cell-multi-line.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/chart_hyperlink.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/column_style.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/condFormat_cellis.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/condformat_databar.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/ooxml/xlsx/condformat_theme_color.xlsx xlsx-hide 8937 7 14530 1 1219
+# test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/conditional_fmt_origin.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/customxml.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/decimal-format.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/duplicate-defined-names.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/empty.xlsx xlsx-hide 5221 6 10155 1 1003
+# test-data/ooxml/xlsx/enhanced-protection.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/external-link-path-missing.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/external-link-path-startup.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/fontSize.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/formats.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/headerFooterTest.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/hyperlink.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/hyperlink_export.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/hyperlink_formula.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/hyperlinks.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/ooxml/xlsx/named-ranges-global.xlsx xlsx-hide 5664 6 13071 1 1924
+# test-data/ooxml/xlsx/named-ranges-hidden.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/noSharedStringTable.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/sample.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/shared_formulas.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/sharedhyperlink.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/ooxml/xlsx/sheet-names.xlsx xlsx-hide 9425 10 13749 1 751
+# test-data/ooxml/xlsx/sheet-state-show.xlsx xlsx-hide baseline-refused TabEditBlocked { sheet: "стр1", position: 0, reason: LastVisibleTab }
+# test-data/ooxml/xlsx/sheet-tab-color.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/sortconditionref.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/sortconditionref2.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/style-alternate-content.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/styles.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/ooxml/xlsx/table-sample.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/tableStyle.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/test_conditional_formatting.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/ooxml/xlsx/universal-content.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/openxml4j/50154.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/47889.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 38 }) })
+# test-data/poi/test-data/spreadsheet/48962.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/49609.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 21 }) })
+# test-data/poi/test-data/spreadsheet/54071.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/56169.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/58106.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/60289.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/62834.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/66365.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx xlsx-hide 654688 90 1020366 1 1671
+# test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx xlsx-hide 19460 17 29482 1 1914
+# test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/FormatKM.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx xlsx-hide 325446 25 2684014 1 2399
+# test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+test-data/poi/test-data/spreadsheet/chart_sheet.xlsx xlsx-hide 10795 12 15388 1 684
+test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx xlsx-hide 19534 14 71362 1 1280
+# test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/right-to-left.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/sample.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/shared_formulas.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/xlookup.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })
+# test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
+# test-data/poi/test-data/xmldsign/hello-world-signed.xlsx xlsx-hide baseline-refused Signed
+# test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx xlsx-hide baseline-refused Signed

@@ -51,6 +51,17 @@ The ODF family record retains its original 0023 identity. The later IWA index
 record, which duplicated that number, is indexed as 0029; its decision text
 remains unchanged apart from the corrected identifier.
 
+## Proposed records (not accepted, not normative)
+
+These drafts exist for human review and are deliberately **not** listed in the
+table above. Nothing in the workspace may cite them as authority, and no code
+change is permitted on their basis, until a human accepts one and moves it into
+the table.
+
+| ADR | Proposal | Raised by |
+|---|---|---|
+| [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors | [change 0610](../performance/0610-opc-lazy-part-decode-design.md), satisfying gate 1 of [change 0581](../performance/0581-opc-package-retention.md) |
+
 ## Decision hierarchy
 
 When two records appear to conflict, apply this order:

@@ -1,0 +1,29 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /word/fonts/font14.odttf 414568 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/theme/theme1.xml 3371 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /docProps/app.xml 584 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /word/header2.xml 977 application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml untouched
+part /word/fonts/font10.odttf 370196 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font3.odttf 247092 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/document.xml 2459 application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml untouched
+part /word/fonts/font13.odttf 410820 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /docProps/custom.xml 241 application/vnd.openxmlformats-officedocument.custom-properties+xml untouched
+part /word/fonts/font4.odttf 238612 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fontTable.xml 2669 application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml untouched
+part /word/fonts/font1.odttf 330412 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /docProps/core.xml 746 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /word/fonts/font12.odttf 376892 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font6.odttf 286620 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font8.odttf 224692 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font2.odttf 333900 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/header1.xml 1109 application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml untouched
+part /word/fonts/font16.odttf 409108 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font7.odttf 206132 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/styles.xml 36552 application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml untouched
+part /word/settings.xml 945 application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml untouched
+part /word/fonts/font11.odttf 375760 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font9.odttf 393692 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font15.odttf 415920 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+part /word/fonts/font5.odttf 275572 application/vnd.openxmlformats-officedocument.obfuscatedFont untouched
+test-data/poi/test-data/document/saut_page.docx opc-reblob 2959626 26 5359641 0 0

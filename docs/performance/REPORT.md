@@ -1,5 +1,38 @@
 # Performance program phase report
 
+## 0610 — a proposed ADR for lazy OPC part decode, with the design frozen and sized
+
+No file under `crates/` changed. Three documents are added: the **proposed, not
+accepted** [ADR 0030](../adr/0030-lazy-opc-part-decode.md), deliberately absent
+from the accepted ADR table and listed instead in a new "Proposed records (not
+accepted, not normative)" section beneath it; a frozen design record; and an
+evidence packet with the sizing probe. The proposed design keeps
+`Part::blob(&self) -> &[u8]` **infallible**, so none of the 1,078 `.blob()` call
+sites changes, and instead relies on the invariant that no `&dyn Part` is handed
+outside `litchi-opc` before its payload is decoded — `get_part`, `get_part_mut`,
+`main_document_part` and `part_by_reltype` already return `Result` and would
+force the decode; `iter_parts` is the only infallible route and gains a
+`try_iter_parts` sibling while its own item type narrows to a metadata view with
+no `blob()`, so the invariant becomes a compile-time property. Payload state
+lives in a `std::sync::OnceLock<Arc<Vec<u8>>>`, the only interior-mutability
+primitive that keeps both `#[derive(Clone)]` and `Send + Sync` on `OpcPackage`;
+`Cell`, `RefCell` and `OnceCell` cost `Sync` and `RwLock` has no `Clone` impl at
+all. The record enumerates the migration surface (259 in-scope production
+`iter_parts()` sites; the payload-reading group bracketed 16–88 by two
+mechanical scopes and put at about 25 by an independent full-context review),
+states the exact provenance interaction with 0593, and gives the predicted
+retention on 0581's axes with one measured decoded-bytes point inside it. Two
+refusal relaxations are put to the reviewer explicitly, both reachable only with
+a central directory that under-declares a part, because the declared-size charge
+already happens before decompression and does not move. Validation: nothing
+changed, so no limit, audit, refusal, fence or signature moved.
+`cargo fmt --all --check`, `check_report_claim_classification.py`,
+`check_crate_boundaries.py` and a 51-link relative-link check all pass;
+`check_perf_claims.py` and `check_example_targets.py` are red on the untouched
+base and were reproduced byte-identically there. No latency, RSS, cold-cache or
+throughput claim follows, and no implementation is authorized. See
+[Change 0610](0610-opc-lazy-part-decode-design.md); `performance_claim: none`.
+
 ## 0608 — what the XLS SST walk costs, what a lazy index would have to walk, and why neither form landed
 
 Change 0608 re-prices the eager shared-string walk on the current base and declines to defer it. Three legs were built from one worktree differing only in `crates/litchi-xls/src/records.rs` — the base, a scaffold that walks every string but stores nothing, and a scaffold that skips the walk entirely — and measured pinned to CPU 28 with ASLR disabled. Eighteen deterministic counter cells per leg are the control: every `open` and `list` cell is identical across all three legs (53 reads/565,201 B/29 observations; 16/110,242/22; 40/317,171/25, reproducing the retained figures of changes 0565, 0574, 0576 and 0595), which proves the SST bytes are read at open whatever the index does with them. Callgrind isolation pairs put the walk at 74,236 / 147,687 / 1,906,053 Ir per open — 3.19% / 18.27% / 35.73% — and the two scaffolds split that into 3.18% / 18.09% / 35.75% for the walk and 0.30% / 1.22% / 2.09% for the storage alone; `MeasuredText::consume`, `walk_one_shared_string` and `walk_formatting_runs` are exactly zero in the skip leg on all three fixtures and every symbol outside the walk is identical across the legs. Native `perf stat`, median of five repetitions, puts the same two splits at 2.99% / 18.32% / 30.99% and 0.44% / 3.13% / 3.09% of cycles; two A/A legs in the same window span −0.17% to +0.66%, and a paired A1 B1 B2 A2 wall clock of 400 samples per round puts the same-binary floor at −1.75% to +1.70% at p50 over 24 comparisons, against which the skip leg moves −31.65% to −2.57% and the store-nothing leg −4.06% to +1.39%. The decision rests on a census rather than on those numbers: over all 126 `.xls`/`.xlt` fixtures, 123 carry an SST, four are refused by header checks — the same four change 0576 refuses, identified independently with the reason each fails — and on **94 of 94** fixtures with shared strings the highest index any cell references is the last entry; the probe reproduces 0576's corpus totals exactly, 17,434 entries to the unit, from code that shares nothing with the scan, so the scenarios that dominate the corpus gain nothing from deferral. Gates on the clean worktree at the base commit: `cargo fmt --all --check` clean, Clippy clean on `litchi-xls` with all targets, `cargo test -p litchi-xls` 72 binaries with 1,382 passed, 0 failed and 1 pre-existing ignored doctest, `cargo doc` clean. No production code changed; `performance_claim: none`. [Change and limitations](0608-xls-lazy-sst-index-design.md); [retained evidence](results/change-0608/README.md).

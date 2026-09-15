@@ -1,0 +1,22 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /word/theme/theme1.xml 7043 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /word/embeddings/oleObject1.bin 16384 application/vnd.openxmlformats-officedocument.oleObject untouched
+part /word/media/image3.png 1415 image/png untouched
+part /word/media/image6.png 3839 image/png untouched
+part /word/settings.xml 2401 application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml untouched
+part /word/document.xml 288070 application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml untouched
+part /word/styles.xml 24719 application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml untouched
+part /word/media/image9.png 153 image/png untouched
+part /word/media/image7.png 653 image/png untouched
+part /word/media/image10.png 4128 image/png untouched
+part /word/media/image8.gif 3002 image/gif untouched
+part /word/media/image4.png 3003 image/png untouched
+part /word/media/image5.png 150 image/png untouched
+part /word/media/image2.png 3957 image/png untouched
+part /word/fontTable.xml 3012 application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml untouched
+part /docProps/core.xml 703 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /word/media/image1.wmf 3728 image/x-wmf untouched
+part /word/webSettings.xml 11072 application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml untouched
+part /docProps/app.xml 5032 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+test-data/ooxml/docx/drawing.docx opc-reblob 95247 19 382464 0 0

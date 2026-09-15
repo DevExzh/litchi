@@ -1,5 +1,47 @@
 # Performance hotspot inventory
 
+## 0610 — an XLSX open-edit-save reads one part of ninety
+
+Design only, implementing 0587's SAVE-5 and drafting the proposed ADR that gate
+1 of 0581 requires. 0581 measured what the eager `OpcPackage` *retains*; nobody
+had measured what an operation *reads*. A retained ablation probe now does:
+substitute a sentinel payload for one part at a time and compare the operation's
+outcome everywhere except that part's own member. `load_parts_eager` inflates
+**5,077 parts and 45,562,463 bytes** across 334 real OOXML fixtures whose
+archives total 15,323,729 (2.97×; XML parts are 90.8% of the inflated bytes).
+The documented XLSX editor route — `Workbook::open` → `edit()` → hide a tab →
+`commit()` → `to_bytes()` — reads **exactly one part on all 33 corpus fixtures
+that admit it, `/xl/workbook.xml` every time**: 33 of 550 parts and 60,239 of
+8,274,037 inflated bytes, **0.728%**; on the 132-member
+`ConditionalFormattingSamples.xlsx` it is 1 of 90 parts and 0.164% of bytes. The
+physical `OpcPackage` open-edit-publish route reads **zero** other parts across
+325 fixtures and 4,896 parts, so the publication plan needs no decoded payload
+for any member it copies — which is true only because 0593 replaced the plan's
+byte comparison with a provenance-identity proof, making 0593 a prerequisite for
+C2′ rather than merely a predecessor. The census also measures Σ decompressed
+payloads directly and confirms 0581's stated inference: `archive + Σ` accounts
+for **98.32%** of the retention 0581 measured across its six axis-3 fixtures.
+The migration surface is far smaller than 0587 estimated: of 307
+`iter_parts()` sites under `crates/*/src`, 21 are inline tests and 27 are
+`SourceBackedPackage::iter_parts` (out of scope), leaving **259 in-scope
+production sites**, of which the payload-reading group is bracketed **16–88** by
+two mechanical scopes and put at **about 25** by an independent full-context
+review; none of the 1,078 `.blob()` sites changes, because `Part::blob` keeps
+its signature. Gate 2 is also smaller
+than 0581 assumed — the reader already charges `PartBytes` and `TotalPartBytes`
+against declared central-directory sizes before any decompression and again
+against actual sizes after, so only the second charge moves.
+`performance_claim: none`; `claim_authorized: false`; nothing is implemented and
+ADR 0030 is **proposed, not accepted**. Also reported, not diagnosed: the
+pre-existing `NotCompact` defect 0587 §4 found on two operations of one fixture
+blocks the `hide` operation on **59 of 180** `.xlsx` fixtures. Remaining in this
+area: SAVE-3 (PPTX eager save regenerates every slide), SAVE-4 (fresh deflate
+state per regenerated member), and C3 as the end state. OLE2 and OOXML remain
+active; ODF is deferred until that goal completes and iWork is excluded.
+[Change and limitations](0610-opc-lazy-part-decode-design.md);
+[proposed ADR](../adr/0030-lazy-opc-part-decode.md);
+[retained evidence](results/change-0610/README.md).
+
 ## 0608 — the XLS shared-string walk re-priced, and XLS-2 declined on a corpus census
 
 The 0587 queue ranked XLS-2 (lazy SST indexing) at 23 on a retained pre-0595 figure of 49.5% of the `54016.xls` open. Re-measured on this base with callgrind isolation pairs and native `perf stat` pinned to one CPU, `scan_shared_string_records` is **35.73%** of that open in instructions, **30.99%** in cycles and 31.1–31.7% at p50 in wall clock; **18.27% / 18.32% / 20.4%** on `WithCustomViews.xls`; **3.19% / 2.99% / 3.5%** on `ConditionalFormattingSamples.xls`. Per shared string the walk is 241.5 Ir against the 454 change 0587 retained for the pre-0595 scan, which is change 0595's claim measured from a third direction. The item is nevertheless declined, on a measurement nobody had taken: **a deferred index is a *prefix* index**, so its reach is set by the highest SST index a scenario resolves, and a census of all 126 `.xls`/`.xlt` fixtures finds that on **94 of 94** files carrying both an SST and a `LabelSst` cell the highest index referenced is the **last** entry — so a full text or an all-cells read drives the prefix to completion and saves exactly zero, while paying for a second read pass over the SST (up to +70.9% of the open's read bytes on `54016.xls`, because `GlobalsBuffer`'s payload dies with the open and `ParsedGlobals` retains offsets only). What survives is open-and-list, and only in instructions: preserving the `Allocation { resource: "SST entry locator", requested }` message forces `try_reserve_exact(unique)` on the first extension, so the retained weight is unchanged from the first resolved string onward. The one form in which **no** refusal moves — validate every string at open, store no entries until first use — was built as a scaffold and measured at 0.30–2.09% of the open in instructions and 0.44–3.13% in cycles, against a same-binary floor of −1.75% to +1.70% at p50, and it makes every string-resolving scenario pay the walk twice; it is declined too. The general caution for the rest of this queue: an item whose saving is a *prefix* of a table is worth a census of the indices real files reference before it is ranked on the table's size. `performance_claim: none`; no production change. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0608-xls-lazy-sst-index-design.md); [retained evidence](results/change-0608/README.md).

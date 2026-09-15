@@ -1,0 +1,11 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /docProps/core.xml 591 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /xl/styles.xml 7493 application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml untouched
+part /docProps/app.xml 783 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /xl/worksheets/sheet1.xml 3382556 application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml untouched
+part /xl/drawings/drawing1.xml 220 application/vnd.openxmlformats-officedocument.drawing+xml untouched
+part /xl/theme/theme1.xml 7130 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /xl/workbook.xml 553 application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml untouched
+part /xl/sharedStrings.xml 3440972 application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml untouched
+test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx opc-reblob 672414 8 6840298 0 0

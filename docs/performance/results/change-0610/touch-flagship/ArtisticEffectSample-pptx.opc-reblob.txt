@@ -1,0 +1,40 @@
+# fixture operation archive_bytes parts inflated_bytes touched touched_bytes
+# per-part: part <name> <bytes> <content_type> <touched|untouched|ablation-failed>
+part /ppt/slideLayouts/slideLayout2.xml 8593 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/media/image2.tiff 882682 image/tiff untouched
+part /ppt/tableStyles.xml 6423 application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml untouched
+part /ppt/theme/theme1.xml 19687 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /ppt/slides/slide2.xml 1588 application/vnd.openxmlformats-officedocument.presentationml.slide+xml untouched
+part /ppt/slideLayouts/slideLayout1.xml 1609 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/commentAuthors.xml 593 application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml untouched
+part /ppt/media/image1.png 9937 image/png untouched
+part /customXml/item1.xml 290 application/xml untouched
+part /ppt/presentation.xml 4021 application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml untouched
+part /customXml/item2.xml 219 application/xml untouched
+part /ppt/slideLayouts/slideLayout5.xml 189296 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slides/slide1.xml 2366 application/vnd.openxmlformats-officedocument.presentationml.slide+xml untouched
+part /docProps/app.xml 1519 application/vnd.openxmlformats-officedocument.extended-properties+xml untouched
+part /customXml/itemProps3.xml 1149 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+part /ppt/slideLayouts/slideLayout6.xml 13293 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/slideLayouts/slideLayout4.xml 864 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/notesSlides/notesSlide1.xml 1636 application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml untouched
+part /ppt/theme/theme2.xml 6807 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /ppt/slideLayouts/slideLayout7.xml 2001 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /docProps/thumbnail.jpeg 6054 image/jpeg untouched
+part /ppt/notesMasters/notesMaster1.xml 7535 application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml untouched
+part /docProps/custom.xml 402 application/vnd.openxmlformats-officedocument.custom-properties+xml untouched
+part /customXml/item3.xml 9600 application/xml untouched
+part /ppt/slideMasters/slideMaster1.xml 32422 application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml untouched
+part /customXml/itemProps2.xml 335 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+part /ppt/slideLayouts/slideLayout9.xml 2038 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/theme/theme3.xml 6807 application/vnd.openxmlformats-officedocument.theme+xml untouched
+part /ppt/handoutMasters/handoutMaster1.xml 3450 application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml untouched
+part /ppt/media/image3.png 2198 image/png untouched
+part /ppt/viewProps.xml 961 application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml untouched
+part /ppt/presProps.xml 1404 application/vnd.openxmlformats-officedocument.presentationml.presProps+xml untouched
+part /docProps/core.xml 612 application/vnd.openxmlformats-package.core-properties+xml untouched
+part /ppt/slideLayouts/slideLayout8.xml 2041 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /ppt/changesInfos/changesInfo1.xml 80479 application/vnd.ms-powerpoint.changesinfo+xml untouched
+part /ppt/slideLayouts/slideLayout3.xml 845 application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml untouched
+part /customXml/itemProps1.xml 954 application/vnd.openxmlformats-officedocument.customXmlProperties+xml untouched
+test-data/poi/test-data/slideshow/ArtisticEffectSample.pptx opc-reblob 972788 37 1312710 0 0

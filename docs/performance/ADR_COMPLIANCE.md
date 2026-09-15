@@ -1,5 +1,44 @@
 # Performance optimization ADR-compliance matrix
 
+## 0610 — a proposed ADR, and gate 2 turns out to be smaller than it looked
+
+Nothing is implemented, so no accepted record's position changes; what this
+batch adds is a **proposed** ADR for review and the evidence a reviewer needs.
+ADR 0005's "Input and lazy state" clause — *"Semantic payloads load lazily into
+thread-safe weighted caches"* — actively favours the proposal, and 0581 already
+recorded that no accepted ADR requires eager part decoding, an absence noted
+there as an absence of documented rationale rather than as permission; this
+record does not upgrade that absence into permission either. ADR 0005's
+2026-08-21 exact-source amendment is untouched: the retained source archive
+stays, `exact_source_authorized` is not widened, and the proposal uses
+provenance exactly as 0593 already uses it — as planning evidence choosing
+`Copy` for one member inside an already-proven preservation plan, now with
+"never decoded" as the proof instead of a byte comparison. ADR 0005's
+hierarchical-budget clause is where the one real question lies, and it is
+smaller than 0581 framed it: the reader **already** charges
+`ReadResource::PartBytes` and `TotalPartBytes` against declared
+central-directory sizes before any decompression, with a regression test
+asserting that the bulk decompressor is never invoked when that pass fails, and
+charges them again against actual sizes afterwards. Only the second charge would
+move, so every package refused at `open()` today for declared size is still
+refused at `open()` with the identical `OpcError::ReadLimit` value and text. The
+two resulting relaxations are stated for the reviewer rather than assumed: a
+forged central directory's part is refused at first access instead of at open,
+and the aggregate actual charge covers decoded parts rather than all parts. The
+conservative alternative — holding the declared aggregate as a lifetime
+reservation — is already implemented at the physical layer
+(`reserve_declared_parts` / `commit_actual_parts` / `release_declared_parts`)
+and is offered rather than decided. ADR 0003's panic-free facade requirement is
+met by forcing the decode in the fallible accessor rather than by a new
+`Result`; ADR 0006 and record 0528 are untouched, because no audit of changed
+XML moves; ADR 0011's ownership boundary is untouched, because the seam is
+entirely inside `litchi-opc`. No new `unsafe`, limit change, weakened defence,
+global cache, executor, lock, Rayon pool, ambient I/O or leaked archive type is
+proposed. `docs/adr/README.md` gains a "Proposed records (not accepted, not
+normative)" section stating that nothing may cite ADR 0030 as authority until a
+human accepts it. See [Change 0610](0610-opc-lazy-part-decode-design.md);
+[ADR 0030](../adr/0030-lazy-opc-part-decode.md); `performance_claim: none`.
+
 ## 0608 — no boundary moved; the design's compliance, and the one ADR clause it would have to read narrowly
 
 Record: [0608](0608-xls-lazy-sst-index-design.md).

@@ -1,0 +1,28 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0610",
+  "retained_in_repository": [
+    "docs/adr/0030-lazy-opc-part-decode.md (the proposed ADR, status Proposed, not in the accepted table)",
+    "docs/adr/README.md (one added section, 'Proposed records (not accepted, not normative)', listing ADR 0030)",
+    "docs/performance/0610-opc-lazy-part-decode-design.md",
+    "docs/performance/results/change-0610/ (the probe source and manifest template, the corpus ablation driver, the iter_parts classifier, the whole-corpus census, both ablation summaries, the touched-part listing, the per-part flagship detail, the site-count evidence, gates.txt, log-sections.md, decision.json, cleanup.json)"
+  ],
+  "removed_after_the_packet_was_assembled": [
+    "the scratch copy of the probe crate at /home/zhuhe/code/litchi-worktrees/0610-probe (60 KiB); its source and manifest template are retained in the packet and rebuild from them",
+    "the session scratch directory scratchpad/agents/0610 (200 KiB at its peak: the census, the two corpus ablation runs, the flagship per-part runs, the classifier output and the two gate logs, every one of which is retained in the packet after absolute worktree paths were rewritten to repo-relative ones)",
+    "no worktree, target directory or fixture copy was ever placed on the RAM-backed /tmp",
+    "the source-only tree at /home/zhuhe/code/litchi-worktrees/0610-src (116 MiB, `git archive 818e58bee crates`), used to re-run the corrected classifier after the first worktree had been removed"
+  ],
+  "build_directories_removed": [
+    "/home/zhuhe/code/litchi-worktrees/targets/0610-probe (353 MiB, the probe build; the probe is a scratch crate with path dependencies and is not part of the workspace build)",
+    "/home/zhuhe/code/litchi-worktrees/0610 (7.0 GiB checkout, no target directory: this batch built no workspace crate because it modified none)",
+    "/home/zhuhe/code/litchi-worktrees/0610-fix (7.0 GiB checkout), created only to land the classifier correction and re-run the gates, removed afterwards"
+  ],
+  "worktree": "/home/zhuhe/code/litchi-worktrees/0610 removed after the commit; the branch perf/0610-opc-lazy-part-decode-adr-draft is kept",
+  "shared_resources_left_untouched": [
+    "/home/zhuhe/code/litchi (the shared working copy; never built, edited or tested in)",
+    "/home/zhuhe/code/litchi-worktrees/before-6c4c1469b (the shared read-only before checkout; not needed, because this batch has no before leg to measure)"
+  ],
+  "note": "no before leg was built. Every figure in this packet is a deterministic count of parts or bytes taken from one build of the base, so no paired measurement and no second checkout was required. The packet was corrected once after its first commit; README.md records what changed and why, and no measured figure moved."
+}

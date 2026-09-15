@@ -1,0 +1,80 @@
+# Gates for change 0610
+
+Documentation-only batch: no file under `crates/` was modified, so no
+crate-scoped `clippy`, `test` or `doc` gate applies. What follows is every
+workspace-wide checker that could observe a documentation change, plus a
+relative-link check of the four documents this batch adds or edits, plus the
+clean release build of the retained probe.
+
+Two checkers are **red on the untouched base** for reasons unrelated to this
+batch. Both are reproduced below on a pristine `818e58bee` and produce
+byte-identical output there, so this batch does not change their state.
+`check_perf_claims.py` is the same pre-existing failure change 0581 recorded;
+`check_example_targets.py` is the same duplicate-iWork-example-target failure
+0581 recorded, with one more duplicate than it saw.
+
+This log was re-captured after the classifier correction described in
+`README.md`; the pristine-base section below is the original capture, which the
+correction does not affect because it touches only files under `docs/`.
+
+Produced by `run-gates.sh` in this directory.
+
+
+===== cargo fmt --all --check =====
+[exit 0]
+
+===== python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural =====
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+[exit 2]
+
+===== python3 tools/check_report_claim_classification.py =====
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+[exit 0]
+
+===== python3 tools/check_example_targets.py =====
+example-target-check: cross-package duplicate example target 'edit_chart_arrangement': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_chart_arrangement.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_chart_arrangement.rs
+example-target-check: cross-package duplicate example target 'edit_image_adjustments': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_image_adjustments.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_image_adjustments.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/edit_image_adjustments.rs
+example-target-check: cross-package duplicate example target 'edit_table_cell_number_format': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_table_cell_number_format.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_table_cell_number_format.rs
+example-target-check: cross-package duplicate example target 'save_package': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/save_package.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/save_package.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/save_package.rs
+[exit 1]
+
+===== python3 tools/check_crate_boundaries.py =====
+crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+  [002] litchi-iwa -> litchi-iwa-archive
+  [004] litchi-iwa -> litchi-iwa-common
+  [008] litchi-iwa -> litchi-iwa-index
+  [010] litchi-iwa -> litchi-iwa-protos
+  [012] litchi-iwa -> litchi-iwa-text
+  [013] litchi-iwa -> litchi-iwa-text-wire
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+[exit 0]
+
+===== relative-link check for the new documents =====
+checked 52 relative links across 4 documents; 0 broken
+[exit 0]
+# ---------------------------------------------------------------------------
+# The two red gates, reproduced on the pristine base (stashed working tree)
+# ---------------------------------------------------------------------------
+===== python3 tools/check_perf_claims.py (pristine base) =====
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+[exit 2]
+
+===== python3 tools/check_example_targets.py (pristine base) =====
+example-target-check: cross-package duplicate example target 'edit_chart_arrangement': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_chart_arrangement.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_chart_arrangement.rs
+example-target-check: cross-package duplicate example target 'edit_image_adjustments': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_image_adjustments.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_image_adjustments.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/edit_image_adjustments.rs
+example-target-check: cross-package duplicate example target 'edit_table_cell_number_format': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_table_cell_number_format.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_table_cell_number_format.rs
+example-target-check: cross-package duplicate example target 'save_package': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/save_package.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/save_package.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/save_package.rs
+[exit 1]
+
+# ---------------------------------------------------------------------------
+# Retained probe: clean release build, no warnings
+# ---------------------------------------------------------------------------
+===== cargo build --release (scratch crate, path dependencies) =====
+    Finished `release` profile [optimized] target(s)
+[exit 0]
+opc-touch-probe sha256 e895d92cf46a0bd0db720452eebe91754dd7a5768de7c6ad91b74f2d6b4d2a7b

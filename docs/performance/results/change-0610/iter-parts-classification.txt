@@ -1,0 +1,140 @@
+# iter_parts() sites under crates/*/src, narrow window = 8 lines
+# scanned 307; 21 inside an inline #[cfg(test)] mod; 27 on SourceBackedPackage (out of scope); 259 classified
+
+## narrow window (bytes = LOWER bound)
+  crate                      bytes  metadata     count   unclear     total
+  litchi                         0         1         0         0         1
+  litchi-docx                    1        32         0         0        33
+  litchi-ooxml-common            0        16         1         0        17
+  litchi-opc                     0         8         1         0         9
+  litchi-ppt                     3         1         0         0         4
+  litchi-pptx                    4        76         2         0        82
+  litchi-xlsb                    6        39         3         1        49
+  litchi-xlsx                    2        62         0         0        64
+  TOTAL                         16       235         7         1       259
+
+## enclosing function (bytes = UPPER bound)
+  crate                      bytes  metadata     count   unclear     total
+  litchi                         0         1         0         0         1
+  litchi-docx                    9        24         0         0        33
+  litchi-ooxml-common            1        16         0         0        17
+  litchi-opc                     3         6         0         0         9
+  litchi-ppt                     4         0         0         0         4
+  litchi-pptx                   34        46         2         0        82
+  litchi-xlsb                   17        30         1         1        49
+  litchi-xlsx                   20        44         0         0        64
+  TOTAL                         88       167         3         1       259
+
+## source-backed, out of scope
+  litchi                         1
+  litchi-docx                   16
+  litchi-ooxml-common            2
+  litchi-opc                     2
+  litchi-pptx                    6
+  TOTAL                         27
+    crates/litchi/src/detection_smart/ooxml.rs:302
+    crates/litchi-docx/src/source_backed/paragraph_copy.rs:1173
+    crates/litchi-docx/src/source_backed/story_text.rs:1675
+    crates/litchi-docx/src/source_backed/story_text.rs:1726
+    crates/litchi-docx/src/source_backed/story_text.rs:1947
+    crates/litchi-docx/src/source_backed/story_text.rs:1997
+    crates/litchi-docx/src/source_backed/story_text.rs:2091
+    crates/litchi-docx/src/source_backed/tail_append.rs:1289
+    crates/litchi-docx/src/source_backed.rs:1723
+    crates/litchi-docx/src/source_backed.rs:1957
+    crates/litchi-docx/src/story_hyperlinks.rs:1117
+    crates/litchi-docx/src/story_hyperlinks.rs:1260
+    crates/litchi-docx/src/story_hyperlinks.rs:1302
+    crates/litchi-docx/src/validation.rs:560
+    crates/litchi-docx/src/validation.rs:1461
+    crates/litchi-docx/src/validation.rs:1496
+    crates/litchi-docx/src/validation.rs:1526
+    crates/litchi-ooxml-common/src/embedded/codec.rs:173
+    crates/litchi-ooxml-common/src/properties/graph.rs:24
+    crates/litchi-opc/src/prepared.rs:79
+    crates/litchi-opc/src/validation.rs:393
+    crates/litchi-pptx/src/presentation/source_cross_copy.rs:3597
+    crates/litchi-pptx/src/presentation/source_cross_copy.rs:3609
+    crates/litchi-pptx/src/presentation/source_cross_copy.rs:4124
+    crates/litchi-pptx/src/presentation/source_cross_copy.rs:4684
+    crates/litchi-pptx/src/presentation/source_cross_copy.rs:4719
+    crates/litchi-pptx/src/validation.rs:1120
+
+## sites where the two scopes disagree (77)
+  crates/litchi-docx/src/chart/package.rs:198  narrow=metadata function=bytes
+  crates/litchi-docx/src/chart/package.rs:202  narrow=metadata function=bytes
+  crates/litchi-docx/src/chart/package.rs:206  narrow=metadata function=bytes
+  crates/litchi-docx/src/content_control/package.rs:1278  narrow=metadata function=bytes
+  crates/litchi-docx/src/content_control/package.rs:1458  narrow=metadata function=bytes
+  crates/litchi-docx/src/package/package/transfer.rs:285  narrow=metadata function=bytes
+  crates/litchi-docx/src/package/package/transfer.rs:390  narrow=metadata function=bytes
+  crates/litchi-docx/src/package/package/transfer.rs:533  narrow=metadata function=bytes
+  crates/litchi-ooxml-common/src/custom_xml/package.rs:216  narrow=metadata function=bytes
+  crates/litchi-ooxml-common/src/ribbon/package.rs:235  narrow=count function=metadata
+  crates/litchi-opc/src/package.rs:1269  narrow=metadata function=bytes
+  crates/litchi-opc/src/pkgwriter.rs:140  narrow=metadata function=bytes
+  crates/litchi-opc/src/sign.rs:313  narrow=metadata function=bytes
+  crates/litchi-opc/src/sign.rs:801  narrow=count function=metadata
+  crates/litchi-ppt/src/slide_round_trip.rs:349  narrow=metadata function=bytes
+  crates/litchi-pptx/src/master_layout/package.rs:283  narrow=metadata function=bytes
+  crates/litchi-pptx/src/modern_comments/package.rs:74  narrow=metadata function=bytes
+  crates/litchi-pptx/src/modern_comments/package.rs:101  narrow=metadata function=bytes
+  crates/litchi-pptx/src/modern_comments/package.rs:879  narrow=metadata function=bytes
+  crates/litchi-pptx/src/modern_comments/package.rs:905  narrow=metadata function=bytes
+  crates/litchi-pptx/src/modern_comments/package.rs:927  narrow=metadata function=bytes
+  crates/litchi-pptx/src/notes/package.rs:214  narrow=metadata function=bytes
+  crates/litchi-pptx/src/notes/package.rs:398  narrow=metadata function=bytes
+  crates/litchi-pptx/src/notes/package.rs:403  narrow=metadata function=bytes
+  crates/litchi-pptx/src/opened/model.rs:466  narrow=metadata function=bytes
+  crates/litchi-pptx/src/opened/tests.rs:846  narrow=metadata function=bytes
+  crates/litchi-pptx/src/opened/tests.rs:891  narrow=metadata function=bytes
+  crates/litchi-pptx/src/opened/transaction.rs:349  narrow=metadata function=bytes
+  crates/litchi-pptx/src/package/codec.rs:418  narrow=metadata function=bytes
+  crates/litchi-pptx/src/package/codec.rs:427  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation/embedded/content_parts/validation.rs:245  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation/embedded/ole/slide/package.rs:39  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:109  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:133  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:160  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs:125  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs:150  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs:177  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/slide_sync/package.rs:47  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/slide_sync/package.rs:102  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/tracks/codec.rs:84  narrow=metadata function=bytes
+  crates/litchi-pptx/src/presentation_properties/metadata/tracks/codec.rs:131  narrow=metadata function=bytes
+  crates/litchi-pptx/src/shape/theme/package.rs:247  narrow=metadata function=bytes
+  crates/litchi-pptx/src/table/style/validation.rs:261  narrow=metadata function=bytes
+  crates/litchi-pptx/src/table/style/validation.rs:270  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/cell_values/drawing_transfer.rs:1504  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/cell_values/root.rs:1052  narrow=count function=bytes
+  crates/litchi-xlsb/src/comments/threaded/edit.rs:491  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/comments/threaded/package/mod.rs:342  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/comments/threaded/package/mod.rs:351  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/comments/threaded/package/mod.rs:436  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:190  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/package/owner_transaction.rs:50  narrow=count function=metadata
+  crates/litchi-xlsb/src/package/owner_transaction.rs:64  narrow=unclear function=metadata
+  crates/litchi-xlsb/src/shared_workbook/tests.rs:179  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/slicer/package.rs:407  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/timeline/package.rs:353  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/writer/workbook/tests/worksheet.rs:1203  narrow=metadata function=bytes
+  crates/litchi-xlsb/src/writer/workbook/tests/worksheet.rs:1749  narrow=metadata function=unclear
+  crates/litchi-xlsx/src/connections/package.rs:499  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/rich_values/package/load.rs:24  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/slicer_cache/crud.rs:830  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/slicer_cache/package.rs:92  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/survey.rs:623  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/survey.rs:627  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:43  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:111  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:164  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:223  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:315  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/timelines/package.rs:368  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/data_model/package.rs:27  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/data_model/package.rs:88  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs:127  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/edit/package.rs:262  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:1941  narrow=metadata function=bytes
+  crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:2061  narrow=metadata function=bytes

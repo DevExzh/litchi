@@ -1,0 +1,1 @@
+# test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx xlsx-hide baseline-refused Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })

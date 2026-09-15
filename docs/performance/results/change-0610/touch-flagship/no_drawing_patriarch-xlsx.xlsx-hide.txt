@@ -1,0 +1,1 @@
+# test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx xlsx-hide baseline-refused skipped: fewer than two sheets
