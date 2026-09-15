@@ -1,5 +1,29 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0602 — real-producer CRUD coverage is blocked before the editor, and before publication
+
+Record: [0602](0602-xlsx-real-producer-admission-design.md).
+
+The audit's standing P1 row "cover the high-impact CRUD categories and real
+producers" now has a measured obstruction on the XLSX source-backed value path.
+The source-backed value editor admits 0 of the 95 real `.xlsx` fixtures: 93
+refuse at the package-root relationship allow-list with a typed
+`value-only edits refuse package relationship` error naming `docProps/app.xml`
+or `docProps/core.xml`, and 2 fail earlier in the read door. Opening that gate
+exposes seven more, of which the vocabulary gates are the expensive ones: the
+value-only worksheet element allow-list is sixteen names and admits no
+`sheetPr`, `mergeCells`, `pageMargins`, `pageSetup`, `autoFilter`,
+`conditionalFormatting`, `dataValidations`, `hyperlinks` or `extLst`. Beyond the
+editor, the OPC publication audit applies `verify_authored` to the **original**
+bytes of every replaced part, and 94 of 95 real fixtures are non-compact
+(`FormattingWhitespace`); the only compact package in the corpus is the one
+litchi wrote. This confirms as a blocker what change 0587's XLSX section listed
+as an item to verify. No harness corpus can exercise any of it: none carries a
+shared-string part, a worksheet relationship, an out-of-`sheetData` child or
+non-compact XML, and the record specifies the generator shape that would.
+`performance_claim: none`; `claim_authorized: false`. OLE2/OOXML remain active;
+ODF is deferred until completion and iWork excluded.
+
 ## 0588: the cheapest read-side transform in the OOXML path, and a contract nobody had written down
 
 `docs/GOAL.md`'s optimization order puts "eliminate unnecessary allocation and

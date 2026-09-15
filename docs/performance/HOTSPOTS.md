@@ -1,5 +1,28 @@
 # Performance hotspot inventory
 
+## 0602 — XLSX real-producer admission is the blocker, not the readback gate
+
+Change 0587's item XLSX-2 ranked widening `stored_entry_is_supported` and the
+worksheet-relationship refusal so change 0525's readback reaches Excel-produced
+files. Measured on the same 95-fixture corpus, all 95 are refused seven gates
+earlier by the package-root relationship allow-list (`snapshot.rs:1924-1952`),
+which admits no `docProps`; and `stored_entry_is_supported` refuses none of
+them, because all four of its clauses are unreachable — a `t="s"` cell with a
+`<v>` fails the planning parse (every parse in `cell_values` passes
+`|| Ok(None)`), `<r>` is outside the worksheet element allow-list, and `cm` and
+`vm` are outside the `<c>` attribute allow-list, each shown by a synthetic twin.
+Independent would-refuse counts: G1 95, G2 77 (no `sharedStrings` in the
+workbook allow-list), G3 45, G4 64, G5 0. The mechanism 0525 removes is
+nonetheless large, measured at 32.9–85.3% of the commit that pays it on four
+derived real-producer fixtures, so XLSX-2's under-10% falsification condition is
+not met; but its population is zero. Separately, `verify_authored` refuses the
+original bytes of 94 of the 95 fixtures' `workbook.xml` and first worksheet, so
+publication blocks real producers even after every editor gate opens. XLSX-2 is
+re-scoped from a readback widening to an admission-surface widening with a
+`litchi-opc` prerequisite; no production change and no speedup is claimed.
+[Design, gates and falsification](0602-xlsx-real-producer-admission-design.md);
+[evidence](results/change-0602/README.md).
+
 ## 0588 — the MCE codec's per-attribute allocations, and why its namespace emission cannot move yet
 
 Survey item XML-1 (rank 1 of change [0587](0587-remaining-opportunity-survey.md))

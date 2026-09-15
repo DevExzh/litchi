@@ -1,0 +1,111 @@
+# Documentation gates for change 0602
+#
+# Run in the worktree at f22f9393598da39272f2185d2dac3d36c4b61d23 with
+# perf/0602-xlsx-real-producer-admission-design checked out. No file under
+# crates/ was modified by this batch, so these gate the record, not a change.
+# Each block is the command, the tail of its output and its exit status.
+
+=== $ cargo fmt --all --check ===
+--- exit 0 ---
+
+=== $ cargo clippy -p litchi-xlsx --all-targets ===
+    ... 167 earlier lines elided ...
+   Compiling quick-xml v0.41.0
+    Checking icu_normalizer v1.5.0
+    Checking digest v0.10.7
+    Checking rand v0.10.2
+    Checking sha2 v0.11.0
+    Checking bitflags v2.13.2
+    Checking cpufeatures v0.2.17
+    Checking linux-raw-sys v0.12.1
+    Checking fast-float2 v0.2.4
+    Checking either v1.18.0
+    Checking base64 v0.22.1
+    Checking zlib-rs v0.6.8
+    Checking flate2 v1.1.10
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-core)
+    Checking rayon v1.12.0
+    Checking sha2 v0.10.9
+    Checking idna_adapter v1.2.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0602/crates/xml-minifier-macros)
+    Checking debug_unsafe v0.1.4
+    Checking tinyvec v1.13.3
+    Checking fastrand v2.5.0
+    Checking percent-encoding v2.3.2
+    Checking form_urlencoded v1.2.2
+    Checking tempfile v3.27.0
+    Checking unicode-normalization v0.1.25
+    Checking atoi_simd v0.18.1
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0602/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/soapberry-zip)
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-opc)
+    Checking caseless v0.2.2
+    Checking ryu v1.0.22
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-spreadsheet-drawing)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-sheet)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 09s
+--- exit 0 ---
+
+=== $ cargo test -p litchi-xlsx ===
+    ... 1525 earlier lines elided ...
+test standalone_workbook_opens_xlsx_theme_variants ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xlsx_threaded_comment_crud.rs (target/debug/deps/xlsx_threaded_comment_crud-d2b6a5bef797acc9)
+running 1 test
+test threaded_comment_models_round_trip_through_the_bounded_codecs ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xlsx_volatile_dependencies_owner.rs (target/debug/deps/xlsx_volatile_dependencies_owner-6f0e1695c1e13413)
+running 2 tests
+test volatile_dependencies_removal_is_idempotent ... ok
+test volatile_dependencies_survive_direct_package_publication ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xlsx_workbook_durable.rs (target/debug/deps/xlsx_workbook_durable-e94fc30659973c01)
+running 9 tests
+test cell_copy_and_move_close_formula_text_and_style_dependencies ... ok
+test cell_transfer_is_bounded_and_malformed_package_bytes_stay_test_only ... ok
+test cell_transfer_participates_in_non_applying_three_way_plans ... ok
+test commits_record_exact_weighted_history_and_refuse_small_budgets ... ok
+test durable_json_is_deterministic_stale_checked_reversible_and_reopenable ... ok
+test page_break_copy_and_move_are_atomic_dependency_checked_transfers ... ok
+test real_poi_and_libreoffice_formulas_copy_and_fully_reopen ... ok
+test real_poi_fixture_round_trips_and_inverse_preserves_the_exact_package ... ok
+test three_way_planning_keeps_disjoint_work_and_requires_conflict_resolution ... ok
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+     Running tests/xlsx_xml_maps_owner.rs (target/debug/deps/xlsx_xml_maps_owner-ec90b537971da029)
+running 2 tests
+test xml_maps_removal_is_idempotent ... ok
+test xml_maps_survive_direct_package_publication ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xml_maps_api_compat.rs (target/debug/deps/xml_maps_api_compat-3f682350b8fd9eb1)
+running 2 tests
+test legacy_types_struct_literals_and_inherent_methods_remain_usable ... ok
+test xlsx_adapters_retain_the_boxed_error_result_surface ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_xlsx
+running 2 tests
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+--- exit 0 ---
+
+=== $ cargo doc -p litchi-xlsx --no-deps ===
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0602/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0602/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/soapberry-zip)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-spreadsheet-drawing)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-sheet)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0602/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.14s
+   Generated /home/zhuhe/code/litchi-worktrees/0602/target/doc/litchi_xlsx/index.html
+--- exit 0 ---
+

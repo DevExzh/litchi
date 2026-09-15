@@ -626,6 +626,15 @@ worksheets. Size: 0525's 96% parser-instruction and 30% commit-p50 reduction,
 currently zero on any Excel-produced file; absolute unknown. Risk medium; needs a
 frozen design and an SST-bearing harness shape. Falsified if the complete
 candidate parse is under 10% of commit instructions on an SST-bearing input.
+**Corrected by change 0602:** the mechanism above is wrong. The value editor
+admits none of the 95 real fixtures — 93 refuse at the package-root relationship
+allow-list, two gates before `stored_entry_is_supported`, whose four clauses are
+all refused upstream and cannot fire — and the publication audit of the
+*original* part bytes (defect 1 below) refuses 94 of 95 real packages outright.
+XLSX-2 is therefore an admission-surface widening gated on a `litchi-opc`
+compactness-contract prerequisite, not a readback widening; 0602 measured the
+complete candidate parse at 32.9-85.3% of the commits that pay it, so the
+falsification condition is not met.
 
 **XLSX-3. Reuse the publication audit of the unchanged original** (step 2).
 `litchi-opc` audits both the original and the replacement bytes of every

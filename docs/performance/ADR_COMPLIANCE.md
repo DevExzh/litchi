@@ -1,5 +1,32 @@
 # Performance optimization ADR-compliance matrix
 
+## 0602 — what admitting real producers would cost in contracts
+
+The frozen design widens the value editor's admission surface in five ordered
+parts and states the ADR reading for each. ADR 0006's preservation default
+argues *for* admission, not against it: a value-only rewrite writes only the
+`<dimension ref>` attribute and the cell records between `<sheetData>` and
+`</sheetData>`, copying the head and tail byte-verbatim, and in `CT_Worksheet`'s
+fixed sequence every `r:id`-bearing child follows `sheetData` while neither
+`CT_Row` nor `CT_Cell` has an `r:id` — so a relationship-bearing worksheet is
+already preserved by construction and refusing it refuses to preserve what is
+preserved. The same argument admits `docProps` at the package root, because the
+topology plan names only the worksheet, the workbook and the `calcChain`.
+ADR 0005 is not relaxed: every mandated traversal keeps running, complete, over
+the complete output, and only the vocabulary the value-only validator admits
+widens, to elements the rewrite already copies and never interprets. Admitting
+`cm`, `vm` and `<r>` as preserved-but-uninterpreted is what makes
+`stored_entry_is_supported` reachable, turning today's dead guard into the
+load-bearing safety net it was written to be. Change 0541's six error-precedence
+properties survive unchanged and must be re-run with one control per widened
+gate, plus two new shared-string orderings. Two doors stay shut: external
+relationships, whose closure cannot be proved, and `Error::Signed` on a
+signature-bearing package. The publication original-bytes compactness contract
+is a `litchi-opc` prerequisite needing change 0528's review and is not designed
+here. No ADR is amended and no ADR clarification is proposed by this record.
+[Change 0602](0602-xlsx-real-producer-admission-design.md);
+`performance_claim: none`.
+
 ## 0588: nothing published, nothing relocated, and two publication paths reported rather than changed
 
 [0588](0588-mce-codec-namespace-emission.md) changes allocation strategy inside

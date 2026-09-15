@@ -1,0 +1,8 @@
+single	multi	sheets	sheet	target	cycle	detail	path
+no:invalid XLSX structure: value-only edits refuse attribute 'cm' on 'c'	no:invalid XLSX structure: value-only edits refuse attribute 'cm' on 'c'	1	Sheet1	P3	cycle-err	invalid XLSX structure: value-only edits refuse attribute 'cm' on 'c'	synth-256x24-cm.xlsx
+yes	yes	1	Sheet1	A1	ok	23987	synth-256x24-inline.xlsx
+yes	yes	1	Sheet1	A1	ok	19143	synth-256x24-numeric.xlsx
+no:invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'r'	no:invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'r'	1	Sheet1	P3	cycle-err	invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'r'	synth-256x24-rich.xlsx
+no:invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'	no:invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'	1	Sheet1	P3	cycle-err	invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'	synth-256x24-sst.xlsx
+read-err	-	-	-	-	-	invalid XLSX structure: worksheet uses shared strings but the workbook has no shared-string part	synth-256x24-sstfree.xlsx
+no:invalid XLSX structure: value-only edits refuse attribute 'vm' on 'c'	no:invalid XLSX structure: value-only edits refuse attribute 'vm' on 'c'	1	Sheet1	P3	cycle-err	invalid XLSX structure: value-only edits refuse attribute 'vm' on 'c'	synth-256x24-vm.xlsx
