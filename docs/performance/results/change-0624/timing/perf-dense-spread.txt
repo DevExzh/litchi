@@ -1,0 +1,27 @@
+# perf report -i dense-spread.data --no-children --no-call-graph (cycles:u, F=4999, taskset -c 18)
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 10K of event 'cycles:u'
+# Event count (approx.): 8266338970
+#
+# Overhead  Command    Shared Object         Symbol                                                                                                
+# ........  .........  ....................  ......................................................................................................
+#
+    45.25%  probe0624  probe0624             [.] zlib_rs::deflate::longest_match::longest_match
+    23.98%  probe0624  probe0624             [.] litchi_opc::pkgwriter::PackageWriter::validate_authored_xml
+    11.11%  probe0624  probe0624             [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     2.08%  probe0624  probe0624             [.] zlib_rs::deflate::flush_block_only
+     1.57%  probe0624  probe0624             [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     0.98%  probe0624  probe0624             [.] quick_xml::name::NamespaceResolver::resolve_event
+     0.93%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::next
+     0.89%  probe0624  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     0.83%  probe0624  libc.so.6             [.] __memcmp_evex_movbe
+     0.82%  probe0624  probe0624             [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+     0.71%  probe0624  probe0624             [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     0.70%  probe0624  libc.so.6             [.] cfree@GLIBC_2.2.5
+     0.68%  probe0624  probe0624             [.] quick_xml::reader::state::ReaderState::emit_start
+
+# zlib_rs/flate2/deflate total share of cycles:u = 58.85%

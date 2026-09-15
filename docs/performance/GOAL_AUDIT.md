@@ -1,5 +1,48 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0624 — the audit's parallelism row now has a size, and its threshold has a correction
+
+Design only; no production file was modified, so every limit, refusal, audit and
+fence is exactly as change 0618 left it. Against `docs/GOAL.md` Workstream F's
+"compression of changed output members" row, which change 0615 recorded as
+having no parallel path at all, this record supplies the size the row lacked and
+two corrections the audit should carry. First, the size: deflate of the changed
+set is 24.19% to 61.94% of a save's native user cycles across five scenarios
+spanning real fixtures, the harness corpora and the authored path, which makes
+it the largest single term in every save measured. Second, the correction to the
+gate: the "two or more members of 256 KiB or more" rule the survey inherited
+from changes 0009, 0498 and 0499 does not transfer, because those records
+measured *decompression batches* contending on one positional source with
+per-wave thread creation and per-task memory reservations, whereas a deflate
+task borrows an owned slice, shares nothing and returns a `Vec` — measured
+profit begins at four 871-byte members, three orders of magnitude under the
+proposed floor, and the real discriminator is whether one member dominates the
+set. Third, the reason the row stays open: `docs/GOAL.md` rule 9 requires CPU
+parallelism to be "opt-in and controlled by an explicit execution context with
+thread, memory, I/O, cancellation, and task-granularity budgets", and a grep at
+the base commit finds zero `ExecutionContext` or `ExecutionLimits` references
+under `litchi-opc/src/pkgwriter.rs`, `atomic.rs`, the `soapberry-zip` writers or
+the `litchi-cfb` writers; proposed ADR 0031, which would supply them, is not
+accepted, and change 0615 §7 names its acceptance and gates G1–G3 as the
+prerequisite for exactly this work. The audit rows this does **not** close:
+nothing parallel was built and nothing end-to-end was timed, so every
+end-to-end figure is Amdahl arithmetic and is labelled modelled; the DOCX
+multi-part case the survey names was measured through the `OpcPackage`
+publication route over all 62 DOCX fixtures rather than through `litchi-docx`'s
+own editor, and the largest DOCX fixture's twelve ≥256 KiB members are embedded
+fonts no paragraph edit regenerates; the authored path, which carries the
+largest modelled win, sits behind the harder writer boundary and is out of scope
+for a first implementation; and compression level remains fixed at 6 everywhere
+and is still unmeasured, as SAVE-6 noted. Cold cache, peak RSS, allocation
+profile, physical-device and cross-platform behaviour were not measured, and
+allocation matters here because change 0618 rejected a pooled compressor on
+glibc page-fault behaviour — this record makes re-measuring that an admission
+gate (A5) rather than assuming per-worker state behaves differently.
+`performance_claim: none`. OLE2 and OOXML remain active; ODF is deferred until
+that goal completes and iWork is excluded.
+[Change](0624-parallel-changed-member-deflate-design.md);
+[evidence](results/change-0624/README.md).
+
 ## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
 
 Record: [0622](0622-xlsx-compact-source-facts.md).

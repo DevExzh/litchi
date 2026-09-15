@@ -1,0 +1,32 @@
+=== xlsx-dense-wide.xlsx xlsxspread:1 ===
+changed_members	2	changed_bytes	3786900	ge_256KiB	2
+publish	n=200	p50=40833092	mean=45521381	p95=85081173	p99=88654422
+deflate	n=200	p50=27330848	mean=27355552	p95=27570870	p99=27840091
+=== xlsx-dense-wide.xlsx xlsxcells:1 ===
+changed_members	1	changed_bytes	1860130	ge_256KiB	1
+publish	n=200	p50=20188659	mean=20213372	p95=20427351	p99=20574631
+deflate	n=200	p50=13684954	mean=13778988	p95=14085626	p99=16914791
+=== xlsx-medium.xlsx xlsxspread:1 ===
+changed_members	4	changed_bytes	106792	ge_256KiB	0
+publish	n=500	p50=1316717	mean=1318868	p95=1329967	p99=1353487
+deflate	n=500	p50=878885	mean=880139	p95=888694	p99=921055
+=== no_drawing_patriarch.xlsx xlsxcells:1 ===
+changed_members	2	changed_bytes	3383231	ge_256KiB	1
+publish	n=200	p50=39064581	mean=39060632	p95=39297362	p99=39534654
+deflate	n=200	p50=27339988	mean=27332213	p95=27428738	p99=27622939
+=== ConditionalFormattingSamples.xlsx xlsxcells:1 ===
+changed_members	4	changed_bytes	19391	ge_256KiB	0
+publish	n=500	p50=211221	mean=212852	p95=220111	p99=221991
+deflate	n=500	p50=65341	mean=65819	p95=70920	p99=72520
+=== ConditionalFormattingSamples.xlsx addrelall ===
+changed_members	40	changed_bytes	34855	ge_256KiB	0
+publish	n=500	p50=576273	mean=575952	p95=582823	p99=601003
+deflate	n=500	p50=353281	mean=356232	p95=363112	p99=383292
+=== authored deck 50 slides ===
+changed_members	161	changed_bytes	249666	ge_256KiB	0
+publish	n=200	p50=2563074	mean=2572575	p95=2608163	p99=2613324
+deflate	n=200	p50=1942570	mean=1943300	p95=1952430	p99=1959861
+=== authored deck 200 slides ===
+changed_members	537	changed_bytes	724782	ge_256KiB	0
+publish	n=200	p50=7388059	mean=7411193	p95=7511630	p99=7543619
+deflate	n=200	p50=5659760	mean=5662150	p95=5679530	p99=5695060

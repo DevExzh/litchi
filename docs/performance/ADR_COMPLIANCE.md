@@ -1,5 +1,45 @@
 # Performance optimization ADR-compliance matrix
 
+## 0624 — a design that adds no dependency edge, no visible executor and no ceiling
+
+No production file was modified, so nothing in the accepted ADR set moves; what
+follows is the reading the design commits to and the gates that would prove it.
+ADR 0002 holds by construction: `soapberry-zip` gains no dependency, because it
+defines its own `ScopedWorkers` trait rather than importing `litchi-core`'s,
+exactly as it already defines its own `CancellationProbe` for the same reason,
+and `litchi-opc` bridges the two as it already bridges `ExecutionLimits` to
+`ParallelReadLimits`. ADR 0005's bounded resources hold: the parallel section
+sits inside a preflight that already retains every regenerated member's buffer,
+so peak memory rises only by `W` compressor states of about 300 KiB, `W` is
+bounded by the granted worker permits, and the pool is built lazily on the first
+qualifying batch — change 0615 gate G1's requirement, which `ParallelReadSession`
+does not meet today because it builds its pool in its constructor. ADR 0006 is
+the binding constraint and the design's entire claim to soundness is that it
+cannot move a published byte: `generated_entry` is a pure function of one
+regenerated entry, and output order is set by the index's physical local order
+and central-directory order rather than by the loop, which the writer documents
+as its contract. That is not argued but made an admission gate — 336 fixtures ×
+five scenarios × four widths, byte-identical, with every typed refusal
+reproduced — beside a second gate on error *order*, because the serial loop
+returns the first error in plan-action order and a parallel version that
+returned the first to fail in time would change error identity on a plan with
+two failing members. ADR 0011 holds: `ParallelWriteSession` is a `soapberry-zip`
+type reached only through an advanced-ingress session parameter, so no archive
+type, raw lock or executor appears in any `Workbook`, `Document` or
+`Presentation` signature, and `PackageWriter::to_bytes` and `save` are unchanged.
+`docs/GOAL.md` rules 8 and 9 are the reason this is a design and not a change:
+there is no ambient Rayon and no global pool today on the write path because
+there is no parallelism at all, and adding any would require the explicit
+execution context rule 9 mandates — which is proposed ADR 0031, **not accepted**,
+and which change 0615 §7 places ahead of this work. Rule 10 is untouched: no
+`unsafe` is proposed anywhere. This record also supplies a second, independent
+argument for ADR 0031 §7's per-task floor, with the correction that a *deflate*
+floor is on the order of a kilobyte rather than the 256 KiB the survey assumed,
+and that the aggregate `min_parallel_bytes` cannot express the largest-member
+rule the measurements actually support. See
+[Change 0624](0624-parallel-changed-member-deflate-design.md);
+`performance_claim: none`.
+
 ## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
 
 Record: [0622](0622-xlsx-compact-source-facts.md).

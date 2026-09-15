@@ -1,0 +1,27 @@
+# Manifest template for change 0624's save-census and save-split probe.
+# Build one copy with its own `CARGO_TARGET_DIR`, pointing the path
+# dependencies at the checkout. `--locked` is not used: the probe is a fresh
+# crate with no lockfile of its own and resolves through the path dependencies.
+#
+# Built for this record with `cargo build --release --offline`, pinned with
+# `taskset`, against the checkout named in ../README.md.
+
+[package]
+name = "probe0624"
+version = "0.0.1"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+litchi-xlsx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-xlsx" }
+litchi-pptx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-pptx" }
+litchi-sheet = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-sheet" }
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+rayon = "1"
+sha2 = "0.10"
+
+[profile.release]
+lto = true
+debug = 1

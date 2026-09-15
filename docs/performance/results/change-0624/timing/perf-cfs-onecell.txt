@@ -1,0 +1,27 @@
+# perf report -i cfs-onecell.data --no-children --no-call-graph (cycles:u, F=4999, taskset -c 18)
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 977  of event 'cycles:u'
+# Event count (approx.): 792897928
+#
+# Overhead  Command    Shared Object         Symbol                                                                                                      
+# ........  .........  ....................  ............................................................................................................
+#
+    10.39%  probe0624  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     9.24%  probe0624  probe0624             [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     6.31%  probe0624  libc.so.6             [.] __memset_avx512_unaligned_erms
+     6.10%  probe0624  libc.so.6             [.] __memcmp_evex_movbe
+     4.62%  probe0624  probe0624             [.] zlib_rs::deflate::longest_match::longest_match
+     4.20%  probe0624  probe0624             [.] litchi_opc::pkgwriter::PackageWriter::validate_authored_xml
+     4.10%  probe0624  probe0624             [.] zlib_rs::deflate::Heap::pqdownheap
+     3.25%  probe0624  probe0624             [.] zlib_rs::deflate::flush_block_only
+     2.51%  probe0624  probe0624             [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     2.33%  probe0624  [unknown]             [k] 0xffffffff9e800ef0
+     2.30%  probe0624  probe0624             [.] quick_xml::events::attributes::IterState::next
+     2.10%  probe0624  probe0624             [.] litchi_opc::pkgwriter::PackageWriter::to_bytes
+     2.09%  probe0624  probe0624             [.] xml_minifier::audit::check_attribute_layout
+
+# zlib_rs/flate2/deflate total share of cycles:u = 24.19%

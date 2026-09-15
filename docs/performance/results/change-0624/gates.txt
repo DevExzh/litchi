@@ -1,0 +1,40 @@
+Gates for change 0624 — design only, no production file modified.
+
+`git diff --name-only HEAD` in the branch worktree lists **0 modified tracked
+files**: everything this change adds is new. The crate set this change touched
+is therefore empty, so the briefing's per-crate `cargo clippy -p`,
+`cargo test -p` and `cargo doc -p` gates have no crate to name; the workspace is
+byte-for-byte the one change 0618 left and its suites were run there. What is
+run below is the gate that does apply to a documentation-and-evidence change —
+formatting — plus the repository's own record and claim checkers, which are the
+things a new record can break.
+
+=== cargo fmt --all --check (workspace) ===
+exit 0
+
+=== cargo fmt --check (probe0624, retained scratch probe) ===
+exit 0
+
+=== cargo fmt --check (probe0624-deflate, retained scratch probe) ===
+exit 0
+
+=== python3 tools/check_report_claim_classification.py ===
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit 0
+
+=== python3 tools/check_perf_claims.py --mode strict ===
+(change 0624 registers no claim; this proves the registry is unmoved)
+OK: 10 performance claims validated (strict)
+exit 0
+
+=== python3 tools/validate_crud_coverage_index.py ===
+validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)
+exit 0
+
+=== python3 -m json.tool results/change-0624/decision.json ===
+valid JSON
+exit 0
+
+=== git diff --name-only HEAD | wc -l (tracked files modified) ===
+0
+exit 0

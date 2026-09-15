@@ -1,0 +1,50 @@
+set	densewide-spread	members=2	total_bytes=3786900	members_ge_256KiB=2	max_bytes=1893450
+leg	densewide-spread	serial	p50=27205758	mean=27200869	p95=27247168	p99=27281808
+leg	densewide-spread	width1	p50=27261718	mean=27360413	p95=27999552	p99=28002892
+scaling	densewide-spread	width=1	speedup=0.998	efficiency=0.998	amdahl_s=out-of-model	class=baseline-width
+leg	densewide-spread	width2	p50=13682695	mean=13804262	p95=14172447	p99=14608300
+scaling	densewide-spread	width=2	speedup=1.988	efficiency=0.994	amdahl_s=0.0059	class=valid
+leg	densewide-spread	width4	p50=13693725	mean=13703404	p95=13733124	p99=13991946
+scaling	densewide-spread	width=4	speedup=1.987	efficiency=0.497	amdahl_s=0.3378	class=valid
+leg	densewide-spread	width8	p50=13716374	mean=13763089	p95=13891835	p99=15338644
+scaling	densewide-spread	width=8	speedup=1.983	efficiency=0.248	amdahl_s=0.4333	class=valid
+set	ndp-onecell	members=2	total_bytes=3383231	members_ge_256KiB=1	max_bytes=3382600
+leg	ndp-onecell	serial	p50=27359559	mean=27375896	p95=27538340	p99=27652610
+leg	ndp-onecell	width1	p50=27403579	mean=27406069	p95=27457949	p99=27475209
+scaling	ndp-onecell	width=1	speedup=0.998	efficiency=0.998	amdahl_s=out-of-model	class=baseline-width
+leg	ndp-onecell	width2	p50=27434318	mean=27462523	p95=27595700	p99=27781011
+scaling	ndp-onecell	width=2	speedup=0.997	efficiency=0.499	amdahl_s=out-of-model	class=slowdown
+leg	ndp-onecell	width4	p50=27488320	mean=27487947	p95=27551360	p99=27639840
+scaling	ndp-onecell	width=4	speedup=0.995	efficiency=0.249	amdahl_s=out-of-model	class=slowdown
+leg	ndp-onecell	width8	p50=27464019	mean=27513300	p95=27589170	p99=28599575
+scaling	ndp-onecell	width=8	speedup=0.996	efficiency=0.125	amdahl_s=out-of-model	class=slowdown
+set	medium-spread	members=4	total_bytes=106792	members_ge_256KiB=0	max_bytes=26698
+leg	medium-spread	serial	p50=902985	mean=904030	p95=909465	p99=930205
+leg	medium-spread	width1	p50=915485	mean=915246	p95=920115	p99=921475
+scaling	medium-spread	width=1	speedup=0.986	efficiency=0.986	amdahl_s=out-of-model	class=baseline-width
+leg	medium-spread	width2	p50=460882	mean=461711	p95=466662	p99=471652
+scaling	medium-spread	width=2	speedup=1.959	efficiency=0.980	amdahl_s=0.0208	class=valid
+leg	medium-spread	width4	p50=234001	mean=234952	p95=242812	p99=244791
+scaling	medium-spread	width=4	speedup=3.859	efficiency=0.965	amdahl_s=0.0122	class=valid
+leg	medium-spread	width8	p50=233311	mean=234428	p95=244021	p99=245232
+scaling	medium-spread	width=8	speedup=3.870	efficiency=0.484	amdahl_s=0.1524	class=valid
+set	cfs-onecell	members=4	total_bytes=19391	members_ge_256KiB=0	max_bytes=9680
+leg	cfs-onecell	serial	p50=65481	mean=66221	p95=72031	p99=76830
+leg	cfs-onecell	width1	p50=66840	mean=67579	p95=70040	p99=80240
+scaling	cfs-onecell	width=1	speedup=0.980	efficiency=0.980	amdahl_s=out-of-model	class=baseline-width
+leg	cfs-onecell	width2	p50=34941	mean=35426	p95=35660	p99=52590
+scaling	cfs-onecell	width=2	speedup=1.874	efficiency=0.937	amdahl_s=0.0672	class=valid
+leg	cfs-onecell	width4	p50=23720	mean=24717	p95=28520	p99=34490
+scaling	cfs-onecell	width=4	speedup=2.761	efficiency=0.690	amdahl_s=0.1497	class=valid
+leg	cfs-onecell	width8	p50=24711	mean=25964	p95=32400	p99=35020
+scaling	cfs-onecell	width=8	speedup=2.650	efficiency=0.331	amdahl_s=0.2884	class=valid
+set	cfs-addrelall	members=40	total_bytes=34855	members_ge_256KiB=0	max_bytes=3859
+leg	cfs-addrelall	serial	p50=352962	mean=354990	p95=359812	p99=370202
+leg	cfs-addrelall	width1	p50=362272	mean=362371	p95=369042	p99=369441
+scaling	cfs-addrelall	width=1	speedup=0.974	efficiency=0.974	amdahl_s=out-of-model	class=baseline-width
+leg	cfs-addrelall	width2	p50=185801	mean=187369	p95=198601	p99=207451
+scaling	cfs-addrelall	width=2	speedup=1.900	efficiency=0.950	amdahl_s=0.0528	class=valid
+leg	cfs-addrelall	width4	p50=94860	mean=96144	p95=101990	p99=112771
+scaling	cfs-addrelall	width=4	speedup=3.721	efficiency=0.930	amdahl_s=0.0250	class=valid
+leg	cfs-addrelall	width8	p50=74450	mean=75343	p95=84220	p99=92830
+scaling	cfs-addrelall	width=8	speedup=4.741	efficiency=0.593	amdahl_s=0.0982	class=valid

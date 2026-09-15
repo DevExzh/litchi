@@ -1,5 +1,53 @@
 # Performance program phase report
 
+## 0624 — where a parallel deflate section would sit, and what it would have to prove
+
+No production code changed. The design names one boundary and rejects the other
+for a first implementation. The boundary it takes is
+`PreservationIndex::prepare` (`crates/soapberry-zip/src/preserve.rs:840-914`),
+which walks the plan's actions and calls `generated_entry(entry)` (`:897`, and
+`:911` for appended members) for each `PreservationAction::Regenerate`.
+`generated_entry` (`:2070`) is a pure function of one `&RegeneratedEntry`: it
+compresses into a one-entry `ZipArchiveWriter`, re-parses that mini-archive for
+its framing and returns a `PreparedEntry`, touching no shared state. Four
+properties the code already has make the boundary low-risk: results are placed
+at `prepared[index]` and emitted later by physical order (`:780`) and
+central-directory order (`:808`), so the action list is explicitly not an
+ordering control (`:236-243`) and reordering *when* a member is compressed
+cannot move a byte; every compression already completes before any byte is
+emitted, so the emission boundary does not move; `prepare` already retains every
+regenerated member's buffer simultaneously — the fact change 0618's rejected
+pooled variant turned on — so peak memory rises only by `W` compressor states;
+and 0618's deliberate one-state-per-member choice becomes one-state-per-worker,
+which has the opposite allocation shape and must be re-measured rather than
+assumed. The boundary it **rejects for now** is `StreamingArchiveWriter`
+(`office.rs:5744`, `write_deflated_with_accounting` `:6919`), which writes each
+member into the sink as it compresses it: parallelising it requires a reorder
+buffer, introduces in-flight bytes that do not exist today, and
+`LimitedEntryWriter` charges the compressed-size budget per write call, so
+buffering could move when a limit is refused — a contract change, and the place
+the authored path's modelled 1.85× lives. Governance follows ADR 0031 §5-6 with
+no new dependency edge: `soapberry-zip` defines its own `ScopedWorkers` exactly
+as it already defines its own `CancellationProbe` (`office.rs:232-249`), a
+`ParallelWriteSession` builds its pool lazily, `litchi_opc::OpenSession` bridges
+`ExecutionLimits` to it as it already bridges `ParallelReadLimits`
+(`litchi-opc/src/execution.rs:33-50`), cancellation is probed between waves and
+never inside a member, and a new opt-in entry point carries the session so
+`PackageWriter::to_bytes` and `save` keep their signatures and their serial
+behaviour. The admission gates any implementation must clear are stated: byte
+identity over 336 fixtures × five scenarios at four widths (A1); error identity
+*and error order*, since the serial loop returns the first error in plan-action
+order and a parallel version must return the same one rather than the first to
+fail in time (A2); no regression at width 1 or below threshold, with no pool
+constructed, counted from `/proc/self/task` (A3); scaling stated in full with
+superlinear and `S < 1` cells labelled out-of-model (A4); minor faults and peak
+RSS against change 0618's 271-fault finding (A5); and a fixture whose physical
+local order differs from its central-directory order published at width 4 (A6).
+Validation for this record is `cargo fmt --all --check` plus the repository's own
+documentation and claim checkers; no crate was touched, so no crate suite
+applies. See [Change 0624](0624-parallel-changed-member-deflate-design.md);
+`performance_claim: none`.
+
 ## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
 
 Record: [0622](0622-xlsx-compact-source-facts.md).

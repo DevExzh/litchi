@@ -1,0 +1,26 @@
+# Manifest template for change 0624's deflate-scaling probe.
+#
+# This crate deliberately has NO litchi dependency: a threshold measured with
+# it is a property of the codec and the host, not of any litchi version. The
+# flate2 backend and the resolved `zlib-rs` version must match the workspace
+# lockfile exactly, or the numbers are not comparable with a save profile:
+#
+#   cargo update -p zlib-rs --precise 0.6.7 --offline
+#
+# (workspace Cargo.lock at the base commit: flate2 1.1.10, zlib-rs 0.6.7,
+# rayon 1.12.0, rayon-core 1.13.0).
+
+[package]
+name = "probe0624-deflate"
+version = "0.0.1"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+rayon = "1"
+
+[profile.release]
+lto = true
+debug = 1
