@@ -1,0 +1,20 @@
+54016  file-source  open        version=    25 len=  1 reads=   40 bytes=  317171 outcome=None
+54016  file-source  list        version=    25 len=  1 reads=   40 bytes=  317171 outcome=None
+54016  file-source  one-cell    version=    43 len=  1 reads=   65 bytes=  932993 outcome=None
+54016  facade-file  open        version=     0 len=  0 reads=    0 bytes=       0 outcome=None
+54016  facade-file  list        version=     0 len=  0 reads=    0 bytes=       0 outcome=None
+54016  facade-file  one-cell    ERROR Error: Custom { kind: Unsupported, error: "facade-file does not expose selected-
+54016  owned-readat open        version=    25 len=  1 reads=   40 bytes=  317171 outcome=None
+54016  owned-readat list        version=    25 len=  1 reads=   40 bytes=  317171 outcome=None
+54016  owned-readat one-cell    version=    43 len=  1 reads=   65 bytes=  932993 outcome=None
+54016  file-source  all-cells   version= 64307 len=  1 reads=16145 bytes= 1256139 outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b
+54016  file-source  full-text   version= 89789 len=  1 reads=16145 bytes= 1256139 outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0
+54016  owned-readat all-cells   version= 64307 len=  1 reads=16145 bytes= 1256139 outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b
+54016  owned-readat full-text   version= 89789 len=  1 reads=16145 bytes= 1256139 outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0
+cfs    file-source  open        version=    29 len=  1 reads=   53 bytes=  565201 outcome=None
+cfs    file-source  one-cell    version=    38 len=  1 reads=   61 bytes=  611226 outcome=None
+cfs    facade-file  open        version=     0 len=  0 reads=    0 bytes=       0 outcome=None
+cfs    facade-file  one-cell    ERROR Error: Custom { kind: Unsupported, error: "facade-file does not expose selected-
+cfs    file-source  full-text   version=  1936 len=  1 reads=  394 bytes=  790147 outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+simple file-source  full-text   version=    59 len=  1 reads=   14 bytes=    4410 outcome=text:48:e6901ef32a48793a80139d15c016a1452dde984fa240d0fb9faa47257d151618
+simple file-source  open        version=    16 len=  1 reads=   10 bytes=    3112 outcome=None

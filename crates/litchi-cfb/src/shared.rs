@@ -597,16 +597,21 @@ impl SharedOleFile {
         source_is_owned_immutable: bool,
     ) -> Result<Self, OleError> {
         let expected_version = source.version()?;
-        let source_length = source.len();
-        let observed = source.version()?;
-        if observed != expected_version {
-            return Err(OleError::SourceChanged {
-                expected: expected_version,
-                observed,
-            });
-        }
-        let source_length = source_length?;
+        // The length observation is bracketed by this capture and the
+        // post-parse comparison below, exactly as the parse itself is. A third
+        // observation between them would only re-prove what the post-parse one
+        // proves, so it survives on the two branches that return *before* the
+        // post-parse comparison can run and would otherwise report a
+        // length-derived failure while the source was already stale.
+        let source_length = match source.len() {
+            Ok(length) => length,
+            Err(error) => {
+                Self::refuse_if_changed(source.as_ref(), expected_version)?;
+                return Err(error.into());
+            },
+        };
         if source_length > limits.max_input_bytes() {
+            Self::refuse_if_changed(source.as_ref(), expected_version)?;
             return Err(OleError::LimitExceeded {
                 resource: "input bytes",
                 observed: source_length,
@@ -2388,6 +2393,22 @@ impl SharedOleFile {
         })
     }
 
+    /// Observes `source` and refuses when it is no longer `expected`.
+    ///
+    /// This is [`Self::check_source_version`] for the open path, where no
+    /// `SharedOleFile` exists yet to hold the captured version. It is called
+    /// only on branches that leave `open_source_with_limits` before the
+    /// post-parse comparison, so that a failure derived from the source's
+    /// length is never reported in place of the mutation that caused it.
+    fn refuse_if_changed(source: &dyn ReadAt, expected: SourceVersion) -> Result<(), OleError> {
+        let observed = source.version()?;
+        if observed == expected {
+            Ok(())
+        } else {
+            Err(OleError::SourceChanged { expected, observed })
+        }
+    }
+
     pub(crate) fn check_source_version(&self) -> Result<(), OleError> {
         let observed = self.source.version()?;
         if observed == self.expected_version {
@@ -3246,6 +3267,8 @@ mod tests {
         interrupt_next_read: AtomicBool,
         panic_next_read: AtomicBool,
         cancel_on_read: AtomicBool,
+        change_on_len: AtomicBool,
+        fail_next_len: AtomicBool,
         cancellation: Mutex<Option<CancellationSource>>,
         barrier: Mutex<Option<Arc<Barrier>>>,
         barrier_reads: AtomicUsize,
@@ -3271,6 +3294,8 @@ mod tests {
                 interrupt_next_read: AtomicBool::new(false),
                 panic_next_read: AtomicBool::new(false),
                 cancel_on_read: AtomicBool::new(false),
+                change_on_len: AtomicBool::new(false),
+                fail_next_len: AtomicBool::new(false),
                 cancellation: Mutex::new(None),
                 barrier: Mutex::new(None),
                 barrier_reads: AtomicUsize::new(0),
@@ -3327,10 +3352,30 @@ mod tests {
         fn fail_all_reads(&self) {
             self.fail_all_reads.store(true, AtomicOrdering::SeqCst);
         }
+
+        /// Mutates the source while its length is being observed.
+        ///
+        /// This is the window the open path's second observation used to
+        /// cover: the capture has been taken, the length has not yet been
+        /// consumed, and the branches that reject the length run before the
+        /// post-parse comparison can.
+        fn change_while_observing_length(&self) {
+            self.change_on_len.store(true, AtomicOrdering::SeqCst);
+        }
+
+        fn fail_next_len(&self) {
+            self.fail_next_len.store(true, AtomicOrdering::SeqCst);
+        }
     }
 
     impl ReadAt for TestSource {
         fn len(&self) -> io::Result<u64> {
+            if self.change_on_len.swap(false, AtomicOrdering::SeqCst) {
+                self.revision.fetch_add(1, AtomicOrdering::SeqCst);
+            }
+            if self.fail_next_len.swap(false, AtomicOrdering::SeqCst) {
+                return Err(io::Error::other("injected source length failure"));
+            }
             Ok(self.bytes.len() as u64)
         }
 
@@ -6936,6 +6981,79 @@ mod tests {
         assert!(
             format!("{error}").contains("injected positional read failure"),
             "expected the payload failure, found: {error}"
+        );
+    }
+
+    #[test]
+    fn an_open_observes_the_source_twice_around_its_parse() {
+        // The open path captures the source version, consumes the length,
+        // parses, and compares. That is one opening observation and one
+        // closing observation; the parse itself takes none, because
+        // `ReadAtCursor` reads through the source directly. A third
+        // observation between the capture and the parse would only re-prove
+        // what the closing one proves.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        source.reset_observation_counts();
+        let file = shared(Arc::clone(&source));
+        let (_reads, versions) = source.observation_counts();
+        assert_eq!(
+            versions, 2,
+            "an open observes the source once before and once after parsing"
+        );
+        assert_eq!(file.file_size(), source.bytes.len() as u64);
+    }
+
+    #[test]
+    fn an_open_refuses_a_changed_source_over_its_input_limit() {
+        // A mutation that lands while the length is observed must be reported
+        // as `SourceChanged`, not as the limit the mutated length violates.
+        // The relocated fence on this branch is what keeps that precedence.
+        let bytes = sample_bytes();
+        let source = Arc::new(TestSource::new(bytes.clone()));
+        source.change_while_observing_length();
+        let limits = SharedOleFileLimits::new(64).unwrap();
+        let error = SharedOleFile::open_with_limits(source, limits).unwrap_err();
+        assert!(
+            matches!(error, OleError::SourceChanged { .. }),
+            "expected SourceChanged, found: {error:?}"
+        );
+
+        // Without the mutation the same call still reports the limit.
+        let stable = Arc::new(TestSource::new(bytes));
+        let limits = SharedOleFileLimits::new(64).unwrap();
+        let error = SharedOleFile::open_with_limits(stable, limits).unwrap_err();
+        assert!(
+            matches!(
+                error,
+                OleError::LimitExceeded {
+                    resource: "input bytes",
+                    ..
+                }
+            ),
+            "expected LimitExceeded, found: {error:?}"
+        );
+    }
+
+    #[test]
+    fn an_open_refuses_a_changed_source_over_a_failed_length() {
+        // Same precedence on the other branch that leaves the open before the
+        // post-parse comparison: the length could not be observed at all.
+        let bytes = sample_bytes();
+        let source = Arc::new(TestSource::new(bytes.clone()));
+        source.change_while_observing_length();
+        source.fail_next_len();
+        let error = SharedOleFile::open(source).unwrap_err();
+        assert!(
+            matches!(error, OleError::SourceChanged { .. }),
+            "expected SourceChanged, found: {error:?}"
+        );
+
+        let stable = Arc::new(TestSource::new(bytes));
+        stable.fail_next_len();
+        let error = SharedOleFile::open(stable).unwrap_err();
+        assert!(
+            format!("{error}").contains("injected source length failure"),
+            "expected the length failure, found: {error}"
         );
     }
 

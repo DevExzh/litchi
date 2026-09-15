@@ -886,7 +886,7 @@ impl SourceBackedWorkbook {
                     .map_err(|source| writer.document_error(source))?;
                 check_text_state(&self.inner, execution)
                     .map_err(|source| writer.document_error(source))?;
-                write_text_sheet(&self.inner, &collected, &mut writer, execution)?;
+                write_text_sheet(&collected, &mut writer, execution)?;
             }
             Ok::<(), TextOutputError<SourceBackedError>>(())
         })();
@@ -1020,8 +1020,14 @@ impl SourceBackedWorkbook {
     ) -> Result<Self> {
         limits.validate()?;
         let source = cfb.source_arc();
+        // `SharedOleFile::source_version` already observes the source this view
+        // was opened over and refuses when it has moved, and `source` is that
+        // same object (`source_arc`). An `ensure_current_parts` call here would
+        // observe it a second time with nothing in between -- no source byte is
+        // consumed, and the captured-version equality it also checks is this
+        // very value -- so it would re-prove what this line proved. Change 0560
+        // collapsed the same pair inside `ensure_current_parts` itself.
         let expected_version = cfb.source_version().map_err(SourceBackedError::from)?;
-        ensure_current_parts(&source, &cfb, expected_version)?;
         let file_size = cfb.file_size();
         if file_size > limits.max_input_bytes {
             return Err(SourceBackedError::ResourceLimit {
@@ -1546,7 +1552,14 @@ fn select_workbook_stream(
     source: &Arc<dyn ReadAt>,
     expected_version: SourceVersion,
 ) -> Result<(Vec<String>, u64)> {
-    ensure_current_parts(source, cfb, expected_version)?;
+    // `SharedOleFile::stream_len` resolves a name against the directory tree
+    // captured and validated while opening; it consumes no source byte. A
+    // leading fence here would therefore prove exactly what the fence on each
+    // of the four exits proves, and those exits are where it matters: every
+    // one of them observes before it reports, so a changed source still
+    // outranks `WorkbookStreamMissing` and the mapped CFB error. This is the
+    // shape change 0560 gave the retained-metadata helpers -- fence once,
+    // after the value is produced.
     for name in ["Workbook", "Book"] {
         let path = vec![name.to_string()];
         let refs = [name];
@@ -2483,10 +2496,26 @@ impl<'a> WorksheetScan<'a> {
 }
 
 fn check_text_state(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Result<()> {
+    check_text_cancellation(execution)?;
+    owner.ensure_current()
+}
+
+/// The cancellation half of [`check_text_state`], for the row loop, where the
+/// source observation is taken one call deeper.
+///
+/// [`write_text_sheet`] emits rows out of the map [`scan_text_sheet`] already
+/// collected and fenced; it consumes no source byte. Every byte it emits goes
+/// through [`SourceCheckedTextSink`], which observes the source immediately
+/// before the write and again immediately after it, so a per-row observation
+/// here would sit between two in-memory steps and re-prove what the sink's
+/// leading observation proves a moment later. Cancellation is not in the same
+/// position: a row whose object the writer skips reaches no sink call at all,
+/// so the row loop keeps its own cancellation granularity.
+fn check_text_cancellation(execution: Option<&ExecutionContext>) -> Result<()> {
     if let Some(context) = execution {
         context.check().map_err(SourceBackedError::from)?;
     }
-    owner.ensure_current()
+    Ok(())
 }
 
 fn map_text_output_error(
@@ -2669,14 +2698,13 @@ fn scan_text_sheet(
 }
 
 fn write_text_sheet<'options, 'output, W: Write + ?Sized>(
-    owner: &SourceInner,
     sheet: &SourceTextSheet,
     writer: &mut SequentialTextWriter<'options, 'output, W>,
     execution: Option<&ExecutionContext>,
 ) -> std::result::Result<(), TextOutputError<SourceBackedError>> {
     let mut row = 0_u16;
     loop {
-        check_text_state(owner, execution).map_err(|source| writer.document_error(source))?;
+        check_text_cancellation(execution).map_err(|source| writer.document_error(source))?;
         let mut value = String::new();
         let mut column = 0_u16;
         loop {
@@ -3173,7 +3201,34 @@ impl<'a> SharedStringResolver<'a> {
     }
 }
 
+/// Resolves one shared string, refusing a mutation over any other failure.
+///
+/// Every byte this returns is read through `SharedOleStreamCursor::read_exact`,
+/// which observes the source after each read (change 0558), so the value is
+/// already bracketed by the observation the scan took before it and by that
+/// trailing observation. The resolver therefore takes no observation of its own
+/// on the path that succeeds. It keeps one on the path that fails, where the
+/// observation is not redundant but decisive: change 0317's precedence makes a
+/// stale source outrank the locator, allocation, chain and decode errors a
+/// mutation can provoke. As in `SharedOleFile::finish_stream_range`, only a
+/// `SourceChanged` refusal displaces the original error; an observation that
+/// cannot be taken at all leaves the original error in place.
 fn resolve_shared_string(
+    owner: &SourceInner,
+    string_index: u32,
+    execution: Option<&ExecutionContext>,
+    strings: &mut SharedStringResolver<'_>,
+) -> Result<litchi_core::sheet::CellValue> {
+    match resolve_shared_string_inner(owner, string_index, execution, strings) {
+        Ok(value) => Ok(value),
+        Err(original) => match owner.ensure_current() {
+            Err(changed @ SourceBackedError::SourceChanged { .. }) => Err(changed),
+            _ => Err(original),
+        },
+    }
+}
+
+fn resolve_shared_string_inner(
     owner: &SourceInner,
     string_index: u32,
     execution: Option<&ExecutionContext>,
@@ -3205,7 +3260,6 @@ fn resolve_shared_string(
     if let Some(context) = execution {
         context.check().map_err(SourceBackedError::from)?;
     }
-    owner.ensure_current()?;
 
     let mut first_segment = None;
     for (segment_index, segment) in owner.sst.segments.iter().enumerate() {
@@ -3257,7 +3311,6 @@ fn resolve_shared_string(
         if let Some(context) = execution {
             context.check().map_err(SourceBackedError::from)?;
         }
-        owner.ensure_current()?;
         let source_offset = segment
             .source_offset
             .checked_add((start - segment.logical_offset) as u64)
@@ -3292,14 +3345,8 @@ fn resolve_shared_string(
     }
     let decoded = decode_shared_string_entry(&slices);
     match decoded {
-        Ok(value) => {
-            owner.ensure_current()?;
-            Ok(litchi_core::sheet::CellValue::String(value))
-        },
-        Err(error) => {
-            owner.ensure_current()?;
-            Err(map_shared_string_error(error))
-        },
+        Ok(value) => Ok(litchi_core::sheet::CellValue::String(value)),
+        Err(error) => Err(map_shared_string_error(error)),
     }
 }
 

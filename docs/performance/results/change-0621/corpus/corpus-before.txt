@@ -1,0 +1,218 @@
+test-data/ole/xls/ComplexFunctionTestCaseData.xls full-text outcome=text:1867:d6c50340d83169c55482adbd5fdd5bcb4f003f537f1af56366a2d98a8f645ebf reads=46 bytes=22107 versions=355
+test-data/ole/xls/ComplexFunctionTestCaseData.xls all-cells outcome=cells:10:ca138adeef7c8467ab7b9c25a7eeb8a1af6a357bab2313fa3e91c45892861021 reads=25 bytes=19589 versions=63
+test-data/ole/xls/ConditionalFormattingSamples copy.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token reads=394 bytes=790147 versions=1936
+test-data/ole/xls/ConditionalFormattingSamples copy.xls all-cells outcome=cells:61:661c0620faadfe8b30d7c1c9f399af960a600055873bf54a417847ae8c16e6ec reads=97 bytes=612624 versions=182
+test-data/ole/xls/ConditionalFormattingSamples.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token reads=394 bytes=790147 versions=1936
+test-data/ole/xls/ConditionalFormattingSamples.xls all-cells outcome=cells:61:661c0620faadfe8b30d7c1c9f399af960a600055873bf54a417847ae8c16e6ec reads=97 bytes=612624 versions=182
+test-data/ole/xls/DateFormats.xls full-text outcome=text:72:b331de0464538c7404cfd90675d6d1a4b1abe6fa1218a91d31c89845650e128c reads=20 bytes=6530 versions=80
+test-data/ole/xls/DateFormats.xls all-cells outcome=cells:10:c06e13e8e2ee3bec47e3c9994ab4acf7463162fad723b82a2e65f029a6b64aa3 reads=18 bytes=5755 versions=41
+test-data/ole/xls/DateTimeToNumberTestCases.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token reads=34 bytes=23305 versions=148
+test-data/ole/xls/DateTimeToNumberTestCases.xls all-cells outcome=cells:11:9d12c5af4f24d53c5d5409f9aebff1a22df26ac1016704b1c3a209aa9d08d5c8 reads=25 bytes=19644 versions=63
+test-data/ole/xls/FormulaEvalTestData.xls full-text outcome=text:104620:7cdb5fedce626eef54b7ac496532eb25d408c957bf7cae9032cc10c429dc4ef2 reads=1552 bytes=182557 versions=14176
+test-data/ole/xls/FormulaEvalTestData.xls all-cells outcome=cells:4627:3b5fd64a0f4c9ae78b149374ae0a077af2a576a8ac369ad7d83151dac01e67de reads=1515 bytes=172381 versions=5958
+test-data/ole/xls/FormulaRefs.xls full-text outcome=text:67:8987d869f924e1ed03794a90bcc127f4609b726979759cef961c0cffcdc8cb83 reads=24 bytes=17759 versions=82
+test-data/ole/xls/FormulaRefs.xls all-cells outcome=cells:10:571f80ab0118a6af9e8989c804adc262ba3f687266ea4ef3fb7e46b3e68b1806 reads=22 bytes=16979 versions=43
+test-data/ole/xls/FormulaSheetRange.xls full-text outcome=text:423:2f151009228afc58cc281fdcbee5513148e00f549ba1cab203582d3eadf8f99c reads=32 bytes=6254 versions=405
+test-data/ole/xls/FormulaSheetRange.xls all-cells outcome=cells:20:e99f74b223f7289619ae530e5ebc0e8489428731124376da127db43c070367bf reads=28 bytes=4810 versions=81
+test-data/ole/xls/HyperlinksOnManySheets.xls full-text outcome=text:300:ddac5523144bc5a9fbb1b367352d8e02dd6bf3af4909db4fa4dcf8d2f05283c3 reads=32 bytes=5900 versions=178
+test-data/ole/xls/HyperlinksOnManySheets.xls all-cells outcome=cells:7:63592aaa5e3456e7722a077fe9de95dd4e21453131233fa15c60f65d214b3399 reads=20 bytes=4367 versions=49
+test-data/ole/xls/Simple.xls full-text outcome=text:12:43b12b2b6ef262856c44ad96ac735c38049000b4a0abfdc675a4b258f4eaaec3 reads=14 bytes=4210 versions=42
+test-data/ole/xls/Simple.xls all-cells outcome=cells:1:b5bd2a25e92d4e1e168ed2c2a60bee36833c3d4aaa9a4344ac2e15f99b6aae66 reads=12 bytes=3435 versions=23
+test-data/ole/xls/SimpleChart.xls full-text outcome=text:154:8e5672dbf8547d332363e03defe40a35797221bb8cc8087bbacd2898904f2ed6 reads=16 bytes=5971 versions=161
+test-data/ole/xls/SimpleChart.xls all-cells outcome=cells:30:cd14f2cd53b884a96dfdb010ac6ee373256980439cde4fb57d27347b1e6d04af reads=14 bytes=5445 versions=22
+test-data/ole/xls/SimpleMacro.xls full-text outcome=text:27:93ae155a9ff0015a3526bb61bcfdb1cf688a88a3d92eb049e9d4c6a1984b9845 reads=23 bytes=19034 versions=45
+test-data/ole/xls/SimpleMacro.xls all-cells outcome=cells:1:58148503960c7254ad1d1235053aa173a05f0d71272822b710efef0335016c4f reads=21 bytes=18228 versions=26
+test-data/ole/xls/SimpleMultiCell.xls full-text outcome=text:48:e6901ef32a48793a80139d15c016a1452dde984fa240d0fb9faa47257d151618 reads=14 bytes=4410 versions=59
+test-data/ole/xls/SimpleMultiCell.xls all-cells outcome=cells:15:078dd023421c4f1df855c4481123b6015965cef5eacb3432726217078b0ba7c4 reads=12 bytes=3635 versions=20
+test-data/ole/xls/SimpleScatterChart.xls full-text outcome=text:16:ed3c169b07d1d5342fc2bb68b795984edb950f3536df6508e2e1d9310e7568b0 reads=20 bytes=26647 versions=51
+test-data/ole/xls/SimpleScatterChart.xls all-cells outcome=cells:6:fb19e2b379dabac90dc697a14c72224b6390be2dec38576d8d94fd44ff549684 reads=20 bytes=26647 versions=34
+test-data/ole/xls/SimpleWithAutofilter copy.xls full-text outcome=text:26:71449fd4880b1343248e0114fb57f2ea1904c71b7dc4fbe3d222129b62f3b1e0 reads=21 bytes=4982 versions=89
+test-data/ole/xls/SimpleWithAutofilter copy.xls all-cells outcome=cells:12:4ec3ad7663b06549ffda23a28d9abdcb9eb989cb76d9acbb03fbd66dd9676eb5 reads=19 bytes=4207 versions=45
+test-data/ole/xls/SimpleWithAutofilter.xls full-text outcome=text:26:71449fd4880b1343248e0114fb57f2ea1904c71b7dc4fbe3d222129b62f3b1e0 reads=21 bytes=4982 versions=89
+test-data/ole/xls/SimpleWithAutofilter.xls all-cells outcome=cells:12:4ec3ad7663b06549ffda23a28d9abdcb9eb989cb76d9acbb03fbd66dd9676eb5 reads=19 bytes=4207 versions=45
+test-data/ole/xls/SimpleWithChoose copy.xls full-text outcome=text:55:218dcee190439215111761f6b338689646f99f3d3f5cb7d29bf3dd0495c98890 reads=15 bytes=4558 versions=78
+test-data/ole/xls/SimpleWithChoose copy.xls all-cells outcome=cells:10:6f291b06d20a9dcf6647a97144e2965c7d0e9b5e06b4da16f98669b17557a953 reads=13 bytes=3783 versions=24
+test-data/ole/xls/SimpleWithChoose.xls full-text outcome=text:55:218dcee190439215111761f6b338689646f99f3d3f5cb7d29bf3dd0495c98890 reads=15 bytes=4558 versions=78
+test-data/ole/xls/SimpleWithChoose.xls all-cells outcome=cells:10:6f291b06d20a9dcf6647a97144e2965c7d0e9b5e06b4da16f98669b17557a953 reads=13 bytes=3783 versions=24
+test-data/ole/xls/SimpleWithColours copy.xls full-text outcome=text:120:24a52e0c129d2aa322a3b1f22b034eca1a532ffdc12fd5751f0d3f7ae3995489 reads=21 bytes=6618 versions=80
+test-data/ole/xls/SimpleWithColours copy.xls all-cells outcome=cells:5:9f01ccd0d64a919112095e7f7e40c3dfa10f53f331d4a60a7e47875368db5607 reads=19 bytes=5888 versions=41
+test-data/ole/xls/SimpleWithColours.xls full-text outcome=text:120:24a52e0c129d2aa322a3b1f22b034eca1a532ffdc12fd5751f0d3f7ae3995489 reads=21 bytes=6618 versions=80
+test-data/ole/xls/SimpleWithColours.xls all-cells outcome=cells:5:9f01ccd0d64a919112095e7f7e40c3dfa10f53f331d4a60a7e47875368db5607 reads=19 bytes=5888 versions=41
+test-data/ole/xls/SimpleWithComments copy.xls full-text outcome=text:22:d60dee18897588b0c77feac3db5045cf4e24e28735a0f869ae905d69024399cd reads=18 bytes=5325 versions=62
+test-data/ole/xls/SimpleWithComments copy.xls all-cells outcome=cells:6:0db1165e8b3b77dcd72de67238b6d08e40accf0253d5d7bbbcecc71a99ba2c2e reads=16 bytes=4550 versions=33
+test-data/ole/xls/SimpleWithComments.xls full-text outcome=text:22:d60dee18897588b0c77feac3db5045cf4e24e28735a0f869ae905d69024399cd reads=18 bytes=5325 versions=62
+test-data/ole/xls/SimpleWithComments.xls all-cells outcome=cells:6:0db1165e8b3b77dcd72de67238b6d08e40accf0253d5d7bbbcecc71a99ba2c2e reads=16 bytes=4550 versions=33
+test-data/ole/xls/SimpleWithDataFormat copy.xls full-text outcome=text:7:f8cec7cc8dfb76ee23f95296131176ede034bd9742b50137ab055a67e3be974d reads=14 bytes=4560 versions=39
+test-data/ole/xls/SimpleWithDataFormat copy.xls all-cells outcome=cells:1:03911ef41d6fa702ce80788bc427252ccd918e2f428aa58636169cb2128dfed1 reads=12 bytes=3785 versions=20
+test-data/ole/xls/SimpleWithDataFormat.xls full-text outcome=text:7:f8cec7cc8dfb76ee23f95296131176ede034bd9742b50137ab055a67e3be974d reads=14 bytes=4560 versions=39
+test-data/ole/xls/SimpleWithDataFormat.xls all-cells outcome=cells:1:03911ef41d6fa702ce80788bc427252ccd918e2f428aa58636169cb2128dfed1 reads=12 bytes=3785 versions=20
+test-data/ole/xls/SimpleWithFormula copy.xls full-text outcome=text:41:ad62a951777bcf252a61b026300dd2d00f84b4ad707a30e3236de4c16401d00c reads=15 bytes=4345 versions=56
+test-data/ole/xls/SimpleWithFormula copy.xls all-cells outcome=cells:3:a4f10be37faa6e9f47e1f45f56e91ba3af71319300de9ba1a7e25fcaeb3ee591 reads=13 bytes=3570 versions=27
+test-data/ole/xls/SimpleWithFormula.xls full-text outcome=text:41:ad62a951777bcf252a61b026300dd2d00f84b4ad707a30e3236de4c16401d00c reads=15 bytes=4345 versions=56
+test-data/ole/xls/SimpleWithFormula.xls all-cells outcome=cells:3:a4f10be37faa6e9f47e1f45f56e91ba3af71319300de9ba1a7e25fcaeb3ee591 reads=13 bytes=3570 versions=27
+test-data/ole/xls/SimpleWithImages copy.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=18 bytes=39539 versions=41
+test-data/ole/xls/SimpleWithImages copy.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=16 bytes=39013 versions=24
+test-data/ole/xls/SimpleWithImages-mac copy.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=24 bytes=90174 versions=43
+test-data/ole/xls/SimpleWithImages-mac copy.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=22 bytes=89574 versions=26
+test-data/ole/xls/SimpleWithImages-mac.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=24 bytes=90174 versions=43
+test-data/ole/xls/SimpleWithImages-mac.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=22 bytes=89574 versions=26
+test-data/ole/xls/SimpleWithImages.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=18 bytes=39539 versions=41
+test-data/ole/xls/SimpleWithImages.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=16 bytes=39013 versions=24
+test-data/ole/xls/SimpleWithPageBreaks copy.xls full-text outcome=text:29:dd34468682a0ad3eebd1c10b0d96f627023958dc8c8a9da2f33ac389c2f99544 reads=15 bytes=5111 versions=109
+test-data/ole/xls/SimpleWithPageBreaks copy.xls all-cells outcome=cells:1:801a791630a19d00ca77eece23df718b3fd44a577d113d2c2b0a4cbb2e37e918 reads=13 bytes=4336 versions=24
+test-data/ole/xls/SimpleWithPageBreaks.xls full-text outcome=text:29:dd34468682a0ad3eebd1c10b0d96f627023958dc8c8a9da2f33ac389c2f99544 reads=15 bytes=5111 versions=109
+test-data/ole/xls/SimpleWithPageBreaks.xls all-cells outcome=cells:1:801a791630a19d00ca77eece23df718b3fd44a577d113d2c2b0a4cbb2e37e918 reads=13 bytes=4336 versions=24
+test-data/ole/xls/SimpleWithPrintArea copy.xls full-text outcome=text:23:5876f9747c591aa7a2270ec8656135b338e3b142b5a2b8b55a2449e9c05ba26a reads=15 bytes=5095 versions=43
+test-data/ole/xls/SimpleWithPrintArea copy.xls all-cells outcome=cells:1:325bb5e737a1d4a5f2e3ad1151dd3c38203a0586cecd9d5a9e2c7168f23a0ce4 reads=13 bytes=4320 versions=24
+test-data/ole/xls/SimpleWithPrintArea.xls full-text outcome=text:23:5876f9747c591aa7a2270ec8656135b338e3b142b5a2b8b55a2449e9c05ba26a reads=15 bytes=5095 versions=43
+test-data/ole/xls/SimpleWithPrintArea.xls all-cells outcome=cells:1:325bb5e737a1d4a5f2e3ad1151dd3c38203a0586cecd9d5a9e2c7168f23a0ce4 reads=13 bytes=4320 versions=24
+test-data/ole/xls/SimpleWithSkip copy.xls full-text outcome=text:48:98340ba0ce4ac66031d6f7ed5f7b6420e62de7f6bd780c41f3392e8d07ebb2e5 reads=17 bytes=4316 versions=59
+test-data/ole/xls/SimpleWithSkip copy.xls all-cells outcome=cells:4:5eaf4967d5d07de962799b254f02346541fd9f7d95a0cd5545f3d8e339ffc91b reads=15 bytes=3541 versions=35
+test-data/ole/xls/SimpleWithSkip.xls full-text outcome=text:48:98340ba0ce4ac66031d6f7ed5f7b6420e62de7f6bd780c41f3392e8d07ebb2e5 reads=17 bytes=4316 versions=59
+test-data/ole/xls/SimpleWithSkip.xls all-cells outcome=cells:4:5eaf4967d5d07de962799b254f02346541fd9f7d95a0cd5545f3d8e339ffc91b reads=15 bytes=3541 versions=35
+test-data/ole/xls/SimpleWithStyling copy.xls full-text outcome=text:42:4c1cc7be13a64d70b484cd8d3ca5da7aa660925126aa0907de44799cfd709d8f reads=19 bytes=4688 versions=71
+test-data/ole/xls/SimpleWithStyling copy.xls all-cells outcome=cells:4:62f3aa4297fb8eeb06a260713ddfd62c8a757ffe9fbb339b2f7453b761cebf0b reads=17 bytes=3913 versions=37
+test-data/ole/xls/SimpleWithStyling.xls full-text outcome=text:42:4c1cc7be13a64d70b484cd8d3ca5da7aa660925126aa0907de44799cfd709d8f reads=19 bytes=4688 versions=71
+test-data/ole/xls/SimpleWithStyling.xls all-cells outcome=cells:4:62f3aa4297fb8eeb06a260713ddfd62c8a757ffe9fbb339b2f7453b761cebf0b reads=17 bytes=3913 versions=37
+test-data/ole/xls/SingleLetterRanges.xls full-text outcome=text:119:2f13c4653678c68f406b9a8f1a9eddbd314834ab455f79f3f3a52f7f4a570d18 reads=16 bytes=6787 versions=65
+test-data/ole/xls/SingleLetterRanges.xls all-cells outcome=cells:12:33283dc07a43829b3ea50a2d9da999e36d42459589639cd6daf43172199a0883 reads=16 bytes=6787 versions=33
+test-data/ole/xls/WeekNumFunctionTestCaseData.xls full-text outcome=text:1882:e4a86e05c38caa181bca00b72c35cb02a69f0f6c7b0d4e2da73ca28b8d60ea44 reads=45 bytes=22208 versions=336
+test-data/ole/xls/WeekNumFunctionTestCaseData.xls all-cells outcome=cells:10:12acbdd0a8b019647df3bad66a0b897344dc8d5f78e9d577a8dd9f1a3e1c7066 reads=25 bytes=19589 versions=63
+test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls full-text outcome=text:1886:8c9c3ad1e8a6221eda282696adffc120a2f3d9e1fcc0dedb06cb429ceff5a4da reads=46 bytes=23063 versions=337
+test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls all-cells outcome=cells:10:6f8479704f6d521ee1b2641149473166dedc5cb54e641beeebd3c034c40fd2f4 reads=26 bytes=21038 versions=64
+test-data/ole/xls/WithChart.xls full-text outcome=text:59:f500f7fa125a69674e9b670d703b6c5af4a2b790f0f92fe80404dbfe7a1106c6 reads=22 bytes=23834 versions=97
+test-data/ole/xls/WithChart.xls all-cells outcome=cells:12:f7999eedc0d89a046657524644ffd14c67a34108d30170d4ea2c67f4562d4262 reads=17 bytes=19222 versions=23
+test-data/ole/xls/WithCheckBoxes.xls full-text outcome=text:11:e68809c739274242df2dcace8084a3066a342f63cf9b70faa54942309e33b1b1 reads=22 bytes=8189 versions=47
+test-data/ole/xls/WithCheckBoxes.xls all-cells outcome=cells:1:26c22ef47c356bda53baa092b0c1f4ccfe50e8a5b3f15b97b33f461817187a0c reads=20 bytes=7663 versions=25
+test-data/ole/xls/WithConditionalFormatting.xls full-text outcome=text:60:b5056a9e9d193756ee69fef9437bfb290c5dbfc42ecef2f9c9d8006f65e286eb reads=27 bytes=20724 versions=119
+test-data/ole/xls/WithConditionalFormatting.xls all-cells outcome=cells:17:0d90149690ab1fe3e9be1bf05346e9130629481592a3040b8090ec9e6d2525d2 reads=25 bytes=19944 versions=60
+test-data/ole/xls/WithCustomViews.xls full-text outcome=text:107420:bdd9a79ef483a767ac8cd118a46ca2a59ecadf84d461042ab1420f04f7b71ed5 reads=898 bytes=257894 versions=5025
+test-data/ole/xls/WithCustomViews.xls all-cells outcome=cells:3325:804257a9e49ac1cde6059245bf513010400a099b5ca63e1de6dd153f9e454278 reads=896 bytes=257066 versions=3501
+test-data/ole/xls/WithEmbeddedObjects.xls full-text outcome=text:11:339cbe8e3a27b824bae9131f2a218f1cbf8000357717dedc512df7d1563e8ac8 reads=37 bytes=34461 versions=47
+test-data/ole/xls/WithEmbeddedObjects.xls all-cells outcome=cells:1:3819e157c53462478e7334d0ec6786e22af1ac78fa9ba28d217a84b1cdc92acd reads=35 bytes=33681 versions=28
+test-data/ole/xls/WithExtendedStyles.xls full-text outcome=text:35:5844cfe874f6b3bb30ca5b755d5c2b3753db89f26e3e2d5fdaf09f3550241ad5 reads=18 bytes=5633 versions=61
+test-data/ole/xls/WithExtendedStyles.xls all-cells outcome=cells:4:a791812e12d2e284ea51324d6cc1a783876abb65700f23b40d3cc285eafe3af9 reads=16 bytes=4729 versions=32
+test-data/ole/xls/WithFormattedGraphTitle.xls full-text outcome=text:45:c551e2d0d6ec0be1f6f53772a01ff227daac0fdf9c1debc01b37d40a51ecf494 reads=18 bytes=5975 versions=65
+test-data/ole/xls/WithFormattedGraphTitle.xls all-cells outcome=cells:9:c960cce2084baf01c69111bf9d71e68c215bda60287fbf708a9b61a48d9d9e6e reads=18 bytes=5975 versions=38
+test-data/ole/xls/WithHyperlink.xls full-text outcome=text:93:b664b3a5d3989bbfa73e58d35da61fd946698c91a55a60e655cdcc4575b536db reads=20 bytes=4524 versions=80
+test-data/ole/xls/WithHyperlink.xls all-cells outcome=cells:5:afdaed73f9f0017e4f613ae4d52c1a3e22002eb11181b281859503164adfb115 reads=18 bytes=3749 versions=41
+test-data/ole/xls/WithThreeCharts.xls full-text outcome=text:128:cb04687c487da9827ba2e018a45894288dbbc5c7c06a81ce15bd9265ec59f032 reads=25 bytes=32157 versions=127
+test-data/ole/xls/WithThreeCharts.xls all-cells outcome=cells:24:ae3a9aba17eb3d17c117e355154bef9c305efabcf36311388a2e07b10955c3e6 reads=17 bytes=19515 versions=23
+test-data/ole/xls/WithTwoCharts.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token reads=17 bytes=19528 versions=23
+test-data/ole/xls/WithTwoCharts.xls all-cells tool_error=Error: Parse(InvalidRecord { record_type: 6, message: "shared Formula metadata requires a leading Pt
+test-data/ole/xls/WithTwoHyperLinks.xls full-text outcome=text:153:d8265010637ef8eb0ff0f47bbc42fafa2a8f2d9abb5ea210f1316d0453eaa724 reads=23 bytes=4924 versions=112
+test-data/ole/xls/WithTwoHyperLinks.xls all-cells outcome=cells:8:38e28cc796de0d2daea6e7159cc3fae616cd669bcd733a53f9ad089eb3ee8570 reads=21 bytes=4149 versions=53
+test-data/ole/xls/empty.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=21 bytes=20476 versions=42
+test-data/ole/xls/empty.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=17 bytes=19140 versions=23
+test-data/ole/xls/password.xls full-text tool_error=Error: EncryptedUnsupported
+test-data/ole/xls/password.xls all-cells tool_error=Error: EncryptedUnsupported
+test-data/poi/test-data/spreadsheet/15228.xls full-text outcome=text:81306:1dddcac954971323aa0ffa88087438ad6c2362560bd276f8eefb22d45d412676 reads=595 bytes=631201 versions=6912
+test-data/poi/test-data/spreadsheet/15228.xls all-cells outcome=cells:193:b0568f4b7b9d2ab3d91436d217076c73bb82b2f892ed808107e30b231cab167b reads=71 bytes=47825 versions=138
+test-data/poi/test-data/spreadsheet/1900DateWindowing.xls full-text tool_error=Error: Cfb(CorruptedFile("FAT sector 10 is not marked FATSECT"))
+test-data/poi/test-data/spreadsheet/1900DateWindowing.xls all-cells tool_error=Error: Cfb(CorruptedFile("FAT sector 10 is not marked FATSECT"))
+test-data/poi/test-data/spreadsheet/1904DateWindowing.xls full-text tool_error=Error: Cfb(CorruptedFile("FAT sector 10 is not marked FATSECT"))
+test-data/poi/test-data/spreadsheet/1904DateWindowing.xls all-cells tool_error=Error: Cfb(CorruptedFile("FAT sector 10 is not marked FATSECT"))
+test-data/poi/test-data/spreadsheet/24207.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=13 bytes=4150 versions=36
+test-data/poi/test-data/spreadsheet/24207.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=11 bytes=3375 versions=19
+test-data/poi/test-data/spreadsheet/29942.xls full-text tool_error=Error: InvalidData("Font family 108 is invalid; expected 0..=5")
+test-data/poi/test-data/spreadsheet/29942.xls all-cells tool_error=Error: InvalidData("Font family 108 is invalid; expected 0..=5")
+test-data/poi/test-data/spreadsheet/35897-type4.xls full-text tool_error=Error: EncryptedUnsupported
+test-data/poi/test-data/spreadsheet/35897-type4.xls all-cells tool_error=Error: EncryptedUnsupported
+test-data/poi/test-data/spreadsheet/41139.xls full-text outcome=text:2210:97324c461b520794d4bdafeb646e14eff3abe7ccbad721b340239fd517ec2f41 reads=166 bytes=31639 versions=652
+test-data/poi/test-data/spreadsheet/41139.xls all-cells outcome=cells:1423:d6c713abf2bb14e02f4c6b3a65f72b3b45dcb62790abcb7b28581f2d16a4bae9 reads=166 bytes=31639 versions=615
+test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls full-text outcome=text:553:ff6c1143fcc93e34ee7e538d6a9134d74468af1df968d107dac0c886f93fafad reads=45 bytes=15846 versions=190
+test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls all-cells outcome=cells:156:0ce18f98e84b9fadb62969b023726cfa8582c0a02f0eca6eadc2ba78efde7e92 reads=45 bytes=15846 versions=128
+test-data/poi/test-data/spreadsheet/45365-2.xls full-text outcome=text:67336:1ae73ff52ebdbd39e2ebe67ff26a61ca2ca13471f034351bb05560b0ee856cff reads=721 bytes=185352 versions=6120
+test-data/poi/test-data/spreadsheet/45365-2.xls all-cells outcome=cells:16598:9c3c5b1c0bc76cb483043e8b26bb4ddc0bf8aba7d2128ba71ab813a52415d392 reads=721 bytes=185352 versions=2793
+test-data/poi/test-data/spreadsheet/45365.xls full-text outcome=text:14626:e7b43ab57ab36d793fef8f8587c20834ebf3bd50fd15bbd73f6a00a5477ef1a0 reads=23 bytes=52567 versions=824
+test-data/poi/test-data/spreadsheet/45365.xls all-cells outcome=cells:3901:7194ca9b7f6b569a286e608631eff0eb5ed8b795087617efd72ae5d74c4e284d reads=23 bytes=52567 versions=32
+test-data/poi/test-data/spreadsheet/45492.xls full-text outcome=text:53:7ba4a53544dbf135e57884e24be8bbc9890948c9e1abf85aa8b930f8d7b690b6 reads=19 bytes=5739 versions=55
+test-data/poi/test-data/spreadsheet/45492.xls all-cells outcome=cells:7:ee3d8b861c1b13618ce23239c797eb62ea56ebfbee1fbfc06f03f6e528e828f6 reads=19 bytes=5739 versions=48
+test-data/poi/test-data/spreadsheet/45761.xls full-text outcome=text:27:84771aa5d4cf522c1f5d6d675a09788ad993c38b6f88662d61a10e9cc5eb7933 reads=21 bytes=6677 versions=54
+test-data/poi/test-data/spreadsheet/45761.xls all-cells outcome=cells:1:829cb05a07c40d2a7d42ff024aee3c05e0601f83390ea2b3fe641f477b4352b7 reads=17 bytes=6006 versions=23
+test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls full-text outcome=text:4:181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b reads=12 bytes=3630 versions=30
+test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls all-cells outcome=cells:1:26f5585ab6d6d32af389f43376de06f9b7d36856f688fab03ee2b56e99ec72a5 reads=12 bytes=3630 versions=23
+test-data/poi/test-data/spreadsheet/48968.xls full-text outcome=text:432:10ac5245db5031ac3b03f9e6eb16a73e4eaca0cdb7fcc30df5913341a91c2bf9 reads=66 bytes=21686 versions=363
+test-data/poi/test-data/spreadsheet/48968.xls all-cells outcome=cells:72:c855ea0594c1f800dd25856300023ed445542d951f19494cf9cd608ed97cd311 reads=66 bytes=21686 versions=216
+test-data/poi/test-data/spreadsheet/50939.xls full-text outcome=text:2013:9eb1b218ca09ce6c854b85c23c1ba3c6117537eef8c6e85eaf0e52972e0a7f24 reads=37 bytes=102577 versions=847
+test-data/poi/test-data/spreadsheet/50939.xls all-cells outcome=cells:160:62c41dede770acb077c7ae790df61c7db11e5674c765ad1ee4a75b8661846a38 reads=32 bytes=88518 versions=28
+test-data/poi/test-data/spreadsheet/53109.xls full-text outcome=text:92:ec761b3013a0d12be2ce1537074b94442b2449f58ab97bf74404135fdd346dbe reads=19 bytes=20149 versions=112
+test-data/poi/test-data/spreadsheet/53109.xls all-cells outcome=cells:40:6cb4ecdb275a1ba60892ff5403a52c897d26c5992944148f262b7152b341c428 reads=17 bytes=19349 versions=23
+test-data/poi/test-data/spreadsheet/54016.xls full-text outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0 reads=16145 bytes=1256139 versions=89789
+test-data/poi/test-data/spreadsheet/54016.xls all-cells outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b reads=16145 bytes=1256139 versions=64307
+test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls full-text outcome=text:158:c5cc0c1794e7919ca93ad6da3fba525a2712f1a55d2f9eab85daefef1802dcfc reads=18 bytes=19862 versions=102
+test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls all-cells outcome=cells:12:df3434f98fea26a2b647aadee3a287fef67c4320090bd6890005bef08b050a6b reads=16 bytes=19082 versions=23
+test-data/poi/test-data/spreadsheet/57456.xls full-text tool_error=Error: Parse(InvalidData("SST total count is smaller than its unique count"))
+test-data/poi/test-data/spreadsheet/57456.xls all-cells tool_error=Error: Parse(InvalidData("SST total count is smaller than its unique count"))
+test-data/poi/test-data/spreadsheet/59858.xls full-text outcome=text:40551:7cb94a209fdb0c8fdd3fdc19c511c75fd5cfeec6c21b8d252c212a50c8bfe301 reads=983 bytes=882737 versions=7220
+test-data/poi/test-data/spreadsheet/59858.xls all-cells outcome=cells:78:d76527f90d2997b5817dab0072f88118cdecc73830950bb9492193897a71a990 reads=98 bytes=795920 versions=141
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token reads=394 bytes=790147 versions=1936
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls all-cells outcome=cells:61:661c0620faadfe8b30d7c1c9f399af960a600055873bf54a417847ae8c16e6ec reads=97 bytes=612624 versions=182
+test-data/poi/test-data/spreadsheet/DBCSHeader.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=15 bytes=5028 versions=37
+test-data/poi/test-data/spreadsheet/DBCSHeader.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=13 bytes=4253 versions=20
+test-data/poi/test-data/spreadsheet/DateFormats.xls full-text outcome=text:72:b331de0464538c7404cfd90675d6d1a4b1abe6fa1218a91d31c89845650e128c reads=20 bytes=6530 versions=80
+test-data/poi/test-data/spreadsheet/DateFormats.xls all-cells outcome=cells:10:c06e13e8e2ee3bec47e3c9994ab4acf7463162fad723b82a2e65f029a6b64aa3 reads=18 bytes=5755 versions=41
+test-data/poi/test-data/spreadsheet/DrawingAndComments.xls full-text outcome=text:78:55663b9d8f346dca2e70475497fc1bb9bf31a136de0048f0d71a211a501674d9 reads=27 bytes=32547 versions=113
+test-data/poi/test-data/spreadsheet/DrawingAndComments.xls all-cells outcome=cells:7:abf1f6d28430bd1cfa08187dd0f42cd8c69acba3d945d2683200d34197d1d950 reads=25 bytes=31747 versions=54
+test-data/poi/test-data/spreadsheet/Formatting.xls full-text outcome=text:201:aa831988721ee2c89b68740973d345d60b7ca57c8f17c0570f14181fd8784ce8 reads=31 bytes=19220 versions=150
+test-data/poi/test-data/spreadsheet/Formatting.xls all-cells outcome=cells:23:8de64f0fa36aefe0fdc7cb4e8d016fbe4c9ae459caa498e2ecac7c31a2e14125 reads=29 bytes=18440 versions=71
+test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls full-text outcome=text:300:ddac5523144bc5a9fbb1b367352d8e02dd6bf3af4909db4fa4dcf8d2f05283c3 reads=32 bytes=5900 versions=178
+test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls all-cells outcome=cells:7:63592aaa5e3456e7722a077fe9de95dd4e21453131233fa15c60f65d214b3399 reads=20 bytes=4367 versions=49
+test-data/poi/test-data/spreadsheet/MRExtraLines.xls full-text outcome=text:3111:32c391a48146c57817a748c2b3a4d63f44ffd31f2f795497be93b0d390b4eacf reads=54 bytes=27100 versions=336
+test-data/poi/test-data/spreadsheet/MRExtraLines.xls all-cells outcome=cells:789:986b2a3d40e0b27253d5e1190c473d20dc919945d604d362a81b04fcee7db41c reads=52 bytes=26320 versions=157
+test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls full-text outcome=text:1295:5f213f11547b86d66ad37d2ae65297b115411f341dca300e4b32bf5ea656a42f reads=38 bytes=32447 versions=193
+test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls all-cells outcome=cells:340:b677097b8c6f38dc936024a78b2d71736240631ad30587753dbe63d447d8a067 reads=38 bytes=32447 versions=106
+test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls full-text tool_error=Error: Parse(InvalidRecord { record_type: 2172, message: "XFCRC declares 72 XF records but 62 were p
+test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls all-cells tool_error=Error: Parse(InvalidRecord { record_type: 2172, message: "XFCRC declares 72 XF records but 62 were p
+test-data/poi/test-data/spreadsheet/ShrinkToFit.xls full-text outcome=text:64:cb4009f0de835fa6c8b47acd0175f12ac3569ebbf89ae81cdeafb190e7b5167e reads=18 bytes=18090 versions=61
+test-data/poi/test-data/spreadsheet/ShrinkToFit.xls all-cells outcome=cells:2:a92e65c710fac232a6cf8a5f82a9ebb66581daff937c2b8fd22d8b8d755ecf01 reads=16 bytes=17310 versions=27
+test-data/poi/test-data/spreadsheet/Simple.xls full-text outcome=text:12:43b12b2b6ef262856c44ad96ac735c38049000b4a0abfdc675a4b258f4eaaec3 reads=14 bytes=4210 versions=42
+test-data/poi/test-data/spreadsheet/Simple.xls all-cells outcome=cells:1:b5bd2a25e92d4e1e168ed2c2a60bee36833c3d4aaa9a4344ac2e15f99b6aae66 reads=12 bytes=3435 versions=23
+test-data/poi/test-data/spreadsheet/SimpleMacro.xls full-text outcome=text:27:93ae155a9ff0015a3526bb61bcfdb1cf688a88a3d92eb049e9d4c6a1984b9845 reads=23 bytes=19034 versions=45
+test-data/poi/test-data/spreadsheet/SimpleMacro.xls all-cells outcome=cells:1:58148503960c7254ad1d1235053aa173a05f0d71272822b710efef0335016c4f reads=21 bytes=18228 versions=26
+test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls full-text outcome=text:16:ed3c169b07d1d5342fc2bb68b795984edb950f3536df6508e2e1d9310e7568b0 reads=20 bytes=26647 versions=51
+test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls all-cells outcome=cells:6:fb19e2b379dabac90dc697a14c72224b6390be2dec38576d8d94fd44ff549684 reads=20 bytes=26647 versions=34
+test-data/poi/test-data/spreadsheet/SimpleWithColours.xls full-text outcome=text:120:24a52e0c129d2aa322a3b1f22b034eca1a532ffdc12fd5751f0d3f7ae3995489 reads=21 bytes=6618 versions=80
+test-data/poi/test-data/spreadsheet/SimpleWithColours.xls all-cells outcome=cells:5:9f01ccd0d64a919112095e7f7e40c3dfa10f53f331d4a60a7e47875368db5607 reads=19 bytes=5888 versions=41
+test-data/poi/test-data/spreadsheet/SimpleWithComments.xls full-text outcome=text:22:d60dee18897588b0c77feac3db5045cf4e24e28735a0f869ae905d69024399cd reads=18 bytes=5325 versions=62
+test-data/poi/test-data/spreadsheet/SimpleWithComments.xls all-cells outcome=cells:6:0db1165e8b3b77dcd72de67238b6d08e40accf0253d5d7bbbcecc71a99ba2c2e reads=16 bytes=4550 versions=33
+test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls full-text outcome=text:29:dd34468682a0ad3eebd1c10b0d96f627023958dc8c8a9da2f33ac389c2f99544 reads=15 bytes=5111 versions=109
+test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls all-cells outcome=cells:1:801a791630a19d00ca77eece23df718b3fd44a577d113d2c2b0a4cbb2e37e918 reads=13 bytes=4336 versions=24
+test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls full-text outcome=text:23:5876f9747c591aa7a2270ec8656135b338e3b142b5a2b8b55a2449e9c05ba26a reads=15 bytes=5095 versions=43
+test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls all-cells outcome=cells:1:325bb5e737a1d4a5f2e3ad1151dd3c38203a0586cecd9d5a9e2c7168f23a0ce4 reads=13 bytes=4320 versions=24
+test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls full-text outcome=text:18:91f3a2ff84cca68cf43c932db5124c91d42e50b0afa632df7a53fbe485c455cd reads=15 bytes=3972 versions=43
+test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls all-cells outcome=cells:1:d508e68433543f32d85fbeace2e0980e168de382d945876950eb4fdf2eaf0816 reads=13 bytes=3449 versions=24
+test-data/poi/test-data/spreadsheet/UncalcedRecord.xls full-text outcome=text:6:607215711f23c1d4d14d3eb26780e02d0efe646d08ecbba79860c46d0d3bad3f reads=14 bytes=6781 versions=39
+test-data/poi/test-data/spreadsheet/UncalcedRecord.xls all-cells outcome=cells:1:4a699fd78bf796f0085b4cf3590b7986dacd37f9f8d3cbe66b85ed46048e8be5 reads=12 bytes=6006 versions=20
+test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls full-text outcome=text:60:b5056a9e9d193756ee69fef9437bfb290c5dbfc42ecef2f9c9d8006f65e286eb reads=27 bytes=20724 versions=119
+test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls all-cells outcome=cells:17:0d90149690ab1fe3e9be1bf05346e9130629481592a3040b8090ec9e6d2525d2 reads=25 bytes=19944 versions=60
+test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls full-text outcome=text:153:d8265010637ef8eb0ff0f47bbc42fafa2a8f2d9abb5ea210f1316d0453eaa724 reads=23 bytes=4924 versions=112
+test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls all-cells outcome=cells:8:38e28cc796de0d2daea6e7159cc3fae616cd669bcd733a53f9ad089eb3ee8570 reads=21 bytes=4149 versions=53
+test-data/poi/test-data/spreadsheet/XRefCalc.xls full-text outcome=text:101:256c17cd9341e9727e4348eac75d67d64565f9f9fe154feca9aa96dc0b20ce2c reads=23 bytes=18959 versions=69
+test-data/poi/test-data/spreadsheet/XRefCalc.xls all-cells outcome=cells:12:55f07ee83fa1781ee897b30bed5fdfd5d5f6b45a053dc484ab44603b4b436953 reads=23 bytes=18959 versions=47
+test-data/poi/test-data/spreadsheet/colwidth.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=14 bytes=4454 versions=37
+test-data/poi/test-data/spreadsheet/colwidth.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=12 bytes=3679 versions=20
+test-data/poi/test-data/spreadsheet/comments.xls full-text outcome=text:26:0a3334be8ca6e527b33f0b78cb92dd6d6b84163ca5129392b2c1c64ad78b2ea2 reads=19 bytes=7113 versions=71
+test-data/poi/test-data/spreadsheet/comments.xls all-cells outcome=cells:4:2e70efb577a90716754ba0777adeeeb19d4fc4efdbfd0e83a4959ab00ff85a91 reads=17 bytes=6555 versions=37
+test-data/poi/test-data/spreadsheet/duprich1.xls full-text outcome=text:2392:95bd650403642910c97e87c1e95b449c83f93817e49fd2fdc37cc315a4f2a615 reads=525 bytes=16911 versions=2149
+test-data/poi/test-data/spreadsheet/duprich1.xls all-cells outcome=cells:10:c9caba8c011c2331f8ed306d6fe4f1494270cd534f6d12472d626698aa4139ab reads=23 bytes=5783 versions=61
+test-data/poi/test-data/spreadsheet/duprich2.xls full-text outcome=text:44:537674f7ea3440a8d7cff47b52d601683606b5e052f8c52e65442d2b40f8c699 reads=21 bytes=6858 versions=89
+test-data/poi/test-data/spreadsheet/duprich2.xls all-cells outcome=cells:6:d354af5e188595222bf2315bacadfbebcdf27def899d2537c2da72bb2aa26118 reads=19 bytes=6083 versions=45
+test-data/poi/test-data/spreadsheet/dvEmpty.xls full-text outcome=text:119:f0ab348c2dd5b23b83948db5ae31806fe8d4e77d0bda1e0fc1aaf2021ebe34f2 reads=17 bytes=15529 versions=33
+test-data/poi/test-data/spreadsheet/dvEmpty.xls all-cells outcome=cells:1:92762d8de2076cf2abb0a03f786b407daa5f7167d81d4193dd9caf78c6f8fbd7 reads=17 bytes=15529 versions=26
+test-data/poi/test-data/spreadsheet/externalFunctionExample.xls full-text outcome=text:58:f12f988de6d7a9c1088fd3f9a87c3386299c12694cd0b9c018adfc85bde55d4c reads=19 bytes=16401 versions=58
+test-data/poi/test-data/spreadsheet/externalFunctionExample.xls all-cells outcome=cells:7:6f8576d88738c7802aa9b4edfe99db12d82f6893f21f4f085761ccef46e2a7ec reads=19 bytes=16401 versions=31
+test-data/poi/test-data/spreadsheet/external_name.xls full-text outcome=text:28131:87a9192c39dff61b0204229f379cf707038bac70f200ceffc577f5b43b3dfe82 reads=179 bytes=155985 versions=1383
+test-data/poi/test-data/spreadsheet/external_name.xls all-cells outcome=cells:12:639395652e785b5edbeee51fab21023420f437b4b2baa3f95f007c10fed98575 reads=34 bytes=28530 versions=72
+test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits reads=13 bytes=5160 versions=19
+test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls all-cells tool_error=Error: Parse(InvalidRecord { record_type: 6, message: "Formula flags contain reserved bits" })
+test-data/poi/test-data/spreadsheet/named-cell-test.xls full-text outcome=refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits reads=13 bytes=5160 versions=19
+test-data/poi/test-data/spreadsheet/named-cell-test.xls all-cells tool_error=Error: Parse(InvalidRecord { record_type: 6, message: "Formula flags contain reserved bits" })
+test-data/poi/test-data/spreadsheet/namedinput.xls full-text outcome=text:3:6a3cf5192354f71615ac51034b3e97c20eda99643fcaf5bbe6d41ad59bd12167 reads=13 bytes=4150 versions=36
+test-data/poi/test-data/spreadsheet/namedinput.xls all-cells outcome=cells:0:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 reads=11 bytes=3375 versions=19
+test-data/poi/test-data/spreadsheet/testNames.xls full-text outcome=text:86:1500be2b242d4326e03272327b24b3dd00b5afd131328abd9d4cfda3aea87f00 reads=22 bytes=19627 versions=79
+test-data/poi/test-data/spreadsheet/testNames.xls all-cells outcome=cells:15:4cd20448a26ceeb744e4908436fbc43c70bbacf902db445e2fb0caf80043cdfb reads=22 bytes=19627 versions=27
+test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls full-text outcome=text:26:942550059aba0b2727446e5a99dc3d234c200e6e9364ea29bc1f5a7de8243f11 reads=23 bytes=6752 versions=87
+test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls all-cells outcome=cells:8:13e612c8420f3456768212284abebc083a07c5b87b376bea7491d6e84da32dc1 reads=21 bytes=5977 versions=53
+test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls full-text tool_error=Error: EncryptedUnsupported
+test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls all-cells tool_error=Error: EncryptedUnsupported

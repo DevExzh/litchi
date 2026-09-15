@@ -819,6 +819,8 @@ struct CountingSource {
     cancel_on_read: Arc<Mutex<Option<CancellationSource>>>,
     revision: Arc<AtomicU64>,
     versions: Arc<AtomicU64>,
+    /// One-based observation ordinal after which the source mutates, or zero.
+    bump_after_version: Arc<AtomicU64>,
 }
 
 impl CountingSource {
@@ -829,7 +831,17 @@ impl CountingSource {
             cancel_on_read: Arc::new(Mutex::new(None)),
             revision: Arc::new(AtomicU64::new(0)),
             versions: Arc::new(AtomicU64::new(0)),
+            bump_after_version: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Mutates the source immediately after its `ordinal`-th observation.
+    ///
+    /// Every former fence point lies between two observations the reader still
+    /// takes, so sweeping `ordinal` over an operation places a mutation in
+    /// every window a removed fence used to cover.
+    fn bump_after_observation(&self, ordinal: u64) {
+        self.bump_after_version.store(ordinal, Ordering::Relaxed);
     }
 
     fn version_calls(&self) -> u64 {
@@ -887,11 +899,13 @@ impl ReadAt for CountingSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
-        self.versions.fetch_add(1, Ordering::Relaxed);
-        Ok(SourceVersion::new(
-            0x584c_535f_5445_5354,
-            self.revision.load(Ordering::Relaxed),
-        ))
+        let ordinal = self.versions.fetch_add(1, Ordering::Relaxed) + 1;
+        let observed =
+            SourceVersion::new(0x584c_535f_5445_5354, self.revision.load(Ordering::Relaxed));
+        if self.bump_after_version.load(Ordering::Relaxed) == ordinal {
+            self.revision.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(observed)
     }
 }
 
@@ -971,6 +985,237 @@ fn retained_metadata_queries_still_refuse_a_changed_source() {
             Err(SourceBackedError::SourceChanged { .. })
         ),
         "a changed source must still be refused by worksheet metadata"
+    );
+}
+
+/// True for the two typed refusals a mutation can surface on these paths.
+///
+/// A mutation seen by a `litchi-xls` fence is `SourceBackedError::SourceChanged`;
+/// one seen by the CFB reader's own fence arrives already mapped, so both
+/// spellings name the same refusal.
+fn refuses_a_changed_source(error: &SourceBackedError) -> bool {
+    matches!(error, SourceBackedError::SourceChanged { .. })
+}
+
+/// Builds `Simple.xls` with `extra` further `LabelSst` cells on one new row,
+/// each naming the string the fixture already has.
+fn workbook_with_extra_shared_string_cells(extra: u16) -> Vec<u8> {
+    let stream = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let (row, _column) = first_label_sst_cell(&stream);
+    let row = row.checked_add(1).unwrap();
+    let mut frames = Vec::new();
+    for column in 0..extra {
+        frames.extend_from_slice(&shifted_label_sst_frame(&stream, row, column));
+    }
+    let stream = insert_before_worksheet_eof(&stream, &frames);
+    cfb_with_streams(&[("Workbook", &stream)])
+}
+
+#[test]
+fn a_text_extraction_observes_the_source_once_per_shared_string_read_and_no_more() {
+    // Resolving a shared string reads its bytes through the CFB cursor, which
+    // observes the source once after the read (change 0558). The resolver adds
+    // none of its own: its former observations sat between in-memory steps and
+    // between a read and that read's own trailing fence.
+    //
+    // The slope is the invariant, not the intercept: adding cells on one row
+    // adds no rows and so no written objects, and every added cell resolves
+    // one shared string out of one chunk. One added read and one added
+    // observation per cell is the discipline; the four the resolver used to
+    // take per string would make this four.
+    let measure = |extra: u16| -> (u64, u64) {
+        let source = Arc::new(CountingSource::new(
+            workbook_with_extra_shared_string_cells(extra),
+        ));
+        let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        source.clear_version_calls();
+        source.clear_ranges();
+        owner.text().unwrap();
+        (source.ranges().len() as u64, source.version_calls())
+    };
+    let (base_reads, base_observations) = measure(1);
+    let (wide_reads, wide_observations) = measure(9);
+    assert_eq!(
+        (
+            wide_reads - base_reads,
+            wide_observations - base_observations
+        ),
+        (8, 8),
+        "eight more shared-string cells must cost eight reads and eight observations"
+    );
+}
+
+#[test]
+fn a_text_extraction_observes_the_source_once_per_read_and_twice_per_written_object() {
+    // The composition this pins, for `Simple.xls`:
+    //
+    //   * one observation per source read, taken by the CFB reader after the
+    //     read (change 0558) -- the globals fills, the worksheet frames and
+    //     every shared-string chunk;
+    //   * two per `Write` call reaching the source-checked sink, one before
+    //     the bytes leave and one after;
+    //   * the few the operation's own brackets take.
+    //
+    // Nothing is taken per shared string and nothing per emitted row. A fence
+    // re-added at either place fails this assertion.
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let open_observations = source.version_calls();
+    source.clear_version_calls();
+    source.clear_ranges();
+
+    let text = owner.text().unwrap();
+    assert_eq!(text, "replaceMe\n\n\n", "unexpected projection");
+    let reads = source.ranges().len() as u64;
+    assert_eq!(
+        (open_observations, reads, source.version_calls()),
+        (12, 4, 21),
+        "the observation composition of the open and the text projection is pinned"
+    );
+}
+
+#[test]
+fn a_mutation_in_any_observation_window_of_a_text_extraction_is_refused() {
+    // Every fence this change removed sat between two observations the reader
+    // still takes. Sweeping the mutation over every one of those windows
+    // therefore covers each removed fence, and the same typed refusal has to
+    // surface in all of them. The final window is the one after the last
+    // observation of the operation, where a mutation is by construction
+    // invisible; the sweep stops before it and the assertion below states it.
+    let probe = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(probe.clone()).unwrap();
+    owner.text().unwrap();
+    let total = probe.version_calls();
+    assert!(total > 30, "expected a multi-window operation, got {total}");
+
+    for ordinal in 1..total {
+        let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+        source.bump_after_observation(ordinal);
+        let outcome =
+            SourceBackedWorkbook::from_read_at(source.clone()).and_then(|workbook| workbook.text());
+        match outcome {
+            Ok(_) => panic!("a mutation after observation {ordinal} was not refused"),
+            Err(error) => assert!(
+                refuses_a_changed_source(&error),
+                "a mutation after observation {ordinal} reported {error:?}"
+            ),
+        }
+    }
+
+    // The control: mutating after the operation's last observation is outside
+    // the operation, and the projection still succeeds.
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    source.bump_after_observation(total);
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    workbook.text().unwrap();
+}
+
+#[test]
+fn a_mutation_in_any_observation_window_of_an_open_is_refused() {
+    let probe = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    SourceBackedWorkbook::from_read_at(probe.clone()).unwrap();
+    let total = probe.version_calls();
+
+    for ordinal in 1..total {
+        let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+        source.bump_after_observation(ordinal);
+        match SourceBackedWorkbook::from_read_at(source) {
+            Ok(_) => panic!("an open mutated after observation {ordinal} was not refused"),
+            Err(error) => assert!(
+                refuses_a_changed_source(&error),
+                "an open mutated after observation {ordinal} reported {error:?}"
+            ),
+        }
+    }
+}
+
+#[test]
+fn a_mutation_from_inside_the_output_sink_stops_the_text_stream() {
+    // The row loop no longer observes the source; the sink does, immediately
+    // before and immediately after every write. This is the test that the
+    // stream still stops promptly rather than emitting the rest of the
+    // document and refusing at the end.
+    struct MutatingSink {
+        source: Arc<CountingSource>,
+        written: usize,
+        writes: usize,
+    }
+
+    impl io::Write for MutatingSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.writes += 1;
+            self.written += bytes.len();
+            if self.writes == 1 {
+                self.source.bump();
+            }
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let complete = owner.text().unwrap();
+
+    let stable = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let owner = SourceBackedWorkbook::from_read_at(stable.clone()).unwrap();
+    let mut sink = MutatingSink {
+        source: stable.clone(),
+        written: 0,
+        writes: 0,
+    };
+    let error = owner
+        .write_text_to(&mut sink, Default::default())
+        .unwrap_err();
+    let written = sink.written;
+    let writes = sink.writes;
+    match error {
+        TextOutputError::Document { source, .. } => assert!(
+            refuses_a_changed_source(&source),
+            "expected SourceChanged from the sink bracket, got {source:?}"
+        ),
+        other => panic!("expected a document error, got {other:?}"),
+    }
+    assert_eq!(writes, 1, "the stream stops at the write that mutated");
+    assert!(
+        written < complete.len(),
+        "the stream emitted {written} of {} bytes after the mutation",
+        complete.len()
+    );
+}
+
+#[test]
+fn a_changed_source_outranks_a_missing_workbook_stream() {
+    // `select_workbook_stream` no longer fences before looking the name up,
+    // because the lookup reads no source byte. Each of its exits still
+    // observes before it reports, which is what keeps this precedence.
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["NotAWorkbook"], b"payload").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let bytes = output.into_inner();
+
+    let probe = Arc::new(CountingSource::new(bytes.clone()));
+    let error = SourceBackedWorkbook::from_read_at(probe.clone()).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::WorkbookStreamMissing),
+        "expected WorkbookStreamMissing on a stable source, got {error:?}"
+    );
+    let cfb_observations = {
+        let counter = Arc::new(CountingSource::new(bytes.clone()));
+        SharedOleFile::open(counter.clone()).unwrap();
+        counter.version_calls()
+    };
+
+    let source = Arc::new(CountingSource::new(bytes));
+    source.bump_after_observation(cfb_observations);
+    let error = SourceBackedWorkbook::from_read_at(source).unwrap_err();
+    assert!(
+        refuses_a_changed_source(&error),
+        "a changed source must outrank WorkbookStreamMissing, got {error:?}"
     );
 }
 

@@ -1,0 +1,98 @@
+# Gates for change 0621
+# worktree /home/zhuhe/code/litchi-worktrees/0621, branch perf/0621-xls-open-fence-count,
+# base 1e41983213dc378c13774ed7038c51faf231977f
+# host AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0
+
+$ cargo fmt --all --check
+(no output: clean)
+
+$ cargo clippy -p litchi-cfb --all-targets
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0621/crates/litchi-cfb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.99s
+
+$ cargo clippy -p litchi-xls --all-targets
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0621/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.23s
+
+$ cargo clippy -p litchi --all-targets
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.44s
+(the three warnings are pre-existing dead-code warnings for feature-gated test
+ helpers in crates/litchi/tests/unexpected_format.rs, a file this change does not
+ touch; the same three appear on the untouched before checkout of 1e4198321)
+
+$ cargo clippy -p litchi --all-targets --features xls,xlsx,xlsb,ods,opc,docx,pptx
+warning: field `bytes` is never read
+warning: function `missing_ooxml_catalog_part_error` is never used
+warning: passing a unit value to a function
+warning: passing a unit value to a function
+warning: `litchi` (lib) generated 4 warnings
+warning: function `missing_ooxml_catalog_part_error` is never used
+warning: passing a unit value to a function
+warning: passing a unit value to a function
+warning: `litchi` (lib test) generated 5 warnings (2 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.32s
+(PRE-EXISTING. The two unit_arg sites are crates/litchi/src/document/doc.rs:775,
+ :921, :2568 and :2655, and the dead items are in doc.rs and detected.rs:612;
+ none is in a function this change touches. Reproduced verbatim on the untouched
+ before checkout of 1e4198321 with CARGO_TARGET_DIR outside that checkout:
+ an identical nine-line warning set, byte for byte.)
+
+$ cargo test -p litchi-cfb
+4 test binaries: 356 passed, 0 failed, 1 ignored
+  (includes the three tests this change adds:
+   an_open_observes_the_source_twice_around_its_parse,
+   an_open_refuses_a_changed_source_over_its_input_limit,
+   an_open_refuses_a_changed_source_over_a_failed_length)
+
+$ cargo test -p litchi-xls
+72 test binaries: 1396 passed, 0 failed, 1 ignored
+  (includes the six tests this change adds to tests/source_backed.rs)
+
+$ cargo test -p litchi
+26 test binaries: 0 passed, 0 failed, 5 ignored
+  (litchi's default feature set is empty, so this compiles almost no tests;
+   the feature-bearing run below is the real gate)
+
+$ cargo test -p litchi --features xls,xlsx,xlsb,ods,opc,docx,pptx
+test result: FAILED. 226 passed; 1 failed; 0 ignored
+  document::doc::tests::managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal
+  panicked at crates/litchi/src/document/doc.rs:2659:40:
+  called `Result::unwrap()` on an `Err` value: Other("OPC execution failed:
+  Memory budget exceeded in facade-managed-docx-paragraph-text: observed 137474,
+  limit 1154")
+(PRE-EXISTING and unrelated: a DOCX managed-facade memory budget, in a file and a
+ code path this change does not touch. Reproduced on the untouched before
+ checkout of 1e4198321 with the same feature set and the same
+ "226 passed; 1 failed" line and the same panic site.)
+
+$ cargo doc -p litchi-cfb --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.29s
+   Generated /home/zhuhe/code/litchi-worktrees/0621/target/doc/litchi_cfb/index.html
+
+$ cargo doc -p litchi-xls --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.48s
+   Generated /home/zhuhe/code/litchi-worktrees/0621/target/doc/litchi_xls/index.html
+
+$ cargo doc -p litchi --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.26s
+   Generated /home/zhuhe/code/litchi-worktrees/0621/target/doc/litchi/index.html
+
+$ corpus differential: every .xls fixture under test-data/, both legs,
+$ full text and whole-sheet walk (scripts/corpus.sh, scripts/analyze_corpus.py)
+cells compared: 218 (199 reached the reader; the rest are typed refusals)
+identical outcome (projection digest or exact typed refusal): 218
+identical read_calls and read_bytes: 218
+observations over the corpus: 230,619 -> 91,611 (-60.28%)
+
+$ negative control: the three counted-invariant tests with the removed fences put
+$ back (scripts/restore-fences.py restore), then removed again
+litchi-cfb  an_open_observes_the_source_twice_around_its_parse ....... FAILED (3, not 2)
+litchi-xls  a_text_extraction_observes_..._per_written_object ........ FAILED ((15, 4, 27), not (12, 4, 21))
+litchi-xls  a_text_extraction_observes_..._per_shared_string_read .... FAILED (slope (8, 32), not (8, 8))
+litchi-cfb  an_open_refuses_a_changed_source_over_its_input_limit .... ok (both legs)
+litchi-cfb  an_open_refuses_a_changed_source_over_a_failed_length .... ok (both legs)
+litchi-xls  a_mutation_in_any_observation_window_of_a_text_extraction_is_refused ... ok (both legs)
+litchi-xls  a_mutation_in_any_observation_window_of_an_open_is_refused ............. ok (both legs)
+litchi-xls  a_mutation_from_inside_the_output_sink_stops_the_text_stream ........... ok (both legs)
+litchi-xls  a_changed_source_outranks_a_missing_workbook_stream ..................... ok (both legs)
