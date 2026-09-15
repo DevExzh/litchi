@@ -1,5 +1,43 @@
 # Performance hotspot inventory
 
+## 0620 — the XLS edit-and-save path attributed; one duplicate source parse removed; the readback-owner swap frozen as inadmissible
+
+Takes change 0587 item XLS-9 (rank 31), which the survey could only size as
+**unknown** because no attribution of the XLS edit path existed, and supplies
+it. On `54016.xls` one `Snapshot::from_bytes` is 167,311,992 Ir and the complete
+eager `Workbook::new` inside it is **82.1%** of that; the offset inventory the
+edit owner actually keeps is 12.5%. One `commit_source_backed` runs **three**
+more complete parses of the same workbook — for the source policy checks, inside
+the target's `Snapshot::from_bytes`, and inside
+`verify_source_backed_numeric_target` — so **one open-edit-save parses the whole
+workbook four times, 52.1% of the operation**. 0587's falsification test
+("falsified if `Workbook::new` is under 15% of a plan-only commit") resolves at
+**54.7%**; on the generic path it is 76-80% of the commit. One of the four
+parses was already redundant: `commit_source_backed_numeric` re-parsed the
+snapshot's own sealed bytes to ask three questions `SourcePolicyFacts` had
+already answered at open, which commit `237309eea` had fixed for the plan-only
+sibling and left here. Reusing the facts removes **137,061,668 Ir**, cuts the
+operation by 14.0% in instructions and **25.1% in native cycles**, cuts
+allocation calls by 19.9% and **peak retained bytes by 34.1%** (the removed
+`Workbook` was alive across the whole target materialization), and moves the
+commit p50 by **−32.1% / −33.7%** on `54016.xls` and −26.8% / −26.2% on
+`WithCustomViews.xls` against an A/A floor under 2%. The remaining three parses
+are named with their sizes. The survey's proposed cure — a source-backed
+candidate readback — is **frozen as inadmissible as specified**:
+`require_public_worksheet_coverage` asserts that the *eager parser* projected a
+sheet, and `SourceBackedWorkbook` sets the same field unconditionally from the
+BoundSheet8 `dt` byte without reading a worksheet byte, so it is always true;
+five admission gates are recorded. Two new blockers for this area: **33 of 126 fixtures never reach
+a snapshot at all**, 24 of them because a worksheet was not published by the
+complete reader — including the flagship `ConditionalFormattingSamples.xls`,
+which no XLS edit measurement in this program can ever use — and
+the registered XLS numeric corpora have a Workbook stream that is 0.48% of the
+archive against 78.9-94.2% on real files, so they cannot price anything in the
+BIFF record path. OLE2/OOXML optimization remains active; ODF is deferred until
+completion and iWork excluded. [Change and
+limitations](0620-xls-edit-save-attribution.md); [retained
+evidence](results/change-0620/README.md).
+
 ## 0600 — one fewer observation per cold Part read, a bounded monitored-read scope, and an allocation-free member lookup
 
 Items ZIP-3 and ZIP-4 of the [0587 queue](0587-remaining-opportunity-survey.md)

@@ -1,0 +1,9 @@
+host: Linux 7.0.0-1012-aws x86_64
+cpu: AMD EPYC 9R45
+cores: 32
+memory: 123 GiB
+rustc: rustc 1.95.0 (59807616e 2026-04-14)
+cargo: cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+valgrind: valgrind-3.26.0
+base commit: 1e4198321
+branch: perf/0620-xls-edit-save-attribution

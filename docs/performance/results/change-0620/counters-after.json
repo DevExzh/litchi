@@ -1,0 +1,918 @@
+[
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "open",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 0,
+  "allocations": 51818,
+  "allocated_bytes": 26140189,
+  "peak_live_bytes": 17787131,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": null,
+  "open_ns": [
+   11808404,
+   11137643,
+   11147093,
+   11369504,
+   11382174
+  ],
+  "stage_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "commit_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "publish_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "number-plan",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 984576,
+  "allocations": 99952,
+  "allocated_bytes": 44623130,
+  "peak_live_bytes": 18540525,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": {
+   "changed_cells": 1,
+   "touched_streams": 1,
+   "splice_count": 1,
+   "replacement_bytes": 4,
+   "changed_spans": 1,
+   "source_bytes": 984576,
+   "source_workbook_bytes": 927178,
+   "target_workbook_bytes": 927178
+  },
+  "open_ns": [
+   13001225,
+   11358674,
+   11400944,
+   11607834,
+   12168264
+  ],
+  "stage_ns": [
+   338000,
+   212311,
+   217250,
+   223491,
+   217560
+  ],
+  "commit_ns": [
+   12144964,
+   11159413,
+   11444314,
+   11606554,
+   11567164
+  ],
+  "publish_ns": [
+   940550,
+   927491,
+   938800,
+   942700,
+   936271
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "number-source-backed",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 984576,
+  "allocations": 161751,
+  "allocated_bytes": 76204234,
+  "peak_live_bytes": 26082823,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": {
+   "changed_cells": 1,
+   "touched_streams": 1,
+   "splice_count": 1,
+   "replacement_bytes": 4,
+   "changed_spans": 1,
+   "source_bytes": 984576,
+   "source_workbook_bytes": 927178,
+   "target_workbook_bytes": 927178
+  },
+  "open_ns": [
+   13276654,
+   11773884,
+   12008044,
+   12026794,
+   12002024
+  ],
+  "stage_ns": [
+   348100,
+   216790,
+   218470,
+   229391,
+   221580
+  ],
+  "commit_ns": [
+   28754371,
+   27241300,
+   27933250,
+   26870959,
+   27676990
+  ],
+  "publish_ns": [
+   944490,
+   941530,
+   951540,
+   948770,
+   944530
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "number-generic",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 984576,
+  "allocations": 118063,
+  "allocated_bytes": 63060394,
+  "peak_live_bytes": 24254634,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": null,
+  "open_ns": [
+   13292715,
+   12915025,
+   12854704,
+   12658284,
+   12587855
+  ],
+  "stage_ns": [
+   349670,
+   228230,
+   229950,
+   224130,
+   228600
+  ],
+  "commit_ns": [
+   13817095,
+   13240444,
+   12861305,
+   12773275,
+   13375284
+  ],
+  "publish_ns": [
+   60,
+   180,
+   50,
+   40,
+   230
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "string-generic",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 984576,
+  "allocations": 127693,
+  "allocated_bytes": 66233349,
+  "peak_live_bytes": 24233934,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": null,
+  "open_ns": [
+   12589674,
+   11603204,
+   12682735,
+   12411564,
+   12428514
+  ],
+  "stage_ns": [
+   658380,
+   409760,
+   414390,
+   422050,
+   420950
+  ],
+  "commit_ns": [
+   12896775,
+   12758905,
+   13276234,
+   12433564,
+   12750365
+  ],
+  "publish_ns": [
+   60,
+   150,
+   60,
+   60,
+   50
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54016.xls",
+  "operation": "noop-generic",
+  "source_bytes": 984576,
+  "workbook_stream_bytes": 927178,
+  "samples": 5,
+  "published_bytes": 984576,
+  "allocations": 59714,
+  "allocated_bytes": 26531880,
+  "peak_live_bytes": 17787131,
+  "open_allocations": 51818,
+  "open_allocated_bytes": 26140189,
+  "open_peak_live_bytes": 17787131,
+  "diagnostics": null,
+  "open_ns": [
+   13257454,
+   12340575,
+   11975504,
+   11525344,
+   11660864
+  ],
+  "stage_ns": [
+   350050,
+   236050,
+   217370,
+   216741,
+   219770
+  ],
+  "commit_ns": [
+   1920,
+   1800,
+   1750,
+   1600,
+   1590
+  ],
+  "publish_ns": [
+   40,
+   40,
+   40,
+   40,
+   40
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "open",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 0,
+  "allocations": 6839,
+  "allocated_bytes": 3285160,
+  "peak_live_bytes": 1862105,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": null,
+  "open_ns": [
+   1083170,
+   1007941,
+   1018730,
+   985450,
+   985131
+  ],
+  "stage_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "commit_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "publish_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "number-plan",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 165888,
+  "allocations": 13100,
+  "allocated_bytes": 5847933,
+  "peak_live_bytes": 2181242,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": {
+   "changed_cells": 1,
+   "touched_streams": 1,
+   "splice_count": 1,
+   "replacement_bytes": 4,
+   "changed_spans": 1,
+   "source_bytes": 165888,
+   "source_workbook_bytes": 150437,
+   "target_workbook_bytes": 150437
+  },
+  "open_ns": [
+   1105001,
+   1023861,
+   1014291,
+   1017820,
+   1035420
+  ],
+  "stage_ns": [
+   21860,
+   18930,
+   18510,
+   18190,
+   18060
+  ],
+  "commit_ns": [
+   1157620,
+   1105030,
+   1095600,
+   1085721,
+   1094421
+  ],
+  "publish_ns": [
+   156620,
+   156320,
+   155780,
+   156110,
+   156180
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "number-source-backed",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 165888,
+  "allocations": 20945,
+  "allocated_bytes": 9911311,
+  "peak_live_bytes": 3176770,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": {
+   "changed_cells": 1,
+   "touched_streams": 1,
+   "splice_count": 1,
+   "replacement_bytes": 4,
+   "changed_spans": 1,
+   "source_bytes": 165888,
+   "source_workbook_bytes": 150437,
+   "target_workbook_bytes": 150437
+  },
+  "open_ns": [
+   1067341,
+   1002470,
+   994831,
+   1059211,
+   993490
+  ],
+  "stage_ns": [
+   20980,
+   17490,
+   17260,
+   17130,
+   16620
+  ],
+  "commit_ns": [
+   2621981,
+   2454461,
+   2495080,
+   2463401,
+   2444071
+  ],
+  "publish_ns": [
+   164480,
+   155960,
+   156830,
+   156410,
+   156830
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "number-generic",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 165888,
+  "allocations": 14760,
+  "allocated_bytes": 8662354,
+  "peak_live_bytes": 2955437,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": null,
+  "open_ns": [
+   1056480,
+   1001480,
+   992220,
+   992691,
+   994090
+  ],
+  "stage_ns": [
+   21040,
+   17860,
+   17260,
+   17500,
+   17410
+  ],
+  "commit_ns": [
+   1208481,
+   1119661,
+   1117700,
+   1111710,
+   1117901
+  ],
+  "publish_ns": [
+   30,
+   30,
+   40,
+   30,
+   30
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "string-generic",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 165888,
+  "allocations": 15423,
+  "allocated_bytes": 8984377,
+  "peak_live_bytes": 2893725,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": null,
+  "open_ns": [
+   1054180,
+   1024621,
+   985561,
+   1006690,
+   985060
+  ],
+  "stage_ns": [
+   39950,
+   32950,
+   31980,
+   32090,
+   31690
+  ],
+  "commit_ns": [
+   1149540,
+   1129610,
+   1112790,
+   1125561,
+   1113641
+  ],
+  "publish_ns": [
+   30,
+   30,
+   30,
+   30,
+   40
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/WithCustomViews.xls",
+  "operation": "noop-generic",
+  "source_bytes": 165888,
+  "workbook_stream_bytes": 150437,
+  "samples": 5,
+  "published_bytes": 165888,
+  "allocations": 7317,
+  "allocated_bytes": 3395609,
+  "peak_live_bytes": 1862105,
+  "open_allocations": 6839,
+  "open_allocated_bytes": 3285160,
+  "open_peak_live_bytes": 1862105,
+  "diagnostics": null,
+  "open_ns": [
+   1050731,
+   985670,
+   987701,
+   1010410,
+   993560
+  ],
+  "stage_ns": [
+   21170,
+   17250,
+   17560,
+   16910,
+   16820
+  ],
+  "commit_ns": [
+   240,
+   230,
+   200,
+   260,
+   230
+  ],
+  "publish_ns": [
+   30,
+   30,
+   30,
+   40,
+   30
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/FormulaEvalTestData.xls",
+  "operation": "open",
+  "source_bytes": 178176,
+  "workbook_stream_bytes": 158487,
+  "samples": 5,
+  "published_bytes": 0,
+  "allocations": 28718,
+  "allocated_bytes": 4772340,
+  "peak_live_bytes": 2757906,
+  "open_allocations": 28718,
+  "open_allocated_bytes": 4772340,
+  "open_peak_live_bytes": 2757906,
+  "diagnostics": null,
+  "open_ns": [
+   2477161,
+   2238971,
+   2170960,
+   2176931,
+   2183261
+  ],
+  "stage_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "commit_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "publish_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "stem": "formula",
+  "operation": "number-plan",
+  "refused": "Error: UnsafeEdit('macro-bearing XLS sources are not eligible for source-backed numeric edits')"
+ },
+ {
+  "stem": "formula",
+  "operation": "number-source-backed",
+  "refused": "Error: UnsafeEdit('macro-bearing XLS sources are not eligible for source-backed numeric edits')"
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/FormulaEvalTestData.xls",
+  "operation": "number-generic",
+  "source_bytes": 178176,
+  "workbook_stream_bytes": 158487,
+  "samples": 5,
+  "published_bytes": 178176,
+  "allocations": 60592,
+  "allocated_bytes": 11289540,
+  "peak_live_bytes": 3714974,
+  "open_allocations": 28718,
+  "open_allocated_bytes": 4772340,
+  "open_peak_live_bytes": 2757906,
+  "diagnostics": null,
+  "open_ns": [
+   2517921,
+   2220001,
+   2237951,
+   2238211,
+   2239371
+  ],
+  "stage_ns": [
+   50640,
+   30780,
+   31230,
+   30620,
+   30810
+  ],
+  "commit_ns": [
+   2671021,
+   2400410,
+   2370071,
+   2359741,
+   2330660
+  ],
+  "publish_ns": [
+   40,
+   30,
+   40,
+   40,
+   40
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/FormulaEvalTestData.xls",
+  "operation": "string-generic",
+  "source_bytes": 178176,
+  "workbook_stream_bytes": 158487,
+  "samples": 5,
+  "published_bytes": 178176,
+  "allocations": 62256,
+  "allocated_bytes": 12292949,
+  "peak_live_bytes": 4007397,
+  "open_allocations": 28718,
+  "open_allocated_bytes": 4772340,
+  "open_peak_live_bytes": 2757906,
+  "diagnostics": null,
+  "open_ns": [
+   2543881,
+   2208431,
+   2183131,
+   2188100,
+   2137471
+  ],
+  "stage_ns": [
+   100250,
+   56540,
+   57230,
+   57320,
+   57370
+  ],
+  "commit_ns": [
+   2736491,
+   2417221,
+   2361301,
+   2311651,
+   2394621
+  ],
+  "publish_ns": [
+   40,
+   40,
+   30,
+   40,
+   30
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/ole/xls/FormulaEvalTestData.xls",
+  "operation": "noop-generic",
+  "source_bytes": 178176,
+  "workbook_stream_bytes": 158487,
+  "samples": 5,
+  "published_bytes": 178176,
+  "allocations": 29970,
+  "allocated_bytes": 4814625,
+  "peak_live_bytes": 2757906,
+  "open_allocations": 28718,
+  "open_allocated_bytes": 4772340,
+  "open_peak_live_bytes": 2757906,
+  "diagnostics": null,
+  "open_ns": [
+   2476661,
+   2198461,
+   2192561,
+   2206211,
+   2214920
+  ],
+  "stage_ns": [
+   50060,
+   28160,
+   37620,
+   27880,
+   28070
+  ],
+  "commit_ns": [
+   350,
+   410,
+   350,
+   270,
+   370
+  ],
+  "publish_ns": [
+   30,
+   30,
+   30,
+   30,
+   30
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/59858.xls",
+  "operation": "open",
+  "source_bytes": 1103360,
+  "workbook_stream_bytes": 870403,
+  "samples": 5,
+  "published_bytes": 0,
+  "allocations": 9535,
+  "allocated_bytes": 8187958,
+  "peak_live_bytes": 3529873,
+  "open_allocations": 9535,
+  "open_allocated_bytes": 8187958,
+  "open_peak_live_bytes": 3529873,
+  "diagnostics": null,
+  "open_ns": [
+   1725551,
+   1637281,
+   1625240,
+   1653181,
+   1638271
+  ],
+  "stage_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "commit_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "publish_ns": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "stem": "59858",
+  "operation": "number-plan",
+  "refused": "Error: UnsafeEdit('protected worksheets are not eligible for source-backed numeric edits')"
+ },
+ {
+  "stem": "59858",
+  "operation": "number-source-backed",
+  "refused": "Error: UnsafeEdit('protected worksheets are not eligible for source-backed numeric edits')"
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/59858.xls",
+  "operation": "number-generic",
+  "source_bytes": 1103360,
+  "workbook_stream_bytes": 870403,
+  "samples": 5,
+  "published_bytes": 1103360,
+  "allocations": 21518,
+  "allocated_bytes": 31560092,
+  "peak_live_bytes": 8169797,
+  "open_allocations": 9535,
+  "open_allocated_bytes": 8187958,
+  "open_peak_live_bytes": 3529873,
+  "diagnostics": null,
+  "open_ns": [
+   1456411,
+   1352791,
+   1353060,
+   1356011,
+   1361600
+  ],
+  "stage_ns": [
+   15540,
+   12540,
+   12510,
+   12140,
+   12520
+  ],
+  "commit_ns": [
+   2888741,
+   2796921,
+   2756471,
+   2780191,
+   2748581
+  ],
+  "publish_ns": [
+   70,
+   60,
+   50,
+   60,
+   50
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/59858.xls",
+  "operation": "string-generic",
+  "source_bytes": 1103360,
+  "workbook_stream_bytes": 870403,
+  "samples": 5,
+  "published_bytes": 1103360,
+  "allocations": 23187,
+  "allocated_bytes": 31912861,
+  "peak_live_bytes": 8170079,
+  "open_allocations": 9535,
+  "open_allocated_bytes": 8187958,
+  "open_peak_live_bytes": 3529873,
+  "diagnostics": null,
+  "open_ns": [
+   1455111,
+   1368820,
+   1342761,
+   1372580,
+   1352711
+  ],
+  "stage_ns": [
+   29060,
+   23210,
+   23250,
+   23090,
+   23430
+  ],
+  "commit_ns": [
+   2924711,
+   2858221,
+   2849621,
+   2792171,
+   2831121
+  ],
+  "publish_ns": [
+   60,
+   70,
+   50,
+   60,
+   50
+  ]
+ },
+ {
+  "input": "/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/59858.xls",
+  "operation": "noop-generic",
+  "source_bytes": 1103360,
+  "workbook_stream_bytes": 870403,
+  "samples": 5,
+  "published_bytes": 1103360,
+  "allocations": 9873,
+  "allocated_bytes": 8211988,
+  "peak_live_bytes": 3529873,
+  "open_allocations": 9535,
+  "open_allocated_bytes": 8187958,
+  "open_peak_live_bytes": 3529873,
+  "diagnostics": null,
+  "open_ns": [
+   1747681,
+   1652170,
+   1681000,
+   1648791,
+   1636361
+  ],
+  "stage_ns": [
+   14190,
+   10990,
+   11050,
+   11390,
+   10570
+  ],
+  "commit_ns": [
+   510,
+   500,
+   610,
+   520,
+   370
+  ],
+  "publish_ns": [
+   50,
+   70,
+   50,
+   60,
+   40
+  ]
+ }
+]

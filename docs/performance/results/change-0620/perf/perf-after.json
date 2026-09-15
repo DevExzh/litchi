@@ -1,0 +1,114 @@
+{
+ "54016/noop-generic": {
+  "branch-misses": 397189.2,
+  "branches": 35652136.47,
+  "cycles": 49025240.67,
+  "instructions": 158677080.87,
+  "task-clock": 10.93
+ },
+ "54016/number-generic": {
+  "branch-misses": 831705.23,
+  "branches": 69645976.03,
+  "cycles": 102524161.77,
+  "instructions": 311076796.07,
+  "task-clock": 22.91
+ },
+ "54016/number-plan": {
+  "branch-misses": 811470.7,
+  "branches": 67420760.33,
+  "cycles": 102971744.9,
+  "instructions": 309679136.0,
+  "task-clock": 23.02
+ },
+ "54016/number-source-backed": {
+  "branch-misses": 1277943.43,
+  "branches": 103989280.9,
+  "cycles": 171248047.0,
+  "instructions": 484563358.13,
+  "task-clock": 38.39
+ },
+ "54016/open": {
+  "branch-misses": 410021.73,
+  "branches": 34792066.3,
+  "cycles": 48467674.53,
+  "instructions": 155020439.13,
+  "task-clock": 10.83
+ },
+ "54016/string-generic": {
+  "branch-misses": 871441.17,
+  "branches": 72199685.9,
+  "cycles": 105203142.83,
+  "instructions": 321803704.4,
+  "task-clock": 23.45
+ },
+ "cv/noop-generic": {
+  "branch-misses": 48878.72,
+  "branches": 3044103.59,
+  "cycles": 4521925.7,
+  "instructions": 13865349.78,
+  "task-clock": 1.01
+ },
+ "cv/number-generic": {
+  "branch-misses": 106585.99,
+  "branches": 6222140.63,
+  "cycles": 9898567.27,
+  "instructions": 28598587.09,
+  "task-clock": 2.21
+ },
+ "cv/number-plan": {
+  "branch-misses": 98674.34,
+  "branches": 5948825.73,
+  "cycles": 10425887.15,
+  "instructions": 28841405.93,
+  "task-clock": 2.33
+ },
+ "cv/number-source-backed": {
+  "branch-misses": 153239.88,
+  "branches": 9069478.31,
+  "cycles": 16521722.97,
+  "instructions": 44775228.08,
+  "task-clock": 3.69
+ },
+ "cv/open": {
+  "branch-misses": 48228.92,
+  "branches": 3014308.4,
+  "cycles": 4497633.44,
+  "instructions": 13757949.35,
+  "task-clock": 1.0
+ },
+ "cv/string-generic": {
+  "branch-misses": 106295.1,
+  "branches": 6352364.61,
+  "cycles": 9969542.63,
+  "instructions": 29157423.22,
+  "task-clock": 2.22
+ },
+ "formula/noop-generic": {
+  "branch-misses": 91461.37,
+  "branches": 6307272.11,
+  "cycles": 10282227.95,
+  "instructions": 30003783.72,
+  "task-clock": 2.29
+ },
+ "formula/number-generic": {
+  "branch-misses": 186412.78,
+  "branches": 12534026.35,
+  "cycles": 20819804.83,
+  "instructions": 59755105.25,
+  "task-clock": 4.64
+ },
+ "formula/open": {
+  "branch-misses": 89990.99,
+  "branches": 6164427.29,
+  "cycles": 10100045.5,
+  "instructions": 29397363.13,
+  "task-clock": 2.25
+ },
+ "formula/string-generic": {
+  "branch-misses": 191778.94,
+  "branches": 12946995.87,
+  "cycles": 21324618.03,
+  "instructions": 61513497.36,
+  "task-clock": 4.76
+ }
+}

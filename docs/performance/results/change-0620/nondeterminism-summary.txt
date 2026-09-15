@@ -1,0 +1,81 @@
+Per-process nondeterminism of the generic Transaction::commit output
+16 runs of each leg over the two affected fixtures.
+
+59858.xls                            noop-generic           distinct digests before=1 after=1  sets EQUAL
+      e5b4513f628fc16088b79ef6ad019d479706111fd11da7fe41f93bd0458da43f   before=True after=True
+59858.xls                            number-generic         distinct digests before=16 after=16  sets DIFFER
+      01465ecc2cce58952ac42dcbe80f4608038b96d380690ea836b169a6560be7c6   before=False after=True
+      03811537ece3453b837b1d3e375ea2cc8c0e052d1910b8536f75ce7fb9af5449   before=False after=True
+      0689020854f3fca9b1e94ad876dd4d4f519f03b3d9117c5692ba3989e2f847f3   before=False after=True
+      0b2a5665875572f0891f9edd7766e669e0650fb28edaa6fe1b59e48206b39ff3   before=True after=False
+      15b6225760562a93091ac2b331d997bc60658d2989ab0824ddab63c0ccd5679f   before=True after=False
+      1b687dc38b83ace5477c80a2ff7980ed6c18af265bc1f6bf73c06e8c4c2277ca   before=True after=False
+      2486bc092c0a92b9b584ed0ff2ce5aaaa4da734681982409e0ba9f14dbb8e81d   before=True after=False
+      3a889c1f5a663b93b481ea1c2841428ab14d7be8fba95ed2a31a36fb38a58a4e   before=True after=False
+      3b2d31a2793f7748eb67855ea8217b97111c186dddfbcc35909f6c6d002accb1   before=False after=True
+      44553e7e44f7df2f600bcf61266b3c59ff5664ccbb5e0890d364380bba32c26e   before=True after=False
+      55c0215b1c7cfe66639cf452745e8c888988faa388b755d55a39a18b23b4c5b7   before=False after=True
+      57730106089a4b70082c987502d5b89f3252e7adb36275c74f181f4066c804b1   before=False after=True
+      60b6b152dd42fd3c454a171025eae4dced2c0bcca00191b345c102334f62c0b9   before=True after=False
+      63c0b4aa3f473c6851fb3c6284eb0e41af36d5ab80927cd0d1d143d36639d92b   before=True after=False
+      791fcd6140befb2496a068161f9b3a85153b41f3af2740f0203ef1676a52658c   before=True after=False
+      7aa0538906279523a6cb4ddd35bdc6028f36fe34896042904f9c15cc02ad96a0   before=True after=False
+      89149b0b1d9796033da5d1cd1c4252ae10b56f7a90a9f68abfd857f903b5b2b4   before=True after=False
+      8ada11843362722cbd42d4bd91f2e963f1a751e9d1b21a6e62c7774ea64d9f25   before=False after=True
+      994bddabe1187ae784342b39e86d5d1e0c5a51c727e22fe7564cc7adb65f87eb   before=True after=False
+      9a58b760c1b9daf5e7e4efb064d94ef132c7bae8e9f6954607ab7f1d7b960df1   before=False after=True
+      a8aa2040342899b9f3a2db4735223131c6d5a708b2115adb8ee306d860e96dc5   before=False after=True
+      ab16a5bb84783035445bae7e19eb19e6bf4cf1ef703c03e24685f9c216878b64   before=False after=True
+      ace62697d7f4d7fc2f3645f1d80ce071311793fdac00a7d4b26e004cdf214e52   before=True after=False
+      cddb629d7e685b6f2ee9e7764d4d8142c687dae4854391cbe0678ccd2fefbd17   before=True after=False
+      dcdf2af48d15936b0f6879a62bfb396cf26a7cd77c0b7d380e30620a6e01378d   before=False after=True
+      e0683d096649872ed80078b4ee5bc51b77e4af09994379e95803c50876f3dda8   before=False after=True
+      e1f435f7b09c3e55daf0c17b75e747470336cbbd39d348a2c61dbd85d8e2c267   before=True after=False
+      e90c13b73d3541b668def13c2663c6ed10e8a206a4b36ad8e7acc41fe2cd8c80   before=True after=False
+      f267e1a809697c165ee0ef2d1e004567029c3fb391f84280de35be79b376e388   before=False after=True
+      f2b1ed02866b644f4c9c9a1e0b065a10079d799d188b85a50560ba4a7223e8f8   before=False after=True
+      f5ab24ab549d5ac1f139075acff210fb98048c7081882734aa822c54f570f290   before=False after=True
+      fb5f72e0aeaed436c2ffd6ff1b8ab252c1888e8d8e18909a27fe4ae8682325d0   before=False after=True
+59858.xls                            string-generic         distinct digests before=16 after=16  sets DIFFER
+      07b659ad9d9537e8c5e5253908a45c5192eb3b23dfcdbc3bf923c324241bb03d   before=False after=True
+      0820ebdb5128d9763687f19361cbd2b72416dd90f462b1e05c7f3db2ebae2d91   before=False after=True
+      0e80e911ad89618658a01b25fb7fd2a406d5dd117be349922f473c9c30d4fdd9   before=False after=True
+      1dba3db28ba592d05e91dc7581d51738cfd932bed3d3dbacd5b9776b6a35d7ed   before=True after=False
+      36e068039c89c9d1b8a76541b061ee1263b848d167b3bb44d0548d717cd9324a   before=True after=False
+      4b0bea026692193e123a16bc1419e925aa3b8fe4c70db1b3ad3d4bc791d076d6   before=False after=True
+      502610c5860beb61ebf2140512ca32b316e7203c972350485fa39962d4d1753c   before=True after=False
+      512c551e54f17fa5f0b36f4cc905f502cc1ba6d40ab84389a4c349f6f558ccde   before=False after=True
+      52599e39cc0577a0abc5c9e1c28d769d970d4453ea52453378ad45da2e7ea3ab   before=True after=False
+      5a5cbd2f8424059f828d3b1b12d333d22d17fc5ab7750cbef67f51b7a1590f84   before=True after=False
+      647749ec39760cdb55a8c67e61c4786a2f4ca8ae34d6d729f9d835ff9a224996   before=True after=False
+      6aa03bf84350151840bef6299e3f75e91ff734b8d2ef5c826f8c3b653339b941   before=True after=False
+      6ec78dea4e9b61ddd431c49b6358e8b18ad18720ca2e5e747988c12681d6d514   before=True after=False
+      7111fc439984adb528ec9066c2632be3176d1f9c2688df40b1d80f056b6822c2   before=True after=False
+      73352184ab1994b759a3d3c1aa24cac349d99d48bbe3ccc99d1c8eb1a2be34d6   before=False after=True
+      89eb99aae1a8d41eb98c3a9d9bea6a05a5e639a0d10fea4ec052cf76595a54b2   before=False after=True
+      8c88a36e48be383bb33ff1f27c00292a1546f0fbce020ec98886bc793704be62   before=True after=False
+      8e3848fa864cbc391eb620153c4c3e56a7026aa25f59bde150bc705b76c78e3b   before=False after=True
+      9620265c1ff858c42f603d1e456a82c4db935c9abb3ebdcc24d9ce969a5161fe   before=False after=True
+      a9fbccd42a89291320dd5c4fc2b3de36796db3411bcfbe4bbc005f61e877d998   before=False after=True
+      bc9f7d05789683930c1c046698536c58e6be203f65cbc188b0a46e5a5226cf18   before=True after=False
+      c46b12280acebeac3efa69e8834153d4e6ac1d0335f3495ed5a360cf021e8b61   before=True after=False
+      c5c6eb2dc1343fde3cd2ba6cc1300278228021e90ab7ff7e2f791eea0267b949   before=False after=True
+      c81c40c0e959a445373455e93296838c7de6ed1e777d3617c17d09ea33ecf0d1   before=True after=False
+      ca21ce53be7b69768f8ca3ac04f8e149fd5ca0973a109a543f71c1e109171975   before=True after=False
+      cad38577efd71f87ad105a88595adcbf0622df66f7067a364532ae0213d8192d   before=False after=True
+      cc80407b49399994e4c3c2612fe8d1de05fa494acf2ae6239bea1c93a3637e6a   before=False after=True
+      edc072c45234a6dadc4e7ef4a52ae61016bec47e5ea71fb203298540d67cba6a   before=False after=True
+      efcf0905809bb5f3bfdb80c101ddd73528e601c872a8aba8552796fe120dfcda   before=True after=False
+      f06c493c3a155a6588c353d3c8622102b35456c59f6db6ca502095b94759c932   before=False after=True
+      f4365ddbecb2169e7cdd023ffe92e977d28049285bf97aa8fa00be69540cda61   before=False after=True
+      f6f924e348a18cfc1031e17f6b8bee89b0f5a2437e1ac80dc713b4c7c99410ea   before=True after=False
+pivottable_dates_grouping.xls        noop-generic           distinct digests before=1 after=1  sets EQUAL
+      9f0f311ee9dc2960e5f4c2fc109e3e8e075bbcb1d25e3291e9f02423dd3ff0b8   before=True after=True
+pivottable_dates_grouping.xls        number-generic         distinct digests before=3 after=3  sets EQUAL
+      95a52f8b4f69b8ec8e2eff552d17fc5fd32db1896253eeddcb62aae241811700   before=True after=True
+      cb21942f182ee58ba05c1c81cd3850565ed8c25fac17f2723f54520676562b5a   before=True after=True
+      cb9eb7330500bc74ad8a502ac904313c71d99215cfd78972dad7c0003e76afa3   before=True after=True
+pivottable_dates_grouping.xls        string-generic         distinct digests before=3 after=3  sets EQUAL
+      29954da3acd65995a4c7f1bca953c0fe436960e75e8720a1d12198dbddeccdc6   before=True after=True
+      7a4c3aa9ff9c1a67298235098bbf09e304ae57a69161ad96a836d6a7e722de6d   before=True after=True
+      8eac3b4870fe61c966b7e3957b876c3a9c34cd8b35b77554c91a26eda9eeb8ef   before=True after=True

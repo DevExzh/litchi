@@ -1,5 +1,42 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0620 — the XLS edit-and-save path attributed; one duplicate source parse removed; the readback-owner swap frozen as inadmissible
+
+GOAL step 1 (eliminate unnecessary work) in the narrowest admissible form: the
+work removed is one complete parse of bytes the same call chain had already
+parsed, under the same limits and the same compatibility profile, whose three
+verdicts were already recorded. No step was skipped and no later step was
+reached — no layout change, no algorithm substitution, no parallelism, no SIMD —
+and no validation was moved, relaxed or deferred, because the candidate readback
+this record is about is untouched: the target is still materialized, reopened
+through a complete `Workbook::new` and validated again by a second one. The
+decision rules are satisfied in order: before measurements from the shared
+read-only checkout of the base, hypothesis and mechanism stated, smallest
+coherent change, correctness and adversarial evidence, after measurements with
+identical setup. The **measurement-blocker-is-work** rule was applied rather than
+noted: 0587 recorded that no attribution of this path existed and that the
+harness's XLS attribution binary supports only `open`, `list` and `one-cell`, so
+this change wrote a probe that drives the real editor on real fixtures and
+retains its source. The **instructions-rank-work, cycles-price-latency** rule
+decided how the result is stated: callgrind reports −14.0% and native `perf stat`
+−25.1% on the same operation, and the gap is exactly the software SHA-256
+valgrind is forced into, which inflates the fingerprint terms the change does not
+touch. Evidence tiers: **measured** for every per-call-site Ir figure (32
+isolation pairs, 64 annotated profiles), the 32 native counter pairs, the 48
+counter rows, the 5,760 timed operations across four rounds and the 3,546
+corpus-differential rows; **modelled** for nothing — this record makes no
+arithmetic prediction; **unknown** for the cost of the two remaining target
+parses beyond their measured Ir, and for the shares on any workbook with a record
+mix unlike the three measured. Host quiescence is established for the retained
+timing run and is *not* assumed: the first timing run of this change was taken
+while a corpus sweep occupied two other cores, its A/A floor reached 30% at p50,
+and it was discarded and re-run rather than reported. The honest control band is
+stated as ±5% at p50 — larger than the measured ±2% A/A floor — because the two
+binaries differ in code layout and the unchanged `open` phase shows it. OLE2/OOXML
+optimization remains active; ODF is deferred until completion and iWork excluded.
+[Change and limitations](0620-xls-edit-save-attribution.md); [retained
+evidence](results/change-0620/README.md).
+
 ## 0600 — one fewer observation per cold Part read, a bounded monitored-read scope, and an allocation-free member lookup
 
 `docs/GOAL.md` puts unnecessary work ahead of I/O and unnecessary allocation

@@ -5257,10 +5257,13 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
     }
 
     let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[])?;
-    let source_workbook = Workbook::new(Cursor::new(source.bytes()))?;
-    require_public_worksheet_coverage(&source_workbook, &source.inner.sheets)?;
-    require_unprotected_workbook(&source_workbook)?;
-    require_macro_free_workbook(&source_workbook)?;
+    // The complete source Workbook validation already ran when this immutable
+    // snapshot was opened, over the same sealed bytes under the same limits,
+    // and `SourcePolicyFacts` recorded its three verdicts with their exact
+    // refusal texts. Reuse them here as the plan-only publication already
+    // does; the target is still validated independently below over its own
+    // complete reopen.
+    source.inner.source_policy.require()?;
 
     let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
