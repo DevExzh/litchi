@@ -1121,6 +1121,15 @@ of the flagship open as an instruction upper bound, 5.1% of aggregate open time,
 at a cost of about 46 more requests, a range-source regression. Risk
 medium-high; frozen design record. Falsified if the 103 dense-globals fixtures
 regress in cycles more than the sparse ones gain.
+**Falsified by change 0612:** the gate fires on 19 of 123 real fixtures and the
+flagship open's read bytes fall 85%, but the open is 5.54% slower in native
+cycles on an owned source and 17.22% slower on a file source (floor under 1%),
+because the 48 extra reads each re-resolve the CFB directory entry by path;
+0574's 53.4 ns/KiB coefficient is about 15× too large, 0574's opportunity 3
+(a retained globals cursor) regresses on its own, and this record's "261 records
+of about 2 KiB" description of the flagship chain is wrong (64 payloads at the
+8,224-byte BIFF maximum). Only 0574's opportunity 5, framing the globals once,
+survives as a 1.5% candidate.
 
 **XLS-7. Zero-fill of the fill buffers** (0574 opportunity 4): 23.0% of the
 flagship open (`GlobalsBuffer::ensure`'s `memset`, upper bound), 3.7% of the
