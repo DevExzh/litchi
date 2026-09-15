@@ -1,0 +1,55 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0579",
+  "title": "Resume the CFB allocation-chain walk instead of restarting it on every range read",
+  "decision": "retained",
+  "code_state": "crates/litchi-cfb/src/{shared.rs,lib.rs} and crates/litchi-xls/src/workbook/source.rs modified; no other file under crates/ touched",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": "opportunity 3 of change 0574",
+  "reason_codes": [
+    "the mechanism is measured: the flagship open walks 5,796 FAT links before and 2,099 after, reproducing change 0574's independently captured 5,796 exactly",
+    "instructions and cycles both fall on every measured cell; the flagship open falls 11.44% in instructions and 8.34% in cycles",
+    "paired A/B/B/A medians improve in both directions in two windows on all six cells, every improvement larger than the widest same-binary excursion of 0.94%",
+    "reads, read bytes, source-version observations and refusal texts are identical over all 126 XLS fixtures and over 18 counted cells",
+    "the first implementation, a retained SharedOleStreamCursor, was measured and rejected: it removed more instructions but added cycles and regressed the flagship by 4.0% to 4.5% at p50"
+  ],
+  "accepted_evidence": {
+    "deterministic_counters": "18 cells, three source implementations by three operations by two legs, 20 warmups and 100 samples, every logical counter constant across all samples and identical between legs",
+    "corpus_differential": "one source-backed open of each of 126 XLS and XLT fixtures through a range-recording positional source, comparing read count, read bytes, source-version count, an FNV-1a digest of the exact positional read ranges, and the refusal text; the two logs are byte-identical",
+    "hardware_counters": "perf stat isolation pairs at 1100 and 100 samples divided by 1000, on three fixtures by two source implementations",
+    "instruction_attribution": "callgrind isolation pairs on eight fixtures including all three whose Workbook stream is mini-stream resident, annotated at threshold 100 so no small edge is dropped",
+    "latency": "paired A/B/B/A medians, 100 warmups and 3000 samples, two windows, with the same binary against itself as the noise floor in each window",
+    "mutation_checks": "six mutations of the hint logic; two are caught by targeted tests, one by three differential tests, and three are rejected by the crate's own dead-field lint and are individually redundant given the others"
+  },
+  "accepted_costs": {
+    "latency_scope": "warm page cache, staged immutable copy, one host, two binaries differing in three files; host quiescence not established",
+    "callgrind_string_ops": "memset and memcpy instruction counts remain upper bounds because Valgrind instruments ERMS string loops per iteration; this change touches neither",
+    "api_surface": "one new public type (StreamChainHint) and two new public methods (SharedOleFile::chain_hint, SharedOleFile::read_stream_range_hinted)"
+  },
+  "known_gaps": {
+    "formats": "only XLS was measured; litchi-doc issues the same repeated-range-read pattern and is not changed or measured here",
+    "concentration": "the saving scales with how many fills a scan issues over how long a chain; two fixtures move by less than 0.15% of instructions and are within isolation-pair noise",
+    "mini_stream": "the three mini-stream-resident fixtures gain 8, 8 and 0 chain steps per open, which is nearly nothing; no wall clock was taken for them",
+    "worksheet_scan": "the worksheet scan already uses a cursor and is untouched; no attempt was made to move it onto the hint"
+  },
+  "withheld": [
+    "any cold-cache, physical-device, remote or range-source, peak-RSS, allocation-profile, concurrency-scaling, real-producer or cross-platform result",
+    "any DOC, PPT, XLSX or non-OLE2 result"
+  ],
+  "provenance": {
+    "base_revision": "32d25e08806d93f792ffd4954d83acc9db9c5301",
+    "before_binary_sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06",
+    "after_binary_sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad",
+    "note": "both legs were built from a detached git worktree of the base revision outside the repository working copy, each with its own CARGO_TARGET_DIR; the after leg differs only in the three files this change edits"
+  },
+  "gates": {
+    "cargo_fmt": "clean for litchi-cfb and litchi-xls",
+    "clippy": "clean, --all-features --all-targets -D warnings",
+    "rustdoc": "clean",
+    "non_iwork_gate_clippy": "clean",
+    "suites": "6,355 tests, 0 failures, 233 binaries across litchi-xls, litchi-cfb, litchi-biff, litchi-ole-common, litchi-doc, litchi-ppt, litchi-xlsx, litchi-xlsb",
+    "known_red_unchanged": "litchi facade library tests 380 pass / 3 fail (document::doc, pre-existing at HEAD); tools/check_example_targets.py duplicate example targets in iWork crates (pre-existing at HEAD)"
+  }
+}

@@ -1,0 +1,30 @@
+{
+ "schema": "litchi-perf-environment",
+ "schema_version": 1,
+ "change_id": "0579",
+ "host": {
+  "cpu": "AMD EPYC 9R45",
+  "cores": 32,
+  "threads_per_core": 1,
+  "memory_gib": 123,
+  "kernel": "7.0.0-1012-aws",
+  "pinned_cpu": 17,
+  "aslr": "disabled for every timed and counted child (setarch -R)"
+ },
+ "toolchain": {
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "profile": "release, --locked",
+  "valgrind": "valgrind-3.26.0"
+ },
+ "trees": {
+  "base_revision": "32d25e08806d93f792ffd4954d83acc9db9c5301",
+  "before": "detached git worktree of that revision, unmodified",
+  "after": "the same detached worktree with crates/litchi-cfb/src/{shared.rs,lib.rs} and crates/litchi-xls/src/workbook/source.rs replaced by the change under test",
+  "note": "both trees live outside the repository working copy, each with its own CARGO_TARGET_DIR, so no concurrently edited file could enter a measured binary"
+ },
+ "binaries": {
+  "harness": "tools/perf-baseline --features xls-source-attribution --bin xls_source_attribution",
+  "before_sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06",
+  "after_sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+ }
+}

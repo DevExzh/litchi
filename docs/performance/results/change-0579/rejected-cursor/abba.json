@@ -1,0 +1,392 @@
+[
+ {
+  "fixture": "flagship",
+  "mode": "owned-readat",
+  "before_p50": 79805.0,
+  "after_p50": 82660.0,
+  "dir1": 3.2318442725230847,
+  "dir2": 3.9260098150245377,
+  "AA": -0.8360369353631145,
+  "BB": -0.16922519037833916,
+  "p99_dir1": 1.1182409593155345,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 80140.0,
+    "p95": 87620,
+    "p99": 90231,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 82730.0,
+    "p95": 89481,
+    "p99": 91240,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 82590.0,
+    "p95": 89501,
+    "p99": 91051,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 79470.0,
+    "p95": 86511,
+    "p99": 88601,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    53,
+    565201,
+    29
+   ]
+  ]
+ },
+ {
+  "fixture": "flagship",
+  "mode": "file-source",
+  "before_p50": 98076.0,
+  "after_p50": 101495.5,
+  "dir1": 3.192279138827023,
+  "dir2": 3.7824189080054387,
+  "AA": -0.5186563748970314,
+  "BB": 0.05026116093426629,
+  "p99_dir1": 2.810693709088532,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 98331.0,
+    "p95": 105350,
+    "p99": 107091,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 101470.0,
+    "p95": 108461,
+    "p99": 110101,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 101521.0,
+    "p95": 108601,
+    "p99": 110201,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 97821.0,
+    "p95": 104971,
+    "p99": 106761,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    53,
+    565201,
+    29
+   ]
+  ]
+ },
+ {
+  "fixture": "cv",
+  "mode": "owned-readat",
+  "before_p50": 31965.0,
+  "after_p50": 32705.0,
+  "dir1": 2.313222882150672,
+  "dir2": 2.316844082654978,
+  "AA": -0.15629884338855893,
+  "BB": -0.15276504735716467,
+  "p99_dir1": 1.769290724863601,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 31990.0,
+    "p95": 32520,
+    "p99": 38490,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 32730.0,
+    "p95": 33170,
+    "p99": 39171,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 32680.0,
+    "p95": 33230,
+    "p99": 39500,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 31940.0,
+    "p95": 32430,
+    "p99": 38300,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    16,
+    110242,
+    22
+   ]
+  ]
+ },
+ {
+  "fixture": "cv",
+  "mode": "file-source",
+  "before_p50": 39505.0,
+  "after_p50": 40205.5,
+  "dir1": 1.9260946595798532,
+  "dir2": 1.620253164556962,
+  "AA": -0.025310048089091368,
+  "BB": -0.3252961187951628,
+  "p99_dir1": 1.1548331907613345,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 39510.0,
+    "p95": 40530,
+    "p99": 46760,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 40271.0,
+    "p95": 42430,
+    "p99": 47300,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 40140.0,
+    "p95": 42231,
+    "p99": 47041,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 39500.0,
+    "p95": 41860,
+    "p99": 46831,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    16,
+    110242,
+    22
+   ]
+  ]
+ },
+ {
+  "fixture": "54016",
+  "mode": "owned-readat",
+  "before_p50": 262432.0,
+  "after_p50": 264026.0,
+  "dir1": 0.5518066049232269,
+  "dir2": 0.6630520985846754,
+  "AA": -0.12186205215695832,
+  "BB": -0.011361871830511171,
+  "p99_dir1": 1.1774399417349308,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 262592.0,
+    "p95": 269761,
+    "p99": 271861,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 264041.0,
+    "p95": 271812,
+    "p99": 275062,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 264011.0,
+    "p95": 271821,
+    "p99": 274842,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 262272.0,
+    "p95": 269931,
+    "p99": 271972,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    40,
+    317171,
+    25
+   ]
+  ]
+ },
+ {
+  "fixture": "54016",
+  "mode": "file-source",
+  "before_p50": 276276.5,
+  "after_p50": 277776.5,
+  "dir1": 0.4848905920369385,
+  "dir2": 0.6010094061592602,
+  "AA": -0.05391693896530137,
+  "BB": 0.06157923735374931,
+  "p99_dir1": 0.6766630106072447,
+  "counters_identical": true,
+  "legs": {
+   "A1": {
+    "p50": 276351.0,
+    "p95": 283662,
+    "p99": 285371,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   },
+   "B1": {
+    "p50": 277691.0,
+    "p95": 285152,
+    "p99": 287302,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "B2": {
+    "p50": 277862.0,
+    "p95": 285272,
+    "p99": 287271,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.cursor",
+     "bytes": 8965328,
+     "sha256": "b67c3be3068da5c30fa08f9d477bc77d86ef4dd1b6cb636a6be77d40777e04d9"
+    }
+   },
+   "A2": {
+    "p50": 276202.0,
+    "p95": 283821,
+    "p99": 286282,
+    "n": 3000,
+    "binary": {
+     "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+     "bytes": 8974536,
+     "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+    }
+   }
+  },
+  "counter_values": [
+   [
+    40,
+    317171,
+    25
+   ]
+  ]
+ }
+]

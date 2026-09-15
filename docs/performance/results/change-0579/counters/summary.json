@@ -1,0 +1,488 @@
+{
+ "before/owned-readat/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 81246.0,
+  "p95_ns": 89680,
+  "p99_ns": 91110
+ },
+ "before/owned-readat/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 81950.0,
+  "p95_ns": 90830,
+  "p99_ns": 99171
+ },
+ "before/owned-readat/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 92371.0,
+  "p95_ns": 100671,
+  "p99_ns": 102510
+ },
+ "before/file-source/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 97675.5,
+  "p95_ns": 107001,
+  "p99_ns": 142621
+ },
+ "before/file-source/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 99205.0,
+  "p95_ns": 107420,
+  "p99_ns": 120330
+ },
+ "before/file-source/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 115046.0,
+  "p95_ns": 123091,
+  "p99_ns": 138321
+ },
+ "before/tracked-file/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 105425.0,
+  "p95_ns": 115310,
+  "p99_ns": 129471
+ },
+ "before/tracked-file/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 105760.0,
+  "p95_ns": 115020,
+  "p99_ns": 116861
+ },
+ "before/tracked-file/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.before",
+   "bytes": 8974536,
+   "sha256": "c9b3b63ed01bd25229d8f1ab2fc1c26f390eb94474fd9d998c95cbd006142c06"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 120840.5,
+  "p95_ns": 130050,
+  "p99_ns": 136901
+ },
+ "after/owned-readat/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 74461.0,
+  "p95_ns": 83480,
+  "p99_ns": 101471
+ },
+ "after/owned-readat/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 75006.0,
+  "p95_ns": 82390,
+  "p99_ns": 101251
+ },
+ "after/owned-readat/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 85360.0,
+  "p95_ns": 92551,
+  "p99_ns": 111121
+ },
+ "after/file-source/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 91081.0,
+  "p95_ns": 98350,
+  "p99_ns": 107780
+ },
+ "after/file-source/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 92911.0,
+  "p95_ns": 101301,
+  "p99_ns": 124691
+ },
+ "after/file-source/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 107675.5,
+  "p95_ns": 115291,
+  "p99_ns": 116091
+ },
+ "after/tracked-file/open": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 98676.0,
+  "p95_ns": 106521,
+  "p99_ns": 124120
+ },
+ "after/tracked-file/list": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 53,
+    "read_bytes": 565201,
+    "version_calls": 29,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 97860.5,
+  "p95_ns": 105171,
+  "p99_ns": 127520
+ },
+ "after/tracked-file/one-cell": {
+  "binary": {
+   "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/02240c68-6724-42ba-929e-c4157529483d/scratchpad/change-0579/bin/xls_source_attribution.after",
+   "bytes": 8976392,
+   "sha256": "f2007d9a1230b6190b8bc2a545ab4bc0ded314201e5cb9acc15fe2a340728bad"
+  },
+  "input": {
+   "path": "/home/zhuhe/code/litchi/test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "bytes": 1402368,
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "revision": "unknown",
+  "warmups": 20,
+  "samples": 100,
+  "distinct_counter_tuples": [
+   {
+    "read_calls": 61,
+    "read_bytes": 603115,
+    "version_calls": 42,
+    "len_calls": 1,
+    "samples": 100
+   }
+  ],
+  "p50_ns": 113010.5,
+  "p95_ns": 120491,
+  "p99_ns": 143940
+ }
+}

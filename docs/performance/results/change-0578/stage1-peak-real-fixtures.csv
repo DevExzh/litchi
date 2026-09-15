@@ -1,0 +1,6 @@
+fixture,scenario,archive_bytes,largest_member,region_peak_bytes,allocations,allocated_bytes,output_bytes
+ArtisticEffectSample.pptx,A_copy_all,972788,882682,33583,69,35903,972788
+saut_page.docx,A_copy_all,2959626,217495,17022,70,18840,2959626
+no_drawing_patriarch.xlsx,A_copy_all,672414,336090,7536,22,8056,672414
+ConditionalFormattingSamples.xlsx,A_copy_all,654688,57356,84124,145,89404,654688
+EmbeddedVideo.pptx,A_copy_all,201418,101799,24169,50,25729,201418

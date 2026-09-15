@@ -1,0 +1,10 @@
+revision: 32d25e08806d93f792ffd4954d83acc9db9c5301
+worktree: detached git worktree of that revision
+cargo:    cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustc:    rustc 1.95.0 (59807616e 2026-04-14)
+cpu:      AMD EPYC 9R45
+cores:    32
+mem:      123 GiB
+kernel:   Linux 7.0.0-1012-aws
+profile:  release, CARGO_TARGET_DIR isolated in the session scratchpad
+allocator: process-global CountingSystemAllocator(std::alloc::System), same wrapper shape as tools/perf-baseline/src/bin/support/counting_allocator.rs

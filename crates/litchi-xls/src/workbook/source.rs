@@ -19,7 +19,9 @@ use crate::records::{
 };
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
-use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
+use litchi_cfb::{
+    OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint,
+};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::sheet::Cell as CellTrait;
@@ -1510,8 +1512,18 @@ fn select_workbook_stream(
 ///
 /// The buffer holds Workbook stream bytes `[0, filled)` and is grown only by
 /// reads that start at `filled`, so a byte is read from the source at most
-/// once. `read_stream_range` issues one physical read per contiguous FAT run
-/// and one source-version observation per call.
+/// once. Each fill issues one physical read per contiguous FAT run and takes
+/// one source-version observation.
+///
+/// The allocation-chain position is retained across fills in a
+/// [`StreamChainHint`]. `read_stream_range` walks the FAT from the stream's
+/// **first** sector on every call, so a scan that fills forward in `n` windows
+/// walks the prefix `n` times; one hint walks each chain link once for the
+/// whole scan. The hint is three integers and a stream identity — it is not an
+/// index of the chain — so retaining it allocates nothing and costs no memory
+/// proportional to the stream. Everything else about the read, including which
+/// physical runs it issues and where it fences the retained source, is
+/// unchanged: `read_stream_range` is the same function with a fresh hint.
 struct GlobalsBuffer<'a> {
     cfb: &'a SharedOleFile,
     refs: &'a [&'a str],
@@ -1519,6 +1531,9 @@ struct GlobalsBuffer<'a> {
     max_global_bytes: u64,
     bytes: Vec<u8>,
     filled: u64,
+    /// Allocation-chain position for the next fill. Empty before the first
+    /// fill; a hint that does not apply to a fill is ignored by the reader.
+    chain: StreamChainHint<'a>,
     /// Size of the next window fill, before clamping.
     window: u64,
     /// Smallest `lbPlyPos` seen in a `BoundSheet8` payload framed *so far*.
@@ -1541,6 +1556,7 @@ impl<'a> GlobalsBuffer<'a> {
             max_global_bytes,
             bytes: Vec::new(),
             filled: 0,
+            chain: cfb.chain_hint(),
             window: GLOBALS_FIRST_WINDOW_BYTES,
             min_sheet_start: None,
             sheet_clamp_active: true,
@@ -1618,9 +1634,14 @@ impl<'a> GlobalsBuffer<'a> {
                 requested: finish as u64,
             })?;
         self.bytes.resize(finish, 0);
-        self.cfb
-            .read_stream_range(self.refs, self.filled, &mut self.bytes[start..finish])
-            .map_err(SourceBackedError::from)?;
+        let cfb: &'a SharedOleFile = self.cfb;
+        cfb.read_stream_range_hinted(
+            self.refs,
+            self.filled,
+            &mut self.bytes[start..finish],
+            &mut self.chain,
+        )
+        .map_err(SourceBackedError::from)?;
         self.filled = end;
         Ok(())
     }
@@ -3172,7 +3193,178 @@ fn map_biff_error(error: litchi_biff::Error) -> SourceBackedError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
+    use std::io;
+    use std::sync::Mutex;
+
+    /// A positional source that records every read range and every
+    /// source-version observation, so two legs can be compared for I/O
+    /// identity rather than only for the bytes they produce.
+    #[derive(Debug)]
+    struct RecordingSource {
+        bytes: Vec<u8>,
+        ranges: Mutex<Vec<(u64, usize)>>,
+        versions: Mutex<usize>,
+    }
+
+    impl RecordingSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                ranges: Mutex::new(Vec::new()),
+                versions: Mutex::new(0),
+            }
+        }
+
+        fn take(&self) -> (Vec<(u64, usize)>, usize) {
+            let ranges = std::mem::take(&mut *self.ranges.lock().unwrap());
+            let versions = std::mem::replace(&mut *self.versions.lock().unwrap(), 0);
+            (ranges, versions)
+        }
+    }
+
+    impl ReadAt for RecordingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let Ok(start) = usize::try_from(offset) else {
+                return Ok(0);
+            };
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            self.ranges.lock().unwrap().push((offset, count));
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            *self.versions.lock().unwrap() += 1;
+            Ok(SourceVersion::new(0x584c_535f_4755_524d, 0))
+        }
+    }
+
+    fn erased(source: &Arc<RecordingSource>) -> Arc<dyn ReadAt> {
+        let source: Arc<RecordingSource> = Arc::clone(source);
+        source
+    }
+
+    fn ole_fixture(name: &str) -> Vec<u8> {
+        std::fs::read(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/ole/xls")
+                .join(name),
+        )
+        .unwrap()
+    }
+
+    /// The fill schedule below is issued twice over the same file: once
+    /// through `GlobalsBuffer`, which carries one chain hint across all of its
+    /// fills, and once through plain `SharedOleFile::read_stream_range`, which
+    /// walks the chain from the stream's first sector on every call. The two
+    /// legs must be indistinguishable from outside the reader.
+    const FILL_SCHEDULE: [(u64, bool); 7] = [
+        (4, true),
+        (24, true),
+        (60, true),
+        (512, false),
+        (4_096, false),
+        (12_000, false),
+        (30_000, false),
+    ];
+
+    #[test]
+    fn the_globals_scan_reads_identically_with_and_without_its_chain_hint() {
+        let bytes = ole_fixture("SimpleWithImages-mac.xls");
+        let source = Arc::new(RecordingSource::new(bytes));
+        let cfb = SharedOleFile::open(erased(&source)).unwrap();
+        let stream_len = cfb.stream_len(&["Workbook"]).unwrap();
+        assert!(
+            stream_len > FILL_SCHEDULE.last().unwrap().0,
+            "the fixture must be long enough to need every fill"
+        );
+        let refs = ["Workbook"];
+
+        let mut globals = GlobalsBuffer::new(&cfb, &refs, stream_len, u64::MAX);
+        let _ = source.take();
+        for (need, exact) in FILL_SCHEDULE {
+            globals.ensure(need, exact).unwrap();
+        }
+        let (hinted_ranges, hinted_versions) = source.take();
+        let hinted_bytes = globals.bytes.clone();
+        let filled = globals.filled;
+
+        let plain_source = Arc::new(RecordingSource::new(source.bytes.clone()));
+        let plain_cfb = SharedOleFile::open(erased(&plain_source)).unwrap();
+        let mut plain_bytes = vec![0u8; usize::try_from(filled).unwrap()];
+        let _ = plain_source.take();
+        for (start, end) in fill_extents(&globals_extents(stream_len)) {
+            let (start, end) = (
+                usize::try_from(start).unwrap(),
+                usize::try_from(end).unwrap(),
+            );
+            plain_cfb
+                .read_stream_range(&refs, start as u64, &mut plain_bytes[start..end])
+                .unwrap();
+        }
+        let (plain_ranges, plain_versions) = plain_source.take();
+
+        assert_eq!(hinted_bytes, plain_bytes, "payload bytes differ");
+        assert_eq!(hinted_ranges, plain_ranges, "positional reads differ");
+        assert_eq!(
+            hinted_versions, plain_versions,
+            "source-version observations differ"
+        );
+        assert!(
+            hinted_ranges.len() >= FILL_SCHEDULE.len(),
+            "the schedule must actually reach the source"
+        );
+    }
+
+    /// Recomputes the `[filled, end)` extents `GlobalsBuffer` produces for
+    /// `FILL_SCHEDULE`, independently of the buffer itself, so the comparison
+    /// leg shares no code with the leg under test.
+    fn globals_extents(stream_len: u64) -> Vec<u64> {
+        let mut ends = Vec::new();
+        let mut filled = 0u64;
+        let mut window = GLOBALS_FIRST_WINDOW_BYTES;
+        for (need, exact) in FILL_SCHEDULE {
+            if need <= filled {
+                continue;
+            }
+            let end = if exact {
+                need
+            } else {
+                let end = need
+                    .max(filled.saturating_add(window))
+                    .min(stream_len.max(need));
+                window = window.saturating_mul(2).min(GLOBALS_MAX_WINDOW_BYTES);
+                end
+            };
+            ends.push(end);
+            filled = end;
+        }
+        ends
+    }
+
+    fn fill_extents(ends: &[u64]) -> Vec<(u64, u64)> {
+        let mut extents = Vec::new();
+        let mut start = 0u64;
+        for &end in ends {
+            extents.push((start, end));
+            start = end;
+        }
+        extents
+    }
 
     #[test]
     fn limits_are_finite_by_default() {

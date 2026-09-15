@@ -91,6 +91,114 @@ enum SharedOleStreamCursorState {
     MiniFAT { sector: u32, within: usize },
 }
 
+/// A resumable position inside one validated allocation chain of one reader.
+///
+/// [`SharedOleFile::read_stream_range`] walks the chain from the stream's
+/// **first** sector on every call, so a scan that reads one stream forward in
+/// `n` calls walks the prefix `n` times. Carrying one hint across those calls
+/// through [`SharedOleFile::read_stream_range_hinted`] walks each chain link
+/// once instead.
+///
+/// A hint is three integers plus a stream identity and a borrow of the reader
+/// it came from. It is **not** an index of the chain, so retaining one costs
+/// nothing proportional to the stream, and it is `Copy`, so it allocates
+/// nothing.
+///
+/// # Why a hint cannot serve the wrong bytes
+///
+/// Three independent properties, in order:
+///
+/// 1. **It cannot cross readers.** A hint is obtained only from
+///    [`SharedOleFile::chain_hint`] and borrows that reader for its whole life,
+///    so the reader cannot be dropped or moved while a hint to it exists and no
+///    other live reader can occupy its address. A hint offered to a different
+///    reader is discarded on an address comparison.
+/// 2. **It cannot cross streams.** It records the directory entry SID, the
+///    allocation table it indexes and the stream's first sector, and is
+///    discarded unless all three match the stream being read.
+/// 3. **It cannot move a read backwards.** A chain is singly linked, so a hint
+///    sitting past the requested offset is discarded and the walk restarts at
+///    the stream's first sector.
+///
+/// A discarded hint costs exactly what an unhinted read costs: the walk starts
+/// at the first sector. A hint therefore only ever removes work it has already
+/// done; it can never redirect a read.
+///
+/// It also caches no source bytes and holds nothing a source mutation can
+/// invalidate. The FAT and MiniFAT tables it indexes are captured and fully
+/// validated while the file is opened and are immutable for the life of the
+/// reader; every read taken through a hint still fences the retained source
+/// exactly as an unhinted read does.
+#[derive(Debug, Clone, Copy)]
+pub struct StreamChainHint<'a> {
+    file: &'a SharedOleFile,
+    resume: Option<ChainResume>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ChainResume {
+    /// Directory entry identity. All three fields must match before a retained
+    /// position is used, so a hint taken from one stream can never serve
+    /// another even if the two happened to share a first sector.
+    sid: u32,
+    is_minifat: bool,
+    start_sector: u32,
+    /// Sector ordinal within the chain, and the sector found at it.
+    ordinal: usize,
+    sector: u32,
+}
+
+impl<'a> StreamChainHint<'a> {
+    /// Where to begin walking for `ordinal`: the retained position when it
+    /// belongs to this reader and this stream and is at or before `ordinal`,
+    /// and the stream's first sector in every other case.
+    fn resume_from(
+        &self,
+        file: &SharedOleFile,
+        sid: u32,
+        is_minifat: bool,
+        start_sector: u32,
+        ordinal: usize,
+    ) -> (u32, usize) {
+        if !std::ptr::eq(self.file, file) {
+            return (start_sector, 0);
+        }
+        match self.resume {
+            Some(resume)
+                if resume.sid == sid
+                    && resume.is_minifat == is_minifat
+                    && resume.start_sector == start_sector
+                    && resume.ordinal <= ordinal =>
+            {
+                (resume.sector, resume.ordinal)
+            },
+            _ => (start_sector, 0),
+        }
+    }
+
+    /// Records a position the caller has just walked to and validated.
+    fn record(
+        &mut self,
+        file: &SharedOleFile,
+        sid: u32,
+        is_minifat: bool,
+        start_sector: u32,
+        ordinal: usize,
+        sector: u32,
+    ) {
+        if !std::ptr::eq(self.file, file) {
+            return;
+        }
+        self.resume = Some(ChainResume {
+            sid,
+            is_minifat,
+            start_sector,
+            ordinal,
+            sector,
+        });
+    }
+}
+
 /// A non-owning, forward-only cursor over one validated CFB stream.
 ///
 /// The cursor resolves the stream directory entry once and keeps only the
@@ -120,6 +228,10 @@ impl std::fmt::Debug for SharedOleStreamCursor<'_> {
 // MS-CFB routes streams strictly smaller than the 4096-byte cutoff through
 // MiniFAT. Keep this bound local to the positional reader rather than adding
 // another public limit: it is an invariant of the format, not caller policy.
+/// Stands for "no directory entry" in a chain hint. A CFB directory can
+/// never contain `u32::MAX` entries, so no real SID can collide with it and
+/// a hint recorded under it can never be reused by a hinted read.
+const MINIFAT_UNHINTED_SID: u32 = u32::MAX;
 const MINIFAT_DIRECT_READ_MAX_BYTES: u64 = 4095;
 const MINIFAT_DIRECT_ROOT_SIZE_RATIO: u64 = 2;
 // Keep the direct target SID, flight epoch, waiter intent, and state in one
@@ -659,6 +771,20 @@ impl SharedOleFile {
         })
     }
 
+    /// Creates an empty resumable chain position bound to this reader.
+    ///
+    /// Pass the same hint to every [`Self::read_stream_range_hinted`] call of
+    /// one forward scan over one stream. The returned value borrows this
+    /// reader, which is what makes a hint from another reader impossible to
+    /// pass here rather than merely discouraged.
+    #[must_use]
+    pub const fn chain_hint(&self) -> StreamChainHint<'_> {
+        StreamChainHint {
+            file: self,
+            resume: None,
+        }
+    }
+
     /// Returns whether an entry is present at `path`.
     #[must_use]
     pub fn exists(&self, path: &[&str]) -> bool {
@@ -804,12 +930,48 @@ impl SharedOleFile {
         offset: u64,
         output: &mut [u8],
     ) -> Result<(), OleError> {
-        let (is_minifat, start_sector, size) = {
+        self.read_stream_range_hinted(path, offset, output, &mut self.chain_hint())
+    }
+
+    /// Reads a stream range, resuming the allocation-chain walk from `hint`.
+    ///
+    /// This is [`Self::read_stream_range`] with one difference: instead of
+    /// walking the chain from the stream's first sector to reach `offset`, it
+    /// resumes from the position `hint` retains and records where it finished.
+    /// A caller that reads one stream forward in several calls therefore walks
+    /// each chain link once for the whole scan rather than once per call.
+    /// `read_stream_range` is exactly this function with a fresh hint, so there
+    /// is one implementation of the read and of every check inside it.
+    ///
+    /// Every validation keeps its position and its identity. The links the hint
+    /// lets the walk skip are links this same hint already walked and validated
+    /// on an earlier call through the same chain; links ahead of it are walked
+    /// and checked here. A hint naming a different directory entry, a different
+    /// first sector, a different allocation table, or a **later** ordinal than
+    /// the one requested is discarded, and the walk restarts at the stream's
+    /// first sector.
+    ///
+    /// The hint holds no source bytes and nothing a source mutation can
+    /// invalidate: the allocation tables are captured and validated at open and
+    /// are immutable thereafter, and this call fences the retained source
+    /// exactly as [`Self::read_stream_range`] does.
+    ///
+    /// # Errors
+    ///
+    /// Identical to [`Self::read_stream_range`].
+    pub fn read_stream_range_hinted(
+        &self,
+        path: &[&str],
+        offset: u64,
+        output: &mut [u8],
+        hint: &mut StreamChainHint<'_>,
+    ) -> Result<(), OleError> {
+        let (sid, is_minifat, start_sector, size) = {
             let entry = self.find_entry(path)?;
             if entry.entry_type != STGTY_STREAM {
                 return Err(OleError::InvalidFormat("Not a stream".to_string()));
             }
-            (entry.is_minifat, entry.start_sector, entry.size)
+            (entry.sid, entry.is_minifat, entry.start_sector, entry.size)
         };
         let end = offset
             .checked_add(output.len() as u64)
@@ -825,7 +987,15 @@ impl SharedOleFile {
 
         let result = (|| -> Result<(), OleError> {
             if is_minifat {
-                self.read_minifat_range(start_sector, offset, output, false, false)?;
+                self.read_minifat_range_hinted(
+                    sid,
+                    start_sector,
+                    offset,
+                    output,
+                    false,
+                    false,
+                    hint,
+                )?;
             } else {
                 let sector_size = self.index.sector_size;
                 if offset == 0 && size == output.len() as u64 {
@@ -844,12 +1014,18 @@ impl SharedOleFile {
                     )?;
                     return Ok(());
                 }
-                let mut sector = start_sector;
                 let first_ordinal =
                     usize::try_from(offset / sector_size as u64).map_err(|_error| {
                         OleError::InvalidData("FAT range sector does not fit usize".to_string())
                     })?;
-                for _ in 0..first_ordinal {
+                // Resume the prefix walk where an earlier call through this
+                // same hint left it. `walked` is zero and `sector` the
+                // stream's first sector whenever the hint does not apply, so
+                // the loop below is the original walk in that case. The links
+                // it skips are links this hint already traversed and checked.
+                let (mut sector, walked) =
+                    hint.resume_from(self, sid, is_minifat, start_sector, first_ordinal);
+                for _ in walked..first_ordinal {
                     sector = next_chain_sector(&self.index.fat, sector, "FAT")?;
                     if sector == ENDOFCHAIN {
                         return Err(OleError::CorruptedFile(
@@ -857,6 +1033,7 @@ impl SharedOleFile {
                         ));
                     }
                 }
+                hint.record(self, sid, is_minifat, start_sector, first_ordinal, sector);
                 let mut within =
                     usize::try_from(offset % sector_size as u64).map_err(|_error| {
                         OleError::InvalidData("FAT range offset does not fit usize".to_string())
@@ -1920,6 +2097,34 @@ impl SharedOleFile {
         require_chain_end: bool,
         zero_fill_truncated: bool,
     ) -> Result<(), OleError> {
+        // `MINIFAT_UNHINTED_SID` cannot equal any directory entry's SID, so a
+        // hint recorded here can never be reused; this call therefore behaves
+        // exactly as it did before hints existed.
+        self.read_minifat_range_hinted(
+            MINIFAT_UNHINTED_SID,
+            start_sector,
+            offset,
+            output,
+            require_chain_end,
+            zero_fill_truncated,
+            &mut self.chain_hint(),
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one reader with an explicit resumable chain position"
+    )]
+    fn read_minifat_range_hinted(
+        &self,
+        sid: u32,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+        require_chain_end: bool,
+        zero_fill_truncated: bool,
+        hint: &mut StreamChainHint<'_>,
+    ) -> Result<(), OleError> {
         let root =
             self.index.root.as_ref().ok_or_else(|| {
                 OleError::CorruptedFile("mini stream has no root entry".to_string())
@@ -1929,8 +2134,9 @@ impl SharedOleFile {
             usize::try_from(offset / mini_sector_size as u64).map_err(|_error| {
                 OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
             })?;
-        let mut mini_sector = start_sector;
-        for _ in 0..first_ordinal {
+        let (mut mini_sector, walked) =
+            hint.resume_from(self, sid, true, start_sector, first_ordinal);
+        for _ in walked..first_ordinal {
             mini_sector = next_chain_sector(&self.index.minifat, mini_sector, "MiniFAT")?;
             if mini_sector == ENDOFCHAIN {
                 return Err(OleError::CorruptedFile(
@@ -1938,6 +2144,7 @@ impl SharedOleFile {
                 ));
             }
         }
+        hint.record(self, sid, true, start_sector, first_ordinal, mini_sector);
         let mut within = usize::try_from(offset % mini_sector_size as u64).map_err(|_error| {
             OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
         })?;
@@ -3152,6 +3359,51 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
+    }
+
+    /// `sample_bytes` with a patterned `Large` payload and its first four
+    /// sectors rewired into a non-monotonic chain, so a physical run ends
+    /// where the chain says rather than where the payload does. The pattern
+    /// matters: a constant payload cannot tell a leg that read the sectors in
+    /// the wrong order from one that did not.
+    fn fragmented_payload() -> Vec<u8> {
+        (0..8192usize)
+            .map(|index| u8::try_from((index * 37 + 11) % 251).unwrap())
+            .collect()
+    }
+
+    fn fragmented_large_bytes() -> Vec<u8> {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Small"], b"mini stream").unwrap();
+        writer
+            .create_stream_owned(&["Large"], fragmented_payload())
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let mut bytes = output.into_inner();
+
+        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let entry = parsed.find_entry(&["Large"]).unwrap();
+        let sector_size = parsed.index.sector_size;
+        let mut chain = Vec::new();
+        let mut sector = entry.start_sector;
+        for _ in 0..8192usize.div_ceil(sector_size) {
+            chain.push(sector);
+            sector = parsed.index.fat[sector as usize];
+        }
+        let fat_sector = u32::from_le_bytes(bytes[0x4c..0x50].try_into().unwrap());
+        let fat_offset = (fat_sector as usize + 1) * sector_size;
+        let [first, second, third, fourth] = [chain[0], chain[1], chain[2], chain[3]];
+        for (current, next) in [(first, third), (third, second), (second, fourth)] {
+            let offset = fat_offset + current as usize * 4;
+            bytes[offset..offset + 4].copy_from_slice(&next.to_le_bytes());
+        }
+        let second_offset = (second as usize + 1) * sector_size;
+        let third_offset = (third as usize + 1) * sector_size;
+        for index in 0..sector_size {
+            bytes.swap(second_offset + index, third_offset + index);
+        }
+        bytes
     }
 
     fn multi_mini_bytes() -> Vec<u8> {
@@ -5507,6 +5759,352 @@ mod tests {
             assert_eq!(offset, 512 + index as u64 * 512);
             assert_eq!(length, 512);
         }
+    }
+
+    /// Reads one stream twice over the same ascending, non-overlapping
+    /// partition: once with a plain `read_stream_range` per piece, and once
+    /// with `read_stream_range_hinted` carrying one retained chain position
+    /// across all of them. Asserts the two legs are indistinguishable from
+    /// outside the reader -- same bytes, same positional reads in the same
+    /// order, same number of source-version observations.
+    ///
+    /// This is the property the `litchi-xls` workbook-globals scan relies on.
+    /// The saving is CPU only: the hint must not move a byte of I/O, must not
+    /// change how often the retained source is fenced, and must not change
+    /// which bytes land in the destination.
+    fn assert_hinted_matches_unhinted(
+        bytes: &[u8],
+        path: &[&str],
+        length: usize,
+        pieces: &[usize],
+    ) {
+        assert_eq!(
+            pieces.iter().sum::<usize>(),
+            length,
+            "the partition must cover the stream exactly"
+        );
+
+        let plain_source = Arc::new(TestSource::new(bytes.to_vec()));
+        let plain_file = shared(Arc::clone(&plain_source));
+        let mut plain_output = vec![0u8; length];
+        plain_source.reset_observation_counts();
+        let mut offset = 0u64;
+        for &piece in pieces {
+            let start = usize::try_from(offset).unwrap();
+            plain_file
+                .read_stream_range(path, offset, &mut plain_output[start..start + piece])
+                .unwrap();
+            offset += piece as u64;
+        }
+        let plain_ranges = plain_source.read_ranges();
+        let plain_counts = plain_source.observation_counts();
+
+        let hinted_source = Arc::new(TestSource::new(bytes.to_vec()));
+        let hinted_file = shared(Arc::clone(&hinted_source));
+        let mut hinted_output = vec![0u8; length];
+        hinted_source.reset_observation_counts();
+        let mut hint = hinted_file.chain_hint();
+        let mut offset = 0u64;
+        for &piece in pieces {
+            let start = usize::try_from(offset).unwrap();
+            hinted_file
+                .read_stream_range_hinted(
+                    path,
+                    offset,
+                    &mut hinted_output[start..start + piece],
+                    &mut hint,
+                )
+                .unwrap();
+            offset += piece as u64;
+        }
+        let hinted_ranges = hinted_source.read_ranges();
+        let hinted_counts = hinted_source.observation_counts();
+
+        assert_eq!(hinted_output, plain_output, "payload bytes differ");
+        assert_eq!(
+            hinted_ranges, plain_ranges,
+            "positional reads differ for {path:?} over {pieces:?}"
+        );
+        assert_eq!(
+            hinted_counts, plain_counts,
+            "read or source-version observation counts differ for {path:?}"
+        );
+    }
+
+    /// The fill schedule the workbook-globals scan actually issues: a small
+    /// exact prologue followed by a doubling window, ending on a short final
+    /// piece. It is the shape that makes the prefix walk quadratic, so it is
+    /// the one the differential must cover.
+    fn doubling_window_partition(length: usize) -> Vec<usize> {
+        let mut pieces = Vec::new();
+        let mut filled = 0usize;
+        let mut window = 4usize;
+        while filled < length {
+            let piece = window.min(length - filled);
+            pieces.push(piece);
+            filled += piece;
+            window = window.saturating_mul(2).min(64 * 1024);
+        }
+        pieces
+    }
+
+    fn uniform_partition(length: usize, piece: usize) -> Vec<usize> {
+        let mut pieces = vec![piece; length / piece];
+        if length % piece != 0 {
+            pieces.push(length % piece);
+        }
+        pieces
+    }
+
+    #[test]
+    fn a_hinted_fat_read_matches_an_unhinted_one_over_every_partition() {
+        let bytes = sample_bytes();
+        for piece in [1usize, 7, 511, 512, 513, 1000, 4096, 8192] {
+            assert_hinted_matches_unhinted(
+                &bytes,
+                &["Large"],
+                8192,
+                &uniform_partition(8192, piece),
+            );
+        }
+        assert_hinted_matches_unhinted(&bytes, &["Large"], 8192, &doubling_window_partition(8192));
+    }
+
+    #[test]
+    fn a_hinted_read_of_a_fragmented_fat_chain_matches_an_unhinted_one() {
+        let bytes = fragmented_large_bytes();
+        for piece in [1usize, 512, 700, 1024] {
+            assert_hinted_matches_unhinted(
+                &bytes,
+                &["Large"],
+                8192,
+                &uniform_partition(8192, piece),
+            );
+        }
+        assert_hinted_matches_unhinted(&bytes, &["Large"], 8192, &doubling_window_partition(8192));
+    }
+
+    #[test]
+    fn a_hinted_minifat_read_matches_an_unhinted_one() {
+        // Change 0574 named the mini-stream-resident case as the way this
+        // change could be falsified: a MiniFAT range read reaches the root
+        // chain by different code from a FAT one.
+        let (bytes, expected) = large_mini_bytes(512, 4095);
+        for piece in [1usize, 63, 64, 65, 512, 1000] {
+            assert_hinted_matches_unhinted(
+                &bytes,
+                &["Mini"],
+                expected.len(),
+                &uniform_partition(expected.len(), piece),
+            );
+        }
+        assert_hinted_matches_unhinted(
+            &bytes,
+            &["Mini"],
+            expected.len(),
+            &doubling_window_partition(expected.len()),
+        );
+    }
+
+    #[test]
+    fn a_hinted_read_matches_an_unhinted_one_at_a_4096_byte_sector_size() {
+        let (bytes, expected) = large_mini_bytes(4096, 4000);
+        for piece in [1usize, 64, 999, 4000] {
+            assert_hinted_matches_unhinted(
+                &bytes,
+                &["Mini"],
+                expected.len(),
+                &uniform_partition(expected.len(), piece),
+            );
+        }
+    }
+
+    #[test]
+    fn a_hint_taken_from_another_stream_is_ignored() {
+        // The failure this design must make impossible: a hint that names a
+        // different directory entry must never position a read. `Small` is
+        // MiniFAT-resident and `Large` is FAT-resident, so the hint carried
+        // between them differs in every identity field it has.
+        let bytes = sample_bytes();
+        let source = Arc::new(TestSource::new(bytes.clone()));
+        let file = shared(Arc::clone(&source));
+        let mut hint = file.chain_hint();
+
+        let mut small = [0u8; 11];
+        file.read_stream_range_hinted(&["Small"], 0, &mut small, &mut hint)
+            .unwrap();
+        assert_eq!(&small, b"mini stream");
+
+        source.reset_observation_counts();
+        let mut hinted = vec![0u8; 4096];
+        file.read_stream_range_hinted(&["Large"], 4096, &mut hinted, &mut hint)
+            .unwrap();
+        let hinted_ranges = source.read_ranges();
+        let hinted_counts = source.observation_counts();
+
+        source.reset_observation_counts();
+        let mut plain = vec![0u8; 4096];
+        file.read_stream_range(&["Large"], 4096, &mut plain)
+            .unwrap();
+
+        assert_eq!(hinted, plain);
+        assert_eq!(hinted, vec![0xA5; 4096]);
+        assert_eq!(hinted_ranges, source.read_ranges());
+        assert_eq!(hinted_counts, source.observation_counts());
+    }
+
+    #[test]
+    fn a_hint_bound_to_another_reader_is_ignored() {
+        // A hint borrows the reader it came from, so it cannot outlive it and
+        // no second live reader can occupy its address. What remains reachable
+        // is two readers alive at once whose stream identities agree in every
+        // field a hint records -- same SID, same allocation table, same first
+        // sector -- and whose chains then diverge. `fragmented_large_bytes`
+        // is `sample_bytes` with `Large`'s chain rewired and the matching
+        // sector payloads swapped, so the two files lay the same logical
+        // stream out on different physical sectors from ordinal 1 onward.
+        let contiguous = sample_bytes();
+        let fragmented = fragmented_large_bytes();
+        let plain_source = Arc::new(TestSource::new(contiguous.clone()));
+        let plain = shared(Arc::clone(&plain_source));
+        let other_source = Arc::new(TestSource::new(fragmented.clone()));
+        let other = shared(Arc::clone(&other_source));
+        assert!(!std::ptr::eq(&plain, &other));
+
+        let plain_entry = plain.find_entry(&["Large"]).unwrap();
+        let other_entry = other.find_entry(&["Large"]).unwrap();
+        assert_eq!(
+            (
+                plain_entry.sid,
+                plain_entry.is_minifat,
+                plain_entry.start_sector
+            ),
+            (
+                other_entry.sid,
+                other_entry.is_minifat,
+                other_entry.start_sector
+            ),
+            "the two readers must be separated by reader identity alone"
+        );
+
+        let mut foreign = plain.chain_hint();
+        let mut warm = vec![0u8; 512];
+        plain
+            .read_stream_range_hinted(&["Large"], 1_024, &mut warm, &mut foreign)
+            .unwrap();
+
+        other_source.reset_observation_counts();
+        let mut hinted = vec![0u8; 1_024];
+        other
+            .read_stream_range_hinted(&["Large"], 1_024, &mut hinted, &mut foreign)
+            .unwrap();
+        let hinted_ranges = other_source.read_ranges();
+        let hinted_counts = other_source.observation_counts();
+
+        other_source.reset_observation_counts();
+        let mut unhinted = vec![0u8; 1_024];
+        other
+            .read_stream_range(&["Large"], 1_024, &mut unhinted)
+            .unwrap();
+
+        assert_eq!(
+            unhinted[..],
+            fragmented_payload()[1_024..2_048],
+            "the control leg must read the fragmented file's own bytes"
+        );
+        assert_eq!(hinted, unhinted, "a foreign hint changed the bytes read");
+        assert_eq!(hinted_ranges, other_source.read_ranges());
+        assert_eq!(hinted_counts, other_source.observation_counts());
+    }
+
+    #[test]
+    fn a_hint_past_the_requested_offset_is_ignored() {
+        // A chain is singly linked, so a position past the offset cannot serve
+        // it. Such a hint must be discarded and the walk restarted at the
+        // stream's first sector, never trusted in place.
+        let bytes = fragmented_large_bytes();
+        let source = Arc::new(TestSource::new(bytes.clone()));
+        let file = shared(Arc::clone(&source));
+        let mut hint = file.chain_hint();
+
+        let mut forward = vec![0u8; 512];
+        file.read_stream_range_hinted(&["Large"], 7_168, &mut forward, &mut hint)
+            .unwrap();
+
+        source.reset_observation_counts();
+        let mut hinted = vec![0u8; 1_024];
+        file.read_stream_range_hinted(&["Large"], 512, &mut hinted, &mut hint)
+            .unwrap();
+        let hinted_ranges = source.read_ranges();
+        let hinted_counts = source.observation_counts();
+
+        source.reset_observation_counts();
+        let mut plain = vec![0u8; 1_024];
+        file.read_stream_range(&["Large"], 512, &mut plain).unwrap();
+
+        assert_eq!(hinted, plain, "a backward hint changed the bytes read");
+        assert_eq!(hinted_ranges, source.read_ranges());
+        assert_eq!(hinted_counts, source.observation_counts());
+    }
+
+    #[test]
+    fn a_hint_does_not_change_a_refusal_or_its_text() {
+        // Every refusal the range reader raises must survive a hint unchanged,
+        // including one raised past a prefix the hint let the walk skip.
+        let bytes = sample_bytes();
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(Arc::clone(&source));
+        let mut hint = file.chain_hint();
+        let mut scratch = vec![0u8; 512];
+        file.read_stream_range_hinted(&["Large"], 4_096, &mut scratch, &mut hint)
+            .unwrap();
+
+        let cases: Vec<(Vec<&str>, u64, usize)> = vec![
+            (vec!["Large"], 8_192, 1),
+            (vec!["Large"], u64::MAX, 1),
+            (vec!["Missing"], 0, 1),
+            (vec![], 0, 1),
+        ];
+        for (path, offset, length) in cases {
+            let mut hinted_output = vec![0u8; length];
+            let hinted = file
+                .read_stream_range_hinted(&path, offset, &mut hinted_output, &mut hint)
+                .unwrap_err();
+            let mut plain_output = vec![0u8; length];
+            let plain = file
+                .read_stream_range(&path, offset, &mut plain_output)
+                .unwrap_err();
+            assert_eq!(
+                hinted.to_string(),
+                plain.to_string(),
+                "refusal text changed for {path:?} at {offset}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_hint_costs_one_chain_walk_where_an_unhinted_read_costs_one_per_call() {
+        // The mechanism, as an arithmetic statement rather than a profile: an
+        // unhinted scan walks `0 + 1 + ... + (n-1)` links to read a stream in
+        // `n` sector-sized calls; a hinted one walks `n - 1`.
+        let bytes = sample_bytes();
+        let file = shared(Arc::new(TestSource::new(bytes.clone())));
+        let sector_size = file.index.sector_size;
+        let sectors = 8192 / sector_size;
+        let unhinted_steps = sectors * (sectors - 1) / 2;
+        let hinted_steps = sectors - 1;
+        assert!(
+            unhinted_steps > hinted_steps,
+            "the prefix walk must be quadratic in the number of calls"
+        );
+        assert_eq!((unhinted_steps, hinted_steps), (120, 15));
+
+        assert_hinted_matches_unhinted(
+            &bytes,
+            &["Large"],
+            8192,
+            &uniform_partition(8192, sector_size),
+        );
     }
 
     #[test]
