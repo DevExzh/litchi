@@ -1,0 +1,37 @@
+# Log sections for change 0604
+
+Four paragraphs for the coordinator to merge, one each into `HOTSPOTS.md`,
+`GOAL_AUDIT.md`, `REPORT.md` and `ADR_COMPLIANCE.md`, in the style of each
+file's newest section. This change modified no file under `crates/`.
+
+---
+
+## For `HOTSPOTS.md`
+
+## 0604 — OLE2 whole-stream zero-fill priced natively; CFB-1 declined
+
+The 0587 queue ranked CFB-1 (append-style stream reads) at 22 on a retained callgrind share of 9–32% of DOC and PPT open instructions, and wrote its own falsification criterion. Priced natively on this host with `perf stat` cycles, isolation pairs at 10/110 samples over 11 repetitions pinned to one CPU, the zero-fill is 1.88% of the 1.6 MB DOC eager open, 0.57% of the 335 KB DOC eager open, 2.84% of the eager PPT open, 2.68% of the source-backed PPT open and 2.94% of the source-backed XLS open — inside the 4% p50 floor on every fixture, with two A/A controls in the same window at 0.44%/0.29% (isolation-pair cycles) and −0.06%/+0.00%/+0.26% (wall-clock p50, 60 samples per leg). Exact byte counts were taken at every `u8` zero-fill site: 1,623,070 bytes per 1.6 MB DOC open (1,595,422 of it three slurped streams), 565,713 per flagship XLS open of which 551,377 is `GlobalsBuffer::ensure` and **none** is a CFB stream slurp, confirming XLS-7 as a `litchi-xls` item rather than a CFB one. The general caution for the rest of this queue: callgrind counts `rep stosb` once per byte, and on the DOC open it reported 1,595,476 Ir for work that retires 44,925 instructions natively — a 35× overstatement, so every bulk-copy share in this record set is an upper bound that must be re-priced in cycles before it is ranked. CFB-1 and XLS-7 are declined on this evidence; the design is frozen and retained for a corpus this one does not contain. `performance_claim: none`; no production change. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0604-cfb-append-reads-design.md); [retained evidence](results/change-0604/README.md).
+
+---
+
+## For `GOAL_AUDIT.md`
+
+## 0604 — a `docs/GOAL.md` rule-10 blocker resolved on paper, and closed on measurement
+
+`docs/GOAL.md` hypothesis 11 — "CFB may … allocate and zero a sector `Vec` for frequent reads … and copy streams unnecessarily" — is confirmed as a mechanism and closed as an opportunity for this corpus. The safe shape that rule 10 demands (no new `unsafe`, no `MaybeUninit`) is now written out in full: a provided `ReadAt` method appending into a caller's `Vec`, whose default preserves today's zero-fill so no implementor breaks, with overrides for `OwnedSource`, `SliceSource` and `OwnedArcSource`; one `litchi-cfb` chain walk parameterized by a slice or appending sink so the chain-validation error order stays single-sourced; tail-only zeroing in the sector helpers; and `try_reserve_exact` up front so the typed `OleError::Allocation` refusal stays ahead of any read (rule 12). It is not implemented, because measurement puts its ceiling at 0.57–2.94% of an open in cycles, inside this host's 4% p50 floor, and because no stable positional API accepts uninitialized memory — so `FileSource` and every `File`-backed reader, which is what `Package::open`, `SourceBackedWorkbook::from_path` and `SourceBackedPackage::from_path` use, gain nothing at all. The audit row this leaves open is the corpus one: no OLE2 fixture above 1.6 MB, none with a DIFAT sector and none with 4,096-byte sectors exists, so a large-source claim for this or for CFB-3 and CFB-5 remains unmeasurable until a synthetic corpus is built. No latency, RSS, allocation or throughput improvement is claimed by this batch. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.
+
+---
+
+## For `REPORT.md`
+
+## 0604 — the OLE2 zero-fill ceiling, and a frozen design that is not implemented
+
+Change 0604 measures what the whole-stream zero-fill on the OLE2 slurp paths actually costs and declines to remove it. Five opens on owned in-memory sources were priced with `perf stat` on CPU 19 by isolation pair (10 and 110 samples, median of 11 repetitions): 2,310,748 cycles for the 1.6 MB DOC eager open, 915,516 for the 335 KB DOC, 211,456 for the eager PPT, 197,940 for the source-backed PPT and 317,682 for the source-backed XLS. Against those, a micro-benchmark of the same exact byte counts puts the zero-fill at 43,399, 5,194, 6,010, 5,303 and 9,339 cycles — 1.88%, 0.57%, 2.84%, 2.68% and 2.94% of the operation, and 0.29–1.88% of its instructions. The allocation itself is free at this scale (−509 to +1,014 cycles without the fill). Two A/A controls ran in the same window and stayed within 0.44% and 0.26% at p50, so the floor is not what hides the effect; the effect is simply small, it is strictly an upper bound on what removing it could return, and it is exactly zero on file-backed sources. Gates on the clean worktree at the base commit: `cargo fmt --all --check` clean, Clippy clean on `litchi-cfb`, `litchi-core` and `litchi-xls` with all targets, `cargo test -p litchi-cfb` 322 + 13 + 6 passed plus 12 doctests with 1 ignored and 0 failed, the three named truncated-final-sector parity tests passed, and `cargo doc` clean on the three crates. No production code changed; `performance_claim: none`. [Change and limitations](0604-cfb-append-reads-design.md); [retained evidence](results/change-0604/README.md).
+
+---
+
+## For `ADR_COMPLIANCE.md`
+
+## 0604 — no boundary moved; the design's compliance stated in advance
+
+Nothing was implemented, so no ADR boundary moved and no accepted hash changed. The frozen design is recorded against the boundaries it would have to hold. ADR 0005: every mandatory structural validation stays where it is — `validate_stream_allocations`, `validate_physical_sector_layout` and `collect_exact` remain whole-container and are not made closure-proportional, which is what change 0574 opportunity 6 rejected — and the design's own allocation refusal is kept typed and kept ahead of any source read by an up-front `try_reserve_exact`, so `OleError::Allocation` naming `"FAT stream data"` never degrades into an `io::ErrorKind::OutOfMemory` raised mid-chain. ADR 0006: no output byte changes, no `SourceVersion` fence moves, and no read crosses into a sector another stream owns, because the chain walk itself is unchanged and stays single-sourced so that `Sector N is outside the file`, `chain ends before its declared length` and `chain exceeds its declared length` keep their identity and their order — change 0570's warning about a helper that "would have silently zero-filled where the old path raised a typed error" is the specific regression the sink split is shaped to prevent. ADR 0003 is not engaged; nothing is published. `docs/GOAL.md` rule 10 is satisfied by construction (the whole purpose of the trait shape is to avoid `MaybeUninit`), rule 11 by an additive provided method on `litchi-core`'s `ReadAt` that moves bytes and leaks no archive type, lock or executor, and rule 12 by `try_reserve` before every append with no limit, budget, cancellation point or malformed-input defence weakened. The one part flagged as unproven is the eager reader's short-read reporting (`read_to_end` returns `Ok(n)` where `read_exact` raises `UnexpectedEof`), whose differential over the malformed corpus must precede any implementation. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.

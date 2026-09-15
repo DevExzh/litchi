@@ -1,0 +1,100 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 7937df7b3..6d9abac43 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -1023,6 +1023,7 @@ impl<R: Read + Seek> OleFile<R> {
+         // its permanent location. This also leaves the unread tail of a short
+         // final sector zero-filled, matching `read_sector`.
+         let mut dir_data = try_filled_vec(data_len, 0u8, "directory data")?;
++        eprintln!("ZF ZF_DIRDATA {data_len}");
+         self.read_sectors_batched(&sectors, &mut dir_data)?;
+ 
+         let validated_entries = Self::validated_directory_entries(&dir_data, self.sector_size)?;
+@@ -1622,6 +1623,7 @@ impl<R: Read + Seek> OleFile<R> {
+         self.reader.seek(SeekFrom::Start(position))?;
+         let present = self.present_sector_bytes(position, self.sector_size);
+         let mut buffer = try_filled_vec(self.sector_size, 0u8, "sector buffer")?;
++        eprintln!("ZF ZF_SECTBUF_ALLOC {}", self.sector_size);
+         self.reader.read_exact(&mut buffer[..present])?;
+         Ok(buffer)
+     }
+@@ -1645,6 +1647,7 @@ impl<R: Read + Seek> OleFile<R> {
+         // stays zero. See the file-length note in the header parser.
+         let present = self.present_sector_bytes(position, self.sector_size);
+         buffer.fill(0);
++        eprintln!("ZF ZF_SECTBUF_FILL {}", buffer.len());
+         self.reader.read_exact(&mut buffer[..present])?;
+         Ok(())
+     }
+@@ -1681,6 +1684,7 @@ impl<R: Read + Seek> OleFile<R> {
+         let batch_sectors = (SECTOR_BATCH_SCRATCH_BYTES / self.sector_size).clamp(1, longest);
+         // The product is either at most `SECTOR_BATCH_SCRATCH_BYTES` rounded
+         // down to a whole sector, or exactly one sector, so it cannot overflow.
++        { eprintln!("ZF ZF_BATCH_ALLOC {}", batch_sectors * self.sector_size); }
+         try_filled_vec(batch_sectors * self.sector_size, 0u8, resource)
+     }
+ 
+@@ -1742,6 +1746,7 @@ impl<R: Read + Seek> OleFile<R> {
+         let present = self.present_sector_bytes(position, span);
+         let run = &mut scratch[..span];
+         run.fill(0);
++        eprintln!("ZF ZF_RUN_FILL {}", run.len());
+         self.reader.read_exact(&mut run[..present])?;
+ 
+         Ok(count)
+@@ -2131,6 +2136,7 @@ impl<R: Read + Seek> OleFile<R> {
+         // unused sectors after the logical end, and a corrupt file must not
+         // turn those into an avoidable allocation.
+         let mut data = try_filled_vec(size, 0u8, "FAT stream data")?;
++        eprintln!("ZF ZF_EAGER_FATSTREAM {size}");
+ 
+         // Batch read contiguous sectors
+         self.read_sectors_batched(&sectors[..required_sectors], &mut data)?;
+diff --git a/crates/litchi-cfb/src/shared.rs b/crates/litchi-cfb/src/shared.rs
+index acbc2101c..c01594e59 100644
+--- a/crates/litchi-cfb/src/shared.rs
++++ b/crates/litchi-cfb/src/shared.rs
+@@ -2144,6 +2144,7 @@ impl SharedOleFile {
+         let size = usize::try_from(size)
+             .map_err(|_error| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+         let mut data = try_zeroed_vec(size, "MiniFAT stream data")?;
++        eprintln!("ZF ZF_MINI {size}");
+         // `open_stream` has already performed lookup and bounds validation.
+         // Require the exact chain terminator here so a malformed synthetic
+         // index cannot turn the bounded reader into a weaker full-read check.
+@@ -2425,6 +2426,7 @@ impl SharedOleFile {
+             .map_err(|_error| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+         let required = size.div_ceil(self.index.sector_size);
+         let mut data = try_zeroed_vec(size, "FAT stream data")?;
++        eprintln!("ZF ZF_SHARED_FATSTREAM {size}");
+         self.read_chain_into(
+             &self.index.fat,
+             start_sector,
+@@ -2478,6 +2480,7 @@ impl SharedOleFile {
+             .map_err(|_error| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+         let required = size.div_ceil(self.index.mini_sector_size);
+         let mut data = try_zeroed_vec(size, "MiniFAT stream data")?;
++        eprintln!("ZF ZF_MINI {size}");
+         let mut sector = start_sector;
+ 
+         for index in 0..required {
+@@ -3139,6 +3142,7 @@ fn clone_minifat_waiter_payload(payload: &[u8]) -> Result<Vec<u8>, OleError> {
+         ));
+     }
+     let mut copy = try_zeroed_vec(payload.len(), "MiniFAT direct waiter data")?;
++    eprintln!("ZF ZF_WAITER {}", payload.len());
+     copy.copy_from_slice(payload);
+     Ok(copy)
+ }
+diff --git a/crates/litchi-xls/src/workbook/source.rs b/crates/litchi-xls/src/workbook/source.rs
+index 2065dc3b1..c3ca4f0e7 100644
+--- a/crates/litchi-xls/src/workbook/source.rs
++++ b/crates/litchi-xls/src/workbook/source.rs
+@@ -1643,6 +1643,7 @@ impl<'a> GlobalsBuffer<'a> {
+                 requested: finish as u64,
+             })?;
+         self.bytes.resize(finish, 0);
++        eprintln!("ZF ZF_XLS_GLOBALS {}", finish - start);
+         let cfb: &'a SharedOleFile = self.cfb;
+         cfb.read_stream_range_hinted(
+             self.refs,

@@ -1,0 +1,15 @@
+## doc-open  (A/A, same binary both legs, ns per operation)
+legA: n=60 p50=577366.2 mean=577052.4 p95=580813.7 p99=582091.7
+legB: n=60 p50=576996.8 mean=577018.2 p95=581960.7 p99=583905.7
+floor: p50 A=577366.0 B=576997.0  B/A-1 = -0.06%  A/B-1 = +0.06%
+
+## ppt-source-open  (A/A, same binary both legs, ns per operation)
+legA: n=60 p50=57792.3 mean=57922.7 p95=59142.0 p99=59468.0
+legB: n=60 p50=57794.9 mean=57951.6 p95=59369.6 p99=59500.7
+floor: p50 A=57792.3 B=57794.9  B/A-1 = +0.00%  A/B-1 = -0.00%
+
+## xls-source-open  (A/A, same binary both legs, ns per operation)
+legA: n=60 p50=88704.0 mean=97128.1 p95=160709.2 p99=161699.8
+legB: n=60 p50=88938.8 mean=98745.7 p95=193419.0 p99=194505.7
+floor: p50 A=88704.0 B=88938.8  B/A-1 = +0.26%  A/B-1 = -0.26%
+
