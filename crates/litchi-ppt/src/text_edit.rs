@@ -3332,7 +3332,7 @@ mod tests {
     use std::io::{self, Cursor, Write};
     use std::sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     };
 
     fn fixture(text: &str) -> Vec<u8> {
@@ -3416,6 +3416,161 @@ mod tests {
                 self.revision.load(Ordering::Acquire),
             ))
         }
+    }
+
+    /// Hostile adapter that flips one tail byte after an exact read ordinal
+    /// while keeping a stable version token.
+    struct ScheduledMutationSource {
+        bytes: Mutex<Vec<u8>>,
+        reads: Arc<AtomicUsize>,
+        request_sizes: Mutex<Vec<usize>>,
+        mutate_after_read: usize,
+        fired: Arc<AtomicBool>,
+    }
+
+    impl ScheduledMutationSource {
+        fn new(bytes: Vec<u8>, mutate_after_read: usize) -> Self {
+            Self {
+                bytes: Mutex::new(bytes),
+                reads: Arc::new(AtomicUsize::new(0)),
+                request_sizes: Mutex::new(Vec::new()),
+                mutate_after_read,
+                fired: Arc::new(AtomicBool::new(false)),
+            }
+        }
+
+        fn current_bytes(&self) -> Vec<u8> {
+            self.bytes.lock().unwrap().clone()
+        }
+
+        /// Ordinal of the first read that requests the complete artifact,
+        /// which is the first chunk of the first complete identity pass.
+        fn first_identity_read(&self, length: usize) -> usize {
+            self.request_sizes
+                .lock()
+                .unwrap()
+                .iter()
+                .position(|size| *size == length)
+                .expect("a complete-artifact fingerprint request")
+                + 1
+        }
+    }
+
+    impl ReadAt for ScheduledMutationSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.lock().unwrap().len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let call = self.reads.fetch_add(1, Ordering::SeqCst) + 1;
+            self.request_sizes.lock().unwrap().push(output.len());
+            let mut bytes = self.bytes.lock().unwrap();
+            let start = usize::try_from(offset).unwrap_or(usize::MAX);
+            let Some(available) = bytes.get(start..) else {
+                return Ok(0);
+            };
+            let count = available.len().min(output.len());
+            output[..count].copy_from_slice(&available[..count]);
+            if call == self.mutate_after_read
+                && !self.fired.swap(true, Ordering::SeqCst)
+                && let Some(last) = bytes.last_mut()
+            {
+                *last ^= 0x01;
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(0x5050_0589, 0))
+        }
+    }
+
+    /// Change 0589: the text-edit snapshot's identity fence still refuses a
+    /// stable-token mutation placed in every gap between its fence points.
+    ///
+    /// `SourceSnapshot::open` is one empty-splice identity plan: two complete
+    /// source reads, formerly four SHA-256 passes and now two, because with no
+    /// span the composed target *is* the source. Eliding the duplicate hasher
+    /// must not move a fence point, so once the first complete identity pass
+    /// has started, every later read of the open must be refused — except the
+    /// very last, which no finite number of passes can bracket and which the
+    /// commit fence catches instead.
+    #[test]
+    fn a_stable_token_mutation_after_every_open_read_is_still_refused() {
+        let bytes = fixture("abc");
+        let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
+        let clean_source: Arc<dyn ReadAt> = clean.clone();
+        super::SourceSnapshot::open(clean_source).expect("clean source-backed PPT fixture");
+        let reads = clean.reads.load(Ordering::SeqCst);
+        let first_identity = clean.first_identity_read(bytes.len());
+        assert!(
+            reads > first_identity,
+            "an open hashes after its first pass"
+        );
+
+        let mut refused = 0_usize;
+        for ordinal in 1..=reads {
+            let hostile = Arc::new(ScheduledMutationSource::new(bytes.clone(), ordinal));
+            let source: Arc<dyn ReadAt> = hostile.clone();
+            let outcome = super::SourceSnapshot::open(source);
+            assert!(
+                hostile.fired.load(Ordering::SeqCst),
+                "read {ordinal} never fired"
+            );
+            match outcome {
+                Err(Error::Source(OverlayError::SourceFingerprintChanged { .. })) => {
+                    assert!(ordinal >= first_identity);
+                    refused += 1;
+                },
+                Err(other) => panic!("read {ordinal} produced an unexpected error: {other:?}"),
+                Ok(snapshot) => {
+                    let settled = super::SourceSnapshot::open(Arc::new(OwnedSource::new(
+                        hostile.current_bytes(),
+                    )))
+                    .expect("mutated artifact reopens");
+                    if ordinal < first_identity {
+                        // The mutation preceded the first identity pass, so the
+                        // snapshot is bound to exactly the bytes that exist.
+                        assert_eq!(snapshot.fingerprint(), settled.fingerprint());
+                    } else {
+                        assert_eq!(
+                            ordinal, reads,
+                            "read {ordinal} opened over an artifact that changed inside the fence"
+                        );
+                        assert_ne!(snapshot.fingerprint(), settled.fingerprint());
+                        // The commit fence re-plans the identity and must refuse.
+                        let mut transaction = snapshot.edit_text(target()).expect("first shape");
+                        let replacement = transaction.text().to_owned();
+                        transaction.set_text(replacement).expect("same width");
+                        assert!(matches!(
+                            transaction.commit(),
+                            Err(Error::Source(OverlayError::SourceFingerprintChanged { .. }))
+                        ));
+                    }
+                },
+            }
+        }
+        assert_eq!(refused, reads - first_identity);
+    }
+
+    /// Change 0589: an empty-splice identity plan reports one digest for both
+    /// identities, and it is the same digest the owned path computes.
+    #[test]
+    fn the_identity_plan_reports_one_digest_for_both_identities() {
+        let bytes = fixture("abc");
+        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let plan = shared
+            .plan_same_length_stream_splices(Vec::new(), StreamSpliceLimits::default())
+            .unwrap();
+        assert!(plan.is_noop());
+        assert_eq!(plan.source_fingerprint(), plan.target_fingerprint());
+
+        let owned = super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        assert_eq!(owned.fingerprint(), plan.source_fingerprint());
+
+        let generic: Arc<dyn ReadAt> = Arc::new(ScheduledMutationSource::new(bytes, usize::MAX));
+        let generic = super::SourceSnapshot::open(generic).unwrap();
+        assert_eq!(generic.fingerprint(), plan.source_fingerprint());
     }
 
     fn resolve_owned_and_range(

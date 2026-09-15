@@ -1,0 +1,11 @@
+==1039992== Callgrind, a call-graph generating cache profiler
+==1039992== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1039992== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1039992== Command: /home/zhuhe/code/litchi-worktrees/0589/target/release/snapfence_probe profile doc-snapshot-open /home/zhuhe/code/litchi/test-data/ole/doc/picture.doc 0 5
+==1039992== 
+==1039992== For interactive control, run 'callgrind_control -h'.
+==1039992== 
+==1039992== Events    : Ir
+==1039992== Collected : 2300675517
+==1039992== 
+==1039992== I   refs:      2,300,675,517

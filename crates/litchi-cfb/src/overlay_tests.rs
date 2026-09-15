@@ -79,10 +79,13 @@ fn assert_operation_shape(
     shape: crate::OverlayOperationShape,
     source_mode: OverlaySourceMode,
     source_bytes: u64,
+    is_noop: bool,
 ) {
     let fingerprint_chunks = source_bytes.div_ceil(1024 * 1024);
     let publication_chunks = source_bytes.div_ceil(65_536);
-    let fingerprint_bytes = source_bytes * 2;
+    // An effective plan hashes source and composed target; a no-op plan
+    // composes the source, so one digest is both identities.
+    let fingerprint_bytes = source_bytes * if is_noop { 1 } else { 2 };
     let fenced = u64::from(source_mode == OverlaySourceMode::GenericReadAt);
     assert_eq!(
         shape.counter_scope,
@@ -185,12 +188,42 @@ fn operation_shape_matches_generic_and_owned_overlay_policy() {
         generic.operation_shape(),
         OverlaySourceMode::GenericReadAt,
         bytes.len() as u64,
+        false,
     );
     assert_operation_shape(
         owned.operation_shape(),
         OverlaySourceMode::OwnedImmutableArc,
         bytes.len() as u64,
+        false,
     );
+
+    // An exact byte no-op keeps every pass and chunk count and halves only the
+    // logical bytes hashed, because one digest is both identities.
+    let noop = shared(bytes.clone())
+        .plan_same_length_stream_overlays(
+            vec![SameLengthStreamOverlay::new(
+                vec!["Fat4096".to_string()],
+                Arc::from(vec![0x22; 4_096]),
+            )],
+            limits(),
+        )
+        .unwrap();
+    assert!(noop.is_noop());
+    assert_operation_shape(
+        noop.operation_shape(),
+        OverlaySourceMode::GenericReadAt,
+        bytes.len() as u64,
+        true,
+    );
+    assert_eq!(
+        noop.operation_shape().planning_fingerprint_scans,
+        generic.operation_shape().planning_fingerprint_scans
+    );
+    assert_eq!(
+        noop.operation_shape().planning_fingerprint_chunks,
+        generic.operation_shape().planning_fingerprint_chunks
+    );
+    assert_eq!(noop.source_fingerprint(), noop.target_fingerprint());
 }
 
 #[test]
@@ -506,6 +539,10 @@ struct MutableSource {
     request_sizes: Mutex<Vec<usize>>,
     fail_read: AtomicUsize,
     mutate_after_read: AtomicUsize,
+    /// Byte flipped by the hostile mutation; 700 lies in the CFB header/FAT
+    /// region, so tests that need the reopen to succeed move it into an
+    /// unselected stream payload instead.
+    mutate_offset: AtomicUsize,
     overreport: AtomicBool,
 }
 
@@ -518,6 +555,7 @@ impl MutableSource {
             request_sizes: Mutex::new(Vec::new()),
             fail_read: AtomicUsize::new(usize::MAX),
             mutate_after_read: AtomicUsize::new(usize::MAX),
+            mutate_offset: AtomicUsize::new(700),
             overreport: AtomicBool::new(false),
         }
     }
@@ -527,7 +565,8 @@ impl MutableSource {
     }
 
     fn change_bytes_without_version(&self) {
-        self.bytes.lock().unwrap()[700] ^= 0xff;
+        let offset = self.mutate_offset.load(Ordering::SeqCst);
+        self.bytes.lock().unwrap()[offset] ^= 0xff;
     }
 }
 
@@ -554,7 +593,8 @@ impl ReadAt for MutableSource {
         let count = output.len().min(available.len());
         output[..count].copy_from_slice(&available[..count]);
         if call == self.mutate_after_read.load(Ordering::SeqCst) {
-            bytes[700] ^= 0xff;
+            let target = self.mutate_offset.load(Ordering::SeqCst);
+            bytes[target] ^= 0xff;
         }
         Ok(count)
     }
@@ -976,4 +1016,236 @@ fn atomic_path_late_stable_token_mutation_leaves_destination_unchanged() {
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();
     std::fs::remove_dir(directory).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Change 0589: an exact no-op composes the source, so one digest is both
+// identities. These tests pin the value identity and every fence point that
+// the elided second hasher must not move.
+// ---------------------------------------------------------------------------
+
+fn noop_overlay() -> SameLengthStreamOverlay {
+    // `sample_bytes` stores `Fat4096` as 4,096 bytes of 0x22, so this
+    // replacement is an exact byte no-op and plans to zero physical spans.
+    SameLengthStreamOverlay::new(vec!["Fat4096".to_string()], Arc::from(vec![0x22; 4_096]))
+}
+
+/// Offset of a byte inside the unselected `LargeOpaque` payload.
+///
+/// `sample_bytes` fills that stream with 0x45 and no other stream or CFB
+/// structure uses that value in a 4 KiB run, so a flip here leaves the
+/// directory, FAT and the selected `Fat4096` stream intact.
+fn unselected_payload_offset(bytes: &[u8]) -> usize {
+    let run = bytes
+        .windows(4_096)
+        .position(|window| window.iter().all(|byte| *byte == 0x45))
+        .expect("an unselected 0x45 payload run");
+    run + 2_048
+}
+
+fn sha256_of(bytes: &[u8]) -> [u8; 32] {
+    use sha2::{Digest as _, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
+/// Read ordinal of the last chunk of the first complete fingerprint pass.
+///
+/// A fingerprint pass requests `min(length, 1 MiB)`; the precondition
+/// comparison requests one sector and emission requests 64 KiB, so on this
+/// fixture the request size identifies the pass unambiguously.
+fn first_fingerprint_read(file: &SharedOleFile, source: &MutableSource) -> usize {
+    assert!(file.file_size() < 1024 * 1024);
+    let sizes = source.request_sizes.lock().unwrap();
+    sizes
+        .iter()
+        .position(|size| *size as u64 == file.file_size())
+        .expect("a complete fingerprint chunk request")
+        + 1
+}
+
+#[test]
+fn noop_plan_reports_the_source_digest_as_both_identities() {
+    let bytes = sample_bytes();
+    let expected = sha256_of(&bytes);
+
+    let plan = shared(bytes.clone())
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    assert!(plan.is_noop());
+    assert_eq!(plan.changed_spans(), 0);
+    assert_eq!(plan.source_fingerprint().as_bytes(), &expected);
+    assert_eq!(plan.target_fingerprint().as_bytes(), &expected);
+
+    // An effective plan over the same artifact keeps two distinct digests, and
+    // its source digest is still the complete source artifact digest.
+    let effective = shared(bytes.clone())
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x67, 4_096)], limits())
+        .unwrap();
+    assert!(!effective.is_noop());
+    assert_eq!(effective.source_fingerprint().as_bytes(), &expected);
+    assert_ne!(
+        effective.source_fingerprint(),
+        effective.target_fingerprint()
+    );
+}
+
+#[test]
+fn noop_plan_retains_every_complete_source_scan() {
+    let bytes = sample_bytes();
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let chunks = fingerprint_chunks(file.file_size());
+    source.reads.store(0, Ordering::SeqCst);
+    source.request_sizes.lock().unwrap().clear();
+    let noop = file
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    assert!(noop.is_noop());
+    let noop_fingerprint_reads = source
+        .request_sizes
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|size| **size as u64 == file.file_size())
+        .count();
+
+    let effective_source = Arc::new(MutableSource::new(bytes.clone()));
+    let effective_file = SharedOleFile::open(effective_source.clone()).unwrap();
+    effective_source.reads.store(0, Ordering::SeqCst);
+    effective_source.request_sizes.lock().unwrap().clear();
+    let effective = effective_file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x68, 4_096)], limits())
+        .unwrap();
+    assert!(!effective.is_noop());
+    let effective_fingerprint_reads = effective_source
+        .request_sizes
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|size| **size as u64 == effective_file.file_size())
+        .count();
+
+    // Both plans keep the generic-source read-twice-compare bracket: the
+    // planning preflight and the post-reopen fence each read the complete
+    // artifact once. Only the digest work differs.
+    assert_eq!(noop_fingerprint_reads, chunks * 2);
+    assert_eq!(noop_fingerprint_reads, effective_fingerprint_reads);
+    assert_eq!(
+        noop.operation_shape().planning_fingerprint_scans,
+        effective.operation_shape().planning_fingerprint_scans
+    );
+    assert_eq!(
+        noop.operation_shape().planning_fingerprint_chunks,
+        effective.operation_shape().planning_fingerprint_chunks
+    );
+    assert_eq!(
+        noop.operation_shape().planning_fingerprint_bytes * 2,
+        effective.operation_shape().planning_fingerprint_bytes
+    );
+}
+
+#[test]
+fn noop_plan_catches_a_stable_token_mutation_between_planning_scans() {
+    let bytes = sample_bytes();
+    let probe = Arc::new(MutableSource::new(bytes.clone()));
+    let probe_file = SharedOleFile::open(probe.clone()).unwrap();
+    probe.request_sizes.lock().unwrap().clear();
+    probe_file
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    let boundary = first_fingerprint_read(&probe_file, &probe);
+
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    source.request_sizes.lock().unwrap().clear();
+    source.reads.store(0, Ordering::SeqCst);
+    // Mutate immediately after the first complete planning fingerprint. The
+    // post-reopen fence reads the artifact again and must observe a different
+    // source digest even though only one hasher now runs per pass.
+    source.mutate_after_read.store(boundary, Ordering::SeqCst);
+
+    // Flip a byte of the unselected `LargeOpaque` payload so the composed CFB
+    // reopen and the `Fat4096` precondition both still succeed; only the
+    // second complete fingerprint can detect this mutation.
+    let unselected = unselected_payload_offset(&bytes);
+    source.mutate_offset.store(unselected, Ordering::SeqCst);
+
+    assert!(matches!(
+        file.plan_same_length_stream_overlays(vec![noop_overlay()], limits()),
+        Err(OverlayError::SourceFingerprintChanged { .. })
+    ));
+}
+
+#[test]
+fn noop_direct_write_catches_a_late_stable_token_mutation() {
+    let bytes = sample_bytes();
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    assert!(plan.is_noop());
+    let length = file.file_size();
+    let fingerprint_reads = fingerprint_chunks(length);
+    let publication_reads = publication_chunks(length);
+    source.reads.store(0, Ordering::SeqCst);
+    // Mutate after the last emission read: the emission-time hash accepted the
+    // original bytes, so only the mandatory post-emission preflight sees it.
+    source
+        .mutate_after_read
+        .store(fingerprint_reads + publication_reads, Ordering::SeqCst);
+
+    let mut output = Vec::new();
+    assert!(matches!(
+        plan.write_to(&mut output),
+        Err(OverlayError::IncompleteOutput {
+            progress: OutputProgress::CompleteUnflushed { bytes },
+            source,
+        }) if bytes == length && matches!(*source, OverlayError::SourceFingerprintChanged { .. })
+    ));
+    assert_eq!(output.len() as u64, length);
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_reads * 2 + publication_reads
+    );
+}
+
+#[test]
+fn noop_direct_write_catches_a_mutation_inside_the_emission_scan() {
+    let bytes = sample_bytes();
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    assert!(plan.is_noop());
+    source.reads.store(0, Ordering::SeqCst);
+    // Mutate after the write preflight but during emission: the single
+    // emission hasher must still diverge from the retained source identity.
+    source
+        .mutate_after_read
+        .store(fingerprint_chunks(file.file_size()) + 1, Ordering::SeqCst);
+
+    let mut output = Vec::new();
+    assert!(matches!(
+        plan.write_to(&mut output),
+        Err(OverlayError::IncompleteOutput { source, .. })
+            if matches!(*source, OverlayError::SourceFingerprintChanged { .. })
+    ));
+}
+
+#[test]
+fn noop_plan_publishes_the_exact_source_bytes() {
+    let bytes = sample_bytes();
+    let plan = shared(bytes.clone())
+        .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+        .unwrap();
+    let mut output = Vec::new();
+    let report = plan.write_to(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    assert_eq!(report.changed_spans(), 0);
+    assert_eq!(report.source_fingerprint(), report.target_fingerprint());
+    assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&bytes));
 }

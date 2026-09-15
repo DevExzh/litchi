@@ -2641,6 +2641,221 @@ mod tests {
         assert!(counted.total_bytes.load(Ordering::SeqCst) < giant.len() as u64);
     }
 
+    /// Hostile adapter that flips one tail byte after an exact read ordinal
+    /// while keeping a stable version token.
+    ///
+    /// The ordinal lets a test place the mutation in every gap between the
+    /// fence points of one open, which is what change 0589 must not move.
+    struct ScheduledMutationSource {
+        bytes: Mutex<Vec<u8>>,
+        reads: AtomicUsize,
+        request_sizes: Mutex<Vec<usize>>,
+        mutate_after_read: AtomicUsize,
+        fired: AtomicBool,
+    }
+
+    impl ScheduledMutationSource {
+        fn new(bytes: Vec<u8>, mutate_after_read: usize) -> Self {
+            Self {
+                bytes: Mutex::new(bytes),
+                reads: AtomicUsize::new(0),
+                request_sizes: Mutex::new(Vec::new()),
+                mutate_after_read: AtomicUsize::new(mutate_after_read),
+                fired: AtomicBool::new(false),
+            }
+        }
+
+        fn current_bytes(&self) -> Vec<u8> {
+            self.bytes.lock().expect("source lock").clone()
+        }
+
+        /// Ordinal of the first read that requests the complete artifact,
+        /// which is the first chunk of the first complete identity pass.
+        fn first_identity_read(&self, length: usize) -> usize {
+            self.request_sizes
+                .lock()
+                .expect("size lock")
+                .iter()
+                .position(|size| *size == length)
+                .expect("a complete-artifact fingerprint request")
+                + 1
+        }
+    }
+
+    impl ReadAt for ScheduledMutationSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.lock().expect("source lock").len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let call = self.reads.fetch_add(1, Ordering::SeqCst) + 1;
+            self.request_sizes
+                .lock()
+                .expect("size lock")
+                .push(output.len());
+            let mut bytes = self.bytes.lock().expect("source lock");
+            let start = usize::try_from(offset)
+                .map_err(|_error| io::Error::other("source offset does not fit usize"))?;
+            let Some(input) = bytes.get(start..) else {
+                return Ok(0);
+            };
+            let count = input.len().min(output.len());
+            output[..count].copy_from_slice(&input[..count]);
+            if call == self.mutate_after_read.load(Ordering::SeqCst)
+                && !self.fired.swap(true, Ordering::SeqCst)
+                && let Some(last) = bytes.last_mut()
+            {
+                *last ^= 0x01;
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(0xD0C0_0589, 0))
+        }
+    }
+
+    fn documentproperties_bytes() -> Vec<u8> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/documentProperties.doc");
+        std::fs::read(path).expect("DOC fixture")
+    }
+
+    /// Change 0589: the source-identity fence still refuses a stable-token
+    /// mutation placed in *every* gap between the fence points of one open.
+    ///
+    /// Before this change each identity pass hashed the artifact twice; the
+    /// second hasher consumed the same bytes as the first because the splice
+    /// list is empty, so its digest was value-identical and is now elided.
+    /// That must not move a fence point: once the first complete identity pass
+    /// has started, a mutation at any later read of the open must be refused
+    /// by the open itself or by the mandatory readback that follows it.
+    ///
+    /// A mutation that lands *before* the first identity pass is not a fence
+    /// failure — there is no earlier identity to disagree with — so the
+    /// assertion for those ordinals is that the snapshot is bound to exactly
+    /// the bytes that now exist.
+    #[test]
+    fn a_stable_token_mutation_after_every_open_read_is_still_refused() {
+        let bytes = documentproperties_bytes();
+        let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
+        let clean_source: Arc<dyn ReadAt> = clean.clone();
+        SourceSnapshot::open(clean_source).expect("clean source-backed DOC fixture");
+        let reads = clean.reads.load(Ordering::SeqCst);
+        let first_identity = clean.first_identity_read(bytes.len());
+        assert!(
+            reads > first_identity,
+            "an open hashes after its first pass"
+        );
+
+        let mut refused = 0_usize;
+        for ordinal in 1..=reads {
+            let hostile = Arc::new(ScheduledMutationSource::new(bytes.clone(), ordinal));
+            let source: Arc<dyn ReadAt> = hostile.clone();
+            let outcome = SourceSnapshot::open(source).and_then(|snapshot| {
+                snapshot.paragraph(Position::new(0))?;
+                Ok(snapshot)
+            });
+            assert!(
+                hostile.fired.load(Ordering::SeqCst),
+                "read {ordinal} never fired"
+            );
+            match outcome {
+                Err(Error::Overlay(OverlayError::SourceFingerprintChanged { .. })) => {
+                    refused += 1;
+                },
+                Err(other) => panic!("read {ordinal} produced an unexpected error: {other:?}"),
+                Ok(snapshot) => {
+                    assert!(
+                        ordinal < first_identity,
+                        "read {ordinal} served an artifact that changed after its identity"
+                    );
+                    let settled = SourceSnapshot::from_bytes(hostile.current_bytes())
+                        .expect("mutated artifact reopens");
+                    assert_eq!(
+                        snapshot.fingerprint(),
+                        settled.fingerprint(),
+                        "read {ordinal} retained an identity the artifact does not have"
+                    );
+                },
+            }
+        }
+        assert_eq!(refused, reads - (first_identity - 1));
+    }
+
+    /// Change 0589: the same sweep across the mandatory readback, which
+    /// brackets a paragraph read with complete identity passes.
+    ///
+    /// Only a mutation after the readback's very last read is invisible to it,
+    /// which is true of any finite number of passes and is unchanged here.
+    #[test]
+    fn a_stable_token_mutation_after_every_readback_read_is_still_refused() {
+        let bytes = documentproperties_bytes();
+        let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
+        let clean_source: Arc<dyn ReadAt> = clean.clone();
+        let snapshot = SourceSnapshot::open(clean_source).expect("clean source-backed DOC fixture");
+        let open_reads = clean.reads.load(Ordering::SeqCst);
+        snapshot
+            .paragraph(Position::new(0))
+            .expect("clean first paragraph");
+        let readback_reads = clean.reads.load(Ordering::SeqCst) - open_reads;
+        assert!(
+            readback_reads > 2,
+            "a readback brackets the paragraph with complete identity passes"
+        );
+
+        for ordinal in 1..readback_reads {
+            let hostile = Arc::new(ScheduledMutationSource::new(
+                bytes.clone(),
+                open_reads + ordinal,
+            ));
+            let source: Arc<dyn ReadAt> = hostile.clone();
+            let snapshot = SourceSnapshot::open(source).expect("clean open");
+            assert!(
+                matches!(
+                    snapshot.paragraph(Position::new(0)),
+                    Err(Error::Overlay(
+                        OverlayError::SourceFingerprintChanged { .. }
+                    ))
+                ),
+                "readback read {ordinal} served a mutated artifact"
+            );
+            assert!(
+                hostile.fired.load(Ordering::SeqCst),
+                "readback read {ordinal} never fired"
+            );
+        }
+    }
+
+    /// Change 0589: the identity a snapshot retains is the complete source
+    /// artifact digest whichever adapter supplies the bytes, and a no-op
+    /// commit still publishes exactly those bytes.
+    ///
+    /// `litchi-cfb`'s `noop_plan_reports_the_source_digest_as_both_identities`
+    /// pins that this digest is SHA-256 over the whole artifact; here it is
+    /// pinned to be the same across the owned and the generic `ReadAt` path,
+    /// which run a different number of identity passes.
+    #[test]
+    fn the_retained_identity_is_the_complete_source_artifact_digest() {
+        let bytes = documentproperties_bytes();
+        let owned = SourceSnapshot::from_bytes(bytes.clone()).expect("source-backed DOC");
+
+        let generic: Arc<dyn ReadAt> =
+            Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
+        let generic = SourceSnapshot::open(generic).expect("generic source-backed DOC");
+        assert_eq!(generic.fingerprint(), owned.fingerprint());
+
+        let commit = owned
+            .edit_paragraph(Position::new(0))
+            .expect("first paragraph")
+            .commit()
+            .expect("no-op commit");
+        assert!(commit.is_noop());
+        let mut output = Vec::new();
+        commit.write_to(&mut output).expect("no-op output");
+        assert_eq!(output, bytes);
+    }
+
     struct CountingSource {
         bytes: Arc<[u8]>,
         total_bytes: AtomicU64,

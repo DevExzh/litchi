@@ -1,0 +1,15 @@
+[package]
+name = "snapfence_probe"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "@ROOT@/crates/litchi-core" }
+litchi-doc = { path = "@ROOT@/crates/litchi-doc" }
+litchi-ppt = { path = "@ROOT@/crates/litchi-ppt" }
+
+[profile.release]
+debug = false
+strip = false

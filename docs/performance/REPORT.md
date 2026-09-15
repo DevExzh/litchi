@@ -1,5 +1,27 @@
 # Performance program phase report
 
+## 0589 — an empty overlay hashes the artifact once
+
+Retained, partially implemented. With no physical span the CFB overlay is the
+identity, so its target digest equals its source digest by construction; the
+duplicate hasher is elided in `overlay::fingerprints` and `write_validated`.
+DOC generic snapshot opens fall from 12 to 6 complete SHA-256 passes and PPT
+text-edit opens from 4 to 2, with complete source reads unchanged. Native cycles
+fall by a median 36.6% across all 38 admitted fixtures (range 25.5–48.0%, every
+fixture improving); paired timing p50 improves 43.4–48.1% on the four largest,
+against an A/A floor of p50 ±0.1% and p99 ≤ 2.5%. Value identity is proven by an
+87-artifact differential whose two reports — every plan fingerprint, span count,
+published SHA-256 and typed refusal, across empty, exact-no-op and effective span
+shapes — are byte-identical. All gates pass (77 test binaries, zero failures),
+including the two consumer crates. `OverlayOperationShape` now reports a no-op
+plan's logical bytes hashed truthfully; its pass and chunk counts are unchanged.
+The DOC open's third identity pass and the duplicate CFB index parse are
+read-twice-compare defences: both are designed with a priced saving and
+deliberately not implemented. No latency, allocation, RSS or cold-cache claim is
+registered. OLE2/OOXML remain active; ODF is deferred until completion and iWork
+excluded. [Change and limitations](0589-ole2-snapshot-fingerprint-passes.md);
+[retained evidence](results/change-0589/README.md); `performance_claim: none`.
+
 ## 0587: a whole-path survey, and nothing landed
 
 One record, no production change. [0587](0587-remaining-opportunity-survey.md)
@@ -23,7 +45,8 @@ sees it, an eager open plus one cell costs 12.9× the marker-free control, and
 off on most real files by the same markers. On the OLE2 side the finding is
 that whole-artifact SHA-256, which callgrind cannot price, dominates the
 source-backed DOC and PPT snapshot opens — 13.4× the full eager parse of the
-same PPT in native cycles — and explains why change 0586 measured zero; the
+same PPT in native cycles — and explains why no read hint on that path could show in latency (0586's
+own zero was structural, as change 0589 corrects); the
 same term is 34.9% of a PPTX opened transaction and 85% of a cross-package
 slide copy. The CFB substrate itself is at its floor for this corpus, and the
 XLS one-cell query's remaining cost is framing overhead that 0584 named and no

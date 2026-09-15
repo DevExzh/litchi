@@ -1,0 +1,56 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0589",
+  "title": "An empty overlay hashes the artifact once, not twice: DOC and PPT source-backed opens lose half their SHA-256 work",
+  "decision": "retained, partially implemented; the value-identical subset of survey item DOC-1 landed, two fence-moving items are designed and not implemented",
+  "code_state": "three edits in crates/litchi-cfb/src/overlay.rs; crates/litchi-doc/src/body_text/source.rs and crates/litchi-ppt/src/text_edit.rs changed in their test modules only",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "overlay::fingerprints and write_validated drove two SHA-256 hashers over one source read; with an empty span list apply_spans cannot write a byte, so the target hasher consumed exactly the bytes the source hasher consumed and finalized to the same digest",
+    "the empty span list is the whole PPT text-edit snapshot open, all three DOC identity passes, both ensure_current passes, and every exact byte no-op publication",
+    "the elision is value identity by construction, not an approximation: the 87-artifact fingerprint differential between the two legs is byte-identical across all three span shapes",
+    "no fence point moved: complete source reads, read calls, requested bytes, len() calls and version() calls per open are byte-for-byte identical on all 38 admitted fixtures",
+    "the DOC open's third identity pass and the duplicate CFB index parse are read-twice-compare defences whose removal would change when a refusal happens; both are designed with a stated predicted saving and left in place"
+  ],
+  "accepted_evidence": {
+    "hash_pass_counts": "callgrind runs sha2's software backend at a constant 52.07 Ir per artifact byte per complete pass, which turns the sha2 instruction share into an exact pass count: DOC generic open 12.00 -> 6.00, PPT text-edit open 4.00 -> 2.00, fitted on three fixtures",
+    "read_counts": "a counting ReadAt adapter records read calls, bytes, len() and version() calls per operation; diff of counts-before.jsonl and counts-after.jsonl is empty over 8 doc-snapshot-open, 4 doc-snapshot-resolve and 30 ppt-textedit-open runs",
+    "native_cycles": "perf stat -r 5 isolation pairs on all 38 admitted fixtures, pinned to CPU 9: cycles median -36.6%, range -48.0% to -25.5%; instructions median -29.0%, range -47.6% to -17.0%; every fixture improved",
+    "paired_timing": "order A1 B1 B2 A2 with two further before legs for the control, 80-120 samples per leg on four fixtures: p50 -48.1%, -43.4%, -48.1%, -47.9% after against before, and +92.6%, +76.8%, +92.6%, +92.1% before against after; p99 -48.0%, -41.0%, -47.9%, -45.0%",
+    "floor": "A/A in the same window: perf stat cycles median +0.1%, range -0.5% to +1.0% over 38 fixtures; paired timing p50 +0.1%, -0.1%, -0.1%, +0.0% and p99 +0.7%, +2.2%, -1.8%, +2.5%",
+    "differential": "87 .doc and .ppt artifacts under test-data/, both legs printing the empty-splice plan's two fingerprints, is_noop, published SHA-256 and report fingerprints, an exact-byte no-op splice plan's fingerprints, span count and published digest, an effective one-byte splice plan's, and the DOC and PPT snapshot fingerprints or exact typed refusals; the two reports are byte-identical",
+    "tests": "six new litchi-cfb overlay tests including an exact digest check against an independently computed SHA-256; three new litchi-doc tests, two of which sweep every read ordinal of an open and of a readback and assert the exact refusal count; two new litchi-ppt tests, one sweeping every read ordinal of the open and driving the commit fence where the open survives",
+    "gates": "cargo fmt --all --check; cargo clippy and cargo test for litchi-cfb, litchi-doc, litchi-ppt and for the two consumer crates litchi-xls and litchi-ole-common; cargo doc --no-deps; all pass with 77 test binaries and zero failures"
+  },
+  "accepted_costs": {
+    "public_diagnostic": "OverlayOperationShape::new now takes the plan's no-op flag so its documented 'logical bytes hashed' fields report source_bytes once rather than twice for a no-op plan. Pass and chunk counts are unchanged. ValidatedOverlayPlan::is_noop() is already public, so no new information is exposed; the two consumers outside litchi-cfb carry effective edits and neither asserts a *_bytes value",
+    "cpu_only": "the saving is CPU; no allocation, RSS, syscall, cold-cache, physical-device or range-source measurement was taken",
+    "callgrind_mispricing": "callgrind prices SHA-256 in software, about five times its native share; its totals are used only to count passes, never to claim latency",
+    "shared_host": "eight measurement agents were active on the host; every measured process was pinned to CPU 9 and an A/A control was taken in the same window"
+  },
+  "known_gaps": {
+    "unmeasured_paths": "the commit and save paths gain the same halving on a no-op publication and are covered only by unit tests; no perf-baseline selector opens either measured path, so no harness scenario moved",
+    "corpus_ceiling": "the largest fixture either path admits is 1.45 MB; behaviour at DIFAT scale is unmeasured",
+    "hardware": "measured on a host with SHA-NI; a host without it would see a larger relative saving, and none was measured",
+    "designed_not_implemented": "the DOC open's third identity pass (predicted: 2 of the 6 remaining SHA-256 passes and 2 of the 6 complete source reads per generic DOC open) and the duplicate CFB index parse (measured at 23,023 to 51,326 cycles, 6.7% to 0.27% of the post-change open) are described, priced and left in place because removing either changes when a typed refusal happens"
+  },
+  "withheld": [
+    "any registered claim, cold-cache, allocation, RSS, syscall, range-source, concurrency-scaling or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8e",
+    "branch": "perf/0589-ole2-snapshot-fingerprint-passes",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": 9,
+    "probe_binaries": {
+      "measurement_pair_before_sha256": "9e693c753dfe64d4d0dc21caf630cf82dc18a0231f33d2e7473abf2f193d0023",
+      "measurement_pair_after_sha256": "96e62c0918f15f5e27a6301e4aaaf0e47483953cb5192239ff4eb0c1caae4d98",
+      "differential_pair_before_sha256": "32cc96c146b0e6285ba977c4d224bc3906db3b91d61000b8819b6231635472e6",
+      "differential_pair_after_sha256": "c2f01a129a55665e4eaab065232439cd0254ef1b88d33cf51f67406b0831fca5",
+      "note": "the differential pair is the measurement pair plus a digest subcommand and a sha2 dependency reachable only from it; no timing figure came from it"
+    },
+    "change_0582_harness": "does not apply; it is a soapberry-zip differential over strict_layout_for and reaches no CFB, DOC or PPT code. An equivalent 87-artifact fingerprint differential was built for this change instead and is retained in differential/"
+  }
+}

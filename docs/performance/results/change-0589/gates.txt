@@ -1,0 +1,154 @@
+# Gate tails, change 0589
+
+Run in /home/zhuhe/code/litchi-worktrees/0589 on branch
+perf/0589-ole2-snapshot-fingerprint-passes, base 08d968f8e, rustc 1.95.0.
+Workspace lints are deny, so any clippy or rustdoc warning fails the gate.
+No pre-existing failure was encountered.
+
+================================================================
+### cargo fmt --all --check ###
+----------------------------------------------------------------
+### cargo fmt --all --check ###
+EXIT=0
+
+================================================================
+### cargo clippy -p litchi-cfb -p litchi-doc -p litchi-ppt --all-targets (post-format) ###
+----------------------------------------------------------------
+### cargo clippy -p litchi-cfb -p litchi-doc -p litchi-ppt --all-targets (post-format) ###
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.95s
+EXIT=0
+
+================================================================
+### cargo clippy -p litchi-xls -p litchi-ole-common --all-targets ###
+----------------------------------------------------------------
+    Checking thiserror v2.0.18
+    Checking der v0.7.10
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-odraw)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-biff)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-core)
+    Checking num-bigint-dig v0.8.6
+    Checking spki v0.7.3
+    Checking pkcs8 v0.10.2
+    Checking x509-cert v0.2.5
+    Checking sec1 v0.7.3
+    Checking pkcs1 v0.7.5
+    Checking elliptic-curve v0.13.8
+    Checking rsa v0.9.10
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking p256 v0.13.2
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-sign)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ograph)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.08s
+EXIT=0
+
+================================================================
+### cargo test -p litchi-cfb -p litchi-doc -p litchi-ppt ###
+----------------------------------------------------------------
+test crates/litchi-ppt/src/package/model.rs - package::model::Package (line 242) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 108) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::presentation (line 144) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_reader (line 56) - compile ... ok
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_geometry_rect (line 253) ... ignored
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_vertices (line 315) ... ignored
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation (line 120) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation::images (line 1277) - compile ... ok
+test crates/litchi-ppt/src/shapes/picture.rs - shapes::picture::PictureShape (line 39) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new (line 521) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new_borrowed (line 561) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::set_text_margins (line 647) ... ignored
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.43s; merged doctests compilation took 0.43s
+EXIT=0
+
+================================================================
+### cargo test -p litchi-xls -p litchi-ole-common ###
+----------------------------------------------------------------
+
+     Running tests/xls_xf_inheritance.rs (target/debug/deps/xls_xf_inheritance-e21c7881dcd9ccf2)
+
+running 2 tests
+test resolves_libreoffice_xf_inheritance ... ok
+test resolves_poi_xf_inheritance ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_ole_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_xls
+
+running 2 tests
+test crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100) ... ignored
+test crates/litchi-xls/src/writer/mod.rs - writer::core (line 22) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.29s; merged doctests compilation took 0.29s
+EXIT=0
+
+================================================================
+### cargo doc -p litchi-cfb -p litchi-doc -p litchi-ppt --no-deps ###
+----------------------------------------------------------------
+### cargo doc -p litchi-cfb -p litchi-doc -p litchi-ppt --no-deps ###
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0589/crates/xml-minifier-macros)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-odraw)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-biff)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0589/crates/xml-minifier)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-cfb)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-crypto)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-ppt)
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0589/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.70s
+   Generated /home/zhuhe/code/litchi-worktrees/0589/target/doc/litchi_cfb/index.html and 2 other files
+EXIT=0
+
+================================================================
+### library test totals (from test.txt) ###
+----------------------------------------------------------------
+test result: ok. 322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 995 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.66s
+test result: ok. 1077 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+test binaries reporting ok: 77
+test binaries reporting FAILED: 0
+
+================================================================
+### 87-artifact fingerprint differential ###
+----------------------------------------------------------------
+$ diff differential/digest-before.tsv differential/digest-after.tsv
+(no output: identical on 87 artifacts)
+
+================================================================
+### deterministic source-read counts ###
+----------------------------------------------------------------
+$ diff counts/counts-before.jsonl counts/counts-after.jsonl
+(no output: identical over 42 operations on 38 fixtures)

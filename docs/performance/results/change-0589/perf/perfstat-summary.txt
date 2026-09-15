@@ -1,0 +1,43 @@
+mode               fixture                                                  bytes   before cyc    after cyc      d%    AA%   before ins    after ins      d%
+doc-snapshot-open  ole/doc/picture.doc                                    1448448   36,846,505   19,170,816   -48.0   +0.4   46,838,775   24,544,745   -47.6
+doc-snapshot-open  ole/doc/duplicate-style-names.doc                        64512    1,842,062    1,048,606   -43.1   +0.1    2,630,953    1,635,717   -37.8
+doc-snapshot-open  ole/doc/table-merged-cells.doc                           17408      657,035      440,202   -33.0   -0.1    1,112,296      842,349   -24.3
+doc-snapshot-open  ole/doc/lists-margins.doc                                10752      493,914      359,625   -27.2   -0.2      920,016      750,235   -18.5
+doc-snapshot-open  ce-interop/libreoffice-resaved/noheadfoot-litchi.doc     10240      478,812      352,345   -26.4   +0.2      899,183      739,538   -17.8
+doc-snapshot-open  ole/doc/documentProperties.doc                            9728      466,197      344,713   -26.1   +0.3      879,758      727,888   -17.3
+doc-snapshot-open  ole/doc/endingnote.doc                                    9728      467,494      345,188   -26.2   -0.1      881,454      728,708   -17.3
+doc-snapshot-open  ole/doc/footnote.doc                                      9728      466,297      346,756   -25.6   +0.1      883,283      731,558   -17.2
+ppt-textedit-open  poi/test-data/slideshow/cryptoapi-proc2356.ppt         1341952   11,404,643    5,958,650   -47.8   +0.2   14,529,286    7,655,878   -47.3
+ppt-textedit-open  erop/libreoffice-resaved/45543-transition-litchi.ppt    842240    7,196,581    3,756,651   -47.8   +0.1    9,206,018    4,884,292   -46.9
+ppt-textedit-open  e-interop/litchi-changed/45543-transition-litchi.ppt    397312    3,394,018    1,775,274   -47.7   +0.3    4,416,316    2,377,141   -46.2
+ppt-textedit-open  poi/test-data/slideshow/45543.ppt                       385024    3,288,139    1,721,860   -47.6   +0.2    4,286,811    2,310,825   -46.1
+ppt-textedit-open  poi/test-data/slideshow/41246-1.ppt                     275456    2,382,642    1,262,430   -47.0   +0.2    3,158,063    1,743,865   -44.8
+ppt-textedit-open  poi/test-data/slideshow/ppt_with_embeded.ppt            180736    1,581,524      841,962   -46.8   -0.0    2,113,172    1,184,574   -43.9
+ppt-textedit-open  poi/test-data/slideshow/headers_footers_2007.ppt        169472    1,483,300      792,116   -46.6   +0.2    1,986,109    1,116,122   -43.8
+ppt-textedit-open  est-data/slideshow/bug58144-headers-footers-2007.ppt    142848    1,275,336      692,761   -45.7   +0.0    1,731,851      998,230   -42.4
+ppt-textedit-open  ole/ppt/SampleShow.ppt                                  125440    1,127,840      614,684   -45.5   -0.0    1,538,648      894,228   -41.9
+ppt-textedit-open  poi/test-data/slideshow/datetime.ppt                    114176    1,035,942      570,297   -44.9   +0.1    1,424,394      838,696   -41.1
+ppt-textedit-open  poi/test-data/slideshow/54880_chinese.ppt               103936      949,120      524,246   -44.8   -0.1    1,309,816      774,732   -40.9
+ppt-textedit-open  poi/test-data/slideshow/testPPT_oleWorkbook.ppt          98304      903,430      502,773   -44.3   +0.1    1,256,995      752,368   -40.1
+ppt-textedit-open  ole/ppt/text-margins.ppt                                 44032      443,906      263,720   -40.6   +0.2      660,061      433,492   -34.3
+ppt-textedit-open  poi/test-data/slideshow/text-margins.ppt                 44032      445,106      265,213   -40.4   -0.1      660,861      434,145   -34.3
+ppt-textedit-open  poi/test-data/slideshow/sound.ppt                        43520      443,811      264,139   -40.5   -0.1      666,425      442,058   -33.7
+ppt-textedit-open  poi/test-data/slideshow/ole2-embedding-2003.ppt          40448      417,428      251,558   -39.7   -0.0      631,907      423,686   -33.0
+ppt-textedit-open  ole/ppt/ppt_with_png.ppt                                 39424      407,164      245,971   -39.6   +0.2      619,698      416,791   -32.7
+ppt-textedit-open  poi/test-data/slideshow/WithLinks.ppt                    20992      254,245      168,544   -33.7   +0.0      428,163      319,793   -25.3
+ppt-textedit-open  poi/test-data/slideshow/basic_test_ppt_file.ppt          15360      204,021      140,679   -31.0   +0.2      355,038      275,547   -22.4
+ppt-textedit-open  poi/test-data/slideshow/headers_footers.ppt              12800      182,790      130,341   -28.7   +0.2      327,828      261,493   -20.2
+ppt-textedit-open  ole/ppt/empty_textbox.ppt                                11776      173,684      125,734   -27.6   +0.2      315,911      254,769   -19.4
+ppt-textedit-open  est-data/slideshow/bug58144-headers-footers-2003.ppt     11776      174,086      125,814   -27.7   +0.5      319,355      258,308   -19.1
+ppt-textedit-open  ole/ppt/text_shapes.ppt                                  11264      170,269      123,540   -27.4   +0.3      313,675      255,045   -18.7
+ppt-textedit-open  /test-data/slideshow/Password_Protected-56-hello.ppt     10752      165,372      120,978   -26.8   +0.4      305,086      249,167   -18.3
+ppt-textedit-open  poi/test-data/slideshow/Password_Protected-hello.ppt     10752      166,203      120,718   -27.4   -0.5      305,199      249,200   -18.3
+ppt-textedit-open  /test-data/slideshow/Password_Protected-np-hello.ppt     10752      166,006      121,162   -27.0   -0.1      305,249      249,317   -18.3
+ppt-textedit-open  poi/test-data/slideshow/WithComments.ppt                 10752      166,704      121,224   -27.3   -0.1      308,999      253,236   -18.0
+ppt-textedit-open  ole/ppt/empty.ppt                                        10240      163,322      120,660   -26.1   +0.5      311,038      257,752   -17.1
+ppt-textedit-open  rc/main/resources/org/apache/poi/hslf/data/empty.ppt     10240      164,528      121,228   -26.3   +0.9      313,667      260,487   -17.0
+ppt-textedit-open  poi/test-data/slideshow/incorrect_slide_order.ppt         9728      156,406      116,498   -25.5   +1.0      294,924      244,089   -17.2
+
+cycles                 median  -36.6%  min  -48.0%  max  -25.5%  n=38
+instructions           median  -29.0%  min  -47.6%  max  -17.0%  n=38
+A/A cycles (floor)     median   +0.1%  min   -0.5%  max   +1.0%  n=38
