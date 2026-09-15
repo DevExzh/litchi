@@ -1,0 +1,45 @@
+----- fmt
+$ cargo fmt --all --check
+exit=0
+
+----- clippy
+$ cargo clippy -p litchi-cfb -p litchi-core -p litchi-xls --all-targets --locked
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-ole-common)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.02s
+
+----- test-cfb
+$ cargo test -p litchi-cfb --release --locked
+running 322 tests
+test result: ok. 322 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 13 tests
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+running 6 tests
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 13 tests
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+----- test-parity
+$ cargo test -p litchi-cfb --release --locked -- fat_stream_read_zero_fills_a_truncated_final_sector batched_fat_reads_zero_fill_a_truncated_final_sector direct_open_zero_fills_a_truncated_final_root_sector_like_the_cache
+test file::tests::batched_fat_reads_zero_fill_a_truncated_final_sector ... ok
+test file::tests::fat_stream_read_zero_fills_a_truncated_final_sector ... ok
+test shared::tests::direct_open_zero_fills_a_truncated_final_root_sector_like_the_cache ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+----- doc
+$ cargo doc -p litchi-cfb -p litchi-core -p litchi-xls --no-deps --locked
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-ograph)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-crypto)
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0604/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.76s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0604-gates/doc/litchi_cfb/index.html and 2 other files
+

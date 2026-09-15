@@ -1,0 +1,48 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0604",
+  "title": "The OLE2 whole-stream zero-fill ceiling, measured natively, and the frozen appending-read design",
+  "decision": "design retained, implementation declined on the measured ceiling",
+  "code_state": "no file under crates/ was modified by this batch",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 ranked CFB-1 on a retained callgrind share of 9-32% of DOC and PPT open instructions and wrote its own falsification criterion: falsified if a cycles A/B of the DOC and PPT opens on an owned source sits inside the 4% p50 floor",
+    "measured natively on this host, the zero-fill is 1.88% of the 1.6 MB DOC eager open, 0.57% of the 335 KB DOC eager open, 2.84% of the eager PPT open, 2.68% of the source-backed PPT open and 2.94% of the source-backed XLS open in cycles, and 0.29% to 1.88% in instructions; inside 4% on every fixture, so the criterion is met and the item is declined",
+    "the callgrind share it was ranked on counts rep stosb once per byte: 1,595,476 Ir retained against 44,925 instructions measured natively for the same work on the same fixture, a 35x overstatement",
+    "the safe shape helps only sources that own contiguous bytes; no stable positional API accepts uninitialized memory, so FileSource and every File-backed reader keep today's zero-fill, and those are the routes Package::open, SourceBackedWorkbook::from_path and SourceBackedPackage::from_path take",
+    "the design is written out in full anyway, because twenty-one items in the 0587 queue need a frozen design record and this one is now available without re-deriving it"
+  ],
+  "accepted_evidence": {
+    "byte_counts": "exact bytes zero-filled per open at every u8 zero-fill site in litchi-cfb and at the litchi-xls globals buffer, from instrumented single opens on owned in-memory sources: 1,623,070 for the 1.6 MB DOC eager open (1,595,422 of it three slurped streams), 323,850 for the 335 KB DOC, 360,903 for the eager PPT, 322,788 for the source-backed PPT, 565,713 for the source-backed XLS (551,377 of it the XLS globals buffer across 20 fills, and no CFB stream slurp at all)",
+    "native_cycles": "perf stat cycles and instructions per operation for the five opens and for the memset, zero+copy, append and allocation-only micro-benchmarks at each fixture's byte counts; isolation pairs at 10 and 110 samples, median of 11 repetitions, taskset -c 19",
+    "aa_floor": "two A/A controls in the same window: 0.44% and 0.29% apart on the isolation-pair cycle metric, and a wall-clock paired A/A of 60 samples per leg in A1 B1 B2 A2 order whose p50 legs differ by -0.06%, +0.00% and +0.26%",
+    "gates": "cargo fmt --all --check, clippy on litchi-cfb, litchi-core and litchi-xls with all targets, cargo test -p litchi-cfb (322 + 13 + 6 + 12 passed, 0 failed), the three named truncated-final-sector parity tests, and cargo doc on the three crates, all on the clean worktree at the base commit"
+  },
+  "accepted_costs": {
+    "ceiling_not_delta": "every percentage is a micro-benchmark of the same byte counts divided by a measured open, so it bounds the term rather than measuring it in place; the realizable saving is strictly smaller and is not measured, because nothing was implemented",
+    "owned_sources_only": "every open measured wraps bytes already in memory; no file-backed leg exists because the design cannot change one",
+    "warm_heap": "the slurp micro-benchmarks allocate and free in a tight loop, so the allocator reuses a warm block after the first iterations; their absolute figures are warm-heap numbers, equally so on both legs",
+    "shared_host": "seven other agents were building and measuring on the same 32-core host throughout; the XLS A/A p95 and p99 are 1.8x to 2.2x its p50 on both legs because of it"
+  },
+  "known_gaps": {
+    "corpus": "no OLE2 fixture above 1.6 MB, none with a DIFAT sector and none with 4,096-byte sectors exists in this repository (0587's census over 212 fixtures); a synthetic large or v4 fixture could move the ceiling and none was built",
+    "selectors": "no registered perf-baseline selector times a DOC or PPT open, so the opens were measured through a scratch probe with path dependencies, retained in this packet",
+    "unproven_design_part": "Part 3a of the design replaces read_exact with take().read_to_end() on the eager reader, which reports a short read as Ok(n) where read_exact raises UnexpectedEof; its error-identity proof over the malformed corpus is the first thing a future batch must do",
+    "not_sized": "the try_reserve_exact realloc pattern in GlobalsBuffer::ensure is recorded as a mechanism with no size; whether it costs a copy per fill depends on whether the allocator can mremap the block"
+  },
+  "withheld": [
+    "any speedup, regression, file-backed, range-source, cold-cache, peak-RSS, allocation-count, concurrency-scaling or cross-platform result",
+    "any statement about DOC, PPT or XLS opens outside the five fixtures named",
+    "any conclusion about CFB-2 to CFB-6, XLS-6 or the other items 0587 ranks near this one"
+  ],
+  "provenance": {
+    "base_commit": "f8cf7d2a1d155615ab97eda6310c3d5ced0b82ae",
+    "branch": "perf/0604-cfb-append-reads-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, perf available",
+    "measured_cpu": 19,
+    "probe_sha256": "de22ca1072e97c9f69c878b9e08f871f37d093931e84b2d931d5c1dbccf82fae",
+    "note": "all work was done in a detached worktree with its own target directory; the instrumentation used for the byte counts was applied, captured and reverted, and the tree was verified clean before the gates and the commit"
+  }
+}

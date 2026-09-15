@@ -919,6 +919,11 @@ Risk medium; frozen design record, no ADR. Falsified if a cycles A/B of the DOC
 and PPT opens on an owned source sits inside the 4% p50 floor — plausible, since
 a 1.6 MB `memset` is 60-80 µs on this host against an open of 1-2 ms; the
 callgrind share is a `rep stosb` upper bound.
+**Resolved by change 0604:** the ceiling measured natively is 0.57-2.94% of
+open cycles on every fixture (the retained 32.15% `memset` share of the 1.6 MB
+DOC open retires as 44,925 instructions, a 35× overstatement of `rep stosb`),
+and it is exactly zero on `FileSource`; CFB-1 and XLS-7 are declined and the
+appending design is frozen for a corpus this repository does not contain.
 
 **CFB-2. A copy-through writer for length-changing OLE2 saves** (steps 1 and 2;
 GOAL's "LEGACY CFB-SPECIFIC WORK"). `OleWriter` (`writer/core.rs:250-1222`) is a

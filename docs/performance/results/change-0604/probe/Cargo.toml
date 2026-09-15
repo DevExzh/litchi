@@ -1,0 +1,21 @@
+[workspace]
+
+[package]
+name = "cfb-zero-fill-ceiling"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "cfb_zero_fill_ceiling"
+path = "src/main.rs"
+
+[dependencies]
+litchi-core = { path = "<REPO-ROOT>/crates/litchi-core" }
+litchi-cfb  = { path = "<REPO-ROOT>/crates/litchi-cfb" }
+litchi-doc  = { path = "<REPO-ROOT>/crates/litchi-doc" }
+litchi-ppt  = { path = "<REPO-ROOT>/crates/litchi-ppt" }
+litchi-xls  = { path = "<REPO-ROOT>/crates/litchi-xls" }
+
+[profile.release]
+debug = 1

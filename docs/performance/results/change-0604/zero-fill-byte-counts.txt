@@ -1,0 +1,55 @@
+# change 0604: zero-filled bytes per open, counted at every u8 zero-fill site
+# base f8cf7d2a1d155615ab97eda6310c3d5ced0b82ae + zero-fill-count-instrumentation.patch
+# one open per run, OWNED in-memory source, release build
+# sites: ZF_EAGER_FATSTREAM = OleFile::read_stream_from_fat (file.rs:2133)
+#        ZF_SHARED_FATSTREAM = SharedOleFile::read_fat_stream (shared.rs:2427)
+#        ZF_DIRDATA = directory stream buffer (file.rs:1025)
+#        ZF_BATCH_ALLOC = sector_batch_scratch allocation (file.rs:1684)
+#        ZF_RUN_FILL = read_sector_run_into's per-run refill (file.rs:1744)
+#        ZF_XLS_GLOBALS = litchi-xls GlobalsBuffer::ensure resize (workbook/source.rs:1647)
+
+## DOC eager  ca.kwsymphony...doc (1,619,457 B)
+   TOTAL                  bytes=1623070
+   ZF_BATCH_ALLOC         calls=2     bytes=13312
+   ZF_DIRDATA             calls=1     bytes=1024
+   ZF_EAGER_FATSTREAM     calls=3     bytes=1595422
+   ZF_RUN_FILL            calls=2     bytes=13312
+   per-stream sizes:
+     697827,     893499,     4096
+
+## DOC eager  FloatingPictures.doc (335,360 B)
+   TOTAL                  bytes=323850
+   ZF_BATCH_ALLOC         calls=2     bytes=2560
+   ZF_DIRDATA             calls=1     bytes=2048
+   ZF_EAGER_FATSTREAM     calls=3     bytes=315658
+   ZF_RUN_FILL            calls=4     bytes=3584
+   per-stream sizes:
+     38775,     21575,     255308
+
+## PPT eager  45543.ppt (385,024 B)
+   TOTAL                  bytes=360903
+   ZF_BATCH_ALLOC         calls=1     bytes=3072
+   ZF_DIRDATA             calls=1     bytes=1024
+   ZF_EAGER_FATSTREAM     calls=3     bytes=353735
+   ZF_RUN_FILL            calls=1     bytes=3072
+   per-stream sizes:
+     311524,     4096,     38115
+
+## PPT shared 45543.ppt (385,024 B)
+   TOTAL                  bytes=322788
+   ZF_BATCH_ALLOC         calls=1     bytes=3072
+   ZF_DIRDATA             calls=1     bytes=1024
+   ZF_RUN_FILL            calls=1     bytes=3072
+   ZF_SHARED_FATSTREAM    calls=2     bytes=315620
+   per-stream sizes:
+     311524,     4096
+
+## XLS shared ConditionalFormattingSamples.xls (1,402,368 B)
+   TOTAL                  bytes=565713
+   ZF_BATCH_ALLOC         calls=2     bytes=1024
+   ZF_DIRDATA             calls=1     bytes=1536
+   ZF_RUN_FILL            calls=23    bytes=11776
+   ZF_XLS_GLOBALS         calls=20    bytes=551377
+   per-stream sizes:
+
+
