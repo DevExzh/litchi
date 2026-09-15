@@ -1,5 +1,49 @@
 # Performance hotspot inventory
 
+## 0599 — XLSB cell-value commit: one workbook parse instead of two, none for a proven no-op
+
+Survey item XLSB-1 (rank 19 of change 0587) is implemented in full, and it is
+the first XLSB *performance* record in the program — all sixteen prior XLSB
+records (0304–0376) are correctness records. `Workbook::apply_cell_values`
+cloned its package and reparsed the entire eager `Workbook` unconditionally,
+including when the callee had just proved the patch reproduced the stored
+worksheet bytes exactly; a real edit took **three** `OpcPackage` clones, one
+worksheet-blob copy and **two** independent full parses of byte-identical
+candidate bytes, discarding the first after validating against it. The callee is
+now a crate-private `apply_retaining_parse` returning `Applied::Unchanged` or
+`Applied::Published{snapshot, workbook}`: a proven no-op clones nothing and
+parses nothing, and a real edit publishes the very parse that
+`validate_dependencies` ran against. Instructions per commit fall
+**52,308,801 → 29,325,884 (−43.94%)** for `noop_transaction_commit_save` and
+**78,314,813 → 54,162,314 (−30.84%)** for `edit_one_existing_scalar_save` on
+`testVarious.xlsb`. The per-symbol difference is *identical to the instruction*
+between the two cases, which is the signature of exactly one
+`from_opc_package_with_external_link_limits` removed in each; the 1,169,582 Ir by
+which they differ is the edit path's two extra clones and its blob copy, and
+package clones are cheap only because `BlobPart` holds `Arc<Vec<u8>>`. Paired
+timing (A1 B1 B2 A2 plus an A/A pair, 40 samples a leg, CPU 17) gives p50
+**−46.43%**, **−31.40%** and **−29.38%** for the three commit cases on
+`testVarious.xlsb` and −9.69%, −9.69%, −8.29% on `cond_format.xlsb`. Every commit
+case moved down on every fixture and nothing regressed above the review
+threshold: the largest positive p50 delta in the 32 case×fixture cells is +1.93%,
+on an untouched read path. The saving tracks a workbook's **feature
+surface**, not its size: it is the cost of one eager parse, dominated by the XML
+of drawings, pivot caches, tables, chart sheets and connections, so it is 44% of
+a no-op commit on the feature-rich 22.7 KB real producer and 7% on a
+feature-free 324 KB synthetic. Change 0587 named the corpus ceiling — 22,715
+bytes, one sheet, 48 cells — as the blocker for every XLSB scaling question;
+this change lifts it with a checked-in generator
+(`tools/perf-baseline/src/bin/xlsb_synthetic_fixture.rs`) rather than a
+checked-in blob, and the 4-sheet, 90,000-cell fixture it produces is what shows
+that the saving does **not** scale with cell count. What remains ranked in this
+area: `cell_values::root`'s two sibling sites still reparse a second time and
+have no harness selector; XLSB-2 stays frozen behind 0581's ADR; XLSB-3 stays
+ADR 0005-blocked; and a **large real-producer `.xlsb`** is still absent, which
+is now the one measurement that would turn this change's 7%–44% range into a
+number.
+[Change 0599](0599-xlsb-commit-single-parse.md);
+[evidence](results/change-0599/README.md); `performance_claim: none`.
+
 ## 0593 — OPC publication reuses the open-time relationship proof
 
 Retained implementation of 0587's SAVE-1 and SAVE-2. The publication plan

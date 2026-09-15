@@ -1,5 +1,38 @@
 # Performance optimization ADR-compliance matrix
 
+## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
+
+Change 0599 tightens, rather than relaxes, the ADR 0003 publication boundary for
+XLSB cell-value commits. ADR 0003 requires that "public format editors publish
+only after their staged CRUD operation and typed readback succeed"; the new
+`apply_retaining_parse` takes the package by shared reference and builds its
+candidate in a local, so every refusal on the way — the missing or non-worksheet
+part, the stale patch, the candidate parse, the candidate worksheet-URI lookup,
+the typed worksheet decode, and `validate_dependencies` — returns before anything
+the caller owns has been touched, and the single assignment that publishes is the
+last statement executed. The old shape mutated the callee's `&mut OpcPackage`
+argument one statement earlier. Two properties are asserted rather than argued:
+an in-crate test destructures `Workbook` **exhaustively** — so a field added later
+will not compile until the projection covers it — and proves that after a real
+edit the published workbook equals a fresh
+`from_opc_package_with_external_link_limits` over the bytes it published, and
+that after an exact no-op the workbook is both unchanged and still equal to a
+fresh parse of its own package; a third test proves a refused publication leaves
+that projection identical. At the public boundary, two further tests prove that
+an exact no-op publication and a refused publication each save a **byte-identical
+package**, which is the ADR 0006 preservation obligation, and the 17-artifact
+differential extends that to every `.xlsb` in the corpus, including the exact
+typed refusal string. No public signature changed; the two new items are
+`pub(crate)`. No `unsafe` was added, no limit relaxed and no malformed-input
+defence weakened: `entries.try_reserve(1)` per cell, `Cursor::guard`,
+`raw::record::Limits`, `cell_values::Limits`, `litchi_opc::ReadLimits` and
+`ExternalLinkLimits` are untouched, and the harness re-proves the last three
+refuse on every fixture in every leg. One question is raised and **not** answered:
+`Workbook::apply_sparklines` and `Workbook::apply_cell_watches` publish straight
+into `&mut self.package` and never refresh the derived workbook fields at all,
+which is a different shape from the boundary this change tightened. See
+[Change 0599](0599-xlsb-commit-single-parse.md); `performance_claim: none`.
+
 ## 0593 — preservation provenance stays planning evidence
 
 ADR 0005's 2026-08-21 amendment holds: the open-time relationship capture is used

@@ -1,0 +1,50 @@
+# change 0599 paired timing, 40 samples/leg after 3 warmups, taskset -c 17
+# before = A1+A2 pooled, after = B1+B2 pooled, A/A control = A3 vs A4
+
+## fixture poi: testVarious.xlsb 22715 B, 1 sheets, 48 stored cells on the selected sheet, 17 parts
+case                                              A p50     B p50     B-A%    A mean    B mean     A p95     B p95     A p99     B p99   AA12%   AA34%
+open_identify                                     2.956     2.853    -3.49     2.941     2.861     3.009     2.908     3.016     2.916   -2.89   -0.08
+worksheet_catalog                                 1.575     1.529    -2.90     1.570     1.532     1.605     1.568     1.611     1.576   -3.22   -0.06
+selected_worksheet_cell                           1.592     1.536    -3.54     1.579     1.539     1.610     1.574     1.613     1.590   -3.17   +0.39
+full_stored_cell_scan                             1.580     1.539    -2.60     1.581     1.546     1.602     1.596     1.609     1.603   -1.96   +0.70
+full_text                                         0.143     0.142    -0.26     0.146     0.146     0.167     0.162     0.178     0.190   -0.84   -1.47
+noop_transaction_commit_save                      2.926     1.567   -46.43     2.924     1.573     2.973     1.616     2.983     1.625   -1.80   -0.65
+edit_one_existing_scalar_save                     4.392     3.013   -31.40     4.395     3.016     4.484     3.075     4.495     3.084   -0.90   -0.65
+edit_ceil_one_percent_existing_cells_save         4.340     3.065   -29.38     4.343     3.058     4.393     3.106     4.481     3.113   +0.31   -0.58
+output sha256 identical across every leg: True
+
+## fixture cond: cond_format.xlsb 8253 B, 1 sheets, 16 stored cells on the selected sheet, 8 parts
+case                                              A p50     B p50     B-A%    A mean    B mean     A p95     B p95     A p99     B p99   AA12%   AA34%
+open_identify                                     0.117     0.118    +1.48     0.118     0.120     0.125     0.127     0.133     0.137   -1.55   -0.32
+worksheet_catalog                                 0.078     0.079    +1.34     0.079     0.080     0.087     0.088     0.091     0.097   -0.56   +0.85
+selected_worksheet_cell                           0.080     0.080    +0.62     0.081     0.081     0.087     0.086     0.088     0.088   +0.19   -0.87
+full_stored_cell_scan                             0.080     0.080    +0.53     0.080     0.081     0.086     0.086     0.087     0.087   +0.13   -0.83
+full_text                                         0.067     0.069    +1.93     0.069     0.070     0.078     0.078     0.079     0.086   +0.53   +0.41
+noop_transaction_commit_save                      0.095     0.086    -9.69     0.096     0.087     0.105     0.095     0.108     0.097   -1.69   -1.61
+edit_one_existing_scalar_save                     0.170     0.154    -9.69     0.173     0.156     0.186     0.167     0.189     0.176   -1.04   +0.16
+edit_ceil_one_percent_existing_cells_save         0.166     0.152    -8.29     0.168     0.154     0.177     0.163     0.179     0.167   -0.61   -0.04
+output sha256 identical across every leg: True
+
+## fixture syn_small: synthetic-4x500x8.xlsb 63635 B, 4 sheets, 3750 stored cells on the selected sheet, 13 parts
+case                                              A p50     B p50     B-A%    A mean    B mean     A p95     B p95     A p99     B p99   AA12%   AA34%
+open_identify                                     0.522     0.511    -2.26     0.524     0.512     0.540     0.530     0.559     0.536   -0.74   +0.25
+worksheet_catalog                                 0.368     0.364    -1.21     0.369     0.364     0.378     0.372     0.382     0.375   -0.51   -0.12
+selected_worksheet_cell                           0.585     0.569    -2.67     0.585     0.570     0.593     0.577     0.597     0.580   -1.22   -7.04
+full_stored_cell_scan                             0.585     0.570    -2.66     0.585     0.570     0.592     0.577     0.596     0.580   -0.87   -7.26
+full_text                                         4.756     4.711    -0.94     4.755     4.686     4.804     4.748     4.828     4.787   -0.88   -0.22
+noop_transaction_commit_save                      2.002     1.844    -7.90     2.001     1.850     2.030     1.883     2.046     1.892   -0.58   -4.23
+edit_one_existing_scalar_save                     4.216     4.016    -4.76     4.210     4.022     4.302     4.106     4.313     4.151   -2.03   -0.69
+edit_ceil_one_percent_existing_cells_save         4.302     4.088    -4.98     4.285     4.088     4.421     4.125     4.462     4.169   -3.74  -10.04
+output sha256 identical across every leg: True
+
+## fixture syn_large: synthetic-4x2000x12.xlsb 323710 B, 4 sheets, 22500 stored cells on the selected sheet, 13 parts
+case                                              A p50     B p50     B-A%    A mean    B mean     A p95     B p95     A p99     B p99   AA12%   AA34%
+open_identify                                     2.158     2.075    -3.82     2.169     2.075     2.252     2.089     2.255     2.097   -1.69   +1.08
+worksheet_catalog                                 1.635     1.555    -4.89     1.634     1.556     1.644     1.568     1.657     1.569   +0.61   +0.56
+selected_worksheet_cell                           3.132     3.121    -0.36     3.124     3.078     3.181     3.255     3.192     3.276   -1.77   +1.23
+full_stored_cell_scan                             3.152     3.132    -0.62     3.131     3.075     3.193     3.227     3.215     3.251   -2.98   +0.80
+full_text                                        30.434    29.692    -2.44    30.943    29.770    34.136    31.093    35.788    31.588   -6.61   -1.90
+noop_transaction_commit_save                     14.388    14.157    -1.60    14.352    14.189    14.755    14.542    14.931    14.655   +2.32   -0.40
+edit_one_existing_scalar_save                    29.751    29.009    -2.49    29.753    29.025    30.194    29.618    30.474    29.814   +0.10   +1.00
+edit_ceil_one_percent_existing_cells_save        32.540    31.771    -2.36    32.605    31.779    33.195    32.181    33.255    32.249   +0.67   -0.06
+output sha256 identical across every leg: True

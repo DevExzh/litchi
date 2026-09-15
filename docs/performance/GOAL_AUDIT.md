@@ -1,5 +1,28 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0599: an XLSB cell-value commit parses the workbook once, not twice — and a proven no-op parses it not at all
+
+Record: [0599](0599-xlsb-commit-single-parse.md).
+
+| priority | item | what it needs |
+| --- | --- | --- |
+| P1 (progressed) | Finish source-backed CRUD adoption across formats — the XLSB publication half | Change 0599 removes the duplicated whole-workbook readback from the XLSB cell-value commit and skips it entirely for a proven no-op, the first XLSB performance evidence in the program. What stays open is unchanged by it: XLSB cell reads still go through the eager `OpcPackage` door (0581's frozen ADR question), `SourceBackedWorkbook` still feeds only a sequential text writer, and the publication path for `apply_workbook_structure`, `apply_sparklines` and `apply_cell_watches` is unmeasured because **no harness selector opens it**. Registering one is the prerequisite for finishing the pattern in this crate. |
+| P1 (progressed) | Cover the high-impact CRUD categories and real producers — XLSB corpus ceiling | The ceiling change 0587 recorded (largest `.xlsb` 22,715 bytes, one sheet, 48 stored cells, so a one-cell read and a full scan are 0.3% apart) is now liftable on demand: `tools/perf-baseline`'s `xlsb_synthetic_fixture` generates a deterministic workbook of any shape through the public writer and proves it reopens before writing it. Change 0599 measured 4-sheet fixtures of 15,000 and 90,000 cells with it. The gap it does **not** close is a *real-producer* large `.xlsb`: the generator emits no pivot cache, table, chart sheet, drawing, connection, external link or VBA project, which is exactly the surface whose parsing dominates the figures. Change 0599's saving therefore has a measured range, 7%–44%, and no single number. |
+
+Supporting note for the audit body: change 0599 is a GOAL step 1 result —
+*eliminate unnecessary work* — and its evidence separates the two methods rather
+than leaning on either. The five `xlsb_crud` read-only cases never reach
+`apply_cell_values`, so their paired delta (−3.54% to +1.93%) bounds drift and
+code layout in the same window; subtracting that offset from the no-op delta
+gives about −43% against the deterministic −43.94% of instructions. That window's
+A/A floor was **worse than the host's standing figure** — |p50| median 0.84%,
+p90 3.22%, max 10.04% over 64 control pairs — and the record respects it: the two
+synthetic fixtures' commit deltas fall inside it and **nothing is claimed from
+their timing**. No allocation, RSS, syscall, cold-cache, physical-device or
+cross-platform measurement was taken; three allocations per commit are removed by
+construction and none was counted, because `xlsb_crud` still has no
+allocator-metrics hookup.
+
 ## 0593 — unchanged-member preservation stops paying for discarded work
 
 Retained implementation against the audit's standing "close ZIP64/CFB and

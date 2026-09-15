@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0599",
+  "title": "An XLSB cell-value commit parses the workbook once, not twice, and a proven no-op parses it not at all",
+  "decision": "retained, implemented",
+  "code_state": "crates/litchi-xlsb/src/cell_values/workbook.rs and crates/litchi-xlsb/src/workbook/package.rs changed; tests added in crates/litchi-xlsb/src/workbook/tests.rs and crates/litchi-xlsb/tests/cell_value_edit.rs; tools/perf-baseline gains one fixture-generator binary",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "implements": "item XLSB-1 (rank 19) of change 0587, in full",
+  "reason_codes": [
+    "an exact no-op cell-value commit cloned the package and reparsed the whole workbook from bytes the callee had just proved byte-identical; both are now skipped and the workbook is kept",
+    "a real edit took three OpcPackage clones, one worksheet-blob copy and two independent full Workbook parses of the same candidate bytes, discarding the first parse after validating against it; the validated parse is now what gets published, so one parse and two clones are gone",
+    "value identity is by construction: from_opc_package_with_external_link_limits is a pure function of the package and the external-link limits, and both branches feed it the same bytes it was fed before",
+    "atomicity is strictly tighter than before, because nothing the caller owns is touched until every check has passed and the single assignment is the last statement",
+    "the public apply and apply_with_external_link_limits keep their signatures, their &mut OpcPackage publication contract and their error identity"
+  ],
+  "accepted_evidence": {
+    "instruction_counts": "callgrind isolation pairs at 5 and 15 samples, differenced over 10, pinned to CPU 17: testVarious.xlsb no-op 52,308,801 -> 29,325,884 Ir/op (-43.94%), one-cell edit 78,314,813 -> 54,162,314 (-30.84%); synthetic-4x2000x12.xlsb no-op 188,809,497 -> 175,541,374 (-7.03%), edit 357,557,295 -> 343,509,287 (-3.93%)",
+    "mechanism_attribution": "the per-symbol difference on testVarious.xlsb is identical to the instruction between the no-op case and the edit case (mce::codec::BoundedOutput::extend_from_slice -71,907,399 in both over ten extra samples, and likewise for realloc, RawVecInner::finish_grow, quick_xml attributes and mce::codec::esc), which is the signature of exactly one Workbook parse removed in each; the 1,169,582 Ir by which the two cases differ is the edit path's two extra Arc-sharing package clones and its worksheet-blob copy",
+    "paired_timing": "order A1 B1 B2 A2 plus an A3/A4 A-A control pair in the same window, 40 samples per leg after 3 warmups, all 8 xlsb_crud cases on 4 fixtures; testVarious.xlsb p50 no-op -46.43%, one edit -31.40%, ceil(1%) edits -29.38%; cond_format.xlsb -9.69%, -9.69%, -8.29%; every commit case moved down on every fixture and the largest positive p50 delta in the 32 case-by-fixture cells is +1.93%, on an untouched read path, against a 5% review trigger",
+    "in_run_control": "the five read-only cases never reach apply_cell_values and moved -3.54% to +1.93%, bounding drift and code layout; subtracting that offset from the no-op delta gives about -43% against the deterministic -43.94% of instructions",
+    "differential": "17 artifact paths (all 15 .xlsb fixtures under test-data/, two of which are byte-identical copies, plus two synthetic), 35 worksheets: catalogs, per-worksheet snapshot and cell digests, an exact no-op commit and a real scalar edit per worksheet with published digests, saved-package digests and readbacks, and one refused publication per artifact with its typed error and a byte-identity check; the two legs' reports are byte-identical",
+    "harness_gates": "192 observations across 6 legs x 4 fixtures x 8 cases: every applicable xlsb_crud gate true, changed package members empty for every no-op case and exactly one worksheet part for every edit case, output SHA-256 identical across all six legs",
+    "tests": "three in-crate tests over an exhaustively destructured whole-Workbook projection (no-op publishes nothing and stays a parse of its own package; a real edit installs a workbook equal to a fresh parse of the published bytes; a refusal leaves the projection unchanged) and two public-boundary byte-identity tests"
+  },
+  "accepted_costs": {
+    "aa_floor": "this window's A-A floor is worse than the host's standing figure: over 64 control pairs, |p50 delta| median 0.84%, p90 3.22%, max 10.04%; |p99 delta| median 1.75%, p90 10.57%, max 31.59%",
+    "not_separable": "on synthetic-4x500x8.xlsb (-7.90%, -4.76%, -4.98%) and synthetic-4x2000x12.xlsb (-1.60%, -2.49%, -2.36%) the commit deltas are inside that fixture's own A-A range or the same size as its untouched read-only drift; nothing is claimed from their timing",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software, and the per-op figure includes the harness's own out-of-band output hashing, which is constant across legs",
+    "corpus": "the saving tracks a workbook's feature surface rather than its size; on the feature-rich 22.7 KB real producer it is 44% of a no-op commit and save, on a feature-free 324 KB synthetic 7%. No large real-producer .xlsb exists in this corpus, so the figure for one is unknown and bounded by those two"
+  },
+  "known_gaps": {
+    "unmeasured_resources": "bytes read, syscalls, peak RSS and allocation counts; allocations are removed by construction (a whole parse and one package clone on the no-op path; a parse, two package clones and one worksheet-blob copy on the edit path) but none was counted, and xlsb_crud has no allocator-metrics hookup",
+    "sibling_sites": "cell_values::root::insert_candidate_cell (root.rs:233) and transfer_cell (root.rs:1253) still reparse the package a second time into *workbook after calling apply_with_external_link_limits; each would lose one further parse by taking Applied::Published directly. They are reached only through apply_workbook_structure, for which no harness selector exists, so they were left unmeasured rather than changed unmeasured",
+    "unanswered_question": "Workbook::apply_sparklines and Workbook::apply_cell_watches publish straight into &mut self.package and never refresh the derived workbook fields; whether that is intended is a correctness question this record does not answer",
+    "synthetic_fixtures": "producer-free: no pivot cache, structured table, chart sheet, drawing, connection, external link or VBA project. They answer whether the commit path scales with cell count and nothing about real-producer feature surface"
+  },
+  "withheld": [
+    "any speedup, regression, cold-cache, physical-device, range-source, peak-RSS, allocation-profile, concurrency-scaling or cross-platform result",
+    "any timing statement about the two synthetic fixtures, whose deltas fall inside this window's A-A floor"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec39a4fbcfd7dbb4e59cdd44e4ed99c8",
+    "branch": "perf/0599-xlsb-commit-single-parse",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0, eight agents building concurrently, every measured process pinned to CPU 17",
+    "binaries": {
+      "xlsb_crud_before": "2694b2b95ba2bd7f70403d875096d5199e78f666e8ece319b4b21a8db94a8da5",
+      "xlsb_crud_after": "b1f9d9d2c450607a07a883edd6f2442810b25c96dd84dccf914a6a7151d945e1",
+      "xlsb_commit_differential_before": "f25d38f5a3495b6e23a0f24c3cc449ef8536b347e075935a65d9365f44b0ecdf",
+      "xlsb_commit_differential_after": "23a0870e73fb81a52d89ccd69c120474956b195c354d471ba10de63788bd1020"
+    },
+    "fixtures": {
+      "testVarious.xlsb": "22,715 bytes, 1 sheet, 48 stored cells, 17 parts",
+      "cond_format.xlsb": "8,253 bytes, 1 sheet, 16 stored cells, 8 parts",
+      "synthetic-4x500x8.xlsb": "63,635 bytes, sha256 001028d36186e7fa933db77a669dfb50d76d34dc6607c26d08fdb4fdbb8c2a41, 4 sheets, 3,750 stored cells on the selected sheet, 13 parts; scratch, regenerable from tools/perf-baseline's xlsb_synthetic_fixture",
+      "synthetic-4x2000x12.xlsb": "323,710 bytes, sha256 05ea78ab6117e40d879f07b072d5832c48d8d87486c78fd76f8a6a1ba23caa57, 4 sheets, 22,500 stored cells on the selected sheet, 13 parts; scratch, regenerable"
+    }
+  }
+}

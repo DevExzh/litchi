@@ -1,0 +1,38 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0599/cg/before-noop_transaction_commit_save-poi-15.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 242489768
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud --case noop_transaction_commit_save --warmup 1 --samples 15 --fixture /home/zhuhe/code/litchi-worktrees/0599/test-data/poi/test-data/spreadsheet/testVarious.xlsb --json /dev/null (PID 1631723, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       80
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+1,703,513,735 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+633,409,248 (37.18%)  ???:sha2::sha256::soft::unroll::compress [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+173,423,727 (10.18%)  ???:litchi_ooxml_common::mce::codec::BoundedOutput::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+117,066,272 ( 6.87%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+109,033,386 ( 6.40%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 87,009,440 ( 5.11%)  ???:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 64,491,427 ( 3.79%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 62,902,692 ( 3.69%)  ???:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 59,337,498 ( 3.48%)  ???:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 16,900,723 ( 0.99%)  ???:quick_xml::name::NamespaceResolver::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 16,007,823 ( 0.94%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 14,853,567 ( 0.87%)  ???:zlib_rs::inflate::inflate_fast_help_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0599-before/release/xlsb_crud]
+ 14,239,150 ( 0.84%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+

@@ -1,0 +1,51 @@
+# xlsb_crud's own correctness gates, every leg x fixture x case.
+# The harness exits non-zero on any failed gate; these are the recorded values.
+# null means the gate does not apply to that case (no saved output).
+
+exact_noop_patch                                   None     168 observations
+exact_noop_patch                                   True      24 observations
+malformed_input_refused                            True     192 observations
+output_matches_across_samples                      None     120 observations
+output_matches_across_samples                      True      72 observations
+representative_output_reopen_ok                    None     120 observations
+representative_output_reopen_ok                    True      72 observations
+semantic_readback_ok                               True     192 observations
+sparse_iteration_without_rectangular_expansion     True     192 observations
+tight_cell_limits_refused                          True     192 observations
+tight_limits_refused                               True     192 observations
+unchanged_parts_ok                                 None     120 observations
+unchanged_parts_ok                                 True      72 observations
+
+changed package members, per fixture and case (identical across all six legs):
+  cond       edit_ceil_one_percent_existing_cells_save     ['/xl/worksheets/sheet1.bin']
+  cond       edit_one_existing_scalar_save                 ['/xl/worksheets/sheet1.bin']
+  cond       full_stored_cell_scan                         []
+  cond       full_text                                     []
+  cond       noop_transaction_commit_save                  []
+  cond       open_identify                                 []
+  cond       selected_worksheet_cell                       []
+  cond       worksheet_catalog                             []
+  poi        edit_ceil_one_percent_existing_cells_save     ['/xl/worksheets/sheet1.bin']
+  poi        edit_one_existing_scalar_save                 ['/xl/worksheets/sheet1.bin']
+  poi        full_stored_cell_scan                         []
+  poi        full_text                                     []
+  poi        noop_transaction_commit_save                  []
+  poi        open_identify                                 []
+  poi        selected_worksheet_cell                       []
+  poi        worksheet_catalog                             []
+  syn_large  edit_ceil_one_percent_existing_cells_save     ['/xl/worksheets/sheet1.bin']
+  syn_large  edit_one_existing_scalar_save                 ['/xl/worksheets/sheet1.bin']
+  syn_large  full_stored_cell_scan                         []
+  syn_large  full_text                                     []
+  syn_large  noop_transaction_commit_save                  []
+  syn_large  open_identify                                 []
+  syn_large  selected_worksheet_cell                       []
+  syn_large  worksheet_catalog                             []
+  syn_small  edit_ceil_one_percent_existing_cells_save     ['/xl/worksheets/sheet1.bin']
+  syn_small  edit_one_existing_scalar_save                 ['/xl/worksheets/sheet1.bin']
+  syn_small  full_stored_cell_scan                         []
+  syn_small  full_text                                     []
+  syn_small  noop_transaction_commit_save                  []
+  syn_small  open_identify                                 []
+  syn_small  selected_worksheet_cell                       []
+  syn_small  worksheet_catalog                             []

@@ -21,7 +21,9 @@ use litchi_ooxml_common::web;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -1480,4 +1482,183 @@ fn loads_typed_pivot_cache_definitions_from_package_relationships() {
         })
     );
     assert!(workbook.pivot_cache_definition(99).is_none());
+}
+
+/// Hash every part of an OPC package: its content type, bytes, and declared
+/// relationships, in a stable order.
+fn package_digest(package: &OpcPackage) -> Vec<String> {
+    let mut digests: Vec<String> = package
+        .iter_parts()
+        .map(|part| {
+            let mut hasher = DefaultHasher::new();
+            part.content_type().hash(&mut hasher);
+            part.blob().hash(&mut hasher);
+            let mut relationships: Vec<String> = part
+                .rels()
+                .iter()
+                .map(|relationship| {
+                    format!(
+                        "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                        relationship.r_id(),
+                        relationship.reltype(),
+                        relationship.target_ref(),
+                        relationship.is_external()
+                    )
+                })
+                .collect();
+            relationships.sort();
+            relationships.hash(&mut hasher);
+            format!("{} {:016x}", part.partname().as_str(), hasher.finish())
+        })
+        .collect();
+    digests.sort();
+    digests
+}
+
+/// Render a styles table with its one hash-ordered field sorted, so two
+/// equal tables always project to the same string.
+fn styles_projection(styles: &StylesTable) -> String {
+    let mut num_fmts: Vec<(u32, &String)> = styles
+        .num_fmts
+        .iter()
+        .map(|(id, format)| (*id, format))
+        .collect();
+    num_fmts.sort();
+    let fonts = &styles.fonts;
+    let fills = &styles.fills;
+    let borders = &styles.borders;
+    let cell_xfs = &styles.cell_xfs;
+    let cell_style_xfs = &styles.cell_style_xfs;
+    format!(
+        "fonts={fonts:?} fills={fills:?} borders={borders:?} num_fmts={num_fmts:?} \
+         cell_xfs={cell_xfs:?} cell_style_xfs={cell_style_xfs:?}"
+    )
+}
+
+/// Project every field of a parsed workbook into one comparable string.
+///
+/// The destructuring is exhaustive on purpose: a field added to [`Workbook`]
+/// later will not compile until this projection covers it too.
+fn workbook_projection(workbook: &Workbook) -> String {
+    let Workbook {
+        package,
+        worksheets,
+        worksheet_names,
+        worksheet_positions,
+        worksheet_rel_ids,
+        active_catalog_position,
+        formula_context,
+        external_link_limits,
+        shared_strings,
+        styles,
+        calc,
+        is_1904,
+        pivot_cache_definitions,
+        structured_tables,
+        chart_sheets,
+        sheet_drawings,
+        connections,
+    } = workbook;
+    let package = package_digest(package).join("\n  ");
+    let styles = styles_projection(styles);
+    format!(
+        "package=\n  {package}\nworksheets={worksheets:?}\nworksheet_names={worksheet_names:?}\n\
+         worksheet_positions={worksheet_positions:?}\nworksheet_rel_ids={worksheet_rel_ids:?}\n\
+         active_catalog_position={active_catalog_position:?}\n\
+         formula_context={formula_context:?}\nexternal_link_limits={external_link_limits:?}\n\
+         shared_strings={shared_strings:?}\nstyles={styles}\ncalc={calc:?}\nis_1904={is_1904:?}\n\
+         pivot_cache_definitions={pivot_cache_definitions:?}\n\
+         structured_tables={structured_tables:?}\nchart_sheets={chart_sheets:?}\n\
+         sheet_drawings={sheet_drawings:?}\nconnections={connections:?}"
+    )
+}
+
+/// Parse the package a workbook currently publishes, exactly as the caller of
+/// `apply_cell_values` used to.
+fn reparse_published_package(workbook: &Workbook) -> Workbook {
+    Workbook::from_opc_package_with_external_link_limits(
+        workbook.opc_package().clone(),
+        workbook.external_link_limits(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn exact_noop_cell_value_commit_publishes_nothing() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    );
+    let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
+    let before = workbook_projection(&workbook);
+    let commit = workbook.cell_values(0).unwrap().edit().commit().unwrap();
+    assert!(
+        commit.patch().is_empty(),
+        "the control commit must change no worksheet bytes"
+    );
+
+    let published = workbook.apply_cell_values(0, &commit).unwrap();
+
+    assert_eq!(published.source_bytes(), commit.snapshot().source_bytes());
+    assert_eq!(workbook_projection(&workbook), before);
+    assert_eq!(
+        workbook_projection(&workbook),
+        workbook_projection(&reparse_published_package(&workbook)),
+        "skipping the no-op reparse must leave the workbook a parse of its own package"
+    );
+}
+
+#[test]
+fn cell_value_publication_installs_the_parse_that_validated_it() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    );
+    let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
+    let before = workbook_projection(&workbook);
+
+    let mut edit = workbook.edit_cell_values(0).unwrap();
+    edit.insert(
+        crate::cell_values::Reference::new(10_001, 100).unwrap(),
+        crate::cell_values::StyleIndex::new(0).unwrap(),
+        crate::cell_values::Value::Number(1.0),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_empty());
+
+    workbook.apply_cell_values(0, &commit).unwrap();
+
+    assert_ne!(workbook_projection(&workbook), before);
+    assert_eq!(
+        workbook_projection(&workbook),
+        workbook_projection(&reparse_published_package(&workbook)),
+        "the published parse must be what parsing the published bytes produces"
+    );
+}
+
+#[test]
+fn refused_cell_value_publication_leaves_the_workbook_unchanged() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    );
+    let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
+    let before = workbook_projection(&workbook);
+
+    let mut edit = workbook.edit_cell_values(0).unwrap();
+    edit.insert(
+        crate::cell_values::Reference::new(10_001, 100).unwrap(),
+        crate::cell_values::StyleIndex::new(0x00FF_FFFF).unwrap(),
+        crate::cell_values::Value::Number(1.0),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert!(workbook.apply_cell_values(0, &commit).is_err());
+    assert_eq!(
+        workbook_projection(&workbook),
+        before,
+        "a refused commit must leave the published snapshot exactly as it was"
+    );
 }

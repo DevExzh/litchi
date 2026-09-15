@@ -1,0 +1,14 @@
+[package]
+name = "xlsb-commit-differential-before"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "xlsb_commit_differential"
+path = "src/main.rs"
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-core" }
+litchi-xlsb = { path = "/home/zhuhe/code/litchi-worktrees/before-08d968f8e/crates/litchi-xlsb" }
+sha2 = "0.11"

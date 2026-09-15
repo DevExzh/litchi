@@ -429,3 +429,78 @@ const fn alternate_error(error: CellError) -> CellError {
         CellError::Reference
     }
 }
+
+#[test]
+fn real_fixture_exact_noop_publication_saves_byte_identical_output() {
+    let mut workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let sheet = 0;
+
+    let mut before = Cursor::new(Vec::new());
+    workbook.save(&mut before).expect("save before");
+    let before = before.into_inner();
+    let before_cells: Vec<_> = workbook
+        .cell_values(sheet)
+        .expect("snapshot")
+        .cells()
+        .cloned()
+        .collect();
+
+    let commit = workbook
+        .cell_values(sheet)
+        .expect("snapshot")
+        .edit()
+        .commit()
+        .expect("commit");
+    assert!(commit.patch().is_empty());
+    let published = workbook
+        .apply_cell_values(sheet, &commit)
+        .expect("publish no-op");
+    assert_eq!(published.source_bytes(), commit.snapshot().source_bytes());
+
+    let mut after = Cursor::new(Vec::new());
+    workbook.save(&mut after).expect("save after");
+    assert_eq!(
+        after.into_inner(),
+        before,
+        "an exact no-op publication must not change a single saved byte"
+    );
+    let after_cells: Vec<_> = workbook
+        .cell_values(sheet)
+        .expect("snapshot")
+        .cells()
+        .cloned()
+        .collect();
+    assert_eq!(after_cells, before_cells);
+}
+
+#[test]
+fn real_fixture_refused_publication_saves_byte_identical_output() {
+    let mut workbook =
+        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
+            .expect("workbook");
+    let sheet = 0;
+
+    let mut before = Cursor::new(Vec::new());
+    workbook.save(&mut before).expect("save before");
+    let before = before.into_inner();
+
+    let mut edit = workbook.edit_cell_values(sheet).expect("edit");
+    edit.insert(
+        Reference::new(10_001, 100).expect("reference"),
+        StyleIndex::new(0x00FF_FFFF).expect("wire style"),
+        Value::Number(1.0),
+    )
+    .expect("insert");
+    let commit = edit.commit().expect("commit");
+    assert!(workbook.apply_cell_values(sheet, &commit).is_err());
+
+    let mut after = Cursor::new(Vec::new());
+    workbook.save(&mut after).expect("save after");
+    assert_eq!(
+        after.into_inner(),
+        before,
+        "a refused publication must leave the published workbook byte-identical"
+    );
+}
