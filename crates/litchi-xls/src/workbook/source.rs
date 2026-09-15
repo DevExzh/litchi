@@ -865,6 +865,11 @@ impl SourceBackedWorkbook {
                 .iter()
                 .map(String::as_str)
                 .collect::<Vec<_>>();
+            // One shared-string resolver for the whole document. Its chain
+            // position carries across sheets because every sheet resolves out
+            // of the same string table; a position that does not apply to a
+            // resolve is discarded by the reader, which then walks cold.
+            let mut strings = SharedStringResolver::new(&self.inner, &refs);
             for sheet in self
                 .inner
                 .sheets
@@ -873,7 +878,7 @@ impl SourceBackedWorkbook {
             {
                 check_text_state(&self.inner, execution)
                     .map_err(|source| writer.document_error(source))?;
-                let collected = scan_text_sheet(&self.inner, sheet, &refs, execution)
+                let collected = scan_text_sheet(&self.inner, sheet, &refs, execution, &mut strings)
                     .map_err(|source| writer.document_error(source))?;
                 check_text_state(&self.inner, execution)
                     .map_err(|source| writer.document_error(source))?;
@@ -2433,6 +2438,7 @@ fn scan_text_sheet(
     sheet: &SheetEntry,
     refs: &[&str],
     execution: Option<&ExecutionContext>,
+    strings: &mut SharedStringResolver<'_>,
 ) -> Result<SourceTextSheet> {
     let mut collected = SourceTextSheet::new();
     let mut scan = WorksheetScan::new(
@@ -2503,7 +2509,7 @@ fn scan_text_sheet(
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
-                collect_source_cell(&formula, owner, &mut collected, execution)?;
+                collect_source_cell(&formula, owner, &mut collected, execution, strings)?;
                 continue;
             }
             if !matches!(frame.kind, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
@@ -2547,21 +2553,22 @@ fn scan_text_sheet(
                 ) {
                     pending_formula = Some(cell);
                 } else {
-                    collect_source_cell(&cell, owner, &mut collected, execution)?;
+                    collect_source_cell(&cell, owner, &mut collected, execution, strings)?;
                 }
             },
             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
                 let payload = scan.read_payload(&frame)?;
                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
-                collect_source_cell(&cell, owner, &mut collected, execution)?;
+                collect_source_cell(&cell, owner, &mut collected, execution, strings)?;
             },
             0x00BD => {
                 let payload = scan.read_payload(&frame)?;
                 let mut processing = Ok(());
                 CellRecord::visit_mul_rk(payload, |cell| {
                     if processing.is_ok() {
-                        processing = collect_source_cell(&cell, owner, &mut collected, execution);
+                        processing =
+                            collect_source_cell(&cell, owner, &mut collected, execution, strings);
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
@@ -2572,7 +2579,8 @@ fn scan_text_sheet(
                 let mut processing = Ok(());
                 CellRecord::visit_mul_blank(payload, |cell| {
                     if processing.is_ok() {
-                        processing = collect_source_cell(&cell, owner, &mut collected, execution);
+                        processing =
+                            collect_source_cell(&cell, owner, &mut collected, execution, strings);
                     }
                 })
                 .map_err(SourceBackedError::Parse)?;
@@ -2748,6 +2756,7 @@ fn query_cell(
         .iter()
         .map(String::as_str)
         .collect::<Vec<_>>();
+    let mut strings = SharedStringResolver::new(owner, &refs);
     let mut found = None;
     let mut pending_formula = None;
     let target_row = row as u16;
@@ -2820,6 +2829,7 @@ fn query_cell(
                     target_column,
                     execution,
                     &mut found,
+                    &mut strings,
                 )?;
                 continue;
             }
@@ -2854,6 +2864,7 @@ fn query_cell(
                             target_column,
                             execution,
                             &mut found,
+                            &mut strings,
                         )?;
                     }
                 } else {
@@ -2865,6 +2876,7 @@ fn query_cell(
                         target_column,
                         execution,
                         &mut found,
+                        &mut strings,
                     )?;
                 }
             },
@@ -2880,6 +2892,7 @@ fn query_cell(
                     target_column,
                     execution,
                     &mut found,
+                    &mut strings,
                 )?;
             },
             0x00BD => {
@@ -2895,6 +2908,7 @@ fn query_cell(
                             target_column,
                             execution,
                             &mut found,
+                            &mut strings,
                         );
                     }
                 })
@@ -2914,6 +2928,7 @@ fn query_cell(
                             target_column,
                             execution,
                             &mut found,
+                            &mut strings,
                         );
                     }
                 })
@@ -2937,10 +2952,43 @@ fn finish_query(
     Ok(found)
 }
 
+/// The per-scan state `resolve_shared_string` would otherwise rebuild on every
+/// string cell.
+///
+/// One sheet scan resolves one shared string per `LabelSst` -- 658 times on
+/// `ConditionalFormattingSamples.xls`, 16,055 times on `54016.xls` -- and each
+/// of those calls was rebuilding the workbook stream path into a fresh `Vec`
+/// and walking the `Workbook` allocation chain from its **first** sector to
+/// reach the string table. Both are per-scan constants, so both live here.
+///
+/// The chain position is dedicated to the SST region and is deliberately
+/// **not** shared with the worksheet scan's own cursor. A hint retains one
+/// position, and the worksheet cursor sits permanently past the string table:
+/// one hint serving both would be discarded as a backward step by every
+/// resolve and again by every sheet, and would save nothing on either path.
+struct SharedStringResolver<'a> {
+    /// The workbook stream path, borrowed for the whole scan.
+    path: &'a [&'a str],
+    /// Allocation-chain position of the last resolved entry. Empty before the
+    /// first resolve; a hint that does not apply is ignored by the reader,
+    /// which then walks from the stream's first sector exactly as before.
+    chain: StreamChainHint<'a>,
+}
+
+impl<'a> SharedStringResolver<'a> {
+    fn new(owner: &'a SourceInner, path: &'a [&'a str]) -> Self {
+        Self {
+            path,
+            chain: owner.cfb.chain_hint(),
+        }
+    }
+}
+
 fn resolve_shared_string(
     owner: &SourceInner,
     string_index: u32,
     execution: Option<&ExecutionContext>,
+    strings: &mut SharedStringResolver<'_>,
 ) -> Result<litchi_core::sheet::CellValue> {
     if owner.sst.segments.is_empty() {
         return Ok(litchi_core::sheet::CellValue::Error(
@@ -2992,14 +3040,9 @@ fn resolve_shared_string(
         .source_offset
         .checked_add((location.start - first.logical_offset) as u64)
         .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))?;
-    let refs = owner
-        .workbook_path
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
     let mut cursor = owner
         .cfb
-        .stream_cursor_at(&refs, first_offset)
+        .stream_cursor_at_hinted(strings.path, first_offset, &mut strings.chain)
         .map_err(SourceBackedError::from)?;
     let mut chunks = Vec::<Vec<u8>>::new();
     chunks
@@ -3076,6 +3119,7 @@ fn decode_source_cell(
     owner: &SourceInner,
     formatting: &Formatting,
     execution: Option<&ExecutionContext>,
+    strings: &mut SharedStringResolver<'_>,
 ) -> Result<Option<(u16, u16, litchi_core::sheet::CellValue)>> {
     formatting
         .validate_cell_xf(cell_xf_index(record))
@@ -3090,7 +3134,7 @@ fn decode_source_cell(
                 "Invalid SST index: {string_index} (max: 0)"
             ))
         } else {
-            resolve_shared_string(owner, string_index, execution)?
+            resolve_shared_string(owner, string_index, execution, strings)?
         }
     } else {
         cell.value().clone()
@@ -3103,15 +3147,20 @@ fn collect_source_cell(
     owner: &SourceInner,
     collected: &mut SourceTextSheet,
     execution: Option<&ExecutionContext>,
+    strings: &mut SharedStringResolver<'_>,
 ) -> Result<()> {
     if let Some((row, column, value)) =
-        decode_source_cell(record, owner, &owner.formatting, execution)?
+        decode_source_cell(record, owner, &owner.formatting, execution, strings)?
     {
         collected.insert(row, column, value, owner.limits)?;
     }
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one cell visitor with an explicit per-scan shared-string resolver"
+)]
 fn process_cell(
     record: &CellRecord,
     owner: &SourceInner,
@@ -3120,6 +3169,7 @@ fn process_cell(
     target_column: u16,
     execution: Option<&ExecutionContext>,
     found: &mut Option<SourceBackedCell>,
+    strings: &mut SharedStringResolver<'_>,
 ) -> Result<()> {
     formatting
         .validate_cell_xf(cell_xf_index(record))
@@ -3132,7 +3182,7 @@ fn process_cell(
         return Ok(());
     };
     let value = if let Some(string_index) = cell.shared_string_index() {
-        resolve_shared_string(owner, string_index, execution)?
+        resolve_shared_string(owner, string_index, execution, strings)?
     } else {
         cell.value().clone()
     };

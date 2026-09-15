@@ -1,0 +1,727 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/out-docppt/cg/pptsmall-text-s320.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 65866006
+Trigger: Program termination
+Profiled target:  /tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile --input /home/zhuhe/code/litchi/test-data/ole/ppt/SampleShow.ppt --format ppt --operation text --warmups 1 --samples 320 (PID 296028, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99.5
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+143,020,928 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+
+17,543,190 (12.27%)  < ???:litchi_ppt::records::record::Record::parse_impl (4,173x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+10,227,006 ( 7.15%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (63,879x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,562,307 ( 1.09%)  < ???:litchi_cfb::directory_name::directory_name_data (100,794x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   452,714 ( 0.32%)  < ???:0x0000000004ab9680 (10,947x) [???]
+   327,420 ( 0.23%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (10,914x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   269,640 ( 0.19%)  < ???:<std::fs::File>::metadata (8,988x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    86,670 ( 0.06%)  < ???:alloc::vec::Vec<T,A>::resize (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    77,040 ( 0.05%)  < ???:litchi_cfb::file::try_push (2,568x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,249 ( 0.04%)  < ???:alloc::str::join_generic_copy (3,531x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    47,502 ( 0.03%)  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    28,890 ( 0.02%)  < ???:litchi_ppt::package::source::SourceBackedPackage::from_read_at_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,964 ( 0.02%)  < ???:<alloc::string::String as core::fmt::Write>::write_str (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    20,865 ( 0.01%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    20,865 ( 0.01%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    20,865 ( 0.01%)  < ???:ole_doc_ppt_profile::main (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    17,976 ( 0.01%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    16,692 ( 0.01%)  < ???:litchi_ppt::presentation::model::Presentation::text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    12,519 ( 0.01%)  < ???:litchi_ppt::text::extractor::parse_cstring (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     9,630 ( 0.01%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     9,630 ( 0.01%)  < ???:litchi_cfb::file::try_filled_vec (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     8,346 ( 0.01%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     8,025 ( 0.01%)  < ???:<alloc::string::String as core::clone::Clone>::clone (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     3,852 ( 0.00%)  < ???:<std::fs::OpenOptions>::_open (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       168 ( 0.00%)  < ???:std::env::args_os (11x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       150 ( 0.00%)  < ???:<std::io::stdio::StdoutLock as std::io::Write>::write_all (10x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        26 ( 0.00%)  < ???:<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<usize, std::sys::pal::unix::stack_overflow::thread_info::ThreadInfo>>::remove_kv::{closure#0}, alloc::alloc::Global> (2x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+30,853,201 (21.57%)  *  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+20,035,857 (14.01%)  < ???:litchi_cfb::shared::SharedOleFile::read_fat_stream (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,320,915 ( 0.92%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    57,096 ( 0.04%)  < ???:litchi_cfb::file::OleFile<R>::read_sector_run_into (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    25,024 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::sector_batch_scratch (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    25,024 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    24,717 ( 0.02%)  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,791 ( 0.02%)  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    16,050 ( 0.01%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    16,036 ( 0.01%)  < ???:litchi_cfb::file::OleFile<R>::load_minifat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     8,346 ( 0.01%)  < ???:litchi_cfb::file::try_filled_vec (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     7,704 ( 0.01%)  < ???:litchi_cfb::file::collect_sector_chain_exact (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     3,852 ( 0.00%)  < ???:litchi_cfb::file::collect_directory_sector_chain (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     3,852 ( 0.00%)  < ???:litchi_cfb::shared::try_zeroed_vec (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        37 ( 0.00%)  < ???:0x0000000004ab9710 (2x) [???]
+21,567,301 (15.08%)  *  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+36,795,856 (25.73%)  < ???:litchi_ppt::records::record::Record::parse_container_children (30,174x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+21,688,510 (15.16%)  < ???:litchi_ppt::records::record::Record::parse_container_children'2 (34,668x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 8,609,541 ( 6.02%)  *  ???:litchi_ppt::records::record::Record::parse_impl'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 6,530,856 ( 4.57%)  < ./malloc/./malloc/malloc.c:__libc_malloc2 (35,948x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,929,439 ( 1.35%)  < ./malloc/./malloc/malloc.c:_int_realloc (10,897x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       200 ( 0.00%)  < ./malloc/./malloc/malloc.c:__libc_calloc2 (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 7,756,434 ( 5.42%)  *  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 9,080,597 ( 6.35%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (63,879x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 3,054,078 ( 2.14%)  < ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (12,198x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,451,329 ( 1.71%)  < ???:litchi_ppt::records::record::Record::parse_container_children'2 (17,334x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,410,678 ( 1.69%)  < ???:litchi_ppt::records::record::Record::parse_container_children (7,383x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,359,620 ( 0.95%)  < ???:alloc::raw_vec::RawVec<T,A>::grow_one (8,667x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,022,495 ( 0.71%)  < ???:litchi_ppt::records::record::Record::parse_impl (4,173x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   802,116 ( 0.56%)  < ???:litchi_cfb::file::try_vec_with_capacity (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   548,686 ( 0.38%)  < ???:litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   150,069 ( 0.10%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   144,775 ( 0.10%)  < ???:litchi_cfb::file::try_push (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   131,333 ( 0.09%)  < ???:litchi_cfb::file::try_filled_vec (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   107,840 ( 0.08%)  < ???:litchi_cfb::shared::SharedOleFile::read_fat_stream (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   104,144 ( 0.07%)  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   101,761 ( 0.07%)  < ???:litchi_cfb::file::collect_sector_chain_exact (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    52,284 ( 0.04%)  < ???:litchi_cfb::file::OleFile<R>::load_minifat (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    52,139 ( 0.04%)  < ???:litchi_cfb::file::collect_directory_sector_chain (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    50,718 ( 0.04%)  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,141 ( 0.02%)  < ???:alloc::raw_vec::RawVecInner<A>::try_reserve (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,138 ( 0.02%)  < ???:litchi_cfb::shared::try_zeroed_vec (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,001 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::sector_batch_scratch (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,001 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    24,717 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    24,717 ( 0.02%)  < ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 4,969,080 ( 3.47%)  *  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 6,540,317 ( 4.57%)  < ./malloc/./malloc/malloc.c:_int_free_chunk (61,164x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 4,619,394 ( 3.23%)  *  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+10,430,923 ( 7.29%)  < ???:__rustc::__rdl_dealloc (130,982x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       504 ( 0.00%)  < ???:0x0000000004ab93c0 (6x) [???]
+ 4,105,239 ( 2.87%)  *  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+10,794,632 ( 7.55%)  < ???:__rustc::__rdl_alloc (130,983x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       693 ( 0.00%)  < ???:0x0000000004ab93d0 (3x) [???]
+       397 ( 0.00%)  < ./malloc/./malloc/malloc.c:realloc (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 3,438,201 ( 2.40%)  *  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 3,226,692 ( 2.26%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,689,338 ( 1.88%)  < ???:litchi_cfb::shared::SharedOleFile::find_entry (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 3,330,054 ( 2.33%)  *  ???:litchi_cfb::directory_name::directory_name_data [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,921,561 ( 2.04%)  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,794,626 ( 1.95%)  *  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+26,738,013 (18.70%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (16,371x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,598,174 ( 1.82%)  *  ???:litchi_ppt::records::record::Record::parse_container_children'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,468,301 ( 1.73%)  < ???:litchi_ppt::text::extractor::from_utf16le_lossy (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   785,487 ( 0.55%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 2,320,830 ( 1.62%)  *  ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 4,744,859 ( 3.32%)  < ???:litchi_ppt::records::record::Record::extract_text (23,112x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   988,680 ( 0.69%)  < ???:litchi_ppt::records::record::Record::extract_text'2 (8,667x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,899,999 ( 1.33%)  *  ???:litchi_ppt::records::record::Record::extract_text'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+40,906,550 (28.60%)  < ???:litchi_ppt::records::record::Record::parse_impl (3,531x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,700,016 ( 1.19%)  *  ???:litchi_ppt::records::record::Record::parse_container_children [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,490,802 ( 1.04%)  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (61,164x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,490,486 ( 1.04%)  *  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 9,573,835 ( 6.69%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,453,167 ( 1.02%)  *  ???:litchi_cfb::file::OleFile<R>::load_directory [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,399,154 ( 1.68%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (64,842x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   154,401 ( 0.11%)  < ???:litchi_ppt::records::record::Record::parse_impl (4,173x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,380,300 ( 0.97%)  *  ???:litchi_ppt::records::record::ParseBudget::charge_record [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,559,097 ( 1.09%)  < ???:litchi_ppt::odraw::codec::push_children (26,001x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,370,349 ( 0.96%)  *  ???:<litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+11,973,479 ( 8.37%)  < ???:__rustc::__rust_alloc (130,983x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,178,847 ( 0.82%)  *  ???:__rustc::__rdl_alloc [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,173,255 ( 0.82%)  < ???:litchi_ppt::records::record::ParseBudget::charge_record (69,015x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,173,255 ( 0.82%)  *  ???:litchi_ppt::records::record::ParseBudget::charge_visit [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,230,308 ( 1.56%)  < ???:litchi_cfb::shared::SharedOleFile::read_fat_stream (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,169,082 ( 0.82%)  *  ???:litchi_cfb::shared::SharedOleFile::read_chain_into [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   686,405 ( 0.48%)  < ./malloc/./malloc/malloc.c:_int_malloc (29,045x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   430,121 ( 0.30%)  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (21,650x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    25,848 ( 0.02%)  < ./malloc/./malloc/malloc.c:_int_realloc (1,341x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,142,374 ( 0.80%)  *  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   886,439 ( 0.62%)  < ???:litchi_ppt::records::record::Record::extract_text'2 (30,495x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   216,171 ( 0.15%)  < ???:litchi_ppt::records::record::Record::extract_text (3,531x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   154,308 ( 0.11%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    61,311 ( 0.04%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,095,573 ( 0.77%)  *  ???:alloc::str::join_generic_copy [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 6,231,473 ( 4.36%)  < ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 4,567,358 ( 3.19%)  < ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop'2 (33,705x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,086,585 ( 0.76%)  *  ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   988,038 ( 0.69%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (64,842x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    63,558 ( 0.04%)  < ???:litchi_ppt::records::record::Record::parse_impl (4,173x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,051,596 ( 0.74%)  *  ???:<litchi_ppt::consts::RecordType as core::convert::From<u16>>::from [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 6,177,320 ( 4.32%)  < ./malloc/./malloc/malloc.c:free (49,519x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,402,785 ( 0.98%)  < ./malloc/./malloc/malloc.c:_int_realloc (11,645x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,039,788 ( 0.73%)  *  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 4,150,991 ( 2.90%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,036,509 ( 0.72%)  *  ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 5,735,279 ( 4.01%)  < ???:__rustc::__rdl_realloc (16,371x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       811 ( 0.00%)  < ???:0x0000000004ab93f0 (3x) [???]
+   995,748 ( 0.70%)  *  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   585,504 ( 0.41%)  < ???:hashbrown::map::HashMap<K,V,S,A>::insert (5,136x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   219,564 ( 0.15%)  < ???:litchi_ppt::slide::notes::NotesIndex::descriptor (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   146,376 ( 0.10%)  < ???:litchi_ppt::slide::factory::SlideFactory::parse_slide (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   109,782 ( 0.08%)  < ???:litchi_ppt::persist::mapping::PersistMapping::get_offset (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   109,782 ( 0.08%)  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    73,188 ( 0.05%)  < ???:hashbrown::map::HashMap<K,V,S,A>::get (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    73,188 ( 0.05%)  < ???:hashbrown::map::HashMap<K,V,S,A>::contains_key (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   993,816 ( 0.69%)  *  ???:core::hash::BuildHasher::hash_one [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,603,051 ( 1.82%)  < ???:core::ptr::drop_in_place<litchi_ppt::records::record::Record> (9,951x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   442,017 ( 0.31%)  < ???:litchi_ppt::records::record::Record::parse_impl'2 (16,371x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    95,337 ( 0.07%)  < ???:litchi_ppt::records::record::Record::parse_impl (3,531x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   961,395 ( 0.67%)  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 5,495,085 ( 3.84%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (7,062x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   953,370 ( 0.67%)  *  ???:litchi_ppt::odraw::codec::push_children [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   939,888 ( 0.66%)  < ???:litchi_cfb::shared::SharedOleFile::read_chain_into (39,162x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     7,704 ( 0.01%)  < ???:litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   947,592 ( 0.66%)  *  ???:litchi_cfb::shared::next_chain_sector [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   944,382 ( 0.66%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   944,382 ( 0.66%)  *  ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,103,139 ( 0.77%)  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   921,270 ( 0.64%)  *  ???:litchi_cfb::file::decode_utf16le [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   882,108 ( 0.62%)  < ???:litchi_cfb::directory_name::directory_name_data (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   882,108 ( 0.62%)  *  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,552,289 ( 1.78%)  < ???:litchi_ppt::text::extractor::from_utf16le_lossy (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,002 ( 0.04%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    52,457 ( 0.04%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   866,379 ( 0.61%)  *  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   890,454 ( 0.62%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   824,649 ( 0.58%)  *  ???:<alloc::string::String>::from_utf16 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 4,665,125 ( 3.26%)  < ./malloc/./malloc/malloc.c:realloc (12,470x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   789,886 ( 0.55%)  *  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 7,357,521 ( 5.14%)  < ./malloc/./malloc/malloc.c:malloc (35,947x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       139 ( 0.00%)  < ./malloc/./malloc/malloc.c:tcache_free_init (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   754,908 ( 0.53%)  *  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 1,260,606 ( 0.88%)  < ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>> (10,914x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   518,856 ( 0.36%)  < ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>>'2 (10,272x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   720,966 ( 0.50%)  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>>'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   908,513 ( 0.64%)  < ???:litchi_ppt::odraw::codec::push_children (7,062x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   619,209 ( 0.43%)  *  ???:<core::iter::adapters::rev::Rev<I> as core::iter::traits::iterator::Iterator>::fold [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+43,478,946 (30.40%)  < ???:litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 8,183,054 ( 5.72%)  < ???:litchi_ppt::records::record::Record::parse_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 6,881,519 ( 4.81%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,849,665 ( 1.29%)  < ???:litchi_ppt::slide::factory::SlideFactory::parse_slide (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   607,653 ( 0.42%)  *  ???:litchi_ppt::records::record::Record::parse_impl [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 4,650,335 ( 3.25%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,071,412 ( 0.75%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   588,072 ( 0.41%)  *  ???:litchi_ppt::records::record::Record::extract_text [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,835,478 ( 1.28%)  < ???:litchi_cfb::shared::SharedOleFile::stream_len (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,406,943 ( 0.98%)  < ???:litchi_cfb::shared::SharedOleFile::open_stream_with_mode (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   518,415 ( 0.36%)  *  ???:litchi_cfb::shared::SharedOleFile::find_entry [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   539,281 ( 0.38%)  < ???:<std::fs::File>::metadata (4,494x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   489,847 ( 0.34%)  *  ???:std::sys::fs::unix::try_statx [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+10,348,314 ( 7.24%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   485,994 ( 0.34%)  *  ???:litchi_ppt::odraw::codec::text_from_drawing [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   750,435 ( 0.52%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   471,870 ( 0.33%)  *  ???:litchi_cfb::file::OleFile<R>::load_minifat [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,645,949 ( 1.15%)  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (4,815x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   932,958 ( 0.65%)  < ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter (5,136x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   540,182 ( 0.38%)  < ???:litchi_ppt::odraw::codec::push_children (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   374,117 ( 0.26%)  < ???:litchi_ppt::presentation::model::Presentation::text (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   439,128 ( 0.31%)  *  ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   716,721 ( 0.50%)  < ???:litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   354,256 ( 0.25%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   238,837 ( 0.17%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   120,696 ( 0.08%)  < ???:litchi_ppt::embedded::object::editor::mapping::chain::read (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   386,877 ( 0.27%)  *  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 6,095,441 ( 4.26%)  < ???:__rustc::__rust_realloc (16,371x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   360,162 ( 0.25%)  *  ???:__rustc::__rdl_realloc [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 4,231,477 ( 2.96%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   343,149 ( 0.24%)  *  ???:litchi_ppt::odraw::codec::text_from_ppt_records [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   323,568 ( 0.23%)  < ???:core::hash::BuildHasher::hash_one (11,556x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   323,568 ( 0.23%)  *  ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   441,982 ( 0.31%)  < ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   272,005 ( 0.19%)  < ???:<alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   117,669 ( 0.08%)  < ???:<alloc::string::String>::try_reserve (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   243,639 ( 0.17%)  *  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   371,076 ( 0.26%)  < ???:litchi_cfb::shared::SharedOleFile::open_stream_with_mode (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   278,307 ( 0.19%)  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   185,538 ( 0.13%)  < ???:litchi_ppt::package::source::SourceBackedPackage::from_read_at_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    92,769 ( 0.06%)  < ???:litchi_cfb::shared::SharedOleFile::source_version (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   231,120 ( 0.16%)  *  ???:<litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::version [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+12,377,526 ( 8.65%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   214,749 ( 0.15%)  *  ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,533,923 ( 1.07%)  < ???:litchi_ppt::odraw::codec::push_children (8,346x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,705 ( 0.02%)  < ???:litchi_ppt::records::record::Record::group_into_slide_atoms_sets (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   208,008 ( 0.15%)  *  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   188,748 ( 0.13%)  < ???:<litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next (18,939x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     7,704 ( 0.01%)  < ???:litchi_odraw::record::Record::parse (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   196,452 ( 0.14%)  *  ???:litchi_odraw::record::RecordKind::from_raw [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   193,242 ( 0.14%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   193,242 ( 0.14%)  *  ???:<u16 as core::slice::cmp::SliceContains>::slice_contains [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   187,464 ( 0.13%)  < ???:litchi_core::simd::fmt::hex_encode_to_string (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   187,464 ( 0.13%)  *  ???:litchi_core::simd::fmt::hex_encode_avx2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,159,221 ( 0.81%)  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   471,138 ( 0.33%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   182,970 ( 0.13%)  *  ???:litchi_cfb::file::OleFile<R>::parse_directory_entry [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   501,853 ( 0.35%)  < ???:litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   181,689 ( 0.13%)  *  ???:litchi_ppt::embedded::object::editor::mapping::chain::read [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   177,834 ( 0.12%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (6,099x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   177,834 ( 0.12%)  *  ???:<litchi_ppt::odraw::package::RawRecords as core::iter::traits::iterator::Iterator>::next [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+11,620,575 ( 8.13%)  < ???:litchi_ppt::presentation::model::Presentation::text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   177,252 ( 0.12%)  *  ???:litchi_ppt::slide::factory::SlideFactory::parse_slide [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   368,599 ( 0.26%)  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   175,266 ( 0.12%)  *  ???:hashbrown::raw::RawTableInner::fallible_with_capacity [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   458,129 ( 0.32%)  < ???:hashbrown::map::HashMap<K,V,S,A>::insert (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   119,803 ( 0.08%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    85,357 ( 0.06%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   173,673 ( 0.12%)  *  ???:hashbrown::raw::RawTable<T,A>::reserve_rehash [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,657,236 ( 1.16%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,503,443 ( 1.05%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   589,657 ( 0.41%)  < ???:core::ptr::drop_in_place<litchi_ppt::slide::types::Slide> (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   173,019 ( 0.12%)  *  ???:core::ptr::drop_in_place<litchi_ppt::records::record::Record> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+49,261,392 (34.44%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   170,130 ( 0.12%)  *  ???:litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   696,570 ( 0.49%)  < ???:<litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::version (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   139,315 ( 0.10%)  < ???:litchi_core::source::file::FileSource::from_file (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   139,314 ( 0.10%)  < ???:<litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::len (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   166,278 ( 0.12%)  *  ???:<std::fs::File>::metadata [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   381,352 ( 0.27%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (5,778x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   159,537 ( 0.11%)  *  ???:litchi_cfb::file::try_push [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,391,625 ( 0.97%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   159,216 ( 0.11%)  *  ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    65,484 ( 0.05%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    60,669 ( 0.04%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    32,742 ( 0.02%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   158,895 ( 0.11%)  *  ???:core::str::<impl str>::trim_matches [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 5,028,641 ( 3.52%)  < ???:litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   157,932 ( 0.11%)  *  ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   148,557 ( 0.10%)  *  ./malloc/./malloc/arena.c:free
+
+   141,561 ( 0.10%)  < ???:litchi_cfb::directory_name::directory_name_data (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   141,561 ( 0.10%)  *  ???:core::slice::memchr::memchr_aligned [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   133,536 ( 0.09%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   133,536 ( 0.09%)  *  ???:alloc::vec::Vec<T,A>::extend_trusted [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+10,803,988 ( 7.55%)  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (108,819x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   366,917 ( 0.26%)  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (5,778x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   166,369 ( 0.12%)  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   165,518 ( 0.12%)  < ???:alloc::str::join_generic_copy (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   145,272 ( 0.10%)  < ???:litchi_ppt::text::extractor::parse_cstring (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   143,852 ( 0.10%)  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (2,568x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    64,200 ( 0.04%)  < ???:<alloc::string::String>::from_utf16 (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    51,360 ( 0.04%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    38,755 ( 0.03%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,169 ( 0.02%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,105 ( 0.02%)  < ???:alloc::boxed::box_new_uninit (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    25,817 ( 0.02%)  < ???:<alloc::string::String as core::clone::Clone>::clone (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    25,680 ( 0.02%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    13,163 ( 0.01%)  < ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    12,977 ( 0.01%)  < ???:litchi_core::source::file::FileSource::from_file (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    12,977 ( 0.01%)  < ???:litchi_cfb::file::format_clsid (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    12,840 ( 0.01%)  < ???:litchi_ppt::package::source::SourceBackedPackage::from_path_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     2,106 ( 0.00%)  < ???:std::env::args_os (12x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       357 ( 0.00%)  < ???:std::sys::pal::unix::stack_overflow::thread_info::set_current_info (2x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        40 ( 0.00%)  < ???:<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0} (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   130,983 ( 0.09%)  *  ???:__rustc::__rust_alloc [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   108,819 ( 0.08%)  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (108,819x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     5,778 ( 0.00%)  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (5,778x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     2,889 ( 0.00%)  < ???:alloc::str::join_generic_copy (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     2,568 ( 0.00%)  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (2,568x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     2,247 ( 0.00%)  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     1,605 ( 0.00%)  < ???:<alloc::string::String>::from_utf16 (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     1,284 ( 0.00%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       963 ( 0.00%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       963 ( 0.00%)  < ???:litchi_ppt::text::extractor::parse_cstring (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       642 ( 0.00%)  < ???:<alloc::string::String as core::clone::Clone>::clone (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       642 ( 0.00%)  < ???:alloc::boxed::box_new_uninit (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       642 ( 0.00%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       642 ( 0.00%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       321 ( 0.00%)  < ???:litchi_ppt::package::source::SourceBackedPackage::from_path_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       321 ( 0.00%)  < ???:litchi_core::source::file::FileSource::from_file (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       321 ( 0.00%)  < ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       321 ( 0.00%)  < ???:litchi_cfb::file::format_clsid (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        12 ( 0.00%)  < ???:std::env::args_os (12x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+         2 ( 0.00%)  < ???:std::sys::pal::unix::stack_overflow::thread_info::set_current_info (2x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+         1 ( 0.00%)  < ???:<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<std::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0} (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   130,983 ( 0.09%)  *  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+10,561,905 ( 7.38%)  < ???:__rustc::__rust_dealloc (130,982x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   130,982 ( 0.09%)  *  ???:__rustc::__rdl_dealloc [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 5,144,888 ( 3.60%)  < ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop'2 (40,125x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   974,266 ( 0.68%)  < ???:core::ptr::drop_in_place<litchi_ppt::records::record::Record> (11,877x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   918,404 ( 0.64%)  < ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>> (15,408x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   778,675 ( 0.54%)  < ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop (5,136x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   539,640 ( 0.38%)  < ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::records::record::Record>>'2 (15,408x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   413,193 ( 0.29%)  < ???:alloc::sync::Arc<T,A>::drop_slow'2 (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   289,304 ( 0.20%)  < ???:<core::iter::adapters::rev::Rev<I> as core::iter::traits::iterator::Iterator>::fold (7,062x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   219,502 ( 0.15%)  < ???:core::ptr::drop_in_place<litchi_cfb::file::DirectoryEntry> (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   169,219 ( 0.12%)  < ???:core::ptr::drop_in_place<litchi_ppt::presentation::model::Presentation> (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   141,679 ( 0.10%)  < ???:litchi_ppt::text::extractor::from_utf16le_lossy (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   113,692 ( 0.08%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   103,940 ( 0.07%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (2,568x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    89,880 ( 0.06%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (2,568x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    67,410 ( 0.05%)  < ???:litchi_ppt::records::record::Record::extract_text (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    67,410 ( 0.05%)  < ???:litchi_ppt::records::record::Record::extract_text'2 (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    59,550 ( 0.04%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    56,869 ( 0.04%)  < ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (643x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    56,175 ( 0.04%)  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    56,175 ( 0.04%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    52,163 ( 0.04%)  < ???:ole_doc_ppt_profile::main (331x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,705 ( 0.02%)  < ???:litchi_ppt::slide::directory::read_header (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,705 ( 0.02%)  < ???:core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory> (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,705 ( 0.02%)  < ???:litchi_ppt::text::extractor::parse_cstring (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    28,195 ( 0.02%)  < ???:alloc::sync::Arc<T,A>::drop_slow (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,618 ( 0.02%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_minifat (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_cfb::file::collect_sector_chain_exact (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_ppt::presentation::model::Presentation::text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:core::ptr::drop_in_place<litchi_ppt::slide::types::Slide> (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    22,470 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:alloc::collections::btree::map::IntoIter<K,V,A>::dying_next (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:litchi_cfb::file::OleFile<R>::into_parsed_index (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:litchi_cfb::file::collect_directory_sector_chain (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    11,235 ( 0.01%)  < ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+       155 ( 0.00%)  < ???:std::sys::pal::unix::stack_overflow::imp::drop_handler (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        35 ( 0.00%)  < ???:<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0} (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+        35 ( 0.00%)  < ???:core::iter::traits::iterator::Iterator::try_fold (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   130,982 ( 0.09%)  *  ???:__rustc::__rust_dealloc [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   134,178 ( 0.09%)  < ???:litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   122,943 ( 0.09%)  *  ???:alloc::collections::btree::map::IntoIter<K,V,A>::dying_next [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   159,858 ( 0.11%)  < ???:std::io::default_read_exact (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   106,572 ( 0.07%)  < ???:litchi_core::source::ReadAt::read_exact_at (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   121,980 ( 0.09%)  *  ???:<litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::read_at [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   206,724 ( 0.14%)  < ???:litchi_cfb::file::try_filled_vec (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   120,054 ( 0.08%)  *  ???:alloc::vec::Vec<T,A>::resize [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+24,825,225 (17.36%)  < ???:ole_doc_ppt_profile::main (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   120,054 ( 0.08%)  *  ???:litchi_ppt::presentation::model::Presentation::text [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   137,709 ( 0.10%)  < ???:litchi_cfb::file::OleFile<R>::read_sector_run_into (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    91,806 ( 0.06%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    45,903 ( 0.03%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   115,560 ( 0.08%)  *  ???:std::io::default_read_exact [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+11,968,668 ( 8.37%)  < ???:once_cell::unsync::OnceCell<T>::get_or_try_init (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   107,214 ( 0.07%)  *  ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 2,667,405 ( 1.87%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   104,646 ( 0.07%)  *  ???:litchi_cfb::file::OleFile<R>::load_fat [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+90,167,713 (63.05%)  < ???:litchi_ppt::package::source::SourceBackedPackage::presentation (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   103,362 ( 0.07%)  *  ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   320,478 ( 0.22%)  < ???:litchi_ppt::slide::factory::SlideFactory::parse_slide (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   100,914 ( 0.07%)  *  ???:litchi_ppt::slide::notes::NotesIndex::descriptor [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+24,468,667 (17.11%)  < ???:litchi_cfb::shared::SharedOleFile::open_stream (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    97,905 ( 0.07%)  *  ???:litchi_cfb::shared::SharedOleFile::open_stream_with_mode [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   787,699 ( 0.55%)  < ???:litchi_ppt::slide::directory::read_header (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    89,559 ( 0.06%)  *  ???:alloc::fmt::format::format_inner [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   107,174 ( 0.07%)  < ???:litchi_ppt::records::record::Record::extract_text'2 (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   105,235 ( 0.07%)  < ???:litchi_ppt::records::record::Record::extract_text (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    76,288 ( 0.05%)  < ???:litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    34,989 ( 0.02%)  < ???:litchi_ppt::parsers::parser::RecordParser::parse_document_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    34,989 ( 0.02%)  < ???:litchi_ppt::parsers::parser::RecordParser::extract_all_text (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    86,670 ( 0.06%)  *  ???:<alloc::raw_vec::RawVec<alloc::vec::Vec<u8>>>::grow_one [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   793,195 ( 0.55%)  < ???:core::ptr::drop_in_place<litchi_cfb::shared::SharedOleFile> (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    25,359 ( 0.02%)  < ???:core::ptr::drop_in_place<litchi_core::source::file::FileSource> (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    86,349 ( 0.06%)  *  ???:alloc::sync::Arc<T,A>::drop_slow'2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   193,856 ( 0.14%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    85,693 ( 0.06%)  < ???:litchi_cfb::file::OleFile<R>::load_minifat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    84,744 ( 0.06%)  *  ???:litchi_cfb::file::OleFile<R>::read_sector_run_into [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 9,126,804 ( 6.38%)  < ???:litchi_ppt::slide::factory::SlideFactory::parse_slide (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    84,744 ( 0.06%)  *  ???:litchi_ppt::slide::notes::NotesIndex::build_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   112,029 ( 0.08%)  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   102,082 ( 0.07%)  < ???:litchi_cfb::file::OleFile<R>::load_minifat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    82,176 ( 0.06%)  *  ???:litchi_cfb::file::collect_sector_chain_exact [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   167,564 ( 0.12%)  < ???:litchi_ppt::embedded::object::editor::mapping::chain::read (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    80,892 ( 0.06%)  *  ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    74,820 ( 0.05%)  *  ./malloc/./malloc/arena.c:realloc
+
+    73,188 ( 0.05%)  < ???:alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    73,188 ( 0.05%)  *  ???:alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut,K,V,alloc::collections::btree::node::marker::Leaf>,alloc::collections::btree::node::marker::Edge>::insert_recursing [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   698,140 ( 0.49%)  < ???:alloc::fmt::format::format_inner (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     2,367 ( 0.00%)  < ???:<&std::io::stdio::Stdout as std::io::Write>::write_fmt (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    72,448 ( 0.05%)  *  ???:core::fmt::write [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 7,070,496 ( 4.94%)  < ???:core::ptr::drop_in_place<litchi_ppt::presentation::model::Presentation> (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    28,248 ( 0.02%)  < ???:core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory> (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    71,904 ( 0.05%)  *  ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    71,896 ( 0.05%)  *  ./malloc/./malloc/arena.c:__libc_malloc2
+
+ 2,684,963 ( 1.88%)  < ???:litchi_ppt::odraw::codec::text_from_ppt_records (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,536,487 ( 1.07%)  < ???:litchi_ppt::text::extractor::parse_cstring (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+ 1,010,155 ( 0.71%)  < ???:litchi_ppt::current_user::CurrentUser::parse_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    69,336 ( 0.05%)  *  ???:litchi_ppt::text::extractor::from_utf16le_lossy [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   344,250 ( 0.24%)  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    68,374 ( 0.05%)  *  ???:litchi_cfb::file::format_clsid [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    54,570 ( 0.04%)  < ./posix/../sysdeps/unix/sysv/linux/pread64.c:pread (3,210x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+     5,457 ( 0.00%)  < ./io/../sysdeps/unix/sysv/linux/open64.c:open (321x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+     5,457 ( 0.00%)  < ./io/../sysdeps/unix/sysv/linux/close.c:close (321x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        17 ( 0.00%)  < ./io/../sysdeps/unix/sysv/linux/poll.c:poll (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        17 ( 0.00%)  < ./stdlib/../sysdeps/unix/sysv/linux/getrandom.c:getrandom_vdso (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        17 ( 0.00%)  < ./io/../sysdeps/unix/sysv/linux/write.c:write (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    65,535 ( 0.05%)  *  ./nptl/./nptl/cancellation.c:__syscall_cancel [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   321,252 ( 0.22%)  < ???:core::fmt::write (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   270,958 ( 0.19%)  < ???:<core::fmt::Formatter>::pad (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    65,484 ( 0.05%)  *  ???:<alloc::string::String as core::fmt::Write>::write_str [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   181,869 ( 0.13%)  < ???:litchi_cfb::file::decode_utf16le (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    64,200 ( 0.04%)  *  ???:<alloc::string::String>::try_reserve [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+18,279,648 (12.78%)  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    62,274 ( 0.04%)  *  ???:litchi_cfb::file::OleFile<R>::open_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   127,895 ( 0.09%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    60,669 ( 0.04%)  *  ???:litchi_cfb::file::collect_directory_sector_chain [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   278,245 ( 0.19%)  < ???:alloc::sync::Arc<T,A>::drop_slow'2 (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    58,743 ( 0.04%)  *  ???:core::ptr::drop_in_place<litchi_cfb::file::DirectoryEntry> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   880,147 ( 0.62%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    58,743 ( 0.04%)  *  ???:litchi_ppt::slide::directory::read_header [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   499,762 ( 0.35%)  < ???:<alloc::string::String as core::fmt::Write>::write_str (1,926x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    57,780 ( 0.04%)  *  ???:<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   121,338 ( 0.08%)  < ???:litchi_cfb::shared::SharedOleFile::read_chain_into (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    40,446 ( 0.03%)  < ???:litchi_cfb::shared::SharedOleFile::flush_pending_range (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    55,212 ( 0.04%)  *  ???:litchi_core::source::ReadAt::read_exact_at [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,407,643 ( 0.98%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,891 ( 0.04%)  *  ???:litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+ 1,783,837 ( 1.25%)  < ???:litchi_ppt::records::record::Record::extract_text'2 (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,891 ( 0.04%)  *  ???:litchi_ppt::text::extractor::parse_cstring [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   144,450 ( 0.10%)  < ???:<litchi_core::source::file::FileSource as litchi_core::source::ReadAt>::read_at (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,570 ( 0.04%)  *  ???:<std::fs::File as std::os::unix::fs::FileExt>::read_at [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+18,781,011 (13.13%)  < ???:litchi_cfb::shared::SharedOleFile::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    54,249 ( 0.04%)  *  ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    53,393 ( 0.04%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (2,889x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    53,393 ( 0.04%)  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    49,434 ( 0.03%)  < ???:std::sys::fs::unix::try_statx (4,494x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    49,434 ( 0.03%)  *  ./io/../sysdeps/unix/sysv/linux/statx.c:statx [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   548,651 ( 0.38%)  < ???:litchi_ppt::current_user::CurrentUser::parse (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+   509,012 ( 0.36%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    47,508 ( 0.03%)  *  ???:litchi_ppt::current_user::CurrentUser::parse_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    77,874 ( 0.05%)  < ./stdio-common/./stdio-common/isoc23_sscanf.c:__isoc23_sscanf (45x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    46,676 ( 0.03%)  *  ./stdio-common/./stdio-common/vfscanf-internal.c:__vfscanf_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   234,009 ( 0.16%)  < ???:litchi_cfb::file::format_clsid (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    46,545 ( 0.03%)  *  ???:litchi_core::simd::fmt::hex_encode_to_string [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   353,786 ( 0.25%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    47,508 ( 0.03%)  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    45,261 ( 0.03%)  *  ???:litchi_cfb::file::try_filled_vec [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   154,140 ( 0.11%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    44,358 ( 0.03%)  *  ???:litchi_ppt::persist::mapping::PersistMapping::get_offset [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    78,003 ( 0.05%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    44,298 ( 0.03%)  *  ???:litchi_ppt::records::record::Record::group_into_slide_atoms_sets [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    43,588 ( 0.03%)  *  ./malloc/../string/bits/string_fortified.h:_int_realloc
+
+   120,375 ( 0.08%)  < ???:litchi_cfb::shared::SharedOleFile::open_stream_with_mode (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    40,767 ( 0.03%)  *  ???:litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    58,246 ( 0.04%)  < ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x (167x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    40,693 ( 0.03%)  *  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+   673,759 ( 0.47%)  < ???:litchi_ppt::presentation::model::Presentation::text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    39,804 ( 0.03%)  *  ???:core::ptr::drop_in_place<litchi_ppt::slide::types::Slide> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    38,199 ( 0.03%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (2,247x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    38,199 ( 0.03%)  *  ???:litchi_cfb::file::OleFile<R>::validated_entry [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+19,125,260 (13.37%)  < ???:litchi_ppt::package::source::SourceBackedPackage::from_path_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    38,199 ( 0.03%)  *  ???:litchi_ppt::package::source::SourceBackedPackage::from_read_at_with_limits [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    36,273 ( 0.03%)  < ???:<std::fs::OpenOptions>::_open (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    36,273 ( 0.03%)  *  ???:<core::ffi::c_str::CStr>::from_bytes_with_nul [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    34,668 ( 0.02%)  < ???:litchi_cfb::shared::SharedOleFile::find_entry (8,667x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+     1,284 ( 0.00%)  < ???:litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_shared_with_options (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    35,952 ( 0.03%)  *  ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+142,705,388 (99.78%)  < ???:std::sys::backtrace::__rust_begin_short_backtrace (1x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    35,476 ( 0.02%)  *  ???:ole_doc_ppt_profile::main [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    89,880 ( 0.06%)  < ???:<std::fs::File as std::os::unix::fs::FileExt>::read_at (3,210x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    35,310 ( 0.02%)  *  ./posix/../sysdeps/unix/sysv/linux/pread64.c:pread [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    16,692 ( 0.01%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    16,692 ( 0.01%)  < ???:<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,384 ( 0.02%)  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<litchi_ppt::text_interaction::TextBodyInteractions>> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    41,088 ( 0.03%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    33,384 ( 0.02%)  *  ???:litchi_odraw::record::Record::parse [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    32,100 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    32,100 ( 0.02%)  *  ???:litchi_cfb::file::CheckedBitSet::insert [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+11,997,558 ( 8.39%)  < ???:litchi_ppt::presentation::model::Presentation::text (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    28,890 ( 0.02%)  *  ???:once_cell::unsync::OnceCell<T>::get_or_try_init [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    28,248 ( 0.02%)  < ???:litchi_cfb::file::format_clsid (1,605x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    28,248 ( 0.02%)  *  ???:litchi_core::simd::cmp::is_all_zero_avx2 [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   100,808 ( 0.07%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    27,620 ( 0.02%)  *  ???:hashbrown::map::HashMap<K,V,S,A>::contains_key [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   100,794 ( 0.07%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    27,606 ( 0.02%)  *  ???:hashbrown::map::HashMap<K,V,S,A>::get [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    78,631 ( 0.05%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    27,606 ( 0.02%)  *  ???:litchi_cfb::file::OleFile<R>::sector_batch_scratch [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    26,964 ( 0.02%)  < ???:litchi_ppt::odraw::codec::text_from_drawing (1,284x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    26,964 ( 0.02%)  *  ???:core::str::<impl str>::trim_end_matches [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    25,577 ( 0.02%)  *  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object_no_relro
+
+22,398,722 (15.66%)  < ???:litchi_cfb::shared::SharedOleFile::open_stream_with_mode (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    24,717 ( 0.02%)  *  ???:litchi_cfb::shared::SharedOleFile::read_fat_stream [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   295,033 ( 0.21%)  < ???:<str as core::fmt::Display>::fmt (963x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    24,075 ( 0.02%)  *  ???:<core::fmt::Formatter>::pad [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    23,908 ( 0.02%)  < ./stdlib/../stdlib/strtol.c:__strtoul_internal (90x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    23,908 ( 0.02%)  *  ./stdlib/../stdlib/strtol_l.c:____strtoul_l_internal [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 7,341,793 ( 5.13%)  < ???:ole_doc_ppt_profile::main (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    23,754 ( 0.02%)  *  ???:core::ptr::drop_in_place<litchi_ppt::presentation::model::Presentation> [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   473,579 ( 0.33%)  < ./malloc/../string/bits/string_fortified.h:_int_realloc (10,897x)
+     1,015 ( 0.00%)  < ./libio/../string/bits/string_fortified.h:getdelim (49x)
+        14 ( 0.00%)  < ./nptl/../string/bits/string_fortified.h:pthread_attr_setaffinity_np@@GLIBC_2.32 (1x)
+    21,894 ( 0.02%)  *  ???:0x0000000004ab9680 [???]
+
+    55,670 ( 0.04%)  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    21,186 ( 0.01%)  *  ???:<alloc::string::String as core::clone::Clone>::clone [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   147,343 ( 0.10%)  < ./elf/./elf/dl-reloc.c:_dl_relocate_object (4x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+       255 ( 0.00%)  < ./elf/./elf/rtld.c:dl_main (1x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    20,232 ( 0.01%)  *  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+    31,458 ( 0.02%)  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    20,223 ( 0.01%)  *  ???:litchi_cfb::file::OleFile<R>::into_parsed_index [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+    19,902 ( 0.01%)  < ???:litchi_ppt::slide::directory::SlideDirectory::build_with_limits (642x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    19,902 ( 0.01%)  *  ???:litchi_ppt::text_interaction::parse_text_bodies [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+   787,350 ( 0.55%)  < ???:litchi_cfb::file::OleFile<R>::load_fat (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    34,026 ( 0.02%)  < ???:litchi_cfb::file::OleFile<R>::load_directory (321x) [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+    19,260 ( 0.01%)  *  ???:litchi_cfb::file::try_vec_with_capacity [/tmp/claude-1001/-home-zhuhe-code-litchi/14c44904-927d-4351-97ac-5611bafb5316/scratchpad/target-head/release/ole_doc_ppt_profile]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./elf/../sysdeps/x86_64/dl-machine.h
+  ./elf/./elf/dl-lookup.c
+  ./elf/./elf/dl-reloc.c
+  ./io/../sysdeps/unix/sysv/linux/statx.c
+  ./malloc/../string/bits/string_fortified.h
+  ./malloc/./malloc/arena.c
+  ./malloc/./malloc/malloc.c
+  ./nptl/./nptl/cancellation.c
+  ./posix/../sysdeps/unix/sysv/linux/pread64.c
+  ./stdio-common/./stdio-common/vfscanf-internal.c
+  ./stdlib/../stdlib/strtol_l.c
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+

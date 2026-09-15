@@ -1,0 +1,339 @@
+pre-0579	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	open=32	total=149	text_len=45	text_fnv=6141bc794f81b6b3
+0579-only	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	open=32	total=149	text_len=45	text_fnv=6141bc794f81b6b3
+this-change	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	open=32	total=108	text_len=45	text_fnv=6141bc794f81b6b3
+pre-0579	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	open=57	total=126	text_len=2	text_fnv=3dde0a07b5084555
+0579-only	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	open=46	total=115	text_len=2	text_fnv=3dde0a07b5084555
+this-change	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	open=46	total=115	text_len=2	text_fnv=3dde0a07b5084555
+pre-0579	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	open=11	total=57	text_len=705	text_fnv=65ac6c09589b287d
+0579-only	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	open=10	total=56	text_len=705	text_fnv=65ac6c09589b287d
+this-change	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	open=10	total=51	text_len=705	text_fnv=65ac6c09589b287d
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	open=53	total=775	text_len=732	text_fnv=57e794f60298054d
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	open=42	total=764	text_len=732	text_fnv=57e794f60298054d
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	open=42	total=194	text_len=732	text_fnv=57e794f60298054d
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	open=40	total=61	text_len=56	text_fnv=a45e51d2b94d8db8
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	open=36	total=57	text_len=56	text_fnv=a45e51d2b94d8db8
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	open=36	total=57	text_len=56	text_fnv=a45e51d2b94d8db8
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	open=7	total=35	text_len=85	text_fnv=c3d19f5e9b62e775
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	open=6	total=34	text_len=85	text_fnv=c3d19f5e9b62e775
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	open=6	total=19	text_len=85	text_fnv=c3d19f5e9b62e775
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	open=11	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	open=10	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	open=10	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	open=91	total=512	text_len=210	text_fnv=18322a8d33e68e91
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	open=65	total=486	text_len=210	text_fnv=18322a8d33e68e91
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	open=65	total=225	text_len=210	text_fnv=18322a8d33e68e91
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	open=101	total=71435	text_len=26291	text_fnv=e0ab0f9ce92551d5
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	open=75	total=71409	text_len=26291	text_fnv=e0ab0f9ce92551d5
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	open=75	total=34589	text_len=26291	text_fnv=e0ab0f9ce92551d5
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	open=88	total=569	text_len=220	text_fnv=8cc2d07c54887bbd
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	open=62	total=543	text_len=220	text_fnv=8cc2d07c54887bbd
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	open=62	total=152	text_len=220	text_fnv=8cc2d07c54887bbd
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	open=89	total=300	text_len=198	text_fnv=44c3926391e54223
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	open=63	total=274	text_len=198	text_fnv=44c3926391e54223
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	open=63	total=124	text_len=198	text_fnv=44c3926391e54223
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	open=4	total=18	text_len=1132	text_fnv=09fd4d591da1f3e6
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	open=4	total=18	text_len=1132	text_fnv=09fd4d591da1f3e6
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	open=4	total=14	text_len=1132	text_fnv=09fd4d591da1f3e6
+pre-0579	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	open=56	total=86	text_len=58	text_fnv=14bc2a4857ce6709
+0579-only	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	open=45	total=75	text_len=58	text_fnv=14bc2a4857ce6709
+this-change	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	open=45	total=75	text_len=58	text_fnv=14bc2a4857ce6709
+pre-0579	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	open=11	total=57	text_len=708	text_fnv=312c1573d4cda030
+0579-only	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	open=10	total=56	text_len=708	text_fnv=312c1573d4cda030
+this-change	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	open=10	total=51	text_len=708	text_fnv=312c1573d4cda030
+pre-0579	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	open=11	total=57	text_len=708	text_fnv=312c1573d4cda030
+0579-only	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	open=10	total=56	text_len=708	text_fnv=312c1573d4cda030
+this-change	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	open=10	total=51	text_len=708	text_fnv=312c1573d4cda030
+pre-0579	test-data/ole/xls/ComplexFunctionTestCaseData.xls	open=57	total=871	text_len=1867	text_fnv=6d8c6aa60b63e69a
+0579-only	test-data/ole/xls/ComplexFunctionTestCaseData.xls	open=46	total=860	text_len=1867	text_fnv=6d8c6aa60b63e69a
+this-change	test-data/ole/xls/ComplexFunctionTestCaseData.xls	open=46	total=224	text_len=1867	text_fnv=6d8c6aa60b63e69a
+pre-0579	test-data/ole/xls/ConditionalFormattingSamples.xls	open=5796	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+0579-only	test-data/ole/xls/ConditionalFormattingSamples.xls	open=2099	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+this-change	test-data/ole/xls/ConditionalFormattingSamples.xls	open=2099	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+pre-0579	test-data/ole/xls/DateFormats.xls	open=11	total=41	text_len=72	text_fnv=0d2c6fb58a27b1bb
+0579-only	test-data/ole/xls/DateFormats.xls	open=10	total=40	text_len=72	text_fnv=0d2c6fb58a27b1bb
+this-change	test-data/ole/xls/DateFormats.xls	open=10	total=28	text_len=72	text_fnv=0d2c6fb58a27b1bb
+pre-0579	test-data/ole/xls/DateTimeToNumberTestCases.xls	open=57	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+0579-only	test-data/ole/xls/DateTimeToNumberTestCases.xls	open=46	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+this-change	test-data/ole/xls/DateTimeToNumberTestCases.xls	open=46	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+pre-0579	test-data/ole/xls/FormulaEvalTestData.xls	open=119	total=67356	text_len=104620	text_fnv=1e0bbb98cf5a3484
+0579-only	test-data/ole/xls/FormulaEvalTestData.xls	open=93	total=67330	text_len=104620	text_fnv=1e0bbb98cf5a3484
+this-change	test-data/ole/xls/FormulaEvalTestData.xls	open=93	total=12127	text_len=104620	text_fnv=1e0bbb98cf5a3484
+pre-0579	test-data/ole/xls/FormulaRefs.xls	open=52	total=243	text_len=67	text_fnv=e79d8514b54972e3
+0579-only	test-data/ole/xls/FormulaRefs.xls	open=41	total=232	text_len=67	text_fnv=e79d8514b54972e3
+this-change	test-data/ole/xls/FormulaRefs.xls	open=41	total=140	text_len=67	text_fnv=e79d8514b54972e3
+pre-0579	test-data/ole/xls/FormulaSheetRange.xls	open=7	total=160	text_len=423	text_fnv=c39aa89bfcf6578b
+0579-only	test-data/ole/xls/FormulaSheetRange.xls	open=6	total=159	text_len=423	text_fnv=c39aa89bfcf6578b
+this-change	test-data/ole/xls/FormulaSheetRange.xls	open=6	total=117	text_len=423	text_fnv=c39aa89bfcf6578b
+pre-0579	test-data/ole/xls/HyperlinksOnManySheets.xls	open=7	total=69	text_len=300	text_fnv=faa7dd47645ea398
+0579-only	test-data/ole/xls/HyperlinksOnManySheets.xls	open=6	total=68	text_len=300	text_fnv=faa7dd47645ea398
+this-change	test-data/ole/xls/HyperlinksOnManySheets.xls	open=6	total=28	text_len=300	text_fnv=faa7dd47645ea398
+pre-0579	test-data/ole/xls/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+0579-only	test-data/ole/xls/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+this-change	test-data/ole/xls/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+pre-0579	test-data/ole/xls/SimpleChart.xls	open=7	total=30	text_len=154	text_fnv=e7cc900cdf24b1ef
+0579-only	test-data/ole/xls/SimpleChart.xls	open=6	total=29	text_len=154	text_fnv=e7cc900cdf24b1ef
+this-change	test-data/ole/xls/SimpleChart.xls	open=6	total=29	text_len=154	text_fnv=e7cc900cdf24b1ef
+pre-0579	test-data/ole/xls/SimpleMacro.xls	open=51	total=146	text_len=27	text_fnv=e61546104da89452
+0579-only	test-data/ole/xls/SimpleMacro.xls	open=40	total=135	text_len=27	text_fnv=e61546104da89452
+this-change	test-data/ole/xls/SimpleMacro.xls	open=40	total=135	text_len=27	text_fnv=e61546104da89452
+pre-0579	test-data/ole/xls/SimpleMultiCell.xls	open=4	total=16	text_len=48	text_fnv=321af1d7f355ebbb
+0579-only	test-data/ole/xls/SimpleMultiCell.xls	open=4	total=16	text_len=48	text_fnv=321af1d7f355ebbb
+this-change	test-data/ole/xls/SimpleMultiCell.xls	open=4	total=16	text_len=48	text_fnv=321af1d7f355ebbb
+pre-0579	test-data/ole/xls/SimpleScatterChart.xls	open=57	total=151	text_len=16	text_fnv=93cfecb8db15e609
+0579-only	test-data/ole/xls/SimpleScatterChart.xls	open=46	total=140	text_len=16	text_fnv=93cfecb8db15e609
+this-change	test-data/ole/xls/SimpleScatterChart.xls	open=46	total=117	text_len=16	text_fnv=93cfecb8db15e609
+pre-0579	test-data/ole/xls/SimpleWithAutofilter.xls	open=7	total=41	text_len=26	text_fnv=a159cf930315c04d
+0579-only	test-data/ole/xls/SimpleWithAutofilter.xls	open=6	total=40	text_len=26	text_fnv=a159cf930315c04d
+this-change	test-data/ole/xls/SimpleWithAutofilter.xls	open=6	total=25	text_len=26	text_fnv=a159cf930315c04d
+pre-0579	test-data/ole/xls/SimpleWithChoose.xls	open=4	total=19	text_len=55	text_fnv=78d6c569b24874b0
+0579-only	test-data/ole/xls/SimpleWithChoose.xls	open=4	total=19	text_len=55	text_fnv=78d6c569b24874b0
+this-change	test-data/ole/xls/SimpleWithChoose.xls	open=4	total=19	text_len=55	text_fnv=78d6c569b24874b0
+pre-0579	test-data/ole/xls/SimpleWithColours.xls	open=81	total=351	text_len=120	text_fnv=5b9a43d52fa9c5a4
+0579-only	test-data/ole/xls/SimpleWithColours.xls	open=73	total=343	text_len=120	text_fnv=5b9a43d52fa9c5a4
+this-change	test-data/ole/xls/SimpleWithColours.xls	open=73	total=260	text_len=120	text_fnv=5b9a43d52fa9c5a4
+pre-0579	test-data/ole/xls/SimpleWithComments.xls	open=7	total=34	text_len=22	text_fnv=dfc8fafa04cfc96e
+0579-only	test-data/ole/xls/SimpleWithComments.xls	open=6	total=33	text_len=22	text_fnv=dfc8fafa04cfc96e
+this-change	test-data/ole/xls/SimpleWithComments.xls	open=6	total=27	text_len=22	text_fnv=dfc8fafa04cfc96e
+pre-0579	test-data/ole/xls/SimpleWithDataFormat.xls	open=4	total=19	text_len=7	text_fnv=087ce33e812806b3
+0579-only	test-data/ole/xls/SimpleWithDataFormat.xls	open=4	total=19	text_len=7	text_fnv=087ce33e812806b3
+this-change	test-data/ole/xls/SimpleWithDataFormat.xls	open=4	total=19	text_len=7	text_fnv=087ce33e812806b3
+pre-0579	test-data/ole/xls/SimpleWithFormula.xls	open=4	total=20	text_len=41	text_fnv=63de595896d99c8d
+0579-only	test-data/ole/xls/SimpleWithFormula.xls	open=4	total=20	text_len=41	text_fnv=63de595896d99c8d
+this-change	test-data/ole/xls/SimpleWithFormula.xls	open=4	total=18	text_len=41	text_fnv=63de595896d99c8d
+pre-0579	test-data/ole/xls/SimpleWithImages-mac.xls	open=429	total=937	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/ole/xls/SimpleWithImages-mac.xls	open=297	total=805	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/ole/xls/SimpleWithImages-mac.xls	open=297	total=805	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/ole/xls/SimpleWithImages.xls	open=161	total=381	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/ole/xls/SimpleWithImages.xls	open=113	total=333	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/ole/xls/SimpleWithImages.xls	open=113	total=333	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/ole/xls/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+0579-only	test-data/ole/xls/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+this-change	test-data/ole/xls/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+pre-0579	test-data/ole/xls/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+0579-only	test-data/ole/xls/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+this-change	test-data/ole/xls/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+pre-0579	test-data/ole/xls/SimpleWithSkip.xls	open=4	total=24	text_len=48	text_fnv=e1b453ff749c9ec5
+0579-only	test-data/ole/xls/SimpleWithSkip.xls	open=4	total=24	text_len=48	text_fnv=e1b453ff749c9ec5
+this-change	test-data/ole/xls/SimpleWithSkip.xls	open=4	total=18	text_len=48	text_fnv=e1b453ff749c9ec5
+pre-0579	test-data/ole/xls/SimpleWithStyling.xls	open=7	total=34	text_len=42	text_fnv=f51b614a155bdf95
+0579-only	test-data/ole/xls/SimpleWithStyling.xls	open=6	total=33	text_len=42	text_fnv=f51b614a155bdf95
+this-change	test-data/ole/xls/SimpleWithStyling.xls	open=6	total=24	text_len=42	text_fnv=f51b614a155bdf95
+pre-0579	test-data/ole/xls/SingleLetterRanges.xls	open=11	total=30	text_len=119	text_fnv=87ffd37fca8636f8
+0579-only	test-data/ole/xls/SingleLetterRanges.xls	open=10	total=29	text_len=119	text_fnv=87ffd37fca8636f8
+this-change	test-data/ole/xls/SingleLetterRanges.xls	open=10	total=26	text_len=119	text_fnv=87ffd37fca8636f8
+pre-0579	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	open=57	total=883	text_len=1882	text_fnv=33e1a937c2fbc2a3
+0579-only	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	open=46	total=872	text_len=1882	text_fnv=33e1a937c2fbc2a3
+this-change	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	open=46	total=215	text_len=1882	text_fnv=33e1a937c2fbc2a3
+pre-0579	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	open=90	total=872	text_len=1886	text_fnv=394a5d79ff750869
+0579-only	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	open=64	total=846	text_len=1886	text_fnv=394a5d79ff750869
+this-change	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	open=64	total=194	text_len=1886	text_fnv=394a5d79ff750869
+pre-0579	test-data/ole/xls/WithChart.xls	open=57	total=147	text_len=59	text_fnv=00da098c51dec22b
+0579-only	test-data/ole/xls/WithChart.xls	open=46	total=136	text_len=59	text_fnv=00da098c51dec22b
+this-change	test-data/ole/xls/WithChart.xls	open=46	total=136	text_len=59	text_fnv=00da098c51dec22b
+pre-0579	test-data/ole/xls/WithCheckBoxes.xls	open=70	total=263	text_len=11	text_fnv=f1a2e64996fc6b5b
+0579-only	test-data/ole/xls/WithCheckBoxes.xls	open=62	total=255	text_len=11	text_fnv=f1a2e64996fc6b5b
+this-change	test-data/ole/xls/WithCheckBoxes.xls	open=62	total=255	text_len=11	text_fnv=f1a2e64996fc6b5b
+pre-0579	test-data/ole/xls/WithConditionalFormatting.xls	open=56	total=351	text_len=60	text_fnv=a79881867b475fe5
+0579-only	test-data/ole/xls/WithConditionalFormatting.xls	open=45	total=340	text_len=60	text_fnv=a79881867b475fe5
+this-change	test-data/ole/xls/WithConditionalFormatting.xls	open=45	total=156	text_len=60	text_fnv=a79881867b475fe5
+pre-0579	test-data/ole/xls/WithCustomViews.xls	open=456	total=94521	text_len=107420	text_fnv=ac89ca33151c9612
+0579-only	test-data/ole/xls/WithCustomViews.xls	open=336	total=94401	text_len=107420	text_fnv=ac89ca33151c9612
+this-change	test-data/ole/xls/WithCustomViews.xls	open=336	total=55551	text_len=107420	text_fnv=ac89ca33151c9612
+pre-0579	test-data/ole/xls/WithEmbeddedObjects.xls	open=98	total=316	text_len=11	text_fnv=0133f0a7e2b918aa
+0579-only	test-data/ole/xls/WithEmbeddedObjects.xls	open=72	total=290	text_len=11	text_fnv=0133f0a7e2b918aa
+this-change	test-data/ole/xls/WithEmbeddedObjects.xls	open=72	total=290	text_len=11	text_fnv=0133f0a7e2b918aa
+pre-0579	test-data/ole/xls/WithExtendedStyles.xls	open=32	total=206	text_len=35	text_fnv=5344263b03534bdf
+0579-only	test-data/ole/xls/WithExtendedStyles.xls	open=32	total=206	text_len=35	text_fnv=5344263b03534bdf
+this-change	test-data/ole/xls/WithExtendedStyles.xls	open=32	total=165	text_len=35	text_fnv=5344263b03534bdf
+pre-0579	test-data/ole/xls/WithFormattedGraphTitle.xls	open=7	total=27	text_len=45	text_fnv=c0c116ddc248e2ff
+0579-only	test-data/ole/xls/WithFormattedGraphTitle.xls	open=6	total=26	text_len=45	text_fnv=c0c116ddc248e2ff
+this-change	test-data/ole/xls/WithFormattedGraphTitle.xls	open=6	total=17	text_len=45	text_fnv=c0c116ddc248e2ff
+pre-0579	test-data/ole/xls/WithHyperlink.xls	open=7	total=32	text_len=93	text_fnv=aa27c221061fc5d3
+0579-only	test-data/ole/xls/WithHyperlink.xls	open=6	total=31	text_len=93	text_fnv=aa27c221061fc5d3
+this-change	test-data/ole/xls/WithHyperlink.xls	open=6	total=23	text_len=93	text_fnv=aa27c221061fc5d3
+pre-0579	test-data/ole/xls/WithThreeCharts.xls	open=57	total=178	text_len=128	text_fnv=e1d712de6501fd91
+0579-only	test-data/ole/xls/WithThreeCharts.xls	open=46	total=167	text_len=128	text_fnv=e1d712de6501fd91
+this-change	test-data/ole/xls/WithThreeCharts.xls	open=46	total=167	text_len=128	text_fnv=e1d712de6501fd91
+pre-0579	test-data/ole/xls/WithTwoCharts.xls	open=57	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+0579-only	test-data/ole/xls/WithTwoCharts.xls	open=46	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+this-change	test-data/ole/xls/WithTwoCharts.xls	open=46	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+pre-0579	test-data/ole/xls/WithTwoHyperLinks.xls	open=7	total=45	text_len=153	text_fnv=11ddae44562091bb
+0579-only	test-data/ole/xls/WithTwoHyperLinks.xls	open=6	total=44	text_len=153	text_fnv=11ddae44562091bb
+this-change	test-data/ole/xls/WithTwoHyperLinks.xls	open=6	total=25	text_len=153	text_fnv=11ddae44562091bb
+pre-0579	test-data/ole/xls/empty.xls	open=57	total=162	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/ole/xls/empty.xls	open=46	total=151	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/ole/xls/empty.xls	open=46	total=151	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/ole/xls/password.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+0579-only	test-data/ole/xls/password.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+this-change	test-data/ole/xls/password.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+pre-0579	test-data/poi/test-data/hpsf/TestUnicode.xls	open=4	total=18	text_len=34	text_fnv=9673e82fdde086ab
+0579-only	test-data/poi/test-data/hpsf/TestUnicode.xls	open=4	total=18	text_len=34	text_fnv=9673e82fdde086ab
+this-change	test-data/poi/test-data/hpsf/TestUnicode.xls	open=4	total=18	text_len=34	text_fnv=9673e82fdde086ab
+pre-0579	test-data/poi/test-data/spreadsheet/15228.xls	open=112	total=32593	text_len=81306	text_fnv=b6625a5086ddb4ff
+0579-only	test-data/poi/test-data/spreadsheet/15228.xls	open=86	total=32567	text_len=81306	text_fnv=b6625a5086ddb4ff
+this-change	test-data/poi/test-data/spreadsheet/15228.xls	open=86	total=15729	text_len=81306	text_fnv=b6625a5086ddb4ff
+pre-0579	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+0579-only	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+this-change	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+pre-0579	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+0579-only	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+this-change	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	OPEN_REFUSED	source CFB error: Corrupted file: FAT sector 10 is not marked FATSECT
+pre-0579	test-data/poi/test-data/spreadsheet/24207.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/poi/test-data/spreadsheet/24207.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/poi/test-data/spreadsheet/24207.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/poi/test-data/spreadsheet/29942.xls	open=126	total=133522	text_len=17288	text_fnv=fa1559d9f4f382c5
+0579-only	test-data/poi/test-data/spreadsheet/29942.xls	open=93	total=133489	text_len=17288	text_fnv=fa1559d9f4f382c5
+this-change	test-data/poi/test-data/spreadsheet/29942.xls	open=93	total=815	text_len=17288	text_fnv=fa1559d9f4f382c5
+pre-0579	test-data/poi/test-data/spreadsheet/35897-type4.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+0579-only	test-data/poi/test-data/spreadsheet/35897-type4.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+this-change	test-data/poi/test-data/spreadsheet/35897-type4.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+pre-0579	test-data/poi/test-data/spreadsheet/41139.xls	open=41	total=2213	text_len=2210	text_fnv=1e3c2699310d0017
+0579-only	test-data/poi/test-data/spreadsheet/41139.xls	open=30	total=2202	text_len=2210	text_fnv=1e3c2699310d0017
+this-change	test-data/poi/test-data/spreadsheet/41139.xls	open=30	total=219	text_len=2210	text_fnv=1e3c2699310d0017
+pre-0579	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	open=26	total=280	text_len=553	text_fnv=3f4f35652badd1f0
+0579-only	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	open=22	total=276	text_len=553	text_fnv=3f4f35652badd1f0
+this-change	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	open=22	total=51	text_len=553	text_fnv=3f4f35652badd1f0
+pre-0579	test-data/poi/test-data/spreadsheet/45365-2.xls	open=115	total=26738	text_len=67336	text_fnv=5fbf306613f15cf0
+0579-only	test-data/poi/test-data/spreadsheet/45365-2.xls	open=89	total=26712	text_len=67336	text_fnv=5fbf306613f15cf0
+this-change	test-data/poi/test-data/spreadsheet/45365-2.xls	open=89	total=540	text_len=67336	text_fnv=5fbf306613f15cf0
+pre-0579	test-data/poi/test-data/spreadsheet/45365.xls	open=57	total=174	text_len=14626	text_fnv=46e44438f8ccabc9
+0579-only	test-data/poi/test-data/spreadsheet/45365.xls	open=46	total=163	text_len=14626	text_fnv=46e44438f8ccabc9
+this-change	test-data/poi/test-data/spreadsheet/45365.xls	open=46	total=163	text_len=14626	text_fnv=46e44438f8ccabc9
+pre-0579	test-data/poi/test-data/spreadsheet/45492.xls	open=11	total=36	text_len=53	text_fnv=824681369f214ddd
+0579-only	test-data/poi/test-data/spreadsheet/45492.xls	open=10	total=35	text_len=53	text_fnv=824681369f214ddd
+this-change	test-data/poi/test-data/spreadsheet/45492.xls	open=10	total=17	text_len=53	text_fnv=824681369f214ddd
+pre-0579	test-data/poi/test-data/spreadsheet/45761.xls	open=32	total=201	text_len=27	text_fnv=f62a43fd401b2003
+0579-only	test-data/poi/test-data/spreadsheet/45761.xls	open=32	total=201	text_len=27	text_fnv=f62a43fd401b2003
+this-change	test-data/poi/test-data/spreadsheet/45761.xls	open=32	total=157	text_len=27	text_fnv=f62a43fd401b2003
+pre-0579	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	open=4	total=9	text_len=4	text_fnv=04b6f9f103146f23
+0579-only	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	open=4	total=9	text_len=4	text_fnv=04b6f9f103146f23
+this-change	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	open=4	total=9	text_len=4	text_fnv=04b6f9f103146f23
+pre-0579	test-data/poi/test-data/spreadsheet/48968.xls	open=57	total=1100	text_len=432	text_fnv=3dc54122b7d8a84a
+0579-only	test-data/poi/test-data/spreadsheet/48968.xls	open=46	total=1089	text_len=432	text_fnv=3dc54122b7d8a84a
+this-change	test-data/poi/test-data/spreadsheet/48968.xls	open=46	total=102	text_len=432	text_fnv=3dc54122b7d8a84a
+pre-0579	test-data/poi/test-data/spreadsheet/50939.xls	open=392	total=755	text_len=2013	text_fnv=53b103982147a1a4
+0579-only	test-data/poi/test-data/spreadsheet/50939.xls	open=272	total=635	text_len=2013	text_fnv=53b103982147a1a4
+this-change	test-data/poi/test-data/spreadsheet/50939.xls	open=272	total=635	text_len=2013	text_fnv=53b103982147a1a4
+pre-0579	test-data/poi/test-data/spreadsheet/53109.xls	open=56	total=144	text_len=92	text_fnv=3269d5d10980cc3e
+0579-only	test-data/poi/test-data/spreadsheet/53109.xls	open=45	total=133	text_len=92	text_fnv=3269d5d10980cc3e
+this-change	test-data/poi/test-data/spreadsheet/53109.xls	open=45	total=133	text_len=92	text_fnv=3269d5d10980cc3e
+pre-0579	test-data/poi/test-data/spreadsheet/54016.xls	open=1995	total=4690467	text_len=840804	text_fnv=2e9485f3e8fb0004
+0579-only	test-data/poi/test-data/spreadsheet/54016.xls	open=1110	total=4689582	text_len=840804	text_fnv=2e9485f3e8fb0004
+this-change	test-data/poi/test-data/spreadsheet/54016.xls	open=1110	total=1671048	text_len=840804	text_fnv=2e9485f3e8fb0004
+pre-0579	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	open=57	total=153	text_len=158	text_fnv=d86bca418867a324
+0579-only	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	open=46	total=142	text_len=158	text_fnv=d86bca418867a324
+this-change	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	open=46	total=142	text_len=158	text_fnv=d86bca418867a324
+pre-0579	test-data/poi/test-data/spreadsheet/57456.xls	OPEN_REFUSED	source XLS parse error: Invalid data: SST total count is smaller than its unique count
+0579-only	test-data/poi/test-data/spreadsheet/57456.xls	OPEN_REFUSED	source XLS parse error: Invalid data: SST total count is smaller than its unique count
+this-change	test-data/poi/test-data/spreadsheet/57456.xls	OPEN_REFUSED	source XLS parse error: Invalid data: SST total count is smaller than its unique count
+pre-0579	test-data/poi/test-data/spreadsheet/59858.xls	open=10066	total=1334755	text_len=40551	text_fnv=b946ee52430d1e31
+0579-only	test-data/poi/test-data/spreadsheet/59858.xls	open=2916	total=1327605	text_len=40551	text_fnv=b946ee52430d1e31
+this-change	test-data/poi/test-data/spreadsheet/59858.xls	open=2916	total=432546	text_len=40551	text_fnv=b946ee52430d1e31
+pre-0579	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	open=5796	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+0579-only	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	open=2099	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+this-change	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	open=2099	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+pre-0579	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	open=4	total=20	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	open=4	total=20	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	open=4	total=20	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/poi/test-data/spreadsheet/DateFormats.xls	open=11	total=41	text_len=72	text_fnv=0d2c6fb58a27b1bb
+0579-only	test-data/poi/test-data/spreadsheet/DateFormats.xls	open=10	total=40	text_len=72	text_fnv=0d2c6fb58a27b1bb
+this-change	test-data/poi/test-data/spreadsheet/DateFormats.xls	open=10	total=28	text_len=72	text_fnv=0d2c6fb58a27b1bb
+pre-0579	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	open=57	total=417	text_len=78	text_fnv=0d9b4cce73043694
+0579-only	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	open=46	total=406	text_len=78	text_fnv=0d9b4cce73043694
+this-change	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	open=46	total=262	text_len=78	text_fnv=0d9b4cce73043694
+pre-0579	test-data/poi/test-data/spreadsheet/Formatting.xls	open=54	total=424	text_len=201	text_fnv=c4c5345f7f7b0f64
+0579-only	test-data/poi/test-data/spreadsheet/Formatting.xls	open=43	total=413	text_len=201	text_fnv=c4c5345f7f7b0f64
+this-change	test-data/poi/test-data/spreadsheet/Formatting.xls	open=43	total=149	text_len=201	text_fnv=c4c5345f7f7b0f64
+pre-0579	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	open=7	total=69	text_len=300	text_fnv=faa7dd47645ea398
+0579-only	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	open=6	total=68	text_len=300	text_fnv=faa7dd47645ea398
+this-change	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	open=6	total=28	text_len=300	text_fnv=faa7dd47645ea398
+pre-0579	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	open=57	total=979	text_len=3111	text_fnv=6e1a7b058b4cf3e4
+0579-only	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	open=46	total=968	text_len=3111	text_fnv=6e1a7b058b4cf3e4
+this-change	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	open=46	total=218	text_len=3111	text_fnv=6e1a7b058b4cf3e4
+pre-0579	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	open=57	total=584	text_len=1295	text_fnv=6fdbbe25d51a4ecf
+0579-only	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	open=46	total=573	text_len=1295	text_fnv=6fdbbe25d51a4ecf
+this-change	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	open=46	total=136	text_len=1295	text_fnv=6fdbbe25d51a4ecf
+pre-0579	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	OPEN_REFUSED	source XLS parse error: Invalid record 0x087C: XFCRC declares 72 XF records but 62 were parsed
+0579-only	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	OPEN_REFUSED	source XLS parse error: Invalid record 0x087C: XFCRC declares 72 XF records but 62 were parsed
+this-change	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	OPEN_REFUSED	source XLS parse error: Invalid record 0x087C: XFCRC declares 72 XF records but 62 were parsed
+pre-0579	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	open=55	total=163	text_len=64	text_fnv=5a71fd149dd7ed23
+0579-only	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	open=44	total=152	text_len=64	text_fnv=5a71fd149dd7ed23
+this-change	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	open=44	total=152	text_len=64	text_fnv=5a71fd149dd7ed23
+pre-0579	test-data/poi/test-data/spreadsheet/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+0579-only	test-data/poi/test-data/spreadsheet/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+this-change	test-data/poi/test-data/spreadsheet/Simple.xls	open=4	total=16	text_len=12	text_fnv=c46380afa1433885
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	open=51	total=146	text_len=27	text_fnv=e61546104da89452
+0579-only	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	open=40	total=135	text_len=27	text_fnv=e61546104da89452
+this-change	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	open=40	total=135	text_len=27	text_fnv=e61546104da89452
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	open=57	total=151	text_len=16	text_fnv=93cfecb8db15e609
+0579-only	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	open=46	total=140	text_len=16	text_fnv=93cfecb8db15e609
+this-change	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	open=46	total=117	text_len=16	text_fnv=93cfecb8db15e609
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	open=81	total=351	text_len=120	text_fnv=5b9a43d52fa9c5a4
+0579-only	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	open=73	total=343	text_len=120	text_fnv=5b9a43d52fa9c5a4
+this-change	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	open=73	total=260	text_len=120	text_fnv=5b9a43d52fa9c5a4
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	open=7	total=34	text_len=22	text_fnv=dfc8fafa04cfc96e
+0579-only	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	open=6	total=33	text_len=22	text_fnv=dfc8fafa04cfc96e
+this-change	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	open=6	total=27	text_len=22	text_fnv=dfc8fafa04cfc96e
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+0579-only	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+this-change	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	open=4	total=19	text_len=29	text_fnv=0fe0c8fb648fe1bd
+pre-0579	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+0579-only	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+this-change	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	open=4	total=19	text_len=23	text_fnv=37bc6b6405cae6b5
+pre-0579	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	open=7	total=20	text_len=18	text_fnv=74f82a5eb8589dca
+0579-only	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	open=6	total=19	text_len=18	text_fnv=74f82a5eb8589dca
+this-change	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	open=6	total=17	text_len=18	text_fnv=74f82a5eb8589dca
+pre-0579	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	open=11	total=24	text_len=6	text_fnv=4582b262a75f140d
+0579-only	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	open=10	total=23	text_len=6	text_fnv=4582b262a75f140d
+this-change	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	open=10	total=23	text_len=6	text_fnv=4582b262a75f140d
+pre-0579	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	open=56	total=351	text_len=60	text_fnv=a79881867b475fe5
+0579-only	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	open=45	total=340	text_len=60	text_fnv=a79881867b475fe5
+this-change	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	open=45	total=156	text_len=60	text_fnv=a79881867b475fe5
+pre-0579	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	open=7	total=45	text_len=153	text_fnv=11ddae44562091bb
+0579-only	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	open=6	total=44	text_len=153	text_fnv=11ddae44562091bb
+this-change	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	open=6	total=25	text_len=153	text_fnv=11ddae44562091bb
+pre-0579	test-data/poi/test-data/spreadsheet/XRefCalc.xls	open=55	total=228	text_len=101	text_fnv=725f03b87ee19f32
+0579-only	test-data/poi/test-data/spreadsheet/XRefCalc.xls	open=44	total=217	text_len=101	text_fnv=725f03b87ee19f32
+this-change	test-data/poi/test-data/spreadsheet/XRefCalc.xls	open=44	total=97	text_len=101	text_fnv=725f03b87ee19f32
+pre-0579	test-data/poi/test-data/spreadsheet/colwidth.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/poi/test-data/spreadsheet/colwidth.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/poi/test-data/spreadsheet/colwidth.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/poi/test-data/spreadsheet/comments.xls	open=11	total=50	text_len=26	text_fnv=2afa98d503da9dae
+0579-only	test-data/poi/test-data/spreadsheet/comments.xls	open=10	total=49	text_len=26	text_fnv=2afa98d503da9dae
+this-change	test-data/poi/test-data/spreadsheet/comments.xls	open=10	total=37	text_len=26	text_fnv=2afa98d503da9dae
+pre-0579	test-data/poi/test-data/spreadsheet/duprich1.xls	open=11	total=2496	text_len=2392	text_fnv=71331d290212afb2
+0579-only	test-data/poi/test-data/spreadsheet/duprich1.xls	open=10	total=2495	text_len=2392	text_fnv=71331d290212afb2
+this-change	test-data/poi/test-data/spreadsheet/duprich1.xls	open=10	total=101	text_len=2392	text_fnv=71331d290212afb2
+pre-0579	test-data/poi/test-data/spreadsheet/duprich2.xls	open=11	total=47	text_len=44	text_fnv=bac139119290dfb0
+0579-only	test-data/poi/test-data/spreadsheet/duprich2.xls	open=10	total=46	text_len=44	text_fnv=bac139119290dfb0
+this-change	test-data/poi/test-data/spreadsheet/duprich2.xls	open=10	total=31	text_len=44	text_fnv=bac139119290dfb0
+pre-0579	test-data/poi/test-data/spreadsheet/dvEmpty.xls	open=50	total=97	text_len=119	text_fnv=28cbc474753a962f
+0579-only	test-data/poi/test-data/spreadsheet/dvEmpty.xls	open=39	total=86	text_len=119	text_fnv=28cbc474753a962f
+this-change	test-data/poi/test-data/spreadsheet/dvEmpty.xls	open=39	total=86	text_len=119	text_fnv=28cbc474753a962f
+pre-0579	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	open=51	total=122	text_len=58	text_fnv=c55237863b629d80
+0579-only	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	open=40	total=111	text_len=58	text_fnv=c55237863b629d80
+this-change	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	open=40	total=88	text_len=58	text_fnv=c55237863b629d80
+pre-0579	test-data/poi/test-data/spreadsheet/external_name.xls	open=99	total=5935	text_len=28131	text_fnv=744fb0f9a2b5a99c
+0579-only	test-data/poi/test-data/spreadsheet/external_name.xls	open=73	total=5909	text_len=28131	text_fnv=744fb0f9a2b5a99c
+this-change	test-data/poi/test-data/spreadsheet/external_name.xls	open=73	total=1551	text_len=28131	text_fnv=744fb0f9a2b5a99c
+pre-0579	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+0579-only	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+this-change	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+pre-0579	test-data/poi/test-data/spreadsheet/named-cell-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+0579-only	test-data/poi/test-data/spreadsheet/named-cell-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+this-change	test-data/poi/test-data/spreadsheet/named-cell-test.xls	open=32	TEXT_REFUSED	source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+pre-0579	test-data/poi/test-data/spreadsheet/namedinput.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+0579-only	test-data/poi/test-data/spreadsheet/namedinput.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+this-change	test-data/poi/test-data/spreadsheet/namedinput.xls	open=4	total=16	text_len=3	text_fnv=a4a0fb189d0de06d
+pre-0579	test-data/poi/test-data/spreadsheet/testNames.xls	open=53	total=105	text_len=86	text_fnv=3457c64a6bc56768
+0579-only	test-data/poi/test-data/spreadsheet/testNames.xls	open=42	total=94	text_len=86	text_fnv=3457c64a6bc56768
+this-change	test-data/poi/test-data/spreadsheet/testNames.xls	open=42	total=94	text_len=86	text_fnv=3457c64a6bc56768
+pre-0579	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	open=11	total=51	text_len=26	text_fnv=aff80d0cf76e0b91
+0579-only	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	open=10	total=50	text_len=26	text_fnv=aff80d0cf76e0b91
+this-change	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	open=10	total=29	text_len=26	text_fnv=aff80d0cf76e0b91
+pre-0579	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+0579-only	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads
+this-change	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	OPEN_REFUSED	encrypted XLS FILEPASS is unsupported by source-backed reads

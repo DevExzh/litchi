@@ -1,0 +1,21 @@
+fixtures measured end-to-end (text extraction): 98
+fixtures the library refuses:                   15
+digest mismatches before/after:                 0   <-- must be 0
+
+TEXT EXTRACTION chain links: 6,470,352 -> 2,234,052   (65.5% removed)
+OPEN chain links:            7,786 -> 7,786   (0.0% removed)
+fixtures with zero saving:   36 of 98
+fixtures that got worse:     0   <-- must be 0
+
+top movers:
+fixture                                                 0579-only  this-change    saved
+54016.xls                                               4,689,582    1,671,048    64.4%
+59858.xls                                               1,327,605      432,546    67.4%
+29942.xls                                                 133,489          815    99.4%
+FormulaEvalTestData.xls                                    67,330       12,127    82.0%
+WithCustomViews.xls                                        94,401       55,551    41.2%
+pivottable_dates_grouping.xls                              71,409       34,589    51.6%
+45365-2.xls                                                26,712          540    98.0%
+15228.xls                                                  32,567       15,729    51.7%
+external_name.xls                                           5,909        1,551    73.8%
+duprich1.xls                                                2,495          101    96.0%

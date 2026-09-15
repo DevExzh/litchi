@@ -1,0 +1,38 @@
+diff --git a/crates/litchi-doc/src/body_text/source.rs b/crates/litchi-doc/src/body_text/source.rs
+index 98f8f70f4..fdc7bb704 100644
+--- a/crates/litchi-doc/src/body_text/source.rs
++++ b/crates/litchi-doc/src/body_text/source.rs
+@@ -1677,6 +1677,19 @@ fn resolve_paragraph(
+         .checked_mul(2)
+         .ok_or_else(|| Error::Limit("DOC scan chunk byte length overflows usize".into()))?;
+     let mut bytes = try_zeroed(scan_chunk_bytes, "DOC paragraph scan chunk")?;
++    // One resumable `WordDocument` allocation-chain position for the whole
++    // scan.  Every chunk this loop reads begins at or after the end of the
++    // previous one — `cp` only advances inside a piece, and `parse_clx`
++    // refuses a piece whose `fc` precedes the previous piece's `fc_end` with
++    // `Refusal::AmbiguousTopology` — so the walk that reaches each chunk is a
++    // continuation of the one before it rather than a fresh walk from the
++    // stream's first sector.
++    //
++    // Only the saving depends on that ordering.  A hint sitting past the
++    // requested offset is discarded by the reader and the walk restarts cold,
++    // so a scan that ever moved backwards would read exactly the bytes it
++    // reads today.
++    let mut chain = shared.chain_hint();
+     for (piece_index, piece) in layout.pieces.iter().enumerate() {
+         let start = piece.cp_start;
+         let end = piece.cp_end.min(layout.ccp_text);
+@@ -1712,7 +1725,12 @@ fn resolve_paragraph(
+                         .ok_or_else(|| Error::Limit("DOC piece FC offset overflows u64".into()))?,
+                 )
+                 .ok_or_else(|| Error::Limit("DOC piece FC offset overflows u64".into()))?;
+-            shared.read_stream_range(&[WORD_DOCUMENT], fc, &mut bytes[..byte_len])?;
++            shared.read_stream_range_hinted(
++                &[WORD_DOCUMENT],
++                fc,
++                &mut bytes[..byte_len],
++                &mut chain,
++            )?;
+             prefix_units = prefix_units
+                 .checked_add(count)
+                 .ok_or_else(|| Error::Limit("DOC paragraph-prefix count overflows usize".into()))?;

@@ -1,0 +1,468 @@
+
+== docbig/open  --  ca.kwsymphony...Seat_Booking_Form.doc (1,619,457 B) / open ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 4,962,445
+   sum of per-symbol self deltas                              : 4,957,553
+   negative-delta mass (noise floor)                          : -711  (0.0143% of whole)
+   linearity: 20->170 = 4,965,923 Ir/op ; 170->320 = 4,958,966 Ir/op  (drift 0.1402%)
+   rank    self Ir/op       %  crate              symbol
+      1     1,629,651  32.84%  libc/runtime       __memset_avx2_unaligned_erms
+      2     1,051,844  21.20%  libc/runtime       __memcpy_avx_unaligned_erms
+      3       315,315   6.35%  litchi-doc         litchi_doc::sprm::parse_sprms
+      4       118,318   2.38%  libc/runtime       _int_malloc
+      5       107,054   2.16%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+      6       106,678   2.15%  litchi-cfb         litchi_cfb::file::collect_sector_chain
+      7        97,394   1.96%  libc/runtime       free
+      8        80,049   1.61%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+      9        80,003   1.61%  libc/runtime       malloc
+     10        59,342   1.20%  libc/runtime       _int_free_merge_chunk
+     11        57,360   1.16%  litchi-doc         litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+     12        55,895   1.13%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+     13        54,945   1.11%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+     14        53,956   1.09%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     15        49,652   1.00%  litchi-doc         litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::apply_sprm
+   -- by crate --
+            3,159,374  63.67%  libc/runtime
+            1,151,592  23.21%  litchi-doc
+              357,304   7.20%  litchi-cfb
+              263,941   5.32%  core/alloc/std
+               14,273   0.29%  hashbrown
+                4,928   0.10%  litchi-ole-common
+                2,758   0.06%  smallvec
+                1,531   0.03%  encoding-rs
+                1,000   0.02%  memchr
+                  853   0.02%  litchi-core
+
+== docbig/text  --  ca.kwsymphony...Seat_Booking_Form.doc (1,619,457 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 4,946,963
+   sum of per-symbol self deltas                              : 4,942,062
+   negative-delta mass (noise floor)                          : -711  (0.0144% of whole)
+   linearity: 20->170 = 4,957,312 Ir/op ; 170->320 = 4,936,614 Ir/op  (drift 0.4184%)
+   rank    self Ir/op       %  crate              symbol
+      1     1,629,657  32.94%  libc/runtime       __memset_avx2_unaligned_erms
+      2     1,036,126  20.94%  libc/runtime       __memcpy_avx_unaligned_erms
+      3       315,315   6.37%  litchi-doc         litchi_doc::sprm::parse_sprms
+      4       118,911   2.40%  libc/runtime       _int_malloc
+      5       107,054   2.16%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+      6       106,678   2.16%  litchi-cfb         litchi_cfb::file::collect_sector_chain
+      7        97,411   1.97%  libc/runtime       free
+      8        80,049   1.62%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+      9        80,040   1.62%  libc/runtime       malloc
+     10        59,213   1.20%  libc/runtime       _int_free_merge_chunk
+     11        57,360   1.16%  litchi-doc         litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::from_sprm
+     12        55,895   1.13%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+     13        54,945   1.11%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+     14        53,956   1.09%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     15        49,652   1.00%  litchi-doc         litchi_doc::parts::chp::codec::<impl litchi_doc::parts::chp::model::CharacterProperties>::apply_sprm
+   -- by crate --
+            3,143,830  63.55%  libc/runtime
+            1,151,592  23.28%  litchi-doc
+              357,304   7.22%  litchi-cfb
+              263,993   5.34%  core/alloc/std
+               14,273   0.29%  hashbrown
+                4,928   0.10%  litchi-ole-common
+                2,758   0.06%  smallvec
+                1,531   0.03%  encoding-rs
+                1,000   0.02%  memchr
+                  853   0.02%  litchi-core
+
+== docmid/open  --  FloatingPictures.doc (335,360 B) / open ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 3,457,522
+   sum of per-symbol self deltas                              : 3,454,090
+   negative-delta mass (noise floor)                          : -489  (0.0141% of whole)
+   linearity: 20->170 = 3,461,222 Ir/op ; 170->320 = 3,453,822 Ir/op  (drift 0.2140%)
+   rank    self Ir/op       %  crate              symbol
+      1       475,265  13.75%  libc/runtime       __memcpy_avx_unaligned_erms
+      2       321,215   9.29%  libc/runtime       __memset_avx2_unaligned_erms
+      3       287,382   8.31%  litchi-doc         litchi_doc::parts::text::TextExtractor::new
+      4       259,614   7.51%  core/alloc/std     <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+      5       175,217   5.07%  litchi-doc         litchi_doc::sprm::parse_sprms
+      6       141,674   4.10%  litchi-doc         litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+      7       141,027   4.08%  libc/runtime       _int_malloc
+      8       105,221   3.04%  libc/runtime       free
+      9        91,665   2.65%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     10        86,917   2.51%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+     11        82,892   2.40%  libc/runtime       malloc
+     12        81,497   2.36%  libc/runtime       _int_free_merge_chunk
+     13        77,584   2.24%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+     14        74,985   2.17%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+     15        45,340   1.31%  core/alloc/std     <[V] as alloc::slice::Concat<T>>::concat
+   -- by crate --
+            1,450,659  41.96%  litchi-doc
+            1,348,336  39.00%  libc/runtime
+              499,109  14.44%  core/alloc/std
+              127,109   3.68%  litchi-cfb
+               13,330   0.39%  hashbrown
+                7,200   0.21%  litchi-ole-common
+                4,681   0.14%  smallvec
+                1,742   0.05%  litchi-core
+                1,129   0.03%  memchr
+                  796   0.02%  encoding-rs
+
+== docmid/text  --  FloatingPictures.doc (335,360 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 3,468,253
+   sum of per-symbol self deltas                              : 3,464,811
+   negative-delta mass (noise floor)                          : -489  (0.0141% of whole)
+   linearity: 20->170 = 3,471,459 Ir/op ; 170->320 = 3,465,047 Ir/op  (drift 0.1849%)
+   rank    self Ir/op       %  crate              symbol
+      1       484,887  13.98%  libc/runtime       __memcpy_avx_unaligned_erms
+      2       321,213   9.26%  libc/runtime       __memset_avx2_unaligned_erms
+      3       287,382   8.29%  litchi-doc         litchi_doc::parts::text::TextExtractor::new
+      4       259,614   7.49%  core/alloc/std     <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+      5       175,217   5.05%  litchi-doc         litchi_doc::sprm::parse_sprms
+      6       141,674   4.08%  litchi-doc         litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+      7       141,516   4.08%  libc/runtime       _int_malloc
+      8       105,247   3.03%  libc/runtime       free
+      9        91,665   2.64%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     10        86,917   2.51%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+     11        82,887   2.39%  libc/runtime       malloc
+     12        81,723   2.36%  libc/runtime       _int_free_merge_chunk
+     13        77,584   2.24%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+     14        74,985   2.16%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+     15        45,340   1.31%  core/alloc/std     <[V] as alloc::slice::Concat<T>>::concat
+   -- by crate --
+            1,450,659  41.83%  litchi-doc
+            1,358,999  39.18%  libc/runtime
+              499,161  14.39%  core/alloc/std
+              127,109   3.66%  litchi-cfb
+               13,336   0.38%  hashbrown
+                7,200   0.21%  litchi-ole-common
+                4,681   0.13%  smallvec
+                1,742   0.05%  litchi-core
+                1,129   0.03%  memchr
+                  796   0.02%  encoding-rs
+
+== docsmall/open  --  saved-by-table.doc (65,024 B) / open ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 5,398,535
+   sum of per-symbol self deltas                              : 5,393,195
+   negative-delta mass (noise floor)                          : -714  (0.0132% of whole)
+   linearity: 20->170 = 5,396,023 Ir/op ; 170->320 = 5,401,046 Ir/op  (drift 0.0930%)
+   rank    self Ir/op       %  crate              symbol
+      1       873,414  16.18%  litchi-doc         litchi_doc::parts::text::TextExtractor::new
+      2       860,910  15.95%  libc/runtime       __memcpy_avx_unaligned_erms
+      3       790,965  14.65%  core/alloc/std     <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+      4       436,366   8.08%  litchi-doc         litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+      5       249,981   4.63%  litchi-doc         litchi_doc::sprm::parse_sprms
+      6       182,504   3.38%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+      7       172,313   3.19%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+      8       151,860   2.81%  libc/runtime       free
+      9       142,839   2.65%  libc/runtime       _int_malloc
+     10       123,676   2.29%  libc/runtime       malloc
+     11        94,806   1.76%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     12        88,535   1.64%  libc/runtime       _int_free_merge_chunk
+     13        77,504   1.44%  litchi-doc         litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_context
+     14        75,547   1.40%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+     15        75,267   1.39%  litchi-doc         litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_sprms
+   -- by crate --
+            2,666,692  49.40%  litchi-doc
+            1,590,783  29.47%  libc/runtime
+            1,079,277  19.99%  core/alloc/std
+               44,187   0.82%  litchi-cfb
+                8,420   0.16%  hashbrown
+                2,731   0.05%  smallvec
+                  853   0.02%  litchi-core
+                  253   0.00%  memchr
+
+== docsmall/text  --  saved-by-table.doc (65,024 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 5,426,545
+   sum of per-symbol self deltas                              : 5,421,174
+   negative-delta mass (noise floor)                          : -715  (0.0132% of whole)
+   linearity: 20->170 = 5,424,033 Ir/op ; 170->320 = 5,429,056 Ir/op  (drift 0.0926%)
+   rank    self Ir/op       %  crate              symbol
+      1       888,230  16.37%  libc/runtime       __memcpy_avx_unaligned_erms
+      2       873,414  16.10%  litchi-doc         litchi_doc::parts::text::TextExtractor::new
+      3       790,965  14.58%  core/alloc/std     <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+      4       436,366   8.04%  litchi-doc         litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors
+      5       249,981   4.61%  litchi-doc         litchi_doc::sprm::parse_sprms
+      6       182,504   3.36%  litchi-doc         <litchi_doc::parts::pap::model::ParagraphProperties as core::clone::Clone>::clone
+      7       172,313   3.18%  litchi-doc         litchi_doc::parts::pap_bin_table::PapBinTable::parse
+      8       151,880   2.80%  libc/runtime       free
+      9       143,226   2.64%  libc/runtime       _int_malloc
+     10       123,687   2.28%  libc/runtime       malloc
+     11        94,806   1.75%  litchi-doc         litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges
+     12        88,606   1.63%  libc/runtime       _int_free_merge_chunk
+     13        77,504   1.43%  litchi-doc         litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::from_sprm_context
+     14        75,547   1.39%  litchi-doc         litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+     15        75,267   1.39%  litchi-doc         litchi_doc::parts::pap::parser::<impl litchi_doc::parts::pap::model::ParagraphProperties>::apply_direct_sprms
+   -- by crate --
+            2,666,692  49.14%  litchi-doc
+            1,618,732  29.83%  libc/runtime
+            1,079,308  19.89%  core/alloc/std
+               44,187   0.81%  litchi-cfb
+                8,419   0.16%  hashbrown
+                2,731   0.05%  smallvec
+                  853   0.02%  litchi-core
+                  253   0.00%  memchr
+
+== pptbig/open  --  45543-transition-litchi.ppt (842,240 B) / open+slide_count ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 949,401
+   sum of per-symbol self deltas                              : 948,474
+   negative-delta mass (noise floor)                          : -356  (0.0375% of whole)
+   linearity: 20->170 = 949,570 Ir/op ; 170->320 = 949,231 Ir/op  (drift 0.0357%)
+   rank    self Ir/op       %  crate              symbol
+      1       219,252  23.09%  libc/runtime       __memset_avx2_unaligned_erms
+      2       181,376  19.10%  libc/runtime       __memcpy_avx_unaligned_erms
+      3        69,567   7.33%  libc/runtime       _int_malloc
+      4        56,343   5.93%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+      5        44,675   4.71%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      6        32,036   3.37%  libc/runtime       _int_free_merge_chunk
+      7        21,600   2.28%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      8        19,740   2.08%  litchi-cfb         litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+      9        18,773   1.98%  litchi-cfb         litchi_cfb::file::OleFile<R>::validate_stream_allocations
+     10        18,036   1.90%  libc/runtime       free
+     11        14,090   1.48%  litchi-ppt         litchi_ppt::records::record::Record::extract_text'2
+     12        12,727   1.34%  libc/runtime       malloc
+     13        12,642   1.33%  core/alloc/std     core::hash::BuildHasher::hash_one
+     14        12,055   1.27%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children'2
+     15        11,926   1.26%  litchi-cfb         litchi_cfb::directory_name::directory_name_data
+   -- by crate --
+              585,588  61.68%  libc/runtime
+              147,473  15.53%  litchi-cfb
+              126,975  13.37%  litchi-ppt
+               74,356   7.83%  core/alloc/std
+                8,338   0.88%  hashbrown
+                3,193   0.34%  smallvec
+                2,119   0.22%  litchi-core
+                  432   0.05%  memchr
+
+== pptbig/text  --  45543-transition-litchi.ppt (842,240 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 1,364,463
+   sum of per-symbol self deltas                              : 1,363,113
+   negative-delta mass (noise floor)                          : -495  (0.0363% of whole)
+   linearity: 20->170 = 1,365,948 Ir/op ; 170->320 = 1,362,978 Ir/op  (drift 0.2176%)
+   rank    self Ir/op       %  crate              symbol
+      1       219,299  16.07%  libc/runtime       __memset_avx2_unaligned_erms
+      2       197,466  14.47%  libc/runtime       __memcpy_avx_unaligned_erms
+      3        89,189   6.54%  libc/runtime       _int_malloc
+      4        68,267   5.00%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      5        67,580   4.95%  core/alloc/std     <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+      6        56,343   4.13%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+      7        49,938   3.66%  libc/runtime       _int_free_merge_chunk
+      8        43,400   3.18%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      9        33,590   2.46%  libc/runtime       free
+     10        31,359   2.30%  core/alloc/std     <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+     11        26,197   1.92%  libc/runtime       malloc
+     12        20,124   1.47%  core/alloc/std     core::hash::BuildHasher::hash_one
+     13        19,827   1.45%  litchi-odraw       <litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next
+     14        19,740   1.45%  litchi-cfb         litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+     15        19,496   1.43%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children'2
+   -- by crate --
+              711,991  52.18%  libc/runtime
+              234,073  17.15%  litchi-ppt
+              229,125  16.79%  core/alloc/std
+              147,372  10.80%  litchi-cfb
+               23,828   1.75%  litchi-odraw
+               10,979   0.80%  hashbrown
+                3,193   0.23%  smallvec
+                2,119   0.16%  litchi-core
+                  432   0.03%  memchr
+
+== pptmid/open  --  45543.ppt (385,024 B) / open+slide_count ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 1,180,448
+   sum of per-symbol self deltas                              : 1,179,301
+   negative-delta mass (noise floor)                          : -445  (0.0377% of whole)
+   linearity: 20->170 = 1,180,814 Ir/op ; 170->320 = 1,180,082 Ir/op  (drift 0.0620%)
+   rank    self Ir/op       %  crate              symbol
+      1       359,055  30.42%  libc/runtime       __memcpy_avx_unaligned_erms
+      2       326,363  27.65%  libc/runtime       __memset_avx2_unaligned_erms
+      3        67,744   5.74%  libc/runtime       _int_malloc
+      4        44,095   3.74%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      5        31,114   2.64%  libc/runtime       _int_free_merge_chunk
+      6        25,608   2.17%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+      7        20,800   1.76%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      8        17,472   1.48%  litchi-cfb         litchi_cfb::shared::SharedOleFile::read_chain_into
+      9        17,171   1.45%  libc/runtime       free
+     10        14,808   1.25%  litchi-cfb         litchi_cfb::shared::next_chain_sector
+     11        13,366   1.13%  litchi-ppt         litchi_ppt::records::record::Record::extract_text'2
+     12        12,728   1.08%  core/alloc/std     core::hash::BuildHasher::hash_one
+     13        12,298   1.04%  libc/runtime       malloc
+     14        10,975   0.93%  litchi-cfb         litchi_cfb::directory_name::directory_name_data
+     15        10,902   0.92%  libc/runtime       unlink_chunk.isra.0
+   -- by crate --
+              865,109  73.29%  libc/runtime
+              125,389  10.62%  litchi-ppt
+              101,132   8.57%  litchi-cfb
+               73,982   6.27%  core/alloc/std
+                8,413   0.71%  hashbrown
+                2,915   0.25%  smallvec
+                1,888   0.16%  litchi-core
+                  471   0.04%  memchr
+
+== pptmid/text  --  45543.ppt (385,024 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 1,572,305
+   sum of per-symbol self deltas                              : 1,570,782
+   negative-delta mass (noise floor)                          : -494  (0.0314% of whole)
+   linearity: 20->170 = 1,575,188 Ir/op ; 170->320 = 1,569,423 Ir/op  (drift 0.3667%)
+   rank    self Ir/op       %  crate              symbol
+      1       418,589  26.62%  libc/runtime       __memcpy_avx_unaligned_erms
+      2       326,413  20.76%  libc/runtime       __memset_avx2_unaligned_erms
+      3        90,993   5.79%  libc/runtime       _int_malloc
+      4        63,733   4.05%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      5        49,315   3.14%  core/alloc/std     <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+      6        45,250   2.88%  libc/runtime       _int_free_merge_chunk
+      7        37,480   2.38%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      8        31,111   1.98%  libc/runtime       free
+      9        25,992   1.65%  litchi-odraw       <litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next
+     10        25,608   1.63%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+     11        24,037   1.53%  libc/runtime       malloc
+     12        20,210   1.29%  core/alloc/std     core::hash::BuildHasher::hash_one
+     13        17,472   1.11%  litchi-cfb         litchi_cfb::shared::SharedOleFile::read_chain_into
+     14        16,466   1.05%  litchi-ppt         litchi_ppt::records::record::Record::extract_text'2
+     15        16,191   1.03%  litchi-ppt         litchi_ppt::odraw::codec::push_children
+   -- by crate --
+            1,018,360  64.77%  libc/runtime
+              226,782  14.42%  litchi-ppt
+              177,457  11.29%  core/alloc/std
+              101,076   6.43%  litchi-cfb
+               30,837   1.96%  litchi-odraw
+               11,057   0.70%  hashbrown
+                2,915   0.19%  smallvec
+                1,827   0.12%  litchi-core
+                  471   0.03%  memchr
+
+== pptsmall/open  --  SampleShow.ppt (125,440 B) / open+slide_count ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 369,287
+   sum of per-symbol self deltas                              : 368,966
+   negative-delta mass (noise floor)                          : -195  (0.0528% of whole)
+   linearity: 20->170 = 369,178 Ir/op ; 170->320 = 369,396 Ir/op  (drift 0.0588%)
+   rank    self Ir/op       %  crate              symbol
+      1        93,052  25.20%  libc/runtime       __memcpy_avx_unaligned_erms
+      2        67,138  18.18%  libc/runtime       __memset_avx2_unaligned_erms
+      3        21,164   5.73%  libc/runtime       _int_malloc
+      4        19,751   5.35%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      5        10,977   2.97%  libc/runtime       _int_free_merge_chunk
+      6        10,480   2.84%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      7        10,374   2.81%  litchi-cfb         litchi_cfb::directory_name::directory_name_data
+      8         9,109   2.47%  libc/runtime       free
+      9         8,706   2.36%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+     10         7,123   1.93%  libc/runtime       malloc
+     11         5,653   1.53%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children'2
+     12         5,381   1.46%  litchi-ppt         litchi_ppt::records::record::Record::extract_text'2
+     13         4,527   1.23%  litchi-cfb         litchi_cfb::file::OleFile<R>::load_directory
+     14         4,122   1.12%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children
+     15         3,642   0.99%  litchi-cfb         litchi_cfb::shared::SharedOleFile::read_chain_into
+   -- by crate --
+              228,205  61.80%  libc/runtime
+               53,493  14.49%  litchi-ppt
+               47,458  12.85%  litchi-cfb
+               32,569   8.82%  core/alloc/std
+                2,748   0.74%  smallvec
+                2,170   0.59%  litchi-core
+                1,890   0.51%  hashbrown
+                  432   0.12%  memchr
+
+== pptsmall/text  --  SampleShow.ppt (125,440 B) / open+text ==
+   whole-operation Ir per sample (PROGRAM TOTALS delta/300) : 444,281
+   sum of per-symbol self deltas                              : 443,865
+   negative-delta mass (noise floor)                          : -202  (0.0454% of whole)
+   linearity: 20->170 = 444,936 Ir/op ; 170->320 = 443,625 Ir/op  (drift 0.2950%)
+   rank    self Ir/op       %  crate              symbol
+      1        96,112  21.63%  libc/runtime       __memcpy_avx_unaligned_erms
+      2        67,188  15.12%  libc/runtime       __memset_avx2_unaligned_erms
+      3        26,821   6.04%  litchi-ppt         litchi_ppt::records::record::Record::parse_impl'2
+      4        23,907   5.38%  libc/runtime       _int_malloc
+      5        15,480   3.48%  core/alloc/std     alloc::raw_vec::RawVecInner<A>::finish_grow
+      6        14,406   3.24%  libc/runtime       _int_free_merge_chunk
+      7        13,251   2.98%  libc/runtime       free
+      8        10,717   2.41%  libc/runtime       malloc
+      9        10,374   2.34%  litchi-cfb         litchi_cfb::directory_name::directory_name_data
+     10         8,706   1.96%  litchi-cfb         litchi_cfb::file::SectorChainScratch::collect_exact
+     11         8,094   1.82%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children'2
+     12         7,230   1.63%  core/alloc/std     <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+     13         5,919   1.33%  litchi-ppt         litchi_ppt::records::record::Record::extract_text'2
+     14         5,296   1.19%  litchi-ppt         litchi_ppt::records::record::Record::parse_container_children
+     15         4,652   1.05%  libc/runtime       _int_free_maybe_trim
+   -- by crate --
+              252,580  56.85%  libc/runtime
+               79,402  17.87%  litchi-ppt
+               51,646  11.62%  core/alloc/std
+               47,438  10.68%  litchi-cfb
+                4,985   1.12%  litchi-odraw
+                2,748   0.62%  smallvec
+                2,464   0.55%  hashbrown
+                2,170   0.49%  litchi-core
+                  432   0.10%  memchr
+
+
+######## litchi-cfb / litchi-ole-common symbols, self Ir per operation ########
+symbol                                                                        docbig/open      docbig/text      docmid/open      docmid/text    docsmall/open    docsmall/text      pptbig/open      pptbig/text      pptmid/open      pptmid/text    pptsmall/open    pptsmall/text
+litchi_cfb::file::SectorChainScratch::collect_exact                    *   107,054  2.16%   107,054  2.16%    24,771  0.72%    24,771  0.71%     4,593  0.09%     4,593  0.08%    56,343  5.93%    56,343  4.13%    25,608  2.17%    25,608  1.63%     8,706  2.36%     8,706  1.96%
+litchi_cfb::file::collect_sector_chain                                     106,678  2.15%   106,678  2.16%    21,646  0.63%    21,646  0.62%     3,934  0.07%     3,934  0.07%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::validate_physical_sector_layout          *    37,958  0.76%    37,958  0.77%     7,850  0.23%     7,850  0.23%     1,526  0.03%     1,526  0.03%    19,740  2.08%    19,740  1.45%     9,026  0.76%     9,026  0.57%     2,942  0.80%     2,942  0.66%
+litchi_cfb::file::OleFile<R>::validate_stream_allocations              *    31,830  0.64%    31,830  0.64%     8,832  0.26%     8,832  0.25%     1,677  0.03%     1,677  0.03%    18,773  1.98%    18,773  1.38%     8,584  0.73%     8,584  0.55%     3,229  0.87%     3,229  0.73%
+litchi_cfb::directory_name::directory_name_data                             10,092  0.20%    10,092  0.20%    17,187  0.50%    17,187  0.50%    10,122  0.19%    10,122  0.19%    11,926  1.26%    11,926  0.87%    10,975  0.93%    10,975  0.70%    10,374  2.81%    10,374  2.34%
+litchi_cfb::file::OleFile<R>::read_sectors_batched                          40,919  0.82%    40,919  0.83%     8,726  0.25%     8,726  0.25%     1,670  0.03%     1,670  0.03%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::shared::SharedOleFile::read_chain_into                               0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%    11,390  1.20%    11,390  0.83%    17,472  1.48%    17,472  1.11%     3,642  0.99%     3,642  0.82%
+litchi_cfb::shared::next_chain_sector                                  *         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%     9,648  1.02%     9,648  0.71%    14,808  1.25%    14,808  0.94%     2,952  0.80%     2,952  0.66%
+litchi_cfb::file::decode_utf16le                                             2,944  0.06%     2,944  0.06%     6,472  0.19%     6,472  0.19%     3,124  0.06%     3,124  0.06%     3,626  0.38%     3,626  0.27%     3,162  0.27%     3,162  0.20%     2,870  0.78%     2,870  0.65%
+litchi_cfb::file::OleFile<R>::validated_directory_entries                    4,895  0.10%     4,895  0.10%    10,775  0.31%    10,775  0.31%     5,008  0.09%     5,008  0.09%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::load_directory                                   853  0.02%       853  0.02%     1,430  0.04%     1,430  0.04%       853  0.02%       853  0.02%     5,825  0.61%     5,825  0.43%     4,963  0.42%     4,963  0.32%     4,527  1.23%     4,527  1.02%
+litchi_cfb::file::OleFile<R>::load_minifat                                   2,753  0.06%     2,753  0.06%     2,753  0.08%     2,753  0.08%     2,753  0.05%     2,753  0.05%     1,470  0.15%     1,470  0.11%         0  0.00%         0  0.00%     1,470  0.40%     1,470  0.33%
+litchi_cfb::file::read_u32_le                                                2,576  0.05%     2,576  0.05%     2,272  0.07%     2,272  0.07%     2,192  0.04%     2,192  0.04%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::parse_directory_entry                            798  0.02%       798  0.02%     1,824  0.05%     1,824  0.05%       798  0.01%       798  0.01%       912  0.10%       912  0.07%       684  0.06%       684  0.04%       570  0.15%       570  0.13%
+litchi_cfb::shared::SharedOleFile::find_entry                                    0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%     1,769  0.19%     1,769  0.13%     1,802  0.15%     1,802  0.11%     1,615  0.44%     1,615  0.36%
+litchi_cfb::file::OleFile<R>::build_storage_tree_iterative                     720  0.01%       720  0.01%     1,694  0.05%     1,694  0.05%       720  0.01%       720  0.01%       808  0.09%       808  0.06%       600  0.05%       600  0.04%       496  0.13%       496  0.11%
+litchi_cfb::file::OleFile<R>::find_entry                                     1,210  0.02%     1,210  0.02%     1,462  0.04%     1,462  0.04%     1,287  0.02%     1,287  0.02%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::try_push                                                     385  0.01%       385  0.01%     1,023  0.03%     1,023  0.03%       409  0.01%       409  0.01%       653  0.07%       653  0.05%       549  0.05%       549  0.03%       497  0.13%       497  0.11%
+litchi_cfb::file::OleFile<R>::load_fat                                 *     1,184  0.02%     1,184  0.02%       499  0.01%       499  0.01%       248  0.00%       248  0.00%       674  0.07%       674  0.05%       394  0.03%       394  0.03%       326  0.09%       326  0.07%
+litchi_ole_common::smart_tags::codec::<impl litchi_ole_common::smart_t         672  0.01%       672  0.01%     2,587  0.07%     2,587  0.07%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::CheckedBitSet::insert                                        300  0.01%       300  0.01%     2,160  0.06%     2,160  0.06%       300  0.01%       300  0.01%       160  0.02%       160  0.01%       120  0.01%       120  0.01%       100  0.03%       100  0.02%
+litchi_ole_common::smart_tags::codec::Cursor::u16                              912  0.02%       912  0.02%     2,064  0.06%     2,064  0.06%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_ole_common::smart_tags::codec::Cursor::pb_string                      1,745  0.04%     1,745  0.04%       895  0.03%       895  0.03%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::directory_name::DirectoryNameData::compare                         709  0.01%       709  0.01%       947  0.03%       947  0.03%       671  0.01%       671  0.01%       142  0.01%       142  0.01%        83  0.01%        83  0.01%        59  0.02%        59  0.01%
+litchi_cfb::file::OleFile<R>::read_sector_run_into                     *       737  0.01%       737  0.01%       490  0.01%       490  0.01%       200  0.00%       200  0.00%       540  0.06%       540  0.04%       187  0.02%       187  0.01%       264  0.07%       264  0.06%
+litchi_cfb::file::format_clsid                                                 269  0.01%       269  0.01%       594  0.02%       594  0.02%       269  0.00%       269  0.00%       297  0.03%       297  0.02%       241  0.02%       241  0.02%       213  0.06%       213  0.05%
+core::ptr::drop_in_place<litchi_cfb::file::DirectoryEntry>                     255  0.01%       255  0.01%       582  0.02%       582  0.02%       255  0.00%       255  0.00%       291  0.03%       291  0.02%       219  0.02%       219  0.01%       183  0.05%       183  0.04%
+litchi_cfb::file::collect_sector_chain_exact                                   224  0.00%       224  0.00%       512  0.01%       512  0.01%       224  0.00%       224  0.00%       288  0.03%       288  0.02%        -2 -0.00%        -2 -0.00%       256  0.07%       256  0.06%
+litchi_cfb::file::OleFile<R>::validated_entry                                  221  0.00%       221  0.00%       527  0.02%       527  0.02%       204  0.00%       204  0.00%       255  0.03%       255  0.02%       170  0.01%       170  0.01%       119  0.03%       119  0.03%
+litchi_ole_common::smart_tags::codec::<impl litchi_ole_common::smart_t         887  0.02%       887  0.02%       539  0.02%       539  0.02%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::collect_directory_sector_chain                               189  0.00%       189  0.00%       283  0.01%       283  0.01%       189  0.00%       189  0.00%       189  0.02%       189  0.01%       189  0.02%       189  0.01%       189  0.05%       189  0.04%
+litchi_ole_common::smart_tags::codec::<impl litchi_ole_common::smart_t         232  0.00%       232  0.00%       827  0.02%       827  0.02%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::open                                             328  0.01%       328  0.01%       328  0.01%       328  0.01%       328  0.01%       328  0.01%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+core::ptr::drop_in_place<litchi_cfb::file::OleError>                           132  0.00%       132  0.00%       188  0.01%       188  0.01%       168  0.00%       168  0.00%       124  0.01%       124  0.01%       124  0.01%       124  0.01%       112  0.03%       112  0.03%
+litchi_cfb::file::try_filled_vec                                               141  0.00%       141  0.00%       141  0.00%       141  0.00%       141  0.00%       141  0.00%       141  0.01%       141  0.01%       141  0.01%       141  0.01%       141  0.04%       141  0.03%
+litchi_cfb::file::OleFile<R>::sector_batch_scratch                             320  0.01%       320  0.01%       117  0.00%       117  0.00%         0  0.00%         0  0.00%       191  0.02%       191  0.01%       119  0.01%       119  0.01%        86  0.02%        86  0.02%
+litchi_cfb::shared::SharedOleFile::open_stream_with_mode               *         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%       305  0.03%       305  0.02%       180  0.02%       180  0.01%       305  0.08%       305  0.07%
+litchi_ole_common::smart_tags::codec::Cursor::u32                              480  0.01%       480  0.01%       288  0.01%       288  0.01%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::read_stream_from_fat                             276  0.01%       276  0.01%       276  0.01%       276  0.01%       184  0.00%       184  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::open_with_limits                                   0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%       194  0.02%       194  0.01%       187  0.02%       187  0.01%       194  0.05%       194  0.04%
+litchi_cfb::file::CheckedBitSet::try_with_capacity                             147  0.00%       147  0.00%       154  0.00%       154  0.00%       147  0.00%       147  0.00%        49  0.01%        -3 -0.00%        -3 -0.00%        -3 -0.00%        49  0.01%        49  0.01%
+litchi_cfb::shared::SharedOleFile::open_source_with_limits                       0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%       169  0.02%       169  0.01%       169  0.01%       169  0.01%       169  0.05%       169  0.04%
+<litchi_cfb::file::DirectoryNodeColor as core::convert::TryFrom<u8>>::         108  0.00%       108  0.00%       236  0.01%       236  0.01%        -7 -0.00%        -7 -0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::shared::SharedOleFile::read_fat_stream                               0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        77  0.01%        77  0.01%       154  0.01%       154  0.01%        77  0.02%        77  0.02%
+litchi_cfb::file::try_vec_with_capacity                                         -4 -0.00%        -4 -0.00%       110  0.00%       110  0.00%         0  0.00%         0  0.00%        60  0.01%        60  0.00%        60  0.01%        60  0.00%        60  0.02%        60  0.01%
+litchi_cfb::shared::SharedOleFile::read_minifat_range_hinted                     0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%       127  0.01%       127  0.01%         0  0.00%         0  0.00%       127  0.03%       127  0.03%
+litchi_cfb::file::OleFile<R>::open_stream                              *       108  0.00%       108  0.00%       108  0.00%       108  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::file::OleFile<R>::into_parsed_index                                  0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        63  0.01%        63  0.00%        63  0.01%        63  0.00%        63  0.02%        63  0.01%
+<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone                  0  0.00%         0  0.00%        -4 -0.00%        -4 -0.00%         0  0.00%         0  0.00%        59  0.01%        59  0.00%        59  0.00%        59  0.00%        59  0.02%        59  0.01%
+litchi_cfb::shared::SharedOleFile::stream_len                                    0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        54  0.01%        54  0.00%        54  0.00%        -4 -0.00%        55  0.01%        55  0.01%
+litchi_cfb::shared::SharedOleFile::flush_pending_range                           0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        56  0.01%        56  0.00%         0  0.00%         0  0.00%        56  0.02%        56  0.01%
+<litchi_cfb::shared::MiniFATDirectOwner as core::ops::drop::Drop>::dro           0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        54  0.01%        54  0.00%         0  0.00%         0  0.00%        54  0.01%        54  0.01%
+core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_na           0  0.00%         0  0.00%        80  0.00%        80  0.00%         0  0.00%         0  0.00%        -3 -0.00%        -3 -0.00%        -2 -0.00%        -2 -0.00%        25  0.01%        25  0.01%
+litchi_cfb::shared::try_zeroed_vec                                               0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        46  0.00%        -3 -0.00%         0  0.00%         0  0.00%        46  0.01%        46  0.01%
+litchi_cfb::file::read_u16_le                                                   -4 -0.00%        -4 -0.00%        64  0.00%        64  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%
+litchi_cfb::shared::SharedOleFile::minifat_physical_range                        0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -3 -0.00%        -3 -0.00%         0  0.00%         0  0.00%        42  0.01%        42  0.01%
+litchi_cfb::shared::SharedOleFile::publish_minifat_direct                        0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -3 -0.00%        -3 -0.00%         0  0.00%         0  0.00%        36  0.01%        36  0.01%
+litchi_cfb::shared::SharedOleFile::source_version                                0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -2 -0.00%        -2 -0.00%        -2 -0.00%        -2 -0.00%        35  0.01%        35  0.01%
+core::ptr::drop_in_place<litchi_cfb::shared::SharedOleFile>                      0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -2 -0.00%        -2 -0.00%        -2 -0.00%        -2 -0.00%        26  0.01%        26  0.01%
+core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_c           0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -2 -0.00%        -2 -0.00%        -2 -0.00%         0  0.00%        23  0.01%        23  0.01%
+core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_c           0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%         0  0.00%        -1 -0.00%         0  0.00%         0  0.00%         0  0.00%        19  0.01%        -1 -0.00%
+
+-- named targets present / absent --
+  PRESENT  next_chain_sector                  -> litchi_cfb::shared::next_chain_sector
+           pptbig/open=9,648, pptbig/text=9,648, pptmid/open=14,808, pptmid/text=14,808, pptsmall/open=2,952, pptsmall/text=2,952
+  ABSENT   read_stream_range_hinted
+  ABSENT   read_stream_range
+  PRESENT  collect_exact                      -> litchi_cfb::file::SectorChainScratch::collect_exact
+           docbig/open=107,054, docbig/text=107,054, docmid/open=24,771, docmid/text=24,771, docsmall/open=4,593, docsmall/text=4,593, pptbig/open=56,343, pptbig/text=56,343, pptmid/open=25,608, pptmid/text=25,608, pptsmall/open=8,706, pptsmall/text=8,706
+  PRESENT  validate_stream_allocations        -> litchi_cfb::file::OleFile<R>::validate_stream_allocations
+           docbig/open=31,830, docbig/text=31,830, docmid/open=8,832, docmid/text=8,832, docsmall/open=1,677, docsmall/text=1,677, pptbig/open=18,773, pptbig/text=18,773, pptmid/open=8,584, pptmid/text=8,584, pptsmall/open=3,229, pptsmall/text=3,229
+  PRESENT  validate_physical_sector_layout    -> litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+           docbig/open=37,958, docbig/text=37,958, docmid/open=7,850, docmid/text=7,850, docsmall/open=1,526, docsmall/text=1,526, pptbig/open=19,740, pptbig/text=19,740, pptmid/open=9,026, pptmid/text=9,026, pptsmall/open=2,942, pptsmall/text=2,942
+  PRESENT  load_fat                           -> litchi_cfb::file::OleFile<R>::load_fat
+           docbig/open=1,184, docbig/text=1,184, docmid/open=499, docmid/text=499, docsmall/open=248, docsmall/text=248, pptbig/open=674, pptbig/text=674, pptmid/open=394, pptmid/text=394, pptsmall/open=326, pptsmall/text=326
+  PRESENT  open_stream                        -> litchi_cfb::file::OleFile<R>::open_stream
+           docbig/open=108, docbig/text=108, docmid/open=108, docmid/text=108
+  PRESENT  open_stream                        -> litchi_cfb::shared::SharedOleFile::open_stream_with_mode
+           pptbig/open=305, pptbig/text=305, pptmid/open=180, pptmid/text=180, pptsmall/open=305, pptsmall/text=305
+  PRESENT  read_sector_run                    -> litchi_cfb::file::OleFile<R>::read_sector_run_into
+           docbig/open=737, docbig/text=737, docmid/open=490, docmid/text=490, docsmall/open=200, docsmall/text=200, pptbig/open=540, pptbig/text=540, pptmid/open=187, pptmid/text=187, pptsmall/open=264, pptsmall/text=264

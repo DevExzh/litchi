@@ -1,5 +1,91 @@
 # Performance hotspot inventory
 
+## Change 0586: the DOC paragraph hint measures exactly zero, and is reverted
+
+The [0586 record](0586-doc-paragraph-hint-rejected.md) applies change 0579's
+resumable chain walk to `litchi-doc`'s `resolve_paragraph` — the follow-up 0579
+named — and measures **0.0% on all eight measurable fixtures**, 3,991 chain links
+before and after, not one removed. Reverted.
+
+The reason is a design finding rather than a corpus accident: the hint is created
+inside `resolve_paragraph` and dies with it, so it can only shorten walks between
+reads issued by *one* call, and a paragraph reached in a single 8 KiB read has no
+prefix to resume. Making it pay needs a hint spanning calls, which means holding
+it in the snapshot beside the `SharedOleFile` it borrows — a self-referential
+borrow and a materially different design. 49 of 57 `.doc` fixtures are refused by
+`SourceSnapshot::open` outright, so eight is the whole measurable population.
+`performance_claim: none`. The rejected implementation is retained.
+
+## Change 0585: the cursor's own construction walk is now resumable
+
+The [0585 record](0585-cfb-resumable-cursor-construction.md) implements change
+0584's candidate 1 and answers the question change 0579 left open — **in the
+negative, then acts on what the refutation found.** A hint would do nothing for
+the worksheet scan, because `SharedOleStreamCursor`'s state already *is* a
+resumption position and `normalize_state` walks each link once. What nothing
+resumed was the walk that **builds** the cursor: `stream_cursor_at` reached its
+offset from the stream's first sector, and `resolve_shared_string` built a fresh
+cursor **per string cell**.
+
+`SharedOleFile::stream_cursor_at_hinted` reuses 0579's `StreamChainHint`
+unchanged, and `stream_cursor_at` delegates to it so the two cannot drift.
+`litchi-xls` gains a `SharedStringResolver` holding one hint dedicated to the
+shared-string region plus the workbook path that was a per-call `Vec`
+allocation. The hint is deliberately **not** shared with the worksheet cursor,
+which sits permanently past the string table; one hint serving both would be
+discarded as a backward step by every resolve and every sheet.
+
+Measured over every `.xls` fixture, full text extraction: **6,469,099 → 2,233,171
+chain links, 65.5% removed**, with **0 text-digest mismatches**, **0 fixtures
+worse**, and the open unchanged to the link at 7,532. 32 of 86 fixtures save
+nothing — single-resolve files with no prior position. The counter validated
+itself first: a `pre-0579` control leg reproduces that record's 5,796 and the
+`0579-only` leg its 2,099, exactly. **No timing was measured**; 0584's byte-layout
+model predicted 74.4% and is superseded by the 65.5% measured here.
+`performance_claim: none`. [Evidence](results/change-0585/instrumentation.patch.md).
+
+## Change 0584: the OLE2 ranking at HEAD, and the first DOC and PPT numbers
+
+The [0584 record](0584-ole2-profile-at-head.md) re-ranks the OLE2 read path at
+`e927e139c` and is the post-0579 successor to change 0574. It differences
+callgrind isolation pairs **per symbol** rather than per program total, so the
+harness's own fixture staging — 53% of the raw profile — cancels exactly, making
+a symbol table of the *operation* possible. Three controls tie it to change
+0579's retained evidence: flagship `open` reproduces 2,099 chain links and
+53 reads / 565,201 bytes exactly, and whole-operation Ir to 0.04%. Two
+byte-identical runs differ by 635 Ir in 678,704,129.
+
+**The worksheet scan is bimodal, and the flagship fixture alone hides it.** The
+scan is 9.1% of a flagship one-cell query and **70.5%** of a `54016.xls` one.
+The cause is not size — `query_cell` scans to EOF and never stops when the cell
+is found, so one query frames 37,929 records and parses 29,608 cell records to
+return one value. That is 0574 opportunity 6, rejected on ADR 0005
+mandatory-validation grounds, and it is reported only because it sets a
+~30,000-fold multiplier on everything inside the loop.
+
+**Chain links are now attributable per caller.** Flagship `open` 2,099 →
+`one-cell` 4,428, of which **2,238 come from `stream_cursor_at`** — more links in
+one query than the entire globals scan — from two call sites that each restart at
+sector zero. 0579's hint reaches neither: it was applied to `read_stream_range`
+only, and there is no hinted cursor constructor.
+
+**Reading the globals bytes costs 3.5× what interpreting them costs** (57.66%
+inclusive against 16.58%). `54016.xls`'s open is a third regime again: 49.5% of
+it is the SST measure-walk.
+
+**DOC and PPT are measured for the first time in this program** — 0574 states
+neither ever was. DOC cost is not size-driven: a 65 KB fixture costs 9% *more*
+per open than a 1.6 MB one.
+
+Five candidates are ranked and each screened against the record set; three are
+already-deferred or already-rejected work (0576 defers lazy SST indexing because
+it moves when a malformed SST is refused; 0574 opportunity 2 depends on the
+density gate 0568 recorded as untestable; opportunity 4 is blocked by
+`docs/GOAL.md` rule 10). `performance_claim: none` — attribution only, no timing,
+and no candidate in it is authorized by it. Instruction counts rank work, not
+latency: candidates 1 and 2 are understated here and 4 and 5 overstated.
+[Evidence](results/change-0584/README.md).
+
 ## Change 0583: a neighbour's span bound now trusts whichever size is larger
 
 The [0583 record](0583-zip-local-size-span-bound.md) closes the one soundness
