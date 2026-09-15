@@ -1125,7 +1125,7 @@ pub(super) fn parse_source_with_observer<'a, F, O>(
 ) -> super::SourceParseAttempt
 where
     F: FnOnce() -> Result<Option<&'a [Text]>>,
-    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>, super::EventSpan) -> bool,
 {
     let mut reader = NsReader::from_reader(content);
     reader.config_mut().check_end_names = true;
@@ -1142,9 +1142,15 @@ where
     };
 
     loop {
+        let Ok(event_start) = usize::try_from(reader.buffer_position()) else {
+            return super::SourceParseAttempt::ProvisionalFailed;
+        };
         let event = match reader.read_event() {
             Ok(event) => event,
             Err(_) => return super::SourceParseAttempt::ReaderFailed,
+        };
+        let Ok(event_end) = usize::try_from(reader.buffer_position()) else {
+            return super::SourceParseAttempt::ProvisionalFailed;
         };
         let event_limit_exceeded = match event_count.checked_add(1) {
             Some(count) => {
@@ -1161,7 +1167,14 @@ where
         }
         let decoder = reader.decoder();
         let resolver = reader.resolver();
-        let parser_allowed = observer(&namespace, &event);
+        let parser_allowed = observer(
+            &namespace,
+            &event,
+            super::EventSpan {
+                start: event_start,
+                end: event_end,
+            },
+        );
         if !parser_allowed || event_limit_exceeded {
             return super::SourceParseAttempt::ProvisionalFailed;
         }

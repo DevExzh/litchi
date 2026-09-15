@@ -1,5 +1,28 @@
 # Performance optimization ADR-compliance matrix
 
+## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
+
+Record: [0622](0622-xlsx-compact-source-facts.md).
+
+Change 0622 (`litchi-xlsx`, compact planning facts) is compliant and adds no ADR
+question. **ADR 0003 (bounded resources):** the retained state is a flat
+`Box<[CellFact]>` and `Box<[RowFact]>` with no per-cell heap object, bounded by
+the worksheet the planning `Store` already holds; every push uses `try_reserve`
+and a failed reservation declines rather than errors. The 256-action commit cap
+is unchanged and now also bounds how many cell slots are materialized. No new
+`unsafe`, no new dependency, no weakened limit. **ADR 0005 (validation
+placement):** no validation moved. The value-only XML validator still sees every
+event of the source first and still owns the first error; the raw parser still
+builds the `Store` from the same transition function; the commit's `scan` remains
+the authority and still runs whenever the builder declined. The builder never
+returns an error and never stops the traversal, so no provisional diagnostic can
+become a public planning error. **ADR 0006 (lossless preservation):** output
+bytes are unchanged, proved by the harness's package hashes and by the in-crate
+oracle; change 0525's independent changed-cell readback and change 0528's two
+publication audits are untouched. **Contract movement: none.** The builder's
+allow-list narrows only which worksheets take the fast route, never which
+worksheets are accepted, which errors are raised or in what order.
+
 ## 0621 — ADR 0005's freshness rule, priced per site rather than per call
 
 Record: [0621](0621-xls-open-fence-count.md).

@@ -1,0 +1,33 @@
+whole harness iteration (open, plan, edit, commit, publish, verify), Ir per sample
+case                   shape                 before Ir         after Ir    delta%
+one_edit_save          medium            1,235,178,277    1,220,456,892     -1.19
+one_edit_save          dense-sparse      1,924,144,737    1,822,424,520     -5.29
+one_edit_save          noncompact        1,263,579,335    1,240,442,559     -1.83
+one_percent_edit_save  medium            1,478,899,619    1,422,105,816     -3.84
+one_percent_edit_save  dense-sparse      2,015,103,395    1,903,685,934     -5.53
+
+per-symbol inclusive Ir per operation (N=11 minus N=1, divided by 10)
+case                   shape          symbol                                          before           after    delta%
+one_edit_save          medium         Snapshot::from_source_selected (planning)      23,658,195      27,726,299    +17.20
+one_edit_save          medium         rewrite_value_only_with_provenance (commit)      18,406,801         205,359    -98.88
+one_edit_save          medium         scan::scan_with_limit (the removed walk)      17,727,405          -1,316   -100.01
+one_edit_save          dense-sparse   Snapshot::from_source_selected (planning)     164,090,362     193,159,174    +17.72
+one_edit_save          dense-sparse   rewrite_value_only_with_provenance (commit)     129,702,821       1,318,090    -98.98
+one_edit_save          dense-sparse   scan::scan_with_limit (the removed walk)     125,515,694           3,853   -100.00
+one_edit_save          noncompact     Snapshot::from_source_selected (planning)      26,308,248      30,251,272    +14.99
+one_edit_save          noncompact     rewrite_value_only_with_provenance (commit)      25,625,689         210,662    -99.18
+one_edit_save          noncompact     scan::scan_with_limit (the removed walk)      22,757,377             207   -100.00
+one_percent_edit_save  medium         Snapshot::from_source_selected (planning)      96,084,074     112,413,786    +17.00
+one_percent_edit_save  medium         rewrite_value_only_with_provenance (commit)      75,200,897       2,808,548    -96.27
+one_percent_edit_save  medium         scan::scan_with_limit (the removed walk)      71,031,988             328   -100.00
+one_percent_edit_save  dense-sparse   Snapshot::from_source_selected (planning)     180,852,405     212,635,380    +17.57
+one_percent_edit_save  dense-sparse   rewrite_value_only_with_provenance (commit)     146,851,844       7,343,534    -95.00
+one_percent_edit_save  dense-sparse   scan::scan_with_limit (the removed walk)     137,530,166           4,628   -100.00
+
+planning plus commit, Ir per operation
+case                   shape                   before           after    delta%
+one_edit_save          medium              42,064,996      27,931,658    -33.60
+one_edit_save          dense-sparse       293,793,183     194,477,264    -33.80
+one_edit_save          noncompact          51,933,938      30,461,935    -41.34
+one_percent_edit_save  medium             171,284,970     115,222,334    -32.73
+one_percent_edit_save  dense-sparse       327,704,249     219,978,915    -32.87

@@ -11,6 +11,9 @@
 //! shared strings, or formulas. Workbooks outside the statically provable
 //! closure are refused.
 
+#[cfg(test)]
+#[path = "facts_oracle_tests.rs"]
+mod facts_oracle_tests;
 mod patch;
 mod snapshot;
 mod source;

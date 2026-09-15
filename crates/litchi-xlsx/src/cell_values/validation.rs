@@ -199,28 +199,44 @@ impl Validator {
 pub(super) fn worksheet_xml_and_parse_source(
     content: &[u8],
     admission: raw::worksheet::SourceAdmission,
-) -> Result<crate::cell::Store> {
+) -> Result<(crate::cell::Store, Option<raw::worksheet::SourceFacts>)> {
     let mut validator = Validator::new(XmlOwner::Worksheet);
+    let mut builder = raw::worksheet::FactsBuilder::new();
     let attempt = raw::worksheet::parse_source_with_observer(
         content,
         admission,
         || Ok(None),
-        |namespace, event| validator.observe(namespace, event),
+        |namespace, event, span| {
+            // The validator owns the first error and its precedence. The
+            // fact builder only ever observes an event the validator has
+            // already accepted, and it never stops the traversal: a builder
+            // refusal drops the facts and nothing else.
+            if !validator.observe(namespace, event) {
+                return false;
+            }
+            builder.observe(namespace, event, span, content);
+            true
+        },
     );
     match attempt {
         raw::worksheet::SourceParseAttempt::Complete(parsed) => {
             validator.finish()?;
-            raw::worksheet::complete_source_parse(content, parsed)
+            let cells = raw::worksheet::complete_source_parse(content, parsed)?;
+            // Facts are published only after validator EOF and a successful
+            // raw finalization, so no provisional state can outlive a refusal.
+            Ok((cells, builder.finish(content)))
         },
         raw::worksheet::SourceParseAttempt::ProvisionalFailed => {
             drop(validator);
+            drop(builder);
             worksheet_xml(content)?;
-            raw::worksheet::parse(content, || Ok(None))
+            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
         },
         raw::worksheet::SourceParseAttempt::ReaderFailed => {
             drop(validator);
+            drop(builder);
             worksheet_xml(content)?;
-            raw::worksheet::parse(content, || Ok(None))
+            Ok((raw::worksheet::parse(content, || Ok(None))?, None))
         },
     }
 }

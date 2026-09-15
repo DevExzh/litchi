@@ -1,0 +1,12 @@
+worksheet parts scanned: 389
+    122  formula <f>
+     46  mergeCells
+     12  sheetProtection
+     20  dataValidation
+    202  cols
+    388  other worksheet child (pageMargins, pageSetup, drawing, extLst, ...)
+     84  ampersand anywhere
+      2  AlternateContent
+    184  dyDescent
+parts carrying none of the above: 1
+    test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx::xl/worksheets/sheet1.xml

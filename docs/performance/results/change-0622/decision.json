@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0622",
+  "title": "Compact per-cell source facts carried from planning delete the XLSX commit's second whole-sheet layout scan",
+  "decision": "retained, implemented in litchi-xlsx",
+  "code_state": "crates/litchi-xlsx only; no public API, error type, limit or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0550 measured the commit's layout scan at 53.24-54.94% of commit instructions and named its removal the next task; this removes it and the symbol is absent from the after profile",
+    "the design is change 0551's, implemented as frozen: compact per-cell source offsets with changed-cell tag materialization, a builder that declines rather than errors, and a differential oracle proving the facts reproduce the layout the scan would have built",
+    "0550's admission condition is met: planning plus commit instructions fall 33.6-41.4%, so work is removed rather than shifted; publication is untouched",
+    "the two gates that rejected changes 0552 and 0553 are cleared: valid no-op planning is unaffected because an empty plan returns before the fact route is consulted, and dense-sparse process peak RSS rises 4.23% at the median inside that leg's own 6.49% run-to-run spread, against 0552's +6.97% and 0553's +5.16%",
+    "value identity is proved two ways: 32 of 32 (case, shape) published-package sha256 pairs are identical, and an in-crate oracle compares the fact-derived and scan-derived rewrites byte for byte and error for error"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs, N=1 and N=11, differenced and divided by 10, per leg for one_edit_save on medium/dense-sparse/noncompact and one_percent_edit_save on medium/dense-sparse; whole-sample totals plus per-symbol inclusive Ir for from_source_selected, scan_with_limit and rewrite_value_only_with_provenance",
+    "allocations": "litchi-perf-baseline-alloc with the change-0538 phase regions (plan, staging, commit_core, commit, publication), five samples per leg, maximum per region",
+    "peak_rss": "/usr/bin/time -f %M, fifteen runs per leg on dense-sparse one_edit_save, with the before leg's own run-to-run spread reported beside the delta",
+    "timing": "tools/perf-baseline, --warmup 5 --samples 30, order A1 B1 B2 A2 on CPU 15, followed by four before-only runs F1..F4 for the A/A floor in the same window, over five source-backed cell-value cases and three shapes",
+    "value_identity": "output_sha256 for 32 (case, shape) pairs across eight source-backed edit cases and four shapes including vendor-extension",
+    "differential_oracle": "crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs: eleven admitted synthetic shapes, sixteen declined shapes, a dense grid, and every worksheet part of every .xlsx under test-data/; each cell compared through both routes with test-only route counters proving which route ran"
+  },
+  "accepted_costs": {
+    "planning_grows": "the fact builder costs 15.0-17.7% of planning instructions and 3.90-6.09% of planning allocated bytes; it is paid on every source-backed planning of an admitted worksheet, including plans that never commit",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg",
+    "whole_sample_totals": "the isolation pair's per-sample scope is the harness iteration, which includes the per-sample output verification the timed scope excludes, so the whole-sample Ir delta understates the delta over the timed interval",
+    "peak_rss_noise": "process peak RSS is a process-lifetime high-water mark, not an operation-local peak, and the before leg's own spread exceeds the measured delta",
+    "narrowing": "a worksheet carrying a <f> element, an ampersand inside a start tag, a cell or row without an explicit r, or any direct worksheet child outside dimension/sheetViews/sheetFormatPr/cols/sheetData keeps the complete scan"
+  },
+  "known_gaps": {
+    "real_producer_reach": "of 391 real worksheet parts under test-data/, 207 are admitted to the shared traversal but exactly one is accepted by the value-only planning validator, and that one publishes facts; change 0602 established the editor admits none of the 95 real .xlsx fixtures, and this change neither widens nor narrows that surface",
+    "second_commit": "only the first commit of a snapshot chain uses the facts; a snapshot derived from a rewrite drops them and pays the scan",
+    "formulas": "worksheets carrying <f> are declined by design, not by measurement",
+    "oracle_stride": "the corpus sweep visits every cell of worksheets with at most 96 cells and a fixed stride through larger ones unless LITCHI_0622_FULL_ORACLE=1 is set"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "1e41983213dc378c13774ed7038c51faf231977f",
+    "branch": "perf/0622-xlsx-compact-source-facts",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 15",
+    "binaries": {
+      "before/litchi-perf-baseline": "aeeb1cd91f90f43bed8eed2787c1c221282ea288710c407df1cc22d8bf08ac48",
+      "after/litchi-perf-baseline": "3f57a6cd74613bb8cda6101fd150eb1692fb459d907e59e1f3d89f22d6f6b375",
+      "before/litchi-perf-baseline-alloc": "261950334e7cc54f7c155091d27ef47dab6dab86d39df80816691ceddd14fb60",
+      "after/litchi-perf-baseline-alloc": "f25f306b4bc43835d120105b1258c59b78a8dd7dfaf1baded412cbbbb6e45b59"
+    },
+    "note": "both legs built with cargo build --release --locked --bins --features allocator-metrics from tools/perf-baseline; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-1e4198321 with its own CARGO_TARGET_DIR"
+  }
+}

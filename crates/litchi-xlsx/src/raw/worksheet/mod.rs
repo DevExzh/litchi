@@ -15,6 +15,7 @@ mod x14ac;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use edit::{EventSpan, FactsBuilder, SourceFacts};
 pub(crate) use model::merge_successor;
 pub(crate) use validation::{
     optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32,
@@ -338,7 +339,7 @@ pub(crate) fn parse_source_with_observer<'a, F, O>(
 ) -> SourceParseAttempt
 where
     F: FnOnce() -> Result<Option<&'a [Text]>>,
-    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+    O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>, EventSpan) -> bool,
 {
     if !shared_event_bound_within_cap(content) {
         return SourceParseAttempt::ProvisionalFailed;

@@ -1,0 +1,108 @@
+A/A floor in this window, (max-min)/min over the four before-only runs F1..F4
+case                                                     shape                p50      mean       p95       p99
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse      3.765%    6.819%   14.404%   84.701%
+xlsx_source_backed_cell_values_batch_edit_save           medium            6.358%    6.836%    9.632%   19.840%
+xlsx_source_backed_cell_values_batch_edit_save           noncompact        5.817%   11.873%   25.148%  168.971%
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse      3.334%    3.276%    3.330%    3.342%
+xlsx_source_backed_cell_values_one_edit_save             medium            6.778%    9.540%   48.232%   50.191%
+xlsx_source_backed_cell_values_one_edit_save             noncompact        8.874%   10.747%   16.467%   44.197%
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse      3.326%    3.387%    3.738%    3.544%
+xlsx_source_backed_cell_values_one_percent_edit_save     medium            6.346%    8.253%   15.421%   34.815%
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact        5.503%    6.542%   17.641%   38.742%
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse      4.599%    4.861%    5.384%   12.522%
+xlsx_source_backed_managed_cell_values_one_edit_save     medium           15.846%   16.333%   15.163%   33.986%
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        8.122%    8.524%   11.964%   20.059%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse      5.075%    7.555%   12.959%   49.792%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium            6.159%    5.999%    5.803%    6.539%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact        6.687%    7.153%    8.390%   17.056%
+
+paired deltas, positive = this change faster; leg 1 is A1 vs B1, leg 2 is A2 vs B2
+-- p50
+case                                                     shape               leg1      leg2     floor
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse      17.72%    16.98%     3.76%
+xlsx_source_backed_cell_values_batch_edit_save           medium            18.00%    19.96%     6.36%
+xlsx_source_backed_cell_values_batch_edit_save           noncompact        26.12%    27.21%     5.82%
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse      18.22%    13.08%     3.33%
+xlsx_source_backed_cell_values_one_edit_save             medium            17.92%    17.18%     6.78%
+xlsx_source_backed_cell_values_one_edit_save             noncompact        31.21%    24.29%     8.87%
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse      19.00%    16.92%     3.33%
+xlsx_source_backed_cell_values_one_percent_edit_save     medium            18.13%    15.76%     6.35%
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact        27.68%    26.96%     5.50%
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse      16.82%    17.88%     4.60%
+xlsx_source_backed_managed_cell_values_one_edit_save     medium            25.99%    16.36%    15.85%
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        28.79%    26.09%     8.12%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse      17.53%    18.08%     5.07%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium            18.12%    18.21%     6.16%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact        27.43%    27.02%     6.69%
+
+-- mean
+case                                                     shape               leg1      leg2     floor
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse      17.93%    16.92%     6.82%
+xlsx_source_backed_cell_values_batch_edit_save           medium            17.84%    19.93%     6.84%
+xlsx_source_backed_cell_values_batch_edit_save           noncompact        26.24%    27.08%    11.87%
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse      18.17%    13.09%     3.28%
+xlsx_source_backed_cell_values_one_edit_save             medium            17.74%    17.21%     9.54%
+xlsx_source_backed_cell_values_one_edit_save             noncompact        31.29%    24.32%    10.75%
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse      18.91%    16.96%     3.39%
+xlsx_source_backed_cell_values_one_percent_edit_save     medium            18.23%    16.42%     8.25%
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact        27.52%    26.97%     6.54%
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse      17.01%    17.82%     4.86%
+xlsx_source_backed_managed_cell_values_one_edit_save     medium            26.03%    16.41%    16.33%
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        28.86%    25.70%     8.52%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse      17.49%    17.71%     7.56%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium            18.21%    18.28%     6.00%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact        27.39%    26.76%     7.15%
+
+-- p95
+case                                                     shape               leg1      leg2     floor
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse      18.13%    16.60%    14.40%
+xlsx_source_backed_cell_values_batch_edit_save           medium            17.76%    19.66%     9.63%
+xlsx_source_backed_cell_values_batch_edit_save           noncompact        25.90%    27.12%    25.15%
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse      18.69%    13.28%     3.33%
+xlsx_source_backed_cell_values_one_edit_save             medium            16.91%    17.09%    48.23%
+xlsx_source_backed_cell_values_one_edit_save             noncompact        31.70%    24.87%    16.47%
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse      18.95%    16.10%     3.74%
+xlsx_source_backed_cell_values_one_percent_edit_save     medium            18.03%    15.23%    15.42%
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact        26.91%    27.57%    17.64%
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse      17.58%    17.86%     5.38%
+xlsx_source_backed_managed_cell_values_one_edit_save     medium            26.91%    15.72%    15.16%
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        28.64%    25.51%    11.96%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse      17.66%    16.84%    12.96%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium            18.43%    18.58%     5.80%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact        27.05%    26.49%     8.39%
+
+-- p99
+case                                                     shape               leg1      leg2     floor
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse      17.04%    15.66%    84.70%
+xlsx_source_backed_cell_values_batch_edit_save           medium            16.56%    20.12%    19.84%
+xlsx_source_backed_cell_values_batch_edit_save           noncompact        25.82%    27.46%   168.97%
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse      19.24%    11.97%     3.34%
+xlsx_source_backed_cell_values_one_edit_save             medium            16.55%    17.73%    50.19%
+xlsx_source_backed_cell_values_one_edit_save             noncompact        31.81%    25.17%    44.20%
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse      18.91%    15.88%     3.54%
+xlsx_source_backed_cell_values_one_percent_edit_save     medium            18.02%    15.40%    34.82%
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact        27.05%    27.65%    38.74%
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse      17.54%    17.92%    12.52%
+xlsx_source_backed_managed_cell_values_one_edit_save     medium            27.43%    16.04%    33.99%
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        28.07%    26.21%    20.06%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse      17.85%    16.43%    49.79%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium            18.54%    19.10%     6.54%
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact        27.03%    26.28%    17.06%
+
+raw p50 nanoseconds
+case                                                     shape                    A1           B1           B2           A2
+xlsx_source_backed_cell_values_batch_edit_save           dense-sparse     39,690,076   32,655,547   32,283,071   38,883,937
+xlsx_source_backed_cell_values_batch_edit_save           medium           21,147,331   17,340,147   16,836,479   21,035,752
+xlsx_source_backed_cell_values_batch_edit_save           noncompact       23,568,565   17,411,331   16,864,750   23,169,030
+xlsx_source_backed_cell_values_one_edit_save             dense-sparse     35,615,655   29,126,945   30,767,439   35,397,643
+xlsx_source_backed_cell_values_one_edit_save             medium            5,502,789    4,516,759    4,522,009    5,459,744
+xlsx_source_backed_cell_values_one_edit_save             noncompact        6,726,351    4,626,994    4,614,594    6,095,273
+xlsx_source_backed_cell_values_one_percent_edit_save     dense-sparse     40,196,465   32,557,608   32,885,390   39,583,451
+xlsx_source_backed_cell_values_one_percent_edit_save     medium           21,299,158   17,438,327   17,445,738   20,709,365
+xlsx_source_backed_cell_values_one_percent_edit_save     noncompact       23,704,766   17,143,260   16,947,050   23,202,560
+xlsx_source_backed_managed_cell_values_one_edit_save     dense-sparse     35,322,353   29,381,124   29,230,895   35,597,255
+xlsx_source_backed_managed_cell_values_one_edit_save     medium            6,155,587    4,555,719    4,573,129    5,467,774
+xlsx_source_backed_managed_cell_values_one_edit_save     noncompact        6,747,356    4,804,835    4,629,024    6,262,869
+xlsx_source_backed_managed_cell_values_one_percent_edit_save dense-sparse     39,670,820   32,714,632   32,671,218   39,880,415
+xlsx_source_backed_managed_cell_values_one_percent_edit_save medium           21,346,338   17,477,718   16,872,030   20,629,505
+xlsx_source_backed_managed_cell_values_one_percent_edit_save noncompact       23,560,380   17,096,826   17,008,531   23,305,746

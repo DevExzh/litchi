@@ -1,5 +1,24 @@
 # Performance program phase report
 
+## 0622: sixteen bytes per cell carried from planning delete the XLSX commit's second whole-sheet scan
+
+Record: [0622](0622-xlsx-compact-source-facts.md).
+
+`litchi-xlsx`: the source-backed cell-value commit stopped reading the worksheet
+a second time. Previously an open-edit-save of one cell walked the touched sheet
+about six times; one of those walks — the commit's layout scan, measured by
+change 0550 at 53.24-54.94% of commit instructions — is gone, replaced by a
+sixteen-byte-per-cell note taken during the walk that already happens. On the
+harness corpora a one-cell source-backed edit and save is 12-15% faster at p50
+and a one-percent edit 15-20% faster, with commit allocations roughly halved.
+Output is byte-identical: `output_sha256` matches on both legs for every case and
+shape measured, and an in-crate differential oracle compares the two commit
+routes cell by cell over the synthetic shapes, a dense grid and every worksheet
+part of every `.xlsx` fixture in the repository. No public API changed and no
+error moved. The saving does not reach files produced by Excel: the value editor
+that owns this path refuses them for reasons change 0602 recorded, and this
+change neither widens nor narrows that surface.
+
 ## 0621 — a full XLS text projection took four source observations per shared string; it now takes one per read
 
 Four source files changed — `litchi-cfb`, `litchi-xls`, the `litchi` facade and one test file — `performance_claim: none`. Ten observation sites stop observing on the paths that succeed and five of them are relocated onto the error branch, or into the probe, where they were load-bearing. The changed scenario is the source-backed XLS text projection: p50 **48,732,149 → 35,307,864 ns** on `54016.xls`, −27.55% forward and −28.32% reverse, p95 −30.45%/−24.96%, p99 −30.28%/−26.82%, against a same-binary A/A floor of −3.71% at p50. Deterministic counters on the same fixture: observations **89,789 → 36,503** (−59.3%), whole-child `statx` 89,794 → 36,508, instructions 426,888,900 → 400,986,804 (−6.07%), and `pread64`, `read_calls`, `read_bytes` and the SHA-256 of the projected text **identical**. The whole-sheet walk falls 64,307 → 16,117 observations (−74.9%) with the same cell digest. The controls are the three sub-millisecond cases and they are reported saying what they say: file-source open −0.76%/−0.70% p50 against a +0.31% floor, facade open −1.60%/−0.19% against +0.12%, one cell −1.33%/−1.41% against +0.10% — all inside or barely outside their floors, which is the result change 0587 predicted for a per-open count of 25. **No comparison is adverse in both directions by more than 5%**; exactly one is adverse in both directions at all, the facade open's p99 at +3.17%/+0.43% against a +1.91% floor, and it is reported rather than excluded. Correctness: every `.xls` fixture under `test-data/` — 109 files, 218 cells over the text projection and the whole-sheet walk — produces an identical digest or a character-identical typed refusal on both legs, with identical reads and read bytes, while observations over the corpus fall 230,619 → 91,611. Nine tests are added. Three are counted invariants and the record shows each failing with the fences put back (the CFB open at 3 rather than 2; a `Simple.xls` open and projection at (15, 4, 27) rather than (12, 4, 21); eight further shared-string cells costing 32 observations rather than 8). Four are the change-under-read sweeps: every removed fence sat between two observations the reader still takes, so the test mutates the source in **each of those windows in turn** and requires the same typed refusal from all of them, with a control that mutates after the last observation and requires success. Two more pin the relocated precedences and one pins that a mutation raised from inside the caller's own `Write` still stops the stream at that write instead of emitting the rest of the document. Gates: `cargo fmt --all --check` clean, Clippy and `cargo doc` clean on `litchi-cfb` and `litchi-xls`, `cargo test -p litchi-cfb` 356 passed and `-p litchi-xls` 1,396 passed across 72 binaries with 0 failures; `litchi` carries one pre-existing test failure and a nine-line pre-existing warning set under the feature combination that compiles the facade's XLS route, both reproduced byte for byte on the untouched before checkout. [Change and limitations](0621-xls-open-fence-count.md); [retained evidence](results/change-0621/README.md).

@@ -837,6 +837,7 @@ impl SourceEdit {
             self.before.source_xml(),
             self.before.sheet_name(),
             actions,
+            self.before.source_facts(),
         )?;
         let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
             .with_invalidated_calculation()?;
@@ -1178,6 +1179,7 @@ impl MultiSourceEdit {
                 snapshot.source_xml(),
                 snapshot.sheet_name(),
                 actions,
+                snapshot.source_facts(),
             )?;
             aggregate_bytes = super::snapshot::checked_multi_bytes(
                 aggregate_bytes,
