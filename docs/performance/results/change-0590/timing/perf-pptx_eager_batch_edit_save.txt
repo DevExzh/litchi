@@ -1,0 +1,7 @@
+leg	A1	cycles=74,587,125,203	instructions=208,061,718,941	task-clock=16,805ms
+leg	B1	cycles=71,173,755,982	instructions=199,395,093,978	task-clock=16,099ms
+leg	B2	cycles=70,612,177,883	instructions=199,340,180,528	task-clock=15,833ms
+leg	A2	cycles=74,877,105,273	instructions=208,078,953,842	task-clock=16,856ms
+cycles	before=74,732,115,238	after=70,892,966,932	delta=-5.14%	A/A=+0.39%
+instructions	before=208,070,336,392	after=199,367,637,253	delta=-4.18%	A/A=+0.01%
+task-clock	before=16,830	after=15,966	delta=-5.14%	A/A=+0.31%

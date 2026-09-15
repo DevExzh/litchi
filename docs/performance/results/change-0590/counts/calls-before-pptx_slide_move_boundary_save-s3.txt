@@ -1,0 +1,6 @@
+total_Ir	4863640146
+calls	130	litchi_pptx::opened::model::package_fingerprint
+calls	0	<no callee matching capture_internal>
+calls	96	litchi_pptx::opened::model::capture_with_provenance
+calls	96	litchi_pptx::notes::package::load_snapshot
+calls	0	<no callee matching packages_equal>

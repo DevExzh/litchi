@@ -1,0 +1,49 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0590",
+  "removed": [
+    {
+      "path": "<session scratchpad>/agents/0590/cg-{before,after}-<case>-s{1,3}.out",
+      "count": 14,
+      "bytes_approx": 6291456,
+      "what": "raw callgrind output files for both legs of the four selectors plus the three isolation pairs",
+      "why": "the inclusive annotations (incl-*.txt) and the call counts (calls-*.txt) derived from them are retained in counts/, and every number the record quotes comes from those two derived forms"
+    },
+    {
+      "path": "<session scratchpad>/agents/0590/probe.json, build-before.log, build-after.log, test-out.txt, cg-*.json, cg-*.log duplicates",
+      "what": "the one-sample probe run, the two build logs, the captured test output and the harness JSON written by the callgrind legs",
+      "why": "the build results are recorded as binary sha256s in README.md, the gate tails in gates.txt, and the callgrind legs' own logs are retained in counts/"
+    },
+    {
+      "path": "<session scratchpad>/agents/0590/",
+      "what": "the whole agent scratch directory, 8.2 MiB",
+      "why": "every script it held is retained verbatim in scripts/ and every output the record cites is retained in counts/ and timing/"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0590-before",
+      "bytes_approx": 1181116006,
+      "what": "the before leg's CARGO_TARGET_DIR (1.1 GiB)",
+      "why": "the before binary's sha256 and the checkout it was built from are recorded in README.md; the binary is reproducible from the read-only base checkout"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0590",
+      "bytes_approx": 20401094656,
+      "what": "the working worktree and its build output (19 GiB, of which tools/perf-baseline/target holds the after binary)",
+      "why": "removed after the branch was committed; the branch perf/0590-pptx-opened-transaction-revision-reuse is kept"
+    }
+  ],
+  "retained_in_repository": [
+    "docs/performance/0590-pptx-opened-transaction-revision-reuse.md",
+    "docs/performance/results/change-0590/README.md",
+    "docs/performance/results/change-0590/counts/ (42 files: call counts, inclusive annotations and valgrind logs for both legs of four selectors plus three isolation pairs)",
+    "docs/performance/results/change-0590/timing/ (harness reports and summaries for 4 selectors x 4 legs, the 100-sample repeat of pptx_slide_remove_boundary_save, perf stat for 4 selectors x 4 legs, and the per-phase reports for the two boundary selectors)",
+    "docs/performance/results/change-0590/scripts/ (every script used, verbatim)",
+    "docs/performance/results/change-0590/gates.txt",
+    "docs/performance/results/change-0590/decision.json",
+    "docs/performance/results/change-0590/log-sections.md"
+  ],
+  "not_removed": [
+    "/home/zhuhe/code/litchi-worktrees/before-08d968f8e — the shared read-only base checkout, owned by the wave and used by every agent"
+  ]
+}

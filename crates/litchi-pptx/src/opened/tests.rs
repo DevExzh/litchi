@@ -3849,3 +3849,281 @@ fn disjoint_new_shape_and_modern_comment_changes_merge_automatically() -> Result
     );
     Ok(())
 }
+
+fn attach_signature_graph(package: &mut Package) -> Result<PackURI> {
+    let origin = PackURI::new("/_xmlsignatures/origin.sigs").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        origin.clone(),
+        litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.into(),
+        b"origin".to_vec(),
+    )))?;
+    package.opc.rels_mut().try_add_relationship(
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.into(),
+        "_xmlsignatures/origin.sigs".into(),
+        "rIdSignature".into(),
+        TargetMode::Internal,
+    )?;
+    assert!(package.opc.is_signed());
+    Ok(origin)
+}
+
+#[test]
+fn commit_rehashes_a_package_whose_unsign_strips_signature_bytes() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let origin = attach_signature_graph(&mut package)?;
+
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(0_usize, 0_usize, "Signed edit")?);
+    let commit = edit.commit()?;
+    let committed = commit.snapshot().revision();
+
+    // The commit must bind the stripped package, never the staged package it
+    // hashed before `unsign` removed the signature graph.
+    assert!(!commit.snapshot().package.is_signed());
+    assert_eq!(
+        committed,
+        super::model::package_fingerprint(commit.snapshot().package.as_ref())?
+    );
+    assert_ne!(committed, source.revision());
+
+    let published = package.apply_opened_presentation_commit(commit)?;
+    assert!(package.opc.get_part(&origin).is_err());
+    assert!(!package.opc.is_signed());
+    assert_eq!(published.revision(), committed);
+    assert_eq!(
+        published.revision(),
+        super::model::package_fingerprint(&package.opc)?
+    );
+    Ok(())
+}
+
+#[test]
+fn commit_revision_binds_the_staged_package_without_a_signature_graph() -> Result<()> {
+    let package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(1_usize, 0_usize, "Plain edit")?);
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.snapshot().revision(),
+        super::model::package_fingerprint(commit.snapshot().package.as_ref())?
+    );
+    assert_ne!(commit.snapshot().revision(), source.revision());
+    Ok(())
+}
+
+fn assert_snapshot_fields_match(
+    published: &super::Snapshot,
+    fresh: &super::Snapshot,
+) -> Result<()> {
+    assert_eq!(published.revision(), fresh.revision());
+    assert_eq!(published.presentation_name, fresh.presentation_name);
+    assert_eq!(published.slides(), fresh.slides());
+    assert_eq!(published.limits, fresh.limits);
+    assert_eq!(
+        published.physical_source_provenance,
+        fresh.physical_source_provenance
+    );
+    assert!(super::model::packages_equal(
+        published.package.as_ref(),
+        fresh.package.as_ref()
+    ));
+    for slide in fresh.slides() {
+        assert_eq!(
+            published
+                .slide_name_index
+                .resolve(published.slides(), slide.name())
+                .map(|resolved| resolved.id())
+                .ok(),
+            fresh
+                .slide_name_index
+                .resolve(fresh.slides(), slide.name())
+                .map(|resolved| resolved.id())
+                .ok()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn published_commit_snapshot_equals_a_fresh_capture() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(0_usize, 0_usize, "Published text")?);
+    edit.move_slide(0, 1)?;
+    edit.set_notes_text(0_usize, "Published notes")?;
+    let commit = edit.commit()?;
+    let committed = commit.snapshot().revision();
+    let published = package.apply_opened_presentation_commit(commit)?;
+    let fresh = package.opened_presentation()?;
+    assert_eq!(published.revision(), committed);
+    assert_snapshot_fields_match(&published, &fresh)?;
+
+    // An exact no-op commit publishes the source snapshot through the same
+    // route and must still agree with a fresh capture.
+    let unchanged = package.opened_presentation()?;
+    let noop = unchanged.edit().commit()?;
+    assert!(!noop.is_changed());
+    let published = package.apply_opened_presentation_commit(noop)?;
+    let fresh = package.opened_presentation()?;
+    assert_snapshot_fields_match(&published, &fresh)?;
+    Ok(())
+}
+
+#[test]
+fn commit_publication_captures_a_package_that_drifted_outside_the_write_set() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(0_usize, 0_usize, "Drift target")?);
+    let commit = edit.commit()?;
+    let committed = commit.snapshot().revision();
+
+    // A resource the patch never names moves between commit and publication.
+    let drifted = PackURI::new("/docProps/drift.bin").map_err(Error::Invalid)?;
+    package.opc.try_add_part(Box::new(BlobPart::new(
+        drifted.clone(),
+        "application/octet-stream".into(),
+        b"drift".to_vec(),
+    )))?;
+
+    let published = package.apply_opened_presentation_commit(commit)?;
+    assert_ne!(published.revision(), committed);
+    assert_eq!(
+        published.revision(),
+        super::model::package_fingerprint(&package.opc)?
+    );
+    assert!(published.package.get_part(&drifted).is_ok());
+    let fresh = package.opened_presentation()?;
+    assert_snapshot_fields_match(&published, &fresh)?;
+    Ok(())
+}
+
+#[test]
+fn stale_write_set_still_refuses_a_committed_publication() -> Result<()> {
+    let mut package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    assert!(edit.set_shape_text(0_usize, 0_usize, "Stale commit")?);
+    let commit = edit.commit()?;
+    let slide = commit
+        .patch()
+        .resources()
+        .find(|name| name.as_str().contains("/slides/"))
+        .cloned()
+        .ok_or_else(|| Error::Invalid("shape patch has no slide resource".into()))?;
+    let mut changed = package.opc.get_part(&slide)?.blob().to_vec();
+    changed.extend_from_slice(b" ");
+    package.opc.get_part_mut(&slide)?.set_blob(changed.clone());
+    let before = super::model::package_fingerprint(&package.opc)?;
+
+    assert!(package.apply_opened_presentation_commit(commit).is_err());
+    assert_eq!(package.opc.get_part(&slide)?.blob(), changed);
+    assert_eq!(super::model::package_fingerprint(&package.opc)?, before);
+    Ok(())
+}
+
+#[test]
+fn packages_equal_tracks_every_fingerprint_input() -> Result<()> {
+    let package = opened_two_slide_package()?;
+    let base = package.opc.clone();
+    assert!(super::model::packages_equal(&package.opc, &base));
+    assert_eq!(
+        super::model::package_fingerprint(&package.opc)?,
+        super::model::package_fingerprint(&base)?
+    );
+
+    let slide = package.opened_presentation()?.slides()[0]
+        .part_name()
+        .clone();
+    let main = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
+    let added = PackURI::new("/docProps/extra.bin").map_err(Error::Invalid)?;
+
+    let mutations: Vec<(
+        &str,
+        fn(&mut litchi_opc::OpcPackage, &PackURI, &PackURI) -> Result<()>,
+    )> = vec![
+        ("payload", |opc, slide, _added| {
+            let mut blob = opc.get_part(slide)?.blob().to_vec();
+            blob.extend_from_slice(b" ");
+            opc.get_part_mut(slide)?.set_blob(blob);
+            Ok(())
+        }),
+        ("content type", |opc, slide, _added| {
+            opc.get_part_mut(slide)?
+                .set_content_type("application/octet-stream".into())?;
+            Ok(())
+        }),
+        ("added part", |opc, _slide, added| {
+            opc.try_add_part(Box::new(BlobPart::new(
+                added.clone(),
+                "application/octet-stream".into(),
+                b"extra".to_vec(),
+            )))?;
+            Ok(())
+        }),
+        ("removed part", |opc, slide, _added| {
+            assert!(opc.remove_part(slide));
+            Ok(())
+        }),
+        ("part relationship", |opc, slide, _added| {
+            opc.get_part_mut(slide)?.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "../media/probe.bin".into(),
+                "rIdProbe".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(())
+        }),
+        ("root relationship", |opc, _slide, _added| {
+            opc.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "docProps/probe.bin".into(),
+                "rIdRootProbe".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(())
+        }),
+        ("external relationship", |opc, _slide, _added| {
+            opc.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "https://example.invalid/probe".into(),
+                "rIdExternalProbe".into(),
+                TargetMode::External,
+            )?;
+            Ok(())
+        }),
+    ];
+
+    for (label, mutate) in mutations {
+        let mut mutated = base.clone();
+        mutate(&mut mutated, &slide, &added)?;
+        assert!(
+            !super::model::packages_equal(&base, &mutated),
+            "{label} escaped the complete-package comparison"
+        );
+        assert!(
+            !super::model::packages_equal(&mutated, &base),
+            "{label} escaped the reversed complete-package comparison"
+        );
+        assert_ne!(
+            super::model::package_fingerprint(&base)?,
+            super::model::package_fingerprint(&mutated)?,
+            "{label} escaped the complete-package fingerprint"
+        );
+    }
+
+    // A part rewritten to its own bytes is a different allocation with the same
+    // content: the comparison must still accept it.
+    let mut rewritten = base.clone();
+    let blob = rewritten.get_part(&main)?.blob().to_vec();
+    rewritten.get_part_mut(&main)?.set_blob(blob);
+    assert!(super::model::packages_equal(&base, &rewritten));
+    assert_eq!(
+        super::model::package_fingerprint(&base)?,
+        super::model::package_fingerprint(&rewritten)?
+    );
+    Ok(())
+}

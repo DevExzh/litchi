@@ -1,0 +1,15 @@
+case	pptx_slide_move_boundary_save
+leg	A1	n=30	p50=0.837ms	mean=0.838ms	p95=0.856ms	p99=0.870ms
+leg	B1	n=30	p50=0.514ms	mean=0.513ms	p95=0.522ms	p99=0.536ms
+leg	B2	n=30	p50=0.520ms	mean=0.518ms	p95=0.526ms	p99=0.527ms
+leg	A2	n=30	p50=0.839ms	mean=0.838ms	p95=0.846ms	p99=0.854ms
+pooled	before(A1+A2)	n=60	p50=0.837ms	mean=0.838ms	p95=0.854ms	p99=0.870ms
+pooled	after(B1+B2)	n=60	p50=0.515ms	mean=0.515ms	p95=0.526ms	p99=0.536ms
+delta	p50	after_vs_before=-38.55%	before_vs_after=+62.72%
+delta	p95	after_vs_before=-38.48%	before_vs_after=+62.54%
+delta	p99	after_vs_before=-38.41%	before_vs_after=+62.37%
+delta	mean	after_vs_before=-38.50%	before_vs_after=+62.60%
+floor	A/A_p50	A2_vs_A1=+0.25%
+floor	B/B_p50	B2_vs_B1=+1.11%
+floor	A/A_p95	A2_vs_A1=-1.15%
+floor	A/A_p99	A2_vs_A1=-1.83%

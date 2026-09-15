@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0590 compliance update
+
+Change 0590 keeps ADR 0003's revision binding exactly: the complete-package
+revision is still `package_fingerprint` over the same domain string, the same
+sorted part feed of name, content type, payload and relationships, the same
+package-root relationships and the same opaque non-part members. No revision
+value changes, so the durable `SlideRemovalPatch` (`LPRM0001`) and
+`CrossSlideCopyPatch` (`LPCP0002`) encodings that carry revisions remain
+bit-identical and patches serialized before the change still apply after it.
+ADR 0003 specifies that `commit()` returns a `Commit<T>` "containing the new
+snapshot, a reversible patch, and diagnostics"; part (b) of this change makes
+the PPTX facade use that snapshot rather than discard it, and reuses it only
+after proving the published candidate byte-identical to the package it
+describes. ADR 0005's mandatory validation is intact: no check is removed,
+weakened, reordered or made conditional, and both reuses fall back to the
+original path on any mismatch, including a mismatch in resource limits or the
+physical-source-provenance flag. ADR 0006 preservation is intact because no
+output byte changes and the `unsign` signature policy still forces a fresh hash
+whenever stripping rewrites bytes. ADR 0013's notes-topology check still runs
+inside every capture, including the capture that is later reused; the change
+declines to capture the same content twice, never to capture it zero times. No
+`unsafe`, no new ambient I/O, no global pool, no weakened limit, and no public
+leakage of archive types, locks or executors. See
+[Change 0590](0590-pptx-opened-transaction-revision-reuse.md);
+`performance_claim: none`.
+
 ## 0589 — the source-identity fence, priced and left intact
 
 ADR 0006's source-identity fence and ADR 0005's `SourceChanged` contract are

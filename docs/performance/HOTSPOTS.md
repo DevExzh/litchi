@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0590 — PPTX opened-transaction revision reuse
+
+Item PPTX-1(a)/(b) of the 0587 queue is implemented. An opened PPTX lifecycle
+hashed the complete package — every part blob, media included — six times and
+captured the package five times; it now hashes four times and captures four.
+`Transaction::commit` keeps the revision it computed for the `unsign()`
+decision and reuses it for the recapture, recomputing only when `is_signed()`
+says stripping may have rewritten a fingerprint input, and
+`Package::apply_opened_presentation_commit` stops discarding `commit.snapshot`:
+it still builds, validates and assigns exactly the same candidate, then reuses
+that already-validated capture when a direct comparison of every
+`package_fingerprint` input proves the candidate byte-identical, and captures
+from scratch otherwise. **Measured** on the isolation pair
+(`--samples 3` minus `--samples 1`, callgrind, CPU 10): per lifecycle of
+`pptx_eager_batch_edit_save` 12,679,371,772 → 10,680,374,116 Ir, −15.77%;
+whole child 39.61 G → 33.61 G (−15.15%), `package_fingerprint` inclusive 34.94%
+→ 24.76% and software SHA-256 51.77% → 44.60%; `pptx_eager_multi_slide_batch_edit_save`
+−15.12%, `pptx_slide_remove_boundary_save` −1.80%,
+`pptx_slide_move_boundary_save` −2.57%. The revision value, the durable
+`LPRM0001`/`LPCP0002` patch encodings and every refusal are unchanged; 860
+`litchi-pptx` tests pass, six of them new. The eager corpora are built without
+physical source provenance and re-deflate all media on save, so the timed region
+is dominated by work this change does not touch and the wall-clock deltas sit
+inside the host's A/A floor. Item (c) changes the durable revision format and
+stays a frozen-design prerequisite; item (d) was examined and rejected.
+`performance_claim: none`. [Change and limitations](0590-pptx-opened-transaction-revision-reuse.md);
+[evidence](results/change-0590/README.md). OLE2/OOXML remain active; ODF is
+deferred until completion and iWork excluded.
+
 ## 0589 — DOC and PPT source-backed opens: half the SHA-256 work removed
 
 Survey item DOC-1 (rank 2 of change 0587) is priced and its value-identical

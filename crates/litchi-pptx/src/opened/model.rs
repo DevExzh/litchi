@@ -275,6 +275,25 @@ impl Snapshot {
         super::Transaction::new(self.clone())
     }
 
+    /// Rebind this snapshot's validated state onto a package that carries
+    /// byte-identical [`package_fingerprint`] inputs.
+    ///
+    /// Every derived field — the presentation root, the slide identities, the
+    /// name index and the complete-package revision — is a function of exactly
+    /// the content [`packages_equal`] compares, so the result is the snapshot
+    /// [`capture_with_provenance`] would return for `package`. Callers must
+    /// establish that equality first.
+    pub(crate) fn rebound_to(&self, package: &OpcPackage) -> Self {
+        debug_assert!(
+            packages_equal(self.package.as_ref(), package),
+            "opened-presentation snapshot rebound to a different package"
+        );
+        Self {
+            package: Arc::new(package.clone()),
+            ..self.clone()
+        }
+    }
+
     /// Resource policy inherited by edits and patches.
     #[must_use]
     pub const fn limits(&self) -> Limits {
@@ -309,6 +328,33 @@ pub(crate) fn capture_with_provenance(
     package: &OpcPackage,
     limits: Limits,
     physical_source_provenance: bool,
+) -> Result<Snapshot> {
+    capture_internal(package, limits, physical_source_provenance, None)
+}
+
+/// Capture `package` with a complete-package revision the caller already
+/// computed from the identical package content.
+///
+/// The revision still binds the complete package: it is the value
+/// [`package_fingerprint`] returns for this exact content, so the snapshot is
+/// the one [`capture_with_provenance`] would produce. Every validation the
+/// ordinary capture performs still runs; only the repeated hash of unchanged
+/// bytes is skipped. Callers must not pass a revision taken from any other
+/// package state.
+pub(crate) fn capture_with_revision(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    revision: [u8; 32],
+) -> Result<Snapshot> {
+    capture_internal(package, limits, physical_source_provenance, Some(revision))
+}
+
+fn capture_internal(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    known_revision: Option<[u8; 32]>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
@@ -373,7 +419,16 @@ pub(crate) fn capture_with_provenance(
     }
     let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
     let slide_name_index = SlideNameIndex::build(&slides)?;
-    let revision = package_fingerprint(package)?;
+    let revision = match known_revision {
+        Some(revision) => {
+            debug_assert!(
+                package_fingerprint(package).is_ok_and(|fresh| fresh == revision),
+                "opened-presentation capture reused a stale complete-package revision"
+            );
+            revision
+        },
+        None => package_fingerprint(package)?,
+    };
     Ok(Snapshot {
         package: Arc::new(package.clone()),
         presentation_name,
@@ -431,6 +486,60 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
         feed_relationships(&mut digest, &relationships)?;
     }
     Ok(digest.finalize().into())
+}
+
+/// Whether two packages present byte-identical [`package_fingerprint`] inputs.
+///
+/// Every input the fingerprint feeds is compared here in the same scope: the
+/// package-root relationships, the opaque non-part members, and, per part, the
+/// part name, the content type, the payload and the part relationships. A
+/// `true` result therefore proves the two packages carry the same
+/// complete-package revision without hashing either of them, and proves it by
+/// content rather than by digest. A `false` result proves nothing at all, so
+/// every caller falls back to the ordinary capture.
+///
+/// Payload comparison short-circuits on `Arc` pointer identity, which the
+/// opened-transaction path preserves for every part an edit did not rewrite.
+pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
+    if left.part_count() != right.part_count()
+        || !relationships_equal(left.rels(), right.rels())
+        || left.non_part_members().len() != right.non_part_members().len()
+    {
+        return false;
+    }
+    if left
+        .non_part_members()
+        .iter()
+        .zip(right.non_part_members())
+        .any(|(left, right)| left.name() != right.name() || left.reason() != right.reason())
+    {
+        return false;
+    }
+    left.iter_parts().all(|part| {
+        right.get_part(part.partname()).is_ok_and(|other| {
+            part.content_type() == other.content_type()
+                && blobs_equal(part, other)
+                && relationships_equal(part.rels(), other.rels())
+        })
+    })
+}
+
+fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {
+    Arc::ptr_eq(&left.blob_arc(), &right.blob_arc()) || left.blob() == right.blob()
+}
+
+fn relationships_equal(
+    left: &litchi_opc::Relationships,
+    right: &litchi_opc::Relationships,
+) -> bool {
+    left.len() == right.len()
+        && left.iter().all(|relationship| {
+            right.get(relationship.r_id()).is_some_and(|other| {
+                other.reltype() == relationship.reltype()
+                    && other.target_ref() == relationship.target_ref()
+                    && other.is_external() == relationship.is_external()
+            })
+        })
 }
 
 fn feed_relationships(
