@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0594",
+  "title": "One Deflate decoder per OOXML open, above a measured member threshold",
+  "decision": "retained after a held revision; ZIP-1 of the 0587 queue implemented for the structural admission pass and the serial batch wave, gated by SESSION_MEMBER_THRESHOLD",
+  "code_state": "crates/soapberry-zip/src/office.rs, crates/litchi-opc/src/pkgreader.rs, crates/litchi-opc/src/source_backed.rs, crates/litchi-opc/src/source_backed/batch.rs",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the open's structural admission pass built one DeflateDecoder per member: 41 and 20 constructions of 80,320 bytes removed on the two above-threshold fixtures, 58.95% and 73.02% of the open's allocated bytes",
+    "the first implementation kept the session for every package and regressed docx_file_source_open; the regression is attributed to +8 minor page faults per fresh-process open (92 -> 100 at p50 and every quantile, 150 interleaved runs per leg), caused by the retained 80,320-byte workspace raising the open's heap high-water",
+    "instructions and cycles were not the cause: callgrind showed -7.38% Ir per open on that corpus, perf stat -0.81% instructions and +0.31% cycles, and syscr/rchar were byte-identical, so the RefCell borrow, the decoder reset, inlining and I/O are all ruled out",
+    "a threshold of 16 relationship members, decided from the count source_catalog already computes for its RelationshipParts limit and passed through a new default-no-op ArchiveAccess hook, removes the regression: the same instrument now shows +0.9 minor faults and +2.45% p50 on that corpus, while the 445-member PPTX keeps +2.11% p50 and the 132-member workbook 4.88-5.34% p50 against a 0.14% floor",
+    "a first version of the threshold that scanned member names inside the wrapper cost +4.83% cycles and +659% cache misses per open on the 20-member DOCX and was replaced, not kept",
+    "the harness ABBA on the retained implementation puts docx_file_source_open's adverse direction at -0.20% and -0.74% against floors of 5.52% and 7.61%, and pptx_file_source_open favourable in all four directions (+2.76% to +5.50% p50 against floors of 3.12% and 3.22%)"
+  ],
+  "accepted_evidence": {
+    "counts": "exact allocation, allocated-byte, positional-request and version()-call counts for open, first and second part read, all parts in both physical orders, stream_to and a serial read_parts_ordered wave, on three real OOXML fixtures, both legs",
+    "instructions": "callgrind self-cost tables for open plus one part on the 132-member workbook, and a 20/40 isolation pair of the DOCX open used for the attribution",
+    "cycles": "perf stat 100/200 isolation pairs, -r 5, all counters at 100% coverage, for the DOCX corpus (below the threshold) and the PPTX corpus (above it)",
+    "resource": "minor page faults per fresh-process open from the selector's own --filesystem-child /proc deltas, 150 and 120 interleaved runs per leg, on both corpora and both implementations",
+    "timing": "interleaved paired child measurements alternating leg by sample; an in-process ABBA of the open through the probe on two real fixtures; and A1 B1 B2 A2 harness runs of docx_file_source_open, pptx_file_source_open and xlsx_source_open with an A/A floor in each window",
+    "correctness": "a corpus-wide differential over 179 OOXML packages and 4,215 members that asserts both sides of the threshold are exercised (15 with a session, 164 without), a dedicated threshold test, and a by-name session test covering a refused member and the FileNotFound identity"
+  },
+  "accepted_costs": {
+    "reach": "the threshold limits the change to packages with at least 16 relationship members: 15 of 179 repository OOXML fixtures (8.4%); the other 164 take a byte-identical pre-change path and nothing is claimed for them",
+    "threshold_scope": "16 is a 16:1 margin over a bounded cost measured on one host with one allocator; another platform would need it re-derived",
+    "peak_transient": "an above-threshold package holds one 80,320-byte workspace across the pass, measured as +15 minor page faults per fresh-process open of the 132-member workbook and -2 on the 445-member PPTX",
+    "callgrind_accounting": "rep stosb is counted per byte; this record measured the gap directly, -7.38% Ir against -0.81% native instructions and flat cycles on the same operation",
+    "residual_adverse_row": "xlsx_source_open is -1.40% and -1.89% at p50 against a 1.71% A/A floor over 200 samples per leg. Its nine-member corpus carries two relationship members, so it is below the threshold and executes the pre-change path on both legs; the residue is code layout in a binary carrying added, unexecuted code, about 0.7 us of a 44 us operation. No further attribution was taken and none is claimed."
+  },
+  "known_gaps": {
+    "cold_single_read": "a single cold PartView::data() read still builds one decoder (27 allocations / 86,291 bytes, unchanged); a pooled session needs a self-referential borrow or a hand-rolled inflate loop over flate2::Decompress, and neither is designed here",
+    "managed_packages": "managed packages keep the one-shot path by policy (change 0402)",
+    "parallel_batch": "only the serial batch wave takes a session",
+    "below_threshold": "no packaging below 16 relationship members benefits, including the warm-process case where the held implementation measured favourable on comment.docx"
+  },
+  "withheld": [
+    "any speedup claim, any RSS or peak-memory claim, any cold-cache, physical-device, range-source, remote-transport, concurrency-scaling or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "08d968f8ec7db27cf1187d01911fd08b9d014d91",
+    "branch": "perf/0594-zip-session-reuse-per-open",
+    "held_first_implementation": "c8b23c5f429ea240ed3c58dda1fa1746d7412e5b",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_affinity": "14",
+    "build": "cargo build --release --locked on both legs",
+    "corpora": {
+      "docx_file_source_open": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4, 16,793,036 bytes, 20 members, 3 relationship members",
+      "pptx_file_source_open": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757, 17,017,139 bytes, 445 members, 223 relationship members"
+    }
+  }
+}

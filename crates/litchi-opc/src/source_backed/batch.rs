@@ -477,12 +477,25 @@ fn read_serial(
     requests: &[PreparedRequest],
     output: &mut Vec<PartData>,
 ) -> Result<()> {
+    // The serial wave is one sequential operation over distinct members, so an
+    // unmanaged package long enough to repay the retained workspace may reset
+    // one Deflate decoder across it instead of building one per cold member.
+    // Store members bypass the decoder, cache hits stay cache-only, and a
+    // managed package keeps the one-shot path so that no decoder workspace
+    // outlives a managed load (change 0402).
+    let mut session = package.sequential_read_session(requests.len());
     for request in requests {
         let data = match request.declared_bytes {
-            Some(declared) => {
-                package.read_part_prepared(request.index, request.entry_id, declared)?
+            Some(declared) => package.read_part_prepared_with_session(
+                request.index,
+                request.entry_id,
+                declared,
+                session.as_mut(),
+            )?,
+            None => match session.as_mut() {
+                Some(session) => package.read_part_with_session(request.index, session, None)?,
+                None => package.read_part(request.index)?,
             },
-            None => package.read_part(request.index)?,
         };
         output.push(data);
     }

@@ -1,5 +1,29 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0594 compliance update
+
+Change 0594 threads one `IndexedReadSession` through the OPC structural admission
+pass and the serial batch wave, above a stated member threshold. ADR 0005 is
+satisfied on its own terms: a session is not a cache — it retains no payload, no
+metadata and no verdict, only decoder workspace — and read-order independence is
+preserved because every catalog verdict remains a function of member bytes proven
+identical member by member across the whole OOXML corpus on both sides of the
+threshold, while the threshold itself is a function of the archive's own member
+names computed before the first read. No `ReadLimits` or `ArchiveLimits` value,
+check or ordering moved; the new hook is called immediately after the
+`RelationshipParts` check whose count it reuses, so a package that exceeds that
+limit is refused exactly where it was. The single-flight `Loader`/`Waiter`/
+`Bypass` arms, the `source.ensure_current()` brackets and the budget reservations
+are the ones the sessionless path already used, and a managed package still
+refuses to retain decoder workspace across a load (change 0402). ADR 0006 is
+untouched: no output byte, no typed refusal and no preservation path changed, and
+the validation open keeps its exact `ValidationCatalogPhase` provenance while
+remaining non-mutating. No new `unsafe`, no weakened defence, no hidden global
+pool, no ambient I/O, and no archive, lock or executor type reaches a public
+signature — `SessionedArchive` is `pub(crate)` and the new `SourceBackedPackage`
+methods are module-private. See [Change 0594](0594-zip-session-reuse-per-open.md);
+`performance_claim: none`.
+
 ## 0604 — no boundary moved; the design's compliance stated in advance
 
 Record: [0604](0604-cfb-append-reads-design.md).

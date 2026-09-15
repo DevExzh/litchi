@@ -1,0 +1,21 @@
+Paired open timing through the retained probe (PROBE_PHASES=time), in-process,
+warm, 10 warmups then 40 timed opens per leg, CPU 14, order A1 B1 B2 A2.
+Positive percent = the after leg is faster. A/A is |A1-A2|/A1 in the same window.
+
+== ConditionalFormattingSamples.xlsx (132 members, 42 structural reads)
+stat            A1          B1          B2          A2   A1->B1 %   A2->B2 %    A/A %
+p50         531903      505963      504203      532663       4.88       5.34     0.14
+mean        534460      505992      504677      535291       5.33       5.72     0.16
+p95         554103      519173      522873      555323       6.30       5.84     0.22
+p99         556713      523693      543433      556963       5.93       2.43     0.04
+min         521403      490712      484823      520883       5.89       6.92     0.10
+n               40          40          40          40
+
+== comment.docx (10 members, 3 structural reads)
+stat            A1          B1          B2          A2   A1->B1 %   A2->B2 %    A/A %
+p50          33910       33131       33130       33770       2.30       1.90     0.41
+mean         34454       33405       33350       33911       3.05       1.65     1.58
+p95          34890       34170       34140       34990       2.06       2.43     0.29
+p99          46600       41440       41291       39541      11.07      -4.43    15.15
+min          33320       32581       32240       33060       2.22       2.48     0.78
+n               40          40          40          40

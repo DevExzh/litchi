@@ -1,0 +1,325 @@
+# The threshold, as a patch against the held first implementation
+#
+# The held implementation was commit c8b23c5f429ea240ed3c58dda1fa1746d7412e5b on
+# this branch: the same change with no threshold, a session kept for every
+# package. It is the implementation whose docx_file_source_open regression this
+# record attributes. That commit was amended away, so the supported route is to
+# reverse-apply this patch on the retained tree:
+#
+#     git apply --reverse held-first-implementation/threshold.patch
+#
+# which reproduces the held implementation for anyone who wants to re-measure the
+# +8 minor page faults. Applying it forward turns the held tree into the retained
+# one. Checked with `git apply --reverse --check` at the retained commit.
+#
+diff --git a/crates/litchi-opc/src/pkgreader.rs b/crates/litchi-opc/src/pkgreader.rs
+index 17a9e9ac5..002b8e32d 100644
+--- a/crates/litchi-opc/src/pkgreader.rs
++++ b/crates/litchi-opc/src/pkgreader.rs
+@@ -40,6 +40,16 @@ pub(crate) trait ArchiveAccess {
+         name: &str,
+     ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error>;
+ 
++    /// Tell the accessor how many relationship members this package carries,
++    /// before any structural read has run.
++    ///
++    /// [`PackageReader::source_catalog`] already counts them for the
++    /// `RelationshipParts` limit, so this hands an existing number to the
++    /// accessor rather than computing a new one. A positional archive uses it
++    /// to decide whether keeping one read session is worth the workspace it
++    /// retains; every other implementation ignores it.
++    fn note_relationship_member_count(&self, _relationship_members: usize) {}
++
+     /// Return a shared materialization when this archive has a validated,
+     /// reusable decompression path. Positional archives intentionally retain
+     /// the default `None` so their structural reads stay caller-owned.
+@@ -153,6 +163,30 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
+     }
+ }
+ 
++/// Relationship members a package must carry before a structural admission
++/// pass keeps one Deflate decoder instead of building one per member.
++///
++/// **The rule.** Keep the session only when it will avoid at least this many
++/// decoder constructions, so that the one workspace it retains is repaid at
++/// least sixteenfold in workspace it does not allocate and does not zero.
++///
++/// **Why a rule is needed.** The trade has a fixed side. Keeping the decoder
++/// raises the open's heap high-water by one workspace — 80,320 bytes, zlib-rs
++/// inflate state plus flate2's 32 KiB `BufReader` — for the length of the pass,
++/// where the old code handed those pages back between members. That is
++/// immaterial when the open allocates megabytes and material when it does not.
++/// Measured on one host for change 0594: a 445-member PPTX opened in a fresh
++/// process is 2.20% faster at p50 and takes one extra minor page fault, while a
++/// 20-member DOCX carrying three relationship members is 1.08% slower and takes
++/// eight. Relationship members are counted rather than archive members because
++/// they are exactly the members the session would serve: the pass reads
++/// `[Content_Types].xml` once and then one `.rels` per relationship-bearing
++/// part.
++///
++/// The value is a scoped measurement, not a constant of nature; it is stated
++/// here so that a different allocator, platform or corpus can re-derive it.
++pub(crate) const SESSION_MEMBER_THRESHOLD: usize = 16;
++
+ /// One indexed archive plus the sequential read session that its structural
+ /// admission reads share.
+ ///
+@@ -163,22 +197,30 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
+ /// per member. Nothing else about a read changes: name admission, the local
+ /// header, CRC, declared-size and data-descriptor checks, the limits and every
+ /// error identity are the archive's own, because the session performs exactly
+-/// the read the one-shot entry point performs.
++/// the read the one-shot entry point performs — and a package below
++/// [`SESSION_MEMBER_THRESHOLD`] keeps no session at all, so it takes the
++/// one-shot path it always took.
+ ///
+ /// The wrapper is an operation-scoped stack value. It is never stored in a
+ /// package, so the retained decoder workspace lives only for the length of the
+ /// admission pass, and its `RefCell` never crosses a thread.
+ pub(crate) struct SessionedArchive<'archive, R: soapberry_zip::ReaderAt> {
+     archive: &'archive soapberry_zip::office::IndexedArchive<R>,
+-    session: RefCell<soapberry_zip::office::IndexedReadSession<'archive, R>>,
++    session: RefCell<Option<soapberry_zip::office::IndexedReadSession<'archive, R>>>,
+ }
+ 
+ impl<'archive, R: soapberry_zip::ReaderAt> SessionedArchive<'archive, R> {
+     /// Borrow one indexed archive for a single structural admission pass.
++    ///
++    /// No session exists yet. The pass installs one through
++    /// [`ArchiveAccess::note_relationship_member_count`] if, and only if, the
++    /// count it already computed reaches [`SESSION_MEMBER_THRESHOLD`], so a
++    /// package below the threshold neither keeps a workspace nor pays anything
++    /// to find that out.
+     pub(crate) fn new(archive: &'archive soapberry_zip::office::IndexedArchive<R>) -> Self {
+         Self {
+             archive,
+-            session: RefCell::new(archive.read_session()),
++            session: RefCell::new(None),
+         }
+     }
+ }
+@@ -199,11 +241,23 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for SessionedArchive<'_, R> {
+         self.archive.metadata(name)
+     }
+ 
++    fn note_relationship_member_count(&self, relationship_members: usize) {
++        if relationship_members < SESSION_MEMBER_THRESHOLD {
++            return;
++        }
++        if let Ok(mut slot) = self.session.try_borrow_mut() {
++            slot.get_or_insert_with(|| self.archive.read_session());
++        }
++    }
++
+     fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
+         match self.session.try_borrow_mut() {
+-            Ok(mut session) => session.read(name),
++            Ok(mut slot) => match slot.as_mut() {
++                Some(session) => session.read(name),
++                None => self.archive.read(name),
++            },
+             // Structural admission is sequential and never re-enters a read,
+-            // so the session is always free here. Reading through the archive
++            // so the slot is always free here. Reading through the archive
+             // when it is not keeps that property a performance assumption
+             // rather than a panic; the two paths return the same value.
+             Err(_) => self.archive.read(name),
+@@ -1274,6 +1328,9 @@ impl PackageReader {
+             relationship_part_count as u64,
+             limits.max_relationship_parts() as u64,
+         )?;
++        // The count above is exactly the number of `.rels` members this pass
++        // will read; hand it to the accessor before the first read.
++        archive.note_relationship_member_count(relationship_part_count);
+         let mut ledger = RelationshipLedger::default();
+         let content_types_member = Self::locate_content_types_member(archive)?;
+         let content_types_metadata = archive.metadata(content_types_member)?;
+@@ -1332,6 +1389,9 @@ impl PackageReader {
+                 limits.max_relationship_parts() as u64,
+             )
+             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
++        // The count above is exactly the number of `.rels` members this pass
++        // will read; hand it to the accessor before the first read.
++        archive.note_relationship_member_count(relationship_part_count);
+         let mut ledger = RelationshipLedger::default();
+         let content_types_member = Self::locate_content_types_member(archive)
+             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+@@ -2748,6 +2808,80 @@ mod tests {
+         fixtures
+     }
+ 
++    /// One `[Content_Types].xml` plus `count` relationship members, so that the
++    /// threshold's counting rule is exercised with a non-relationship member
++    /// present that must not be counted.
++    fn archive_with_relationship_members(count: usize) -> Vec<u8> {
++        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
++        writer
++            .write_deflated(CONTENT_TYPES_MEMBER, b"<Types/>")
++            .unwrap();
++        for index in 0..count {
++            writer
++                .write_deflated(
++                    &format!("part{index}/_rels/part{index}.xml.rels"),
++                    b"<Relationships/>",
++                )
++                .unwrap();
++        }
++        writer.finish_to_bytes().unwrap()
++    }
++
++    #[test]
++    fn a_session_is_kept_only_for_packages_above_the_member_threshold() {
++        for (relationship_members, kept) in [
++            (0usize, false),
++            (1, false),
++            (SESSION_MEMBER_THRESHOLD - 1, false),
++            (SESSION_MEMBER_THRESHOLD, true),
++            (SESSION_MEMBER_THRESHOLD + 4, true),
++        ] {
++            let bytes = archive_with_relationship_members(relationship_members);
++            let length = bytes.len() as u64;
++            let archive =
++                soapberry_zip::office::IndexedArchive::from_reader(Cursor::new(bytes), length)
++                    .unwrap();
++            // The content-types member is present and is not a relationship
++            // member, so it must not count towards the threshold.
++            assert_eq!(archive.len(), relationship_members + 1);
++            let sessioned = SessionedArchive::new(&archive);
++            assert!(
++                sessioned.session.borrow().is_none(),
++                "no session exists before the pass reports its count"
++            );
++            let counted = archive
++                .file_names()
++                .filter(|member_name| PackageReader::is_relationship_member(member_name))
++                .count();
++            assert_eq!(counted, relationship_members);
++            ArchiveAccess::note_relationship_member_count(&sessioned, counted);
++            assert_eq!(
++                sessioned.session.borrow().is_some(),
++                kept,
++                "{relationship_members} relationship members"
++            );
++
++            // Whichever side of the threshold the package falls, the bytes are
++            // the archive's own.
++            let names: Vec<String> = archive.file_names().map(str::to_string).collect();
++            for name in &names {
++                assert_eq!(
++                    ArchiveAccess::read(&sessioned, name).unwrap(),
++                    soapberry_zip::office::IndexedArchive::read(&archive, name).unwrap(),
++                    "{relationship_members} relationship members, member {name}"
++                );
++            }
++            assert_eq!(
++                ArchiveAccess::read(&sessioned, "absent.bin")
++                    .unwrap_err()
++                    .to_string(),
++                soapberry_zip::office::IndexedArchive::read(&archive, "absent.bin")
++                    .unwrap_err()
++                    .to_string()
++            );
++        }
++    }
++
+     #[test]
+     fn sessioned_structural_reads_match_one_shot_reads_across_the_ooxml_corpus() {
+         let fixtures = ooxml_corpus();
+@@ -2758,6 +2892,8 @@ mod tests {
+         );
+         let mut packages = 0usize;
+         let mut members = 0usize;
++        let mut with_session = 0usize;
++        let mut without_session = 0usize;
+         for path in fixtures {
+             let bytes = std::fs::read(&path).unwrap();
+             let length = bytes.len() as u64;
+@@ -2769,6 +2905,19 @@ mod tests {
+                 continue;
+             };
+             let sessioned = SessionedArchive::new(&archive);
++            // Drive the same hook `source_catalog` drives, with the same count.
++            ArchiveAccess::note_relationship_member_count(
++                &sessioned,
++                archive
++                    .file_names()
++                    .filter(|member_name| PackageReader::is_relationship_member(member_name))
++                    .count(),
++            );
++            if sessioned.session.borrow().is_some() {
++                with_session += 1;
++            } else {
++                without_session += 1;
++            }
+             packages += 1;
+ 
+             let names: Vec<String> = archive.file_names().map(str::to_string).collect();
+@@ -2845,5 +2994,13 @@ mod tests {
+             packages >= 100 && members >= 1_000,
+             "corpus too small: {packages} packages, {members} members"
+         );
++        // Both sides of the threshold are covered by the differential, so the
++        // kept-session path and the one-shot path are each proven on real
++        // packages rather than only on the synthetic threshold fixture.
++        assert!(
++            with_session > 0 && without_session > 0,
++            "corpus exercises only one side of the threshold: \
++             {with_session} with a session, {without_session} without"
++        );
+     }
+ }
+diff --git a/crates/litchi-opc/src/source_backed.rs b/crates/litchi-opc/src/source_backed.rs
+index b4b233d94..752990d8d 100644
+--- a/crates/litchi-opc/src/source_backed.rs
++++ b/crates/litchi-opc/src/source_backed.rs
+@@ -9944,16 +9944,24 @@ impl SourceBackedPackage {
+         )
+     }
+ 
+-    /// A read session for one sequential multi-member operation, when this
+-    /// package may retain decoder workspace for its length.
++    /// A read session for one sequential multi-member operation over `members`
++    /// distinct members, when this package may retain decoder workspace for its
++    /// length and the operation is long enough to repay it.
+     ///
+     /// A managed package intentionally gets `None`: retaining decoder
+     /// workspace across a managed load would escape the managed memory budget
+-    /// (change 0402). Its cancellation and reservation policy is unchanged.
++    /// (change 0402). Its cancellation and reservation policy is unchanged. An
++    /// operation shorter than
++    /// [`SESSION_MEMBER_THRESHOLD`](crate::pkgreader::SESSION_MEMBER_THRESHOLD)
++    /// also gets `None`, under that constant's stated rule: the one workspace a
++    /// kept session retains is only worth its heap high-water when the
++    /// operation avoids at least sixteen constructions of it.
+     fn sequential_read_session(
+         &self,
++        members: usize,
+     ) -> Option<soapberry_zip::office::IndexedReadSession<'_, SourceReader>> {
+-        (!self.cache.is_managed()).then(|| self.archive.read_session())
++        (!self.cache.is_managed() && members >= crate::pkgreader::SESSION_MEMBER_THRESHOLD)
++            .then(|| self.archive.read_session())
+     }
+ 
+     fn read_part_with_session(
+diff --git a/crates/litchi-opc/src/source_backed/batch.rs b/crates/litchi-opc/src/source_backed/batch.rs
+index 31e7cdd1d..f7ff94145 100644
+--- a/crates/litchi-opc/src/source_backed/batch.rs
++++ b/crates/litchi-opc/src/source_backed/batch.rs
+@@ -478,11 +478,12 @@ fn read_serial(
+     output: &mut Vec<PartData>,
+ ) -> Result<()> {
+     // The serial wave is one sequential operation over distinct members, so an
+-    // unmanaged package may reset one Deflate decoder across it instead of
+-    // building one per cold member. Store members bypass the decoder, cache
+-    // hits stay cache-only, and a managed package keeps the one-shot path so
+-    // that no decoder workspace outlives a managed load (change 0402).
+-    let mut session = package.sequential_read_session();
++    // unmanaged package long enough to repay the retained workspace may reset
++    // one Deflate decoder across it instead of building one per cold member.
++    // Store members bypass the decoder, cache hits stay cache-only, and a
++    // managed package keeps the one-shot path so that no decoder workspace
++    // outlives a managed load (change 0402).
++    let mut session = package.sequential_read_session(requests.len());
+     for request in requests {
+         let data = match request.declared_bytes {
+             Some(declared) => package.read_part_prepared_with_session(

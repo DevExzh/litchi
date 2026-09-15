@@ -1,0 +1,26 @@
+case/cache/shape                                           stat             A1           B1           B2           A2  A1->B1 %  A2->B2 %    A/A %
+docx_file_source_open/cold-requested/media-rich            p50          306667       290817       283912       283336      5.17     -0.20     7.61
+docx_file_source_open/cold-requested/media-rich            mean         306819       289443       287521       286567      5.66     -0.33     6.60
+docx_file_source_open/cold-requested/media-rich            p95          330812       309831       313042       317182      6.34      1.31     4.12
+docx_file_source_open/cold-requested/media-rich            p99          342812       322061       315171       343731      6.05      8.31     0.27
+docx_file_source_open/cold-requested/media-rich            n                40           40           40           40
+docx_file_source_open/warm/media-rich                      p50          305336       290141       290616       288487      4.98     -0.74     5.52
+docx_file_source_open/warm/media-rich                      mean         305491       290892       293623       288644      4.78     -1.72     5.51
+docx_file_source_open/warm/media-rich                      p95          321132       312441       318411       311342      2.71     -2.27     3.05
+docx_file_source_open/warm/media-rich                      p99          342482       317312       335112       337302      7.35      0.65     1.51
+docx_file_source_open/warm/media-rich                      n                40           40           40           40
+pptx_file_source_open/cold-requested/media-rich            p50         2984805      2820669      2788174      2891725      5.50      3.58     3.12
+pptx_file_source_open/cold-requested/media-rich            mean        3623287      2859534      2791662      2888953     21.08      3.37    20.27
+pptx_file_source_open/cold-requested/media-rich            p95         6416940      2964275      2848864      2936675     53.81      2.99    54.24
+pptx_file_source_open/cold-requested/media-rich            p99        17329373      3484237      2855965      2975565     79.89      4.02    82.83
+pptx_file_source_open/cold-requested/media-rich            n                40           40           40           40
+pptx_file_source_open/warm/media-rich                      p50         2969085      2844584      2794439      2873625      4.19      2.76     3.22
+pptx_file_source_open/warm/media-rich                      mean        3005385      2851004      2800537      2887724      5.14      3.02     3.92
+pptx_file_source_open/warm/media-rich                      p95         3149507      2956535      2849914      2976745      6.13      4.26     5.49
+pptx_file_source_open/warm/media-rich                      p99         4385974      3036345      2939144      3155855     30.77      6.87    28.05
+pptx_file_source_open/warm/media-rich                      n                40           40           40           40
+xlsx_source_open/None/medium                               p50           44360        45905        43765        43555     -3.48     -0.48     1.81
+xlsx_source_open/None/medium                               mean          44788        46655        45774        43654     -4.17     -4.86     2.53
+xlsx_source_open/None/medium                               p95           47130        52260        49840        44650    -10.88    -11.62     5.26
+xlsx_source_open/None/medium                               p99           52000        54950        91531        45560     -5.67   -100.90    12.38
+xlsx_source_open/None/medium                               n                40           40           40           40

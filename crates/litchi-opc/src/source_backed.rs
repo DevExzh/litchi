@@ -15,7 +15,7 @@ use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::part::PartFactory;
 use crate::phys_pkg::read_limited;
 use crate::pkgreader::{
-    PackageReader, SerializedRelationship, SourceCatalog, ValidationCatalogError,
+    PackageReader, SerializedRelationship, SessionedArchive, SourceCatalog, ValidationCatalogError,
     ValidationCatalogPhase, is_xml_id,
 };
 use crate::rel::{Relationships, TargetMode};
@@ -5325,7 +5325,14 @@ impl SourceBackedPackage {
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
-        let catalog = match PackageReader::source_catalog_for_validation(&archive, limits) {
+        // Structural admission is one sequential pass. Giving it one indexed
+        // read session lets a single Deflate decoder be reset between the
+        // content-types member and each `.rels` member instead of being built
+        // per member; every read is otherwise the archive's own.
+        let catalog = match PackageReader::source_catalog_for_validation(
+            &SessionedArchive::new(&archive),
+            limits,
+        ) {
             Ok(catalog) => catalog,
             Err(ValidationCatalogError {
                 phase: stage,
@@ -5696,7 +5703,9 @@ impl SourceBackedPackage {
         } else {
             None
         };
-        let catalog = match PackageReader::source_catalog(&archive, limits) {
+        // One sequential structural admission pass, one reset Deflate decoder.
+        let catalog = match PackageReader::source_catalog(&SessionedArchive::new(&archive), limits)
+        {
             Ok(catalog) => catalog,
             Err(error) => {
                 let mapped = map_source_backed_error(error);
@@ -9909,15 +9918,50 @@ impl SourceBackedPackage {
         entry_id: EntryId,
         declared_bytes: u64,
     ) -> Result<PartData> {
+        self.read_part_prepared_with_session(index, entry_id, declared_bytes, None)
+    }
+
+    /// Read one prepared request, optionally reusing a caller-owned session.
+    ///
+    /// The session only resets one Deflate decoder between members. Cache
+    /// admission, the source and budget fences, the ZIP checks and every error
+    /// identity are the sessionless path's.
+    fn read_part_prepared_with_session(
+        &self,
+        index: usize,
+        entry_id: EntryId,
+        declared_bytes: u64,
+        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+    ) -> Result<PartData> {
         let mut observer = NoopDiagnosticObserver;
         self.read_part_with_observer_and_capture(
             index,
             None,
-            None,
+            session,
             &mut observer,
             None,
             Some((entry_id, declared_bytes)),
         )
+    }
+
+    /// A read session for one sequential multi-member operation over `members`
+    /// distinct members, when this package may retain decoder workspace for its
+    /// length and the operation is long enough to repay it.
+    ///
+    /// A managed package intentionally gets `None`: retaining decoder
+    /// workspace across a managed load would escape the managed memory budget
+    /// (change 0402). Its cancellation and reservation policy is unchanged. An
+    /// operation shorter than
+    /// [`SESSION_MEMBER_THRESHOLD`](crate::pkgreader::SESSION_MEMBER_THRESHOLD)
+    /// also gets `None`, under that constant's stated rule: the one workspace a
+    /// kept session retains is only worth its heap high-water when the
+    /// operation avoids at least sixteen constructions of it.
+    fn sequential_read_session(
+        &self,
+        members: usize,
+    ) -> Option<soapberry_zip::office::IndexedReadSession<'_, SourceReader>> {
+        (!self.cache.is_managed() && members >= crate::pkgreader::SESSION_MEMBER_THRESHOLD)
+            .then(|| self.archive.read_session())
     }
 
     fn read_part_with_session(

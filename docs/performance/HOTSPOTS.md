@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## 0594 — one Deflate decoder per OOXML open, above a measured threshold
+
+Item ZIP-1 of the [0587 queue](0587-remaining-opportunity-survey.md) is
+implemented for the structural admission pass and the serial batch wave, gated by
+a stated rule: keep the shared session only when it will avoid at least sixteen
+decoder constructions. Above the gate an open's allocated bytes fall 58.95% on a
+132-member XLSX and 73.02% on a 48-member PPTX, `memset` falls from 17.97% to
+2.92% of open-plus-one-part instructions, the total falls 16.35%, and per-open
+cycles fall 2.17% on a 445-member PPTX; below it every read takes the
+byte-identical pre-change path. The gate exists because the first implementation
+regressed `docx_file_source_open` and the regression was attributed rather than
+argued: callgrind showed −7.38% Ir per open and `perf stat` −0.81% instructions
+with flat cycles, while the selector's own child showed **+8 minor page faults
+per fresh-process open at every quantile** — the retained 80,320-byte workspace
+raising the open's heap high-water — which at ~430 ns per fault is the entire
+1.08% p50 delta. A first gate that scanned member names cost more than it saved
+(+4.83% cycles on that corpus) and was replaced by a hook that reuses the count
+`source_catalog` already computes. Reach is honest and small: 15 of 179
+repository OOXML fixtures carry 16 or more relationship members. The remaining
+ZIP-1 half — a pooled session for a *single* cold part read — is still not
+implementable without a self-referential borrow; ZIP-4 is the next item on this
+path. [Change and limitations](0594-zip-session-reuse-per-open.md);
+[evidence](results/change-0594/README.md).
+
 ## 0604 — OLE2 whole-stream zero-fill priced natively; CFB-1 declined
 
 The 0587 queue ranked CFB-1 (append-style stream reads) at 22 on a retained callgrind share of 9–32% of DOC and PPT open instructions, and wrote its own falsification criterion. Priced natively on this host with `perf stat` cycles, isolation pairs at 10/110 samples over 11 repetitions pinned to one CPU, the zero-fill is 1.88% of the 1.6 MB DOC eager open, 0.57% of the 335 KB DOC eager open, 2.84% of the eager PPT open, 2.68% of the source-backed PPT open and 2.94% of the source-backed XLS open — inside the 4% p50 floor on every fixture, with two A/A controls in the same window at 0.44%/0.29% (isolation-pair cycles) and −0.06%/+0.00%/+0.26% (wall-clock p50, 60 samples per leg). Exact byte counts were taken at every `u8` zero-fill site: 1,623,070 bytes per 1.6 MB DOC open (1,595,422 of it three slurped streams), 565,713 per flagship XLS open of which 551,377 is `GlobalsBuffer::ensure` and **none** is a CFB stream slurp, confirming XLS-7 as a `litchi-xls` item rather than a CFB one. The general caution for the rest of this queue: callgrind counts `rep stosb` once per byte, and on the DOC open it reported 1,595,476 Ir for work that retires 44,925 instructions natively — a 35× overstatement, so every bulk-copy share in this record set is an upper bound that must be re-priced in cycles before it is ranked. CFB-1 and XLS-7 are declined on this evidence; the design is frozen and retained for a corpus this one does not contain. `performance_claim: none`; no production change. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0604-cfb-append-reads-design.md); [retained evidence](results/change-0604/README.md).

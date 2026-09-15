@@ -1,5 +1,28 @@
 # Performance program phase report
 
+## 0594 — one Deflate decoder per OOXML open, above a measured threshold
+
+`IndexedArchive::read` built a fresh `IndexedReadSession` and a fresh
+`DeflateDecoder` for every member, so the OPC structural admission pass paid
+80,320 bytes per `.rels`. One session now spans that pass through a crate-private
+`SessionedArchive` implementing the existing private `ArchiveAccess` trait, and a
+new default-no-op trait hook hands it the relationship-member count
+`source_catalog` already computes so the decision costs one comparison. Above
+sixteen relationship members the open's allocated bytes fall 58.95% and 73.02% on
+the two above-threshold fixtures and per-open cycles fall 2.17% on the 445-member
+PPTX corpus; the in-process open of the 132-member workbook improves 4.88–5.34%
+at p50 against a 0.14% A/A floor. Below the threshold the path is byte-identical
+and 164 of the 179 corpus fixtures take it. The first implementation had no
+threshold and was held: the selector's own measured child showed +8 minor page
+faults per fresh-process open and −1.08% at p50, which the same instrument now
+reports as +0.9 faults and +2.45%. Correctness is a member-by-member differential
+over 179 packages and 4,215 members that asserts both sides of the threshold are
+exercised, a dedicated threshold test and a by-name refusal-recovery test; gates
+are clean on both crates with 1,254 tests passing. No speedup, RSS or cold-cache
+claim follows; `performance_claim: none`.
+[Change and limitations](0594-zip-session-reuse-per-open.md);
+[evidence](results/change-0594/README.md).
+
 ## 0604 — the OLE2 zero-fill ceiling, and a frozen design that is not implemented
 
 Change 0604 measures what the whole-stream zero-fill on the OLE2 slurp paths actually costs and declines to remove it. Five opens on owned in-memory sources were priced with `perf stat` on CPU 19 by isolation pair (10 and 110 samples, median of 11 repetitions): 2,310,748 cycles for the 1.6 MB DOC eager open, 915,516 for the 335 KB DOC, 211,456 for the eager PPT, 197,940 for the source-backed PPT and 317,682 for the source-backed XLS. Against those, a micro-benchmark of the same exact byte counts puts the zero-fill at 43,399, 5,194, 6,010, 5,303 and 9,339 cycles — 1.88%, 0.57%, 2.84%, 2.68% and 2.94% of the operation, and 0.29–1.88% of its instructions. The allocation itself is free at this scale (−509 to +1,014 cycles without the fill). Two A/A controls ran in the same window and stayed within 0.44% and 0.26% at p50, so the floor is not what hides the effect; the effect is simply small, it is strictly an upper bound on what removing it could return, and it is exactly zero on file-backed sources. Gates on the clean worktree at the base commit: `cargo fmt --all --check` clean, Clippy clean on `litchi-cfb`, `litchi-core` and `litchi-xls` with all targets, `cargo test -p litchi-cfb` 322 + 13 + 6 passed plus 12 doctests with 1 ignored and 0 failed, the three named truncated-final-sector parity tests passed, and `cargo doc` clean on the three crates. No production code changed; `performance_claim: none`. [Change and limitations](0604-cfb-append-reads-design.md); [retained evidence](results/change-0604/README.md).
