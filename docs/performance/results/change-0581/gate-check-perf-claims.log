@@ -1,0 +1,8 @@
+# python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+# revision: 32d25e08806d93f792ffd4954d83acc9db9c5301 (pristine worktree, WITHOUT the 0581 record)
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+# exit: 2
+# python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+# working tree WITH the 0581 record and both index sections applied
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+# exit: 2

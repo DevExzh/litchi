@@ -1,0 +1,12 @@
+head 8b07b45dc start 23:32:52
+=== fmt
+fmt exit 0
+=== clippy
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.44s
+clippy exit 0
+=== test
+test exit 0
+result lines: 436, ok: 436, failed: 0
+end 23:36:38
