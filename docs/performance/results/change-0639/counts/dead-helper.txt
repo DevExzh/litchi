@@ -1,0 +1,44 @@
+# change 0639 — counts for the deleted helper `refine_workbook_format`
+
+## Callers at the base c7326f680 (workspace-wide, every .rs file)
+
+$ git grep -n refine_workbook_format c7326f680 -- "*.rs"
+c7326f680:crates/litchi/src/sheet/workbook_types.rs:134:pub fn refine_workbook_format<R: Read + Seek>(
+c7326f680:crates/litchi/src/sheet/workbook_types.rs:274:            refine_workbook_format(&mut reader, WorkbookFormat::Xlsx).unwrap(),
+
+Two hits: the definition and one invocation inside the same file's own
+#[cfg(test)] module. Zero production callers; the compiler agreed, since
+the item carried #[allow(dead_code)], a lint that only fires when nothing
+reaches an item.
+
+## Visibility at the base
+
+$ git grep -n "mod workbook_types" c7326f680 -- crates/litchi/src/sheet/mod.rs
+c7326f680:crates/litchi/src/sheet/mod.rs:93:mod workbook_types;
+$ git grep -n "pub use workbook_types" c7326f680 -- crates/litchi/src
+(no match: nothing re-exports the module)
+
+Declared with a bare `mod` — private — and re-exported nowhere, so no path
+outside the crate could name the function. Its `pub` was crate-internal
+spelling, not public API.
+
+## Lines removed
+
+$ git diff --numstat HEAD -- crates/litchi/src/sheet/workbook_types.rs   (added removed path)
+0	65	crates/litchi/src/sheet/workbook_types.rs
+
+48 function lines, 15 test lines, 2 import lines. Nothing was added.
+
+## Unbounded ingress removed
+
+$ git grep -c "read_to_end" c7326f680 -- crates/litchi/src
+c7326f680:crates/litchi/src/document/doc.rs:1
+c7326f680:crates/litchi/src/sheet/workbook_types.rs:1
+$ git grep -c "read_to_end" -- crates/litchi/src   (this branch, uncommitted)
+crates/litchi/src/document/doc.rs:1
+
+The one remaining `read_to_end` under `crates/litchi/src` is in
+`crates/litchi/src/document/doc.rs:1943`, inside the `#[cfg(test)] mod tests`
+that begins at line 1838 — a test helper that rebuilds an ODT archive with the
+`zip` dev-dependency. After this change the facade therefore has **no
+production `read_to_end` site at all**.

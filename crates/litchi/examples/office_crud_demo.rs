@@ -285,24 +285,44 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     }
 
     // UPDATE: Modify existing presentation
+    //
+    // `presentation_mut` is the authoring writer and belongs to a package this
+    // process created with `Package::new`. An opened deck is never hydrated
+    // into it, so that call would refuse here with `UnsafeEdit`. Opened decks
+    // are edited through one detached, failure-atomic transaction whose commit
+    // the package publishes as a single patch; every part the transaction does
+    // not name keeps its exact source bytes.
     println!("Updating PowerPoint presentation...");
     let mut pkg = PptxPackage::open("demo_presentation.pptx")?;
-    let pres = pkg.presentation_mut()?;
+    let mut edit = pkg.opened_presentation_transaction()?;
 
-    // Add conclusion slide
-    let slide4 = pres.add_slide()?;
-    slide4.set_title("Conclusion");
-    slide4.add_text_box(
-        "Thank you for your attention!",
-        914400,
-        2743200,
-        7315200,
-        914400,
-    );
-    slide4.add_text_box("Questions?", 914400, 3657600, 7315200, 914400);
+    // Retitle the closing slide and append a closing note to it.
+    let closing = edit.slides().len() - 1;
+    edit.set_shape_text(closing, 0_usize, "Financial Performance — Q4 Final")?;
+    edit.add_text_box(
+        closing,
+        "Thank you for your attention! Questions?",
+        (914400, 4572000, 7315200, 914400),
+    )?;
+
+    let commit = edit.commit()?;
+    if !commit.is_changed() {
+        return Err("the opened-presentation transaction changed nothing".into());
+    }
+    pkg.apply_opened_presentation_commit(commit)?;
 
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");
+
+    // Read the update back so the demonstration proves the edit landed.
+    let updated = PptxPackage::open("demo_presentation_updated.pptx")?;
+    let pres = updated.presentation()?;
+    let slide = pres
+        .slides()?
+        .into_iter()
+        .nth(closing)
+        .ok_or("the updated deck lost its closing slide")?;
+    println!("  Closing slide now has {} shapes", slide.shape_count()?);
 
     Ok(())
 }

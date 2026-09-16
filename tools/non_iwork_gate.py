@@ -18,6 +18,15 @@ command per bulk package root and separate facade commands using an isolated
 target directory by default.  The facade's actual default-feature closure is
 checked in its own invocation, in addition to each safe feature and the
 combined explicit ``--no-default-features`` closure.
+
+Two suites sit outside every per-package selection and are covered by their
+own cheap modes.  ``facade-format-tests`` compiles the facade with the four
+Office format leaves, because ``litchi``'s default feature set is empty and a
+bare ``cargo test --package litchi`` therefore compiles almost none of its
+library tests.  ``harness-tests`` runs the performance harness in
+``tools/perf-baseline``, which is a separate Cargo project that no workspace
+selection reaches.  Both are single-command modes placed before the
+long-running package sweeps so a stale expectation fails fast.
 """
 
 from __future__ import annotations
@@ -278,10 +287,28 @@ MODES = (
     "check",
     "clippy",
     "doc",
+    "facade-format-tests",
+    "harness-tests",
     "lib-tests",
     "doc-tests",
     "deprecated",
 )
+
+# `litchi`'s default feature set is empty, so `cargo test --package litchi`
+# compiles almost none of the facade's library and integration tests.  These
+# four format leaves are the smallest closure that compiles every DOCX, XLSX,
+# PPTX and XLS facade test: each one pulls its own substrate (opc,
+# ooxml-common, drawingml, sheet, cfb, ole) through Cargo's feature graph, and
+# none of them reaches an iWork package.  Change 0629 found one test behind
+# `#[cfg(feature = "docx")]` red for 94 commits for exactly this reason.
+FACADE_FORMAT_TEST_FEATURES = ("docx", "pptx", "xls", "xlsx")
+
+# The performance harness is its own Cargo project with its own workspace
+# table, so no `--workspace`, `--package` or exclusion selection in this gate
+# reaches its suite.  Change 0619 found a test there red for 54 records.  Its
+# manifest declares only non-iWork path dependencies, which is what keeps the
+# suite inside this gate's slice; `test_non_iwork_gate` asserts that.
+HARNESS_MANIFEST_RELATIVE_PATH = "tools/perf-baseline/Cargo.toml"
 
 
 class GateError(RuntimeError):
@@ -1535,6 +1562,61 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
 
     if mode not in MODES or mode in {"print", "verify"}:
         raise GateError(f"{mode!r} does not generate Cargo run commands")
+    if mode == "facade-format-tests":
+        # One bounded facade invocation over the four Office format leaves.
+        # --no-fail-fast so a failing lib target cannot hide a later test
+        # binary, which is how the gap this mode closes stayed invisible.
+        return (
+            CommandSpec(
+                "facade-format-tests",
+                (
+                    cargo,
+                    "test",
+                    "--package",
+                    FACADE_PACKAGE,
+                    "--no-default-features",
+                    "--features",
+                    ",".join(FACADE_FORMAT_TEST_FEATURES),
+                    "--lib",
+                    "--tests",
+                    "--no-fail-fast",
+                    "--",
+                    "--test-threads=1",
+                ),
+            ),
+        )
+    if mode == "harness-tests":
+        manifest = ROOT / HARNESS_MANIFEST_RELATIVE_PATH
+        if not manifest.is_file():
+            raise GateError(
+                f"the performance harness manifest {HARNESS_MANIFEST_RELATIVE_PATH} is missing"
+            )
+        # Commands run with ROOT as the working directory, so the manifest
+        # path stays relative and never encodes this checkout's location.
+        #
+        # Unlike the workspace modes this one does not serialize its test
+        # threads.  The bulk modes serialize because a single invocation over
+        # 45 roots keeps every test binary alive until the final link; one
+        # standalone project has no such fan-out, its own workflow
+        # (perf-baseline.yml) has always run this suite with Cargo's default
+        # parallelism, and serializing it here measured 1,870 s of test
+        # execution against 581 s for the same 531 passing tests.  Build
+        # parallelism stays bounded by the gate's CARGO_BUILD_JOBS invariant
+        # either way.
+        return (
+            CommandSpec(
+                "harness-tests",
+                (
+                    cargo,
+                    "test",
+                    "--manifest-path",
+                    HARNESS_MANIFEST_RELATIVE_PATH,
+                    "--lib",
+                    "--tests",
+                    "--no-fail-fast",
+                ),
+            ),
+        )
     if mode == "lib-tests":
         # A single workspace test invocation keeps every test binary alive
         # until the final link and can consume several GiB. Serialize each

@@ -1,0 +1,135 @@
+{
+  "cargo_env": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/0639/target/non-iwork-gate"
+  },
+  "child_rss": {
+    "high_water_bytes": 2622091264,
+    "measurement": "sampled_summed_descendant_process_tree_high_water",
+    "platform": "linux",
+    "reason": "one or more phase RSS samples were partial or unavailable",
+    "sample_interval_ms": 20,
+    "scope": "sampled-descendant-process-tree",
+    "status": "partial"
+  },
+  "claim_scope": "no performance claim",
+  "cleanup": {
+    "disposition": "retained_by_policy",
+    "failure_artifacts": "failing phase/root retained",
+    "package_clean_commands": [],
+    "package_clean_scopes": [],
+    "prior_successful_lib_test_roots": "may be cleaned",
+    "recursive": false
+  },
+  "clock": {
+    "monotonic": true,
+    "name": "time.monotonic_ns",
+    "unit": "ns"
+  },
+  "elapsed_ns": 2082605131118,
+  "env_keys": [
+    "CARGO_BUILD_JOBS",
+    "CARGO_INCREMENTAL",
+    "CARGO_PROFILE_DEV_DEBUG",
+    "CARGO_PROFILE_TEST_DEBUG",
+    "CARGO_TARGET_DIR"
+  ],
+  "error": null,
+  "feature_unification": {
+    "aggregate_guard": "existing workspace CI",
+    "aggregate_workspace_unification": "not_claimed",
+    "gate_scope": "per-package-root --all-features"
+  },
+  "host": {
+    "machine": "x86_64",
+    "os_name": "posix",
+    "platform": "linux",
+    "python_implementation": "CPython",
+    "python_version": "3.14.4"
+  },
+  "limitations": {
+    "interruption": "KeyboardInterrupt returns 130 and requests best-effort child or process-group termination; SIGTERM handling is not guaranteed",
+    "rss": "20 ms sampled sums of readable descendant VmRSS values; short-lived processes and unreadable descendants may be missed; this is not an OS or child-process peak-RSS measurement",
+    "target_scan": "logical regular-file entries are counted with lstat without following symlinks; concurrent changes or access errors produce incomplete/unavailable status; traversal is bounded by explicit entry=100000, directory=20000, depth=64 caps"
+  },
+  "mode": "harness-tests",
+  "outcome": "passed",
+  "phases": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "--tests",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/0639/target/non-iwork-gate"
+      },
+      "child_rss": {
+        "high_water_bytes": 2622091264,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 2082448062805,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 1,
+      "mode": "harness-tests",
+      "returncode": 0,
+      "scope": "harness-tests",
+      "status": "passed",
+      "target_after": {
+        "reason": "regular directory entries counted with lstat; symlinks were not followed",
+        "regular_file_bytes": 2973799137,
+        "regular_file_count": 3409,
+        "status": "complete"
+      },
+      "target_before": {
+        "reason": "regular directory entries counted with lstat; symlinks were not followed",
+        "regular_file_bytes": 958691573,
+        "regular_file_count": 1989,
+        "status": "complete"
+      }
+    }
+  ],
+  "target_after": {
+    "reason": "regular directory entries counted with lstat; symlinks were not followed",
+    "regular_file_bytes": 2973799137,
+    "regular_file_count": 3409,
+    "status": "complete"
+  },
+  "target_before": {
+    "reason": "regular directory entries counted with lstat; symlinks were not followed",
+    "regular_file_bytes": 958691573,
+    "regular_file_count": 1989,
+    "status": "complete"
+  },
+  "target_dir": "/home/zhuhe/code/litchi-worktrees/0639/target/non-iwork-gate",
+  "target_scan_limits": {
+    "max_depth": 64,
+    "max_directories": 20000,
+    "max_entries": 100000
+  },
+  "version": 1
+}

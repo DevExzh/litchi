@@ -1,0 +1,36 @@
+=== Office Document CRUD Demo ===
+
+--- DOCX Operations ---
+Creating new Word document...
+✓ Created: demo_catalog.docx
+Reading Word document...
+  Paragraphs: 16
+  Tables: 1
+  Found 'Widget' in 3 paragraphs
+  Title: Product Catalog
+Updating Word document...
+✓ Updated: demo_catalog_updated.docx
+
+--- XLSX Operations ---
+Creating new Excel workbook...
+✓ Created: demo_employees.xlsx
+Reading Excel workbook...
+  Worksheets: 2
+    - Sheet1
+    - Summary
+  Sheet 'Sheet1' stored extent: Some(Rect { start: Cell { row: Row(0), column: Column(0) }, end_row: 5, end_column: 3 })
+  Worksheet loaded successfully
+Updating Excel workbook...
+✓ Updated: demo_employees_updated.xlsx
+
+--- PPTX Operations ---
+Creating new PowerPoint presentation...
+✓ Created: demo_presentation.pptx
+Reading PowerPoint presentation...
+  Slides: 3
+  Slide 1: 2 shapes
+  Slide 2: 2 shapes
+  Slide 3: 3 shapes
+Updating PowerPoint presentation...
+Error: UnsafeEdit { operation: "presentation_mut", reason: "the lossless facade cannot hydrate an opened package into the mutable writer" }
+exit=1

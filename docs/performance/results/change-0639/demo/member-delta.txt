@@ -1,0 +1,7 @@
+members before=43 after=43 order_identical=True
+identical members=42 changed members=1
+  changed: ppt/slides/slide3.xml 1584 -> 2154 bytes
+added: []
+removed: []
+  ppt/slides/slide3.xml carries: 'Financial Performance — Q4 Final'
+  ppt/slides/slide3.xml carries: 'Thank you for your attention! Questions?'
