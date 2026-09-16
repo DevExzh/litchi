@@ -1,0 +1,42 @@
+members: 6981  packages: 321
+authored-verdict changes across legs: 0
+before-leg source column differs from authored: 0
+
+--- ORIGINAL-bytes audit verdicts, per XML member ---
+class                                                    before   after
+Encoding                                                      1       1
+Malformed:invalid XML declaration boundary                   16      16
+NotCompact:AmbiguousWhitespace                                2       0
+NotCompact:AttributeSeparation                                9       0
+NotCompact:FormattingWhitespace                            6788       0
+NotCompact:WhitespaceBeforeClose                             32       0
+ok                                                          133    6964
+
+--- transitions (before -> after) ---
+  6788  NotCompact:FormattingWhitespace  ->  ok
+   133  ok  ->  ok
+    32  NotCompact:WhitespaceBeforeClose  ->  ok
+    16  Malformed:invalid XML declaration boundary  ->  Malformed:invalid XML declaration boundary
+     9  NotCompact:AttributeSeparation  ->  ok
+     2  NotCompact:AmbiguousWhitespace  ->  ok
+     1  Encoding  ->  Encoding
+
+packages with every XML member accepted by the original-bytes audit:
+  before: 0 / 321
+  after:  318 / 321
+
+packages still carrying a refused XML member after the change:
+   /home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx
+         _rels/.rels :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         xl/_rels/workbook.xml.rels :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         xl/worksheets/_rels/sheet1.xml.rels :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         [Content_Types].xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+   /home/zhuhe/code/litchi/test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx
+         [Content_Types].xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         word/_rels/document.xml.rels :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         word/document.xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         word/header1.xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         word/header2.xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+         word/header3.xml :: ERR malformed XML at byte 0: invalid XML declaration boundary
+   /home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/bug65551.pptx
+         ppt/slideMasters/slideMaster1.xml :: ERR malformed XML at byte 0: invalid XML declaration boundary

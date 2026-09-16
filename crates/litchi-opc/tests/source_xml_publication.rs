@@ -515,3 +515,144 @@ fn managed_source_xml_refuses_retained_fragment_capacity_over_budget() {
     assert_eq!(budget.used(Resource::Memory), 0);
     assert_eq!(budget.used(Resource::Objects), 0);
 }
+
+/// A fixture with a second Part, so that a replacement of the first leaves an
+/// untouched Part whose published bytes can be compared with the source's.
+fn archive_bytes_with_sibling(document: &[u8], styles: &[u8]) -> Vec<u8> {
+    let content_types = format!(
+        r#"<Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#
+    );
+    let root_relationships = format!(
+        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
+    );
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", content_types.as_bytes())
+        .expect("content types fixture must be writable");
+    writer
+        .write_stored("_rels/.rels", root_relationships.as_bytes())
+        .expect("root relationships fixture must be writable");
+    writer
+        .write_stored("word/document.xml", document)
+        .expect("document fixture must be writable");
+    writer
+        .write_stored("word/styles.xml", styles)
+        .expect("styles fixture must be writable");
+    writer
+        .finish_to_bytes()
+        .expect("fixture archive must finish")
+}
+
+/// Change 0654, under change 0652 decision 2.
+///
+/// The original bytes of a replaced Part are audited for structure and finite
+/// budgets, never for this repository's compact output contract. The
+/// replacement keeps the authored contract, which
+/// `ordinary_authored_xml_keeps_the_compactness_gate` above pins.
+#[test]
+fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
+    for (label, original) in [
+        (
+            "declaration line ending and indentation",
+            FORMATTED_DOCUMENT,
+        ),
+        (
+            "attribute separation and whitespace before close",
+            b"<document  a=\"1\"\n\tb = \"2\" ><child /></document >".as_slice(),
+        ),
+        (
+            "plain-space run",
+            b"<document> <child/></document>".as_slice(),
+        ),
+    ] {
+        const SIBLING_STYLES: &[u8] = b"<styles>\n  <style id=\"a\" />\n</styles>";
+        let source = archive_bytes_with_sibling(original, SIBLING_STYLES);
+        let package = SourceBackedPackage::from_vec(source.clone())
+            .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
+        let mut output = Vec::new();
+        package
+            .write_part_overlay_to_stream(
+                &mut output,
+                &document_uri(),
+                b"<document><replaced/></document>".to_vec(),
+            )
+            .unwrap_or_else(|error| {
+                panic!("{label}: non-compact original must publish: {error:?}")
+            });
+
+        let before = SourceBackedPackage::from_vec(source).expect("source must reopen");
+        let after = SourceBackedPackage::from_vec(output).expect("published package must reopen");
+        let mut compared = 0_usize;
+        for part in before.iter_parts() {
+            let name = part.partname().clone();
+            let published = after
+                .part(&name)
+                .unwrap_or_else(|error| panic!("{label}: {name} must survive: {error:?}"))
+                .data()
+                .expect("published payload");
+            if name == document_uri() {
+                assert_eq!(
+                    published.as_bytes(),
+                    b"<document><replaced/></document>",
+                    "{label}: the replaced Part must carry the replacement"
+                );
+                continue;
+            }
+            assert_eq!(
+                published.as_bytes(),
+                part.data().expect("source payload").as_bytes(),
+                "{label}: untouched Part {name} must be byte-identical"
+            );
+            compared += 1;
+        }
+        assert!(compared > 0, "{label}: at least one untouched Part");
+    }
+}
+
+/// Every refusal that is not a compactness verdict still fires on the original
+/// bytes, with the same `OpcError::XmlPublication` identity, before any byte
+/// reaches the sink.
+#[test]
+fn original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal() {
+    for (label, original) in [
+        ("unclosed document element", b"<document>".as_slice()),
+        ("two document elements", b"<document/><other/>".as_slice()),
+        ("unquoted attribute value", b"<document a=1/>".as_slice()),
+        ("DOCTYPE", b"<!DOCTYPE document><document/>".as_slice()),
+        ("invalid UTF-8", b"<document>\xff</document>".as_slice()),
+    ] {
+        let package = SourceBackedPackage::from_vec(archive_bytes(original))
+            .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
+        let mut output = Vec::new();
+        let error = package
+            .write_part_overlay_to_stream(
+                &mut output,
+                &document_uri(),
+                b"<document><replaced/></document>".to_vec(),
+            )
+            .expect_err("a refused original must stay refused");
+        assert!(
+            matches!(error, OpcError::XmlPublication { ref part, .. } if part == "/word/document.xml"),
+            "{label}: refusal must keep its identity, got {error:?}"
+        );
+        assert!(output.is_empty(), "{label}: a refusal emits no archive");
+    }
+
+    // The audit's own finite budgets are unchanged and are exercised at the
+    // auditor in `crates/xml-minifier/tests/audit.rs`; `ReadLimits` does not
+    // feed them, so there is nothing package-level to narrow here.
+}
+
+/// An exact byte no-op is still exact: it never reaches either audit, so a
+/// Part whose source payload is malformed republishes unchanged.
+#[test]
+fn an_exact_no_op_still_precedes_both_audits() {
+    let malformed = b"<document>".as_slice();
+    let source = archive_bytes(malformed);
+    let package = SourceBackedPackage::from_vec(source.clone()).expect("fixture must open");
+    let mut output = Vec::new();
+    package
+        .write_part_overlay_to_stream(&mut output, &document_uri(), malformed.to_vec())
+        .expect("an exact no-op must publish the source artifact byte for byte");
+    assert_eq!(output, source, "an exact no-op copies the source artifact");
+}

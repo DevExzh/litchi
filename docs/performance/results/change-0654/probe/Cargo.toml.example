@@ -1,0 +1,18 @@
+[package]
+name = "litchi-probe-0654"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+# Enabled only on the after leg, where `verify_source` exists.
+source-policy = []
+
+[dependencies]
+litchi-opc = { path = "<CHECKOUT>/crates/litchi-opc" }
+xml-minifier = { path = "<CHECKOUT>/crates/xml-minifier" }
+soapberry-zip = { path = "<CHECKOUT>/crates/soapberry-zip" }
+litchi-xlsx = { path = "<CHECKOUT>/crates/litchi-xlsx" }
+sha2 = "0.11"
+
+[workspace]

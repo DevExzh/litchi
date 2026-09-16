@@ -1,0 +1,6 @@
+leg A1 done
+leg B1 done
+leg B2 done
+leg A2 done
+leg A3 done
+leg A4 done

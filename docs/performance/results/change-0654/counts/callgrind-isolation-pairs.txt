@@ -1,0 +1,72 @@
+== before n=1 ==
+xml_minifier::audit::verify_authored: 86
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 24
+xml_minifier::audit::verify_source: 0
+xml_minifier::audit::verify_with_policy: 86
+    from xml_minifier::audit::verify_authored: 86
+xml_minifier::audit::package::is_xml_part: 1548
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1356
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 12
+summary: 24849999153
+   589,754,395 ( 2.37%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   542,751,856 ( 2.18%)  ???:xml_minifier::audit::verify_authored [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   542,751,254 ( 2.18%)  ???:xml_minifier::audit::verify_with_policy [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   311,080,376 ( 1.25%)  ???:litchi_opc::source_backed::validate_overlay_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+== before n=3 ==
+xml_minifier::audit::verify_authored: 102
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 40
+xml_minifier::audit::verify_source: 0
+xml_minifier::audit::verify_with_policy: 102
+    from xml_minifier::audit::verify_authored: 102
+xml_minifier::audit::package::is_xml_part: 2116
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1916
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 20
+summary: 30939579856
+   965,371,869 ( 3.12%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   750,147,410 ( 2.42%)  ???:xml_minifier::audit::verify_authored [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   750,146,696 ( 2.42%)  ???:xml_minifier::audit::verify_with_policy [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+   518,477,301 ( 1.68%)  ???:litchi_opc::source_backed::validate_overlay_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-before]
+== after n=1 ==
+xml_minifier::audit::verify_authored: 74
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 12
+xml_minifier::audit::verify_source: 12
+    from litchi_opc::source_backed::validate_source_part_xml: 12
+xml_minifier::audit::verify_with_policy: 86
+    from xml_minifier::audit::verify_authored: 74
+    from xml_minifier::audit::verify_source: 12
+xml_minifier::audit::package::is_xml_part: 1548
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1356
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 12
+summary: 24861665774
+   591,900,577 ( 2.38%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   547,541,349 ( 2.20%)  ???:xml_minifier::audit::verify_with_policy [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   392,406,044 ( 1.58%)  ???:xml_minifier::audit::verify_authored [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   157,629,126 ( 0.63%)  ???:litchi_opc::source_backed::validate_overlay_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   155,136,425 ( 0.62%)  ???:litchi_opc::source_backed::validate_source_part_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   155,135,993 ( 0.62%)  ???:xml_minifier::audit::verify_source [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+== after n=3 ==
+xml_minifier::audit::verify_authored: 82
+    from litchi_opc::pkgwriter::PackageWriter::validate_authored_xml: 62
+    from litchi_opc::source_backed::validate_overlay_xml: 20
+xml_minifier::audit::verify_source: 20
+    from litchi_opc::source_backed::validate_source_part_xml: 20
+xml_minifier::audit::verify_with_policy: 102
+    from xml_minifier::audit::verify_authored: 82
+    from xml_minifier::audit::verify_source: 20
+xml_minifier::audit::package::is_xml_part: 2116
+    from litchi_opc::package::OpcPackage::unmarshal_with_payload_donor: 1916
+    from litchi_opc::pkgwriter::PublicationPlan::from_package: 180
+    from litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream: 20
+summary: 30940201508
+   969,173,478 ( 3.13%)  ???:litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   756,058,897 ( 2.44%)  ???:xml_minifier::audit::verify_with_policy [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   497,500,066 ( 1.61%)  ???:xml_minifier::audit::verify_authored [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   262,722,119 ( 0.85%)  ???:litchi_opc::source_backed::validate_overlay_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   258,560,367 ( 0.84%)  ???:litchi_opc::source_backed::validate_source_part_xml [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]
+   258,559,647 ( 0.84%)  ???:xml_minifier::audit::verify_source [/home/zhuhe/code/litchi-worktrees/scratch-0654/bin/lpb-after]

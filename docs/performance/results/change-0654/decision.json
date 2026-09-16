@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0654",
+  "title": "Publication stops requiring the original bytes of a replaced part to be compact, and 297 of 321 real OOXML packages that it refused now publish with every untouched member byte-identical",
+  "decision": "retained, implemented in litchi-opc and xml-minifier; ADR 0006 amended",
+  "code_state": "crates/xml-minifier/src/audit.rs and lib.rs, crates/litchi-opc/src/source_backed.rs and error.rs, plus two test files; one added public function (xml_minifier::audit::verify_source), no removed or changed public item, no new unsafe, no new dependency, no weakened limit",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "change 0652 decision 2, the owner's words: \"Original byte contract: loose the audit, accept non-compact XMLs.\" Designed as D0 by change 0602, priced at 27.6% of source-backed publication by change 0613, held in place until now by one sentence of change 0528.",
+  "reason_codes": [
+    "the compactness contract exists to keep this repository's own authored output byte-minimal; applied to bytes litchi did not author it refused 1,378 of the 1,403 XML members of 0602's 95-package corpus and 6,831 of the 6,981 members of the 321-package OOXML fixture corpus",
+    "both audits still run, on the same bytes, at the same seven plus seven call sites, and construct the same OpcError::XmlPublication; only the contract the original half asserts changes",
+    "every structural, encoding, DOCTYPE and finite-budget check is kept and witnessed; verify_source returns Error::NotCompact on no input at all",
+    "the authored contract does not move: across all 6,981 members of the corpus the verify_authored verdict is identical on both legs, 0 changes",
+    "publication is byte-exact where it matters: 6,781 untouched members compared across 310 published packages with 0 mismatches and 0 member-set changes, and the 13 packages that published on both legs published the identical SHA-256",
+    "the byte-order-mark defect change 0650 froze is reported rather than fixed, because it is a Malformed refusal rather than a compactness verdict and the streaming auditor pins it with a test; it costs 0 of the 95 packages and 3 of the 321"
+  ],
+  "accepted_evidence": {
+    "audit_census": "every XML member of every fixture piped through a retained probe that runs both policies on both legs: 1,403 members over 0602's 95 packages and 6,981 members over the 321-package OOXML fixture corpus, four verdict columns per member",
+    "publication_differential": "all 321 fixtures opened with SourceBackedPackage::from_path and their lexicographically first XML Part replaced through the public write_part_overlay_to_stream door with one fixed compact payload, on both legs; outcome, error text and output SHA-256 per package",
+    "byte_identity": "every published archive reopened and compared member by member against its source: 6,781 untouched members over 310 packages",
+    "eager_route_differential": "change 0610's documented xlsx-hide route over the 180 .xlsx fixtures on both legs, plus a blob-provenance measurement on one refused fixture",
+    "base_witness": "a synthetic package whose original bytes are compact, published on both legs clean and with trailing bytes appended, showing that the refusal unmasked by this change was already reachable at the base",
+    "instructions": "callgrind isolation pairs at --samples 1 and --samples 3 on xlsx_source_backed_cell_values_one_edit_save, both legs, differenced and halved; call counts per callee per call site",
+    "timing": "30 samples per leg after 3 warm-ups, order A1 B1 B2 A2 A3 A4 on CPU 9 in one window, five scenarios over three selectors, with the A/A floor of the same window beside every paired delta",
+    "tests": "seven new tests: four auditor witness tests over the four removed kinds, the never-NotCompact assertion, twelve malformed shapes plus DOCTYPE, encoding, the byte-order mark and all six budgets, and the unchanged authored contract; three publication tests over three non-compact spellings, five structural refusals through the public door, and an exact no-op over a malformed payload"
+  },
+  "accepted_costs": {
+    "instruction_counts": "the audit pair costs +560,005 Ir per iteration (+0.54%) and publication +827,713 Ir (+0.44%) on the compact harness corpus: removing compactness verdicts removes branches, not loops, and the policy plumbing plus the loss of specialization now that verify_with_policy has two callers costs slightly more than the verdicts saved. Disclosed rather than tuned away; a const-generic policy would recover it and is speculative complexity at 0.30% of publication",
+    "one_slower_scenario": "xlsx_source_backed_cell_values_batch_edit_save/medium is +1.20% at p50 against a 0.88% A/A floor in the same window, while the other four scenarios are 0.46% to 2.14% faster; reported, not averaged away, and far below the 5% review trigger",
+    "unmasked_refusals": "two fixtures now report a different, pre-existing refusal that the compactness verdict had been shadowing (trailing bytes outside the located archive; no canonical UTF-8 source member). Both checks are untouched, sit strictly after the audit pair and are computed from raw member names with no reference to XML",
+    "widened_admission": "publication now admits original bytes it used to refuse, which is the decision's purpose; the replacement is still audited in full and the published bytes of an untouched part are still the source's own"
+  },
+  "known_gaps": {
+    "eager_save_route": "PackageWriter::validate_authored_xml (pkgwriter.rs:203) is a second audit site with the same contract and no original/replacement pair. Change 0610's xlsx-hide route is identical on both legs: 59 of 180 .xlsx fixtures still refuse with NotCompact, 57 naming /xl/worksheets/sheet1.xml, and the retained witness shows that Part's blob is byte-identical to the source member. Fixing it needs a provenance signal that site does not have; frozen and reported",
+    "byte_order_mark": "a leading UTF-8 byte order mark is still refused with Malformed { offset: 0 } by the slice auditor's offset defect (change 0650's frozen question 3). 3 of 321 fixtures, 0 of 95",
+    "precompressed_transfers": "try_add_precompressed_part's decoded donor payload is still audited with verify_authored; it is an addition on the cross-package copy contract that changes 0598 and 0646 own, reported rather than moved",
+    "second_unmasked_refusal_is_modelled": "that 49609.xlsx's canonical-member refusal would have fired at the base on a compact original is argued from the source, not measured, because no member of that fixture is compact; the trailing-bytes class is demonstrated at the base by the retained witness",
+    "corpus_bound": "every count is over this repository's fixtures, 0602's 95 packages and the 321 OOXML fixtures under test-data; nothing is claimed about packages outside them",
+    "instruction_share_scope": "the 27.41% original-bytes share is measured on the harness's litchi-written corpora, where both audits accept; it is not measured on a package whose original audit refuses, because publication stops at the first refusal"
+  },
+  "withheld": [
+    "any registered speedup or regression; this change removes a refusal and is not a performance result",
+    "any claim about the eager PackageWriter route, whose audit is unchanged",
+    "any claim about a byte-order-marked original, ODF or iWork"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc",
+    "branch": "perf/0654-opc-original-bytes-audit-loosened",
+    "commit": "the tip of perf/0654-opc-original-bytes-audit-loosened; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws x86_64, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 9",
+    "binaries": {
+      "before/litchi-perf-baseline": "44cc4e2875bb20f6fd5c054a967a052ee95b6b6a0ca5063492ffecd2a603da25",
+      "after/litchi-perf-baseline": "48ecaf8088f60cb89ee1f8660d4204fe31f2ab372969658f279012752eca0aad"
+    },
+    "note": "both harness legs built with cargo build --release --locked and staged outside their Cargo target directories before any leg ran; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-70d7768cc with its own CARGO_TARGET_DIR. The corpus probe is a separate Cargo project with path dependencies on each leg's crates, built --release; its source is retained under probe/"
+  }
+}

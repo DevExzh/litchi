@@ -636,6 +636,35 @@ enum Space {
     Preserve,
 }
 
+/// Which contracts one audit pass asserts.
+///
+/// `require_compact` selects whether provable compactness defects are
+/// refused; every structural, encoding, DOCTYPE and finite-budget check runs
+/// under every policy.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Policy {
+    reject_ambiguous_space: bool,
+    require_compact: bool,
+}
+
+impl Policy {
+    /// Authored bytes: compact, and whitespace-only space runs are ambiguous.
+    const AUTHORED: Self = Self {
+        reject_ambiguous_space: true,
+        require_compact: true,
+    };
+    /// The historical default: compact, ambiguous space runs admitted.
+    const COMPACT: Self = Self {
+        reject_ambiguous_space: false,
+        require_compact: true,
+    };
+    /// Producer bytes: structure and budgets only, no compactness contract.
+    const SOURCE: Self = Self {
+        reject_ambiguous_space: false,
+        require_compact: false,
+    };
+}
+
 struct State {
     ambiguous_space_offset: Option<usize>,
     attributes: usize,
@@ -678,7 +707,7 @@ impl State {
 /// Returns [`Error`] for invalid UTF-8, malformed XML, a finite resource-limit
 /// breach, or the first compactness violation.
 pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
-    verify_with_policy(input, limits, false)
+    verify_with_policy(input, limits, Policy::COMPACT)
 }
 
 /// Verifies XML that is about to be published from authored or changed bytes.
@@ -694,7 +723,33 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// Returns [`Error`] for every failure reported by [`verify`], or
 /// [`Kind::AmbiguousWhitespace`] when authored whitespace cannot be classified.
 pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
-    verify_with_policy(input, limits, true)
+    verify_with_policy(input, limits, Policy::AUTHORED)
+}
+
+/// Verifies XML a package already holds and that this library did not author.
+///
+/// This is the publication audit for *source* bytes: the payload a producer
+/// wrote, which publication either republishes or replaces. It performs every
+/// structural and finite-budget check [`verify`] performs — UTF-8, well-formed
+/// XML, exactly one document element, character data only inside it, no DTD or
+/// DOCTYPE, and each [`Limits`] budget — and does **not** assert this
+/// repository's compact output contract. Indentation and line endings between
+/// elements, a line ending after the XML declaration, attribute separators of
+/// any length or kind, and whitespace before a tag close are accepted as the
+/// producer spelled them, so no [`Error::NotCompact`] is ever returned.
+///
+/// Compactness is a contract on what this library *emits*; it is not a
+/// property of an arbitrary conforming document, and asserting it on bytes the
+/// library did not write refuses ordinary producer output. Authored bytes
+/// still go through [`verify_authored`].
+///
+/// # Errors
+///
+/// Returns [`Error`] for invalid UTF-8, malformed XML, a DTD or DOCTYPE
+/// declaration, or a finite resource-limit breach. Never returns
+/// [`Error::NotCompact`].
+pub fn verify_source(input: &[u8], limits: Limits) -> Result<Report, Error> {
+    verify_with_policy(input, limits, Policy::SOURCE)
 }
 
 /// Verifies one XML document from a caller-owned buffered source.
@@ -740,6 +795,12 @@ fn verify_reader_with_policy<R: BufRead>(
     limits: Limits,
     reject_ambiguous_space: bool,
 ) -> Result<Report, StreamError> {
+    // The streaming auditor has no source-policy caller; it keeps the compact
+    // contract exactly as it stood.
+    let policy = Policy {
+        reject_ambiguous_space,
+        require_compact: true,
+    };
     let token_window = limits
         .token_bytes
         .checked_add(1)
@@ -826,8 +887,10 @@ fn verify_reader_with_policy<R: BufRead>(
 
         match event {
             Event::Start(tag) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
-                check_start(raw, false, start).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
+                check_start(raw, false, start, policy.require_compact)
+                    .map_err(StreamError::Audit)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -845,8 +908,10 @@ fn verify_reader_with_policy<R: BufRead>(
                 state.spaces.push(space);
             },
             Event::Empty(tag) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
-                check_start(raw, true, start).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
+                check_start(raw, true, start, policy.require_compact)
+                    .map_err(StreamError::Audit)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -859,8 +924,9 @@ fn verify_reader_with_policy<R: BufRead>(
                 enter_empty(&mut state, limits, start).map_err(StreamError::Audit)?;
             },
             Event::End(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
-                check_end(raw, start).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
+                check_end(raw, start, policy.require_compact).map_err(StreamError::Audit)?;
                 if state.depth == 0 || state.spaces.pop().is_none() {
                     return Err(StreamError::Audit(Error::malformed(
                         start,
@@ -874,15 +940,17 @@ fn verify_reader_with_policy<R: BufRead>(
                 check_character_context(state.depth, bytes, start).map_err(StreamError::Audit)?;
                 charge_text(&mut state, limits, bytes.len(), start).map_err(StreamError::Audit)?;
                 let whitespace = is_xml_whitespace(bytes);
-                if (state.depth == 0 && whitespace)
-                    || (is_structural_whitespace(bytes) && state.current_space() != Space::Preserve)
+                if policy.require_compact
+                    && ((state.depth == 0 && whitespace)
+                        || (is_structural_whitespace(bytes)
+                            && state.current_space() != Space::Preserve))
                 {
                     return Err(StreamError::Audit(Error::NotCompact(Violation {
                         kind: Kind::FormattingWhitespace,
                         offset: start,
                     })));
                 }
-                if reject_ambiguous_space && state.current_space() != Space::Preserve {
+                if policy.reject_ambiguous_space && state.current_space() != Space::Preserve {
                     if whitespace && !state.text_run_has_explicit_content {
                         state.ambiguous_space_offset.get_or_insert(start);
                     } else if !whitespace {
@@ -911,18 +979,23 @@ fn verify_reader_with_policy<R: BufRead>(
                 state.text_run_has_explicit_content = true;
             },
             Event::Decl(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
-                check_declaration(raw, start).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
+                check_declaration(raw, start, policy.require_compact)
+                    .map_err(StreamError::Audit)?;
             },
             Event::Comment(_) | Event::PI(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
             },
             Event::DocType(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
                 return Err(StreamError::Audit(Error::Doctype { offset: start }));
             },
             Event::Eof => {
-                finish_text_run(&mut state, reject_ambiguous_space).map_err(StreamError::Audit)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)
+                    .map_err(StreamError::Audit)?;
                 break;
             },
         }
@@ -1297,11 +1370,7 @@ impl WindowError {
     }
 }
 
-fn verify_with_policy(
-    input: &[u8],
-    limits: Limits,
-    reject_ambiguous_space: bool,
-) -> Result<Report, Error> {
+fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Report, Error> {
     check_limit(Resource::Bytes, limits.bytes, input.len(), 0)?;
     let xml = std::str::from_utf8(input).map_err(|error| Error::Encoding {
         valid_up_to: error.valid_up_to(),
@@ -1325,8 +1394,8 @@ fn verify_with_policy(
 
         match event {
             Event::Start(tag) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
-                check_start(raw, false, start)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                check_start(raw, false, start, policy.require_compact)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1343,8 +1412,8 @@ fn verify_with_policy(
                 state.spaces.push(space);
             },
             Event::Empty(tag) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
-                check_start(raw, true, start)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                check_start(raw, true, start, policy.require_compact)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1356,8 +1425,8 @@ fn verify_with_policy(
                 enter_empty(&mut state, limits, start)?;
             },
             Event::End(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
-                check_end(raw, start)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                check_end(raw, start, policy.require_compact)?;
                 if state.depth == 0 || state.spaces.pop().is_none() {
                     return Err(Error::malformed(start, "unexpected end element"));
                 }
@@ -1368,15 +1437,17 @@ fn verify_with_policy(
                 check_character_context(state.depth, bytes, start)?;
                 charge_text(&mut state, limits, bytes.len(), start)?;
                 let whitespace = is_xml_whitespace(bytes);
-                if (state.depth == 0 && whitespace)
-                    || (is_structural_whitespace(bytes) && state.current_space() != Space::Preserve)
+                if policy.require_compact
+                    && ((state.depth == 0 && whitespace)
+                        || (is_structural_whitespace(bytes)
+                            && state.current_space() != Space::Preserve))
                 {
                     return Err(Error::NotCompact(Violation {
                         kind: Kind::FormattingWhitespace,
                         offset: start,
                     }));
                 }
-                if reject_ambiguous_space && state.current_space() != Space::Preserve {
+                if policy.reject_ambiguous_space && state.current_space() != Space::Preserve {
                     if whitespace && !state.text_run_has_explicit_content {
                         state.ambiguous_space_offset.get_or_insert(start);
                     } else if !whitespace {
@@ -1403,18 +1474,18 @@ fn verify_with_policy(
                 state.text_run_has_explicit_content = true;
             },
             Event::Decl(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
-                check_declaration(raw, start)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                check_declaration(raw, start, policy.require_compact)?;
             },
             Event::Comment(_) | Event::PI(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
             },
             Event::DocType(_) => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
                 return Err(Error::Doctype { offset: start });
             },
             Event::Eof => {
-                finish_text_run(&mut state, reject_ambiguous_space)?;
+                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
                 break;
             },
         }
@@ -1539,17 +1610,17 @@ fn inspect_attributes(
     Ok(space)
 }
 
-fn check_declaration(raw: &[u8], offset: usize) -> Result<(), Error> {
+fn check_declaration(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
     let Some(inner) = raw
         .strip_prefix(b"<?")
         .and_then(|value| value.strip_suffix(b"?>"))
     else {
         return Err(Error::malformed(offset, "invalid XML declaration boundary"));
     };
-    check_attribute_layout(inner, offset + 2)
+    check_attribute_layout(inner, offset + 2, compact)
 }
 
-fn check_end(raw: &[u8], offset: usize) -> Result<(), Error> {
+fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
     let Some(inner) = raw
         .strip_prefix(b"</")
         .and_then(|value| value.strip_suffix(b">"))
@@ -1557,7 +1628,19 @@ fn check_end(raw: &[u8], offset: usize) -> Result<(), Error> {
         return Err(Error::malformed(offset, "invalid end-tag boundary"));
     };
     if let Some(index) = inner.iter().position(|byte| is_space(*byte)) {
-        let kind = if inner[index..].iter().all(|byte| is_space(*byte)) {
+        let trailing = inner[index..].iter().all(|byte| is_space(*byte));
+        if !compact {
+            // `</name >` is well-formed XML that a producer may write; only an
+            // end tag carrying markup after its name stays refused.
+            if trailing {
+                return Ok(());
+            }
+            return Err(Error::malformed(
+                offset + 2 + index,
+                "end tag must not carry markup after its name",
+            ));
+        }
+        let kind = if trailing {
             Kind::WhitespaceBeforeClose
         } else {
             Kind::AttributeSeparation
@@ -1570,7 +1653,7 @@ fn check_end(raw: &[u8], offset: usize) -> Result<(), Error> {
     Ok(())
 }
 
-fn check_start(raw: &[u8], empty: bool, offset: usize) -> Result<(), Error> {
+fn check_start(raw: &[u8], empty: bool, offset: usize, compact: bool) -> Result<(), Error> {
     let Some(without_open) = raw.strip_prefix(b"<") else {
         return Err(Error::malformed(offset, "invalid start-tag boundary"));
     };
@@ -1580,10 +1663,10 @@ fn check_start(raw: &[u8], empty: bool, offset: usize) -> Result<(), Error> {
         without_open.strip_suffix(b">")
     }
     .ok_or_else(|| Error::malformed(offset, "invalid start-tag close"))?;
-    check_attribute_layout(inner, offset + 1)
+    check_attribute_layout(inner, offset + 1, compact)
 }
 
-fn check_attribute_layout(inner: &[u8], offset: usize) -> Result<(), Error> {
+fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
     let Some(mut cursor) = inner.iter().position(|byte| is_space(*byte)) else {
         return Ok(());
     };
@@ -1594,12 +1677,16 @@ fn check_attribute_layout(inner: &[u8], offset: usize) -> Result<(), Error> {
             cursor += 1;
         }
         if cursor == inner.len() {
+            if !compact {
+                // Whitespace before the tag close is a producer spelling.
+                return Ok(());
+            }
             return Err(Error::NotCompact(Violation {
                 kind: Kind::WhitespaceBeforeClose,
                 offset: offset + separator,
             }));
         }
-        if cursor != separator + 1 || inner[separator] != b' ' {
+        if compact && (cursor != separator + 1 || inner[separator] != b' ') {
             return Err(Error::NotCompact(Violation {
                 kind: Kind::AttributeSeparation,
                 offset: offset + separator,
@@ -1614,17 +1701,41 @@ fn check_attribute_layout(inner: &[u8], offset: usize) -> Result<(), Error> {
             return Err(Error::malformed(offset + cursor, "missing attribute name"));
         }
         if cursor == inner.len() || is_space(inner[cursor]) {
-            return Err(Error::NotCompact(Violation {
-                kind: Kind::AttributeSeparation,
-                offset: offset + cursor,
-            }));
+            if compact {
+                return Err(Error::NotCompact(Violation {
+                    kind: Kind::AttributeSeparation,
+                    offset: offset + cursor,
+                }));
+            }
+            // XML permits whitespace around `=`; the attribute must still have
+            // one, and a name with no value stays refused.
+            while cursor < inner.len() && is_space(inner[cursor]) {
+                cursor += 1;
+            }
+            if cursor == inner.len() || inner[cursor] != b'=' {
+                return Err(Error::malformed(
+                    offset + cursor,
+                    "attribute name must be followed by '='",
+                ));
+            }
         }
         cursor += 1;
         if cursor == inner.len() || is_space(inner[cursor]) {
-            return Err(Error::NotCompact(Violation {
-                kind: Kind::AttributeSeparation,
-                offset: offset + cursor,
-            }));
+            if compact {
+                return Err(Error::NotCompact(Violation {
+                    kind: Kind::AttributeSeparation,
+                    offset: offset + cursor,
+                }));
+            }
+            while cursor < inner.len() && is_space(inner[cursor]) {
+                cursor += 1;
+            }
+            if cursor == inner.len() {
+                return Err(Error::malformed(
+                    offset + cursor,
+                    "attribute value must be quoted",
+                ));
+            }
         }
 
         let quote = inner[cursor];

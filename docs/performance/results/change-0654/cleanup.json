@@ -1,0 +1,26 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0654",
+  "retained_in_repository": [
+    "docs/performance/0654-opc-original-bytes-audit-loosened.md",
+    "docs/performance/results/change-0654/ (every file the README cites)",
+    "docs/adr/0006-validation-security-and-compatibility.md (amended)",
+    "crates/xml-minifier/src/audit.rs, crates/xml-minifier/src/lib.rs, crates/xml-minifier/tests/audit.rs",
+    "crates/litchi-opc/src/source_backed.rs, crates/litchi-opc/src/error.rs, crates/litchi-opc/tests/source_xml_publication.rs"
+  ],
+  "removed_after_the_evidence_was_copied": [
+    "/home/zhuhe/code/litchi-worktrees/probe-0654, -before and -after (the probe Cargo projects; source retained under results/change-0654/probe/)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0654-before, 0654-after, 0654-probe-before, 0654-probe-after (Cargo build output)",
+    "/home/zhuhe/code/litchi-worktrees/scratch-0654 (the two staged harness binaries, the four callgrind profiles and their JSON, and 310 published archives from each leg)",
+    "the session scratchpad directory agents/0654 (corpus lists, census JSONL, publication TSVs, gate logs, timing JSON, derived arithmetic)",
+    "/home/zhuhe/code/litchi-worktrees/0654 (the working worktree; the branch is kept)"
+  ],
+  "kept_for_a_following_batch": [],
+  "notes": [
+    "No file was written under /tmp outside the session scratchpad, and no worktree, Cargo target directory or fixture copy was ever placed on the tmpfs.",
+    "The two census JSONL files are gzipped in the packet (508 KiB and 2.6 MiB raw, 2.8 MiB total packet) because they are the raw output the record's counts are derived from.",
+    "The repository ignores *.log everywhere, so every retained log is named .txt.",
+    "The branch perf/0654-opc-original-bytes-audit-loosened is kept for the coordinator to merge."
+  ]
+}

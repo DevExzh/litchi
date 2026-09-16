@@ -1,5 +1,45 @@
 # Performance hotspot inventory
 
+## 0654 — the queue's first row is cleared: 297 of 321 real packages now publish, and the eager route is the next one
+
+Record: [0654](0654-opc-original-bytes-audit-loosened.md).
+
+**Row 2 of [0651](0651-queue-refresh-after-the-second-wave.md)'s queue —
+[0602](0602-xlsx-real-producer-admission-design.md)'s D0, priced by
+[0613](0613-opc-original-audit-memo.md), blocked since
+[0587](0587-remaining-opportunity-survey.md) — is implemented.** The publication
+audit of a replaced Part's *original* bytes ran `verify_authored`, which asserts
+this repository's compact output contract on bytes this repository did not
+write. The census is exact: **1,378 of the 1,403 XML members** of 0602's
+95-package corpus and **6,831 of the 6,981 members** of the 321-package OOXML
+fixture corpus were refused for that reason alone, and **every one of the 95 and
+318 of the 321 packages** now has every XML member accepted. End to end through
+`write_part_overlay_to_stream`, **297 packages move from refused to published**,
+13 publish with the **identical output SHA-256**, and **6,781 untouched members
+across 310 published packages are byte-identical to their source member with 0
+mismatches and 0 member-set changes**. The mechanism is one new policy —
+`xml_minifier::audit::verify_source`, which keeps UTF-8, well-formedness, the
+single document element, the DOCTYPE refusal and all six finite budgets and
+asserts no compactness — reached from **seven** call sites in
+`source_backed.rs` through a new `validate_source_part_xml` that builds the
+identical `OpcError::XmlPublication`; the seven paired replacement sites and the
+four litchi-generated-XML sites are untouched, and across the whole corpus the
+`verify_authored` verdict moves on **0 of 6,981 members**. The audit's price is
+re-measured and re-split now that the halves are separate symbols: **27.41% of
+source-backed publication instructions for the original, 27.86% for the
+replacement, 55.27% for the pair**, reproducing 0613's 27.59% and 55.06%. **The
+next site is named with its number**: the eager `PackageWriter` route audits a
+Part whenever `is_xml_part(…) && !is_exact_source_xml(part)`, has no
+original/replacement pair to key on, and is **identical on both legs** over
+change [0610](0610-opc-lazy-part-decode-design.md)'s `xlsx-hide` route — 59 of
+180 `.xlsx` fixtures still refuse with `NotCompact`, 57 naming
+`/xl/worksheets/sheet1.xml`, whose blob the retained witness measures as
+**byte-identical to the source member**. `performance_claim: none`; the audit
+costs +0.54% instructions and four of five timed scenarios are faster, neither
+registered. OLE2/OOXML remain active; ODF is deferred until completion and iWork
+excluded. [Record and limitations](0654-opc-original-bytes-audit-loosened.md);
+[retained evidence](results/change-0654/README.md).
+
 ## 0652 — the ten decision rows of the queue are decided; the third wave may implement what the second wave priced
 
 Record: [0652](0652-owner-decisions-for-the-third-wave.md). The owner decided
