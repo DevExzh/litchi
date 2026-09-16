@@ -1,0 +1,14 @@
+==1851899== Callgrind, a call-graph generating cache profiler
+==1851899== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1851899== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==1851899== Command: /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0646/stage/bench-before --warmup 0 --samples 1 --case pptx_cross_copy_media_rich --json /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0646/counts2/cg-before-pptx_cross_copy_media_rich-s1.json
+==1851899== 
+==1851899== For interactive control, run 'callgrind_control -h'.
+==1851899== brk segment overflow in thread #1: can't grow to 0x79ff000
+==1851899== (see section Limitations in user manual)
+==1851899== NOTE: further instances of this message will not be shown
+==1851899== 
+==1851899== Events    : Ir
+==1851899== Collected : 123572072250
+==1851899== 
+==1851899== I   refs:      123,572,072,250

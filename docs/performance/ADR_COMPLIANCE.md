@@ -1,5 +1,43 @@
 # Performance optimization ADR-compliance matrix
 
+## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
+
+Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).
+
+**ADR 0005 (bounded memory; scratch storage as an explicit capability).** The
+record states the memory question exactly rather than asserting compliance: a
+plan retaining the candidate archive owns up to `max_patch_bytes` more, unshared,
+for its whole lifetime — 256 MiB per plan at the default limits, the entire
+`Resource::Memory` limit of `Profile::Server` — and **nothing in the PPTX
+opened-presentation path charges a budget**. The "cache behavior is semantically
+invisible" clause is explicitly declined as the licence, and the design is opt-in
+with `Rebuild` as the default, a ceiling that belongs in `opened::Limits` beside
+the already-enforced `max_history_bytes`, and a typed
+`Error::Limit { resource: "cross-slide retained candidate archive bytes", limit }`
+for the strict route. One shape gap is named rather than papered over:
+`litchi_pptx::Error::Limit` carries `resource` and `limit` but no observed value,
+which ADR 0005 requires of a limit error. **The scratch clause is honoured by
+never spilling**: a candidate archive is document content, so above the ceiling
+the design rebuilds in memory. The record also records why a caller-supplied
+scratch provider would need a *different* fallback rule from the one ADR 0005
+states — absence must mean rebuild, not a typed resource error, because litchi is
+never obliged to hold the candidate — and leaves that route unspecified.
+**ADR 0003 and change 0454.** No revision value, proof format or durable encoding
+changes: `LPCP0002` and its six 32-byte revisions are untouched, `apply_patch`
+retains nothing, and the plan stays an immutable value whose equality does not
+become a byte comparison. **ADR 0011 and the 2026-08-21 OPC exact-source
+amendment.** The retained archive is the exact source the candidate reopen
+already authorized. The one place the design brushes ADR 0011 is the copy at
+application: `OpcPackage::from_vec*` takes an owned `Vec`, so the retained `Arc`
+is cloned once, and removing that needs a shared-bytes ingress in `litchi-opc` —
+an ownership decision the record declines to make. **One proof is replaced by an
+argument, and it is named.** A fresh `to_stream` of the in-memory candidate is no
+longer compared against the retained bytes; its warrant is the four staleness
+proofs plus determinism, re-derived by a `debug_assert` in debug and test builds
+and backed in release by the recomputed graph and archive revisions. A release
+test proves a substituted archive is still refused with the destination left
+byte-identical.
+
 ## 0647 — no boundary moved; the preservation proof is narrowed to exactly the operations that can invalidate it
 
 Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).

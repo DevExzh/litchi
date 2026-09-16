@@ -1,0 +1,56 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0646",
+  "title": "Retaining the planned candidate archive removes the cross-package copy's second deflate, at the price of one whole serialized package held in the plan",
+  "decision": "design, retained; no production code changed",
+  "code_state": "documentation only on the branch; the measured implementation is a scratch patch retained in results/change-0646/patch/ and is not merged",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "queue item 8 of change 0630, left open by change 0598 with the words 'it changes the plan's memory profile under ADR 0005 and needs a frozen design record'; this is that record",
+    "the saving is real and exact on counts: bounded_package_bytes 2 -> 1 and PackageWriter::write_to_stream 7 -> 6 calls per lifecycle, with zlib_rs::deflate::deflate halved on both corpora and every other call count unchanged",
+    "the memory price is measured exactly rather than estimated: the plan's live bytes rise by the archive buffer plus the 40-byte Arc header and by nothing else, and return to parity when the plan is dropped",
+    "the design is frozen with a proof chain that keeps every apply-time verdict, and the one proof it replaces with an argument is re-derived by a debug assertion that the whole 871-test suite exercises",
+    "it is designed and not built because ADR 0005 requires a hierarchical budget this path does not have, and the implementable alternative (a sixth member of opened::Limits) is a breaking public API change"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs at --samples 1 and 3, differenced over the two extra samples, per leg and selector; call counts per callee and inclusive Ir for the twelve symbols the record names",
+    "allocations": "litchi-perf-baseline-alloc retention --api owned, 5 samples after 1 warmup per leg on both corpora, with the nine ownership checkpoints, the observer-ordered region peak and the absolute allocator counters",
+    "timing": "tools/perf-baseline --warmup 3 --samples 30 over all four cross-copy selectors in one process, order A1 B1 B2 A2 on CPU 21, with the A/A and B/B floors from the repeated legs in the same window",
+    "native_cycles": "perf stat -e cycles,instructions whole child, the same A1 B1 B2 A2 order at --warmup 1 --samples 10",
+    "value_identity": "one output_sha256 per corpus across all four timing legs and all eight callgrind profiles, identical between the legs",
+    "verdicts_unchanged": "cargo test -p litchi-pptx on the untouched before checkout (871 passed) and on the scratch tree (874 passed, the three added binding-proof tests), with the debug assertion re-serializing the candidate on every reuse"
+  },
+  "accepted_costs": {
+    "plan_memory": "the plan holds one whole serialized candidate archive for its lifetime; at the default limits the worst case per plan goes from max_patch_bytes (128 MiB) to twice that",
+    "apply_copy": "OpcPackage::from_vec takes an owned Vec, so the retained Arc is copied once per application; removing that needs a shared-bytes ingress in litchi-opc, which is an ADR 0011 question and is not taken",
+    "region_peak": "on the media-rich corpus the lifecycle's peak live bytes rise by about one archive; on the plain corpus they fall, because the removed writer's growth buffer is worth more than the retained 31 KB",
+    "unproved_step": "a fresh to_stream of the in-memory candidate is no longer compared against the retained bytes; its proof is the four staleness checks plus determinism, re-derived by a debug assertion",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg"
+  },
+  "known_gaps": {
+    "no_real_deck": "the largest .pptx under test-data/ is 972,788 bytes, so no real fixture exercises the large end of the retention ceiling; the media-rich corpus is synthetic and deliberately incompressible",
+    "opt_in_shape": "the scratch retains unconditionally to size the design; the policy the design specifies (Rebuild / RetainUpTo / Require) is not implemented or measured",
+    "scratch_provider": "the ADR 0005 caller-supplied scratch route is specified as out of scope and is neither designed in detail nor measured",
+    "apply_patch": "retention is specified for CrossSlideCopyPlan only; the durable CrossSlideCopyPatch carries no archive and apply_patch is unchanged and unmeasured",
+    "source_backed": "no source-backed cross-copy selector exists, so SourceBackedCrossSlideCopyPlan is not measured"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result",
+    "any statement about the shipped library: no production code changed"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0646-pptx-cross-copy-candidate-retention-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 21",
+    "binaries": {
+      "before/litchi-perf-baseline": "900816be96595f095fec6b9a0c765360bb8331f161bb82f78f3d6d5c80abf89f",
+      "after/litchi-perf-baseline": "ac6a1a3b086ad8b0192dbdfac8da6229a2d00c3b815bdb258000e53b54d424a5",
+      "before/litchi-perf-baseline-alloc": "e5df08e5116a2718888e1922cb5a762c15bb977ad2380047a649e33bc1f29a85",
+      "after/litchi-perf-baseline-alloc": "2d13631ce0224d4b62436aafc47f342605249f95a7987dc8751c861b3d90d2b1"
+    },
+    "note": "both legs built with cargo build --release --locked from tools/perf-baseline (plus --bin litchi-perf-baseline-alloc --features allocator-metrics for the allocator legs); the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR; every binary was staged outside both target directories before measurement"
+  }
+}

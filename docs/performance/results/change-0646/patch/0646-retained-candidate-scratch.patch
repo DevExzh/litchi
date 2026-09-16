@@ -1,0 +1,533 @@
+diff --git a/crates/litchi-opc/src/package.rs b/crates/litchi-opc/src/package.rs
+index fd4ea3fc3..2940c9016 100644
+--- a/crates/litchi-opc/src/package.rs
++++ b/crates/litchi-opc/src/package.rs
+@@ -1118,6 +1118,20 @@ impl OpcPackage {
+             .retain(|_, part| !is_signature_infrastructure(&**part));
+     }
+ 
++    /// Shared handle to the exact owned source archive, when the exact-source
++    /// authorization is intact.
++    ///
++    /// SCRATCH (change 0646 sizing measurement): not production API. Returns the
++    /// same bytes [`Self::exact_source`] borrows, as a shared handle, so a caller
++    /// can retain the archive an owned reopen already holds without copying it.
++    #[must_use]
++    #[doc(hidden)]
++    pub fn exact_source_arc(&self) -> Option<Arc<Vec<u8>>> {
++        self.exact_source_authorized
++            .then(|| self.source_archive.clone())
++            .flatten()
++    }
++
+     pub(crate) fn exact_source(&self) -> Option<&[u8]> {
+         self.exact_source_authorized
+             .then(|| self.source_archive.as_deref().map(Vec::as_slice))
+diff --git a/crates/litchi-pptx/src/opened/cross_copy_plan.rs b/crates/litchi-pptx/src/opened/cross_copy_plan.rs
+index c0458be8a..003ea7d2e 100644
+--- a/crates/litchi-pptx/src/opened/cross_copy_plan.rs
++++ b/crates/litchi-pptx/src/opened/cross_copy_plan.rs
+@@ -9,6 +9,7 @@
+ 
+ use std::collections::{HashMap, HashSet, TryReserveError};
+ use std::io::{self, Write};
++use std::sync::Arc;
+ 
+ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+@@ -23,6 +24,10 @@ use super::model::{Limits, Slide, Snapshot, invalid};
+ use super::patch::Patch;
+ use crate::{Error, Result, SlideCopyRefusal};
+ 
++/// SCRATCH (change 0646): ceiling above which a planned candidate archive is
++/// not retained and application rebuilds it exactly as it does today.
++const CANDIDATE_RETENTION_CEILING: usize = 64 * 1024 * 1024;
++
+ const PATCH_MAGIC: &[u8; 8] = b"LPCP0002";
+ const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + (6 * 32) + (4 * 4) + 8 + 4 + 8;
+ const TRANSITIONAL_PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
+@@ -69,9 +74,58 @@ pub struct CrossSlideCopyPlan {
+     destination_physical_revision: [u8; 32],
+     target_physical_revision: [u8; 32],
+     patch: CrossSlideCopyPatch,
++    candidate: Option<RetainedCandidate>,
++}
++
++/// SCRATCH (change 0646): the deflated candidate archive a plan retains for
++/// reuse by the application that proves the same two input packages.
++///
++/// `archive` is the `Arc` the candidate reopen already holds, so retention
++/// allocates nothing new at planning time. `bound` is the archive bound the
++/// bytes were produced under; a different bound is not reused.
++#[derive(Debug, Clone)]
++struct RetainedCandidate {
++    archive: Arc<Vec<u8>>,
++    archive_digest: [u8; 32],
++    bound: usize,
++}
++
++/// Plan equality must not become a byte comparison of the retained archive: the
++/// digest and the length identify the bytes, and every plan field that depends
++/// on them is compared separately.
++impl PartialEq for RetainedCandidate {
++    fn eq(&self, other: &Self) -> bool {
++        self.archive_digest == other.archive_digest
++            && self.bound == other.bound
++            && self.archive.len() == other.archive.len()
++    }
++}
++
++impl Eq for RetainedCandidate {}
++
++/// SCRATCH (change 0646): what this candidate build does about its archive.
++///
++/// One argument rather than two, because `build_candidate` already takes
++/// eleven and the crate's `too_many_arguments` lint is deny. A real
++/// implementation would group the candidate identity into a request struct;
++/// this keeps the scratch at the existing shape.
++#[derive(Clone, Copy)]
++enum CandidateArchive<'a> {
++    /// Serialize the archive and discard it with the candidate package.
++    Build,
++    /// Serialize the archive and hand it back for the plan to retain.
++    BuildAndRetain,
++    /// Reuse the archive a plan retained under the same bound.
++    Reuse(&'a RetainedCandidate),
+ }
+ 
+ impl CrossSlideCopyPlan {
++    /// SCRATCH (change 0646): bytes of the candidate archive this plan retains.
++    #[must_use]
++    pub fn retained_candidate_bytes(&self) -> Option<usize> {
++        self.candidate.as_ref().map(|held| held.archive.len())
++    }
++
+     /// Source semantic slide captured by the immutable source snapshot.
+     #[must_use]
+     pub const fn source(&self) -> &Slide {
+@@ -432,7 +486,14 @@ impl Snapshot {
+     ) -> Result<CrossSlideCopyPlan> {
+         let source_slide = resolve_slide(source, source_slide.into())?;
+         let destination_slide = resolve_slide(self, destination_slide.into())?;
+-        plan_cross_slide_copy_for_slides(source, self, source_slide, destination_slide, position)
++        plan_cross_slide_copy_for_slides(
++            source,
++            self,
++            source_slide,
++            destination_slide,
++            position,
++            CandidateArchive::BuildAndRetain,
++        )
+     }
+ 
+     /// Compatibility-oriented alias for [`Self::plan_cross_slide_copy`].
+@@ -503,6 +564,9 @@ pub(crate) fn apply_plan(
+         plan.source.clone(),
+         plan.destination.clone(),
+         plan.position,
++        plan.candidate
++            .as_ref()
++            .map_or(CandidateArchive::Build, CandidateArchive::Reuse),
+     )?;
+     if fresh.source_revision != plan.source_revision
+         || fresh.destination_revision != plan.destination_revision
+@@ -595,6 +659,7 @@ pub(crate) fn apply_patch(
+         source_slide.clone(),
+         destination_slide.clone(),
+         patch.position,
++        CandidateArchive::Build,
+     )
+     .ok()
+     .and_then(|(fresh, candidate)| {
+@@ -643,6 +708,7 @@ pub(crate) fn apply_patch(
+                         source_slide,
+                         restored_destination,
+                         patch.position,
++                        CandidateArchive::Build,
+                     )
+                     .ok()?;
+                     Some(forward.patch.inverse() == *patch)
+@@ -737,6 +803,7 @@ fn plan_cross_slide_copy_for_slides(
+     source_slide: Slide,
+     destination_slide: Slide,
+     position: usize,
++    archive: CandidateArchive<'_>,
+ ) -> Result<CrossSlideCopyPlan> {
+     prepare_cross_slide_copy_for_slides(
+         source,
+@@ -744,6 +811,7 @@ fn plan_cross_slide_copy_for_slides(
+         source_slide,
+         destination_slide,
+         position,
++        archive,
+     )
+     .map(|(plan, _candidate)| plan)
+ }
+@@ -756,6 +824,7 @@ fn prepare_cross_slide_copy_for_slides(
+     source_slide: Slide,
+     destination_slide: Slide,
+     position: usize,
++    archive: CandidateArchive<'_>,
+ ) -> Result<(CrossSlideCopyPlan, OpcPackage)> {
+     if position > destination.slides.len() {
+         return Err(Error::SlideIndexOutOfBounds {
+@@ -924,19 +993,21 @@ fn prepare_cross_slide_copy_for_slides(
+     preflight_parts(destination, &parts, planned_bytes)?;
+     let source_physical_revision = snapshot_physical_revision(source, limits)?;
+     let destination_physical_revision = snapshot_physical_revision(destination, limits)?;
+-    let (candidate, candidate_revision, candidate_archive_revision) = build_candidate(
+-        source,
+-        destination,
+-        &source_slide,
+-        &destination_slide,
+-        position,
+-        slide_id,
+-        &presentation_relationship_id,
+-        &source_layout,
+-        &destination_layout,
+-        &parts,
+-        limits.max_patch_bytes(),
+-    )?;
++    let (candidate, candidate_revision, candidate_archive_revision, retained_candidate) =
++        build_candidate(
++            source,
++            destination,
++            &source_slide,
++            &destination_slide,
++            position,
++            slide_id,
++            &presentation_relationship_id,
++            &source_layout,
++            &destination_layout,
++            &parts,
++            limits.max_patch_bytes(),
++            archive,
++        )?;
+     let patch = Patch::capture(
+         destination.package.as_ref(),
+         &candidate,
+@@ -991,6 +1062,7 @@ fn prepare_cross_slide_copy_for_slides(
+             destination_physical_revision,
+             target_physical_revision,
+             patch: cross_patch,
++            candidate: retained_candidate,
+         },
+         candidate,
+     ))
+@@ -1008,7 +1080,13 @@ fn build_candidate(
+     destination_layout: &PackURI,
+     parts: &[super::SlideCopyPart],
+     archive_limit: usize,
+-) -> Result<(OpcPackage, [u8; 32], Option<[u8; 32]>)> {
++    archive: CandidateArchive<'_>,
++) -> Result<(
++    OpcPackage,
++    [u8; 32],
++    Option<[u8; 32]>,
++    Option<RetainedCandidate>,
++)> {
+     let mut mapping = HashMap::new();
+     mapping
+         .try_reserve(parts.len())
+@@ -1095,7 +1173,43 @@ fn build_candidate(
+         )?;
+         staged.set_blob(xml);
+     }
+-    let (serialized, archive_digest) = bounded_package_bytes(&candidate, archive_limit)?;
++    // SCRATCH (change 0646): a retained candidate archive is the serialization
++    // of this exact graph, because the caller proved both input packages
++    // unchanged (graph and serialized archive) before reaching here and
++    // `to_stream` is a deterministic function of the package. The
++    // `debug_assert` re-derives it in debug and test builds.
++    let (serialized, archive_digest) = match archive {
++        CandidateArchive::Reuse(held)
++            if held.bound == archive_limit && held.archive.len() <= archive_limit =>
++        {
++            debug_assert!(
++                bounded_package_bytes(&candidate, archive_limit).is_ok_and(|(fresh, digest)| fresh
++                    == *held.archive
++                    && digest == held.archive_digest),
++                "cross-slide reused a retained candidate archive a fresh serialization does not reproduce"
++            );
++            // The copy is fallible, exactly as `BoundedVecWriter::into_bytes`
++            // is: an infallible `Vec::clone` would abort the process where the
++            // route it replaces returns `Error::Allocation`.
++            let mut serialized = Vec::new();
++            serialized
++                .try_reserve_exact(held.archive.len())
++                .map_err(|source| Error::Allocation {
++                    resource: "cross-slide candidate archive",
++                    source,
++                })?;
++            serialized.extend_from_slice(&held.archive);
++            // The digest is recomputed over the retained bytes rather than
++            // carried beside them: the physical revision must remain a hash of
++            // the bytes this call is about to publish. The hash is the one
++            // `bounded_package_bytes` takes anyway, so what retention removes
++            // is exactly the serialization and its deflate.
++            let mut digest = Sha256::new();
++            digest.update(&serialized);
++            (serialized, digest.finalize().into())
++        },
++        _ => bounded_package_bytes(&candidate, archive_limit)?,
++    };
+     let serialized_bytes = serialized.len();
+     // Clean owned ingress proves the destination has built-in parts. Keep
+     // the existing path for caller-defined parts and revoked authorization.
+@@ -1116,6 +1230,17 @@ fn build_candidate(
+         .is_unmodified_owned_source()
+         .then(|| seal_physical_revision(archive_digest, serialized_bytes))
+         .transpose()?;
++    // The reopen retains exactly these bytes behind an `Arc`, so retention
++    // shares that allocation instead of making a second one.
++    let retained_candidate = (matches!(archive, CandidateArchive::BuildAndRetain)
++        && serialized_bytes <= CANDIDATE_RETENTION_CEILING)
++        .then(|| reopened.exact_source_arc())
++        .flatten()
++        .map(|archive| RetainedCandidate {
++            archive,
++            archive_digest,
++            bound: archive_limit,
++        });
+     let captured = super::model::capture(
+         &reopened,
+         destination.limits,
+@@ -1138,7 +1263,7 @@ fn build_candidate(
+         ));
+     }
+     let revision = captured.revision;
+-    Ok((reopened, revision, archive_revision))
++    Ok((reopened, revision, archive_revision, retained_candidate))
+ }
+ 
+ fn preflight_parts(
+@@ -2291,4 +2416,6 @@ impl<'a> WireInput<'a> {
+ #[cfg(test)]
+ mod bounded_writer_tests;
+ #[cfg(test)]
++mod retention_scratch_tests;
++#[cfg(test)]
+ mod revision_cache_tests;
+diff --git a/crates/litchi-pptx/src/opened/cross_copy_plan/retention_scratch_tests.rs b/crates/litchi-pptx/src/opened/cross_copy_plan/retention_scratch_tests.rs
+new file mode 100644
+index 000000000..1616d2587
+--- /dev/null
++++ b/crates/litchi-pptx/src/opened/cross_copy_plan/retention_scratch_tests.rs
+@@ -0,0 +1,217 @@
++//! SCRATCH (change 0646): binding-proof tests for the retained candidate archive.
++//!
++//! These are not production tests. They exist to answer one question for the
++//! frozen design record: does reusing the planned candidate archive at
++//! application move any verdict? Each test builds one plan, then drives the
++//! same application twice — once with the retained archive and once with the
++//! retention cleared — and compares the complete `Result` and the published
++//! bytes.
++#![allow(
++    clippy::expect_used,
++    clippy::unwrap_used,
++    reason = "scratch retention tests use panic-on-fixture-failure assertions"
++)]
++
++use super::{CrossSlideCopyPlan, physical_package_fingerprint, seal_physical_revision};
++use crate::opened::model::Limits;
++use crate::{Error, Package, Result};
++
++fn owned_slides(titles: &[&str]) -> Result<Package> {
++    let mut package = Package::new()?;
++    for title in titles {
++        package.presentation_mut()?.add_slide()?.set_title(title);
++    }
++    let bytes = package.to_bytes()?;
++    Package::from_vec(bytes)
++}
++
++fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
++    let slide = package
++        .opened_presentation()?
++        .slides()
++        .get(index)
++        .cloned()
++        .ok_or(Error::SlideIndexOutOfBounds { index, len: index })?;
++    let part_name = slide.part_name().clone();
++    let xml = std::str::from_utf8(package.opc.get_part(&part_name)?.blob())
++        .map_err(|error| Error::Xml(format!("slide XML is not UTF-8: {error}")))?;
++    let renamed = xml.replacen(
++        &format!(r#"name="Slide {}""#, slide.id()),
++        &format!(r#"name="{name}""#),
++        1,
++    );
++    if renamed == xml {
++        return Err(Error::Invalid(format!(
++            "test slide {index} has no canonical producer name"
++        )));
++    }
++    package
++        .opc
++        .get_part_mut(&part_name)?
++        .set_blob(renamed.into_bytes());
++    Ok(())
++}
++
++fn cross_copy_fixture() -> Result<(Package, Package)> {
++    let mut source = owned_slides(&["retain-source"])?;
++    rename_slide(&mut source, 0, "retain-source")?;
++    let source = Package::from_vec(source.to_bytes()?)?;
++
++    let mut destination = owned_slides(&["retain-destination-a", "retain-destination-b"])?;
++    rename_slide(&mut destination, 0, "retain-destination-a")?;
++    rename_slide(&mut destination, 1, "retain-destination-b")?;
++    let destination = Package::from_vec(destination.to_bytes()?)?;
++    Ok((source, destination))
++}
++
++fn plan_for(source: &Package, destination: &Package) -> Result<CrossSlideCopyPlan> {
++    let source_snapshot = source.opened_presentation()?;
++    let destination_snapshot = destination.opened_presentation()?;
++    destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)
++}
++
++/// The retained archive is exactly the archive the application publishes, and
++/// its sealed revision is the plan's own `target_physical_revision`.
++#[test]
++fn a_plan_retains_the_archive_its_application_publishes() -> Result<()> {
++    let (source, mut destination) = cross_copy_fixture()?;
++    let plan = plan_for(&source, &destination)?;
++
++    let held = plan
++        .candidate
++        .as_ref()
++        .expect("the plan retained a candidate");
++    assert_eq!(plan.retained_candidate_bytes(), Some(held.archive.len()));
++    assert_eq!(
++        seal_physical_revision(held.archive_digest, held.archive.len())?,
++        plan.target_physical_revision(),
++        "the retained archive seals to the plan's own physical revision"
++    );
++
++    let mut applied = Package::from_vec(destination.to_bytes()?)?;
++    applied.apply_cross_slide_copy_plan(&source, &plan)?;
++    assert_eq!(
++        applied.to_bytes()?,
++        *held.archive,
++        "the published archive is byte-identical to the archive the plan retained"
++    );
++    Ok(())
++}
++
++/// Substituting the retained archive is refused before publication and leaves
++/// the destination byte-identical. This is the test that fails if the retained
++/// archive were trusted without a recomputed proof.
++///
++/// Two layers catch it, and this fixture pins both. In debug and test builds
++/// the `debug_assert` in `build_candidate` re-serializes the candidate and
++/// panics; in a release build that assertion is compiled out and the refusal
++/// comes from the recomputed complete-package revision, which is the layer the
++/// design actually rests on. The release half runs under `cargo test
++/// --release`.
++#[test]
++#[cfg(debug_assertions)]
++#[should_panic(expected = "cross-slide reused a retained candidate archive")]
++fn a_substituted_retained_archive_trips_the_debug_assertion() {
++    substitute_and_apply().expect("fixture");
++}
++
++#[test]
++#[cfg(not(debug_assertions))]
++fn a_substituted_retained_archive_is_refused_and_publishes_nothing() -> Result<()> {
++    substitute_and_apply()
++}
++
++fn substitute_and_apply() -> Result<()> {
++    let (source, mut destination) = cross_copy_fixture()?;
++    let mut plan = plan_for(&source, &destination)?;
++
++    // A different, structurally valid PPTX archive: the destination's own.
++    let foreign = destination.to_bytes()?;
++    let foreign_digest: [u8; 32] = {
++        use sha2::{Digest, Sha256};
++        let mut digest = Sha256::new();
++        digest.update(&foreign);
++        digest.finalize().into()
++    };
++    let held = plan
++        .candidate
++        .as_mut()
++        .expect("the plan retained a candidate");
++    held.archive = std::sync::Arc::new(foreign);
++    held.archive_digest = foreign_digest;
++
++    let mut applied = Package::from_vec(destination.to_bytes()?)?;
++    let before = applied.to_bytes()?;
++    let outcome = applied.apply_cross_slide_copy_plan(&source, &plan);
++    eprintln!("SCRATCH-0646 substituted-archive outcome: {outcome:?}");
++    assert!(
++        outcome.is_err(),
++        "a substituted candidate archive must be refused, got {outcome:?}"
++    );
++    assert_eq!(
++        applied.to_bytes()?,
++        before,
++        "a refused application leaves the destination byte-identical"
++    );
++    Ok(())
++}
++
++/// Retention moves no verdict: the same application with and without the
++/// retained archive produces the same published bytes on the accepting route
++/// and the same typed refusal on each rejecting route.
++#[test]
++fn retention_changes_no_apply_verdict() -> Result<()> {
++    let (source, mut destination) = cross_copy_fixture()?;
++    let retained = plan_for(&source, &destination)?;
++    let mut unretained = retained.clone();
++    unretained.candidate = None;
++    let limits = Limits::default();
++    let destination_bytes = destination.to_bytes()?;
++
++    // Accepting route: identical published bytes and identical revisions.
++    let mut with = Package::from_vec(destination_bytes.clone())?;
++    let mut without = Package::from_vec(destination_bytes.clone())?;
++    let with_snapshot = with.apply_cross_slide_copy_plan(&source, &retained)?;
++    let without_snapshot = without.apply_cross_slide_copy_plan(&source, &unretained)?;
++    assert_eq!(with.to_bytes()?, without.to_bytes()?);
++    assert_eq!(with_snapshot.revision(), without_snapshot.revision());
++    assert_eq!(
++        physical_package_fingerprint(&with.opc, limits)?,
++        retained.target_physical_revision()
++    );
++
++    // Rejecting route 1: a destination whose slide XML drifted.
++    let drift = |plan: &CrossSlideCopyPlan| -> Result<String> {
++        let mut drifted = Package::from_vec(destination_bytes.clone())?;
++        let slide = drifted
++            .opened_presentation()?
++            .slides()
++            .first()
++            .expect("destination has slides")
++            .part_name()
++            .clone();
++        let stale = String::from_utf8_lossy(drifted.opc.get_part(&slide)?.blob())
++            .replace("retain-destination-a", "retain-destination-z")
++            .into_bytes();
++        drifted.opc.get_part_mut(&slide)?.set_blob(stale);
++        Ok(format!(
++            "{:?}",
++            drifted.apply_cross_slide_copy_plan(&source, plan)
++        ))
++    };
++    assert_eq!(drift(&retained)?, drift(&unretained)?);
++    assert!(drift(&retained)?.contains("UnsafeEdit"));
++
++    // Rejecting route 2: a foreign source package.
++    let foreign_source = owned_slides(&["foreign"])?;
++    let foreign = |plan: &CrossSlideCopyPlan| -> Result<String> {
++        let mut target = Package::from_vec(destination_bytes.clone())?;
++        Ok(format!(
++            "{:?}",
++            target.apply_cross_slide_copy_plan(&foreign_source, plan)
++        ))
++    };
++    assert_eq!(foreign(&retained)?, foreign(&unretained)?);
++    assert!(foreign(&retained)?.contains("UnsafeEdit"));
++    Ok(())
++}
