@@ -1,0 +1,16 @@
+[package]
+name = "fence_probe_0644"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "@ROOT@/crates/litchi-core" }
+litchi-cfb = { path = "@ROOT@/crates/litchi-cfb" }
+litchi-doc = { path = "@ROOT@/crates/litchi-doc" }
+litchi-ppt = { path = "@ROOT@/crates/litchi-ppt" }
+
+[profile.release]
+debug = false
+strip = false

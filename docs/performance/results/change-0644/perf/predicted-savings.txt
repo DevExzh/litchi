@@ -1,0 +1,52 @@
+## Per-scan cost (measured)
+
+mode	estimator	intercept	slope_per_byte	scans	cycles_per_byte_per_scan	residual_median	residual_min	residual_max
+doc-open	ols	205,152	12.9799	6	2.1633	-0.26%	-1.28%	+0.74%
+doc-open	two-point	206,301	12.9793	6	2.1632	+0.00%	-0.94%	+0.85%
+ppt-open	ols	68,254	4.3487	2	2.1743	-0.66%	-4.06%	+2.03%
+ppt-open	two-point	70,833	4.3409	2	2.1704	+0.60%	-1.94%	+2.17%
+
+# OLS agreement between the two formats: 0.51%
+# 0609 fitted 217,274 + 12.90b over 6 scans -> 2.1500; 0589 measured 2.048 (2.029-2.115)
+
+## A/A floor, cycles per operation, leg B against leg A
+
+cells	38
+median	-0.15%
+min	-2.45%
+max	+0.47%
+p95_abs	1.84%
+
+## Predicted DOC open after each variant (modelled: measured before - scans x per-scan x bytes)
+
+fixture	bytes	measured_before	B3C_after(6->4)	B3C_delta	B2C_after(6->3)	B2C_delta	B1C_after(6->2)	B1C_delta
+documentProperties.doc	9728	332,564	290,475	-12.7%	269,430	-19.0%	248,385	-25.3%
+endingnote.doc	9728	332,802	290,713	-12.6%	269,668	-19.0%	248,623	-25.3%
+footnote.doc	9728	335,732	293,643	-12.5%	272,598	-18.8%	251,553	-25.1%
+noheadfoot-litchi.doc	10240	338,695	294,390	-13.1%	272,238	-19.6%	250,086	-26.2%
+lists-margins.doc	10752	346,910	300,390	-13.4%	277,130	-20.1%	253,870	-26.8%
+table-merged-cells.doc	17408	428,814	353,496	-17.6%	315,837	-26.3%	278,178	-35.1%
+duplicate-style-names.doc	64512	1,034,836	755,717	-27.0%	616,157	-40.5%	476,598	-53.9%
+picture.doc	1448448	19,006,126	12,739,236	-33.0%	9,605,790	-49.5%	6,472,345	-65.9%
+# B3+C (6->4), the recommendation; B omitted from the open, so this is also C alone: median -13.2%, range -33.0%..-12.5%
+# B2+C (6->3): median -19.9%, range -49.5%..-18.8%
+# B1+C (6->2): median -26.5%, range -65.9%..-25.1%
+
+## Predicted further saving on the readback (resolve calls ensure_current twice)
+
+fixture	bytes	B3_or_B2 (8->6 scans)	B1 (8->4 scans)
+documentProperties.doc	9728	42,089	84,179
+endingnote.doc	9728	42,089	84,179
+footnote.doc	9728	42,089	84,179
+noheadfoot-litchi.doc	10240	44,305	88,609
+lists-margins.doc	10752	46,520	93,040
+table-merged-cells.doc	17408	75,318	150,636
+duplicate-style-names.doc	64512	279,119	558,238
+picture.doc	1448448	6,266,890	12,533,781
+
+## One CFB index parse (measured), the term Options D and E would buy
+
+across the 8 DOC fixtures	21,118..51,850 cycles
+across all 38 fixtures	20,244..51,850 cycles
+one parse as a share of the DOC open	0.27%..6.45%
+the two reopens B+C retains	0.55%..12.89%

@@ -1,5 +1,39 @@
 # Performance optimization ADR-compliance matrix
 
+## 0644 — the bracket is what makes the reduction sound, never the token
+
+ADR 0005 requires that a mutation during a read return `SourceChanged`, ADR 0006
+binds a splice to the bytes it was planned against, and ADR 0003 makes the
+fingerprint diagnostic while exact byte equality authorizes application. The
+design preserves all three, and it is precise about which one carries the
+argument. The confirming scan inside each `identity_fingerprint` call may be
+removed **only** because its comparison partner is an earlier scan the caller
+already takes — inside `ensure_current`, `confirmed`'s partner is `observed` —
+and not because the retained `ensure_source_identity` (a `version()`, a `len()`
+and a `version()`) says anything stronger afterwards; that cheap check stays at
+all five fence points of the DOC open and the three inside `ensure_current`, and
+is proved insufficient by the `FileSource` witness. The same reasoning
+**refuses** the change on the PPT open, whose single identity call has no outer
+partner: the sweep shows four of its eight ordinals refused today by the
+internal comparison and by nothing else, and PPT's `ensure_current` checks only
+the version token and the length, so the loss there would be a `read_text` that
+decodes bytes the retained identity does not cover, not a relocated refusal.
+Error identity is treated as a contract rather than a detail: the FAT-sector
+sweep resolves which parse reports each of the 30 ordinals and shows that the
+composed reopens report `Error::Overlay(OverlayError::Ole(..))` while the two
+real index parses report `Error::Ole(..)`, so the reopen is kept and the
+admission gate requires that wrapper to be unchanged at every ordinal. I1 is
+likewise kept in full rather than reduced to a header precheck, because it is
+the malformed-input defence that bounds the work an attacker-chosen non-CFB
+input can buy, and `docs/GOAL.md` forbids weakening one. The single contract
+move the design accepts is stated rather than absorbed: dropping the third
+identity call relocates six ordinals' refusal from `open` to the first call that
+consumes a byte, and although every byte-yielding path goes through
+`ensure_current`, the five retained-state accessors do not, so an implementing
+change owes them a rustdoc sentence. No ADR is amended, no ADR clarification is
+proposed, and proposed ADRs 0030 and 0031 are not cited.
+[Change 0644](0644-ole2-snapshot-fence-design.md); `performance_claim: none`.
+
 ## 0648 — a cache whose ceiling is the region it caches, and whose region the open already read
 
 The window is **all or nothing**, and that is the compliance argument as much as

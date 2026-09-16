@@ -1,0 +1,217 @@
+# fixture=/home/zhuhe/code/litchi/test-data/ole/doc/picture.doc mode=doc-open bytes=1448448
+# outcome=OK
+# fingerprint_chunk=1048576
+call_ordinal	read_ordinal	kind	offset	len	class
+1		len	0	1448448	-
+2		version	0	0	-
+3		version	0	0	-
+4		len	0	1448448	-
+5	1	read	0	512	index-or-range
+6	2	read	512	512	index-or-range
+7	3	read	66048	10752	index-or-range
+8	4	read	1442304	512	index-or-range
+9	5	read	1447424	1024	index-or-range
+10	6	read	1536	512	index-or-range
+11		version	0	0	-
+12		version	0	0	-
+13		len	0	1448448	-
+14		version	0	0	-
+15		version	0	0	-
+16		version	0	0	-
+17		version	0	0	-
+18		len	0	1448448	-
+19		version	0	0	-
+20		version	0	0	-
+21		len	0	1448448	-
+22		version	0	0	-
+23		version	0	0	-
+24	7	read	0	1048576	scan-chunk
+25		version	0	0	-
+26		version	0	0	-
+27	8	read	1048576	399872	scan-chunk
+28		version	0	0	-
+29		version	0	0	-
+30		len	0	1448448	-
+31		version	0	0	-
+32		version	0	0	-
+33		len	0	1448448	-
+34		version	0	0	-
+35		version	0	0	-
+36		len	0	1448448	-
+37		version	0	0	-
+38		version	0	0	-
+39	9	read	0	512	index-or-range
+40		version	0	0	-
+41		version	0	0	-
+42	10	read	512	512	index-or-range
+43		version	0	0	-
+44		version	0	0	-
+45	11	read	66048	10752	index-or-range
+46		version	0	0	-
+47		version	0	0	-
+48	12	read	1442304	512	index-or-range
+49		version	0	0	-
+50		version	0	0	-
+51	13	read	1447424	1024	index-or-range
+52		version	0	0	-
+53		version	0	0	-
+54	14	read	1536	512	index-or-range
+55		version	0	0	-
+56		version	0	0	-
+57		len	0	1448448	-
+58		version	0	0	-
+59		version	0	0	-
+60		len	0	1448448	-
+61		version	0	0	-
+62		version	0	0	-
+63	15	read	0	1048576	scan-chunk
+64		version	0	0	-
+65		version	0	0	-
+66	16	read	1048576	399872	scan-chunk
+67		version	0	0	-
+68		version	0	0	-
+69		len	0	1448448	-
+70		version	0	0	-
+71		version	0	0	-
+72		len	0	1448448	-
+73		version	0	0	-
+74		version	0	0	-
+75		len	0	1448448	-
+76	17	read	0	512	index-or-range
+77	18	read	512	512	index-or-range
+78	19	read	66048	10752	index-or-range
+79	20	read	1442304	512	index-or-range
+80	21	read	1447424	1024	index-or-range
+81	22	read	1536	512	index-or-range
+82		version	0	0	-
+83		version	0	0	-
+84		len	0	1448448	-
+85		version	0	0	-
+86		version	0	0	-
+87	23	read	1439232	154	index-or-range
+88		version	0	0	-
+89	24	read	1439232	1242	index-or-range
+90		version	0	0	-
+91	25	read	3725	84	index-or-range
+92		version	0	0	-
+93	26	read	3164	21	index-or-range
+94		version	0	0	-
+95		version	0	0	-
+96		version	0	0	-
+97		len	0	1448448	-
+98		version	0	0	-
+99		version	0	0	-
+100		len	0	1448448	-
+101		version	0	0	-
+102		version	0	0	-
+103	27	read	0	1048576	scan-chunk
+104		version	0	0	-
+105		version	0	0	-
+106	28	read	1048576	399872	scan-chunk
+107		version	0	0	-
+108		version	0	0	-
+109		len	0	1448448	-
+110		version	0	0	-
+111		version	0	0	-
+112		len	0	1448448	-
+113		version	0	0	-
+114		version	0	0	-
+115		len	0	1448448	-
+116		version	0	0	-
+117		version	0	0	-
+118	29	read	0	512	index-or-range
+119		version	0	0	-
+120		version	0	0	-
+121	30	read	512	512	index-or-range
+122		version	0	0	-
+123		version	0	0	-
+124	31	read	66048	10752	index-or-range
+125		version	0	0	-
+126		version	0	0	-
+127	32	read	1442304	512	index-or-range
+128		version	0	0	-
+129		version	0	0	-
+130	33	read	1447424	1024	index-or-range
+131		version	0	0	-
+132		version	0	0	-
+133	34	read	1536	512	index-or-range
+134		version	0	0	-
+135		version	0	0	-
+136		len	0	1448448	-
+137		version	0	0	-
+138		version	0	0	-
+139		len	0	1448448	-
+140		version	0	0	-
+141		version	0	0	-
+142	35	read	0	1048576	scan-chunk
+143		version	0	0	-
+144		version	0	0	-
+145	36	read	1048576	399872	scan-chunk
+146		version	0	0	-
+147		version	0	0	-
+148		len	0	1448448	-
+149		version	0	0	-
+150		version	0	0	-
+151		len	0	1448448	-
+152		version	0	0	-
+153		version	0	0	-
+154		version	0	0	-
+155		len	0	1448448	-
+156		version	0	0	-
+157		version	0	0	-
+158		len	0	1448448	-
+159		version	0	0	-
+160		version	0	0	-
+161	37	read	0	1048576	scan-chunk
+162		version	0	0	-
+163		version	0	0	-
+164	38	read	1048576	399872	scan-chunk
+165		version	0	0	-
+166		version	0	0	-
+167		len	0	1448448	-
+168		version	0	0	-
+169		version	0	0	-
+170		len	0	1448448	-
+171		version	0	0	-
+172		version	0	0	-
+173		len	0	1448448	-
+174		version	0	0	-
+175		version	0	0	-
+176	39	read	0	512	index-or-range
+177		version	0	0	-
+178		version	0	0	-
+179	40	read	512	512	index-or-range
+180		version	0	0	-
+181		version	0	0	-
+182	41	read	66048	10752	index-or-range
+183		version	0	0	-
+184		version	0	0	-
+185	42	read	1442304	512	index-or-range
+186		version	0	0	-
+187		version	0	0	-
+188	43	read	1447424	1024	index-or-range
+189		version	0	0	-
+190		version	0	0	-
+191	44	read	1536	512	index-or-range
+192		version	0	0	-
+193		version	0	0	-
+194		len	0	1448448	-
+195		version	0	0	-
+196		version	0	0	-
+197		len	0	1448448	-
+198		version	0	0	-
+199		version	0	0	-
+200	45	read	0	1048576	scan-chunk
+201		version	0	0	-
+202		version	0	0	-
+203	46	read	1048576	399872	scan-chunk
+204		version	0	0	-
+205		version	0	0	-
+206		len	0	1448448	-
+207		version	0	0	-
+208		version	0	0	-
+209		len	0	1448448	-
+210		version	0	0	-
+# read_calls=46
+# scan_chunks=12 chunks_per_scan=2
+# complete_scans=6

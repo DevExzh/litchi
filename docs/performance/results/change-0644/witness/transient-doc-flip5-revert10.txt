@@ -1,0 +1,8 @@
+# fixture=/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc mode=doc-open
+flip_after_read	5
+revert_after_read	10
+offset	8703
+reads	10
+mutations_applied	2
+restored_byte_identical	true
+outcome	open-ERR Overlay(SourceFingerprintChanged { expected: ArtifactFingerprint([57, 88, 229, 193, 106, 144, 137, 240, 124, 29, 118, 2, 226, 225, 91, 96, 50, 181, 13...

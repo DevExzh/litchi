@@ -1,5 +1,51 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0644 — a source-identity fence priced per read, with the cheap-token substitution refused again
+
+`docs/GOAL.md` puts correctness, lossless preservation and bounded resources
+over speed, and ADR 0006's source identity is the rule this fence discharges.
+This change moves the "finish source-backed CRUD adoption across formats" row
+forward without touching it: the DOC snapshot's fence is now enumerated read by
+read, each with the mutation it and no earlier read can detect, in the style
+change 0621 established for XLS. The audit's most reusable result is a
+*refusal*. Substituting a `SourceVersion` observation for any of the six
+complete reads is rejected with a witness that runs on an ordinary `FileSource`
+and a real filesystem: an in-place `pwrite` through a second descriptor with the
+modification time restored by `File::set_times` leaves both `version()` and
+`len()` unchanged while the bytes differ, which `FileVersionPolicy`'s own
+rustdoc already warns of and which change 0587 classified as an ADR 0006 policy
+amendment rather than an optimization. Three further options are refused for
+reasons the audit should keep: dropping the composed-CFB reopen would rewrite
+the `Overlay(Ole(..))` error wrapper for 17 of 31 sweep ordinals while buying an
+estimated 0.55-12.89% of the open against the design's 12.5-33.0%, and unlike
+B's confirming scan its precedence has no later observation to be relocated onto
+at any price; hashing before
+the first index parse would move the only pre-scan structural refusal in a
+57-fixture corpus behind a complete hash, with a 2 GiB worst case on
+attacker-chosen input; and deferring the identity in the style of change 0165's
+lazy fingerprint would leave the semantic parse bracketed by nothing, which is a
+wrong-value path rather than a relocated refusal. The one option admitted with a
+cost — dropping the third identity call — moves six ordinals' refusal from
+`open` to the first access with the same typed error, and the record names the
+five accessors that consume no byte and would therefore return values for bytes
+that may no longer exist. A second cost is **avoided rather than accepted**, and
+that is the audit's other reusable result: removing an open identity call's
+confirming scan hands one window of the FAT-sector sweep from
+`Overlay(SourceFingerprintChanged)` to `Ole(CorruptedFile(..))`, blaming the file
+for damage the caller's own writer did, and change 0621's relocation rule cannot
+repair it with the identity entry point alone — the repair must sit on
+`source.rs:531`'s error branch and needs a reopen-free re-hash, because a re-plan
+there fails on the same corrupted sector and yields a third variant. That is a
+second public item in `litchi-cfb` whose only job is an unbracketed digest, so
+the design leaves the open's identity calls alone and applies the reduction only
+where no index parse follows one. Change 0609's verdict on the facade `.doc`
+route is **not** reopened: at the adopted design's minimum the source-backed
+route is still 3.50×–4.29× the eager route on the two fixtures 0609 compared, and
+2.98× even under the most aggressive variant. OLE2 and OOXML
+remain the active priority; ODF stays deferred and iWork excluded.
+[Change and limitations](0644-ole2-snapshot-fence-design.md);
+[evidence](results/change-0644/README.md).
+
 ## 0648 — the range-source scenario 0627 called the most expensive is no longer expensive
 
 Change 0627 called the `54016.xls` whole-sheet walk "the single most expensive

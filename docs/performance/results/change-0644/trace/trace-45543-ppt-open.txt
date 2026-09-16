@@ -1,0 +1,57 @@
+# fixture=/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt mode=ppt-open bytes=385024
+# outcome=OK
+# fingerprint_chunk=1048576
+call_ordinal	read_ordinal	kind	offset	len	class
+1		len	0	385024	-
+2		version	0	0	-
+3		len	0	385024	-
+4	1	read	0	512	index-or-range
+5	2	read	380928	3072	index-or-range
+6	3	read	384000	1024	index-or-range
+7		version	0	0	-
+8		version	0	0	-
+9		version	0	0	-
+10		version	0	0	-
+11		len	0	385024	-
+12		version	0	0	-
+13		version	0	0	-
+14		len	0	385024	-
+15		version	0	0	-
+16		version	0	0	-
+17	4	read	0	385024	scan-chunk
+18		version	0	0	-
+19		version	0	0	-
+20		len	0	385024	-
+21		version	0	0	-
+22		version	0	0	-
+23		len	0	385024	-
+24		version	0	0	-
+25		version	0	0	-
+26		len	0	385024	-
+27		version	0	0	-
+28		version	0	0	-
+29	5	read	0	512	index-or-range
+30		version	0	0	-
+31		version	0	0	-
+32	6	read	380928	3072	index-or-range
+33		version	0	0	-
+34		version	0	0	-
+35	7	read	384000	1024	index-or-range
+36		version	0	0	-
+37		version	0	0	-
+38		len	0	385024	-
+39		version	0	0	-
+40		version	0	0	-
+41		len	0	385024	-
+42		version	0	0	-
+43		version	0	0	-
+44	8	read	0	385024	scan-chunk
+45		version	0	0	-
+46		version	0	0	-
+47		len	0	385024	-
+48		version	0	0	-
+49		version	0	0	-
+50		len	0	385024	-
+# read_calls=8
+# scan_chunks=2 chunks_per_scan=1
+# complete_scans=2

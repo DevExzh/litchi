@@ -1,5 +1,49 @@
 # Performance program phase report
 
+## 0644 — one scan per identity call, where the caller owns the bracket
+
+No crate file changed; `git diff --name-only c7326f680 -- crates/` is empty and
+`crates/` is byte-identical to the shared before checkout. The design is: an
+empty-splice-only identity entry point in `litchi-cfb` that performs the
+planning scan and the composed reopen and returns the digest **without** the
+confirming scan, applied inside DOC `ensure_current` — where the two calls
+already bracket each other and no index parse follows a reduced one — but not to
+the DOC open and not to PPT, plus dropping the DOC open's third identity call. Evidence
+is deterministic first. The read trace gives 6.00 complete scans for DOC `open`
+(30 reads on `documentProperties.doc`, 46 on `picture.doc`) and 2.00 for PPT
+`open` (8 reads). Change-under-read sweeps place a held mutation after every
+read ordinal on three witness placements: on DOC `open` triggers 0–4 return
+`OK` (the mutation precedes the identity capture), 5–29 are refused with
+`Overlay(SourceFingerprintChanged)` and trigger 30 returns `OK` as the trailing
+control; over `open` plus `paragraph(0)` the run takes 59 reads and every
+trigger from 30 to 58 is refused with the same variant by `ensure_current`,
+which is the fence that receives the six relocated ordinals. Two flip-then-revert
+witnesses, run on each of the two calls a variant might reduce, bound the one
+detection the primitive change gives up from both sides: flipping after the
+call's planning scan and reverting after its confirming scan is refused today
+and leaves the artifact byte-identical, while reverting **one read earlier** is
+already accepted today — on the open's first call (r5/r10 against r5/r9) and on
+the first `ensure_current`'s, which is the one the adopted design reduces
+(r31/r36 against r31/r35). Native `perf stat -r 3` isolation pairs over the 8 admitted
+`.doc` and all 30 `.ppt` fixtures fit `206,301 + 12.979 × bytes` for DOC (6
+scans; residual median +0.00%, −0.94%…+0.85%) and `68,254 + 4.3487 × bytes` for
+PPT (2 scans), by OLS with residuals (predicted−measured)/measured of −0.26%
+and −0.66% at the median, giving **2.1633** and **2.1743** cycles per byte per
+scan — agreeing to 0.51%, and reproducing change 0609's fitted 12.90 per byte to
+within 0.6% and change 0589's measured 2.048 to within 5.6%. A two-point
+interpolation through each format's smallest and largest fixture gives 2.1632
+and 2.1704, which is the linearity check. The predicted after-values are a
+median **−12.7%** of the open (−12.5% to −33.0%, which is Option C's saving
+alone because Option B does not touch the open), and a further
+`2 × 2.16331 × bytes` per paragraph read, against an A/A floor of median −0.15%,
+p95 1.84% over 38 cells. Two variants that do reduce the open are priced at
+−19.9% and −26.5% and not recommended. **PPT is predicted to change by
+zero**, because the primitive is not admissible there. No claim-registry entry;
+`performance_claim: none`, and the savings are modelled from a measured constant
+because no after leg exists.
+[Change and limitations](0644-ole2-snapshot-fence-design.md);
+[evidence](results/change-0644/README.md).
+
 ## 0648 — one read for the string table, measured on two source kinds and four instruments
 
 `SharedStringResolver` — change 0585's per-scan state — now retains the
