@@ -1,0 +1,30 @@
+# Change 0642: where the cold whole-sheet `cells` +0.203% goes
+#
+# callgrind_annotate --threshold=99.9 over the N=3 profiles of the cold
+# `cells` isolation pair, before minus after, worktree path prefixes
+# normalized so the same symbol matches in both legs. Values are over three
+# whole-sheet reads of 65,536 cells; divide by three for one read.
+#
+# Per read the pair differs by +2,907,323 instructions (+0.203%).
+
+ delta (3 reads)  symbol
+     -10,027,368  crates/litchi-xlsx/src/workbook/source.rs:litchi_xlsx::workbook::source::SourceWorksheet::stream_cells
+     +10,027,221  crates/litchi-xlsx/src/workbook/source.rs:litchi_xlsx::workbook::source::SourceWorksheet::cells
+      +8,306,268  PROGRAM TOTALS
+      +5,511,342  events annotated
+      +3,932,160  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:core::ptr::drop_in_place<litchi_xlsx::cell::Cell>
+      -3,538,944  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:core::ptr::drop_in_place<litchi_xlsx::workbook::source::SourceCell>
+      +3,348,576  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:quick_xml::reader::Reader<R>::read_event_impl
+      +2,752,524  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_xlsx::workbook::source::SourceWorksheet::cells
+      -2,752,512  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:alloc::vec::Vec<T,A>::push_mut
+      +2,556,255  crates/litchi-xlsx/src/workbook/source.rs:litchi_xlsx::workbook::source::SourceWorksheet::select_cells
+      +2,359,296  shared_text: Option<&[(usize, Text)]>,
+      +2,162,688  values.push(resolve_selected_record(record, shared_text.as_deref())?);
+      -2,162,688  let cell = match (record.cell, record.shared_string_index) {
+      -2,162,688  values.push(SourceCell {
+      +1,966,113  for record in cells {
+      -1,966,098  for record in selected.cells {
+      +1,966,080  ) -> Result<SourceCell> {
+      -1,966,080  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:alloc::vec::Vec<T,A>::push_mut
+      +1,772,649  }
+      +1,769,481  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_xlsx::workbook::source::SourceWorksheet::cells

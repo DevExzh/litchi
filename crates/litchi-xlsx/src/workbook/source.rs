@@ -756,20 +756,35 @@ impl SourceWorksheet {
     /// source and may outlive this worksheet handle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Vec<SourceCell>> {
         let range = area.into().resolve()?;
-        let values =
-            if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet {
-                self.eager_cells(range)
-            } else {
-                self.stream_cells(range)
-            };
+        let values = self
+            .select_cells(range)
+            .and_then(|selection| match selection {
+                Selection::Stored(store) => collect_stored_cells(store, range),
+                Selection::Selected { cells, shared_text } => {
+                    let mut values = Vec::new();
+                    values
+                        .try_reserve_exact(cells.len())
+                        .map_err(|source| allocation("source-backed selected cells", source))?;
+                    for record in cells {
+                        values.push(resolve_selected_record(record, shared_text.as_deref())?);
+                    }
+                    Ok(values)
+                },
+            });
         self.finish_result(values)
     }
 
     /// Visit every stored cell selected by a checked range.
     ///
-    /// The range is first read into the same verified owning values returned by
-    /// [`Self::cells`]. Callbacks then receive references into that local
-    /// vector, so no callback runs while a source reader is active.
+    /// The range takes the same route, the same fences and the same verified
+    /// values as [`Self::cells`], but each selected cell is produced as it is
+    /// visited instead of after a whole-range vector of owning cells has been
+    /// built. Callbacks still receive references into local values, so no
+    /// callback runs while a source reader is active: the bounded selected
+    /// scan reaches worksheet EOF, resolves its shared-string and style
+    /// dependencies and validates every retained record before the first
+    /// callback, so every refusal [`Self::cells`] raises for this range is
+    /// still raised before any cell is visited.
     ///
     /// Cancellation is checked before each callback. Final source and
     /// execution fences run even when a callback fails, so a source mutation
@@ -778,51 +793,106 @@ impl SourceWorksheet {
     where
         F: FnMut(Address, &Cell) -> Result<()>,
     {
-        let values = match self.cells(area) {
-            Ok(values) => values,
+        let range = match area.into().resolve() {
+            Ok(range) => range,
+            Err(error) => return self.finish_result(Err(error.into())),
+        };
+        // `cells` publishes its values through `finish_result` before any
+        // caller can observe them; keep that fence ahead of the first visit.
+        let selection = match self.finish_result(self.select_cells(range)) {
+            Ok(selection) => selection,
             Err(error) => return self.finish_result(Err(error)),
         };
         let mut visited = 0usize;
         let mut result = Ok(());
-        for source_cell in &values {
-            if let Err(error) = self.owner.execution_check() {
-                result = Err(error);
-                break;
-            }
-            if let Err(error) = visit(source_cell.address, &source_cell.cell) {
-                result = Err(error);
-                break;
-            }
-            match visited.checked_add(1) {
-                Some(count) => visited = count,
-                None => {
-                    result = Err(invalid("source-backed cell visit count overflow"));
-                    break;
-                },
-            }
+        match selection {
+            Selection::Stored(store) => {
+                for (address, cell) in store.cells(range) {
+                    if !self.visit_one(&mut visit, address, cell, &mut visited, &mut result) {
+                        break;
+                    }
+                }
+            },
+            Selection::Selected { cells, shared_text } => {
+                for record in cells {
+                    let source_cell = match resolve_selected_record(record, shared_text.as_deref())
+                    {
+                        Ok(source_cell) => source_cell,
+                        Err(error) => {
+                            result = Err(error);
+                            break;
+                        },
+                    };
+                    if !self.visit_one(
+                        &mut visit,
+                        source_cell.address,
+                        &source_cell.cell,
+                        &mut visited,
+                        &mut result,
+                    ) {
+                        break;
+                    }
+                }
+            },
         }
         self.finish_result(result.map(|()| visited))
     }
 
-    fn eager_cells(&self, range: Rect) -> Result<Vec<SourceCell>> {
-        let mut values = Vec::new();
-        for (address, cell) in self.store()?.cells(range) {
-            values
-                .try_reserve(1)
-                .map_err(|source| allocation("source-backed selected cells", source))?;
-            values.push(SourceCell {
-                address,
-                cell: cell.clone(),
-            });
+    /// Hand one produced cell to a range visitor.
+    ///
+    /// Cancellation is checked before the callback and the visited count is
+    /// bounded. `false` stops the walk, with `result` carrying the primary
+    /// error.
+    fn visit_one<F>(
+        &self,
+        visit: &mut F,
+        address: Address,
+        cell: &Cell,
+        visited: &mut usize,
+        result: &mut Result<()>,
+    ) -> bool
+    where
+        F: FnMut(Address, &Cell) -> Result<()>,
+    {
+        if let Err(error) = self.owner.execution_check() {
+            *result = Err(error);
+            return false;
         }
-        Ok(values)
+        if let Err(error) = visit(address, cell) {
+            *result = Err(error);
+            return false;
+        }
+        match visited.checked_add(1) {
+            Some(count) => {
+                *visited = count;
+                true
+            },
+            None => {
+                *result = Err(invalid("source-backed cell visit count overflow"));
+                false
+            },
+        }
+    }
+
+    /// Choose the route one checked range read takes and finish every step
+    /// that reads the source.
+    ///
+    /// Nothing in the returned selection holds a source reader, so a caller
+    /// may convert and publish its records one at a time. Every refusal that a
+    /// whole-range read of this rectangle can raise has already been raised
+    /// when this returns.
+    fn select_cells(&self, range: Rect) -> Result<Selection<'_>> {
+        if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet {
+            return Ok(Selection::Stored(self.store()?));
+        }
+        self.stream_selection(range)
     }
 
     #[expect(
         clippy::result_large_err,
         reason = "The selected stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
     )]
-    fn stream_cells(&self, range: Rect) -> Result<Vec<SourceCell>> {
+    fn stream_selection(&self, range: Rect) -> Result<Selection<'_>> {
         self.owner.execution_check()?;
         let outcome = {
             let part = self.owner.package.part(&self.data.part_uri)?;
@@ -846,7 +916,7 @@ impl SourceWorksheet {
             }
         };
         let Some(outcome) = outcome else {
-            return self.eager_cells(range);
+            return Ok(Selection::Stored(self.store()?));
         };
         let selected = match outcome {
             raw::selected_worksheet::RangeScanOutcome::Eligible(selected) => selected,
@@ -855,7 +925,7 @@ impl SourceWorksheet {
                 // materialized fallback can inspect the source again.
                 self.owner.package.source_version()?;
                 self.owner.execution_check()?;
-                return self.eager_cells(range);
+                return Ok(Selection::Stored(self.store()?));
             },
         };
 
@@ -930,32 +1000,17 @@ impl SourceWorksheet {
         self.owner.package.source_version()?;
         self.owner.execution_check()?;
         if fallback {
-            return self.eager_cells(range);
+            return Ok(Selection::Stored(self.store()?));
         }
 
-        let mut values = Vec::new();
-        values
-            .try_reserve_exact(selected.cells.len())
-            .map_err(|source| allocation("source-backed selected cells", source))?;
-        for record in selected.cells {
-            let cell = match (record.cell, record.shared_string_index) {
-                (Some(cell), None) => cell,
-                (None, Some(index)) => {
-                    let index = usize::try_from(index)
-                        .map_err(|_error| invalid("shared-string index exceeds this platform"))?;
-                    let text = shared_text
-                        .as_ref()
-                        .and_then(|text| {
-                            text.binary_search_by_key(&index, |(candidate, _)| *candidate)
-                                .ok()
-                                .and_then(|position| text.get(position))
-                        })
-                        .map(|(_, text)| text.clone())
-                        .ok_or_else(|| {
-                            invalid("selected shared-string dependency was not retained")
-                        })?;
-                    Cell::Value(Value::Text(text))
-                },
+        // Refuse a malformed retained record here, where the whole-range read
+        // refused it, rather than part-way through a caller's visit. The two
+        // refusals below are defensive: the scanner retains a record through
+        // one constructor whose only two call sites set exactly one of the
+        // two fields, so neither shape is reachable from a valid scan.
+        for record in &selected.cells {
+            match (&record.cell, record.shared_string_index) {
+                (Some(_), None) | (None, Some(_)) => {},
                 (Some(_), Some(_)) => {
                     return Err(invalid(
                         "selected worksheet record has both a semantic cell and shared-string dependency",
@@ -966,13 +1021,12 @@ impl SourceWorksheet {
                         "selected worksheet record has neither a semantic cell nor dependency",
                     ));
                 },
-            };
-            values.push(SourceCell {
-                address: record.address,
-                cell,
-            });
+            }
         }
-        Ok(values)
+        Ok(Selection::Selected {
+            cells: selected.cells,
+            shared_text,
+        })
     }
 
     fn finish_result<T>(&self, result: Result<T>) -> Result<T> {
@@ -1032,6 +1086,86 @@ impl SourceWorksheet {
             invalid("source-backed worksheet cache initialization did not publish a value")
         })
     }
+}
+
+/// Route one checked source-backed range read takes once every source read
+/// it needs is complete.
+///
+/// Neither variant holds a source reader, so a caller may publish its cells
+/// one at a time without a callback observing the source mid-read.
+enum Selection<'a> {
+    /// The materialized worksheet store is authoritative for this read.
+    Stored(&'a Store),
+    /// Physical records retained by the bounded selected scan, in source
+    /// order, with the shared-string payloads they depend on resolved and
+    /// every record validated.
+    Selected {
+        cells: Vec<raw::selected_worksheet::SelectedRecord>,
+        shared_text: Option<Vec<(usize, Text)>>,
+    },
+}
+
+/// Copy every stored cell of a checked range out of a materialized store.
+fn collect_stored_cells(store: &Store, range: Rect) -> Result<Vec<SourceCell>> {
+    let mut values = Vec::new();
+    for (address, cell) in store.cells(range) {
+        values
+            .try_reserve(1)
+            .map_err(|source| allocation("source-backed selected cells", source))?;
+        values.push(SourceCell {
+            address,
+            cell: cell.clone(),
+        });
+    }
+    Ok(values)
+}
+
+/// Bind one retained selected record to its resolved shared-string payload.
+///
+/// `stream_selection` has already refused every record shape this cannot
+/// resolve, so the refusals below are defensive and unreachable from a valid
+/// scan; they are kept so that no record can be published unchecked.
+///
+/// Always inlined: the record and the produced cell are both larger than a
+/// register pair, so an out-of-line call copies each of them through the stack
+/// once per cell. Change 0642 measured the out-of-line form at 688,015 more
+/// instructions over a 65,536-cell range — about 10.5 per cell — on the pinned
+/// toolchain.
+#[inline(always)]
+fn resolve_selected_record(
+    record: raw::selected_worksheet::SelectedRecord,
+    shared_text: Option<&[(usize, Text)]>,
+) -> Result<SourceCell> {
+    let cell = match (record.cell, record.shared_string_index) {
+        (Some(cell), None) => cell,
+        (None, Some(index)) => {
+            let index = usize::try_from(index)
+                .map_err(|_error| invalid("shared-string index exceeds this platform"))?;
+            let text = shared_text
+                .and_then(|text| {
+                    text.binary_search_by_key(&index, |(candidate, _)| *candidate)
+                        .ok()
+                        .and_then(|position| text.get(position))
+                })
+                .map(|(_, text)| text.clone())
+                .ok_or_else(|| invalid("selected shared-string dependency was not retained"))?;
+            Cell::Value(Value::Text(text))
+        },
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                "selected worksheet record has both a semantic cell and shared-string dependency",
+            ));
+        },
+        (None, None) => {
+            return Err(invalid(
+                "selected worksheet record has neither a semantic cell nor dependency",
+            ));
+        },
+    };
+    Ok(SourceCell {
+        address: record.address,
+        cell,
+    })
 }
 
 fn selected_stream_limits(declared: u64) -> Option<StreamLimits> {
@@ -3774,6 +3908,161 @@ mod tests {
                 r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c></row></sheetData>"#,
             );
             assert_fallback_parity(&numeric_with_late_date, None, &eager_numeric, &["A1"]);
+        }
+    }
+
+    /// `visit_cells` streams its cells instead of materializing the range.
+    ///
+    /// Change 0642 stopped building a whole-range `Vec<SourceCell>` before the
+    /// first callback. These tests pin what that must not change: the visited
+    /// sequence on both routes, and the rule that a refusal the whole-range
+    /// read raises still arrives before any cell is visited, including a
+    /// refusal that the worksheet raises after the requested rectangle.
+    mod streaming_0642_tests {
+        use std::sync::Arc;
+
+        use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings};
+        use super::{CountingSource, SourceBackedWorkbook};
+        use crate::Cell;
+
+        const SPREADSHEETML_NAMESPACE: &str =
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+        fn worksheet_xml(sheet_data: &str) -> String {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}-->{sheet_data}</worksheet>"#,
+            )
+        }
+
+        fn source_workbook(
+            worksheet: &str,
+            shared_strings: Option<&str>,
+        ) -> (Arc<CountingSource>, SourceBackedWorkbook) {
+            let source = Arc::new(CountingSource::new(dependency_xlsx(
+                worksheet,
+                shared_strings,
+                None,
+            )));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            (source, workbook)
+        }
+
+        fn stored_fixture() -> String {
+            worksheet_xml(
+                r#"<sheetData>
+                    <row r="1"><c r="A1"><v>7</v></c><c r="C1"/></row>
+                    <row r="2"><c r="B2" t="s"><v>0</v></c></row>
+                    <row r="4"><c r="A4"><v>9</v></c></row>
+                </sheetData>"#,
+            )
+        }
+
+        fn visited(workbook: &SourceBackedWorkbook, warm: bool) -> (usize, Vec<(String, Cell)>) {
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            if warm {
+                sheet.stored_extent().unwrap();
+                assert!(sheet.data.cells.get().is_some());
+            }
+            let mut cells = Vec::new();
+            let count = sheet
+                .visit_cells("A1:D4", |address, cell| {
+                    cells.push((address.a1(), cell.clone()));
+                    Ok(())
+                })
+                .unwrap();
+            (count, cells)
+        }
+
+        #[test]
+        fn visit_cells_0642_matches_cells_on_both_routes() {
+            let fixture = stored_fixture();
+            let strings = plain_shared_strings(&["shared"]);
+
+            let (_source, workbook) = source_workbook(&fixture, Some(&strings));
+            let expected = workbook
+                .sheet("Sheet1")
+                .unwrap()
+                .unwrap()
+                .cells("A1:D4")
+                .unwrap()
+                .into_iter()
+                .map(|cell| (cell.address.a1(), cell.cell))
+                .collect::<Vec<_>>();
+            assert_eq!(expected.len(), 4);
+
+            let (_source, workbook) = source_workbook(&fixture, Some(&strings));
+            let (cold_count, cold) = visited(&workbook, false);
+            assert_eq!(cold_count, expected.len());
+            assert_eq!(cold, expected);
+
+            let (_source, workbook) = source_workbook(&fixture, Some(&strings));
+            let (warm_count, warm) = visited(&workbook, true);
+            assert_eq!(warm_count, expected.len());
+            assert_eq!(warm, expected);
+        }
+
+        /// A worksheet that refuses after the requested rectangle must refuse
+        /// before the first callback, exactly as the whole-range read does.
+        #[test]
+        fn visit_cells_0642_refuses_a_later_row_before_any_visit() {
+            let fixture = worksheet_xml(
+                r#"<sheetData>
+                    <row r="1"><c r="A1"><v>7</v></c></row>
+                    <row r="9"><c r="A9" t="inlineStr"><is><t>x</t></is><v>3</v></c></row>
+                </sheetData>"#,
+            );
+
+            let (_source, workbook) = source_workbook(&fixture, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let whole_range = sheet.cells("A1:A2").unwrap_err().to_string();
+            assert!(
+                whole_range.contains("both inline text and a value"),
+                "unexpected refusal: {whole_range}"
+            );
+
+            let (_source, workbook) = source_workbook(&fixture, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let mut callbacks = 0usize;
+            let streamed = sheet
+                .visit_cells("A1:A2", |_address, _cell| {
+                    callbacks += 1;
+                    Ok(())
+                })
+                .unwrap_err()
+                .to_string();
+
+            assert_eq!(callbacks, 0);
+            assert_eq!(streamed, whole_range);
+        }
+
+        /// The stored route counts and stops exactly like the streamed one.
+        #[test]
+        fn visit_cells_0642_stops_on_the_stored_route_at_the_failing_cell() {
+            let strings = plain_shared_strings(&["shared"]);
+            let (_source, workbook) = source_workbook(&stored_fixture(), Some(&strings));
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            sheet.stored_extent().unwrap();
+            assert!(sheet.data.cells.get().is_some());
+
+            let mut callbacks = 0usize;
+            let error = sheet
+                .visit_cells("A1:D4", |_address, _cell| {
+                    callbacks += 1;
+                    if callbacks == 3 {
+                        return Err(crate::error::invalid("streaming_0642 callback: stop"));
+                    }
+                    Ok(())
+                })
+                .unwrap_err()
+                .to_string();
+
+            assert_eq!(callbacks, 3);
+            assert!(
+                error.contains("streaming_0642 callback: stop"),
+                "unexpected refusal: {error}"
+            );
         }
     }
 }

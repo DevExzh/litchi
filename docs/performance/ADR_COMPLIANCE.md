@@ -1,5 +1,41 @@
 # Performance optimization ADR-compliance matrix
 
+## 0642 — no boundary moved, and the one that could have was left alone
+
+Record: [0642](0642-xlsx-visit-cells-streaming.md).
+
+ADR 0003 makes borrowed views the fine-traversal idiom and requires conversion
+to owned storage to be explicit; ADR 0005 makes semantic payloads lazy behind
+caches whose behaviour is semantically invisible; ADR 0006 makes `Preserve` the
+default and forbids trading a refusal for a partial result. This change is
+compliant on all three, and the interesting part is the third. `visit_cells`'s
+documented promise is that "no callback runs while a source reader is active",
+and it kept that promise the blunt way, by reading the whole range into an owned
+vector first. It now keeps it precisely: the private `Selection` it walks holds
+either a borrowed reference to the already-published worksheet store or records
+the bounded scan produced after `with_verified_decoded_reader` returned and the
+dependency readers were released, so neither variant can be alive while a reader
+is. The `finish_result` fence that published the old vector now publishes the
+selection, in the same place, so a source mutation or a cancellation still
+outranks a callback's own error; cancellation is still checked before every
+callback. **The ADR 0006 boundary that could have moved did not.** The bounded
+scan still reaches worksheet EOF before anything is published, so a malformed
+row *after* the requested rectangle still refuses before the first visit — and a
+new pass validates every retained record before that visit too, so the guarantee
+is structural rather than a reachability argument. Nothing was relaxed: the same
+`StreamLimits`, the same `Capabilities`, the same `selected_stream_limits`
+ceiling, the same four dependency-fallback conditions, the same
+`validate_styles`, the same `invalid(...)` texts in the same order. On ADR 0003,
+the visitor now hands the store's own `&Cell` to the callback on the stored
+route, which is the borrowed-view rule applied where it was previously
+side-stepped, while `cells` remains the explicit owning conversion and returns
+the identical vector. No public API, error type, limit, defence or output byte
+changed; no new `unsafe`; no new dependency; no ambient I/O; no executor. The
+compliance statement to carry forward is the one the change declined to make:
+letting `scan_range` yield to the callback would relocate a typed refusal past a
+partial result and is therefore an ADR 0006 change, not an optimization, and it
+needs a frozen design record before anyone implements it.
+
 ## 0640 — ADR 0006's reader/writer division applied to a redundant MS-DOC annotation
 
 Record: [0640](0640-doc-field-table-flag-refusals.md).

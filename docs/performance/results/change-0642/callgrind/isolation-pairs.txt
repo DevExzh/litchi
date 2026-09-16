@@ -1,0 +1,33 @@
+# Change 0642 callgrind isolation pairs
+# valgrind 3.26.0, --tool=callgrind --cache-sim=no --branch-sim=no, taskset -c 17,
+# rustc 1.95.0, release. Columns: scenario, leg, samples N, whole-run instruction total.
+# Per-operation cost = (total at N_hi - total at N_lo) / (N_hi - N_lo).
+
+warm-dense	before	2	totals: 644274964
+warm-dense	before	6	totals: 807462383
+warm-poi	before	2	totals: 1666890379
+warm-poi	before	6	totals: 1734185676
+cold-visit-dense	before	1	totals: 1434647938
+cold-visit-dense	before	3	totals: 4304854240
+cold-cells-dense	before	1	totals: 1431239539
+cold-cells-dense	before	3	totals: 4294574325
+warm-dense	after	2	totals: 577952635
+warm-dense	after	6	totals: 607887799
+warm-poi	after	2	totals: 1650990979
+warm-poi	after	6	totals: 1686707156
+cold-visit-dense	after	1	totals: 1437073458
+cold-visit-dense	after	3	totals: 4312611344
+cold-cells-dense	after	1	totals: 1433731162
+cold-cells-dense	after	3	totals: 4302880593
+harness	before	1	totals: 10795222465
+harness	before	3	totals: 16304741056
+harness	after	1	totals: 10803789640
+harness	after	3	totals: 16297153670
+
+# derived
+scenario              M            before             after     delta  before/cell  after/cell
+warm-dense            4        40,796,855         7,483,791  -81.656%        622.5       114.2
+warm-poi              4        16,823,824         8,929,044  -46.926%        222.0       117.8
+cold-visit-dense      2     1,435,103,151     1,437,768,943   +0.186%      21897.9     21938.6
+cold-cells-dense      2     1,431,667,393     1,434,574,716   +0.203%      21845.5     21889.9
+harness               2     2,754,759,296     2,746,682,015   -0.293%                         

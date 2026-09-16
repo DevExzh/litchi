@@ -1,0 +1,32 @@
+# Change 0642: whether `resolve_selected_record` should carry `#[inline(always)]`
+#
+# The conversion arms of the former `stream_cells` became one helper shared by
+# `cells` and `visit_cells`. The helper takes a ~96-byte `SelectedRecord` by
+# value and returns a `Result<SourceCell, Error>` whose Err variant is large
+# enough for clippy's `result_large_err`, so an out-of-line call copies both
+# through the stack once per cell.
+#
+# Measured on the pinned toolchain (rustc 1.95.0), callgrind isolation pairs,
+# --cache-sim=no --branch-sim=no, taskset -c 17, dense-wide-probe Sheet1
+# (65,536 cells). Whole-run totals; per-operation cost is (N=3 - N=1) / 2.
+
+cold whole-sheet `cells`, dense-wide-probe
+  before (no helper at all)          N=1 1,431,239,539   N=3 4,294,574,325   ->  1,431,667,393
+  after, #[inline(always)]           N=1 1,433,731,162   N=3 4,302,880,593   ->  1,434,574,716   +0.203%
+  after, no inline attribute         N=1 1,434,579,755   N=3 4,305,105,216   ->  1,435,262,731   +0.251%
+
+  `#[inline(always)]` is worth 688,015 instructions per whole-sheet read of
+  65,536 records, about 10.5 per record, or 0.048 percentage points. Kept.
+
+warm whole-sheet visit, dense-wide-probe (stored route; does not call the helper)
+  after, #[inline(always)]           N=2   577,952,635   N=6   607,887,799   ->      7,483,791
+  after, no inline attribute         N=2   577,955,741   N=6   607,890,811   ->      7,483,768
+
+  A 23-instruction difference over 65,536 cells confirms the stored route does
+  not reach the helper, as expected.
+
+# The "no inline attribute" binary was built from the same source with only the
+# `#[inline(always)]` line deleted (its doc comment was reworded afterwards to
+# cite the measurement above; comments do not reach codegen). The "before"
+# figures are the shared read-only base checkout, which has no helper at all:
+# the conversion arms sat inline in `stream_cells`.

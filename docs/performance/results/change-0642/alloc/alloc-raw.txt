@@ -1,0 +1,34 @@
+# Change 0642 allocation counts
+#
+# xlsx0642_alloc MODE FILE SHEET, taskset -c 17, release, rustc 1.95.0.
+# One untimed warm-up whole-sheet visit runs before the measured window, so
+# lazily-initialized globals are not attributed. Counters are reset immediately
+# before the measured operation; peak_live_delta and retained_live_delta are
+# relative to the live bytes at that reset.
+#
+# Modes:
+#   visit       open a SourceBackedWorkbook and visit_cells the whole sheet
+#   cells       open a SourceBackedWorkbook and cells() the whole sheet
+#   visit-warm  publish the store with stored_extent() OUTSIDE the window,
+#               then visit_cells the whole sheet
+#   cells-warm  the same, with cells()
+#
+# The whole-sheet area is A1:XFD1048576, as in the harness's
+# xlsx_full_cell_scan selector.
+
+before	dense-wide-probe	visit	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=2234372	allocated_bytes=72410333	peak_live_delta=14615454	retained_live_delta=10072
+before	no_drawing_patriarch	visit	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=5570626	allocated_bytes=296248621	peak_live_delta=57025552	retained_live_delta=26033471
+before	dense-wide-probe	cells	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=2234372	allocated_bytes=72410333	peak_live_delta=14615454	retained_live_delta=5618520
+before	no_drawing_patriarch	cells	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=5570626	allocated_bytes=296248621	peak_live_delta=57025552	retained_live_delta=36519231
+before	dense-wide-probe	visit-warm	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=65551	allocated_bytes=5608448	peak_live_delta=5608448	retained_live_delta=0
+before	no_drawing_patriarch	visit-warm	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=16	allocated_bytes=10485760	peak_live_delta=10485760	retained_live_delta=0
+before	dense-wide-probe	cells-warm	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=65551	allocated_bytes=5608448	peak_live_delta=5608448	retained_live_delta=5608448
+before	no_drawing_patriarch	cells-warm	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=16	allocated_bytes=10485760	peak_live_delta=10485760	retained_live_delta=10485760
+after	dense-wide-probe	visit	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=2234371	allocated_bytes=67167453	peak_live_delta=14615454	retained_live_delta=10072
+after	no_drawing_patriarch	visit	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=5570610	allocated_bytes=285762861	peak_live_delta=57025552	retained_live_delta=26033471
+after	dense-wide-probe	cells	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=2234372	allocated_bytes=72410333	peak_live_delta=14615454	retained_live_delta=5618520
+after	no_drawing_patriarch	cells	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=5570626	allocated_bytes=296248621	peak_live_delta=57025552	retained_live_delta=36519231
+after	dense-wide-probe	visit-warm	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=0	allocated_bytes=0	peak_live_delta=0	retained_live_delta=0
+after	no_drawing_patriarch	visit-warm	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=0	allocated_bytes=0	peak_live_delta=0	retained_live_delta=0
+after	dense-wide-probe	cells-warm	/home/zhuhe/code/litchi-worktrees/0642-stage/dense-wide-probe.xlsx	Sheet1	visited=65536	allocations=65551	allocated_bytes=5608448	peak_live_delta=5608448	retained_live_delta=5608448
+after	no_drawing_patriarch	cells-warm	/home/zhuhe/code/litchi-worktrees/0642/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	Лист 1	visited=75770	allocations=16	allocated_bytes=10485760	peak_live_delta=10485760	retained_live_delta=10485760

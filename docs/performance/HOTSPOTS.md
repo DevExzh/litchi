@@ -1,5 +1,44 @@
 # Performance hotspot inventory
 
+## 0642 — the XLSX range visitor stops building the range; XLSX-7 closed
+
+Record: [0642](0642-xlsx-visit-cells-streaming.md).
+
+**XLSX-7 is closed, and the `visit_cells` line in the 0587 XLSX section is now
+wrong in the right direction.** The survey said the source-backed visitor "is
+documented as a visitor but materializes the whole range first", modelling the
+vector at over 5.2 MB for 65,536 cells. It did: `visit_cells` called `cells`,
+took the `Vec<SourceCell>` (80 bytes each), and iterated it — and on the
+materialized-store route it also cloned every `Cell` out of the store to build
+that vector, only to hand the caller a reference to the copy. The route decision
+and every source read now live in a private `select_cells` returning a private
+`Selection`, which `cells` converts into exactly the vector it returned before
+and `visit_cells` walks one cell at a time. **A whole-sheet walk over a
+materialized store is now allocation-free**: 65,551 allocation calls,
+5,608,448 allocated bytes and 5,608,448 peak live bytes fall to **zero** on a
+2×256×256 integer probe workbook, and 16 calls with 10,485,760 bytes fall to
+**zero** on `no_drawing_patriarch.xlsx`'s 75,770-cell worksheet. Instructions for
+that walk fall **81.66%** (622.5 → 114.2 per cell) and **46.93%** (222.0 → 117.8
+per cell); paired timing puts it at **+83.5% to +83.9%** and **+75.3% to +78.3%**
+of p50 in both directions across two windows, against A/A floors of at most 3.9%
+— 6.1× and 4.1–4.6× faster. The two corpora remove different things, which is the
+useful part for ranking what remains: the dense probe's numeric cells cost one
+`Box<str>` clone each (65,536 of its 65,551 calls), while the POI worksheet's
+shared-string cells clone an `Arc` for free and all sixteen calls were the
+vector's own geometric growth to a 131,072-slot capacity — a **42%
+over-allocation that `cells` still pays**, because `collect_stored_cells` keeps
+the original `try_reserve(1)` loop. Two things this does **not** move. A cold
+whole-sheet read loses 5,242,880 bytes (exactly 80 × 65,536) on the scan route
+and 10,485,760 on the stored route but its **peak live bytes do not change at
+all**, because the peak is set by the worksheet payload plus the scan's own
+record vector, or by the eager parse, before the removed vector is allocated; and
+that cold read costs **+0.19% to +0.20% more instructions**, 29% of it the new
+record-validation pass. The next item in this area is therefore the scan's own
+`Vec<SelectedRecord>`, which is what still sets the cold peak — and it is a
+contract change, not a refactor: making `scan_range` yield would move refusals
+after the first visit, so it needs a frozen design record first. OLE2/OOXML
+remain the active priority; ODF stays deferred and iWork excluded.
+
 ## 0640 — defect 4 of the 0587 survey, settled: two field-table refusals removed, five stylesheet refusals confirmed correct
 
 Not a hotspot: change [0587](0587-remaining-opportunity-survey.md)'s correctness defect 4 listed seven `.doc` fixtures the eager facade route refuses and asked whether each refusal is correct. It is now answered for all seven, against the fixture bytes. **Two are defects and are removed.** `grffldEnd.fHasSep` and `grffldEnd.fNested` (MS-DOC 2.9.88–2.9.90) restate what the `FieldList` grammar of the `Plcfld` (MS-DOC 2.8.25) already fixes — the reader derives `separator_cp` from the separator marker it actually saw and `nesting_depth` from how many fields are still open, and never consults either bit — so a disagreement is evidence about the producer, not about the fields, while costing the caller the whole document. The bytes say both files are intact: `ole/doc/watermark.doc` is one `TOC` field (`flt` 0x0D) containing five `HYPERLINK` fields (`flt` 0x58), balanced, CPs strictly increasing, every inner end marker `grffldEnd = 0x80` — `fHasSep` correct, `fNested` clear although nested one level in; `poi/test-data/document/test.doc` is one ` SEQ CHAPTER \h \r 1` field with no separator marker *and no separator character between begin and end*, whose end marker nevertheless sets `fHasSep`, which is exactly what `\h` (hide result) calls for. Over the whole 57-fixture corpus, an independent walk of every `Plcfld` straight from the Table stream counts **98 field end markers** and finds `fNested` set on **none** of them, including the only **five** that are genuinely nested; `fHasSep` tracks the structure on **97 of 98**. **Five are correct and unchanged**: `duplicate-style-names`, `footnote`, `lists-margins`, `picture` and `pictures_escher` all duplicate `"Absatz-Standardschriftart"` across `istd` 10 (the fixed-index `sti` 65 built-in) and `istd` 15 (a user character style), which MS-DOC 2.9 forbids — and **0587's open question has a clean answer: `OpenOptions::with_leniency(Leniency::TolerateStylesheetDefects)` already admits all five on the unmodified base**, each reporting exactly one `DuplicateStyleName` at style index 15 and nothing else. The measurement blocker 0587 hoped to lift is **not** lifted: removing the two refusals admits no fixture, because each witness reaches a further refusal instead — `watermark.doc` on `bookmark ibkl values must be unique and in range`, `poi/.../test.doc` on `malformed SPRM sequence: truncated SPRM opcode at byte 3`. The removal is not free and the record says what it gives up: a disagreement can still indicate a dropped separator marker or a lost enclosing begin/end pair, which the grammar does not see, and the reader can no longer tell that apart from a stale annotation — what remains is a field whose result text is reported inside `code_range()`, with `end_flags` still carrying the producer's contradicting claim. Both unmasked refusals are decoded in [`follow-ups.md`](results/change-0640/follow-ups.md) with a provisional reading that each is *also* stricter than the format, and both are **queued, not decided**. The DOC corpus still admits 42 of 57 through the eager route and 44 would need those two. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0640-doc-field-table-flag-refusals.md); [retained evidence](results/change-0640/README.md).
