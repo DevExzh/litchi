@@ -1,0 +1,35 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0652",
+  "title": "the owner's decisions for the third wave: ten blocked rows unblocked, two ADRs accepted, three standing trade-offs recorded",
+  "decision": "decision record retained; ADR 0030 and ADR 0031 accepted; no production change of its own",
+  "code_state": "this record modifies only documentation: the record, its packet, the status lines of docs/adr/0030 and docs/adr/0031, and the ADR index",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the first ten rows of change 0651's queue each waited on a human decision; the owner gave all ten on 2026-09-16 together with three standing trade-offs (breaking changes acceptable in early alpha; correctness and safety over performance; most inputs benign)",
+    "each decision is quoted verbatim, mapped to the record that priced it, and paired with what the implementing record must still prove, so that the authorization is exact rather than general",
+    "proposed ADRs 0030 (lazy OPC part decode) and 0031 (execution-context budgets) become Accepted by decisions 3 and 6; the programme's rule that no code cites a proposed ADR is unchanged, the two records simply stop being proposed"
+  ],
+  "accepted_evidence": {
+    "owner_decisions": "given in the session of 2026-09-16 after the second wave closed; quoted verbatim in the record",
+    "pricing": "the frozen designs and measurements the decisions unblock: 0588/0649, 0528/0602/0616, 0610/0581, 0645/0590, 0646/0598, 0624/0615, 0602/0603/0601, 0597, 0644/0589, 0591/0617"
+  },
+  "accepted_costs": {
+    "contracts_move": "decisions 2, 4, 8, 9 and 10 move contracts (an audit, a durable patch format, the timing of a refusal, a fence's read count, two default policies); each implementing record must state the movement and prove the invariants the record lists",
+    "breaking_api": "decisions 1, 5 and 10 change public API; the crates are 0.0.x and the owner accepts breaking changes"
+  },
+  "known_gaps": {
+    "not_decided": "wave order and sizing, exact API shapes, default values; each implementing record decides and documents its own",
+    "adr_amendments": "ADR 0006 (original bytes) and ADR 0005 (retained state) are amended by the implementing records of decisions 2, 4 and 5, not by this record"
+  },
+  "withheld": [
+    "any performance figure: this record measures nothing"
+  ],
+  "provenance": {
+    "git_revision_before_this_record": "8fd8cb0bb",
+    "decided_on": "2026-09-16",
+    "note": "the first commit of the third wave; the wave's implementing records use its commit as their base"
+  }
+}

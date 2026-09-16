@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0652 — the owner's trade-offs read against the goal: nothing in the definition of done moves, the blocked rows do
+
+Record: [0652](0652-owner-decisions-for-the-third-wave.md). The three
+trade-offs restate `docs/GOAL.md`'s first rule (correctness, lossless
+preservation, bounded resources and safety over speed) and add two things the
+goal did not say: that public API may break while the crates are 0.0.x, and
+that the common path is the benign one, so a defence may move off it as long
+as the malicious minority is still refused with the same typed error before
+any partial result reaches a caller. No clause of the definition of done is
+weakened; ten rows that waited on a human move from "blocked" to "authorized",
+each with the invariants its implementing record must prove written beside
+the decision.
+
 ## 0651 — the second wave against the goal: unnecessary work removed on ten paths, three contracts priced instead of moved, three refusals corrected
 
 Record: [0651](0651-queue-refresh-after-the-second-wave.md). Against the

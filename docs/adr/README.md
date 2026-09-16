@@ -42,6 +42,8 @@ Office round trips.
 | [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
 | [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host |
 | [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
+| [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
+| [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains
@@ -58,10 +60,10 @@ table above. Nothing in the workspace may cite them as authority, and no code
 change is permitted on their basis, until a human accepts one and moves it into
 the table.
 
-| ADR | Proposal | Raised by |
-|---|---|---|
-| [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors | [change 0610](../performance/0610-opc-lazy-part-decode-design.md), satisfying gate 1 of [change 0581](../performance/0581-opc-package-retention.md) |
-| [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context | [change 0615](../performance/0615-execution-context-completeness-design.md), the ADR 0005 amendment [change 0587](../performance/0587-remaining-opportunity-survey.md) item CORE-3 named |
+No proposed record is outstanding. ADR 0030 and ADR 0031, proposed on
+2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
+[change 0652](../performance/0652-owner-decisions-for-the-third-wave.md) and
+now appear in the table above.
 
 ## Decision hierarchy
 

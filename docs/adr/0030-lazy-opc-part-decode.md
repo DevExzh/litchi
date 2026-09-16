@@ -1,8 +1,6 @@
 # ADR 0030: Lazy OPC part decode behind the fallible package accessors
 
-- Status: **Proposed — awaiting human review. Not accepted, not normative, and
-  deliberately absent from the accepted table in [README](README.md).** No code
-  may cite this record as authority until a human accepts it.
+- Status: Accepted (2026-09-16, by the owner's decision recorded in [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md); proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: nothing.
 - Raised by: [change 0610](../performance/0610-opc-lazy-part-decode-design.md),
