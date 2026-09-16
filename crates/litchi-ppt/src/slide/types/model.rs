@@ -8,7 +8,7 @@ impl<'doc> Slide<'doc> {
     /// Create a slide from parsed slide data.
     #[must_use]
     pub fn from_slide_data(data: SlideData<'doc>, slide_number: usize) -> Self {
-        let doc_data_ref = data.doc_data();
+        let source = data.source();
         Self {
             persist_id: data.persist_id,
             slide_id: data.slide_id,
@@ -16,7 +16,7 @@ impl<'doc> Slide<'doc> {
             outline_text_interactions: data.outline_text_interactions,
             outline_text_refs: data.outline_text_refs,
             slide_number,
-            doc_data: doc_data_ref,
+            source,
             record: data.record,
             shapes: OnceCell::new(),
             text_cache: OnceCell::new(),

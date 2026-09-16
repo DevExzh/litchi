@@ -1,0 +1,142 @@
+# Gate tails for change 0634 (worktree /home/zhuhe/code/litchi-worktrees/0634, branch perf/0634-ppt-slide-factory-borrowed-reparse)
+=== $ cargo fmt --all --check
+--- exit=0
+=== $ cargo clippy -p litchi-ppt --all-targets
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.22s
+--- exit=0
+=== $ cargo clippy -p litchi-ppt --all-targets --all-features
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.15s
+--- exit=0
+=== $ cargo doc -p litchi-ppt --no-deps
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.15s
+   Generated /home/zhuhe/code/litchi-worktrees/0634/target/doc/litchi_ppt/index.html
+--- exit=0
+=== $ cargo test -p litchi-ppt
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::set_text_margins (line 647) ... ignored
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation (line 120) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.55s; merged doctests compilation took 0.55s
+--- exit=0
+=== $ cargo test -p litchi-ppt --all-features
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/package/model.rs - package::model::Package (line 246) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation::images (line 1278) - compile ... ok
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.55s; merged doctests compilation took 0.55s
+--- exit=0
+=== $ cargo clippy -p litchi -p litchi-pptx --all-targets
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+   |    ^^^^^^^^^^^^^^^^^
+
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+   |
+30 | fn assert_boxed_unexpected(
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0634/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.50s
+--- exit=0
+=== $ cargo test -p litchi-pptx
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+all doctests ran in 0.36s; merged doctests compilation took 0.32s
+--- exit=0
+=== $ cargo test -p litchi --features docx,xlsx,pptx,xls
+test crates/litchi/src/detection_smart/functions.rs - detection_smart::functions::detect_and_prepare (line 80) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::from_bytes (line 823) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::metadata (line 1796) - compile ... ok
+test crates/litchi/src/detection_smart/functions.rs - detection_smart::functions::detect_file_format_from_bytes (line 136) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document (line 200) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::paragraph_count (line 1078) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::paragraphs (line 1320) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::open (line 672) - compile ... ok
+test crates/litchi/src/lib.rs - presentation (line 301) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation (line 87) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+all doctests ran in 3.91s; merged doctests compilation took 3.81s
+--- exit=0
+=== $ cargo test -p litchi --features ppt,pptx,docx,xlsx,xls
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_width (line 1346) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_height (line 1391) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::open (line 672) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation (line 87) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::text (line 722) - compile ... ok
+test crates/litchi/src/detection_smart/functions.rs - detection_smart::functions::detect_and_prepare (line 80) - compile ... ok
+test crates/litchi/src/document/doc.rs - document::doc::Document::tables (line 1424) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_count (line 1047) - compile ... ok
+test crates/litchi/src/document/element.rs - document::element::DocumentElement (line 15) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::from_bytes (line 740) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 1.05s; merged doctests compilation took 1.03s
+--- exit=0
+=== $ (tools/perf-baseline) cargo test
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.19s
+
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/code/litchi-worktrees/targets/0634-after/debug/deps/xlsx_planning_allocations-36843f82f3689a15)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- exit=0
+=== $ (tools/native-resave) cargo check --all-targets
+   --> src/main.rs:110:4
+    |
+110 | fn fixture(path: &str) -> PathBuf {
+    |    ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi-native-resave-evidence` (bin "litchi-native-resave-evidence" test) generated 4 warnings (4 duplicates)
+warning: `litchi-native-resave-evidence` (bin "litchi-native-resave-evidence") generated 4 warnings (run `cargo fix --bin "litchi-native-resave-evidence" -p litchi-native-resave-evidence` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.12s
+--- exit=0

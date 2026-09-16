@@ -1,0 +1,57 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0634",
+  "title": "The PPT per-slide re-parse spans the PowerPoint Document stream the presentation already retains, and the glibc heap-trim artifact 0606 left open disappears",
+  "decision": "retained, implemented in litchi-ppt",
+  "code_state": "crates/litchi-ppt only; ten files; no public API signature, error type, limit or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0606's Limitations named this exact follow-on and attributed its +4.71% ppt_semantic_full_text regression to it; change 0630 carries it as queue item 16",
+    "SlideFactory::parse_slide_at_offset, NotesIndex::try_build_with_limits (a whole DocumentContainer re-parse) and SpeakerNotes::parse_with_limits all re-parsed the retained stream through the copying &[u8] entry point; all three now take a PayloadStore and borrow",
+    "the removed work is deterministic: 160 allocations and 160 memcpy calls per Presentation::slides() on 45543.ppt, 98 per speaker-notes read on headers_footers_2007.ppt, with the open path's counts bit-identical",
+    "the 1,000-iteration open+list-slides loop artifact 0606 characterized but did not eliminate is gone: 171,889 -> 667 minor faults and 1.524 G -> 552 M instructions under glibc defaults, and the after leg now lands on the same instruction count as a run with the thresholds pinned",
+    "value identity is proved by 0606's own 30-fixture reader-dump differential, which reproduces 0606's digest 9cdddef6e870aa35884738c3f1729c9e12b6ca7bc22b2e551a4dad586c236b7c on both legs"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs, s=10 and s=110, differenced and divided by 100, per leg for eager-open, eager-slides, eager-text, eager-notes and owned-edit-save; whole-sample totals plus per-symbol self/inclusive Ir and memcpy/malloc/parse_impl call counts",
+    "allocations": "the 0606 counting-allocator driver, one operation after one untimed warm-up, six modes over two fixtures, both legs",
+    "native_counts": "perf stat instructions, cycles and minor-faults; a 1,000-iteration loop under glibc defaults, the same loop with MALLOC_MMAP_THRESHOLD_/MALLOC_TRIM_THRESHOLD_ pinned at 8 MiB, and -r 200 single-shot processes",
+    "timing": "tools/perf-baseline --warmup 5 --samples 40 on CPU 10, order A1 B1 B2 A2 then AA1 AA2 for the A/A floor in the same window, over four registered selectors and both PPT corpora; plus the scratch driver's five whole operations on two real fixtures in both allocator configurations",
+    "differential_oracle": "change 0606's driver oracle mode over all 30 .ppt fixtures, both readers' full semantic surface including speaker notes, 12 owned-editor targets and 6 source-backed-editor targets, plus a record census and FNV digest; 30 of 30 dumps identical after normalizing two per-process-randomized HashMap Debug renderings",
+    "unit_tests": "crates/litchi-ppt/src/presentation/tests.rs: owned and shared factories compared over four real fixtures for records, offsets, note descriptors, text, shapes and speaker notes; the copy budget asserted to accept and refuse identically at and one byte below a slide's payload total; an in-place edit of a borrowed slide payload asserted not to reach the Arc'd stream or its siblings"
+  },
+  "accepted_costs": {
+    "open_regression": "the open path, which this change does not touch, moves +0.25% in callgrind Ir, +0.85% in a native 1,000-iteration loop with cycles -0.10%, and +0.61%/+0.81% in paired p50 against floors of 1.04%/0.26%; identical call and allocation counts make it inlining drift after parse_with_limits became a wrapper, and it was not chased",
+    "full_text_residue": "ppt_semantic_full_text recovers -3.29% of 0606's +4.71% against a 0.15% floor, leaving about +1% against 0606's absolute pre-change number; the stated cause, Record's extra 8 bytes and the payload tag test, is untouched",
+    "selector_attribution": "ppt_semantic_open improves 4.64% because that selector's untimed per-iteration verification runs a full slides()+shapes()+text(); the improvement is allocator state, not a faster open, and the record says so",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg",
+    "arc_traffic": "every borrowed payload clones an Arc, so the per-record atomic increment replaces a malloc plus memcpy; the trade is measured natively, not assumed"
+  },
+  "known_gaps": {
+    "strict_entry_points": "reject_macro_records and inspect_source_text_atom on the source-backed resolve, and four sites in the owned Snapshot editor, still copy through Record::parse_strict_with_limits/parse_strict; they are once-per-resolve rather than once-per-slide and were left alone",
+    "registered_corpora": "the only registered PPT corpora are two synthetic packages of 7,680 and 40,960 bytes; every real-fixture number comes from a scratch driver retained in this packet",
+    "rss": "retained-byte figures are counting-allocator live bytes, not RSS; no cold-cache, physical-device or RSS measurement was taken",
+    "notes_fixtures": "only three fixtures in the corpus carry a speaker-notes page; the notes measurements use headers_footers_2007.ppt because 45543.ppt has none",
+    "record_size": "41246-1.ppt still shows that on a record-dense, payload-light file the remaining cost is the Record struct itself; no packing was attempted"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, RSS, concurrency-scaling, producer-corpus or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0634-ppt-slide-factory-borrowed-reparse",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 10",
+    "binaries": {
+      "before/litchi-perf-baseline": "2b96165d6a3cb486b5db99d9029b17e305dcea7ff0256c8026ae9d5da3a02b00",
+      "after/litchi-perf-baseline": "474a3bf20fc031c1bf9a879043ef20f616d2508f0c8d5ad83d9b5a58d49fb263",
+      "before/ppt0634": "6c4ee49f69d5205080c10acdaafb8da1dc9ab72a87632fcfc5768327c6685bc9",
+      "after/ppt0634": "df1eeba6f382f95ced4074f65b53e606414c4e94c25aa00fd30e9791f13d2e68",
+      "before/ppt0634_alloc": "b1a818079cf3fa26d78fb68b830a43e21f6ed2d87f461e34c2700b736fffb0d8",
+      "after/ppt0634_alloc": "227f08eaa4b1e203dd0e698045ca516f010993e1a3a222abd24ee901ceac7e08"
+    },
+    "note": "the before leg is the shared read-only checkout /home/zhuhe/code/litchi-worktrees/before-c7326f680, which contains change 0606, each leg with its own CARGO_TARGET_DIR; timed binaries were staged outside every Cargo target directory; cargo fmt ran after the measurements and the after driver binary rebuilds byte-identically, while litchi-perf-baseline rebuilds with identical .text and .rodata"
+  }
+}

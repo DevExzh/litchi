@@ -46,9 +46,9 @@ pub struct Slide<'doc> {
     slide_number: usize,
     /// Slide record.
     record: Record,
-    /// Reference to document data for lazy speaker-notes parsing.
+    /// Where the document stream lives, for lazy speaker-notes parsing.
     #[allow(dead_code, reason = "reserved for lazy speaker-notes parsing")]
-    doc_data: &'doc [u8],
+    source: crate::records::PayloadStore<'doc>,
     /// Lazily-loaded shapes stored as owned values.
     shapes: OnceCell<Vec<ShapeEnum<'static>>>,
     /// Cached text content.

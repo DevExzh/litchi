@@ -6,7 +6,7 @@ use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
 use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
-use crate::records::Record;
+use crate::records::{PayloadStore, Record};
 use crate::shapes::ShapeEnum;
 use once_cell::unsync::OnceCell;
 use std::collections::HashMap;
@@ -38,15 +38,19 @@ impl NotesIndex {
         reason = "retained for focused presentation fixture construction"
     )]
     pub(crate) fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
-        Self::build_with_limits(document_data, slide_directory, RecordLimits::default())
+        Self::build_with_limits(
+            PayloadStore::Owned(document_data),
+            slide_directory,
+            RecordLimits::default(),
+        )
     }
 
     pub(crate) fn build_with_limits(
-        document_data: &[u8],
+        source: PayloadStore<'_>,
         slide_directory: &SlideDirectory,
         limits: RecordLimits,
     ) -> Self {
-        match Self::try_build_with_limits(document_data, slide_directory, limits) {
+        match Self::try_build_with_limits(source, slide_directory, limits) {
             Ok(index) => index,
             Err(error) => Self {
                 error: Some(error.to_string()),
@@ -57,16 +61,23 @@ impl NotesIndex {
 
     #[cfg(test)]
     fn try_build(document_data: &[u8], slide_directory: &SlideDirectory) -> Result<Self> {
-        Self::try_build_with_limits(document_data, slide_directory, RecordLimits::default())
+        Self::try_build_with_limits(
+            PayloadStore::Owned(document_data),
+            slide_directory,
+            RecordLimits::default(),
+        )
     }
 
     fn try_build_with_limits(
-        document_data: &[u8],
+        source: PayloadStore<'_>,
         slide_directory: &SlideDirectory,
         limits: RecordLimits,
     ) -> Result<Self> {
-        let (document, _) =
-            Record::parse_with_limits(document_data, slide_directory.document_offset(), limits)?;
+        let (document, _) = Record::parse_from_store_with_limits(
+            source,
+            slide_directory.document_offset(),
+            limits,
+        )?;
         if document.record_type != RecordType::Document {
             return Err(Error::Corrupted(
                 "live document persist object is not a DocumentContainer".to_string(),
@@ -197,20 +208,20 @@ pub struct SpeakerNotes {
 impl SpeakerNotes {
     pub(crate) fn parse_with_limits(
         descriptor: NoteDescriptor,
-        document_data: &[u8],
+        source: PayloadStore<'_>,
         limits: RecordLimits,
     ) -> Result<Self> {
         if descriptor
             .offset
             .checked_add(8)
-            .is_none_or(|end| end > document_data.len())
+            .is_none_or(|end| end > source.bytes().len())
         {
             return Err(Error::Corrupted(format!(
                 "notes persist offset {} is outside the PowerPoint Document stream",
                 descriptor.offset
             )));
         }
-        let (record, _) = Record::parse_with_limits(document_data, descriptor.offset, limits)?;
+        let (record, _) = Record::parse_from_store_with_limits(source, descriptor.offset, limits)?;
         if record.record_type != RecordType::Notes || record.version != 0x0f || record.instance != 0
         {
             return Err(Error::Corrupted(format!(

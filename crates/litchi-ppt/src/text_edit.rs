@@ -1373,7 +1373,14 @@ fn resolve_source_target_owned(
         ))
         .into());
     }
-    let document = read_bounded_stream(shared, document_path, limits, "PowerPoint Document")?;
+    // Shared so the selected slide's record payloads span this buffer instead
+    // of being copied out of it; every reader below still sees `&[u8]`.
+    let document = Arc::new(read_bounded_stream(
+        shared,
+        document_path,
+        limits,
+        "PowerPoint Document",
+    )?);
     let current_user = read_bounded_stream(shared, current_user_path, limits, "Current User")?;
     let current = crate::CurrentUser::parse_with_limits(&current_user, limits)?;
     if current.is_encrypted() {
@@ -1399,7 +1406,7 @@ fn resolve_source_target_owned(
             position: target.slide,
         }))?;
     let factory =
-        crate::slide::SlideFactory::new_with_limits(&document, &mapping, &directory, limits);
+        crate::slide::SlideFactory::new_shared_with_limits(&document, &mapping, &directory, limits);
     let slide_data = factory.parse_slide(entry.persist_id())?;
     let slide_offset = slide_data.offset;
     let slide = crate::Slide::from_slide_data(slide_data, slide_position + 1);

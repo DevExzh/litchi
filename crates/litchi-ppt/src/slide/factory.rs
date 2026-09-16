@@ -6,8 +6,9 @@ use crate::consts::RecordType;
 /// High-performance implementation using lifetimes to avoid data copying.
 use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
-use crate::records::Record;
+use crate::records::{PayloadStore, Record};
 use once_cell::unsync::OnceCell;
+use std::sync::Arc;
 
 /// Factory for creating slides from document data using persist mapping.
 ///
@@ -21,8 +22,9 @@ use once_cell::unsync::OnceCell;
     reason = "`SlideFactory` is the established public API name re-exported as `slide::SlideFactory`; renaming it would break downstream crates"
 )]
 pub struct SlideFactory<'doc> {
-    /// Reference to the complete document stream data
-    doc_data: &'doc [u8],
+    /// Where the per-slide re-parse reads the document stream, and takes each
+    /// record's payload bytes from
+    source: PayloadStore<'doc>,
     /// Persist ID to byte offset mapping
     persist_mapping: &'doc PersistMapping,
     notes_index: OnceCell<NotesIndex>,
@@ -53,8 +55,43 @@ impl<'doc> SlideFactory<'doc> {
         slide_directory: &'doc SlideDirectory,
         record_limits: RecordLimits,
     ) -> Self {
+        Self::from_source(
+            PayloadStore::Owned(doc_data),
+            persist_mapping,
+            slide_directory,
+            record_limits,
+        )
+    }
+
+    /// Create a factory whose per-slide re-parse borrows `document` instead of
+    /// copying every record's payload out of it.
+    ///
+    /// The records this factory returns are value-identical to the ones
+    /// [`Self::new_with_limits`] returns for the same bytes: the same offsets
+    /// are parsed with the same budget and the same limits, and only the
+    /// payload storage differs.
+    pub(crate) fn new_shared_with_limits(
+        document: &'doc Arc<Vec<u8>>,
+        persist_mapping: &'doc PersistMapping,
+        slide_directory: &'doc SlideDirectory,
+        record_limits: RecordLimits,
+    ) -> Self {
+        Self::from_source(
+            PayloadStore::Shared(document),
+            persist_mapping,
+            slide_directory,
+            record_limits,
+        )
+    }
+
+    fn from_source(
+        source: PayloadStore<'doc>,
+        persist_mapping: &'doc PersistMapping,
+        slide_directory: &'doc SlideDirectory,
+        record_limits: RecordLimits,
+    ) -> Self {
         Self {
-            doc_data,
+            source,
             persist_mapping,
             notes_index: OnceCell::new(),
             slide_directory,
@@ -106,7 +143,7 @@ impl<'doc> SlideFactory<'doc> {
     ) -> Result<SlideData<'doc>> {
         let offset_usize = offset as usize;
 
-        if offset_usize + 8 > self.doc_data.len() {
+        if offset_usize + 8 > self.source.bytes().len() {
             return Err(Error::Corrupted(format!(
                 "Offset {offset_usize} exceeds document length"
             )));
@@ -114,7 +151,7 @@ impl<'doc> SlideFactory<'doc> {
 
         // Parse the Slide record at this offset
         let (record, _consumed) =
-            Record::parse_with_limits(self.doc_data, offset_usize, self.record_limits)?;
+            Record::parse_from_store_with_limits(self.source, offset_usize, self.record_limits)?;
 
         if record.record_type != RecordType::Slide {
             return Err(Error::InvalidFormat(format!(
@@ -126,11 +163,7 @@ impl<'doc> SlideFactory<'doc> {
         let note_descriptor = self
             .notes_index
             .get_or_init(|| {
-                NotesIndex::build_with_limits(
-                    self.doc_data,
-                    self.slide_directory,
-                    self.record_limits,
-                )
+                NotesIndex::build_with_limits(self.source, self.slide_directory, self.record_limits)
             })
             .descriptor(&record, entry.persist_id(), self.persist_mapping);
 
@@ -142,7 +175,7 @@ impl<'doc> SlideFactory<'doc> {
             outline_text_refs: entry.outline_text_refs().to_vec(),
             offset: offset_usize,
             record,
-            doc_data: self.doc_data,
+            doc_data: self.source,
             note_descriptor,
             record_limits: self.record_limits,
         })
@@ -182,8 +215,9 @@ pub struct SlideData<'doc> {
     pub offset: usize,
     /// Parsed Slide record
     pub record: Record,
-    /// Reference to complete document data (for lazy shape parsing)
-    doc_data: &'doc [u8],
+    /// The complete document data, and where per-slide re-parses take their
+    /// payload bytes from (for lazy speaker-notes parsing)
+    doc_data: PayloadStore<'doc>,
     pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
     pub(crate) record_limits: RecordLimits,
 }
@@ -214,6 +248,12 @@ impl<'doc> SlideData<'doc> {
     #[inline]
     #[must_use]
     pub fn doc_data(&self) -> &'doc [u8] {
+        self.doc_data.bytes()
+    }
+
+    /// The document stream, and where a re-parse of it takes payload bytes
+    /// from.
+    pub(crate) fn source(&self) -> PayloadStore<'doc> {
         self.doc_data
     }
 
@@ -238,7 +278,7 @@ impl<'doc> SlideData<'doc> {
             outline_text_refs: Vec::new(),
             offset,
             record,
-            doc_data,
+            doc_data: PayloadStore::Owned(doc_data),
             note_descriptor: Ok(None),
             record_limits: RecordLimits::default(),
         }

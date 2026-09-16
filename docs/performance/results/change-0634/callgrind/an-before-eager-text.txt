@@ -1,0 +1,97 @@
+== before-eager-text: total s10=21,222,656 s110=211,333,706 per-op Ir=1,901,110
+-- inclusive per-op deltas (top 40)
+     3,802,221 200.00%  std::rt::lang_start_internal
+     3,802,221 200.00%  (below main)
+     1,901,110 100.00%  main
+     1,901,110 100.00%  0x0000000000023cc0
+     1,901,110 100.00%  __libc_start_main@@GLIBC_2.34
+     1,901,110 100.00%  ppt0634::main
+     1,901,110 100.00%  std::rt::lang_start::{{closure}}
+     1,901,110 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+     1,901,087 100.00%  ppt0634::one_operation
+       989,116  52.03%  litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_ole_with_options
+       810,219  42.62%  __memcpy_avx_unaligned_erms
+       753,261  39.62%  litchi_cfb::file::OleFile<R>::open_stream
+       747,367  39.31%  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+       409,120  21.52%  litchi_ppt::presentation::model::Presentation::text
+       364,553  19.18%  __memset_avx2_unaligned_erms
+       359,577  18.91%  litchi_cfb::file::OleFile<R>::read_sectors_batched
+       351,237  18.48%  litchi_ppt::records::record::Record::parse_impl'2
+       305,670  16.08%  litchi_ppt::records::record::Record::parse_impl
+       278,681  14.66%  once_cell::unsync::OnceCell<T>::get_or_try_init
+       259,324  13.64%  litchi_ppt::records::record::Record::parse_container_children
+       209,407  11.02%  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+       195,199  10.27%  litchi_ppt::odraw::codec::text_from_drawing
+       181,165   9.53%  litchi_ppt::slide::factory::SlideFactory::parse_slide
+       175,762   9.25%  litchi_ppt::records::record::Record::parse_container_children'2
+       144,259   7.59%  alloc::raw_vec::RawVecInner<A>::finish_grow
+       132,938   6.99%  __rustc::__rdl_realloc
+       120,651   6.35%  __rustc::__rdl_alloc
+       114,283   6.01%  litchi_ppt::records::record::PayloadStore::payload
+       107,580   5.66%  litchi_ppt::parsers::parser::RecordParser::parse_shared_document_with_limits
+        99,482   5.23%  litchi_ppt::odraw::codec::push_children
+        97,120   5.11%  litchi_ppt::slide::directory::SlideDirectory::build_with_limits
+        95,717   5.03%  litchi_ppt::package::codec::<impl litchi_ppt::package::model::Package<R>>::from_reader_with_limits
+        90,214   4.75%  litchi_cfb::file::OleFile<R>::open
+        82,649   4.35%  litchi_ppt::odraw::codec::text_from_ppt_records
+        74,795   3.93%  core::ptr::drop_in_place<litchi_ppt::records::record::Record>'2
+        68,599   3.61%  litchi_ppt::slide::notes::NotesIndex::build_with_limits
+        67,194   3.53%  __rustc::__rust_realloc
+        64,694   3.40%  realloc
+        61,319   3.23%  __rustc::__rust_alloc
+        61,017   3.21%  _int_realloc
+-- self per-op deltas (top 25)
+       810,219  42.62%  __memcpy_avx_unaligned_erms
+       364,553  19.18%  __memset_avx2_unaligned_erms
+        69,662   3.66%  litchi_ppt::records::record::Record::parse_impl'2
+        49,764   2.62%  _int_malloc
+        48,325   2.54%  <alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter
+        29,056   1.53%  _int_free_merge_chunk
+        26,600   1.40%  alloc::raw_vec::RawVecInner<A>::finish_grow
+        25,992   1.37%  <litchi_odraw::container::Children as core::iter::traits::iterator::Iterator>::next
+        25,608   1.35%  litchi_cfb::file::SectorChainScratch::collect_exact
+        24,118   1.27%  litchi_cfb::file::collect_sector_chain
+        21,692   1.14%  free
+        20,210   1.06%  core::hash::BuildHasher::hash_one
+        18,766   0.99%  litchi_ppt::records::record::Record::parse_container_children'2
+        18,140   0.95%  litchi_ppt::records::record::Record::parse_container_children
+        18,002   0.95%  malloc
+        16,500   0.87%  litchi_ppt::records::record::PayloadStore::payload
+        16,191   0.85%  litchi_ppt::odraw::codec::push_children
+        15,231   0.80%  core::ptr::drop_in_place<litchi_ppt::records::record::Record>'2
+        13,984   0.74%  litchi_cfb::directory_name::directory_name_data
+        11,079   0.58%  <core::iter::adapters::rev::Rev<I> as core::iter::traits::iterator::Iterator>::fold
+        10,600   0.56%  litchi_ppt::records::record::ParseBudget::charge_record
+        10,398   0.55%  realloc
+         9,672   0.51%  litchi_ppt::odraw::codec::text_from_ppt_records
+         9,386   0.49%  litchi_cfb::file::OleFile<R>::read_sectors_batched
+         9,345   0.49%  _int_realloc
+-- call counts per op (selected)
+       946.9  __memcpy_avx_unaligned_erms
+       665.0  alloc::raw_vec::RawVecInner<A>::finish_grow
+       662.0  malloc
+       485.0  litchi_ppt::records::record::Record::parse_impl'2
+       284.6  _int_malloc
+        74.0  litchi_ppt::records::record::Record::parse_container_children'2
+        58.0  litchi_ppt::records::record::Record::extract_text'2
+        45.0  litchi_ppt::records::record::Record::parse_impl
+        41.0  <alloc::raw_vec::RawVecInner>::finish_grow
+        40.0  litchi_ppt::records::record::Record::parse_container_children
+        30.0  __memset_avx2_unaligned_erms
+        11.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectoryEntry>
+        11.0  litchi_ppt::records::record::Record::extract_text
+        11.0  litchi_ppt::slide::types::codec::<impl litchi_ppt::slide::types::Slide>::extract_all_text
+         6.0  <alloc::string::String>::try_reserve
+         6.0  <alloc::string::String>::from_utf16
+         3.0  litchi_ppt::text::extractor::from_utf16le_lossy
+         3.0  litchi_cfb::file::OleFile<R>::open_stream
+         3.0  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+         3.0  litchi_cfb::file::collect_sector_chain
+         1.0  litchi_cfb::file::OleFile<R>::open
+         1.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory>
+         1.0  litchi_cfb::file::OleFile<R>::load_directory
+         1.0  litchi_cfb::file::collect_sector_chain_exact
+         1.0  litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping
+         1.0  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+         1.0  alloc::raw_vec::RawVecInner<A>::try_reserve
+         1.0  litchi_ppt::slide::directory::SlideDirectory::build_with_limits
