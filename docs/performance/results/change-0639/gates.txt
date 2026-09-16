@@ -1,0 +1,267 @@
+# change 0639 — gate tails
+
+Worktree /home/zhuhe/code/litchi-worktrees/0639, branch
+perf/0639-gate-list-gaps-and-two-dead-paths, base c7326f680.
+Host AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0,
+cargo 1.95.0, eight concurrent agents.
+
+Crates touched: crates/litchi only (one example, one source file).
+Tools touched: tools/non_iwork_gate.py, tools/test_non_iwork_gate.py,
+.github/workflows/rust-ci.yml.
+
+================================================================
+1. cargo fmt --all --check
+================================================================
+exit=0  (no diff)
+
+================================================================
+2. cargo clippy --locked --offline -p litchi --all-targets (default features)
+   and with --no-default-features --features docx,pptx,xls,xlsx
+================================================================
+=== cargo clippy --locked --offline -p litchi --all-targets  (default features) ===
+warning: function `fixture` is never used
+  --> crates/litchi/tests/unexpected_format.rs:15:4
+   |
+15 | fn fixture(relative: &str) -> PathBuf {
+   |    ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+   |
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+   |    ^^^^^^^^^^^^^^^^^
+
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+   |
+30 | fn assert_boxed_unexpected(
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.44s
+exit=0
+
+=== cargo clippy --locked --offline -p litchi --all-targets --no-default-features --features docx,pptx,xls,xlsx ===
+warning: function `missing_ooxml_catalog_part_error` is never used
+   --> crates/litchi/src/detection_smart/detected.rs:612:4
+    |
+612 | fn missing_ooxml_catalog_part_error(error: &crate::opc::OpcError) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> crates/litchi/src/detection_smart/detected.rs:3621:13
+     |
+3621 |         let mut cases: Vec<(std::path::PathBuf, FileFormat)> = Vec::new();
+     |             ----^^^^^
+     |             |
+     |             help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:775:40
+    |
+775 | ...                   inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+    = note: `#[warn(clippy::unit_arg)]` on by default
+help: use a unit literal instead
+    |
+775 -                                 inner: DocumentImpl::DocxSource(package, Default::default()),
+775 +                                 inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+warning: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:921:20
+    |
+921 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+    |
+921 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+921 +             inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+warning: passing a unit value to a function
+    --> crates/litchi/src/document/doc.rs:2568:20
+     |
+2568 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+     |
+2568 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+2568 +             inner: DocumentImpl::DocxSource(package, ()),
+     |
+
+warning: passing a unit value to a function
+    --> crates/litchi/src/document/doc.rs:2666:20
+     |
+2666 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+     |
+2666 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+2666 +             inner: DocumentImpl::DocxSource(package, ()),
+     |
+
+warning: `litchi` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p litchi -- ` to apply 2 suggestions)
+warning: `litchi` (lib test) generated 6 warnings (3 duplicates) (run `cargo clippy --fix --lib -p litchi --tests -- ` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.19s
+exit=0
+
+Pre-existing warnings only. None is in a file this change touches:
+  crates/litchi/tests/unexpected_format.rs:15,22,30  dead_code x3
+     — the set change 0629 recorded as pre-existing, citing change 0621.
+  crates/litchi/src/detection_smart/detected.rs:612   dead_code
+  crates/litchi/src/detection_smart/detected.rs:3621  unused_mut
+  crates/litchi/src/document/doc.rs:775,921,2568,2666 clippy::unit_arg etc.
+crates/litchi has no [lints] section, so it does not inherit the workspace
+deny table; these are warnings rather than denials there. Neither clippy
+run mentions office_crud_demo.rs or workbook_types.rs.
+
+================================================================
+3. cargo doc --locked --offline -p litchi --no-deps  and the feature-bearing doc build
+================================================================
+=== cargo doc --locked --offline -p litchi --no-deps  (default features) ===
+    Checking memchr v2.8.3
+    Checking serde_json v1.0.149
+    Checking chrono v0.4.45
+    Checking getrandom v0.4.3
+    Checking rand v0.10.2
+    Checking thiserror v2.0.18
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0639/crates/litchi-core)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.67s
+   Generated /home/zhuhe/code/litchi-worktrees/0639/target/doc/litchi/index.html
+exit=0
+
+=== cargo test --locked --offline -p litchi  (default features) ===
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 0 tests
+cargo doc --locked --offline -p litchi --no-deps --no-default-features --features docx,pptx,xls,xlsx
+warning: `litchi` (lib doc) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.11s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0639-doc-after/doc/litchi/index.html
+exit=0
+
+================================================================
+4. cargo test --locked --offline -p litchi  (default features) — the gap itself
+================================================================
+20 targets: 0 passed, 0 failed, 0 ignored  (exit 0)
+litchi's default feature set is empty, so this run compiles none of the
+facade's feature-gated tests. That is the gap mode 4 below closes.
+
+================================================================
+5. python3 -m unittest tools.test_non_iwork_gate
+================================================================
+----------------------------------------------------------------------
+Ran 57 tests in 0.400s
+
+OK
+exit=0   (51 tests at the base, 57 here)
+
+================================================================
+6. python3 tools/non_iwork_gate.py print  /  verify
+================================================================
+=== python3 tools/non_iwork_gate.py print ===
+workspace_packages=64
+excluded_packages=18
+bulk_packages=45
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+exit=0
+
+=== python3 tools/non_iwork_gate.py verify ===
+excluded_packages=18
+bulk_packages=45
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit=0
+
+The plan is unchanged by this change: 64 workspace packages, 18 excluded,
+45 bulk roots, 35 safe facade features, 10 unsafe, 45 bulk trees and 35
+safe facade trees plus the combined tree verified.
+
+================================================================
+7. python3 tools/non_iwork_gate.py facade-format-tests  (new)
+================================================================
+### facade-format-tests ###
+[facade-format-tests/facade-format-tests] $ cargo test --package litchi --no-default-features --features docx,pptx,xls,xlsx --lib --tests --no-fail-fast -- --test-threads=1
+25 targets: 230 passed, 0 failed, 0 ignored
+exit=0   (131.8 s total, of which 1.49 s of test execution)
+
+================================================================
+8. python3 tools/non_iwork_gate.py harness-tests  (new)
+================================================================
+### harness-tests (default test threads) ###
+[harness-tests/harness-tests] $ cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib --tests --no-fail-fast
+18 targets: 531 passed, 0 failed, 1 ignored
+exit=0   (581.14 s of test execution; 1,869.73 s for the same 531 tests
+          when --test-threads=1 was tried, which is why the mode does not
+          serialize)
+
+================================================================
+9. The same two argv on the untouched base tree (pre-existing check)
+================================================================
+facade-format-tests(base): 25 targets, 231 passed, 0 failed, 0 ignored, exit 0
+harness-tests(base):       18 targets, 531 passed, 0 failed, 1 ignored, exit 0
+Neither new mode reveals a pre-existing failure. The facade delta of -1 is
+the test deleted with refine_workbook_format.
+
+================================================================
+10. python3 -m unittest tools.test_check_example_targets  /  tools/check_example_targets.py
+================================================================
+Ran 12 tests in 0.009s
+
+OK
+example-target-check: cross-package duplicate example target 'edit_chart_arrangement': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_chart_arrangement.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_chart_arrangement.rs
+example-target-check: cross-package duplicate example target 'edit_image_adjustments': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_image_adjustments.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_image_adjustments.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/edit_image_adjustments.rs
+example-target-check: cross-package duplicate example target 'edit_table_cell_number_format': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/edit_table_cell_number_format.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/edit_table_cell_number_format.rs
+example-target-check: cross-package duplicate example target 'save_package': litchi-keynote@crates/litchi-keynote/Cargo.toml: crates/litchi-keynote/examples/save_package.rs; litchi-numbers@crates/litchi-numbers/Cargo.toml: crates/litchi-numbers/examples/save_package.rs; litchi-pages@crates/litchi-pages/Cargo.toml: crates/litchi-pages/examples/save_package.rs
+exit=1
+
+PRE-EXISTING, reproduced on the untouched shared before checkout at
+/home/zhuhe/code/litchi-worktrees/before-c7326f680: identical four
+cross-package duplicate example targets, identical exit 1. Every duplicate
+is between litchi-keynote, litchi-numbers and litchi-pages — iWork crates
+this change never touches, and which the brief excludes. The example this
+change edits, office_crud_demo, is not among them and its target name is
+unchanged.
+
+================================================================
+11. Public API comparison
+================================================================
+cargo doc -p litchi --no-deps --no-default-features --features docx,pptx,xls,xlsx
+on the base and on this branch; one line per generated item page:
+public-items-before.txt
+public-items-after.txt
+ 16172 total
+diff: empty (0 lines). No documented public item was added or removed.

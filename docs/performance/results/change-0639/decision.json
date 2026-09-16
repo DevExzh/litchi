@@ -1,0 +1,50 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0639",
+  "title": "The two suites no per-crate gate could see now have modes CI runs, the CRUD demo's PPTX update takes the route that works, and a dead whole-input slurp is gone",
+  "decision": "retained, implemented in tools/non_iwork_gate.py, .github/workflows/rust-ci.yml and crates/litchi",
+  "code_state": "one example and one deletion under crates/litchi; no production read path, public API, error type, limit, refusal point or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "changes 0619 and 0629 each found a test red for tens of records for the same structural reason: tools/perf-baseline is a separate Cargo project no workspace selection reaches, and litchi's default feature set is empty so cargo test -p litchi compiles almost none of the facade's tests; two single-command gate modes make both reachable from the job CI already runs",
+    "docx,pptx,xls,xlsx is the smallest feature set that compiles the DOCX, XLSX, PPTX and XLS facade tests: each leaf pulls its own substrate through Cargo's feature graph, and the four cover 998 of the 2,331 feature cfg sites under crates/litchi",
+    "change 0607 recorded the office_crud_demo PPTX update as a report-only defect it would not fix because the fix belongs to the opened/ owner; the step is now opened_presentation_transaction + commit + apply_opened_presentation_commit, the route changes 0590 and 0598 own, and the example runs end to end",
+    "change 0587's CORE section flagged refine_workbook_format as a public, dead, whole-input slurp of any Read and a latent GOAL-hypothesis-1 ingress; it had zero callers, was never reachable from outside the crate, and is deleted with its one test",
+    "no measurement is claimed: this record reports verdicts, a member census and item counts, and states explicitly that no timing was taken and that no A/A floor applies"
+  ],
+  "accepted_evidence": {
+    "gate_modes": "both new modes run end to end through tools/non_iwork_gate.py on this branch and, as raw cargo commands, on the untouched base tree; per-target test result lines, exit statuses and the gate's own --record-file execution reports are retained",
+    "gate_unit_tests": "tools/test_non_iwork_gate.py 51 -> 57 tests, pinning each mode's exact argv, determinism, the sorted four-feature selection and its membership in the plan's safe facade closure, the relative harness manifest path, the GateError raised when it is absent, the harness manifest's freedom from iWork dependencies, and rust-ci.yml invoking both modes with a --record-file before check",
+    "demo": "office_crud_demo built with the identical command from the base and from this branch, each run in an empty directory: exit 1 with UnsafeEdit { operation: \"presentation_mut\" } against exit 0 with all six output files and a read-back shape count",
+    "member_census": "sha256 per member of demo_presentation.pptx against demo_presentation_updated.pptx: 43 members before and after, order identical, 42 byte-identical, 1 changed (ppt/slides/slide3.xml, 1584 -> 2154 bytes), 0 added, 0 removed, both edited strings present in the one changed part",
+    "dead_helper": "git grep over every .rs file at the base finds the definition and one same-file test invocation and nothing else; sheet/mod.rs declares mod workbook_types with no visibility modifier and re-exports nothing from it; git diff --numstat records 0 added and 66 removed lines",
+    "public_api": "the rustdoc item-page inventory of litchi built with --no-default-features --features docx,pptx,xls,xlsx on the base and on this branch, 8,086 pages each, byte-identical listings and an empty diff"
+  },
+  "accepted_costs": {
+    "ci_time": "the non-iWork release gate job gains two Cargo builds; the facade mode rebuilds litchi under a feature set the later modes do not share, and the harness mode builds a project outside the workspace, both with the job's CARGO_BUILD_JOBS=1 invariant",
+    "partial_duplication": "perf-baseline.yml's smoke job already runs the harness's plain suite; harness-tests duplicates that one command in a workflow with a broader path filter, and adds none of the smoke job's other legs",
+    "demo_scope": "the demonstration no longer adds a slide, because opened::Transaction does not expose slide insertion; it shows the two edits the supported route owns",
+    "harness_test_threads": "harness-tests runs at Cargo's default test parallelism rather than the --test-threads=1 the workspace modes use: the same 531 passing tests over 18 targets took 1,869.73 s of test execution serialized against 581.14 s unserialized, and one standalone project has none of the 45-root link fan-out the bulk modes serialize against. Build parallelism stays bounded by the gate's CARGO_BUILD_JOBS invariant either way."
+  },
+  "known_gaps": {
+    "branch_coverage": "both workflows in this repository trigger on push and pull_request against main only, so a performance-program commit on feat/office-format-completeness is still gated only by what its author runs locally; widening the trigger is the workflow owner's decision and is not made here",
+    "example_not_tested": "office_crud_demo is an example; nothing runs it in CI and no runner was added, so the evidence is two manual runs rather than a regression fence",
+    "sibling_helper": "detect_workbook_format_from_signature in the same file is dead too. It is bounded — at most eight bytes read, cursor restored on both paths — so it is not the ingress change 0587 named, and it is left untouched together with its inaccurate 'public' allow-reason",
+    "facade_lints": "crates/litchi has no [lints] section and so does not inherit the workspace deny table; unused and unreachable_pub are warnings there. That is why a dead pub fn in a private module survived, and it is not changed here",
+    "suite_content": "neither newly reachable suite gained a test; this change closes a reachability gap, not a coverage one",
+    "pre_existing_gate_failure": "python3 tools/check_example_targets.py exits 1 with four cross-package duplicate example target names, all between litchi-keynote, litchi-numbers and litchi-pages; reproduced with the identical findings and exit status on the untouched before checkout, so it predates this branch and belongs to crates the brief excludes"
+  },
+  "withheld": [
+    "any latency, throughput, allocation, peak-RSS, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result, and any claim-registry entry"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0639-gate-list-gaps-and-two-dead-paths",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "cpu_pin": "none. The only wall times in this record are the two harness-suite figures that justify the mode's test-thread flag (1,869.73 s serialized against 581.14 s), and they are not a performance result; no other figure is a time, so no pinning and no A/A floor applies",
+    "binaries": {},
+    "note": "all work happened in one detached git worktree on disk at /home/zhuhe/code/litchi-worktrees/0639 with its own target/; the shared working copy at /home/zhuhe/code/litchi was never built in or modified. Cargo.lock is gitignored, so the repository's own lockfile was copied into the worktree before any --locked build"
+  }
+}

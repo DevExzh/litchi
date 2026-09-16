@@ -163,6 +163,16 @@ jobs:
           python3 tools/non_iwork_gate.py print
           python3 tools/non_iwork_gate.py verify
 
+      # The facade's default feature set is empty and the performance harness
+      # is a separate Cargo project, so neither suite is reachable from any
+      # per-package selection below. Both are single-command modes and run
+      # first so a stale expectation fails before the 45-root sweeps.
+      - name: Test the facade with the Office format leaves
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/facade-format-tests.json facade-format-tests
+
+      - name: Test the standalone performance harness
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/harness-tests.json harness-tests
+
       - name: Check non-iWork workspace and safe facade
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/check.json check
 

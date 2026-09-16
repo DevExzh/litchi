@@ -1,0 +1,19 @@
+# change 0639 — public rustdoc item pages of litchi, base against branch
+
+cargo doc -p litchi --no-deps --no-default-features --features docx,pptx,xls,xlsx
+run on the base c7326f680 and on perf/0639-gate-list-gaps-and-two-dead-paths,
+each with its own external CARGO_TARGET_DIR; one line per generated item page,
+LC_ALL=C sorted.
+
+before: 8086 item pages, sha256 1e9e204e65ce0614f293f28cb07ff9990b02a0a3a567e8c135d2bfd3e6e6ea85
+after:  8086 item pages, sha256 1e9e204e65ce0614f293f28cb07ff9990b02a0a3a567e8c135d2bfd3e6e6ea85
+
+$ diff public-items-before.txt public-items-after.txt
+(empty output; exit 0)
+
+The two listings are byte-identical, so only one copy is retained, as
+public-items.txt. No page named refine_workbook_format or workbook_types
+exists on either side: crates/litchi/src/sheet/mod.rs declares
+'mod workbook_types;' with no visibility modifier and re-exports nothing
+from it, so the deleted function was never part of the documented public
+API.

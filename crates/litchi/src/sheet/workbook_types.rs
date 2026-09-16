@@ -1,8 +1,6 @@
 //! Unified workbook types and format detection.
 
 use litchi_core::Error;
-#[cfg(any(feature = "ods", feature = "xlsx", feature = "xlsb"))]
-use litchi_core::FileFormat;
 use std::io::{Read, Seek, SeekFrom};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -121,54 +119,6 @@ pub fn detect_workbook_format_from_signature<R: Read + Seek>(
     }
 }
 
-/// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
-#[allow(
-    dead_code,
-    reason = "kept as a detection helper; callers are expected to prefer smart detection"
-)]
-#[cfg(any(
-    feature = "numbers",
-    any(feature = "xlsx", feature = "xlsb"),
-    feature = "ods"
-))]
-pub fn refine_workbook_format<R: Read + Seek>(
-    reader: &mut R,
-    initial_format: WorkbookFormat,
-) -> Result<WorkbookFormat> {
-    // Only refine if it's a ZIP-based format
-    if initial_format != WorkbookFormat::Xlsx {
-        return Ok(initial_format);
-    }
-
-    let original = reader.stream_position()?;
-    let refined = (|| {
-        reader.seek(SeekFrom::Start(0))?;
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
-
-        #[cfg(any(feature = "xlsx", feature = "xlsb"))]
-        if crate::detection_smart::ooxml::detect_zip_format(&data) == Some(FileFormat::Xlsb) {
-            return Ok(WorkbookFormat::Xlsb);
-        }
-
-        #[cfg(feature = "ods")]
-        if litchi_odf_common::detect::bytes(&data) == Some(FileFormat::Ods) {
-            return Ok(WorkbookFormat::Ods);
-        }
-
-        #[cfg(feature = "numbers")]
-        if litchi_iwa_detect::bytes(&data).ok().flatten()
-            == Some(litchi_iwa_detect::Format::Numbers)
-        {
-            return Ok(WorkbookFormat::Numbers);
-        }
-
-        Ok(initial_format)
-    })();
-    reader.seek(SeekFrom::Start(original))?;
-    refined
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,21 +209,5 @@ mod tests {
         let format = WorkbookFormat::Ods;
         let copied = format;
         assert_eq!(format, copied);
-    }
-
-    #[test]
-    #[cfg(any(
-        feature = "numbers",
-        any(feature = "xlsx", feature = "xlsb"),
-        feature = "ods"
-    ))]
-    fn refinement_restores_a_nonzero_cursor() {
-        let mut reader = Cursor::new(b"PK\x03\x04not-a-valid-package".as_slice());
-        reader.set_position(5);
-        assert_eq!(
-            refine_workbook_format(&mut reader, WorkbookFormat::Xlsx).unwrap(),
-            WorkbookFormat::Xlsx
-        );
-        assert_eq!(reader.position(), 5);
     }
 }

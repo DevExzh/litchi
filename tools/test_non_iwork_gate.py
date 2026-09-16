@@ -2079,6 +2079,150 @@ class NonIworkGateTests(unittest.TestCase):
         self.assertIn("CARGO_PROFILE_DEV_DEBUG: 0", workflow)
         self.assertIn("CARGO_PROFILE_TEST_DEBUG: 0", workflow)
 
+    def test_facade_format_tests_select_the_four_office_leaves_only(self) -> None:
+        specs = gate.command_specs("cargo", self.plan, "facade-format-tests")
+        self.assertEqual(specs, gate.command_specs("cargo", self.plan, "facade-format-tests"))
+        self.assertEqual([spec.scope for spec in specs], ["facade-format-tests"])
+        argv = specs[0].argv
+        self.assertEqual(specs[0].env, ())
+        self.assertEqual(
+            argv,
+            (
+                "cargo",
+                "test",
+                "--package",
+                FIXTURE_FACADE_PACKAGE,
+                "--no-default-features",
+                "--features",
+                "docx,pptx,xls,xlsx",
+                "--lib",
+                "--tests",
+                "--no-fail-fast",
+                "--",
+                "--test-threads=1",
+            ),
+        )
+        # The four leaves must be exactly the ones the facade declares, must
+        # be safe, and must stay sorted so the argument is deterministic.
+        self.assertEqual(
+            set(gate.FACADE_FORMAT_TEST_FEATURES),
+            {"docx", "pptx", "xls", "xlsx"},
+        )
+        self.assertEqual(
+            list(gate.FACADE_FORMAT_TEST_FEATURES),
+            sorted(gate.FACADE_FORMAT_TEST_FEATURES),
+        )
+        self.assertTrue(
+            set(gate.FACADE_FORMAT_TEST_FEATURES) <= self.plan.safe_facade_features
+        )
+        self.assertFalse(
+            set(gate.FACADE_FORMAT_TEST_FEATURES) & self.plan.unsafe_facade_features
+        )
+        # A bare `cargo test --package litchi` compiles almost none of these
+        # tests, which is the gap this mode closes; the selection must never
+        # silently become the default one.
+        self.assertNotIn("--all-features", argv)
+        self.assertNotIn("--workspace", argv)
+
+    def test_facade_format_features_are_declared_by_the_facade_manifest(self) -> None:
+        manifest = (ROOT / "crates/litchi/Cargo.toml").read_text(encoding="utf-8")
+        features = re.search(
+            r"^\[features\]\n(.*?)(?=^\[)", manifest, flags=re.MULTILINE | re.DOTALL
+        )
+        self.assertIsNotNone(features)
+        assert features is not None
+        declared = set(
+            re.findall(r"^([A-Za-z0-9_-]+) = \[", features.group(1), flags=re.MULTILINE)
+        )
+        self.assertTrue(set(gate.FACADE_FORMAT_TEST_FEATURES) <= declared)
+        self.assertRegex(features.group(1), re.compile(r"^default = \[\]$", re.MULTILINE))
+
+    def test_harness_tests_run_the_standalone_project_by_relative_manifest(self) -> None:
+        specs = gate.command_specs("cargo", self.plan, "harness-tests")
+        self.assertEqual(specs, gate.command_specs("cargo", self.plan, "harness-tests"))
+        self.assertEqual([spec.scope for spec in specs], ["harness-tests"])
+        self.assertEqual(specs[0].env, ())
+        self.assertEqual(
+            specs[0].argv,
+            (
+                "cargo",
+                "test",
+                "--manifest-path",
+                "tools/perf-baseline/Cargo.toml",
+                "--lib",
+                "--tests",
+                "--no-fail-fast",
+            ),
+        )
+        # One standalone project has none of the 45-root fan-out the bulk
+        # modes serialize against, so its test threads stay at Cargo's
+        # default; serializing them measured 1,870 s of test execution
+        # against 581 s for the same 531 passing tests.
+        self.assertNotIn("--test-threads=1", specs[0].argv)
+        # Commands run with the repository root as their working directory,
+        # so the manifest path must stay relative and posix-spelled.
+        self.assertEqual(gate.HARNESS_MANIFEST_RELATIVE_PATH, "tools/perf-baseline/Cargo.toml")
+        self.assertFalse(Path(gate.HARNESS_MANIFEST_RELATIVE_PATH).is_absolute())
+        self.assertTrue((ROOT / gate.HARNESS_MANIFEST_RELATIVE_PATH).is_file())
+
+    def test_harness_tests_fail_closed_when_the_manifest_is_absent(self) -> None:
+        with mock.patch.object(gate, "HARNESS_MANIFEST_RELATIVE_PATH", "tools/absent/Cargo.toml"):
+            with self.assertRaises(gate.GateError) as caught:
+                gate.command_specs("cargo", self.plan, "harness-tests")
+        self.assertIn("tools/absent/Cargo.toml", str(caught.exception))
+
+    def test_harness_manifest_declares_no_iwork_dependency(self) -> None:
+        # The harness suite only belongs in the non-iWork gate while the
+        # harness itself stays non-iWork.  An added iWork path dependency must
+        # fail here rather than widen the gate's slice silently.
+        manifest = (ROOT / gate.HARNESS_MANIFEST_RELATIVE_PATH).read_text(encoding="utf-8")
+        section = re.search(
+            r"^\[dependencies\]\n(.*?)(?=^\[)", manifest, flags=re.MULTILINE | re.DOTALL
+        )
+        self.assertIsNotNone(section)
+        assert section is not None
+        names = set(
+            re.findall(r"^([A-Za-z0-9_-]+) = ", section.group(1), flags=re.MULTILINE)
+        )
+        self.assertIn("litchi", names)
+        self.assertFalse(names & FIXTURE_IWORK_PACKAGES)
+        self.assertFalse(
+            {name for name in names if name.startswith(gate.IWORK_PACKAGE_PREFIX)}
+        )
+
+    def test_new_single_command_modes_are_registered_before_the_sweeps(self) -> None:
+        self.assertIn("facade-format-tests", gate.MODES)
+        self.assertIn("harness-tests", gate.MODES)
+        self.assertLess(
+            gate.MODES.index("facade-format-tests"), gate.MODES.index("lib-tests")
+        )
+        self.assertLess(gate.MODES.index("harness-tests"), gate.MODES.index("lib-tests"))
+        self.assertEqual(len(gate.MODES), len(set(gate.MODES)))
+        for mode in ("facade-format-tests", "harness-tests"):
+            with self.subTest(mode=mode):
+                specs = gate.command_specs("cargo", self.plan, mode)
+                self.assertEqual(len(specs), 1)
+                # No shell metacharacters reach a command: every element is a
+                # plain argv token, as for every other mode.
+                self.assertTrue(all(isinstance(item, str) for item in specs[0].argv))
+        workflow = (ROOT / ".github/workflows/rust-ci.yml").read_text(encoding="utf-8")
+        job = re.search(
+            r"^  non-iwork-release-gate:\n(.*?)(?=^  [a-z][a-z0-9-]*:$)",
+            workflow,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        self.assertIsNotNone(job)
+        assert job is not None
+        invoked = re.findall(r"non_iwork_gate\.py[^\n]*? ([a-z-]+)$", job.group(1), re.MULTILINE)
+        for mode in ("facade-format-tests", "harness-tests"):
+            with self.subTest(mode=mode):
+                self.assertIn(mode, invoked)
+                self.assertLess(invoked.index(mode), invoked.index("check"))
+                self.assertIn(
+                    f"target/non-iwork-gate-reports/{mode}.json",
+                    job.group(1),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
