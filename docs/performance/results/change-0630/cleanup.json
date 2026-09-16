@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-16T03:13:36Z",
+  "batch": [
+    "0588-0631 (the first wave on the 0587 queue) and 0630 (its closing record)"
+  ],
+  "removed": [
+    "the session scratchpad in full (484K): the implementer briefing and its per-change briefs, the coordinator's merge and queue-refresh scripts, the closing record's drafts and packet drafts, two integration-gate transcripts (retained in results/change-0630/), and two stray survey directories agents had left",
+    "the disk-backed worktree area /home/zhuhe/code/litchi-worktrees in full (14G at the end; every agent removed its own worktree and target directories when it finished, so what remained was the shared detached base checkouts before-1e4198321 and before-3156bff3b and the empty targets/ directory)",
+    "no agent worktree remained: each agent deleted its worktree, its target directories (up to 52 GiB each), its probe projects and its scratch directory after committing, and every packet's cleanup.json records what its author removed"
+  ],
+  "retained_in_the_repository": [
+    "one record and one packet per change, 0588 to 0631, each citing only evidence it retains",
+    "the agents' branches perf/0588-* through perf/0631-* (44 minus the two unassigned numbers 0614 and 0616), kept so that the cherry-pick trailers in results/change-0630/merge-log.txt resolve; they can be deleted once the wave is reviewed"
+  ],
+  "repository_state": "clean after the closing commit; no untracked or modified files remain",
+  "background_tasks": "no measurement process remains; all agents of the wave completed",
+  "notes": [
+    "the workspace target/ (about 466 GiB of gitignored build output) and tools/perf-baseline/target are retained as ordinary build state; the mid-wave and final integration gates were built there",
+    "two session usage caps terminated agents mid-work (seven at the first, eight plus one sub-agent at the second); each was resumed from its transcript and worktree and finished; no evidence was lost",
+    "two agents' log-sections files used layouts the coordinator's inserter did not recognise at first (0596, 0597); the inserter was generalised and the sections inserted; one brief file (0605) was missing at launch because a shell chain broke and was supplied to the agent a minute later",
+    "the perf/* branches from other sessions (0565-candidate, docx-styles-effects-*, xlsx-svg-phase-*) were not touched"
+  ],
+  "revision": "8b07b45dc",
+  "revision_note": "the head this wave's last production change landed on; the closing commit follows it"
+}

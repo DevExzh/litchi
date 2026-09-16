@@ -1,0 +1,43 @@
+# Commits of the wave on the main branch, oldest first (from 0587's 08d968f8e to 8b07b45dc)
+
+06eddc74a  perf(cfb): hash an empty overlay once, not twice (0589)
+20ef130f7  perf(pptx): reuse the revision and the snapshot an opened commit already produced
+1f4319da3  perf(docx): answer the patch's byte proof from the part, and splice the layout
+f22f93935  perf(docx): build the paragraph index on the first paragraph query (0592)
+c1503db2b  perf(xls): stop building errors the frame loop never returns, and cut the SST walk
+f8cf7d2a1  perf(opc): prove unchanged relationships at open, and buffer the atomic tempfile
+01a5f5731  perf(xlsb): parse the workbook once per cell-value commit (0599)
+c8e856414  perf(doc): decode DOC text once, resolve each PAPX once, share the stream (0596)
+10067930a  perf(ooxml-common): borrow the MCE codec's attributes and names, and freeze its namespace emission
+6c4c1469b  docs(perf): the XLSX value editor admits no real producer file (0602)
+7e766cbc3  perf(pptx): reuse the revisions the cross-package copy has already proven (0598)
+818e58bee  perf(xlsx): stop refusing merges the ineligible scan can no longer place, and freeze the gate that skips the scan (0597)
+0744b1976  docs(perf): price the OLE2 zero-fill natively and freeze the appending design (0604)
+8fe9efa55  perf(zip,opc): share one Deflate decoder across an OOXML open's structural reads
+117bdf4c3  perf(xls): walk a whole XLS worksheet in one validated scan (0605)
+2611ac8c4  docs(perf): no opened deck can reach the PPTX slide regeneration (0607)
+8040896f3  perf(xlsx): parse declaration-only compatibility worksheets without the MCE rewrite (0603)
+0f116946c  perf(harness): give the corpora the shape real producers write, and price it
+1e4198321  perf(ppt): span the retained stream instead of copying every record payload (0606)
+c6df09bd3  docs(perf): price the XLS shared-string walk and freeze the lazy-index design (0608)
+1c0bcb92e  docs(perf): an XLSX open-edit-save reads one part of ninety, and the proposed ADR for lazy OPC part decode (0610)
+b2543d182  docs(perf): the facade's .doc slurp is cheaper than the source-backed DOC route (0609)
+4e6a923aa  docs(perf): baseline the length-changing OLE2 save and freeze the copy-through design (0617)
+3a88d75b3  docs(perf): the execution context bounds one session at a time (0615)
+344ed0298  perf(harness): attribute the standing XLS lifecycle failure to 0565, not 0595 (0619)
+aba3f943d  perf(zip): drive one Deflate compressor per authored save, not one per member (0618)
+7082a1a3f  docs(perf): price the XLS globals skip and decline it on a measured regression (0612)
+2d6fbeaed  perf(zip,opc): stop re-normalizing OOXML member names and bound the monitored-read scope
+1b0554c24  perf(xls): price the edit-and-save path and stop re-parsing the source at commit (0620)
+aa8012f82  fix(cfb): serialize explicitly created storages in a canonical order (0625)
+1946b964e  perf(xls): observe the source once per read on the text path, not four times per shared string (0621)
+2a12bd19e  perf(xlsx): carry sixteen bytes per cell from planning and delete the commit's second scan (0622)
+b559859ad  docs(perf): deflate is the largest term in a save and SAVE-6's threshold is wrong (0624)
+53846b93b  docs(perf): price the original-bytes publication audit and decline its memo (0613)
+732cf44ae  fix(opc): choose relationship reuse by rId, not by hash order (0628)
+9083a6934  perf(ci): fetch the last successful full run as the smoke baseline (0626)
+87bf89a16  perf(harness): give the OLE2 readers a range source, and price one (0627)
+2595967c5  test(litchi): attribute the managed DOCX facade budget failure to 0495, not the 0588-0594 wave (0629)
+3156bff3b  perf(zip): read one bounded span per OOXML member first-read (0611)
+b71d7442a  fix(xlsx,pptx,docx): order relationships by rId where a verdict reads them (0631)
+8b07b45dc  perf(opc): read one bounded span per contiguous run of structural members (0623)

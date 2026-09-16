@@ -1,0 +1,40 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0630",
+  "title": "The 0587 queue, worked: what landed, what fell, and what the survey got wrong",
+  "decision": "coordination record retained; the ranked queue in HOTSPOTS.md refreshed; no production change of its own",
+  "code_state": "this record modifies only documentation; the wave's production changes are the records 0588-0631 it closes, each merged with its own commit",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "every number quoted is the measuring record's own, with that record's tier and floor; nothing is re-measured or aggregated here",
+    "the wave worked every item of change 0587's 36-item queue to an outcome: landed with a paired measurement, frozen as a design, or declined or falsified on measurement",
+    "the survey's own errors that the wave exposed are annotated in the 0587 record beside the items they correct, and are listed here",
+    "the queue that remains is a set of prerequisites (human decisions on contracts, two proposed ADRs, missing infrastructure) rather than a set of optimizations, and is stated with the record that priced each"
+  ],
+  "accepted_evidence": {
+    "per_change_records": "records 0588 to 0631 with their packets under results/change-NNNN/, each with its own before and after measurements, oracles and gates",
+    "integration_gates": "fmt, clippy and test for the fourteen in-scope crates on the merged head mid-wave (1946b964e) and on the final head (8b07b45dc): clean, clean, and 436 test binaries all passing",
+    "merge_log": "the wave's commits on the main branch bound to their branch commits by cherry-pick trailers"
+  },
+  "accepted_costs": {
+    "merge_method": "each branch was cherry-picked onto the main branch in completion order and amended with its log sections; branch commits are retained for traceability",
+    "host_contention": "up to eight agents built and measured on one host at once, so each record's timing floor is its own and several rest on counts",
+    "usage_caps": "two session usage caps terminated seven and then eight agents mid-work; each was resumed from its transcript and worktree; no evidence was lost, and several records were finished in two sittings",
+    "gate_scope": "the integration gates ran with default features and do not reach the harness's own suite or the facade's feature-gated tests (0619, 0629)"
+  },
+  "known_gaps": {
+    "still_required_by_the_goal": "cold-cache and physical-device distributions, a real range source, peak RSS for read paths, concurrency scaling with a reachable parallel path, cross-platform confirmation, coverage-guided fuzzing",
+    "decisions_pending": "the original-bytes compactness contract at publication (0602, 0613), proposed ADRs 0030 and 0031, the OLE2 sector-layout policy (0617), the reader that owns a lazily loaded payload's refusal (0597), the DOCX whitespace-compaction question (0591)",
+    "not_re_verified": "the coordinator did not re-run any agent's measurement, oracle or differential"
+  },
+  "withheld": [
+    "any aggregate, geometric mean or program-level speedup across the wave; every claim stays scoped to the record that made it"
+  ],
+  "provenance": {
+    "base_revision": "08d968f8e",
+    "final_head": "8b07b45dc",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0"
+  }
+}

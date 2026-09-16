@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0630 — the 0587 queue, worked: 25 landed, 11 frozen or declined, and the survey corrected where it was wrong
+
+Change [0630](0630-queue-refresh-after-the-first-wave.md) closes the wave that worked change 0587's 36-item queue — records 0588 to 0631, each by one implementing agent in its own worktree with its own paired measurement — and refreshes the ranked queue at the foot of this file. The landed changes with the largest measured effects: the MCE codec's allocations (a real-file XLSX open plus cell −52% Ir, −44% p50, 0588); the DOC and PPT snapshot's hashing halved (native cycles −37% median over 38 fixtures, 0589); the ordinary DOCX edit's four scans cut to two (one edit −19% to −37% p50, 0591) and its paragraph index built lazily (full text −32% to −40%, 0592); the OPC publication plan's audits of unchanged members removed (publish cycles −63% to −71%, 0593); one Deflate decoder per open above a threshold (allocation bytes −59% to −73%, 0594) and one compressor per authored save (cycles −12%, 0618); the XLS frame loop and SST walk (−23% p50 open, 0595), text-path fences (full text −28%, 0621), a whole-sheet walk (19,000× fewer bytes per cell, 0605) and one fewer commit parse (commit −26% to −34%, 0620); the XLSB no-op reparse (−46%, 0599); the PPT record tree (open −24% Ir, retained bytes 2.9× → 1.2×, 0606); the PPTX opened transaction and cross copy (−16% and −25% Ir, 0590, 0598); one bounded read per ZIP member (requests halved, range-source open −44% to −53%, 0611); and the XLSX commit's second scan deleted (planning-plus-commit −34% to −41% Ir, every scenario faster, 0622). Frozen or declined on measurement: CFB-1 (the zero-fill is 0.6-2.9% of cycles natively, 0604), XLS-2 (0608), XLS-6 (slower, 0612), CORE-1 (slower, 0609), CORE-2 (0621), SAVE-3 (unreachable, 0607), XLSX-3's memo (unreachable, 0613), and the XML-1 namespace rewrite (load-bearing redundancy, 0588). Two proposed ADRs (0030, 0031) await review. Five correctness defects were fixed on the way (0597, 0619, 0625, 0628, 0631) and the CI smoke check was found to have been failing closed for 273 commits (0626). `performance_claim: none`.
+
 ## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
 
 Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
@@ -7321,58 +7325,41 @@ pattern elsewhere.
 
 ## Ranked work queue
 
-Replaced on 2026-09-15 by change [0587](0587-remaining-opportunity-survey.md), which
-ranks 36 opportunities across the whole OLE2 and OOXML path after screening each
-against the 586 records before it; the table below is copied from that record
-and the record carries the mechanism, code evidence, record status, ADR reading and
-falsification condition for every row. The previous queue, written before change
-0190 and headed "provisional until baseline measurements are recorded", ranked
-programmes that have since been implemented, rejected or superseded and is
-retained in the git history of this file. Identifiers refer to the area sections
-of the 0587 record; `step` is the `docs/GOAL.md` optimization-order step.
+Refreshed on 2026-09-16 by change [0630](0630-queue-refresh-after-the-first-wave.md)
+after the wave that worked change [0587](0587-remaining-opportunity-survey.md)'s
+queue: of its 36 items, the wave landed, froze, declined or falsified every one
+except the two it left for the next wave, and 0630 carries the outcome and the
+deciding number per item. What remains is mostly a set of prerequisites — human
+decisions on contracts, two proposed ADRs (0030, 0031), and infrastructure that does
+not exist — ordered below by the size of what each unblocks. The 0587 table this
+replaces, and the pre-0190 table before it, are retained in the git history of
+this file.
 
-| # | id | opportunity | step | size and tier | reach | risk | needs first |
-| ---: | --- | --- | --- | --- | --- | --- | --- |
-| 1 | XML-1 | MCE codec re-declares every namespace on every element: a real Excel sheet grows 16.9×, an eager open plus one cell costs 12.9× the control | 1 | 1,037.8 M vs 80.5 M Ir on one fixture, **measured**; 41 of 60 sheets affected, counted | every XLSX planning and edit route, PPTX text, DOCX source reads, on producer files | medium | frozen design; corpus-wide Ir differential |
-| 2 | DOC-1 | source-backed DOC and PPT snapshot opens hash the whole artifact 2-6 times | 1 | PPT text-edit open 13.4× the eager parse in cycles; DOC 2.5-6.5×, **measured** | every source-backed DOC/PPT read and commit | medium | frozen design of the ADR 0006 fence; 0582 harness re-run |
-| 3 | PPTX-1 | four complete-package revisions per opened transaction | 1 | 34.9% of whole child, **measured**; ~86% of each commit, modelled | every PPTX opened-document CRUD | low (a,b); medium (c,d) | (a,b) paired measurement; (c) frozen design |
-| 4 | DOCX-1 | a one-paragraph edit scans the main part four times and recompacts it whole | 1 | ~64% + 14% of timed Ir, **measured** | every ordinary DOCX edit and save | low (a); medium (b,c) | (a) measurement; (c) frozen record and preservation tests |
-| 5 | PPTX-2 | cross-package slide copy re-serializes and re-hashes source, destination and candidate five or more times | 1-2 | 85% of whole child, **measured** | cross-document copy and assembly | medium | frozen design on proof reuse |
-| 6 | XML-2 | selected-cell stream runs to EOF after the sheet is known ineligible, then the store re-parses | 1 | 63.6% of a source-backed read, **measured**; 27 of 60 sheets, counted | XLSX selected-cell reads on producer files | low-medium | frozen design with an error-order guard |
-| 7 | SAVE-1 | publication plan reserializes and audits unchanged `.rels` and content types | 1 | 32-36% of every save, **measured** | every OOXML save | low | A/B on the 132-member fixture |
-| 8 | ZIP-1 | a fresh Deflate decoder per structural member and per cold part | 2 | 60% of open allocation bytes; ≤18% Ir, **measured** | every OOXML open and cold read | low | ABBA open timing |
-| 9 | XLS-1 | lean worksheet frame loop; 0584's candidate 2 never landed | 1, 3 | 46.1% of the `54016` one-cell query, **retained** | XLS one cell, all cells, text | low | cycles A/B |
-| 10 | DOCX-2 | build the paragraph index lazily | 1 | 75% of a full-text read, **measured** | DOCX text reads | low | measurement |
-| 11 | DOC-2/3/4 | eager DOC open: four-pass text decode, triple PAPX resolution, FIB stream copy | 1-2 | 43% / 22-38% / 14% of opens, **measured** | every DOC open, both validations of every DOC edit | low to low-medium | measurement |
-| 12 | XLSX-2 | admit shared-string and relationship-bearing worksheets to 0525's readback and the value editor | 1 | 0525's 96%/30% is zero on 77 and 57 of 95 real files, counted | XLSX edit and save on producer files | medium | frozen design; SST harness shape |
-| 13 | XML-3 | admit marker-bearing worksheets to 0546's fused traversal | 1 | 0546's −22% planning is zero on 41 of 60 real files, counted; modelled | XLSX planning on producer files | medium | frozen design (0541 guards) |
-| 14 | ZIP-2 | one bounded positional read per member first-read | 2 | open 87 → 45 requests; 0572's 354 −40-50%, modelled | range-source OOXML reads | medium | frozen design; 0582 harness |
-| 15 | ZIP-5 | the accessor 0577's coalesced structural prefetch is blocked on | 2 | 87 → 10 open requests, modelled | range-source OOXML opens | medium | 0577's record, with error precedence stated |
-| 16 | SAVE-2 | buffer the atomic tempfile | 2 | 531 → ~11 write syscalls, **measured** count; 0.8-1.6 ms per save, modelled | every `save(path)` | low | `strace -c` on the target store |
-| 17 | XLS-2b | cheaper eager SST walk: single-segment fast path, no per-string `Vec` | 3 | up to half of 49.5% of the `54016` open, modelled | XLS open with strings | low | 0576 differential |
-| 18 | XLS-3 | retained validated sheet index and an all-cells iterator | 4 | 70.5% of a query per repeat, **retained** | XLS repeated queries, all cells | medium | frozen design (bounded cache) |
-| 19 | XLSB-1 | commit reparses the workbook for a proven no-op, twice for an edit | 1 | +84% no-op, +178% one edit, **measured** single leg | XLSB edit and no-op | low | a large synthetic XLSB fixture |
-| 20 | PPT-1 | record tree copies bytes once per nesting level and retains the stream | 2-3 | memcpy 30% of a PPT open; copy factor 1.3-2×, **measured** | every PPT open and edit | medium | design (public field) |
-| 21 | SAVE-5 | C2′: lazy decode behind the fallible package accessors | 2 | `load_parts_eager` 49% of an edit operation, **measured**; 3.58× retention, **retained** (0581) | every eager OOXML open, edit, save | medium | proposed ADR (0581 gates) |
-| 22 | CFB-1 | append-style reads so the whole-stream zero-fill never exists | 2 | 9-32% of DOC/PPT open Ir, **retained** upper bound; in-memory sources only | eager DOC, PPT and XLS opens | medium | frozen design; cycles A/B, may fall inside the floor |
-| 23 | XLS-2 | lazy SST indexing | 1 | 49.5% of the `54016` open, **retained**; moves when a malformed SST is refused | XLS open and list with strings | high | frozen design (0576) |
-| 24 | XLS-6 | skip never-interpreted globals payloads, frame once | 2 | ~30% of the flagship open Ir, **retained**; +46 requests, modelled | XLS open | medium-high | frozen design with the density gate |
-| 25 | XLSX-1 | compact per-cell source facts from planning into commit | 1-2 | ≤25% of a one-percent edit interval, modelled from 0550/0520 | XLSX source-backed edit | high | 0551's design plus its differential oracle |
-| 26 | XLSX-3 | reuse the publication audit of the unchanged original | 2 | ≤28% of publication, modelled from 0528 | XLSX publication | medium | memo: design; proof door: proposed ADR |
-| 27 | SAVE-3 | the PPTX eager save regenerates every slide | 1 | unknown | PPTX ordinary edit and save | medium-high | measurement, then frozen design |
-| 28 | ZIP-3 | five observations per cold part read, and a sticky monitor flag | 2 | 5 → 2 per read; 54 per stream, **measured** counts | file-backed OOXML reads | low-medium | 0563-style per-site analysis |
-| 29 | ZIP-4 | allocation-free member-name lookup, cheaper `PackURI` admission | 2 | ~19% of open-plus-part Ir, **measured** | every OOXML open | low | cycles A/B |
-| 30 | CORE-1 | the facade slurps every `.doc` and parses it eagerly | 1-2 | unknown; blocked by 8-of-57 admission | facade DOC opens | high | DOC-1 first; frozen design |
-| 31 | XLS-9 | XLS edit and save readback is a complete eager open | 1 | unknown; no attribution exists | XLS edit and save | medium-high | attribution, then proposed ADR or record |
-| 32 | CFB-2 | copy-through writer for length-changing OLE2 saves | 1-2 | unknown; no selector | XLS, DOC, PPT edit and save | high | frozen design and an ADR clarification |
-| 33 | XLS-4 | full-text per-string and per-row fences, rectangle walk | 1-2 | ≥48,165 `fstat` per extraction on a file, modelled | XLS text on file sources | low-medium | design note |
-| 34 | CORE-2 | 25 fences per file-backed XLS open, one per boundary | 2 | 1-1.5% locally; a count claim, modelled | file-backed XLS opens | medium | design note on fence placement |
-| 35 | CORE-3 | complete `ExecutionContext`: I/O concurrency, CPU budget, executor injection | 5 | prerequisite | every parallel path | low | proposed ADR (0005 amendment) |
-| 36 | CORE-4 / SAVE-6 | parallel deflate of changed members, gated | 5 | unknown; gate two or more members of ≥256 KiB | multi-part OOXML saves | medium | frozen design |
+| # | item | what it needs first | priced by |
+| ---: | --- | --- | --- |
+| 1 | the publication audit of original part bytes refuses 94 of 95 real OOXML packages; the same contract is 27.6% of source-backed publication instructions | a human decision on the compactness contract for original bytes (ADR 0006, record 0528); it gates every real-producer edit, XLSX-2, XLSX-3 and the XML-2 gate | 0602, 0613 |
+| 2 | lazy OPC part decode (C2′): an eager XLSX open-edit-save inflates 90 parts to read one | acceptance of proposed ADR 0030, then a migration of 259 sites | 0610, 0581 |
+| 3 | parallel deflate of changed members: 24-62% of every save's cycles | acceptance of proposed ADR 0031, then the measured balance rule, not the survey's threshold | 0624, 0615 |
+| 4 | the MCE codec's namespace-emission rewrite: a further −80% of the codec, −85% of a real-file open plus cell | the slice consumers (`Paragraph::extensions`, `Shape::xml`, five XLSX raw accessors, two publishing writers) must stop depending on per-element re-declaration; 133 sites classified | 0588 |
+| 5 | admission of `mc:Ignorable`/`dyDescent` worksheets to the fused traversal, and the value-only vocabulary that refuses every real worksheet | an admission-surface widening designed with 0602's D1-D4 | 0603, 0602, 0601 |
+| 6 | the XLSX selected-cell ineligibility gate: −63% of an ineligible read | the limit question and an ADR 0005 clarification on which reader owns a lazily loaded payload's refusal, or an observer-detach signal in `litchi-ooxml-common` | 0597 |
+| 7 | PPTX revision proof format: about 23% of what remains in an opened transaction | a frozen design with a magic bump for the `LPRM0001`/`LPCP0002` headers | 0590 |
+| 8 | the cross-package copy still builds and deflates the candidate twice (5.96 G Ir) | retaining the planned archive in the plan, an ADR 0005 memory question | 0598 |
+| 9 | fragment-only DOCX compaction and the main-part copy in `document_snapshot` | the owner's answer on whitespace compaction across untouched paragraphs (defect 5 of 0587) | 0591 |
+| 10 | the DOC and PPT snapshot's remaining hashing: the third identity pass and the duplicate index parse, 2 of the 6 surviving complete reads | an ADR 0006 fence design; until then the facade's `.doc` route stays eager by measurement | 0589, 0609 |
+| 11 | a copy-through OLE2 writer for DOC saves (13-30% of a DOC save) | an ADR clarification of physical sector layout policy | 0617 |
+| 12 | the retained XLS sheet index (repeat queries) | an evictable weighted cache, which no crate has | 0605 |
+| 13 | the XLS commit's second candidate parse (137 M Ir) and `Snapshot::from_bytes`'s double framing | a measured fusion that keeps the coverage proof's order; the readback-owner swap is inadmissible | 0620 |
+| 14 | framing the XLS globals once (1.5% of the flagship open) | nothing; the one survivor of 0574's list | 0612 |
+| 15 | XLSB: `insert_candidate_cell`/`transfer_cell` reparse twice; `apply_sparklines`/`apply_cell_watches` never refresh derived fields | a selector for `apply_workbook_structure`; a correctness answer for the latter | 0599 |
+| 16 | PPT: `SlideFactory`/`NotesIndex` still re-parse each slide through the copying entry point (the +4.7% text-only selector) | a follow-on change in `litchi-ppt` | 0606 |
+| 17 | XLSX facts: the builder is 15-18% of planning; snapshot chains drop facts after the first commit; `<f>` worksheets declined | measurement, then a follow-on | 0622 |
+| 18 | range sources: the whole-sheet XLS walk is request-bound (16,145 requests, 16,061 under 512 bytes); a PPT snapshot open reads 2.02× the file | a cursor read batch for range sources, designed against the fence records | 0627, 0605 |
+| 19 | `SequentialTextWriter`'s two writes per row; `query_cell`'s leading fence | a follow-on in `litchi-xls` | 0621 |
+| 20 | correctness: 86 order-sensitive sites in the consumer crates (three verdict-changing ones taken by 0631), `get_or_add` invalidating the source capture on a no-op reuse, the DOC facade's field-table refusals, the `office_crud_demo` PPTX update, `refine_workbook_format`, MCE output limits on the expanded stream | owners' decisions | 0628, 0587, 0607, 0588 |
 
-Smaller items are recorded in the 0587 area sections and are not ranked. Rank is a
-judgment over expected CRUD reach times size, divided by risk, and moves as the
-top items are priced natively; nothing in the table is authorized by the survey.
+Nothing in the table is authorized by 0630; each row names the record that priced
+it and the decision or design it waits on.
 
 ## Evidence still missing
 

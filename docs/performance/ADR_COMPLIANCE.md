@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0630 — no ADR weakened across 41 records; two proposed, four clarifications requested
+
+Across the wave change [0630](0630-queue-refresh-after-the-first-wave.md) closes, no accepted ADR was weakened and no exception was requested: every record that met a contract boundary stopped at a frozen design (0597, 0602, 0604, 0607, 0608, 0609, 0612, 0613, 0617, 0624), every landed change kept its refusals where they were and its output byte-identical over the fixture corpus, and the one disclosed behaviour change (0593's copy of an unchanged relationship part whose canonical form would exceed the auditor's ceiling) is recorded with its precedent. Two ADRs are proposed and await human review: 0030 (lazy OPC part decode, 0610) and 0031 (execution-context budgets, 0615). Four clarifications are requested of the owner: the compactness contract for original part bytes at publication (0602, 0613), physical sector-layout policy for an OLE2 copy-through writer (0617), which reader owns a lazily loaded payload's malformed-input refusal (0597), and whether the ordinary DOCX commit's whitespace compaction across untouched paragraphs is intended (0591). Five records restored determinism or an exact no-op where ADR 0006 or ADR 0003 required it (0597, 0619, 0625, 0628, 0631).
+
 ## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
 
 Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
