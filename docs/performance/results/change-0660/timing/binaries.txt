@@ -1,0 +1,13 @@
+The staged harness binaries and the probe binaries that produced the
+retained measurements. sha256sum output.
+
+# timing windows w2 and w3, and every deterministic count and census in
+# this packet (the committed change):
+be066f8268e5dafde992fb4c8a6a55cdb67c941b2a1be9d760f9ebadddda5eb5  /home/zhuhe/code/litchi-worktrees/targets/0660-stage/before
+8a8325b47d58092133dbc81deda484019c7c44055ffa5930ec392e93ccb588b0  /home/zhuhe/code/litchi-worktrees/targets/0660-stage/after
+e0565740b5c6e75699add514d0043cedbbbff632d6a0c812220fc20232399c6c  /home/zhuhe/code/litchi-worktrees/targets/0660-probe/before/target/release/docx-compaction-policy-probe
+80ee99e095083740ccd9d47dc652e2511e2e45dc60579e7fe69383a98bef013c  /home/zhuhe/code/litchi-worktrees/targets/0660-probe/after/target/release/docx-compaction-policy-probe
+
+# timing window w1 only: the change binary before a no-op refactor that
+# merged two identical match arms and moved three private functions.
+963b899b949b636646bda11c4b21b0fdaa0f4f3b37ce5064fb1da2bad803bbfd  litchi-perf-baseline (after, w1)
