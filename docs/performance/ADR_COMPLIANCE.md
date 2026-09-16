@@ -1,5 +1,38 @@
 # Performance optimization ADR-compliance matrix
 
+## 0636 — a window that moves when bytes are read, not which bytes exist
+
+The window is a **wrapper**, not a mode of `SharedOleStreamCursor`, and that is
+the compliance argument as much as the performance one: every byte it moves goes
+through the public cursor API, so the cursor keeps its type, its size, its drop
+glue and its read path, and a caller that does not build a wrapper cannot pay
+for one. ADR 0003's bounded-resource rule is met by a ceiling clamped to a
+published 64 KiB constant, a window grown with `try_reserve_exact` that reports
+`OleError::Allocation` on failure, and a fill clamped to the declared stream
+length, so no byte outside the selected stream is ever read. ADR 0005's
+lazy-payload contract is observed rather than altered: the window is filled on
+demand from the same chain walk and never materializes a stream — the MiniFAT
+parity test asserts the Mini Stream cache stays unmaterialized. ADR 0006 is
+untouched: no execution context, no worker pool, no ambient I/O, no lock.
+Because every fill is a cursor `read_exact`, change 0558's trailing fence and
+change 0317's `SourceChanged`-wins precedence execute unmodified, and nothing is
+committed before the step that can fail has succeeded. One contract does move,
+for the opted-in caller only, and it is stated rather than absorbed: a read the
+window covers takes no observation of its own, so change 0621's one-per-read
+rule becomes one per fill and a mutation between two served reads is reported by
+the next fill. Two things bound it — `validate_source_with_limits` ends every
+exit path with an observation that refuses `SourceChanged`, so the
+operation-level bracket is exactly what it was; and a mutation reverted before
+the next fill is not observed, which `litchi_core::FileVersionPolicy` already
+documents for reverted transitions. Change 0621's change-under-read sweep is
+extended to fill boundaries and pins both halves. One defence forced the design
+and is preserved to the byte: XLS validation must stop at a FILEPASS record
+without reading the ciphertext behind it, so the window is not opened until
+`filepass_slot_open` has closed and a properly-placed FILEPASS can no longer
+appear — `xor-encryption-abc.xls` reads the same 8 requests and 2,078 bytes on
+both legs. No ADR is amended and no ADR clarification is proposed.
+[Change 0636](0636-cfb-cursor-bounded-window.md); `performance_claim: none`.
+
 ## 0635 — compliant; two contract questions raised and both answered by declining
 
 Record: [0635](0635-xlsx-facts-builder-and-chains.md).

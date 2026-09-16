@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0636 — the XLS range-source hotspot is validation, not the whole-sheet walk
+
+Change 0630's item 18 aimed a cursor read-ahead at change 0627's most expensive
+range-source scenario, the `54016.xls` whole-sheet walk: 16,145 requests, 16,061
+of them at most 512 bytes. Attribution says the target is wrong twice over.
+First, the walk's small requests are not the worksheet frame loop — change 0568
+already windows that, and the probe sees its exact `512, 1024, 2048, …` schedule
+— they are **shared-string resolutions**, one fresh `stream_cursor_at_hinted`
+cursor and one read per string, 6,214 of them 3 bytes long, jumping backwards
+4,444 times; a read-ahead has no second read on those cursors to serve. Second,
+the header-then-payload loop the item describes is `StreamingRecordReader` in
+`crates/litchi-xls/src/validation.rs`, and it is **five times more expensive**
+than the walk on the same fixture: `litchi_xls::validation::validate_source`,
+which takes an `Arc<dyn ReadAt>` and is therefore a range-source entry point,
+costs **82,727 positional reads and 82,705 source observations** on
+`54016.xls`, 41,358 of those reads exactly four bytes. A bounded window over the
+cursor takes it to **60 reads and 31 observations** for the same 937,418 bytes;
+across 113 XLS fixtures validation falls from 264,622 reads to 1,842 and from
+275,925 observations to 1,699 for 35 more bytes in total, with every one of 565
+frozen outcome digests identical. Natively that is −73.84% cycles on the owned
+source and −98.31% p50 over `FileSource`, where 82,727 `pread` and 82,705
+`fstat` calls become 60 and 31. The walk itself is untouched, and the
+shared-string cursor is now the named next item on that axis.
+[Change and limitations](0636-cfb-cursor-bounded-window.md);
+[evidence](results/change-0636/README.md).
+
 ## 0635 — the XLSX fact builder, the stylesheet count, and a chain that nothing reaches
 
 Record: [0635](0635-xlsx-facts-builder-and-chains.md).

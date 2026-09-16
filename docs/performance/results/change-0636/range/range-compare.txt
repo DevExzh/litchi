@@ -1,0 +1,7 @@
+case                                             req b   req a    bytes b    bytes a  seq-sha256-equal
+xls_range_source_open                               40      40     317171     317171  True
+xls_range_source_open_list_worksheets               40      40     317171     317171  True
+xls_range_source_open_one_cell                      66      66     933004     933004  True
+xls_range_source_open_all_cells                  16145   16145    1256139    1256139  True
+xls_range_source_open_full_text                  16145   16145    1256139    1256139  True
+ALL FIVE SCENARIOS IDENTICAL

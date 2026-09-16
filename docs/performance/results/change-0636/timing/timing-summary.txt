@@ -1,0 +1,64 @@
+scenario                               leg      p50 us    mean us     p95 us     p99 us
+allcells-owned-54016                   A1     7748.378   7721.984   7802.619   7847.710
+allcells-owned-54016                   B1     7830.840   7827.881   7921.780   7968.170
+allcells-owned-54016                   B2     7948.731   7949.364   8013.801   8022.921
+allcells-owned-54016                   A2     7655.259   7653.958   7699.899   7728.579
+allcells-owned-54016                   A/A  floor p50   -1.20%   B/B   +1.51%
+allcells-owned-54016                   A→B  p50   +3.12%  p95   +2.63%  p99   +2.27%
+
+fulltext-owned-54016                   A1    17671.689  18141.815  20957.355  21743.590
+fulltext-owned-54016                   B1    17835.690  18340.842  21243.436  22303.523
+fulltext-owned-54016                   B2    17829.999  18390.859  21167.737  22292.202
+fulltext-owned-54016                   A2    17589.358  18084.455  19937.760  21826.680
+fulltext-owned-54016                   A/A  floor p50   -0.47%   B/B   -0.03%
+fulltext-owned-54016                   A→B  p50   +1.02%  p95   +1.80%  p99   +2.18%
+
+fulltext-owned-wcv                     A1     1028.045   1028.411   1039.455   1044.365
+fulltext-owned-wcv                     B1     1026.685   1027.509   1035.775   1043.675
+fulltext-owned-wcv                     B2     1044.975   1046.367   1061.945   1084.025
+fulltext-owned-wcv                     A2     1031.706   1035.974   1060.236   1096.575
+fulltext-owned-wcv                     A/A  floor p50   +0.36%   B/B   +1.78%
+fulltext-owned-wcv                     A→B  p50   +0.59%  p95   +0.35%  p99   +1.10%
+
+open-owned-54016                       A1      179.921    181.782    188.831    190.761
+open-owned-54016                       B1      178.171    179.609    185.611    192.081
+open-owned-54016                       B2      178.501    180.016    185.700    186.261
+open-owned-54016                       A2      180.341    181.961    188.381    197.281
+open-owned-54016                       A/A  floor p50   +0.23%   B/B   +0.19%
+open-owned-54016                       A→B  p50   -1.06%  p95   -1.64%  p99   -2.64%
+
+validate-file-54016                    A1    27974.924  27808.723  28174.309  28212.389
+validate-file-54016                    B1      472.863    471.904    476.733    478.183
+validate-file-54016                    B2      471.733    471.164    475.493    477.062
+validate-file-54016                    A2    27943.920  27996.604  28249.082  28303.873
+validate-file-54016                    A/A  floor p50   -0.11%   B/B   -0.24%
+validate-file-54016                    A→B  p50  -98.31%  p95  -98.31%  p99  -98.31%
+
+validate-file-cfs                      A1     2489.362   2490.921   2502.872   2511.523
+validate-file-cfs                      B1      145.401    146.587    152.931    161.821
+validate-file-cfs                      B2      146.881    148.234    154.411    155.861
+validate-file-cfs                      A2     2491.042   2491.004   2502.113   2508.063
+validate-file-cfs                      A/A  floor p50   +0.07%   B/B   +1.02%
+validate-file-cfs                      A→B  p50  -94.12%  p95  -93.85%  p99  -93.56%
+
+validate-owned-54016                   A1     1738.679   1738.924   1744.609   1763.978
+validate-owned-54016                   B1      452.113    451.902    456.682    469.472
+validate-owned-54016                   B2      452.622    452.114    457.512    468.232
+validate-owned-54016                   A2     1726.898   1726.881   1733.238   1735.539
+validate-owned-54016                   A/A  floor p50   -0.68%   B/B   +0.11%
+validate-owned-54016                   A→B  p50  -73.89%  p95  -73.78%  p99  -73.18%
+
+validate-owned-cfs                     A1      211.342    213.145    218.901    224.741
+validate-owned-cfs                     B1      123.681    124.502    130.751    133.071
+validate-owned-cfs                     B2      122.060    123.282    129.740    131.941
+validate-owned-cfs                     A2      211.461    213.275    218.661    219.921
+validate-owned-cfs                     A/A  floor p50   +0.06%   B/B   -1.31%
+validate-owned-cfs                     A→B  p50  -41.89%  p95  -40.53%  p99  -40.79%
+
+validate-owned-wcv                     A1       99.601    100.288    105.340    106.561
+validate-owned-wcv                     B1       33.420     33.668     33.710     40.970
+validate-owned-wcv                     B2       33.530     33.742     33.790     40.080
+validate-owned-wcv                     A2       99.880    100.739    106.290    109.041
+validate-owned-wcv                     A/A  floor p50   +0.28%   B/B   +0.33%
+validate-owned-wcv                     A→B  p50  -66.45%  p95  -68.07%  p99  -62.42%
+

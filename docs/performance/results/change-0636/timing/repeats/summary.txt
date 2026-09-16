@@ -1,0 +1,29 @@
+scenario                               leg      p50 us    mean us     p95 us     p99 us
+allcells-owned-54016-r1                A1     7731.634   7730.881   7800.005   7835.425
+allcells-owned-54016-r1                B1     7724.635   7722.341   7779.844   7829.020
+allcells-owned-54016-r1                B2     7976.162   7974.387   8027.521   8079.942
+allcells-owned-54016-r1                A2     7658.210   7659.240   7719.990   7754.170
+allcells-owned-54016-r1                A/A  floor p50   -0.95%   B/B   +3.26%
+allcells-owned-54016-r1                A→B  p50   +2.78%  p95   +2.87%  p99   +2.87%
+
+allcells-owned-54016-r2                A1     7643.616   7648.786   7704.086   7717.936
+allcells-owned-54016-r2                B1     7760.780   7753.675   7800.560   7851.190
+allcells-owned-54016-r2                B2     7743.430   7748.244   7798.660   7814.710
+allcells-owned-54016-r2                A2     7806.510   7789.454   7856.210   7876.990
+allcells-owned-54016-r2                A/A  floor p50   +2.13%   B/B   -0.22%
+allcells-owned-54016-r2                A→B  p50   +0.62%  p95   -0.63%  p99   -0.64%
+
+fulltext-owned-54016-r1                A1    18026.813  18872.207  22245.425  24402.935
+fulltext-owned-54016-r1                B1    18327.775  18929.224  21875.837  23625.091
+fulltext-owned-54016-r1                B2    18264.851  18912.085  22258.249  24124.367
+fulltext-owned-54016-r1                A2    20087.629  20432.138  24467.299  25814.794
+fulltext-owned-54016-r1                A/A  floor p50  +11.43%   B/B   -0.34%
+fulltext-owned-54016-r1                A→B  p50   -4.36%  p95   -7.22%  p99   -6.29%
+
+fulltext-owned-54016-r2                A1    18349.595  19004.525  22236.276  23761.141
+fulltext-owned-54016-r2                B1    18301.646  18864.340  21939.223  23321.389
+fulltext-owned-54016-r2                B2    18210.545  18918.876  22619.827  24602.486
+fulltext-owned-54016-r2                A2    18785.079  19500.649  22979.118  24813.677
+fulltext-owned-54016-r2                A/A  floor p50   +2.37%   B/B   -0.50%
+fulltext-owned-54016-r2                A→B  p50   -1.70%  p95   -1.75%  p99   +1.18%
+

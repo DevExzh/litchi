@@ -1,0 +1,16 @@
+Read-path control deltas across the three `perf stat` windows this change ran.
+The third window is the one the record tabulates and whose raw CSV is retained
+in this directory; the first two ran against earlier builds of the same change
+(the field-based implementation is excluded; these are all wrapper builds).
+
+scenario                cycles delta per window          instructions delta per window
+all-cells 54016.xls     +0.48%   +0.68%   +2.15%         +0.00%   +0.00%   +0.00%
+full-text 54016.xls    -10.82%   -7.44%  +12.60%         -0.01%   -0.18%   -0.54%
+full-text WithCustomViews.xls
+                        -8.16%   +1.04%   -0.40%         -0.08%   +0.34%   -0.31%
+open 54016.xls          -0.01%   -0.27%   +0.30%         +0.01%   -0.01%   -0.01%
+
+The instruction column is stable to well under a percent and the cycle column
+swings by more than twenty points on one row. Nothing on these paths changed, so
+the cycle column is measuring host state, and the record reads these rows from
+the instruction counts and the paired medians rather than from cycles.
