@@ -6565,6 +6565,16 @@ fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
 }
 
 fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
+    scratch_root(requested_root, "filesystem")
+}
+
+/// Creates one private directory for a selector that needs the filesystem.
+///
+/// The parent is the caller's `--filesystem-root` when it supplied one, so the
+/// destination device is the caller's choice rather than an ambient default;
+/// the temporary directory is the documented fallback this harness has always
+/// used for its filesystem cases.
+pub(crate) fn scratch_root(requested_root: Option<&Path>, label: &str) -> io::Result<PathBuf> {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -6572,7 +6582,7 @@ fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
     let parent = requested_root.map_or_else(env::temp_dir, Path::to_path_buf);
     fs::create_dir_all(&parent)?;
     let root = parent.join(format!(
-        "litchi-perf-filesystem-{}-{timestamp}",
+        "litchi-perf-{label}-{}-{timestamp}",
         std::process::id()
     ));
     fs::create_dir(&root)?;

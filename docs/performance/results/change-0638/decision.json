@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0638",
+  "title": "The facade's .doc and .ppt routes and the ordinary documented OOXML save get selectors, and the save turns out to cost 8 to 62 times more to publish than to serialize",
+  "decision": "retained, harness-only; thirty opt-in selectors in tools/perf-baseline and a first descriptive baseline",
+  "code_state": "tools/perf-baseline, tools/test_perf_baseline_source_policy.py and docs/performance/CORPUS_MANIFEST_V2.md only; no file under crates/ changed; no new unsafe, no new dependency, no new external package in the harness lock",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's evidence gap 5 has two halves and change 0630 confirmed both were still open after the first wave: no selector opened a .doc or a .ppt through the litchi facade, and no selector measured the ordinary documented OOXML save path; changes 0593, 0607 and 0609 each had to build a throwaway probe outside the workspace, and 0609's 57-fixture census has been unreproducible from the repository ever since",
+    "change 0593 stated the price of a Path A selector as 'changes the checked catalog SHA-256, the selector registry and the coverage-index minimum'; only the registry moves, 471 to 501 names, because none of the thirty selectors is in Case::DEFAULT and the coverage index's minimum_selectable_cases is 439",
+    "the phase decomposition is the finding: the atomic publication costs 7.7x to 61.7x the identical serialization into a counting sink over six corpora and three formats, so a documented save is publication-bound rather than serialization-bound, and a compression or layout optimization on this route is worth at most 0.2% to 8.7% of a lifecycle",
+    "one shape-text edit on a real 108 KB deck costs 133.61 ms, 95.7% of the PPTX real-file lifecycle and 490x that deck's complete serialization, against 1.95 ms for the same edit on the 61-member generated corpus; the A/A spread on that row is 3.02%, so the figure is solid and unexplained",
+    "the byte split prices change 0593's pristine-member preservation for the first time in bytes rather than member counts: a one-element edit regenerates 0.45% of the XLSX real file's payload bytes, 1.9% of the PPTX real file's and 13.1% of the generated DOCX's",
+    "the save family proves changes 0625's and 0631's determinism invariant on Package::save/Workbook::save rather than on a probe: six corpora each prove that two fresh open/edit/save cycles publish the same digest and that saving one edited owner twice publishes the same digest, before any sample runs"
+  ],
+  "accepted_evidence": {
+    "timing": "tools/perf-baseline, --warmup 20 --samples 50, pinned with taskset -c 14, three complete repeats (R1, R2, R3) of four invocations each; p50/mean/p95/p99 per case from the harness's own statistics; the widest p50 disagreement between the three repeats is the A/A floor per row, because the repeats are the same staged binary over the same bytes",
+    "phase_attribution": "four separately reported phases per (format, origin): lifecycle (open+edit+save), edit alone, atomic save-to-path alone, and documented sequential serialization into a bounded counting sink alone; the open and the edit are outside the clock for the two publish phases, and the destination directory is prepared and the readback, digest and cleanup happen outside the clock, as change 0497's atomic arm does",
+    "byte_accounting": "derived from the published archive and the source archive with soapberry_zip::ZipArchive: a compression-method split (deflate/stored) and a provenance split (byte-identical to the same-named source member's compressed payload, or regenerated) of every published member's stored payload, plus the uncompressed payload of the regenerated Deflate members and the ZIP framing remainder",
+    "determinism": "per corpus and before any sample: two fresh open/edit/save cycles must publish the same digest, and saving one edited owner twice must publish the same digest; per retained sample: the published artifact must equal the corpus reference and the edit outcome must equal the frozen one; per retained facade sample: the projection must equal the oracle derived from the file before the run. 5,850 retained samples, no deviation",
+    "refusal_identity": "two typed refusals measured rather than dropped and frozen as scenario outcomes: the facade's Corrupted file refusal on duplicate-style-names.doc, reproducing change 0609's census message, and litchi_docx::Package::document_mut()'s invalid DOCX XML refusal on change 0593's own alt-chunk-header.docx fixture, stable over 600 retained samples",
+    "gates": "cargo fmt --all --check, cargo clippy --release --locked --all-targets, cargo test --release --locked, cargo doc --release --locked --no-deps on tools/perf-baseline; python3 -m unittest on all 27 tools/test_*.py modules; check_perf_claims.py --mode strict, check_report_claim_classification.py, validate_crud_coverage_index.py and non_iwork_gate.py verify"
+  },
+  "accepted_costs": {
+    "device_bound_medians": "eight of thirty-nine rows have an A/A floor above 5% and five of them carry the atomic publication, whose two fsync calls and rename are served by a device shared with seven other agents; the PPTX real-file atomic median was 6.89, 11.04 and 9.33 ms on the three repeats, so every atomic-publication median is an order of magnitude rather than a number",
+    "host_state_drift": "the two largest DOC facade rows on FloatingPictures.doc agreed within 0.7% on R1 and R2 (275.3 and 277.2 microseconds) and ran 32% faster on R3 (188.6 microseconds); that is a host-state change, not sample noise, and it is why those rows carry a 47.01% and a 6.93% floor",
+    "no_counts": "no allocation, RSS, instruction or cycle counts were taken; the phase attribution is wall-clock only",
+    "counting_phase_asymmetry": "counting_publish times Package::to_stream for DOCX and Workbook::write_to for XLSX but Package::to_bytes for PPTX, which has no sequential-sink entry point, so the PPTX row additionally pays a whole-archive allocation",
+    "one_edit_shape": "one appended paragraph, one cell set to a string, one shape's text replaced; nothing is claimed about batch, length-changing or part-adding edits",
+    "derived_not_instrumented": "litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes, so payload_bytes_identical_to_source is an upper bound on what a copy-through publisher could have avoided re-deflating and not an observation that this writer copied anything"
+  },
+  "known_gaps": {
+    "docx_editor_refusal": "litchi_docx::Package::document_mut() refuses change 0593's alt-chunk-header.docx with 'invalid DOCX XML: syntax error: tag not closed' although Package::open admits it and Package::save republishes it; the extent is uncharacterized (one fixture) and the fix belongs to crates/litchi-docx, not to a harness record",
+    "pptx_opened_transaction_cost": "the 133.61 ms one-shape-text edit on a 103-member real deck is measured and unexplained; opened_presentation_transaction() captures a snapshot of the whole opened presentation and no instruction profile of that capture exists",
+    "facade_census": "change 0609's 57-fixture DOC census is not reproduced; this record measures three .doc and two .ppt fixtures, and the facade selectors take one fixture per format per run",
+    "atomic_interval_attribution": "the atomic interval is one opaque litchi_opc::atomic::replace_with; its sibling creation, two syncs and rename are not separated, which needs production instrumentation or strace and which change 0497's precedent also declined",
+    "ole2_save": "change 0587's gap 5 also names OLE2 length-changing saves, file-backed cold part reads, PPTX capture/commit/apply timers and eager DOCX phases; this record closes the DOC/PPT facade and ordinary-OOXML-save halves only"
+  },
+  "withheld": [
+    "any registered speedup, regression, throughput, allocation, RSS, instruction, cycle, cold-cache, physical-device, fsync-attribution, network, real-producer-breadth or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0638-harness-facade-and-ordinary-save-selectors",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "cpu_pin": "taskset -c 14",
+    "binaries": {
+      "litchi-perf-baseline": "6abee148b50bb6beff8f1bbfe5ea61a28ee095fbbf0664fe7c5a14d1111df4bb"
+    },
+    "note": "there is no before leg: nothing under crates/ changed and every selector is new, so the whole capture is one descriptive baseline. The binary was staged outside the Cargo target directory before the run, and the save destinations lived on the host's ext4 root filesystem through --filesystem-root, never on this host's RAM-backed /tmp."
+  }
+}

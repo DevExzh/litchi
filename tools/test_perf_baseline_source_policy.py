@@ -43,6 +43,12 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.ole2_range_source = (
             PERF_BASELINE / "src" / "ole2_range_source.rs"
         ).read_text(encoding="utf-8")
+        cls.facade_ole2 = (PERF_BASELINE / "src" / "facade_ole2.rs").read_text(
+            encoding="utf-8"
+        )
+        cls.ordinary_save = (PERF_BASELINE / "src" / "ordinary_save.rs").read_text(
+            encoding="utf-8"
+        )
         cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
             encoding="utf-8"
         )
@@ -310,6 +316,113 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             "PptRangeSourceOpenOneShapeText",
             "PptOwnedSourceControlOpen",
             "PptOwnedSourceControlOpenOneShapeText",
+        ):
+            self.assertIn(f"Self::{case}", self.library)
+            self.assertNotIn(case, default_matrix)
+
+
+    def test_facade_and_ordinary_save_modules_own_no_unsafe_or_ambient_surface(self):
+        # Change 0638's two modules. The facade module reads a caller-named
+        # path; the ordinary-save module writes into a caller-named directory
+        # through `filesystem::scratch_root`, which is where `std::env` lives
+        # in this harness. Neither may reach for an ambient one itself.
+        self.assertIn("mod facade_ole2;", self.library)
+        self.assertIn("mod ordinary_save;", self.library)
+        for module in (self.facade_ole2, self.ordinary_save):
+            self.assertNotIn("unsafe", module)
+            self.assertNotIn("#[global_allocator]", module)
+            self.assertNotIn("std::env", module)
+            self.assertNotIn("Command", module)
+        self.assertIn(
+            "crate::filesystem::scratch_root(requested_root, \"ordinary-save\")",
+            self.ordinary_save,
+        )
+
+    def test_facade_selectors_reuse_the_bounded_ole2_file_input(self):
+        # The facade family names no new caller-supplied input: it reads the
+        # same `--ole2-file` fixture change 0627 bounded, through the same
+        # bounded reader, and the module performs no whole-file read of its
+        # own.
+        self.assertEqual(self.facade_ole2.count("fs::read("), 0)
+        self.assertIn("ole2_range_source::{cfb_inventory, provenance_of, read_bounded}", self.facade_ole2)
+        self.assertIn("fn build_doc_corpus(path: &Path)", self.facade_ole2)
+        self.assertIn("fn build_ppt_corpus(path: &Path)", self.facade_ole2)
+        self.assertIn("struct FacadeEvidence", self.facade_ole2)
+        for field in ("real_file: RealFileProvenance", "cfb_stream_count: usize"):
+            self.assertIn(field, self.facade_ole2)
+        # `--ole2-file` now classifies DOC as well, and stays the single
+        # authority for a caller-named OLE2 fixture.
+        self.assertIn("Format::Doc => &mut inputs.doc,", self.ole2_range_source)
+        self.assertIn("fn classify_inputs(paths: &[PathBuf])", self.ole2_range_source)
+
+    def test_ooxml_file_selectors_are_opt_in_bounded_and_self_identifying(self):
+        # `--ooxml-file` is the third input whose bytes come from outside the
+        # process. Keep it bounded, keep its identity in the corpus, and keep
+        # it out of the default matrix.
+        self.assertIn(
+            "const MAX_OOXML_FILE_BYTES: u64 = 32 * 1024 * 1024;",
+            self.ordinary_save,
+        )
+        # Exactly one read of a caller-named path, and it is the bounded one.
+        # Every other `fs::read` in the module reads back an artifact this
+        # harness itself just published into its own private workspace.
+        self.assertIn("fn read_bounded(path: &Path)", self.ordinary_save)
+        self.assertEqual(self.ordinary_save.count("fs::read(path)"), 1)
+        for readback in (
+            "fs::read(&corpus.workspace.destination)",
+            "fs::read(&corpus.workspace.alternate)",
+        ):
+            self.assertIn(readback, self.ordinary_save)
+        self.assertIn('"--ooxml-file" => {', self.library)
+        self.assertIn("--ooxml-file PATH", self.library)
+        self.assertIn("fn classify(path: &Path) -> Result<Format,", self.ordinary_save)
+
+    def test_ordinary_save_reports_its_publication_and_determinism_evidence(self):
+        # The record's three load-bearing claims must be structural, not
+        # narrative: the atomic interval names its steps, the byte split names
+        # its derivation, and the 0625/0631 invariant is proved per corpus.
+        self.assertIn("atomic_publication_steps", self.ordinary_save)
+        self.assertIn("repeated_cycles_identical", self.ordinary_save)
+        self.assertIn("repeated_saves_identical", self.ordinary_save)
+        self.assertIn("payload_bytes_identical_to_source", self.ordinary_save)
+        self.assertIn("uncompressed_payload_bytes_regenerated", self.ordinary_save)
+        self.assertIn("edit_outcomes_identical", self.ordinary_save)
+
+    def test_change_0638_selectors_are_absent_from_the_default_matrix(self):
+        start = self.library.index("const DEFAULT: ")
+        end = self.library.index("];", start)
+        default_matrix = self.library[start:end]
+        for case in (
+            "DocFacadeFileOpen",
+            "DocFacadeFileFullText",
+            "DocFacadeFileOneParagraph",
+            "PptFacadeFileOpen",
+            "PptFacadeFileFullText",
+            "PptFacadeFileOneSlideText",
+            "DocxOrdinarySaveLifecycle",
+            "DocxOrdinarySaveEdit",
+            "DocxOrdinarySaveAtomicPublish",
+            "DocxOrdinarySaveCountingPublish",
+            "DocxRealFileOrdinarySaveLifecycle",
+            "DocxRealFileOrdinarySaveEdit",
+            "DocxRealFileOrdinarySaveAtomicPublish",
+            "DocxRealFileOrdinarySaveCountingPublish",
+            "XlsxOrdinarySaveLifecycle",
+            "XlsxOrdinarySaveEdit",
+            "XlsxOrdinarySaveAtomicPublish",
+            "XlsxOrdinarySaveCountingPublish",
+            "XlsxRealFileOrdinarySaveLifecycle",
+            "XlsxRealFileOrdinarySaveEdit",
+            "XlsxRealFileOrdinarySaveAtomicPublish",
+            "XlsxRealFileOrdinarySaveCountingPublish",
+            "PptxOrdinarySaveLifecycle",
+            "PptxOrdinarySaveEdit",
+            "PptxOrdinarySaveAtomicPublish",
+            "PptxOrdinarySaveCountingPublish",
+            "PptxRealFileOrdinarySaveLifecycle",
+            "PptxRealFileOrdinarySaveEdit",
+            "PptxRealFileOrdinarySaveAtomicPublish",
+            "PptxRealFileOrdinarySaveCountingPublish",
         ):
             self.assertIn(f"Self::{case}", self.library)
             self.assertNotIn(case, default_matrix)

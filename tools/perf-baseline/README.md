@@ -2875,6 +2875,119 @@ baseline: the first measurement of any OLE2 reader over a range source. They
 are absent from `Case::DEFAULT`, and the checked default catalog SHA-256 does
 not move for them.
 
+## Opt-in facade and ordinary-save selectors (change 0638)
+
+Change 0587's evidence gap 5, in two halves: **no selector opened a `.doc` or a
+`.ppt` through the `litchi` facade**, and **no selector measured the ordinary
+documented OOXML save path** — `Package::save` / `Workbook::save` to a path,
+"Path A" of change 0593. Changes 0593, 0607 and 0609 measured all three with
+throwaway probes built outside the workspace. These thirty selectors register
+them. None is in `Case::DEFAULT`; the checked default catalog SHA-256 does not
+move for them.
+
+### Six facade selectors
+
+```text
+doc_facade_file_open            ppt_facade_file_open
+doc_facade_file_full_text       ppt_facade_file_full_text
+doc_facade_file_one_paragraph   ppt_facade_file_one_slide_text
+```
+
+They call `litchi::Document::open` / `Presentation::open` on a caller-named real
+file — the facade takes a path, not bytes — and then `text()`,
+`paragraph_text(index)` or `slide(index).text()`. The fixture is supplied with
+the `--ole2-file PATH` flag change 0627 introduced, which now classifies a
+`WordDocument` stream as DOC as well; it stays the single classification
+authority for a caller-named OLE2 fixture, is bounded to 32 MiB, and carries its
+path, size, SHA-256, CFB stream count, sector size and target stream in the
+corpus identity. The open scenario reads its projection *after* the clock stops,
+so its timed region is the documented open alone; the other two include the
+fresh open, as change 0627's do, because the facade owns no cache across calls.
+A facade refusal is frozen as the scenario's outcome rather than dropped — the
+route reads the artifact before refusing, and change 0609's census found four
+`.doc` fixtures the facade refuses and the source-backed snapshot admits.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 20 --samples 50 \
+  --case doc_facade_file_open,ppt_facade_file_open \
+  --ole2-file test-data/ole/doc/documentProperties.doc \
+  --ole2-file test-data/ole/ppt/SampleShow.ppt --json facade.json
+```
+
+### Twenty-four ordinary-save selectors
+
+Three formats × two corpus origins × four phases:
+
+```text
+docx_ordinary_save_lifecycle          docx_real_file_ordinary_save_lifecycle
+docx_ordinary_save_edit               docx_real_file_ordinary_save_edit
+docx_ordinary_save_atomic_publish     docx_real_file_ordinary_save_atomic_publish
+docx_ordinary_save_counting_publish   docx_real_file_ordinary_save_counting_publish
+```
+
+and the same eight names with `xlsx_` and `pptx_`. The generated origin uses the
+existing `build_semantic_docx_corpus(Medium)`, `build_xlsx_cell_crud_corpus(Medium)`
+and `build_semantic_pptx_corpus(Medium)` corpora; the real-file origin uses
+`--ooxml-file PATH`, repeatable, bounded to 32 MiB and classified by the
+package's own main part (`word/document.xml`, `xl/workbook.xml`,
+`ppt/presentation.xml`).
+
+The route is the documented one: `Package::open(path)` →
+`document_mut().add_paragraph_with_text(..)` → `Package::save(path)` for DOCX,
+`Workbook::open(path)` → `edit().sheet(..).set(..)` → `commit()` →
+`Workbook::save(path)` for XLSX, and `Package::open(path)` →
+`opened_presentation_transaction().set_shape_text(..)` →
+`apply_opened_presentation_commit(..)` → `Package::save(path)` for PPTX.
+
+* `lifecycle` times open, edit and save together.
+* `edit` times the semantic edit alone; the open is outside the clock.
+* `atomic_publish` times the save alone, so the publication is reported
+  separately from the edit exactly as change 0497 reports its atomic arm. The
+  interval is one `litchi_opc::atomic::replace_with`: destination permission
+  probe, sibling temporary creation in the destination's own directory, the
+  publication write, permission preservation, `sync_all` on the temporary, the
+  rename that replaces the destination, and the parent-directory sync. The
+  private workspace is prepared, and the readback, digest and cleanup happen,
+  outside the clock.
+* `counting_publish` times the documented sequential serialization into a
+  bounded counting sink (`Package::to_stream`, `Workbook::write_to`, and
+  `Package::to_bytes` for PPTX, which has no sequential-sink entry point).
+
+The private workspace lives under the caller's `--filesystem-root` when one is
+supplied, so the destination device is the caller's choice, and it is removed
+when the corpus drops.
+
+**The byte split.** The counting result reports `output_total_bytes`,
+`payload_bytes_deflated` / `payload_bytes_stored` (a compression-method split of
+the published members' stored payload), `payload_bytes_identical_to_source` /
+`payload_bytes_regenerated` (a provenance split against the same-named source
+member's compressed bytes), `uncompressed_payload_bytes_regenerated` and
+`framing_bytes`. It is derived from the two archives, **not** from production
+counters: `litchi-opc`'s `OpcOperationAccounting` deliberately excludes
+`PartWriter` and the topology publishers, which is the path a documented save
+takes. `payload_bytes_identical_to_source` is therefore an upper bound on what a
+copy-through publisher could have avoided re-deflating, not an observation that
+this writer copied anything.
+
+**Determinism.** Every corpus proves change 0625's and 0631's invariant before
+any sample runs: two fresh open/edit/save cycles must publish the same digest,
+and saving one edited owner twice must publish the same digest. Every retained
+sample must then reproduce that digest and the frozen edit outcome. A typed
+editor refusal is an outcome, not a failure: the save phases then publish the
+unedited opened package, which is change 0593's `noop` scenario.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 20 --samples 50 \
+  --filesystem-root /some/disk/path \
+  --case docx_ordinary_save_lifecycle,docx_ordinary_save_atomic_publish \
+  --json ordinary-save.json
+```
+
+These selectors take no timing, allocation, physical-I/O, cold-cache or speedup
+claim. They are a descriptive baseline.
+
 ## Opt-in PPTX fresh streaming creation
 
 `pptx_streaming_create` exercises public `StreamingPresentationWriter` with
@@ -4019,6 +4132,15 @@ native-Office claim is made.
   source-backed XLS and PPT read scenarios over the same simulator, on a
   caller-named real fixture supplied with `--ole2-file PATH`. See *Opt-in OLE2
   range-source selectors (change 0627)*.
+- `doc_facade_file_open` / `_full_text` / `_one_paragraph` and
+  `ppt_facade_file_open` / `_full_text` / `_one_slide_text`: the documented
+  `litchi::Document::open` and `litchi::Presentation::open` routes over a
+  caller-named `--ole2-file` fixture. See *Opt-in facade and ordinary-save
+  selectors (change 0638)*.
+- `docx_ordinary_save_*`, `xlsx_ordinary_save_*`, `pptx_ordinary_save_*` and
+  their `*_real_file_*` pairs: the documented `Package::save` / `Workbook::save`
+  route in four separately reported phases, on an existing harness corpus or on
+  a caller-named `--ooxml-file` fixture. Same section.
 - `opc_open_session_scaling`: eager-open every ZIP member with a caller-sized
   `OpenSession` local pool, then verify every generated OPC Part.
 - `cfb_bulk_read_scaling`: use `SharedOleFile::bulk_read` with a caller-sized
