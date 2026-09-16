@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0651",
+  "title": "the 0630 queue, worked: every measurable row landed, every contract row froze with a price, and a real deck re-priced the codec",
+  "decision": "coordination record retained; the ranked queue in HOTSPOTS.md refreshed; no production change of its own",
+  "code_state": "this record modifies only documentation; the wave's production changes are the records 0632-0650 it closes, each merged with its own commit",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "nineteen records (0632-0650) worked the queue change 0630 left: ten landed value-identical production changes, three froze designs with a sizing measurement and admission gates, three fixed correctness defects, one attributed an open regression, one built selectors, one closed gate gaps; every number in this record is quoted from the record that measured it",
+    "the rows that wait on a human decision or an ADR acceptance (0630 rows 1-6, 9, 11, 12, 15) were not dispatched, because an agent cannot take the decision they wait on; the refreshed queue lists them first with what each decision unblocks",
+    "0649's attribution of 0638's 133.61 ms real-deck edit to the MCE codec's frozen namespace emission (six whole-slide rewrites amplified 16x; the revision proof 0.51%) moves 0630's row 4 to the top of the queue and exposes that every prior PPTX record measured on corpora that never exercised the expensive branch",
+    "no claim-registry entry is created by this record or by any record of the wave; the paired medians and counts are evidence at their records' tiers and floors"
+  ],
+  "accepted_evidence": {
+    "per_record_packets": "results/change-0632 through results/change-0650, each with its README, decision.json, gates and log-sections",
+    "merge_log": "merge-log.txt: nineteen cherry-picks in completion order with the branch commit each came from; one import-list conflict (0648 against 0641) resolved by union and re-tested",
+    "integration_gate": "integration-gate.log: cargo fmt, clippy, test and doc for the fourteen in-scope crates on the merged head f0fc20178, plus non_iwork_gate.py facade-format-tests and harness-tests and the four documentation checkers",
+    "merged_xls_suite": "xls-merged-0641-0648.log: cargo test -p litchi-xls on the head that first combined 0641 and 0648, exit 0",
+    "facade_odt_polyglot": "odt-polyglot-local.log: the facade's docx,odt feature combination on the pre-rebase head, showing the three stale tests the upstream commit cb2a1a2d4 rewrites"
+  },
+  "accepted_costs": {
+    "concurrency": "up to eight agents built and measured on one 32-core host at once; every timing floor is the record's own, and 0637 and 0646 rest on counts where the floor was wide",
+    "usage_cap": "one session usage cap terminated 0644 (after its commit), 0650 (mid-census) and one reviewer sub-agent; each was resumed from its transcript and worktree after the reset; no evidence was lost",
+    "coordinator_verification": "the coordinator merged, inserted log sections and ran the integration gate; it did not re-run any agent's measurement, oracle or differential",
+    "rebase": "this record is committed before the rebase onto the upstream branch, so the commit hashes the wave's records cite are pre-rebase; a follow-up commit adds rebase-commit-map.txt to this packet"
+  },
+  "known_gaps": {
+    "not_dispatched": "0630 rows 1-6, 9, 11, 12, 15 (decisions and ADR acceptances) and the MCE rewrite's consumer migration, now row 1 of the refreshed queue",
+    "corpora": "no marker-bearing real-producer PPTX or DOCX harness corpus (0649); no allocation metrics for the ordinary-save selector family (0649); no DOCX text-sink selector (0643)",
+    "gates": "the facade's docx,odt feature combination is compiled by no standing gate; check_perf_claims.py --mode structural fails on landed claim-0251; two flaky allocator tests in the harness; a stale tools/native-resave/Cargo.lock"
+  },
+  "withheld": [
+    "any speedup, regression, cold-cache, physical-device, range-source-hardware, peak-RSS, concurrency-scaling, real-producer or cross-platform result beyond what each record states at its own tier",
+    "any saving from the three frozen designs (0644 modelled; 0645 and 0646 measured on scratch code that is not on the branch)"
+  ],
+  "provenance": {
+    "git_revision_before_this_record": "f0fc20178",
+    "base_of_the_wave": "c7326f680 (0648: 9f28ea621)",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "note": "hashes are pre-rebase; see rebase-commit-map.txt once the follow-up commit lands"
+  }
+}

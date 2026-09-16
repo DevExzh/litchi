@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-16T08:35:01Z",
+  "batch": [
+    "0651-queue-refresh-after-the-second-wave",
+    "the wave it closes: 0632-0650"
+  ],
+  "removed": [
+    "the two shared read-only detached before checkouts /home/zhuhe/code/litchi-worktrees/before-c7326f680 and before-9f28ea621 (about 7 GiB each), removed with git worktree remove --force after chmod -R u+w, and the empty targets directory; every agent had already removed its own worktree, target directories and probe trees before reporting, as its cleanup.json records",
+    "the nineteen branches perf/0632-* through perf/0650-*, each deleted only after the coordinator verified that a commit on the main branch carries the 'cherry picked from commit' trailer naming that branch's tip",
+    "the session scratchpad in full: the shared briefing, the nineteen area briefs, the agents' scratch directories (each agent emptied its own), the coordinator's close directory (the record draft, the queue table, the gate and queue-replacement scripts, the rebase plan) after the files this packet retains were copied in, and the merge helper; the scratchpad stayed under 1 GiB throughout (144 MiB when the wave closed, /tmp at 7 GiB of 62 GiB used)",
+    "cherry-pick and commit-message temporaries the merge procedure created"
+  ],
+  "retained_in_the_repository": [
+    "docs/performance/results/change-0651/: merge-log.txt, integration-gate.log, xls-merged-0641-0648.log, odt-polyglot-local.log, log-sections.md, decision.json, this file, README.md; after the rebase, rebase-commit-map.txt",
+    "each merged record's own packet under results/change-0632 through results/change-0650, exactly as its agent committed it"
+  ],
+  "repository_state": "clean after the batch commit; no untracked or modified files remain",
+  "background_tasks": "no agent or measurement process remains; all nineteen implementing agents completed and reported",
+  "notes": [
+    "nine older perf/* branches (perf/0565-candidate-20260913220136 and eight perf/docx-styles-effects-* and perf/xlsx-svg-* branches dated 2026-09-12/13) predate the 0587 survey, belong to earlier batches, and were left untouched",
+    "the workspace target/ (gitignored build output of the shared working copy) and tools/perf-baseline/target are retained as ordinary build state; the integration gate and the merged litchi-xls run were built there",
+    "four other worktrees of this repository (litchi-array-worktree, litchi-current-baseline-orchestration, litchi-inline-images, litchi-spec-gaps) are not this programme's and were left untouched",
+    "one session usage cap terminated 0644, 0650 and a reviewer sub-agent mid-work; both implementers were resumed from their transcripts and worktrees after the reset; nothing was re-done and no evidence was lost",
+    "the 0648 cherry-pick conflicted with 0641 on one import list in crates/litchi-xls/src/workbook/source.rs; resolved by union, rustfmt clean, litchi-xls suite re-run on the merged head (retained log)"
+  ],
+  "revision": "f0fc20178",
+  "revision_note": "the merged head the integration gate ran on, before this record's own commit and before the rebase; hashes are pre-rebase"
+}

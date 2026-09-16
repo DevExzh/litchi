@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## 0651 — no boundary moved by any landed change; three designs name the boundary they would move
+
+Record: [0651](0651-queue-refresh-after-the-second-wave.md). Every production
+change of the wave is value-identical under the accepted ADRs and says so with a
+corpus differential (0632's 22,875 inputs, 0633, 0634, 0635, 0636, 0637, 0641's
+67,422 cell records, 0642's 397 worksheets, 0643's 333 documents, 0647's 6,281
+publications, 0648's 252 rows, 0650's 63 fixtures, 0640's 57). The three designs
+each state the boundary they would move and stop there: 0644 an ADR 0006 fence
+(and refuses the `SourceVersion` substitution with a runnable witness), 0645 an
+ADR 0003 durable patch format plus an ADR 0005 question about a facade-carried
+memo, 0646 an ADR 0005 budget for a retained package. 0642 declined an ADR 0006
+refusal-order change on its own; 0647 found that the ADR 0006 byte question
+0628 froze does not arise; 0650's fix is ADR 0006's preserve-by-default applied
+to three bytes. Proposed ADRs 0030 and 0031 were cited by no record as
+authority; their rows stay blocked on acceptance. The coordinator's own changes
+are documentation: this record, the four log insertions per merged record, and
+the queue replacement in `HOTSPOTS.md`.
+
 ## 0650 — compliant; ADR 0006's "preserve by default" decides what to do with three bytes
 
 Record: [0650](0650-docx-editor-byte-order-mark-admission.md).

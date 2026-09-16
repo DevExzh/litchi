@@ -1,5 +1,27 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0651 — the second wave against the goal: unnecessary work removed on ten paths, three contracts priced instead of moved, three refusals corrected
+
+Record: [0651](0651-queue-refresh-after-the-second-wave.md). Against the
+optimization order of `docs/GOAL.md`, every landed change of the wave sits in
+the first tier: unnecessary reads (0632, 0636, 0648), unnecessary parsing (0633,
+0634, 0637, 0641), unnecessary allocation and copying (0635, 0642, 0643) and an
+unnecessarily discarded proof (0647); no change in the wave used parallelism,
+SIMD, a weakened limit or `unsafe`. Against the definition of done, 0638 gives
+the facade's `.doc` and `.ppt` routes and the documented ordinary OOXML save
+their first selectors and finds the save publication-bound, which bounds what
+any compression work can be worth on that route. Against "refusals must be
+correct, not merely conservative", 0640 removes two refusals that read a
+redundant flag bit as structure and confirms five, 0650 fixes an editor refusal
+caused by a three-byte offset error and freezes the four refusals it was hiding,
+and 0639 closes the demo route that could not succeed. Against "never trade a
+typed refusal for a partial result", 0642 declined to make the scanner yield and
+0644, 0645 and 0646 stop at frozen designs where the saving would move a fence,
+a durable format or a budget. The wave's method finding is 0648's: a count of
+removed reads is not a saving until bytes are counted, the second time this
+programme has had to say that a removed count trades into something (0612 said
+it of time). The queue is refreshed; its first ten rows are decisions.
+
 ## 0650 — a refusal that was wrong rather than conservative, and the three it was hiding
 
 Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
