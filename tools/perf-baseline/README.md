@@ -2988,6 +2988,186 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
 These selectors take no timing, allocation, physical-I/O, cold-cache or speedup
 claim. They are a descriptive baseline.
 
+## Opt-in marker-bearing corpora and their controls (change 0664)
+
+Change [0649](../../docs/performance/0649-pptx-opened-transaction-real-deck-edit.md)
+found the harness gap that made every earlier PPTX number a measurement of the
+wrong path: `litchi_ooxml_common::mce` borrows a part that never mentions the
+markup-compatibility namespace and re-serializes one that does, the rewriting
+branch produces **16.25x its input** and costs **93.9%** of a real deck's
+opened-transaction edit, and **no generated corpus in this harness ever
+mentioned that namespace**. Change 0601 added producer-shaped corpora, but only
+its XLSX family carries markers across the package: its PPTX shape marks the
+slide parts alone and its DOCX shape marks `word/document.xml` alone, and no
+selector ran the opened-transaction edit, the full text or the ordinary save
+over either.
+
+These corpora close that gap. Two families, each in two variants:
+
+| Corpus | Members | Uncompressed | Marker-bearing members | Marker-bearing bytes | `mc:AlternateContent` |
+|---|---:|---:|---:|---:|---:|
+| `pptx-marker-deck-marker` | 63 | 351,108 | 27 | 314,824 (89.66%) | 13 |
+| `pptx-marker-deck-control` | 63 | 351,108 | 0 | 0 (0.00%) | 13 |
+| `docx-marker-medium-marker` | 12 | 72,956 | 6 | 61,292 (84.01%) | 0 |
+| `docx-marker-medium-control` | 12 | 72,956 | 0 | 0 (0.00%) | 0 |
+
+**The control is the same archive with the other branch taken.** It is produced
+by replacing every occurrence of the markup-compatibility namespace URI with an
+inert URI of *exactly the same length*
+(`http://litchi.invalid/perf-baseline/marker-stripped/0664/xx`, 59 bytes each).
+Member names, per-member uncompressed lengths, start-tag counts, attribute
+counts and the projected text are identical to the marker variant and are
+**proved** before any sample runs (`prove_control_is_byte_comparable`); only the
+compressed archive differs, because deflate sees different bytes. Change 0588
+introduced the technique and 0649 used it on the real deck. A marker/control
+pair is therefore a measurement of the codec branch, not of two differently
+shaped packages.
+
+**The shape is derived, not invented.** `docs/performance/results/change-0664/scripts/derive_marker_shape.py`
+censuses every member of three fixtures that are ordinary tracked files in this
+repository and emits the declaration sets the generator authors:
+
+* `test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx` —
+  0649's deck. 103 members, 796,725 uncompressed bytes, 43 marker-bearing
+  members holding 93.03% of the bytes: 13 slides, 18 layouts, 11 masters and
+  `ppt/presentation.xml`. Themes are **not** marker-bearing. Every marker-bearing
+  root declares exactly **six** bindings (`a`, `p`, `r`, `p14`, `p15`, `mc`) and
+  the deck carries **no `mc:Ignorable` at all** — the bare `xmlns:mc` is what
+  puts a part on the rewriting branch. Each slide carries exactly one
+  `mc:AlternateContent` wrapping a `p14:dur` transition.
+* `test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx` — the only PPTX
+  fixture in the corpus whose marker coverage reaches the notes parts, because
+  0649's deck has no notes slides at all. Its `notesSlide1.xml` and
+  `notesMaster1.xml` roots declare the same six bindings.
+* `test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx` —
+  real Word output. 21 members, 463,565 uncompressed bytes, 10 marker-bearing
+  members holding 95.01% of them, with **32** root declarations and
+  `mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"` on
+  `document.xml`, `numbering.xml`, `footnotes.xml`, `endnotes.xml` and
+  `footer1.xml`, 15 on `settings.xml` and 10 on `styles.xml`.
+
+The corpora themselves are still generated in memory and are a pure function of
+the family and variant: the generator reads no file, and the derivation is a
+checked-in constant table the script's `verify` mode re-derives:
+
+```sh
+python3 docs/performance/results/change-0664/scripts/derive_marker_shape.py verify
+```
+
+The PPTX shape is the production writer's own package at 13 slides of 48 text
+boxes, sized so its **slide** byte total lands near the real deck's, because
+that is what the cost is a function of: change 0649 found that all three
+per-slide sites of one capture read every slide in full and that the capture
+reads no layout and no master at all, so the fixture's 291,551 layout bytes and
+178,069 master bytes are not on the measured path. Thirteen slides of 48 text
+boxes give **247,741** slide bytes against the fixture's 269,178 (92.0%), where
+the generated corpus every earlier PPTX record used has 40,788 (15.2%). Matching
+the fixture's *package* total instead would mean 130 text boxes a slide, which
+triples the edit for no extra signal — measured at 384.56 ms against 151.77 ms
+while both are the same multiple of their own control — because this harness's
+writer emits eleven small layouts and one master where the fixture has eighteen
+large layouts and eleven masters, and no slide/layout ratio can reproduce both.
+The DOCX shape is `semantic_docx_bytes(Medium)` — the same shape the existing
+`docx_ordinary_save_*` selectors measure, so the marker corpus is
+byte-comparable with the generated one it is read against.
+
+**One thing the census states that the program assumed otherwise.** Change 0032
+recorded that the generated *XLSX* worksheets are marker free, and later records
+generalized that to the generated corpora. The DOCX writer is not marker free:
+it already declares `xmlns:mc` on `word/settings.xml`, `word/numbering.xml` and
+`word/fontTable.xml`. Every marker corpus reports what its skeleton already
+carried (`skeleton_marked_member_count`, `skeleton_marked_bytes`) beside what
+the generator added, so the baseline is stated rather than assumed.
+
+### Twenty-six selectors
+
+Sixteen extend change 0638's ordinary-save family with two new origins,
+`marker-bearing-producer-shape` and `marker-stripped-control`, over the same
+four phases:
+
+```text
+docx_marker_ordinary_save_lifecycle          docx_marker_control_ordinary_save_lifecycle
+docx_marker_ordinary_save_edit               docx_marker_control_ordinary_save_edit
+docx_marker_ordinary_save_atomic_publish     docx_marker_control_ordinary_save_atomic_publish
+docx_marker_ordinary_save_counting_publish   docx_marker_control_ordinary_save_counting_publish
+```
+
+and the same eight names with `pptx_`. `pptx_marker_ordinary_save_edit` is
+0649's phase: `opened_presentation_transaction().set_shape_text(..)` plus
+`apply_opened_presentation_commit(..)`. The marker origins cover DOCX and PPTX
+only; an XLSX marker origin is refused with a typed error, because change 0601's
+XLSX producer family already exists.
+
+Eight read the complete projected text through both facades:
+
+```text
+pptx_marker_eager_full_text        pptx_marker_control_eager_full_text
+pptx_marker_source_full_text       pptx_marker_control_source_full_text
+docx_marker_eager_full_text        docx_marker_control_eager_full_text
+docx_marker_source_full_text       docx_marker_control_source_full_text
+```
+
+`SourceBackedPresentation` has no whole-presentation text entry point, so the
+PPTX source-backed scenario is every slide's `text()` in order; its oracle is
+derived the same way at construction, so the two cannot drift apart.
+
+Two close the gap change
+[0643](../../docs/performance/0643-docx-paragraph-count-and-sink-text.md)
+recorded — *"the harness has no DOCX text-sink selector, so no
+`tools/perf-baseline` case covers this path"* — in the shape the RTF, ODT, ODS
+and ODP `*_semantic_text_to_sink` selectors already use, over the ordinary
+generated corpus and with `--semantic-shape`:
+
+```text
+docx_semantic_text_to_sink     docx_source_text_to_sink
+```
+
+None of the twenty-six is in `Case::DEFAULT`; the checked default catalog
+SHA-256 does not move for them. The registry goes from 501 to 527 names.
+
+**A refusal the pair found.** The documented eager DOCX sink entry point
+`Document::write_text_to` **refuses the marker corpus** with the typed
+`semantic DOCX XML exceeds 4096 namespace bindings`, while its byte-identical
+marker-free control is admitted and projects 10,199 bytes over 200 objects. The
+limit is a cumulative count of `xmlns:` attributes over the whole parse, and the
+MCE codec re-declares every in-scope binding on every emitted start tag, so a
+33-declaration root exhausts it after about 124 elements. This is not a claim
+about real Word files: the two real fixtures censused above carry very little
+body text and are admitted. It is the reason there is no marker text-sink
+selector; the refusal is frozen in each corpus's census as `sink_refusal`
+rather than being dropped.
+
+### Allocation metrics for the ordinary-save family
+
+Change 0649 also recorded that `litchi-perf-baseline-alloc` emitted **no**
+allocation metrics for the `*_ordinary_save_*` family, because change 0638
+registered it without ever opening an allocation region. All forty selectors in
+the family now open one, and it is exactly the interval the phase reports: it
+opens immediately before the clock and closes immediately after it. The owner is
+still alive when the region closes (`drop(owner)` has always been outside the
+timer in every phase), so `live_bytes_after` is **retained** memory rather than a
+leak, as the ODP and XLSX source-backed families already report it.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- --warmup 20 --samples 50 \
+  --filesystem-root /some/disk/path \
+  --case pptx_marker_ordinary_save_edit,pptx_marker_control_ordinary_save_edit \
+  --marker-evidence marker-census.json --json marker.json
+```
+
+`--marker-evidence PATH` writes the per-member census of every marker corpus a
+run builds, under the schema
+`litchi.perf-baseline.marker-shape-evidence.v1`: per part, its length, its
+digest, whether it mentions the namespace, its `mc:Ignorable`, its
+`mc:AlternateContent` count, its root declaration count, its start-tag count and
+its attribute count, plus the corpus totals, the derivation fixtures and the
+frozen scenario oracles.
+
+These selectors take no timing, allocation, physical-I/O, cold-cache or speedup
+claim. They are a descriptive baseline: the first measurement of the markup-
+compatibility rewriting branch on a harness selector.
+
 ## Opt-in PPTX fresh streaming creation
 
 `pptx_streaming_create` exercises public `StreamingPresentationWriter` with

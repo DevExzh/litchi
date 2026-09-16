@@ -1,0 +1,68 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0664",
+  "title": "A harness selector reproduces change 0649's 77x: the marker-bearing PPTX edit is 77.21x the generated corpus and 20.23x a byte-identical marker-stripped control",
+  "decision": "retained, harness and corpus work in tools/perf-baseline",
+  "code_state": "tools/perf-baseline only; no file under crates/ modified; no new unsafe and no new dependency; the harness library keeps #![forbid(unsafe_code)]",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0649 recorded that every prior PPTX record measured on corpora whose members never mention the markup-compatibility namespace, so the codec branch that costs 93.9% of a real deck's edit had no harness selector; four new corpora and 24 selectors put it on one",
+    "the marker corpus ships with a marker-stripped control whose member names, per-member uncompressed lengths, start-tag counts, attribute counts and projected text are proved identical before any sample runs, so the pair measures the codec branch and not two differently shaped packages",
+    "the shape is derived from three real tracked fixtures by a retained script whose verify mode is run as a gate, so the corpora cannot silently drift from the files they claim to imitate",
+    "change 0649's second gap is closed in the same batch: all forty ordinary-save selectors now open an allocation region bounded to exactly the interval each phase reports, where change 0638 registered twenty-four that opened none",
+    "change 0643's gap is closed: docx_semantic_text_to_sink and docx_source_text_to_sink cover the DOCX write_text_to path on both facades",
+    "the measured product decomposes the way change 0649's does, 3.82 x 20.23 = 77.3 against 5.57 x 13.9 = 77, and the allocator's 20.93x byte ratio agrees with the clock's 20.23x to 3.4%"
+  ],
+  "accepted_evidence": {
+    "corpus_census": "every member of all four generated corpora and all three derivation fixtures, censused per part for the namespace, mc:Ignorable, mc:AlternateContent count, root declaration count, start-tag count and attribute count; written by --marker-evidence and by the derivation script",
+    "determinism": "two independent builds of each corpus produce the same archive SHA-256, asserted in the module's tests and re-derived by every run that writes a census",
+    "control_proof": "prove_control_is_byte_comparable runs before any sample: identical member names, per-member uncompressed lengths, start-tag counts, attribute counts and projected text, zero namespace mentions in the control and at least one in the marker variant",
+    "timing": "20 warm-ups and 50 retained samples per run, three repeats of every group plus a dedicated A/A pair for the two heaviest groups, taskset -c 19, binaries staged outside every Cargo target directory and hashed; 5,800 retained timing samples",
+    "allocations": "litchi-perf-baseline-alloc, 5 warm-ups and 20 retained samples over 24 ordinary-save selectors; every work counter identical across all 20 samples of every selector; 480 retained allocator samples",
+    "oracles": "every corpus's eager full text, source-backed full text, object count and sink projection are read back out of the built package before any sample runs, and every retained sample must reproduce them",
+    "gates": "cargo fmt/clippy (with and without allocator-metrics)/doc/test in tools/perf-baseline, non_iwork_gate.py harness-tests and verify, validate_crud_coverage_index.py, four Python test modules, and the derivation script's verify mode"
+  },
+  "accepted_costs": {
+    "publication_floors": "the four save-to-path and serialize-to-sink rows run at A/A floors of 13.13% to 240.56% because the interval contains two fsyncs on a device eight agents share; they are reported and not relied on, and their counts are the evidence instead",
+    "single_repeat_outliers": "two selectors have one outlier repeat each (the control edit at 1.87x on A1, the generated edit at 2.6x on R3); the medians exclude them, the within-run distributions are tight, and both series are published in full",
+    "corpus_is_not_the_fixture": "the PPTX corpus reproduces the fixture's slide byte total to 92.0% and its root declaration count exactly, but not its layout and master bytes, because this harness's writer emits eleven small layouts and one master; the capture reads neither, which is why that term was the one dropped",
+    "registry_growth": "Case grows from 501 to 527 variants and ordinary_save::Origin from two to four; both are harness-internal and covered by the harness's own registry tests",
+    "packet_size": "24 harness reports are retained verbatim because the record quotes them; the packet is about 4 MB"
+  },
+  "known_gaps": {
+    "no_native_profile": "no cycles, instructions or per-symbol profile were taken; change 0649 has them for the real deck and this record's job was to make the scenario selectable",
+    "no_xlsx_marker_origin": "change 0601's XLSX producer family already covers marker-bearing spreadsheets, so build_corpus refuses an XLSX marker corpus with a typed error rather than building one",
+    "docx_sink_refusal_scope": "the marker DOCX is refused by the eager sink parser's cumulative namespace-binding limit while its byte-identical control is admitted; this is a corpus fact, and no survey of real Word files was run, so nothing is claimed about them",
+    "no_marker_text_sink_selector": "that refusal is why there is none; the refusal string is frozen in the corpus census instead",
+    "single_shape_per_family": "one PPTX shape and one DOCX shape; no size sweep was taken, and the 130-text-box variant that matches the fixture's package total was measured once and rejected rather than retained",
+    "no_cold_cache_or_rss": "every run is warm, and no RSS measurement was taken"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, concurrency-scaling or cross-platform result",
+    "any claim that real Word files are refused by the DOCX sink parser",
+    "any latency conclusion from the four publication rows"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "branch": "perf/0664-perf-harness-marker-bearing-corpora-and-save-allocations",
+    "commit": "the tip of perf/0664-perf-harness-marker-bearing-corpora-and-save-allocations; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0",
+    "cpu_pin": "taskset -c 19",
+    "binaries": {
+      "litchi-perf-baseline": "095c21f94de740bc827c6080cde46a54b8c32382ec7e8b535bb0b5bcda05ca62",
+      "litchi-perf-baseline-alloc": "6a65a09d706ae0063baebf61943a6f91971309bac26b68b42fb8dd9f31dae574"
+    },
+    "corpora": {
+      "pptx-marker-deck-marker": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+      "pptx-marker-deck-control": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+      "docx-marker-medium-marker": "1762bd514f05cb944874bd318f2a9302786e99f879a93ea46a59e2ee1ec67711",
+      "docx-marker-medium-control": "c61354b61d9b9b82c0baf472289e09f643d772c94ee76f335ffdfad9e09d38a4"
+    },
+    "derivation_fixtures": {
+      "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx": "4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad"
+    }
+  }
+}

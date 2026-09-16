@@ -73,8 +73,8 @@ use soapberry_zip::{CompressionMethod, ZipArchive};
 
 use crate::{
     Case, CaseResult, Corpus, CorpusManifest, SemanticShape, SinkSummary, SourceSummary,
-    XlsxCellCrudShape, boxed_source, iteration_count, producer_shape::RealFileProvenance,
-    record_elapsed, sha256_hex, statistics,
+    XlsxCellCrudShape, allocation_metrics, boxed_source, elapsed_ns, iteration_count,
+    operation_metrics, producer_shape::RealFileProvenance, record_elapsed, sha256_hex, statistics,
 };
 
 /// Largest `--ooxml-file` input this harness will read. A caller-named file is
@@ -172,15 +172,41 @@ pub(crate) enum Origin {
     Generated,
     /// A caller-named real file supplied with `--ooxml-file PATH`.
     RealFile,
+    /// Change 0664's marker-bearing corpus: the same production writer's
+    /// package with the producer's root namespace declarations merged into
+    /// every part kind the real fixture marks, so the markup-compatibility
+    /// codec takes its rewriting branch on this route.
+    MarkerShape,
+    /// Change 0664's marker-stripped control: byte-for-byte the same members,
+    /// lengths, element counts and attribute counts as `MarkerShape`, with the
+    /// namespace URI replaced by an inert URI of the same length, so the codec
+    /// takes its borrowing branch instead.
+    MarkerControl,
 }
 
 impl Origin {
-    pub(crate) const ALL: [Self; 2] = [Self::Generated, Self::RealFile];
+    pub(crate) const ALL: [Self; 4] = [
+        Self::Generated,
+        Self::RealFile,
+        Self::MarkerShape,
+        Self::MarkerControl,
+    ];
 
     const fn as_str(self) -> &'static str {
         match self {
             Self::Generated => "generated-harness-corpus",
             Self::RealFile => "caller-named-real-file",
+            Self::MarkerShape => "marker-bearing-producer-shape",
+            Self::MarkerControl => "marker-stripped-control",
+        }
+    }
+
+    /// The marker family this origin needs, if any.
+    const fn marker_variant(self) -> Option<crate::marker_shape::Variant> {
+        match self {
+            Self::MarkerShape => Some(crate::marker_shape::Variant::Marker),
+            Self::MarkerControl => Some(crate::marker_shape::Variant::Control),
+            Self::Generated | Self::RealFile => None,
         }
     }
 }
@@ -933,6 +959,22 @@ pub(crate) fn build_corpus(
             let (archive, manifest) = generated_archive(format)?;
             (archive, manifest, None)
         },
+        Origin::MarkerShape | Origin::MarkerControl => {
+            let variant = origin
+                .marker_variant()
+                .ok_or("a marker ordinary-save origin has no marker variant")?;
+            let family = match format {
+                Format::Docx => crate::marker_shape::Family::Docx,
+                Format::Pptx => crate::marker_shape::Family::Pptx,
+                Format::Xlsx => {
+                    return Err(
+                        "the marker-shape ordinary-save selectors cover DOCX and PPTX only".into(),
+                    );
+                },
+            };
+            let corpus = crate::marker_shape::build(family, variant)?;
+            (corpus.corpus.archive, corpus.corpus.manifest, None)
+        },
         Origin::RealFile => {
             let path = real_file.ok_or_else(|| {
                 format!(
@@ -1016,6 +1058,11 @@ pub(crate) fn build_corpus(
             generator: match origin {
                 Origin::Generated => "litchi-perf-existing-corpus",
                 Origin::RealFile => format.real_file_generator(),
+                Origin::MarkerShape | Origin::MarkerControl => match format {
+                    Format::Docx => crate::marker_shape::DOCX_MARKER_SHAPE_GENERATOR,
+                    Format::Pptx => crate::marker_shape::PPTX_MARKER_SHAPE_GENERATOR,
+                    Format::Xlsx => "litchi-perf-existing-corpus",
+                },
             },
             format: format.as_str(),
             origin: origin.as_str(),
@@ -1161,49 +1208,66 @@ pub(crate) fn run_case(
     let mut published_sha256 = Vec::with_capacity(samples);
     let mut edit_outcome_sha256 = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sample_split = None;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let (duration, digest, sink, outcome) = match phase {
+        // The allocation region opens immediately before the clock and closes
+        // immediately after it, so it covers exactly the interval this phase
+        // reports. Change 0649 found this family emitted no allocation metrics
+        // at all because it opened no region; it does now. The owner is still
+        // alive when the region closes (`drop(owner)` is outside the timer in
+        // every phase, as it has always been), so `live_bytes_after` is
+        // retained memory rather than a leak, exactly as the ODP and XLSX
+        // source-backed families already report it.
+        let (duration, digest, sink, outcome, allocation) = match phase {
             Phase::Lifecycle => {
+                let region = allocation_metrics::begin();
                 let started = Instant::now();
                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
                 let outcome = owner.edit(corpus)?;
                 owner.save(&corpus.workspace.destination)?;
                 let duration = started.elapsed();
+                let allocation = region.finish();
                 drop(owner);
                 let digest = sha256_hex(&fs::read(&corpus.workspace.destination)?);
                 fs::remove_file(&corpus.workspace.destination)?;
-                (duration, Some(digest), None, outcome)
+                (duration, Some(digest), None, outcome, allocation)
             },
             Phase::Edit => {
                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
+                let region = allocation_metrics::begin();
                 let started = Instant::now();
                 let outcome = owner.edit(corpus)?;
                 let duration = started.elapsed();
+                let allocation = region.finish();
                 std::hint::black_box(&outcome);
                 drop(owner);
-                (duration, None, None, outcome)
+                (duration, None, None, outcome, allocation)
             },
             Phase::AtomicPublish => {
                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
                 let outcome = owner.edit(corpus)?;
+                let region = allocation_metrics::begin();
                 let started = Instant::now();
                 owner.save(&corpus.workspace.destination)?;
                 let duration = started.elapsed();
+                let allocation = region.finish();
                 drop(owner);
                 let digest = sha256_hex(&fs::read(&corpus.workspace.destination)?);
                 fs::remove_file(&corpus.workspace.destination)?;
-                (duration, Some(digest), None, outcome)
+                (duration, Some(digest), None, outcome, allocation)
             },
             Phase::CountingPublish => {
                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
                 let outcome = owner.edit(corpus)?;
                 let mut sink = BoundedSink::bounded(budget);
                 sink.reserve_budget()?;
+                let region = allocation_metrics::begin();
                 let started = Instant::now();
                 owner.write_to(&mut sink)?;
                 let duration = started.elapsed();
+                let allocation = region.finish();
                 drop(owner);
                 let digest = sha256_hex(&sink.bytes);
                 if sample_split.is_none() {
@@ -1211,10 +1275,17 @@ pub(crate) fn run_case(
                 }
                 let summary = sink.summary();
                 std::hint::black_box(&sink.bytes);
-                (duration, Some(digest), Some(summary), outcome)
+                (duration, Some(digest), Some(summary), outcome, allocation)
             },
         };
         if iteration >= warmup_iterations {
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics: None,
+                allocation_metrics: Some(
+                    allocation.unwrap_or_else(allocation_metrics::unavailable_sample),
+                ),
+            });
             if let Some(digest) = digest {
                 published_sha256.push(digest);
             }
@@ -1275,6 +1346,8 @@ pub(crate) fn run_case(
         ..SourceSummary::default()
     };
 
+    let metrics = operation_metrics::from_in_process_observations_without_sink(&observations)?;
+
     Ok(CaseResult {
         case: case.name(),
         cache_state: None,
@@ -1284,7 +1357,7 @@ pub(crate) fn run_case(
         source: boxed_source(summary),
         execution: None,
         output_sha256,
-        operation_metrics: None,
+        operation_metrics: Some(metrics),
     })
 }
 
@@ -1304,10 +1377,17 @@ mod tests {
         );
         assert_eq!(Format::Pptx.main_part(), "ppt/presentation.xml");
         assert_eq!(Origin::RealFile.as_str(), "caller-named-real-file");
+        assert_eq!(
+            Origin::MarkerShape.as_str(),
+            "marker-bearing-producer-shape"
+        );
+        assert_eq!(Origin::MarkerControl.as_str(), "marker-stripped-control");
         assert_eq!(Phase::AtomicPublish.as_str(), "save-to-path");
         assert_eq!(Phase::ALL.len(), 4);
         assert_eq!(Format::ALL.len(), 3);
-        assert_eq!(Origin::ALL.len(), 2);
+        assert_eq!(Origin::ALL.len(), 4);
+        assert_eq!(Origin::Generated.marker_variant(), None);
+        assert_eq!(Origin::RealFile.marker_variant(), None);
     }
 
     #[test]
@@ -1316,6 +1396,15 @@ mod tests {
         for format in Format::ALL {
             for origin in Origin::ALL {
                 for phase in Phase::ALL {
+                    // Change 0664's two marker origins cover DOCX and PPTX
+                    // only: change 0601's XLSX producer family already owns
+                    // the marker-bearing spreadsheet shapes, so no XLSX
+                    // marker selector exists and `build_corpus` refuses one
+                    // with a typed error.
+                    if format == Format::Xlsx && origin.marker_variant().is_some() {
+                        assert_eq!(Case::ordinary_save_case(format, origin, phase), None);
+                        continue;
+                    }
                     let case = Case::ordinary_save_case(format, origin, phase)
                         .expect("every ordinary-save triple has a selector");
                     assert!(case.is_ordinary_save());
@@ -1326,7 +1415,13 @@ mod tests {
                 }
             }
         }
-        assert_eq!(seen, 24);
+        assert_eq!(seen, 40);
+        assert!(
+            build_corpus(Format::Xlsx, Origin::MarkerShape, None, None)
+                .expect_err("an XLSX marker corpus is refused")
+                .to_string()
+                .contains("DOCX and PPTX only")
+        );
     }
 
     #[test]

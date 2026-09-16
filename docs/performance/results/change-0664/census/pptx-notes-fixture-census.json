@@ -1,0 +1,987 @@
+{
+  "archive_bytes": 24629,
+  "archive_sha256": "16faaaffa35304df654bc20927570d1812d5fdf085d0ecd253cd4c272a913610",
+  "fixture": "test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+  "markup_compatibility_byte_share": 0.576617,
+  "markup_compatibility_bytes": 39613,
+  "markup_compatibility_member_count": 17,
+  "member_count": 42,
+  "members": [
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "_rels/.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "c08869dcbaf3f3808c627865cbdcf35c271afe75a4208d126dd2b9ffe148ac61",
+      "uncompressed_bytes": 576
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/_rels/presentation.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "b228e18c867b9cd70e0fdec5f1e5b10efcbf8029586d517f144e522b90302018",
+      "uncompressed_bytes": 850
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-notes-slide",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/notesSlides/_rels/notesSlide1.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "40cf17080b5cc0ec9d253cd260a06b62644ab750c303c7de87142f2c2cd519be",
+      "uncompressed_bytes": 430
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-notes-slide",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/notesSlides/notesSlide1.xml",
+      "root": "p:notes",
+      "root_tag_bytes": 429,
+      "sha256": "2bb1739eeb068ed1a10f83aca4518cadb36c348046762b12cee636e11a61fdbb",
+      "uncompressed_bytes": 1460
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ]
+      ],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/comments/comment1.xml",
+      "root": "p:cmLst",
+      "root_tag_bytes": 78,
+      "sha256": "464926aea86cc70d2dcaeb1145184860de845f5ee854d4e47c4a0915d238e313",
+      "uncompressed_bytes": 263
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slides/_rels/slide1.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "2325c067e1e18d5c5a9b1e00b1eeaf5440662aa12202c63dc848f159152afb83",
+      "uncompressed_bytes": 588
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slides/slide1.xml",
+      "root": "p:sld",
+      "root_tag_bytes": 427,
+      "sha256": "b89d8a7bc9404d29a8cecc592c853c8e5077f3574aaf18f8168ff1a352f1565d",
+      "uncompressed_bytes": 1664
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-notes-master",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/notesMasters/_rels/notesMaster1.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "fc4a9a1c74e4d310047bdc16a1ee798043595bdb810949ab4008eb58db91b499",
+      "uncompressed_bytes": 275
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-notes-master",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/notesMasters/notesMaster1.xml",
+      "root": "p:notesMaster",
+      "root_tag_bytes": 435,
+      "sha256": "62cd317c5df1df4c332efa4da99a963cfcd44bff6be60d9b832e55680ae3d55a",
+      "uncompressed_bytes": 4424
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-presentation",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/presentation.xml",
+      "root": "p:presentation",
+      "root_tag_bytes": 436,
+      "sha256": "5b011656abe9e119ebb51f48d49c82207ac0333abb62757c85aa59aa0c46453c",
+      "uncompressed_bytes": 793
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-master",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "3a498b7d56fc43c13b4f4f0b56bae2626e25ed1e580db315257d5ee9b2f662fa",
+      "uncompressed_bytes": 2130
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-master",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideMasters/slideMaster1.xml",
+      "root": "p:sldMaster",
+      "root_tag_bytes": 433,
+      "sha256": "460a55c8ba9385c1f22a37770da2a64076c9a2b9f2040308b5243add80034a82",
+      "uncompressed_bytes": 1605
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ]
+      ],
+      "kind": "pptx-theme",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/theme/theme2.xml",
+      "root": "a:theme",
+      "root_tag_bytes": 93,
+      "sha256": "7aedff76dc4f3ceed9e6e42e34d97d7b1f5e4defc771976f0f9fa78ac18c7f18",
+      "uncompressed_bytes": 6632
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ]
+      ],
+      "kind": "pptx-theme",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/theme/theme1.xml",
+      "root": "a:theme",
+      "root_tag_bytes": 93,
+      "sha256": "7aedff76dc4f3ceed9e6e42e34d97d7b1f5e4defc771976f0f9fa78ac18c7f18",
+      "uncompressed_bytes": 6632
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ]
+      ],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/commentAuthors.xml",
+      "root": "p:cmAuthorLst",
+      "root_tag_bytes": 84,
+      "sha256": "273305c70ad03785cbbf5fbc6d0e25665a7643035184d18eb61396a8f0a7e7f1",
+      "uncompressed_bytes": 229
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout12.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+      "root": "Relationships",
+      "root_tag_bytes": 84,
+      "sha256": "8d75d283f8517cd39b37d68fe181d89df8dea64d846fd7fd7f9126a530b27f5b",
+      "uncompressed_bytes": 294
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout12.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 459,
+      "sha256": "785c1631f841ddb4106ba67720116f7baba767a424fbb8eb46c2e04053fefa3b",
+      "uncompressed_bytes": 4539
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout11.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 461,
+      "sha256": "dd563535ed015f8f2181f5b31845d895ec15b24baea79e7127d1f9e857c1460d",
+      "uncompressed_bytes": 3505
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout4.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 460,
+      "sha256": "5800c625afa5e593d33e2257077fb5e5028fc90dea8703c87fd5f120d5ae7aa6",
+      "uncompressed_bytes": 2466
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout3.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 457,
+      "sha256": "c21a149a869305db54b67a84c6a622d1b65de47c1ba8339aef01e91ac2596520",
+      "uncompressed_bytes": 1944
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout2.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 456,
+      "sha256": "2aaeeb975d0b19075fd12f06a338219802ab9f377d581193e93b2c779690f82e",
+      "uncompressed_bytes": 1967
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout1.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 459,
+      "sha256": "d89d32fd006288588ce409da82c067e11da3f9208d0bbb7783798eada98e35f3",
+      "uncompressed_bytes": 888
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout5.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 463,
+      "sha256": "f8b4b910f79c3cf88f0524ed12f985ba592fe156d691aaa543e804fb8df6fb89",
+      "uncompressed_bytes": 1430
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout6.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 461,
+      "sha256": "7f438a7e45e4034bfcf1196c099985de2a56d5c8ad50b76b8a4ea443a0627748",
+      "uncompressed_bytes": 1434
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout7.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 466,
+      "sha256": "e2f2dabb53cdbc65c0e7db4f5fc750909a70500d6a44ecb63292de46b3828e34",
+      "uncompressed_bytes": 3003
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout8.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 466,
+      "sha256": "f19c77b0e768eba1c668682f93c6752895b6cd1f35ce09386163d29649bd69d2",
+      "uncompressed_bytes": 3004
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout9.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 466,
+      "sha256": "1a9f720d8714de7e8fe80e35a057bba589afe8482cdb71d3c110baea7826f078",
+      "uncompressed_bytes": 3005
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "a",
+          "http://schemas.openxmlformats.org/drawingml/2006/main"
+        ],
+        [
+          "p",
+          "http://schemas.openxmlformats.org/presentationml/2006/main"
+        ],
+        [
+          "r",
+          "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ],
+        [
+          "p14",
+          "http://schemas.microsoft.com/office/powerpoint/2010/main"
+        ],
+        [
+          "p15",
+          "http://schemas.microsoft.com/office/powerpoint/2012/main"
+        ],
+        [
+          "mc",
+          "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        ]
+      ],
+      "kind": "pptx-slide-layout",
+      "markup_compatibility_namespace": true,
+      "mc_ignorable": null,
+      "part": "ppt/slideLayouts/slideLayout10.xml",
+      "root": "p:sldLayout",
+      "root_tag_bytes": 463,
+      "sha256": "2a5704e43dee7e86dcf539a8aad76fd82eee0cb9b220079f5c3d1cec243f2c84",
+      "uncompressed_bytes": 2482
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "vt",
+          "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
+        ]
+      ],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "docProps/app.xml",
+      "root": "Properties",
+      "root_tag_bytes": 174,
+      "sha256": "761e881da62deaf26099eaf2515d660fcb4d7bfae606536646479e7c3189d3db",
+      "uncompressed_bytes": 418
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [
+        [
+          "cp",
+          "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+        ],
+        [
+          "dc",
+          "http://purl.org/dc/elements/1.1/"
+        ],
+        [
+          "dcterms",
+          "http://purl.org/dc/terms/"
+        ],
+        [
+          "dcmitype",
+          "http://purl.org/dc/dcmitype/"
+        ],
+        [
+          "xsi",
+          "http://www.w3.org/2001/XMLSchema-instance"
+        ]
+      ],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "docProps/core.xml",
+      "root": "cp:coreProperties",
+      "root_tag_bytes": 288,
+      "sha256": "19e21058176ece151b3edb74e3eab99a5057d1788faa9b8eefd4c0bb60923512",
+      "uncompressed_bytes": 732
+    },
+    {
+      "alternate_content_occurrences": 0,
+      "declarations": [],
+      "kind": "other",
+      "markup_compatibility_namespace": false,
+      "mc_ignorable": null,
+      "part": "[Content_Types].xml",
+      "root": "Types",
+      "root_tag_bytes": 76,
+      "sha256": "a4b3f6f2cd95ea25ade67109577663b9419771cb634c1122505389777880eb97",
+      "uncompressed_bytes": 5803
+    }
+  ],
+  "uncompressed_bytes": 68699
+}

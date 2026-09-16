@@ -1,5 +1,38 @@
 # Performance program phase report
 
+## 0664 — the marker-bearing corpora, their controls, and what the pair costs
+
+Record: [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md).
+Harness-only; no file under `crates/` changed. Four corpora:
+`pptx-marker-deck` (63 members, 351,108 uncompressed bytes, 27 marker-bearing
+members holding 89.66% of them, 13 `mc:AlternateContent` blocks, six root
+bindings on every marker-bearing part) and `docx-marker-medium` (12 members,
+72,956 bytes, 6 marker-bearing holding 84.01%, 33 root declarations and Word's
+own `mc:Ignorable` on `document.xml`), each with a marker-stripped control of
+identical member names, lengths, start-tag counts, attribute counts and
+projected text. The shape is derived by
+`results/change-0664/scripts/derive_marker_shape.py` from
+`slide-section-test.pptx` (change 0649's deck: 103 members, 796,725 bytes, 43
+marker-bearing holding 93.03%), `layout-in-cell-2.docx` (real Word output: 10 of
+21 members, 95.01%) and `tdf89064.pptx` (the only fixture whose marker coverage
+reaches the notes parts); its `verify` mode is a gate. Twelve marker/control
+pairs were measured at 20 warm-ups, 50 samples and three repeats plus a
+dedicated A/A pair, pinned to CPU 19. The six clean rows are 12.75× to 30.59×;
+the four publication rows run at floors of 13.13% to 240.56% — two `fsync`s on a
+device eight agents share — and are reported and **not relied on**, one of them
+showing the marker corpus *faster* than its control. A limit fired that no
+record had seen: `Document::write_text_to` refuses the marker DOCX with
+`semantic DOCX XML exceeds 4096 namespace bindings` while its byte-identical
+control is admitted, because the limit counts `xmlns:` attributes cumulatively
+and the codec re-declares every in-scope binding on every emitted start tag.
+That is a corpus fact, not a claim about Word files: both real DOCX fixtures
+censused are admitted, because their `document.xml` carries little body text.
+One correction to the record set: change 0032's "the generated corpora are
+marker free" holds for the XLSX worksheets it measured and **not** for DOCX —
+`litchi_docx::Package::new()` already declares `xmlns:mc` on `settings.xml`,
+`numbering.xml` and `fontTable.xml`, 3 members and 12,300 bytes of the skeleton
+— so every corpus now reports its skeleton's own census beside the generator's.
+
 ## 0660 — editing one paragraph of a Word document no longer rewrites all the others
 
 Record: [0660](0660-docx-compaction-policy.md).

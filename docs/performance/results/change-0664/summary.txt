@@ -1,0 +1,78 @@
+selector                                              p50 median (ms)   mean (ms)   p95 (ms)   p99 (ms)  p50 spread       A/A   n
+docx_marker_control_eager_full_text                            0.2447      0.2461     0.2526     0.2542       4.05%     0.83%   5
+docx_marker_control_ordinary_save_atomic_publish               6.9776      7.7988    14.0800    17.6587      67.48%         -   3
+docx_marker_control_ordinary_save_counting_publish             0.5618      0.6014     0.5829     2.3180       3.80%         -   3
+docx_marker_control_ordinary_save_edit                         0.5954      0.5946     0.6138     0.6168       4.09%         -   3
+docx_marker_control_ordinary_save_lifecycle                    6.7430      6.9205     9.5172    10.4793      59.47%         -   3
+docx_marker_control_source_full_text                           0.2036      0.2050     0.2106     0.2113       2.31%     0.10%   5
+docx_marker_eager_full_text                                    6.2514      6.2497     6.3236     6.3443       3.82%     0.71%   5
+docx_marker_ordinary_save_atomic_publish                       6.1499      6.6349     9.0008    10.5753     107.16%         -   3
+docx_marker_ordinary_save_counting_publish                     0.5865      0.6020     0.6162     0.6233       6.49%         -   3
+docx_marker_ordinary_save_edit                                 7.5936      7.6822     8.2233     8.2709      42.67%         -   3
+docx_marker_ordinary_save_lifecycle                           13.8613     14.2966    16.9504    18.9759      75.99%         -   3
+docx_marker_source_full_text                                   6.2277      6.1957     6.2640     6.2871       4.10%     0.10%   5
+docx_ordinary_save_atomic_publish                              6.2119      7.5949    10.4670    11.3870      38.74%         -   3
+docx_ordinary_save_counting_publish                            0.3810      0.3806     0.3954     0.4018       2.40%         -   3
+docx_ordinary_save_edit                                        0.3869      0.3874     0.3960     0.3982       3.42%         -   3
+docx_ordinary_save_lifecycle                                   6.0412      6.1506     7.3094     8.6415      70.18%         -   3
+docx_semantic_text_to_sink                                     0.1971      0.1976     0.2042     0.2073       2.95%         -   3
+docx_source_text_to_sink                                       0.2815      0.2843     0.2900     0.2912       3.88%         -   3
+pptx_marker_control_eager_full_text                            4.5166      4.5197     4.5464     4.7351       3.07%     3.07%   5
+pptx_marker_control_ordinary_save_atomic_publish               6.6750      6.9427     9.9734    10.8825     240.56%   240.56%   5
+pptx_marker_control_ordinary_save_counting_publish             0.1714      0.1777     0.1975     0.2181      60.70%    60.70%   5
+pptx_marker_control_ordinary_save_edit                         7.4323      7.4918     8.1288     8.2056      87.38%    86.56%   5
+pptx_marker_control_ordinary_save_lifecycle                   15.0319     16.1223    21.6464    25.0953     120.43%   119.08%   5
+pptx_marker_control_source_full_text                           4.4069      4.4081     4.4237     4.4377       3.63%     3.29%   5
+pptx_marker_eager_full_text                                   58.1604     58.4872    59.3654    59.4667       3.87%     0.34%   5
+pptx_marker_ordinary_save_atomic_publish                       7.3457      7.6272    11.4712    11.8759     288.71%    82.64%   5
+pptx_marker_ordinary_save_counting_publish                     0.2115      0.2130     0.2257     0.2321      23.74%    13.13%   5
+pptx_marker_ordinary_save_edit                               150.3678    152.3359   157.6388   158.1713       3.39%     0.73%   5
+pptx_marker_ordinary_save_lifecycle                          163.4596    164.7178   188.1259   213.8892       7.92%     0.37%   5
+pptx_marker_source_full_text                                  58.1644     58.1661    58.6264    59.6791       2.52%     1.68%   5
+pptx_ordinary_save_atomic_publish                              5.4459      5.4386     5.5971     5.6223      41.37%         -   3
+pptx_ordinary_save_counting_publish                            0.1241      0.1146     0.1325     0.1350      51.88%         -   3
+pptx_ordinary_save_edit                                        1.9476      1.9484     1.9604     1.9720     159.72%         -   3
+pptx_ordinary_save_lifecycle                                   8.0246      8.4208    11.2521    11.7781      27.97%         -   3
+
+ratios (median p50):
+  pptx edit marker/control                20.23x
+  pptx lifecycle marker/control           10.87x
+  pptx atomic marker/control               1.10x
+  pptx counting marker/control             1.23x
+  docx edit marker/control                12.75x
+  docx lifecycle marker/control            2.06x
+  pptx eager text marker/control          12.88x
+  pptx source text marker/control         13.20x
+  docx eager text marker/control          25.55x
+  docx source text marker/control         30.59x
+  pptx edit marker/generated              77.21x
+  pptx lifecycle marker/generated         20.37x
+  docx edit marker/generated              19.63x
+  pptx edit control/generated              3.82x
+
+allocations (median of the retained samples):
+selector                                                    calls      alloc bytes   reallocs  retained bytes    region peak  constant
+docx_marker_control_ordinary_save_atomic_publish           7141.0        1022366.0     1276.0         41393.0      1456355.0      True
+docx_marker_control_ordinary_save_counting_publish         7136.0         956337.0     1274.0         41393.0      1493132.0      True
+docx_marker_control_ordinary_save_edit                     8292.0        5454751.0      852.0        407879.0       773719.0      True
+docx_marker_control_ordinary_save_lifecycle               16231.0        7004259.0     2277.0        545139.0      1365575.0      True
+docx_marker_ordinary_save_atomic_publish                   7141.0        1022366.0     1276.0         41393.0      1282308.0      True
+docx_marker_ordinary_save_counting_publish                 7136.0         956337.0     1274.0         41393.0      1328235.0      True
+docx_marker_ordinary_save_edit                            11848.0        8886818.0      877.0        407879.0      1875978.0      True
+docx_marker_ordinary_save_lifecycle                       19787.0       10436205.0     2302.0        545018.0      1835102.0      True
+docx_ordinary_save_atomic_publish                          6528.0         867437.0     1266.0         21575.0      1192323.0      True
+docx_ordinary_save_counting_publish                        6523.0         801408.0     1264.0         21575.0      1238236.0      True
+docx_ordinary_save_edit                                    8277.0        1768329.0      837.0        388061.0       544685.0      True
+docx_ordinary_save_lifecycle                              15603.0        3139880.0     2252.0        482475.0      1110727.0      True
+pptx_marker_control_ordinary_save_atomic_publish            615.0         642041.0       99.0             0.0      1473915.0      True
+pptx_marker_control_ordinary_save_counting_publish          618.0         711927.0      104.0             0.0      1643602.0      True
+pptx_marker_control_ordinary_save_edit                    99367.0        6986277.0     1244.0         17059.0      1026706.0      True
+pptx_marker_control_ordinary_save_lifecycle              103987.0       11355385.0     2180.0        480402.0      1383091.0      True
+pptx_marker_ordinary_save_atomic_publish                    615.0         642041.0       99.0             0.0      1299219.0      True
+pptx_marker_ordinary_save_counting_publish                  618.0         711927.0      104.0             0.0      1476332.0      True
+pptx_marker_ordinary_save_edit                           418273.0      146233844.0    27576.0         17059.0      2074589.0      True
+pptx_marker_ordinary_save_lifecycle                      423025.0      150648260.0    28523.0        479974.0      2033691.0      True
+pptx_ordinary_save_atomic_publish                           362.0         607345.0       95.0             0.0      1210664.0      True
+pptx_ordinary_save_counting_publish                         365.0         676211.0      100.0             0.0      1345127.0      True
+pptx_ordinary_save_edit                                   26794.0        1614311.0     1029.0          1557.0       776921.0      True
+pptx_ordinary_save_lifecycle                              31032.0        5533803.0     1931.0        245212.0      1119856.0      True
