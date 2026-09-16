@@ -1,0 +1,24 @@
+diff --git a/crates/litchi-docx/src/parts/document_part.rs b/crates/litchi-docx/src/parts/document_part.rs
+index f4c918857..a9e1b50ee 100644
+--- a/crates/litchi-docx/src/parts/document_part.rs
++++ b/crates/litchi-docx/src/parts/document_part.rs
+@@ -576,10 +576,18 @@ impl<'a> DocumentPart<'a> {
+     /// Returns an error if the operation cannot be completed.
+     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
+         let xml = visible_document_xml(part.blob_arc())?;
++        // CHANGE 0643 LAYOUT CONTROL (0623's method): the `OnceLock` field and
++        // the `get_or_init` initializer in `paragraph_ranges` are linked
++        // exactly as on the base build, but the cell is filled here, so the
++        // lazy path is never taken and the scan happens where it happened
++        // before change 0592. Any difference between this binary and the
++        // 0592-reverted one is code layout and the `OnceLock` read, not the
++        // placement of the scan.
++        let index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
+         Ok(Self {
+             part,
+             xml,
+-            paragraph_index: OnceLock::new(),
++            paragraph_index: OnceLock::from(index),
+         })
+     }
+ 

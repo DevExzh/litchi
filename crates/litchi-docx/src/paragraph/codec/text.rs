@@ -461,19 +461,28 @@ where
         .map_err(|error| writer.document_error(error))?;
     operation_check().map_err(|error| writer.document_error(error))?;
 
+    // The source is a byte slice, so the reader borrows its events from
+    // `xml_bytes` (change 0229's reading of the sibling `for_each_word_text_chunk`).
+    // `NsReader::<&[u8]>::read_event` and `read_event_into` are the same
+    // `read_event_impl` over the same `ReaderState`, differing only in whether the
+    // token is handed back borrowed from the input or copied into a caller buffer,
+    // so the event stream, the namespace push/pop and the error stream are
+    // unchanged; the copy into `buffer` and the `into_owned()` copy out of it are
+    // the only work removed. `preflight_semantic_xml` above has always read this
+    // same slice with the borrowed form under the same configuration, so every
+    // document reaching this loop was already tokenized that way once. Events
+    // borrow `xml_bytes`, not the reader, so the `&reader` uses below are
+    // unaffected.
     let mut reader = NsReader::from_reader(xml_bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut parser = SemanticTextParser::default();
-    let mut buffer = Vec::new();
     loop {
         operation_check().map_err(|error| writer.document_error(error))?;
-        buffer.clear();
         let event = reader
-            .read_event_into(&mut buffer)
+            .read_event()
             .map_err(|error| writer.document_error(Error::Xml(error.to_string())))?;
         operation_check().map_err(|error| writer.document_error(error))?;
-        let event = event.into_owned();
         if let Event::Start(element) | Event::Empty(element) = &event {
             validate_semantic_attribute_names(&reader, element)
                 .map_err(|error| writer.document_error(error))?;

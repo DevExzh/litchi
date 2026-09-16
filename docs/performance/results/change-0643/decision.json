@@ -1,0 +1,59 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0643",
+  "title": "The DOCX sink text parser borrows its events, and change 0592's open regression is the harness's own preparation",
+  "decision": "retained, implemented in litchi-docx (part b); attribution only, no source change (part a)",
+  "code_state": "crates/litchi-docx/src/paragraph/codec/text.rs only, plus two added tests in crates/litchi-docx/tests/sequential_text.rs; no public API, error type, limit or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "part (b) implements survey item XML-6: the sink emission loop read events into a caller buffer and then called into_owned() on a byte-slice source, while the sibling for_each_word_text_chunk has borrowed since change 0229; NsReader::read_event_into and NsReader::<&[u8]>::read_event are the same read_event_impl over the same ReaderState, and preflight_semantic_xml on the same bytes already used the borrowed form",
+    "part (b) removes 88.84% of the sink read's allocations and 9.67% of its instructions at 10,000 paragraphs and 15.57% of its median wall time, against untouched text() controls that move inside their floors",
+    "part (a) reproduces change 0592's open docx_file_eager_paragraph_count regression at +9.81% pooled with a -0.24% A/A floor, and decomposes it: a constant +0.85% of code layout, proved by a binary that links the lazy mechanism and never takes it (0623's method), and +5.74% that exists only under the harness's own untimed preparation and collapses to +0.27% when that preparation is made symmetric",
+    "part (a) shows the regression is not work: the timed region executes 0.53% fewer instructions on the after leg, takes the same page faults, and the paragraph scan symbol runs twice per harness sample on the before leg and once on the after leg",
+    "value identity is proved over 333 documents on both facades, including 129 Document refusals, 142 Limit refusals and 74 Sink failures with their exact retained partial progress, byte-identical between legs"
+  ],
+  "accepted_evidence": {
+    "allocations": "probe0643 counting global allocator, isolation pairs at reps=4 and reps=20, five operations at 24, 200 and 10,000 paragraphs, both legs; deterministic",
+    "counts": "callgrind isolation pairs (--cache-sim=no --branch-sim=no): reps 4 -> 20 at 24 and 200 paragraphs and 1 -> 5 at 10,000 for part (b); reps 0 -> 1 on the harness corpus file for part (a), which prices the first call in a fresh process, plus per-symbol inclusive Ir for scan_word_element_ranges::<ParagraphIndex::from_xml::{closure#0}>",
+    "perf_counters": "perf stat cycles, instructions, branch-misses, dTLB-load-misses and page-faults over the same reps 0 -> 1 pair, 40 processes per leg per reps value, difference of medians",
+    "timing_part_a": "tools/perf-baseline --filesystem-cache warm, 60 samples and 3 warmups, order A1 B1 B2 A2 on CPU 18, three DOCX file selectors, leg A = 0592 reverted and leg B = base",
+    "timing_layout_control": "probe0643 timed mode, one process per sample, order A1 C1 B1 B2 C2 A2 with C the layout control, 60 samples per leg on the harness corpus file and 40 on the synthetic 200-paragraph package, three preparations",
+    "timing_part_b": "probe0643 timed mode, 60 timed calls per leg per case after one untimed preparation, order A1 B1 B2 A2 on CPU 18, seven sink cases and four text() controls",
+    "differential_oracle": "probe0643 corpus checker over 62 test-data .docx, 270 fuzz-campaign .docx and the harness's own generated corpus file; both facades; write_text_to under five sink configurations signing exact bytes, write-call count and the full TextOutputError including retained progress"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte, and __memcpy_avx_unaligned_erms is 60% of every part (a) profile for that reason, so the part (a) result is read from the per-symbol scan count and the timed-region difference rather than from the totals",
+    "paragraph_string_remains": "the sink parser still allocates one String per w:p (10,045 allocations at 10,000 paragraphs, about one per paragraph, against text()'s 51); reusing one cleared buffer changes what is retained between paragraphs and moves the try_reserve sites that report Error::Allocation, so it is left to a separate change",
+    "part_a_not_fixed": "the +9.81% is attributed, not removed; the only value-identical removal is restoring the eager scan, which costs -39.04% on the same corpus's eager text read and -30.24% on its source-backed one in the same window",
+    "probe_reproduces_two_thirds": "the probe reproduces +6.63% of the selector's +9.81%; the residual is what the harness child does between the preparation and the clock, measured only by difference"
+  },
+  "known_gaps": {
+    "cycles_for_the_single_call": "native cycles could not be scoped to part (a)'s single timed call: the enclosing process is 78-81 M cycles with an interquartile range of 3.2-4.8 M against a sub-1 M signal; reported as inconclusive, as change 0592's cold-first-call.csv was",
+    "layout_term_unexplained": "the control proves the +0.85% is the OnceLock field and its codegen rather than the placement of the scan, but this record does not attribute it to a particular instruction; it is below the review trigger",
+    "no_harness_sink_selector": "tools/perf-baseline has no DOCX text-sink case, so part (b)'s timing comes from the retained probe; the three DOCX file selectors that exist do not reach write_text_to",
+    "package_level_index_memoization": "memoizing the paragraph index across document() calls on one Package would help exactly the caller shape part (a) measures, but it extends a cache lifetime across view boundaries and would move a DocumentIndexAdmission charge on the budget-managed source-backed route; it needs a frozen design record"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, peak-RSS, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f680d4e6a22e0dc9e14bcd0e5e70a92dc5e",
+    "branch": "perf/0643-docx-paragraph-count-and-sink-text",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0, quick-xml 0.41.0",
+    "cpu_pin": "taskset -c 18 for every timed process; taskset -c 19 for the callgrind runs",
+    "binaries": {
+      "rev0592/litchi-perf-baseline": "7a5c9003a39b209feb88705eece436b8b72a47de0d8244c4dcdf2bdb0bb5fecf",
+      "base/litchi-perf-baseline": "5f8f2299666413f82eab7f431723d6fcf0a59665947c50e67aa2337698b8aae4",
+      "rev0592/probe0643": "6d2e1804a1fca1d081ebd961f759100afcb5654263502ddeace3a2f8b5d05046",
+      "layoutctl/probe0643": "926e222adb7b439ef41fbf957117b3385e8e35360cfa59bfc91ef5e5aa81291a",
+      "base/probe0643": "2d6f7751f42fe133d65c6b44b9be969870d112cfbeb1d058ee4064145733388d",
+      "after/probe0643": "b70d3f30a97d2ec15a9cc7c498d5724a9d872e5435c49c921f73265b395aaaf3",
+      "rev0592/corpus0643": "01028df876145d5bcc063390dec3272551954adf8628d434b250aa3cd0221933",
+      "base/corpus0643": "b063ef0d7663f03f4a349c0ed57e52834c6213b68662c64d8178c51122e0b989",
+      "after/corpus0643": "fe30a86ece822504f91e7372bbf62c620f5833427d88ce1a464986f123c531c6"
+    },
+    "note": "four legs, all built --release --locked; rev0592 and layoutctl are detached worktrees of c7326f680 carrying probe/revert-0592.patch and probe/layout-control.patch respectively, base is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680, and after is this branch's worktree; every timed binary was copied out of its Cargo target directory before use (change 0627)"
+  }
+}

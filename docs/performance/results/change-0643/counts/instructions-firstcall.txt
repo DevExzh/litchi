@@ -1,0 +1,7 @@
+operation                              leg              reps       total_ir        call_ir               
+eager_prepared_paragraph_count         rev0592           0/1       85758265        2173875
+eager_prepared_paragraph_count         layoutctl         0/1       85757180        2171314
+eager_prepared_paragraph_count         base              0/1       84303960        2162311
+eager_noprep_paragraph_count           rev0592           0/1       81707672        2172370
+eager_noprep_paragraph_count           layoutctl         0/1       81704926        2171096
+eager_noprep_paragraph_count           base              0/1       81705896        2161084

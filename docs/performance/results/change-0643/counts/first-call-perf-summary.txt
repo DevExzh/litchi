@@ -1,0 +1,16 @@
+op                                    counter                         base         rev0592   delta %
+eager_noprep_paragraph_count          cycles                        992930          670840    -32.44
+eager_noprep_paragraph_count          instructions                 2124243         2148443      1.14
+eager_noprep_paragraph_count          branch_misses                   1981            2192     10.68
+eager_noprep_paragraph_count          dtlb_load_misses                  38              30    -20.00
+eager_noprep_paragraph_count          page_faults                        0               0       nan
+eager_prepared_paragraph_count        cycles                        478125          976838    104.31
+eager_prepared_paragraph_count        instructions                 2175796         2148148     -1.27
+eager_prepared_paragraph_count        branch_misses                   1700             484    -71.51
+eager_prepared_paragraph_count        dtlb_load_misses                 -76             -17    -77.48
+eager_prepared_paragraph_count        page_faults                       -1               1   -200.00
+eager_prepared_warm_paragraph_count   cycles                        410468          340968    -16.93
+eager_prepared_warm_paragraph_count   instructions                 2160664         2142648     -0.83
+eager_prepared_warm_paragraph_count   branch_misses                    802             993     23.82
+eager_prepared_warm_paragraph_count   dtlb_load_misses                  46              64     36.56
+eager_prepared_warm_paragraph_count   page_faults                        1               0   -100.00

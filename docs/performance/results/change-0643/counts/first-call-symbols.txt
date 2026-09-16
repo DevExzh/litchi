@@ -1,0 +1,18 @@
+# Per-symbol callgrind inclusive Ir for the paragraph-index scan, harness fixture
+# probe0643 eager_prepared_paragraph_count <harness-docx.docx> <reps>
+# reps=0 is the untimed preparation alone; reps=1 adds the one call the selector times.
+
+rev0592    reps=0   48,910 ( 0.06%) /home/zhuhe/code/litchi-worktrees/0643-rev0592/crates/litchi-docx/src/namespace.rs:litchi_docx::namespace::scan_word_element_ranges::<<litchi_docx::parts::document_part::ParagraphIndex>::from_xml::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0643-bin/probe-rev0592]
+rev0592    reps=1   97,820 ( 0.11%) /home/zhuhe/code/litchi-worktrees/0643-rev0592/crates/litchi-docx/src/namespace.rs:litchi_docx::namespace::scan_word_element_ranges::<<litchi_docx::parts::document_part::ParagraphIndex>::from_xml::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0643-bin/probe-rev0592]
+layoutctl  reps=0   48,910 ( 0.06%) /home/zhuhe/code/litchi-worktrees/0643-layoutctl/crates/litchi-docx/src/namespace.rs:litchi_docx::namespace::scan_word_element_ranges::<<litchi_docx::parts::document_part::ParagraphIndex>::from_xml::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0643-bin/probe-layoutctl]
+layoutctl  reps=1   97,820 ( 0.11%) /home/zhuhe/code/litchi-worktrees/0643-layoutctl/crates/litchi-docx/src/namespace.rs:litchi_docx::namespace::scan_word_element_ranges::<<litchi_docx::parts::document_part::ParagraphIndex>::from_xml::{closure#0}> [/home/zhuhe/code/litchi-worktrees/targets/0643-bin/probe-layoutctl]
+base       reps=0  <symbol absent>
+base       reps=1   42,635 ( 0.05%) /home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-docx/src/namespace.rs:<litchi_docx::parts::document_part::ParagraphIndex>::from_xml
+
+# summary: totals
+fc-layoutctl-eager_prepared_paragraph_count-1.out:summary: 87928494
+fc-rev0592-eager_prepared_paragraph_count-0.out:summary: 85758265
+fc-base-eager_prepared_paragraph_count-0.out:summary: 84303960
+fc-rev0592-eager_prepared_paragraph_count-1.out:summary: 87932140
+fc-layoutctl-eager_prepared_paragraph_count-0.out:summary: 85757180
+fc-base-eager_prepared_paragraph_count-1.out:summary: 86466271

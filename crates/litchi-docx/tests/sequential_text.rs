@@ -730,3 +730,87 @@ fn declared_size_is_rejected_before_payload_and_media_stays_cold() {
     assert!(output.is_empty());
     assert_eq!(source.reads.load(Ordering::SeqCst), reads_before_sink);
 }
+
+/// The sink parser reads borrowed events straight out of the pinned
+/// main-document slice (change 0643). A borrowed reader and a buffered one
+/// tokenize with the same state machine, so this pins the projection across
+/// every event kind the parser accepts, including the ones that arrive as
+/// several events inside one `w:t`: a comment or a CDATA section splits the
+/// text run, and character references arrive as their own events.
+#[test]
+fn every_accepted_event_kind_projects_identically_through_both_sink_facades() {
+    let bytes = package_bytes(
+        &document_xml(
+            r#"<!--lead--><w:p><w:r><w:t>ab<!--split-->cd</w:t><w:t>e<![CDATA[f]]>g</w:t><w:t>x&amp;y&#x41;z</w:t></w:r></w:p><w:p><w:r><w:tab/><w:t>tail</w:t></w:r></w:p>"#,
+        ),
+        false,
+    );
+    let expected = "abcdefgx&yAz\n\ttail";
+    let (eager, eager_report) = eager_text(&bytes, parity_options(false));
+    let (source, source_report) = source_text(bytes, parity_options(false));
+    assert_eq!(eager, expected.as_bytes());
+    assert_eq!(source, eager);
+    assert_eq!(eager_report.bytes_written(), expected.len() as u64);
+    assert_eq!(eager_report.objects_written(), 2);
+    assert_eq!(source_report, eager_report);
+}
+
+/// End of input is where a borrowed reader and a buffered one are most likely
+/// to diverge, so the two truncation refusals are pinned exactly: the message,
+/// the retained progress, and the bytes the sink already accepted. Both are
+/// raised by `preflight_semantic_xml`, which already read borrowed events
+/// before change 0643 and now shares that form with the emission loop.
+#[test]
+fn truncated_documents_refuse_at_end_of_input_with_unchanged_message_and_progress() {
+    // The tail ends on a token boundary, so the reader reaches `Eof` cleanly
+    // and the preflight's own balance check reports it.
+    let token_boundary = format!(
+        r#"<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>sec"#
+    );
+    // The tail ends inside a start tag, so the reader itself refuses.
+    let mid_tag = format!(
+        r#"<?xml version="1.0"?><w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p"#
+    );
+    let expected = [
+        (
+            token_boundary,
+            "invalid DOCX format: semantic DOCX XML has unbalanced elements",
+        ),
+        (
+            mid_tag,
+            "invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input",
+        ),
+    ];
+    for (prefix, message) in expected {
+        let bytes = package_bytes(prefix.as_bytes(), false);
+        let package = eager_package(&bytes);
+        let document = package.document().expect("truncated semantic document");
+        let mut output = Vec::new();
+        let error = document
+            .write_text_to(&mut output, parity_options(false))
+            .expect_err("a truncated document must refuse");
+        let TextOutputError::Document { source, progress } = error else {
+            panic!("truncation must be a document failure");
+        };
+        assert_eq!(source.to_string(), message);
+        // The preflight walks the whole part before emission begins, so a
+        // truncated tail refuses with no output at all.
+        assert_eq!(progress.bytes_written(), 0);
+        assert_eq!(progress.objects_written(), 0);
+        assert!(output.is_empty());
+
+        let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .expect("source-backed package");
+        let mut output = Vec::new();
+        let error = package
+            .write_text_to(&mut output, parity_options(false))
+            .expect_err("a truncated document must refuse");
+        let TextOutputError::Document { source, progress } = error else {
+            panic!("truncation must be a document failure");
+        };
+        assert_eq!(source.to_string(), message);
+        assert_eq!(progress.bytes_written(), 0);
+        assert_eq!(progress.objects_written(), 0);
+        assert!(output.is_empty());
+    }
+}

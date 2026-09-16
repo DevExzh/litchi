@@ -1,5 +1,54 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0643 — survey item XML-6 closed by code, change 0592's open question closed by attribution
+
+Record: [0643](0643-docx-paragraph-count-and-sink-text.md).
+
+Change 0643 closes item **XML-6** of the 0587 survey and the one question change
+0592 left open. XML-6 is closed by code: the sink emission loop borrows, and the
+counts are in `HOTSPOTS.md`. The 0592 question is closed by **evidence**, and the
+answer is that the regression is not work.
+
+Change 0592 reported `docx_file_eager_paragraph_count` at **+5.49%** pooled
+against a 0.78% floor and wrote, in as many words, "this record does not know what
+it is". It reproduces on the current base at **+9.81%** with a **−0.24%** floor,
+both orders agreeing, so the first thing this change establishes is that 0592 was
+right to report it and right not to bury it in a mean. The second is what it is.
+The timed region — `document()` followed by `paragraph_count()` — executes
+**0.53% fewer instructions** on the after leg and takes the same page faults, so
+no work was added. The per-symbol count says where the difference lives:
+`scan_word_element_ranges::<ParagraphIndex::from_xml::{closure#0}>` runs **twice**
+per harness sample on the before leg — once inside `PreparedDocx::eager`'s untimed
+`document()?.text()?` preparation, once inside the timed call — and **once** on
+the after leg, inside the timed call. The before leg pays 1,454,305 extra
+instructions before the clock starts and gets a warm scan for them.
+
+A layout control in change 0623's shape — a third binary that links the `OnceLock`
+field and the `get_or_init` initializer exactly as the base build does but fills
+the cell in `from_part`, so the lazy path is never taken — splits the 6.63% the
+probe reproduces into **+0.85%** of code layout, constant across all three
+preparations, and **+5.74%** of scan placement. Make the preparation symmetric by
+adding one paragraph query to it and the placement term collapses to **+0.27%**;
+remove the preparation entirely and it is **+0.36%**. It scales with what happens
+between the preparation and the clock: +2.40% on an in-memory package, +5.74% on
+the same operation over a 16.79 MB archive, +9.81% in the harness's own child.
+
+**It is not fixed, and the record says why.** The only value-identical removal is
+restoring the eager scan, which costs −39.04% on the same corpus's eager text read
+and −30.24% on its source-backed one in the same window — the trade change 0592
+made deliberately. The non-identical option, memoizing the index on the `Package`
+so a second `document()` reuses the first view's, would help exactly this caller
+shape and is **not proposed**: it extends a cache lifetime across view boundaries
+and would move a `DocumentIndexAdmission` charge on the budget-managed
+source-backed route, which is the contract line 0592 already declined to cross. It
+needs a frozen design record. The optimization order in `docs/GOAL.md` is
+respected throughout: XML-6 removes unnecessary copying and allocation, ahead of
+layout, algorithms and parallelism; nothing was vectorized and no parallelism was
+introduced. **The audit gap this change does not close** is that
+`tools/perf-baseline` still has no DOCX text-sink selector, so the path XML-6
+improves is covered by a retained probe and a 333-document differential rather
+than by a harness case.
+
 ## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
 
 Record: [0632](0632-zip-directory-prefill-locate.md).

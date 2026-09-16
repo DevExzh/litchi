@@ -1,5 +1,41 @@
 # Performance hotspot inventory
 
+## 0643 — the DOCX sink read stops copying every event, and change 0592's open regression is named
+
+Record: [0643](0643-docx-paragraph-count-and-sink-text.md).
+
+**The DOCX main-document sink read stops copying every event (change 0643).** Change
+0229 made `for_each_word_text_chunk` borrow its events out of the pinned
+main-document slice; its sibling on the sink path,
+`write_text_to_with_operation_check`, kept reading each event into a caller buffer
+and then calling `event.into_owned()` on it — two copies and one heap allocation
+per event, on a source that is a byte slice. Survey item **XML-6 is answered**.
+`NsReader::read_event_into` and `NsReader::<&[u8]>::read_event` are one-line
+wrappers over the same `read_event_impl` and the same `ReaderState`, and
+`preflight_semantic_xml` in the same file has always used the borrowed form on the
+same bytes, so the emission loop was the only pass that did not. Measured on
+`taskset -c 18`, isolation pairs at three shapes: `write_text_to` loses
+**88.84%** of its allocations (90,051 → 10,045 at 10,000 paragraphs; 1,851 → 245
+at 200; 267 → 69 at 24) and **70.09%** of its allocated bytes, **9.67%** of its
+instructions, and **15.57%** of its median wall time; the source-backed sink loses
+the same allocations and −8.22% of its instructions. Change 0592's observation that `write_text_to` cost
+"about 101.9 M instructions and about 90,000 allocations more than `text()`" now
+reads **84.2 M and 9,994**. The cycles fall further than the instructions
+(−15.6% against −9.7%) because what left was 80,006 allocate-and-copy round trips,
+not arithmetic. **What remains on this path is one allocation per paragraph** —
+the bounded `String` the parser accumulates, 10,045 at 10,000 paragraphs against
+`text()`'s 51 — and it is the next reduction here, though it changes what the
+parser retains between paragraphs and moves the `try_reserve` sites that report
+`Error::Allocation`. **The same shape survives elsewhere in the crate and is
+unmeasured**: `read_event_into` with a caller buffer is still how
+`header_footer/codec.rs`, `modern_comments/codec.rs`, `validation.rs`,
+`smartart.rs`, `font/codec.rs`, `chart/codec.rs` and
+`source_backed/tail_append.rs` read, each over a slice; none of them was priced
+here, and only the last is on a save path. **A hotspot is closed by measurement
+rather than by code**:
+change 0592's `docx_file_eager_paragraph_count` regression is not a hotspot at
+all — see `GOAL_AUDIT.md`.
+
 ## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
 
 Record: [0632](0632-zip-directory-prefill-locate.md).

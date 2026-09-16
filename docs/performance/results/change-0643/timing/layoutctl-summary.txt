@@ -1,0 +1,45 @@
+case                                             A1 p50     C1 p50     B1 p50     B2 p50     C2 p50     A2 p50   A/A %   C/C %   B/B %   C-A %   B-C %   B-A %
+eager_noprep_paragraph_count-harness             136860     138491     138931     137491     136940     136040   -0.60   -1.12   -1.04    0.93    0.36    1.29
+eager_noprep_paragraph_count-synthetic200         82351      82980      82470      82880      82920      82371    0.02   -0.07    0.50    0.72   -0.33    0.38
+eager_prepared_paragraph_count-harness           122371     123110     130410     130191     123351     122021   -0.29    0.20   -0.17    0.85    5.74    6.63
+eager_prepared_paragraph_count-synthetic200       77781      78060      79940      79810      77950      77880    0.13   -0.14   -0.16    0.22    2.40    2.63
+eager_prepared_warm_paragraph_count-harness      120751     121751     121941     122581     122111     121211    0.38    0.30    0.52    0.79    0.27    1.06
+eager_prepared_warm_paragraph_count-synthetic200      77500      77490      77641      77600      77411      77301   -0.26   -0.10   -0.05    0.06    0.22    0.28
+
+case                                        leg      n         p50         mean        p95        p99        min
+eager_noprep_paragraph_count-harness        A1      60      136860     138612.8     146120     173521     134930
+eager_noprep_paragraph_count-harness        C1      60      138491     142597.6     176591     193931     134720
+eager_noprep_paragraph_count-harness        B1      60      138931     140408.2     150721     156421     135491
+eager_noprep_paragraph_count-harness        B2      60      137491     139562.2     149671     184071     135261
+eager_noprep_paragraph_count-harness        C2      60      136940     138130.4     147071     153211     135161
+eager_noprep_paragraph_count-harness        A2      60      136040     137199.1     144791     145940     133830
+eager_noprep_paragraph_count-synthetic200   A1      40       82351      84715.9      95590     131071      80861
+eager_noprep_paragraph_count-synthetic200   C1      40       82980      84003.5      96230      96241      81340
+eager_noprep_paragraph_count-synthetic200   B1      40       82470      83897.9      95820      96780      81220
+eager_noprep_paragraph_count-synthetic200   B2      40       82880      85329.2      98081      99420      81060
+eager_noprep_paragraph_count-synthetic200   C2      40       82920      85041.6      99920     102490      81891
+eager_noprep_paragraph_count-synthetic200   A2      40       82371      84299.8     100090     101551      80690
+eager_prepared_paragraph_count-harness      A1      60      122371     124248.3     130341     134401     121171
+eager_prepared_paragraph_count-harness      C1      60      123110     124566.4     131441     135560     121361
+eager_prepared_paragraph_count-harness      B1      60      130410     133816.4     150260     205971     129191
+eager_prepared_paragraph_count-harness      B2      60      130191     131036.8     138170     143991     128620
+eager_prepared_paragraph_count-harness      C2      60      123351     125551.3     131790     170391     121480
+eager_prepared_paragraph_count-harness      A2      60      122021     125032.7     148000     166461     120691
+eager_prepared_paragraph_count-synthetic200 A1      40       77781      79272.7      93221     103801      76961
+eager_prepared_paragraph_count-synthetic200 C1      40       78060      79445.4      92520      92670      77231
+eager_prepared_paragraph_count-synthetic200 B1      40       79940      84368.2     129351     143031      78880
+eager_prepared_paragraph_count-synthetic200 B2      40       79810      82725.4      93361     145071      78980
+eager_prepared_paragraph_count-synthetic200 C2      40       77950      77906.9      78631      78691      76970
+eager_prepared_paragraph_count-synthetic200 A2      40       77880      79368.7      91250      91591      76910
+eager_prepared_warm_paragraph_count-harness A1      60      120751     124290.8     130500     170050     119491
+eager_prepared_warm_paragraph_count-harness C1      60      121751     123980.1     130601     168781     119841
+eager_prepared_warm_paragraph_count-harness B1      60      121941     123250.0     130821     134100     121000
+eager_prepared_warm_paragraph_count-harness B2      60      122581     124512.6     132081     137231     121271
+eager_prepared_warm_paragraph_count-harness C2      60      122111     123278.5     131320     138831     120621
+eager_prepared_warm_paragraph_count-harness A2      60      121211     123683.3     130220     168321     119660
+eager_prepared_warm_paragraph_count-synthetic200A1      40       77500      82310.4      97041     147261      76360
+eager_prepared_warm_paragraph_count-synthetic200C1      40       77490      79808.2      92001      96241      76700
+eager_prepared_warm_paragraph_count-synthetic200B1      40       77641      80247.4      92771      94241      76871
+eager_prepared_warm_paragraph_count-synthetic200B2      40       77600      78576.7      91010      99700      76590
+eager_prepared_warm_paragraph_count-synthetic200C2      40       77411      79104.5      92291      92930      76731
+eager_prepared_warm_paragraph_count-synthetic200A2      40       77301      77959.9      83330      90860      76350
