@@ -1,5 +1,50 @@
 # Performance hotspot inventory
 
+## 0644 — the DOC snapshot's six complete reads are three pairs, and four of them turn out to be load-bearing
+
+Change 0589 halved the *hashing* on the DOC and PPT source-backed opens and left
+the *reads* where they were: a generic-`ReadAt` `SourceSnapshot::open` still
+makes six complete artifact reads. A recording adapter now says exactly what
+they are. On `documentProperties.doc` the open takes 30 reads, of which 6.00 are
+complete sequential scans and the rest belong to **five** CFB index parses — I1
+and I2 on the real source, plus one composed-CFB reopen inside each of the three
+identity calls, which change 0589's inventory names but its read-count paragraph
+does not total.
+The six scans are three pairs, one per `identity_fingerprint` call, and the
+comparison graph is `R1==R2`, `R3==R4`, `R5==R6` internally plus `R1==R3`,
+`R3==R5` in `finish_open`. `picture.doc` has the identical structure at 46 reads
+and `45543.ppt` at 8. The design that follows is **six scans to four** on the
+DOC open and eight to six per `resolve`: the open loses only its third identity
+call, which the trace shows brackets nothing — r24 and r25 are adjacent — while
+the one-scan reduction is applied inside `ensure_current`, where the two calls
+already bracket each other. It is kept *out* of the open because the first
+call's confirming scan is the sole detector at one window of the FAT-sector
+sweep, and repairing that precedence needs a reopen-free re-hash on
+`source.rs:531`'s error branch — a second public entry point in `litchi-cfb`.
+Predicted from a per-scan constant measured twice independently (OLS 2.1633
+cycles/byte/scan over 8 DOC fixtures at 6 scans, 2.1743 over 30 PPT fixtures at
+2, agreeing to 0.51% over a 149× size range), that is a median **−12.7%** of the
+open's native cycles and **−33.0%** on `picture.doc`, against an in-window A/A
+floor of −0.15% median and 1.84% at p95, plus a further `2 × 2.16331 × bytes` on
+each paragraph read. Two more aggressive variants reach −19.9% and −26.5% at the
+median and are recorded and priced, not recommended. The 84% of the `.doc` corpus that is *refused* is
+untouched by the adopted design — those fixtures refuse inside identity call 1,
+which B3 leaves alone — and that is the strongest argument for the B2 variant,
+which would cut their bytes read by 31%–49%.
+The queue item's own framing is adjudicated rather than reinterpreted: 0630
+item 10 scopes this as "the third identity pass and the duplicate index parse,
+2 of the 6 surviving complete reads", and the split is that the third identity
+pass is admitted while the duplicate index parse is **rejected** — it is not a
+complete read at all, and removing it would move the only pre-scan structural
+refusal behind a complete hash. So item 10's two reads are exactly what the open gives up. Two further reads are
+reachable from somewhere item 10 did not name — the confirming scan inside each
+identity call — and both are recorded as priced variants rather than folded into
+the headline; the place that scan comes out for free is the readback, which item
+10 did not mention. Nothing is implemented; the record freezes the
+design, the witnesses and the admission gates.
+[Change and limitations](0644-ole2-snapshot-fence-design.md);
+[evidence](results/change-0644/README.md).
+
 ## 0648 — the XLS whole-sheet walk's hotspot was the per-string read, and the string table fits one window
 
 Change 0636 attributed `54016.xls`'s whole-sheet walk to the shared-string

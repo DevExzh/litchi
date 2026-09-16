@@ -1,0 +1,75 @@
+=== gate: git diff --name-only c7326f680 -- crates/ ===
+$ git -C /home/zhuhe/code/litchi-worktrees/0644 diff --name-only c7326f680 -- crates/
+PASS: no output, no crate file changed
+
+=== gate: git status --porcelain (worktree, before the commit) ===
+?? docs/performance/0644-ole2-snapshot-fence-design.md
+?? docs/performance/results/change-0644/
+PASS: the record and its packet are the only additions
+
+=== gate: cargo fmt --all --check ===
+PASS: cargo fmt --all --check
+
+=== gate: cargo doc -p litchi-cfb -p litchi-doc -p litchi-ppt --no-deps ===
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0644/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/soapberry-zip)
+    Checking rc4 v0.2.0
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-odraw)
+    Checking x509-cert v0.2.5
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-biff)
+    Checking sha1 v0.11.0
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-crypto)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-ograph)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-sign)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-opc)
+    Checking url v2.5.8
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-vba)
+    Checking md-5 v0.11.0
+    Checking bumpalo v3.20.3
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-doc)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-ppt)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-cfb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 47.96s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0644-gates/doc/litchi_cfb/index.html and 2 other files
+PASS: rustdoc lints are deny; no warning emitted
+
+=== gate: probe builds against this worktree's litchi-core/cfb/doc/ppt ===
+   Compiling md-5 v0.11.0
+   Compiling bumpalo v3.20.3
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-doc)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/0644/crates/litchi-ppt)
+   Compiling fence_probe_0644 v0.0.0 (/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0644/probe-wt)
+    Finished `release` profile [optimized] target(s) in 3m 47s
+PASS: compiles clean, no warning
+
+=== gate: crates/ identical to the shared before checkout ===
+$ diff -rq /home/zhuhe/code/litchi-worktrees/0644/crates /home/zhuhe/code/litchi-worktrees/before-c7326f680/crates
+PASS: no output, the trees are identical
+
+=== cross-check: the worktree-built probe reproduces the before-built probe's sweep ===
+$ diff sweeps/sweep-documentProperties-doc-open.tsv <worktree-built probe output>
+PASS: byte-identical
+
+=== gate: scripts/predict.py replays from the packet root ===
+$ cd docs/performance/results/change-0644 && python3 scripts/predict.py | diff - perf/predicted-savings.txt
+PASS: byte-identical; the script takes no arguments and no absolute paths
+
+=== gate: decision.json parses ===
+$ python3 -m json.tool decision.json
+PASS
+
+=== gate: final re-run, after the B3 revision and the W-T3/W-T4 witnesses ===
+$ git diff --name-only c7326f680 -- crates/                       -> empty, PASS
+$ diff -rq crates/ <before checkout>/crates                       -> empty, PASS
+$ cargo fmt --all --check                                         -> PASS
+$ cargo doc -p litchi-cfb -p litchi-doc -p litchi-ppt --no-deps   -> PASS
+    Documenting litchi-doc / litchi-ppt / litchi-cfb; Finished in 43.63s
+    rustdoc lints are deny; no warning emitted
+$ python3 scripts/predict.py | diff - perf/predicted-savings.txt  -> PASS
+$ python3 -m json.tool decision.json                              -> PASS
+
+=== not run, and why ===
+cargo clippy / cargo test per crate: no crate was touched (the first gate is empty).
+tools/perf-baseline suite: no registered harness selector reaches either snapshot path
+  (change 0587's measurement blocker), and this change adds none.
+cargo test -p litchi --features docx,xlsx,pptx,xls: no crate was touched.

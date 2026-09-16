@@ -1,0 +1,14 @@
+# fixture=/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt mode=ppt-open bytes=385024
+# witness_offset=380927 forced=false
+# clean_outcome=OK
+# clean_read_calls=8
+trigger_after_read	fired	reads	outcome
+0	0	8	OK
+1	1	8	OK
+2	1	8	OK
+3	1	8	OK
+4	1	8	open-ERR Source(SourceFingerprintChanged { expected: ArtifactFingerprint([33, 138, 170, 197, 66, 229, 249, 181, 103, 115, 100, 7, 242, 99, 29, 239, 198, 87, 15...
+5	1	8	open-ERR Source(SourceFingerprintChanged { expected: ArtifactFingerprint([33, 138, 170, 197, 66, 229, 249, 181, 103, 115, 100, 7, 242, 99, 29, 239, 198, 87, 15...
+6	1	8	open-ERR Source(SourceFingerprintChanged { expected: ArtifactFingerprint([33, 138, 170, 197, 66, 229, 249, 181, 103, 115, 100, 7, 242, 99, 29, 239, 198, 87, 15...
+7	1	8	open-ERR Source(SourceFingerprintChanged { expected: ArtifactFingerprint([33, 138, 170, 197, 66, 229, 249, 181, 103, 115, 100, 7, 242, 99, 29, 239, 198, 87, 15...
+8	1	8	OK

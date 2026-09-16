@@ -1,0 +1,65 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0644",
+  "title": "Four of the DOC snapshot's six complete reads are load-bearing after all; a SourceVersion can replace none of them, and removing the fifth costs a second public entry point to keep one error from changing its name",
+  "decision": "retained, design only; nothing under crates/ changed",
+  "code_state": "no crate file changed; git diff --name-only c7326f680 -- crates/ is empty and diff -rq against the shared before checkout's crates/ is empty",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "the read inventory is traced rather than inferred: a generic DOC SourceSnapshot::open takes 30 reads on documentProperties.doc and 46 on picture.doc, which is 6.00 complete artifact scans in three pairs plus five CFB index parses (I1, I2 and one composed reopen inside each identity call); 0589's inventory listed the composed reopen once, and the trace shows it is levied three times",
+    "Option B (one complete scan per empty-splice identity call, the read-twice-compare supplied by the caller's outer bracket) is admitted as B3 -- inside DOC ensure_current only -- and refused on the PPT open, whose single identity call has no outer partner: the PPT sweep shows triggers 4-7 refused today by the internal comparison and by nothing else, and PPT's ensure_current checks only the version token and the length. resolve falls from eight complete scans to six",
+    "B is kept out of the DOC open in the adopted design because of cost B-iii: removing the first identity call's confirming scan hands FAT-sweep triggers 7-9 from Overlay(SourceFingerprintChanged) to Ole(CorruptedFile(..)), and change 0621's relocation rule cannot be applied with the identity entry point alone -- the repair must sit on source.rs:531's error branch and needs a reopen-free re-hash, because a re-plan's own composed reopen reads the same corrupted sector and yields a third variant. That is a second public item in litchi-cfb whose only job is an unbracketed digest. B2 (open 6->3, median -19.9%) is recorded and priced so an implementing change can take it with that cost visible",
+    "the exception that holds the trailing window at one ordinal has to be uniform across the operation, not special-cased to the open: resolve's trailing ensure_current has the same shape, so B1 -- B on every call -- grows the window from 1 ordinal to 5 on doc-open AND doc-open-read. B3 and B2 keep the last identity call of each operation and end each in a compared scan",
+    "Option C (drop the DOC open's third identity call) is admitted with a stated relocation: the six ordinals it stops refusing at open are refused at the first access with the same typed error, measured on the adjacent window of the readback sweep, and no path that yields a byte skips ensure_current",
+    "Option A (substitute a SourceVersion observation for a complete read) is rejected with a runnable witness: an in-place pwrite through a second descriptor with the modification time restored leaves FileSource::version() and len() unchanged while the bytes differ; change 0587 already classifies the substitution as an ADR 0006 policy amendment rather than an optimization",
+    "Options D, E, F and G are rejected with their own witnesses: D would rewrite the Overlay(Ole(..)) wrapper for 17 of 31 ordinals and the two reopens that survive B+C are an estimated 0.55-12.89% of the open against B+C's 25.1-65.9%; E would move the only pre-scan structural refusal in a 57-fixture corpus behind a complete hash, with a 2 GiB worst case; F cannot fold a data-dependent pointer chase into a forward pass without unbounded retention or an admission narrowing; G would leave the semantic parse bracketed by nothing, which is a wrong-value path rather than a relocated refusal",
+    "the saving is predicted from a per-scan constant measured twice independently: OLS gives 2.1633 cycles/byte/scan over 8 DOC fixtures at 6 scans and 2.1743 over 30 PPT fixtures at 2 scans, agreeing to 0.51% over a 149x size range and reproducing 0609's 2.150 and 0589's 2.048"
+  ],
+  "accepted_evidence": {
+    "read_inventory": "a recording ReadAt adapter logs every read_at/len/version call in order; a read is classified as a complete-scan chunk when its offset is a multiple of the 1 MiB fingerprint chunk and its length is min(1 MiB, remaining), and complete scans are scan_chunks / ceil(bytes / 1 MiB) \u2014 6.00 for DOC open on two fixtures, 2.00 for PPT open",
+    "change_under_read_sweeps": "a hostile owned adapter with a stable version token and a fixed length flips one byte after read ordinal k, for every k from 0 to the clean read count, on three witness placements (outside every parsed range, inside the directory sector, inside the FAT sector), over doc-open, doc-open-read and ppt-open; each sweep carries a clean control and a trailing control that must return OK",
+    "transient_witnesses": "the same adapter with a revert ordinal, so the mutation exists only between two reads and the artifact ends byte-identical. Run twice: W-T1/W-T2 on the DOC open's first identity call (flip after r5, revert after r10 -- refused; revert after r9 -- already accepted today), and W-T3/W-T4 on the first ensure_current's first identity call, which is the call the adopted design reduces (flip after r31, revert after r36 -- refused at 36 reads; revert after r35 -- already accepted, 59 reads)",
+    "sourceversion_witness": "an ordinary FileSource on a real filesystem: pwrite one flipped byte through a second descriptor on the same inode, fsync, restore accessed and modified times with File::set_times, then re-observe version() and len()",
+    "census": "all 57 .doc fixtures under test-data/ with read calls, read bytes, complete-artifact reads and the outcome, classified by whether the refusal preceded the first complete scan",
+    "native_cycles": "perf stat -r 3 isolation pairs, 200 against 1,200 operations (20 against 120 above 256 KiB), differenced and divided by the operation delta, on the 8 admitted .doc and all 30 .ppt fixtures, pinned to CPU 19, with a second identical leg in the same window as the A/A floor",
+    "index_parse_term": "the same isolation pairs on one SharedOleFile::open per fixture, which prices what Options D and E would buy"
+  },
+  "accepted_costs": {
+    "option_b_transient": "Option B stops refusing a mutation that appears after one identity scan and is reverted before the caller's next one; W-T1 is that witness, and the artifact it leaves is byte-identical to the original, so no value derived from it is wrong. W-T2 shows the current fence already accepts the neighbouring case",
+    "option_c_relocation": "Option C moves six of the thirty DOC ordinals' refusal from open to the first access. The five accessors that return retained state (source_version, fingerprint, len, is_empty, limits) consume no byte and would return values for bytes that may no longer exist; every path that yields a byte goes through ensure_current",
+    "new_public_item": "Option B needs a new empty-splice-only identity entry point in litchi-cfb whose contract is that the caller owns the read-twice-compare; taking no splices at all is what keeps it from skipping the composed reopen for a real plan",
+    "modelled_savings": "no after leg exists; the predicted per-fixture savings are a measured before-value minus the unrounded DOC OLS per-scan constant (12.979873 / 6 = 2.1633122) times the number of scans removed. The constant is reported by OLS (2.1633 DOC, 2.1743 PPT, agreement 0.51%) and by two-point interpolation (2.1632, 2.1704, agreement 0.33%); residuals are (predicted - measured)/measured",
+    "host_not_quiescent": "eight agents built concurrently during the measurement window; the in-window A/A floor is median -0.15% and 1.84% at the 95th percentile of absolute deltas",
+    "option_b_trailing_window": "under B1 an operation ends in the composed reopen's four reads, which no scan follows, so the trailing OK window grows from 1 ordinal to 5 on both doc-open and doc-open-read; those mutations are still refused at the next fence. B3 and B2 avoid it by keeping the last identity call of each operation",
+    "option_b_precedence": "removing an open identity call's confirming scan would change the typed error on one window of the 31-ordinal FAT-sector sweep (two under B1); the repair needs a reopen-free re-hash on source.rs:531's error branch, scoped to structural CFB errors from the retained index parse alone -- not to the composed reopen's own error, which would invert rows 5-6, and not to the 48 semantic Refused(..) fixtures, which would put the second scan back on 84% of the corpus. B3 avoids the question entirely by leaving the open's identity calls alone; separately, Option C deletes identity call 3 in every variant, so W-D2's rows 24-26 lose I3c as their reporting site and relocate to the first access with rows 27-29 -- 14 of the 17 Overlay(Ole(..)) rows keep their site, not 17"
+  },
+  "known_gaps": {
+    "not_implemented": "no crate changed; Options B and C are designed, their admission gates defined, and neither is demonstrated end to end",
+    "not_measured": "no cold-cache, physical-device, range-source, remote, cross-platform, allocation or RSS result; no callgrind and no paired timing, because a design record has one leg",
+    "ppt_scope": "the PPT index-region witness was run on 45543.ppt only; that PPT's ensure_current checks version and length alone is read from text_edit.rs:515-530 and from change 0589, not demonstrated by serving a mutated read_text",
+    "option_e_arithmetic": "the 2 GiB amplification figure for Option E is arithmetic on the default SharedOleFileLimits ceiling; the measured half is the one corpus fixture refused after 512 bytes",
+    "windows": "the SourceVersion witness is Unix only; the Windows policy tracks length, creation time and last-write time and needs its own witness",
+    "corpus_ceiling": "1.45 MB for DOC and 1.34 MB for PPT, with no DIFAT-scale artifact and no 4,096-byte-sector CFB",
+    "sweep_coverage": "the change-under-read sweeps were run on one fixture per format (documentProperties.doc and 45543.ppt); the read structure is confirmed on picture.doc by the trace, but the trigger ranges quoted in the record are those two fixtures' and gate G1 requires the whole corpus of an implementing change",
+    "costs_not_run": "costs B-ii and B-iii, the rows-5-6 inversion and the third-variant failure of a re-plan on the error branch are all derived from the traced read order and from overlay.rs:1035-1041, not from a run of modified code; gate G1 is what would prove them",
+    "variant_set": "B applies per identity call, so the three named variants are not exhaustive; they are the ones whose costs differ in kind. A fourth combination applying B to the open but not to ensure_current was not priced because nothing recommends it"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result",
+    "any reopening of change 0609's verdict on the facade .doc route: at the adopted design's minimum the source-backed route is still 3.50x-4.29x the eager route on the two fixtures 0609 compared, and 2.98x even under B1"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0644-ole2-snapshot-fence-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu_pin": "taskset -c 19",
+    "binaries": {
+      "probe-built-against-before-checkout": "6cc68b61ba5a48d106f61aafaee949748b8904e759eb5e640505a66c2d20e46d",
+      "probe-built-against-this-worktree": "18b49f5032f9104418cd34eee00818b402668be24a9189c1d0089da1c4a82ddc",
+      "probe/main.rs": "35251d10232406bc145377b88dc814143c19c03485bd3bfca08ae9e21a900e57"
+    },
+    "note": "both binaries are cargo build --release of the same retained source against path dependencies; they differ only in the checkout they point at and produce byte-identical output, which gates.txt records"
+  }
+}
