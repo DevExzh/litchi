@@ -21,6 +21,8 @@ committed them.
 | `log-sections.md` | The four paragraphs the coordinator inserted at the top of `HOTSPOTS.md`, `GOAL_AUDIT.md`, `REPORT.md` and `ADR_COMPLIANCE.md` for this change. |
 | `decision.json` | The `litchi-perf-change-decision` record. |
 | `cleanup.json` | What was removed from the worktree area, the branch list and the session scratchpad when the wave closed, and what was kept. |
+| `integration-gate-rebased.log` | The same gate as `integration-gate.log`, on the rebased head `9790cea68` (after the 144 commits were replayed onto the upstream branch and the dead upstream test helper removed): every step exit 0, 442 test binaries all passing. |
+| `rebased-targeted-tests.log` | On the rebased head: the two XLSX test files the rebase resolved (`source_backed_cell_values`, `source_backed_row_visibility`, 74 and 17 tests passing) and the three facade polyglot-detection tests the upstream commit rewrote, run under `--features docx,odt` and passing. |
 | `rebase-commit-map.txt` | Added by the follow-up commit after the rebase onto the upstream `feat/office-format-completeness`: every pre-rebase commit hash of this branch beside its post-rebase hash and subject, so the hashes the wave's records cite stay resolvable. |
 
 ## Provenance
