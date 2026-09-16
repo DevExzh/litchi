@@ -1,0 +1,42 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0645",
+  "removed_after_extraction": [
+    {
+      "path": "<scratchpad>/agents/0645/cg-{before,after,afterb}-<case>-s{1,3}.out",
+      "what": "24 raw callgrind.out profiles",
+      "bytes": 10754642,
+      "why": "the inclusive annotations (counts/incl-*.txt), the per-callee call counts (counts/calls-*.txt) and the per-call-site splits (counts/callsites-*.txt) were extracted first and are retained; scripts/cg-run.sh, callcounts.py and callsites.py regenerate them"
+    },
+    {
+      "path": "<scratchpad>/agents/0645/stage/{before,after,afterb}",
+      "what": "the three staged litchi-perf-baseline binaries (60 MB each)",
+      "why": "their sha256s are recorded in binaries.txt and in decision.json; both legs rebuild from the base commit and the retained patches"
+    },
+    {
+      "path": "<scratchpad>/agents/0645/out/cg-*.json, probe.json, smoke-after.json",
+      "what": "harness JSON reports from the callgrind and probe runs",
+      "why": "not cited; the timing JSONs that are cited are retained under timing/"
+    },
+    {
+      "path": "<scratchpad>/agents/0645/build-*.log",
+      "what": "cargo build logs for the three legs and the probe",
+      "why": "not cited; all four builds finished with exit 0"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0645-{before,after,afterb,probe}",
+      "what": "four CARGO_TARGET_DIRs, about 1.1 GiB each",
+      "why": "build output; removed after the binaries were staged, measured and hashed"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0645",
+      "what": "the measurement worktree, which carried the scratch implementation",
+      "why": "removed after the commit; the scratch survives only as patches/ in this packet, which is the point of a design-only record"
+    }
+  ],
+  "retained_in_repository": [
+    "docs/performance/0645-pptx-memoized-revision-proof-design.md",
+    "docs/performance/results/change-0645/ (counts, timing, scripts, patches, gates.txt, decision.json, log-sections.md, README.md, binaries.txt)"
+  ]
+}

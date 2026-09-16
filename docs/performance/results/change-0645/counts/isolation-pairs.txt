@@ -1,0 +1,20 @@
+## pptx_eager_batch_edit_save
+  before  Ir/life  10,458,591,613   +0.00%   fingerprint 3,678,478,705   +0.00%   sha2 4,562,747,088   +0.00%   fp_calls  4.0 captures  4.0 eq  1.0
+  after   Ir/life   9,556,437,414   -8.63%   fingerprint 2,775,430,951  -24.55%   sha2 3,658,844,136  -19.81%   fp_calls  4.0 captures  4.0 eq  1.0
+  afterb  Ir/life   7,723,437,449  -26.15%   fingerprint   944,205,414  -74.33%   sha2 1,827,693,752  -59.94%   fp_calls  4.0 captures  4.0 eq  1.0
+
+## pptx_eager_multi_slide_batch_edit_save
+  before  Ir/life  10,494,452,610   +0.00%   fingerprint 3,678,533,244   +0.00%   sha2 4,562,756,946   +0.00%   fp_calls  4.0 captures  4.0 eq  1.0
+  after   Ir/life   9,596,966,728   -8.55%   fingerprint 2,776,751,270  -24.51%   sha2 3,660,181,280  -19.78%   fp_calls  4.0 captures  4.0 eq  1.0
+  afterb  Ir/life   7,763,085,693  -26.03%   fingerprint   948,232,832  -74.22%   sha2 1,831,698,428  -59.86%   fp_calls  4.0 captures  4.0 eq  1.0
+
+## pptx_slide_move_boundary_save
+  before  Ir/life      45,796,410   +0.00%   fingerprint    15,087,733   +0.00%   sha2    16,668,962   +0.00%   fp_calls  3.0 captures  3.0 eq  1.0
+  after   Ir/life      42,490,714   -7.22%   fingerprint    11,440,687  -24.17%   sha2    12,945,402  -22.34%   fp_calls  3.0 captures  3.0 eq  1.0
+  afterb  Ir/life      42,628,717   -6.92%   fingerprint    11,428,431  -24.25%   sha2    12,945,402  -22.34%   fp_calls  3.0 captures  3.0 eq  1.0
+
+## pptx_slide_remove_boundary_save
+  before  Ir/life      95,825,741   +0.00%   fingerprint    44,728,467   +0.00%   sha2    46,074,962   +0.00%   fp_calls  9.0 captures  6.0 eq  0.0
+  after   Ir/life      98,139,554   +2.41%   fingerprint    47,480,233   +6.15%   sha2    48,619,010   +5.52%   fp_calls 12.0 captures  6.0 eq  0.0
+  afterb  Ir/life      98,170,602   +2.45%   fingerprint    47,473,915   +6.14%   sha2    48,619,010   +5.52%   fp_calls 12.0 captures  6.0 eq  0.0
+

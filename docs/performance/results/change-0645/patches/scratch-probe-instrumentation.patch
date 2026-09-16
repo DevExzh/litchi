@@ -1,0 +1,174 @@
+diff --git a/crates/litchi-pptx/src/opened/mod.rs b/crates/litchi-pptx/src/opened/mod.rs
+index d25767066..b64a718d8 100644
+--- a/crates/litchi-pptx/src/opened/mod.rs
++++ b/crates/litchi-pptx/src/opened/mod.rs
+@@ -26,6 +26,7 @@ pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
+ pub use transaction::{Commit, Transaction};
+ 
+ pub(crate) use model::{PartDigests, capture_with_provenance, package_fingerprint};
++pub use model::memo_stats;
+ pub(crate) use patch::{apply, apply_committed_with_parent};
+ pub(crate) use remove_plan::apply_patch as apply_removal_patch;
+ pub(crate) use xml::{
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+index 48fa60835..b1aaf8c2d 100644
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -648,19 +648,81 @@ pub(crate) fn package_fingerprint_with_memo(
+         let payload = match memo_key(part) {
+             Some((key, blob)) => {
+                 let payload = match parent.and_then(|parent| parent.get(key)) {
+-                    Some(payload) => payload,
+-                    None => payload_digest(&blob),
++                    Some(payload) => {
++                        record_memo(true, blob.len());
++                        payload
++                    },
++                    None => {
++                        record_memo(false, blob.len());
++                        payload_digest(&blob)
++                    },
+                 };
+                 memo.insert(key, blob, payload)?;
+                 payload
+             },
+-            None => payload_digest_bytes(part.blob()),
++            None => {
++                record_memo(false, part.blob().len());
++                payload_digest_bytes(part.blob())
++            },
+         };
+         digest.update(part_digest(part, payload)?);
+     }
++    if memo_stats::enabled() {
++        let (hits, misses, hit_bytes, miss_bytes) = memo_stats::read();
++        eprintln!(
++            "0645-fp parts={} hits={hits} misses={misses} hit_bytes={hit_bytes} \
++             miss_bytes={miss_bytes} fed_bytes={}",
++            part_count,
++            memo_stats::FED_BYTES.load(std::sync::atomic::Ordering::Relaxed)
++        );
++        memo_stats::reset();
++    }
+     Ok((digest.finalize().into(), memo))
+ }
+ 
++/// SCRATCH (0645): hit/miss accounting for the memo. PROBE BUILD ONLY — this
++/// instrumentation is reverted before the timed binaries are built.
++pub mod memo_stats {
++    use std::sync::atomic::{AtomicU64, Ordering};
++    pub static HITS: AtomicU64 = AtomicU64::new(0);
++    pub static MISSES: AtomicU64 = AtomicU64::new(0);
++    pub static HIT_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static MISS_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static FED_BYTES: AtomicU64 = AtomicU64::new(0);
++
++    /// Whether the probe build should report per-fingerprint statistics.
++    pub fn enabled() -> bool {
++        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++        *ON.get_or_init(|| std::env::var_os("LITCHI_0645_MEMO").is_some())
++    }
++
++    pub fn reset() {
++        for counter in [&HITS, &MISSES, &HIT_BYTES, &MISS_BYTES, &FED_BYTES] {
++            counter.store(0, Ordering::Relaxed);
++        }
++    }
++
++    pub fn read() -> (u64, u64, u64, u64) {
++        (
++            HITS.load(Ordering::Relaxed),
++            MISSES.load(Ordering::Relaxed),
++            HIT_BYTES.load(Ordering::Relaxed),
++            MISS_BYTES.load(Ordering::Relaxed),
++        )
++    }
++}
++
++fn record_memo(hit: bool, bytes: usize) {
++    use std::sync::atomic::Ordering;
++    if hit {
++        memo_stats::HITS.fetch_add(1, Ordering::Relaxed);
++        memo_stats::HIT_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
++    } else {
++        memo_stats::MISSES.fetch_add(1, Ordering::Relaxed);
++        memo_stats::MISS_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
++    }
++}
++
+ /// Digest of one part payload, under its own domain string.
+ fn payload_digest(blob: &Arc<Vec<u8>>) -> [u8; 32] {
+     payload_digest_bytes(blob)
+@@ -816,6 +878,7 @@ fn feed_relationships(
+ }
+ 
+ fn feed(digest: &mut Sha256, value: &[u8]) {
++    memo_stats::FED_BYTES.fetch_add(value.len() as u64 + 8, std::sync::atomic::Ordering::Relaxed);
+     digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+     digest.update(value);
+ }
+diff --git a/crates/litchi-pptx/src/opened/tests.rs b/crates/litchi-pptx/src/opened/tests.rs
+index 464d4a5c7..66a443cb3 100644
+--- a/crates/litchi-pptx/src/opened/tests.rs
++++ b/crates/litchi-pptx/src/opened/tests.rs
+@@ -4313,3 +4313,39 @@ fn part_digest_memo_resident_bytes() -> Result<()> {
+     }
+     Ok(())
+ }
++
++/// SCRATCH (0645): how much of a commit's fingerprint the memo answers, on a
++/// deck shaped like the harness's eager corpus.
++#[test]
++fn commit_fingerprint_memo_hit_rate() -> Result<()> {
++    let mut package = opened_plain_slides_package(24)?;
++    // Eight incompressible media parts, as the eager corpus carries.
++    for index in 0..8_usize {
++        let name = PackURI::new(&format!("/ppt/media/image{index}.bin")).map_err(Error::Invalid)?;
++        let mut blob = vec![0_u8; 256 * 1024];
++        for (offset, byte) in blob.iter_mut().enumerate() {
++            *byte = ((offset.wrapping_mul(31).wrapping_add(index)) % 251) as u8;
++        }
++        package.opc.try_add_part(Box::new(BlobPart::new(
++            name,
++            "image/png".to_owned(),
++            blob,
++        )))?;
++    }
++    let source = package.opened_presentation()?;
++    let parts = package.opc.part_count();
++
++    let mut edit = source.edit();
++    edit.set_shape_text(0, crate::shape::Key::Index(0), "memoized")?;
++    super::model::memo_stats::reset();
++    let commit = edit.commit()?;
++    let (hits, misses, hit_bytes, miss_bytes) = super::model::memo_stats::read();
++    println!(
++        "0645-hitrate parts={parts} hits={hits} misses={misses} \
++         hit_bytes={hit_bytes} miss_bytes={miss_bytes}"
++    );
++    assert_eq!(hits + misses, parts as u64);
++    assert!(hits >= parts as u64 - 2, "only {hits} of {parts} parts hit");
++    drop(commit);
++    Ok(())
++}
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 407fd4301..a54df425f 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -48618,7 +48618,16 @@ fn publish_pptx_batch_edit<W: Write>(
+         if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
+             return Err("PPTX eager batch changed an unexpected shape count".into());
+         }
++        // SCRATCH (0645 probe build only).
++        litchi_pptx::opened::memo_stats::reset();
+         let commit = edit.commit()?;
++        if std::env::var_os("LITCHI_0645_MEMO").is_some() {
++            let (hits, misses, hit_bytes, miss_bytes) = litchi_pptx::opened::memo_stats::read();
++            eprintln!(
++                "0645-commit-memo parts={materializations} hits={hits} misses={misses} \
++                 hit_bytes={hit_bytes} miss_bytes={miss_bytes}"
++            );
++        }
+         if !commit.is_changed() {
+             return Err("PPTX eager batch produced an unchanged commit".into());
+         }

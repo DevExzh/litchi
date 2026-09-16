@@ -1,0 +1,10 @@
+total_Ir	4608579821
+calls	108	litchi_pptx::opened::model::package_fingerprint_with_memo
+calls	16	litchi_pptx::opened::model::package_fingerprint
+calls	0	<no callee matching capture_with_provenance>
+calls	86	litchi_pptx::opened::model::capture_internal
+calls	86	litchi_pptx::notes::package::load_snapshot
+calls	10	litchi_pptx::opened::model::packages_equal
+calls	0	<no callee matching payload_digest>
+calls	0	<no callee matching part_digest>
+calls	28305	sha2::sha256::compress256
