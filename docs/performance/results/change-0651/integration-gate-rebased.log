@@ -1,0 +1,78 @@
+head 9790cea68 start 08:48:38
+=== fmt
+fmt exit 0
+=== clippy
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.14s
+clippy exit 0
+=== test
+test exit 0
+result lines: 442, ok: 442, failed: 0
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+test error::tests::accounting_overflow_is_not_misclassified_as_unsupported ... ok
+test error::tests::allocation_zip_errors_remain_typed ... ok
+test error::tests::execution_io_errors_survive_zip_error_conversion ... ok
+test error::tests::public_execution_error_from_a_format_sink_remains_typed ... ok
+test error::tests::publication_capability_errors_retain_typed_core_classification ... ok
+test error::tests::spool_error_display_is_content_free_and_retains_the_provider_source ... ok
+test error::tests::test_xls_error_debug ... ok
+test error::tests::test_xls_error_cfb_source ... ok
+test error::tests::test_xls_error_encoding ... ok
+test error::tests::test_xls_error_from_io ... ok
+test error::tests::test_xls_error_invalid_cell_reference ... ok
+test error::tests::test_xls_error_eof ... ok
+test error::tests::test_xls_error_invalid_data ... ok
+test error::tests::test_xls_error_invalid_format ... ok
+test error::tests::test_xls_error_source_other ... ok
+test error::tests::test_xls_error_invalid_formula ... ok
+test error::tests::test_xls_error_unexpected_end_of_stream ... ok
+test error::tests::test_xls_error_unsupported_biff_version ... ok
+test error::tests::test_xls_error_unexpected_record_type ... ok
+test error::tests::test_xls_error_invalid_length ... ok
+test error::tests::test_xls_error_worksheet_not_found ... ok
+test error::tests::test_xls_error_invalid_record ... ok
+test error::tests::test_xls_result_type ... ok
+test error::tests::test_xls_error_io ... ok
+test error::tests::test_xls_error_password_protected ... ok
+test error::tests::test_xls_error_source_io ... ok
+test error::tests::test_xls_error_unsupported_feature ... ok
+test error::tests::allocation_preserves_resource_and_source ... ok
+=== doc
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.66s
+   Generated /home/zhuhe/code/litchi/target/doc/litchi/index.html and 13 other files
+doc exit 0
+=== non_iwork_gate facade-format-tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsb_facade.rs (target/non-iwork-gate/debug/deps/xlsb_facade-ec8de7101e03f3bb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+facade-format-tests exit 0
+=== non_iwork_gate harness-tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.36s
+
+     Running tests/xlsx_planning_allocations.rs (target/non-iwork-gate/debug/deps/xlsx_planning_allocations-1c1f9d3dfc257164)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+harness-tests exit 0
+=== documentation checkers
+OK: 10 performance claims validated (strict)
+check_perf_claims exit 0
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+check_report_claim_classification exit 0
+validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)
+validate_crud_coverage_index exit 0
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+non_iwork_gate verify exit 0
+end 09:07:31
