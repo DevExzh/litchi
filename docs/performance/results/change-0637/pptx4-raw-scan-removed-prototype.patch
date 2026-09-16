@@ -1,0 +1,17 @@
+diff --git a/crates/litchi-pptx/src/parts/slide.rs b/crates/litchi-pptx/src/parts/slide.rs
+index fef4d095d..fa1fcf4bc 100644
+--- a/crates/litchi-pptx/src/parts/slide.rs
++++ b/crates/litchi-pptx/src/parts/slide.rs
+@@ -807,7 +807,11 @@ impl<'a> SemanticTextParser<'a> {
+ 
+ fn semantic_text_from_part(part: &dyn Part, paragraph_separator: &str) -> Result<String> {
+     let raw = part.blob();
+-    scan_raw_semantic_text_xml(raw)?;
++    // MEASUREMENT PROTOTYPE ONLY (change 0637, PPTX-4). The raw budget scan is
++    // removed so the isolation pair prices what a fused pass could save at
++    // most. This is not a legal production change: the scan's bounds would
++    // have to be re-established inside the parse.
++    let _fused_prototype_skips_the_raw_scan = scan_raw_semantic_text_xml;
+     let processed =
+         process_markup_compatibility(raw, &Capabilities::ooxml_baseline(), &semantic_mce_limits())?;
+     if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {

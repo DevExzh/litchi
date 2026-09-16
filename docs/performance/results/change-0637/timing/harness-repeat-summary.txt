@@ -1,0 +1,56 @@
+# docx_file_eager_full_text__media-rich__-
+A1                       n=100   p50=     130.18 mean=     130.71 p95=     136.67 p99=     144.96 us
+A2                       n=100   p50=     128.85 mean=     130.17 p95=     138.41 p99=     142.70 us
+B1                       n=100   p50=     129.20 mean=     130.74 p95=     141.81 p99=     147.47 us
+B2                       n=100   p50=     130.12 mean=     131.23 p95=     139.74 p99=     145.68 us
+A (before, pooled)       n=200   p50=     129.47 mean=     130.44 p95=     137.16 p99=     144.56 us
+B (after, pooled)        n=200   p50=     129.48 mean=     130.98 p95=     141.16 p99=     147.47 us
+delta p50   B-A =       +0.01 us    +0.01% of A   A-B =       -0.01 us    -0.01% of B
+delta mean  B-A =       +0.55 us    +0.42% of A   A-B =       -0.55 us    -0.42% of B
+delta p95   B-A =       +4.00 us    +2.92% of A   A-B =       -4.00 us    -2.83% of B
+delta p99   B-A =       +2.91 us    +2.01% of A   A-B =       -2.91 us    -1.97% of B
+A/A floor (A2 vs A1)     p50 -1.02%  p95 +1.27%  p99 -1.56%
+B/B floor (B2 vs B1)     p50 +0.71%  p95 -1.46%  p99 -1.21%
+
+# opc_file_eager_open__few-large__-
+A1                       n=100   p50=   11505.09 mean=   12035.67 p95=   15064.09 p99=   24209.78 us
+A2                       n=100   p50=   10937.27 mean=   12192.01 p95=   15557.23 p99=   33349.17 us
+B1                       n=100   p50=   11385.17 mean=   11549.27 p95=   13430.97 p99=   15233.02 us
+B2                       n=100   p50=   11407.84 mean=   12918.81 p95=   18091.09 p99=   33706.60 us
+A (before, pooled)       n=200   p50=   11342.40 mean=   12113.84 p95=   15405.13 p99=   32496.60 us
+B (after, pooled)        n=200   p50=   11385.17 mean=   12234.04 p95=   17666.77 p99=   28152.94 us
+delta p50   B-A =      +42.77 us    +0.38% of A   A-B =      -42.77 us    -0.38% of B
+delta mean  B-A =     +120.20 us    +0.99% of A   A-B =     -120.20 us    -0.98% of B
+delta p95   B-A =    +2261.64 us   +14.68% of A   A-B =    -2261.64 us   -12.80% of B
+delta p99   B-A =    -4343.66 us   -13.37% of A   A-B =    +4343.66 us   +15.43% of B
+A/A floor (A2 vs A1)     p50 -4.94%  p95 +3.27%  p99 +37.75%
+B/B floor (B2 vs B1)     p50 +0.20%  p95 +34.70%  p99 +121.27%
+
+# pptx_file_eager_selected_slide__media-rich__-
+A1                       n=100   p50=     118.04 mean=     119.94 p95=     130.54 p99=     137.95 us
+A2                       n=100   p50=     112.85 mean=     113.63 p95=     121.34 p99=     126.51 us
+B1                       n=100   p50=     119.92 mean=     120.88 p95=     130.97 p99=     132.66 us
+B2                       n=100   p50=     120.93 mean=     122.56 p95=     134.24 p99=     138.44 us
+A (before, pooled)       n=200   p50=     116.07 mean=     116.79 p95=     128.39 p99=     136.12 us
+B (after, pooled)        n=200   p50=     120.52 mean=     121.72 p95=     131.58 p99=     138.44 us
+delta p50   B-A =       +4.45 us    +3.83% of A   A-B =       -4.45 us    -3.69% of B
+delta mean  B-A =       +4.93 us    +4.22% of A   A-B =       -4.93 us    -4.05% of B
+delta p95   B-A =       +3.19 us    +2.48% of A   A-B =       -3.19 us    -2.42% of B
+delta p99   B-A =       +2.32 us    +1.71% of A   A-B =       -2.32 us    -1.68% of B
+A/A floor (A2 vs A1)     p50 -4.40%  p95 -7.05%  p99 -8.29%
+B/B floor (B2 vs B1)     p50 +0.84%  p95 +2.50%  p99 +4.36%
+
+# pptx_file_eager_slide_count__media-rich__-
+A1                       n=100   p50=       1.94 mean=       2.56 p95=       4.14 p99=       4.22 us
+A2                       n=100   p50=       2.38 mean=       3.17 p95=       4.77 p99=      11.18 us
+B1                       n=100   p50=       3.61 mean=       3.07 p95=       4.39 p99=       4.76 us
+B2                       n=100   p50=       3.94 mean=       3.31 p95=       4.49 p99=       4.86 us
+A (before, pooled)       n=200   p50=       2.20 mean=       2.86 p95=       4.39 p99=       6.02 us
+B (after, pooled)        n=200   p50=       3.85 mean=       3.19 p95=       4.46 p99=       4.84 us
+delta p50   B-A =       +1.65 us   +75.00% of A   A-B =       -1.65 us   -42.86% of B
+delta mean  B-A =       +0.33 us   +11.42% of A   A-B =       -0.33 us   -10.25% of B
+delta p95   B-A =       +0.07 us    +1.59% of A   A-B =       -0.07 us    -1.57% of B
+delta p99   B-A =       -1.18 us   -19.60% of A   A-B =       +1.18 us   +24.38% of B
+A/A floor (A2 vs A1)     p50 +22.68%  p95 +15.22%  p99 +164.95%
+B/B floor (B2 vs B1)     p50 +9.14%  p95 +2.28%  p99 +2.10%
+

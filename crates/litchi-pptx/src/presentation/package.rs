@@ -14,17 +14,9 @@ use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference}
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
 
+use super::Presentation;
 use super::codec;
 use super::embedded;
-
-pub(super) fn slide_references(
-    package: &OpcPackage,
-    part: &PresentationPart<'_>,
-) -> Result<Vec<SlideReference>> {
-    let references = part.slide_references()?;
-    validate_slide_catalog(package, part, &references)?;
-    Ok(references)
-}
 
 pub(super) fn validate_slide_catalog(
     package: &OpcPackage,
@@ -43,27 +35,31 @@ pub(super) fn validate_slide_catalog(
 }
 
 pub(super) fn write_text_to<W: Write + ?Sized>(
-    package: &OpcPackage,
-    presentation: &PresentationPart<'_>,
+    presentation: &Presentation<'_>,
     output: &mut W,
     options: TextOutputOptions<'_>,
 ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+    let package = presentation.package();
     let paragraph_separator = options.paragraph_separator();
     let mut writer = SequentialTextWriter::new(output, options);
-    // This preflight Vec is bounded relationship metadata only. It never
+    // This preflight catalog is bounded relationship metadata only. It never
     // contains slide XML or decoded slide text; the payload remains one slide
     // at a time below.
-    let references = match presentation.slide_references() {
+    let references = match presentation.catalog() {
         Ok(references) => references,
         Err(source) => return Err(writer.document_error(source)),
     };
-    if let Err(source) = validate_slide_catalog(package, presentation, &references) {
+    if let Err(source) = validate_slide_catalog(package, presentation.part(), references) {
         return Err(writer.document_error(source));
     }
 
-    for reference in &references {
+    for reference in references {
         let (_, _, part) = match crate::parts::validate_slide_relationship(
-            presentation.part().rels().get(reference.relationship_id()),
+            presentation
+                .part()
+                .part()
+                .rels()
+                .get(reference.relationship_id()),
             reference.relationship_id(),
             |target| Ok(package.get_part(target)?),
             |part| part.content_type(),
@@ -79,10 +75,6 @@ pub(super) fn write_text_to<W: Write + ?Sized>(
     }
 
     Ok(writer.finish())
-}
-
-pub(super) fn slide_count(package: &OpcPackage, part: &PresentationPart<'_>) -> Result<usize> {
-    Ok(slide_references(package, part)?.len())
 }
 
 pub(super) fn slide_size(part: &PresentationPart<'_>) -> Result<(i64, i64)> {
@@ -109,12 +101,12 @@ pub(super) fn vba(
 }
 
 pub(super) fn content_parts(
-    package: &OpcPackage,
-    presentation: &PresentationPart<'_>,
+    presentation: &Presentation<'_>,
 ) -> Result<Vec<embedded::content_parts::ContentPart>> {
+    let package = presentation.package();
     let mut limits = embedded::content_parts::Limits::default();
     let mut content_parts = Vec::new();
-    for (slide_index, slide) in slides(package, presentation)?.into_iter().enumerate() {
+    for (slide_index, slide) in slides(presentation)?.into_iter().enumerate() {
         content_parts.extend(embedded::content_parts::load_slide(
             package,
             slide_index,
@@ -126,11 +118,10 @@ pub(super) fn content_parts(
 }
 
 pub(super) fn hyperlinks(
-    package: &OpcPackage,
-    presentation: &PresentationPart<'_>,
+    presentation: &Presentation<'_>,
 ) -> Result<Vec<(usize, crate::hyperlinks::Hyperlink)>> {
     let mut hyperlinks = Vec::new();
-    for (slide_index, slide) in slides(package, presentation)?.into_iter().enumerate() {
+    for (slide_index, slide) in slides(presentation)?.into_iter().enumerate() {
         for relationship in slide.part().part().rels().iter().filter(|relationship| {
             matches!(relationship.reltype(), rt::HYPERLINK | rt::STRICT_HYPERLINK)
         }) {
@@ -156,29 +147,28 @@ pub(super) fn hyperlinks(
 }
 
 pub(super) fn slide<'a>(
-    package: &'a OpcPackage,
-    presentation: &PresentationPart<'a>,
+    presentation: &Presentation<'a>,
     index: usize,
 ) -> Result<Option<Slide<'a>>> {
-    let references = presentation.slide_references()?;
+    let package = presentation.package();
+    let references = presentation.catalog()?;
     let Some(reference) = references.get(index) else {
         return Ok(None);
     };
-    let part = slide_part(package, presentation, reference)?;
+    let part = slide_part(package, presentation.part(), reference)?;
     Ok(Some(Slide::new(package, part)))
 }
 
 pub(super) fn find_slide<'a>(
-    package: &'a OpcPackage,
-    presentation: &PresentationPart<'a>,
+    presentation: &Presentation<'a>,
     key: Key<'_>,
 ) -> Result<Option<Slide<'a>>> {
     match key {
-        Key::Index(index) => slide(package, presentation, index),
+        Key::Index(index) => slide(presentation, index),
         Key::Name(name) => {
             let mut found = None;
             let mut matches = 0usize;
-            for slide in slides(package, presentation)? {
+            for slide in slides(presentation)? {
                 if slide.name()? == name {
                     matches = matches.saturating_add(1);
                     found = Some(slide);
@@ -195,16 +185,14 @@ pub(super) fn find_slide<'a>(
     }
 }
 
-pub(super) fn slides<'a>(
-    package: &'a OpcPackage,
-    presentation: &PresentationPart<'a>,
-) -> Result<Vec<Slide<'a>>> {
-    let references = presentation.slide_references()?;
+pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a>>> {
+    let package = presentation.package();
+    let references = presentation.catalog()?;
     let mut slides = Vec::with_capacity(references.len());
-    for reference in &references {
+    for reference in references {
         slides.push(Slide::new(
             package,
-            slide_part(package, presentation, reference)?,
+            slide_part(package, presentation.part(), reference)?,
         ));
     }
     Ok(slides)
@@ -264,12 +252,9 @@ pub(super) fn slide_layouts<'a>(
     Ok(layouts)
 }
 
-pub(super) fn text<'a>(
-    package: &'a OpcPackage,
-    presentation: &PresentationPart<'a>,
-) -> Result<String> {
+pub(super) fn text(presentation: &Presentation<'_>) -> Result<String> {
     let mut text = String::new();
-    for slide in slides(package, presentation)? {
+    for slide in slides(presentation)? {
         let value = slide.text()?;
         if !value.is_empty() {
             if !text.is_empty() {

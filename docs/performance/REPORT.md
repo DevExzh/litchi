@@ -1,5 +1,41 @@
 # Performance program phase report
 
+## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
+
+Record: [0637](0637-pptx-eager-slide-catalog-memo.md).
+
+**0637 — the eager PPTX slide catalog is parsed once per borrowed
+presentation.** Retained, implemented in `litchi-pptx`
+(`presentation/model.rs`, `presentation/package.rs`), `performance_claim:
+none`. Two private `OnceLock` fields on `Presentation<'a>`: the parsed catalog
+and a flag that the package-graph validation accepted it. Only successes are
+memoized, and the base's asymmetry is preserved — `slide`/`slides` keep the
+unvalidated catalog, `slide_count`/`slide_references`/`write_text_to` keep the
+validated one — so no refusal moves in either fill order. Counts (callgrind
+isolation pairs, CPU 13): a 200-slide by-index walk **566.0 M → 26.9 M Ir
+(−95.25%)**, eight `slide_count()` calls **30.7 M → 4.0 M (−86.92%)**, eight
+`slide_references()` calls −85.43%, a three-query session −16.52%; the same
+shapes on `shapes.pptx` −54.70%, −84.24%, −84.03%, −26.97%. Single-query
+operations are flat (−0.62% to +1.17%; the one cost with a mechanism is
+`slide_references()`'s owned-`Vec` clone, about 235 Ir per reference). Paired
+ABBA timing, 40 samples per leg-run: the 200-slide walk **30.94 ms → 1.54 ms
+(−95.03%, floor −0.39%)**, eight counts −86.51%, the session −15.19% and
+−25.69%; single-query operations +0.78% to +1.98% against floors of +0.59% to
++2.80%. `pptx_semantic_full_text` is flat at all three shapes, as a
+one-query-per-sample selector must be. **Two selectors 0587 named for this item
+show +5.49% and +83.10% at p50 and are reported, not averaged**: their timed
+region runs the source-backed facade route and never executes the changed code,
+which the packet's `reach/route-census.txt` and a 100-sample confirmation window
+with two unreachable controls both record. Correctness: 78 `.pptx` fixtures ×
+every catalog-dependent public projection = 1,229 oracle rows per leg,
+byte-identical, including 11 `AmbiguousSlideName` refusals; four new tests that
+also pass on the base. **PPTX-4 is measured and frozen as a design**: the raw
+budget scan is 41.7% of `semantic_text_from_part` per slide and 15.4-37.1% of a
+whole `text()` (18.6-36.0% at p50, floors under 1%), but fusing it relocates two
+raw-byte limits and moves two refusals. Gates: six sections, all exit 0 —
+233 `litchi-pptx` tests, 266 `litchi` tests with `docx,xlsx,pptx,xls`, and
+531 `tools/perf-baseline` tests.
+
 ## 0639 — two gate modes, one fixed example, one deleted ingress
 
 Change 0639 lands three small items the first wave left open, and claims nothing. `tools/non_iwork_gate.py` gains `facade-format-tests` (`cargo test --package litchi --no-default-features --features docx,pptx,xls,xlsx --lib --tests --no-fail-fast -- --test-threads=1`) and `harness-tests` (`cargo test --manifest-path tools/perf-baseline/Cargo.toml --lib --tests --no-fail-fast`), and `.github/workflows/rust-ci.yml`'s `non-iwork-release-gate` job runs both with a `--record-file`, before its 45-root `check` sweep. The four features are the smallest set that compiles the DOCX, XLSX, PPTX and XLS facade tests, since each leaf pulls its substrate through Cargo's feature graph; `tools/perf-baseline` is a separate Cargo project no workspace selection reaches, and it is not serialized because doing so cost 1,869.73 s of test execution against 581.14 s for the same 531 passing tests. `command_specs` returns early for each new mode, so every existing mode's generated commands, the workspace plan, the facade feature closure, the dependency-tree checks, the execution recorder, the environment invariants and the report schema are untouched — the two tests that pin those (`test_non_lib_modes_are_per_root_deterministic_and_use_exact_flags`, `test_lib_tests_serializes_all_bulk_roots_before_facade`) pass unchanged, and `print`/`verify` return the same 64 packages, 18 exclusions, 45 bulk roots and 35 safe facade features with 45 + 35 + 1 trees verified. `crates/litchi/examples/office_crud_demo.rs` moves its PPTX UPDATE from `presentation_mut()` — which change 0607 measured cannot succeed on any opened deck, 78 of 78 — to `opened_presentation_transaction()` + `set_shape_text` + `add_text_box` + `commit()` + `apply_opened_presentation_commit()`, and reads the result back. Built with the identical command from the base and from the branch and run in an empty directory, the example goes from **exit 1**, `UnsafeEdit { operation: "presentation_mut" }`, five of six files written, to **exit 0**, all six written, `Closing slide now has 4 shapes`. The saved package is a per-part delta: 43 members before and after, order identical, 42 byte-identical, one changed (`ppt/slides/slide3.xml`, 1,584 → 2,154 bytes), none added or removed, both edited strings in that one part. `refine_workbook_format` leaves `crates/litchi/src/sheet/workbook_types.rs` — **66 lines removed, 0 added, 0 callers workspace-wide**, never nameable from outside the crate because its module is declared `mod` with no visibility modifier and re-exported nowhere, which the rustdoc inventory confirms at 8,086 item pages before and after with an empty diff. Gates on this branch: `cargo fmt --all --check` exit 0; `cargo clippy -p litchi --all-targets` exit 0 with the three pre-existing `dead_code` warnings in `tests/unexpected_format.rs` change 0629 recorded, and with `--no-default-features --features docx,pptx,xls,xlsx` exit 0 with nine pre-existing warnings in `detection_smart/detected.rs` and `document/doc.rs`, neither run naming a file this change touches; `cargo doc -p litchi --no-deps` exit 0, and exit 0 again with the feature set; `cargo test -p litchi` (default features) exit 0 over 20 targets with 0 tests, the gap itself; `python3 -m unittest tools.test_non_iwork_gate` 57 tests OK; `python3 tools/non_iwork_gate.py print` and `verify` exit 0; `facade-format-tests` exit 0, 25 targets, 230 passed; `harness-tests` exit 0, 18 targets, 531 passed, 1 ignored; the identical argv on the untouched base tree, 231/0/0 and 531/0/1, both exit 0. One gate fails and is pre-existing: `tools/check_example_targets.py` exits 1 on four cross-package duplicate example target names among the iWork crates, reproduced identically on the untouched before checkout. No production read path changed; no library operation was timed, so no A/A floor applies. [Change and limitations](0639-gate-list-gaps-and-two-dead-paths.md); [retained evidence](results/change-0639/README.md).

@@ -3,6 +3,7 @@
 use litchi_core::{TextOutputError, TextOutputOptions, TextOutputReport};
 use litchi_opc::OpcPackage;
 use std::io::Write;
+use std::sync::OnceLock;
 
 use crate::Result;
 use crate::parts::{PresentationPart, SlideReference};
@@ -15,13 +16,64 @@ use super::package;
 pub struct Presentation<'a> {
     pub(super) package: &'a OpcPackage,
     pub(super) part: PresentationPart<'a>,
+    /// Memo of [`PresentationPart::slide_references`]: the ordered catalog as
+    /// parsed from the main part, before any package-graph validation.
+    ///
+    /// The package and the main part are borrowed for `'a`, so neither the
+    /// part's bytes nor the graph they name can change while this view lives.
+    /// Filling the memo therefore preserves every value and every refusal: a
+    /// later call cannot observe a different catalog than the first call did.
+    catalog: OnceLock<Vec<SlideReference>>,
+    /// Set once [`super::package::validate_slide_catalog`] has accepted
+    /// `catalog`. Only success is memoized; a refusal is recomputed, so a
+    /// failing catalog returns the same typed error every time.
+    catalog_validated: OnceLock<()>,
 }
 
 impl<'a> Presentation<'a> {
     /// Construct a view from a validated main part and its package.
     #[must_use]
     pub fn new(part: PresentationPart<'a>, package: &'a OpcPackage) -> Self {
-        Self { package, part }
+        Self {
+            package,
+            part,
+            catalog: OnceLock::new(),
+            catalog_validated: OnceLock::new(),
+        }
+    }
+
+    /// The ordered slide catalog parsed from the immutable main part.
+    ///
+    /// This is the borrowed form of [`PresentationPart::slide_references`],
+    /// parsed at most once per view. Callers that additionally need the
+    /// package-graph checks use [`Self::validated_catalog`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same error [`PresentationPart::slide_references`] returns.
+    pub(super) fn catalog(&self) -> Result<&[SlideReference]> {
+        if let Some(catalog) = self.catalog.get() {
+            return Ok(catalog);
+        }
+        let parsed = self.part.slide_references()?;
+        Ok(self.catalog.get_or_init(|| parsed))
+    }
+
+    /// The ordered slide catalog after the package-graph validation
+    /// [`Self::slide_references`] and [`Self::slide_count`] have always run.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the catalog cannot be parsed or a slide
+    /// relationship is missing, external, mistyped, or resolves to a part
+    /// with the wrong content type.
+    pub(super) fn validated_catalog(&self) -> Result<&[SlideReference]> {
+        let catalog = self.catalog()?;
+        if self.catalog_validated.get().is_none() {
+            package::validate_slide_catalog(self.package, &self.part, catalog)?;
+            let _unset = self.catalog_validated.set(());
+        }
+        Ok(catalog)
     }
 
     /// The underlying OPC package.
@@ -44,7 +96,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_references(&self) -> Result<Vec<SlideReference>> {
-        package::slide_references(self.package, &self.part)
+        Ok(self.validated_catalog()?.to_vec())
     }
 
     /// Number of slides in the ordered presentation graph.
@@ -53,7 +105,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_count(&self) -> Result<usize> {
-        package::slide_count(self.package, &self.part)
+        Ok(self.validated_catalog()?.len())
     }
 
     /// Presentation slide size in EMUs.
@@ -106,7 +158,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn content_parts(&self) -> Result<Vec<embedded::content_parts::ContentPart>> {
-        package::content_parts(self.package, &self.part)
+        package::content_parts(self)
     }
 
     /// Discover inert hyperlinks owned by the presentation's slides.
@@ -119,7 +171,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn hyperlinks(&self) -> Result<Vec<(usize, crate::hyperlinks::Hyperlink)>> {
-        package::hyperlinks(self.package, &self.part)
+        package::hyperlinks(self)
     }
 
     /// Resolve one ordered slide by zero-based index.
@@ -128,7 +180,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide(&self, index: usize) -> Result<Option<Slide<'a>>> {
-        package::slide(self.package, &self.part, index)
+        package::slide(self, index)
     }
 
     /// Resolve a slide by checked index or exact producer-visible name.
@@ -137,7 +189,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn find_slide<'k>(&self, key: impl Into<Key<'k>>) -> Result<Option<Slide<'a>>> {
-        package::find_slide(self.package, &self.part, key.into())
+        package::find_slide(self, key.into())
     }
 
     /// Resolve all slides in presentation order.
@@ -146,7 +198,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slides(&self) -> Result<Vec<Slide<'a>>> {
-        package::slides(self.package, &self.part)
+        package::slides(self)
     }
 
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
@@ -173,7 +225,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
-        package::text(self.package, &self.part)
+        package::text(self)
     }
 
     /// Stream one semantic text object per slide into a caller-owned sink.
@@ -194,7 +246,7 @@ impl<'a> Presentation<'a> {
         output: &mut W,
         options: TextOutputOptions<'_>,
     ) -> std::result::Result<TextOutputReport, TextOutputError<crate::Error>> {
-        package::write_text_to(self.package, &self.part, output, options)
+        package::write_text_to(self, output, options)
     }
 
     /// Load the slide-library synchronization metadata reachable from this

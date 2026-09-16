@@ -1,5 +1,41 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
+
+Record: [0637](0637-pptx-eager-slide-catalog-memo.md).
+
+Change 0637 is a reminder that a scenario name is not a scenario. The 0587
+survey ranked PPTX-3 and named two selectors for it; both selectors carry
+"eager" in their names, both are listed in the harness under the eager half of
+an eager/source pair, and neither executes a line of the eager code. The
+mechanism that hides it is ordinary: the facade's `from_bytes` prefers the
+source-backed route whenever it can build one, and it can always build one for a
+well-formed package, so the eager arm is a fallback for files that fail
+detection. Nothing in the harness is wrong — the selector measures what a
+facade caller gets — but a queue that names a selector as an item's scenario has
+asserted something it did not check. The cheap check is the one this batch ran
+by accident: the same operation, expressed twice, differed by 100×, and a 2 µs
+timed region on a 200-slide deck is not a measurement of parsing 200 slide
+references. **A ranked item should name the function it changes and the
+selector that executes it, and a batch should confirm the second reaches the
+first before it measures anything.**
+
+The second lesson is about where the 4% gate sits relative to the contract
+rules. PPTX-4's gate was "implement if the saving exceeds 4% of
+`pptx_*_full_text`". It does, by between 4.6× and 9×, on counts and on paired
+timing with floors under 1%. It is still not implemented, because the saving is
+the removal of an adversarial-input scan that runs on **raw** bytes before the
+MCE codec rewrites them, and the parse it would fuse into sees **processed**
+bytes: two raw-byte limits would land on a different quantity, a DTD refusal
+would move behind the codec, and a malformed comment inside a discarded
+`mc:Fallback` branch would stop being refused. A size gate says whether an
+opportunity is worth a record. It does not say whether the change is legal, and
+when the two disagree the contract rule wins and the record is a frozen design.
+The design this record freezes moves the scan into the *codec's* tokenizer
+rather than the parse, because that keeps raw budgets on raw bytes, and it names
+the measurement that could still falsify it: the codec's presence fast path may
+mean most slides never tokenize at all.
+
 ## 0639 — the gate list catches up with what two records already diagnosed
 
 Record: [0639](0639-gate-list-gaps-and-two-dead-paths.md).
