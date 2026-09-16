@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0652 — a decision record, no numbers
+
+Record: [0652](0652-owner-decisions-for-the-third-wave.md). This record
+measures nothing and claims nothing. It records the owner's decisions of
+2026-09-16 on the ten rows of the queue that waited on a human, and the three
+trade-offs that bind later waves. The figures those decisions unblock are the
+priced ones of the records they cite (a real-deck PPTX edit −94% behind the
+codec row; −26% of an opened PPTX lifecycle behind the revision proof; the
+apply phase of a cross-copy −72%; a DOC open −20%; 94 of 95 real packages
+admitted to source-backed publication), and none becomes a result until an
+implementing record measures it on landed code beside a floor.
+
 ## 0651 — what the second wave delivered, in the numbers of the records that measured it
 
 Record: [0651](0651-queue-refresh-after-the-second-wave.md). This is a

@@ -1,8 +1,6 @@
 # ADR 0031: I/O concurrency, CPU task and executor budgets in the execution context
 
-- Status: **Proposed — awaiting human review. Not accepted, not normative, and
-  deliberately absent from the accepted table in [README](README.md).** No code
-  may cite this record as authority until a human accepts it.
+- Status: Accepted (2026-09-16, by the owner's decision recorded in [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md); proposed 2026-09-15)
 - Date: 2026-09-15
 - Supersedes: nothing. Amends: the execution paragraph of
   [ADR 0005](0005-io-memory-and-performance.md) only. Every other paragraph of

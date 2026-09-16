@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## 0652 — ADR 0030 and ADR 0031 accepted; three amendments assigned to the records that implement them
+
+Record: [0652](0652-owner-decisions-for-the-third-wave.md). Proposed ADRs 0030
+and 0031 are Accepted as of this record and move into the accepted table of
+the ADR index; the rule that no code cites a proposed record is unchanged, and
+until this commit nothing cited them. Decisions 2, 4 and 5 will amend ADR 0006
+(the original-bytes compactness statement) and ADR 0005 (retained state: a
+facade-carried memo, a budgeted retained candidate) in the records that
+implement them, each naming 0652. Decisions 8 and 9 move a refusal's timing
+and a fence's read count within ADR 0003 and ADR 0006 as those records read
+them; decision 10 adds two public policies whose defaults are
+preservation-by-default (ADR 0006). The trade-off that breaking changes are
+acceptable does not touch ADR 0001's layering or ADR 0005's leakage rules.
+
 ## 0651 — no boundary moved by any landed change; three designs name the boundary they would move
 
 Record: [0651](0651-queue-refresh-after-the-second-wave.md). Every production

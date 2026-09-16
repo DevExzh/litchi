@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## 0652 — the ten decision rows of the queue are decided; the third wave may implement what the second wave priced
+
+Record: [0652](0652-owner-decisions-for-the-third-wave.md). The owner decided
+every row of the refreshed queue that waited on a human: the MCE codec's
+namespace re-declaration may change its consumers' public API (row 1); the
+publication audit of original part bytes loosens and accepts non-compact XML
+(row 2); ADR 0030 (lazy OPC part decode) and ADR 0031 (execution-context
+budgets) are accepted (rows 3 and 6); the memoized PPTX revision proof lands
+with its format bump and the old patches invalidated (row 4); the cross-copy
+candidate is retained under a new budget (row 5); the XLSX value editor widens
+its admission surface by 0602's D4 (row 7); the ineligible-read gate may move
+its refusal's timing (row 8); the DOC fence gets its second public `litchi-cfb`
+entry point (row 9); DOCX compaction and OLE2 sector reuse become
+policy-controlled with preservation-by-default (row 10). Three standing
+trade-offs bind the wave: breaking changes are acceptable in early alpha,
+correctness and safety come before performance, and most inputs are benign.
+The queue table itself is unchanged by this record; the third wave's closing
+record will refresh it.
+
 ## 0651 — the second wave closed: every measurable row landed, every contract row froze with a price, and the codec row moved to the top
 
 Record: [0651](0651-queue-refresh-after-the-second-wave.md). Nineteen records,
@@ -7864,7 +7883,7 @@ decision. Ordered by the size of what each unblocks.
 | # | item | what it needs first | priced by |
 | ---: | --- | --- | --- |
 | 1 | the MCE codec's namespace re-declaration, now known to amplify every whole-slide rewrite of a real deck 16×: a marker-stripped control removes 93.9% of a 133.61 ms opened-transaction shape-text edit, and every prior PPTX record measured on corpora whose members never carry the namespace | an owner decision that the slice consumers (`Paragraph::extensions`, `Shape::xml`, five XLSX raw accessors, two publishing writers) may stop seeing per-element re-declarations (0588 withdrew the rewrite on that contract), then the migration design | 0649, 0588, 0630 row 4 |
-| 2 | the publication audit of original part bytes refuses 94 of 95 real OOXML packages; the same contract is 27.6% of source-backed publication instructions | a human decision on the compactness contract for original bytes (ADR 0006, record 0528); it gates every real-producer source-backed save | 0602, 0616, 0528 |
+| 2 | the publication audit of original part bytes refuses 94 of 95 real OOXML packages; the same contract is 27.6% of source-backed publication instructions | a human decision on the compactness contract for original bytes (ADR 0006, record 0528); it gates every real-producer source-backed save | 0602, 0613, 0528 |
 | 3 | lazy OPC part decode (C2′): an eager XLSX open-edit-save inflates 90 parts to read one | acceptance of proposed ADR 0030, then a migration of 259 sites | 0610, 0581 |
 | 4 | the PPTX memoized revision proof: −26% of an opened lifecycle's instructions, −7.3% at p50, at the price of a durable `LPRM0002`/`LPCP0003` bump with a typed refusal for every serialized patch, and a memo the facade must carry | an owner decision on the format bump and on the facade-carried memo under ADR 0005; the nine admission gates are written | 0645, 0590 |
 | 5 | the cross-package copy's second candidate serialization: deflate calls halve, the apply phase −72%, the media-rich lifecycle −36% at p50, at the price of one whole serialized package retained in a public plan value | a budget for the retained candidate (a breaking `opened::Limits` field, or ADR 0005's hierarchical budget which this path lacks); fourteen gates are written | 0646, 0598 |
