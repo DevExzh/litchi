@@ -1,0 +1,53 @@
+=== cargo fmt --all --check ===
+[exit 0]
+
+=== cargo clippy -p litchi-xls --all-targets ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+[exit 0]
+
+=== cargo doc -p litchi-xls --no-deps ===
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0648/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.33s
+   Generated /home/zhuhe/code/litchi-worktrees/0648/target/doc/litchi_xls/index.html
+[exit 0]
+
+=== cargo test -p litchi-xls ===
+totals: 1411 passed, 0 failed, 1 ignored across 72 suites
+test crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100) ... ignored
+test crates/litchi-xls/src/writer/mod.rs - writer::core (line 22) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.39s; merged doctests compilation took 0.39s
+[exit 0]
+
+=== cargo test -p litchi-xlsx -p litchi-xlsb -p litchi ===
+totals: 2040 passed, 0 failed, 16 ignored across 103 suites
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.98s; merged doctests compilation took 0.98s
+[exit 0]
+
+=== cargo test -p litchi --features docx,xlsx,pptx,xls ===
+totals: 266 passed, 0 failed, 7 ignored across 26 suites
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.61s; merged doctests compilation took 0.61s
+[exit 0]
+
+
+=== cargo test --release --locked (tools/perf-baseline) ===
+totals: 531 passed, 0 failed, 1 ignored across 19 suites
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[exit 0]

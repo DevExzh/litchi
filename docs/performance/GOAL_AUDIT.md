@@ -1,5 +1,29 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0648 — the range-source scenario 0627 called the most expensive is no longer expensive
+
+Change 0627 called the `54016.xls` whole-sheet walk "the single most expensive
+thing a range-source caller can ask an XLS reader for" — 16,145 requests,
+modelled at 16.16 seconds of fixed service at its transport — and change 0636,
+having found the walk's cost was not where its brief expected, left it open as
+the named next item. This change closes it: `xls_range_source_open_all_cells`
+and `xls_range_source_open_full_text` fall to **77 physical requests and
+1,158,091 bytes**, modelled at **88.04 ms**, and the other three selectors carry
+**identical** complete ordered request-sequence digests, so the open, the
+worksheet listing and a selected-cell query did not move at all. That is
+`docs/GOAL.md`'s "caller-supplied remote and range sources" dimension advancing
+on the row it was worst on, and it does so without touching the source-backed
+CRUD surface: no public API, no limit, no error type and no output byte changes,
+and the corpus differential holds 565 frozen outcomes identical across 113
+fixtures. Two things are not supplied. The range figures are change 0627's model
+arithmetic over a deterministic request count, not observed service. And a
+workbook whose string table exceeds 256 KiB gains nothing and is not measured —
+no fixture in this corpus is in that class, which is a statement about the
+corpus as much as about the change. OLE2 and OOXML remain the active priority;
+ODF stays deferred and iWork excluded.
+[Change and limitations](0648-xls-shared-string-resolver-window.md);
+[evidence](results/change-0648/README.md).
+
 ## 0649 — clause (d) is violated by a factor of 259 on the one PPTX route a caller edits through, and no prior record could see it
 
 Record: [0649](0649-pptx-opened-transaction-real-deck-edit.md).

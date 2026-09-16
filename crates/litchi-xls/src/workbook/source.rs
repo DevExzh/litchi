@@ -14,8 +14,8 @@ use crate::leniency::{Leniency, ToleranceLog};
 use crate::number_format::{DateSystem, Formatting};
 use crate::records::{
     BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue,
-    MeasuredCell, SharedStringScanError, SharedStringSstScan, SheetType,
-    decode_shared_string_entry, scan_shared_string_records,
+    MeasuredCell, SharedStringEntryLocation, SharedStringScanError, SharedStringSstScan,
+    SharedStringSstSegment, SheetType, decode_shared_string_entry, scan_shared_string_records,
 };
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
@@ -3276,6 +3276,40 @@ fn finish_scan(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Res
     owner.ensure_current()
 }
 
+/// Upper bound on the bytes one shared-string resolver retains.
+///
+/// A resolver holds the workbook's **whole** string table or none of it, so
+/// this is at once the ceiling on one resolver's window and the largest table
+/// the window applies to. 256 KiB covers every string table in this
+/// repository's XLS corpus -- 108 fixtures carry one, in 61 distinct sizes from
+/// 8 bytes to the 225,003 of `54016.xls`, with `WithCustomViews.xls` next at
+/// 101,121 and every other fixture at 24,270 or less. A workbook whose table is
+/// larger resolves exactly as it did before this window existed.
+///
+/// It is not a new class of retention. The open already holds the whole
+/// workbook-globals substream -- this table inside it -- in one buffer while it
+/// builds the entry table, under the `max_global_bytes` ceiling, which is
+/// 128 MiB by default and can only be larger than the table it contains. What
+/// this window adds is a transient copy of a strict subset of that, for the
+/// life of one scan, taken only by a scan that has shown it is walking the
+/// table. Change 0576's rule that the owner retains locators and not text is
+/// untouched: nothing here outlives the resolver.
+const SHARED_STRING_MAX_WINDOW_BYTES: u64 = 256 * 1024;
+
+/// The `resource` a refused window reservation names.
+///
+/// Matched as well as reported: [`SharedStringResolver::table`] swallows this
+/// one refusal and only this one, so it has to be a value both places name.
+const SHARED_STRING_WINDOW_RESOURCE: &str = "retained SST window";
+
+/// Resolves one scan takes entry by entry before it reads the string table.
+///
+/// A selected-cell query resolves one shared string and a two-cell query two,
+/// so no query pays for a window it cannot amortize and the read sets of the
+/// small operations are unchanged to the byte. A scan that asks for a ninth
+/// string is walking the table, and reads it once.
+const SHARED_STRING_WINDOW_RESOLVES: usize = 8;
+
 /// The per-scan state `resolve_shared_string` would otherwise rebuild on every
 /// string cell.
 ///
@@ -3290,6 +3324,27 @@ fn finish_scan(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Res
 /// position, and the worksheet cursor sits permanently past the string table:
 /// one hint serving both would be discarded as a backward step by every
 /// resolve and again by every sheet, and would save nothing on either path.
+///
+/// # The window
+///
+/// The hint removed the chain walk but not the read. Change 0636 measured what
+/// remained: `54016.xls`'s whole-sheet walk resolves 16,055 shared strings and
+/// takes 16,105 positional reads past its open, one fresh cursor and one read
+/// per string -- 6,214 of them three bytes long, jumping backwards 4,444 times
+/// -- which no read-ahead inside the cursor can serve, because no second read
+/// ever reaches the same cursor.
+///
+/// The window here is **all or nothing**: the resolver retains the table's
+/// whole source extent or reads every entry exactly as it did before. That is a
+/// measurement, not a preference. A sliding window over the same accesses was
+/// implemented and thrown away: the entry order has almost no spatial locality,
+/// so on `54016.xls`'s walk a 64 KiB sliding window cut 16,055 reads to 5,539
+/// while taking **341,656,514 bytes** of them, and a 4 KiB one took 34,540,295.
+/// Reading the
+/// table once costs 225,003 bytes and **one** read, which is fewer bytes than
+/// the 323,234 the per-entry path reads as well as 16,054 fewer reads, because
+/// the walk resolves 16,055 strings out of 7,893 distinct entries and reads the
+/// repeated ones again every time.
 struct SharedStringResolver<'a> {
     /// The workbook stream path, borrowed for the whole scan.
     path: &'a [&'a str],
@@ -3297,6 +3352,19 @@ struct SharedStringResolver<'a> {
     /// first resolve; a hint that does not apply is ignored by the reader,
     /// which then walks from the stream's first sector exactly as before.
     chain: StreamChainHint<'a>,
+    /// The string table's source extent -- its first offset and its length --
+    /// when it fits one window. `None` when the workbook has no string table,
+    /// when the segment table does not describe a bounded range, or when the
+    /// table is larger than the ceiling; in all three cases every resolve reads
+    /// its own bytes exactly as it did before.
+    region: Option<(u64, usize)>,
+    /// The table's bytes once read, and empty until then. At most
+    /// [`SHARED_STRING_MAX_WINDOW_BYTES`], allocated at most once, and released
+    /// with the resolver when the scan ends.
+    window: Vec<u8>,
+    /// Resolves this scan has taken while the window was empty. It stops
+    /// moving once the table is retained, because nothing consults it then.
+    resolves: usize,
 }
 
 impl<'a> SharedStringResolver<'a> {
@@ -3304,7 +3372,264 @@ impl<'a> SharedStringResolver<'a> {
         Self {
             path,
             chain: owner.cfb.chain_hint(),
+            region: sst_region(
+                &owner.sst,
+                owner.workbook_stream_len,
+                SHARED_STRING_MAX_WINDOW_BYTES,
+            ),
+            window: Vec::new(),
+            resolves: 0,
         }
+    }
+
+    /// Returns the string table's bytes, reading it once when this scan has
+    /// shown it is walking the table.
+    ///
+    /// Called exactly once per resolve, which is what makes the resolve count
+    /// it keeps the scan's own. `owner` must be the `SourceInner` the resolver
+    /// was created from: `region` is a pair of offsets into **that** file's
+    /// workbook stream and means nothing against another.
+    ///
+    /// A fill that fails gives the window up for the rest of the scan, and the
+    /// two kinds of failure part company there.
+    ///
+    /// An allocator that cannot hand out the table must not make an operation
+    /// fail that would have completed without the window, so that one refusal
+    /// -- and only that one -- is swallowed and the resolve reads its own entry
+    /// as it always did. Nothing is lost by it: the refusal is new in this
+    /// change, so swallowing it restores exactly what the workbook did before
+    /// the window existed, and the per-entry path asks the allocator for the
+    /// entry's own bytes instead of the whole table's.
+    ///
+    /// Every other failure -- a mutation, a chain fault, a short read -- is this
+    /// resolve's own and is reported. It ends the scan, so the window it gives
+    /// up is not consulted again.
+    fn table(&mut self, owner: &SourceInner) -> Result<Option<&[u8]>> {
+        let Some((start, len)) = self.region else {
+            return Ok(None);
+        };
+        if self.window.is_empty() {
+            self.resolves = self.resolves.saturating_add(1);
+            if self.resolves <= SHARED_STRING_WINDOW_RESOLVES {
+                return Ok(None);
+            }
+            if let Err(error) = self.fill(owner, start, len) {
+                self.region = None;
+                self.window = Vec::new();
+                return match error {
+                    SourceBackedError::Allocation {
+                        resource: SHARED_STRING_WINDOW_RESOURCE,
+                        ..
+                    } => Ok(None),
+                    other => Err(other),
+                };
+            }
+        }
+        Ok(Some(&self.window))
+    }
+
+    /// Reads the whole string table with one `read_exact`.
+    ///
+    /// The read is a `SharedOleStreamCursor::read_exact`, so change 0558's
+    /// trailing fence runs on it and change 0621's rule -- one source
+    /// observation per read -- holds with this fill as that read. A fill that
+    /// fails leaves the window empty, so the next resolve reads and observes
+    /// again rather than serving bytes that were never completely read.
+    fn fill(&mut self, owner: &SourceInner, start: u64, len: usize) -> Result<()> {
+        self.window
+            .try_reserve_exact(len)
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: SHARED_STRING_WINDOW_RESOURCE,
+                requested: len as u64,
+            })?;
+        self.window.resize(len, 0);
+        let filled = (|| -> std::result::Result<(), OleError> {
+            let mut cursor =
+                owner
+                    .cfb
+                    .stream_cursor_at_hinted(self.path, start, &mut self.chain)?;
+            cursor.read_exact(&mut self.window)
+        })();
+        if let Err(error) = filled {
+            self.window.clear();
+            return Err(SourceBackedError::from(error));
+        }
+        Ok(())
+    }
+}
+
+/// The source extent of the string table the open framed, when it fits
+/// `ceiling`: the first byte of the `SST` record's payload through the last
+/// byte of the last `Continue` payload.
+///
+/// Every byte between those two is a byte of that one record group -- the
+/// payloads and the four-byte `Continue` headers between them -- and the open's
+/// own scan read all of them to build the entry table. Clamping the window to
+/// this range is therefore what makes it unable to read a byte the open did not
+/// already read, and the second clamp, to the declared workbook stream length,
+/// makes "never past the declared stream" structural here rather than inherited
+/// from the cursor's own bounds check.
+fn sst_region(sst: &SharedStringSstScan, stream_len: u64, ceiling: u64) -> Option<(u64, usize)> {
+    let mut start = u64::MAX;
+    let mut end = 0_u64;
+    for segment in &sst.segments {
+        let segment_end = segment.source_offset.checked_add(segment.len as u64)?;
+        start = start.min(segment.source_offset);
+        end = end.max(segment_end);
+    }
+    // A table that does not fit entirely inside the declared stream disables the
+    // window rather than being clamped to it: a shortened region could put a
+    // late entry outside the retained bytes, and the per-entry path would report
+    // that the same way it always has. The record walk that built the segment
+    // table cannot produce one, so this is a fence, not a case.
+    if end > stream_len {
+        return None;
+    }
+    let len = end
+        .checked_sub(start)
+        .filter(|len| *len > 0 && *len <= ceiling)?;
+    Some((start, usize::try_from(len).ok()?))
+}
+
+/// Locates the segment holding `logical`, or reports the locator that does not
+/// land in one.
+///
+/// The `logical_offset` column is non-decreasing by construction -- the scan
+/// builds it by accumulating payload lengths in stream order -- so a binary
+/// search finds the same segment the linear walk found, in `O(log n)` rather
+/// than `O(n)` per resolve. `partition_point` returns the index past the last
+/// segment starting at or before `logical`, which is the right one even when an
+/// empty `Continue` payload leaves two segments sharing a start.
+///
+/// The `checked_add` reproduces the walk's `SST segment span overflow` refusal
+/// for the located segment. It is unreachable from any input: the scan builds
+/// `logical_offset` with its own `checked_add` and refuses `SST payload length
+/// overflow` first.
+fn locate_sst_segment(segments: &[SharedStringSstSegment], logical: usize) -> Result<usize> {
+    let outside =
+        || SourceBackedError::InvalidData("SST entry locator is outside its segments".to_owned());
+    let index = segments
+        .partition_point(|segment| segment.logical_offset <= logical)
+        .checked_sub(1)
+        .ok_or_else(outside)?;
+    let segment = &segments[index];
+    if logical >= segment.logical_offset && logical < sst_segment_end(segment)? {
+        Ok(index)
+    } else {
+        Err(outside())
+    }
+}
+
+/// The end of `segment` in the logical coordinates a locator records.
+fn sst_segment_end(segment: &SharedStringSstSegment) -> Result<usize> {
+    segment
+        .logical_offset
+        .checked_add(segment.len)
+        .ok_or_else(|| SourceBackedError::InvalidData("SST segment span overflow".into()))
+}
+
+/// The source offset of the logical position `logical` inside `segment`.
+fn sst_source_offset(segment: &SharedStringSstSegment, logical: usize) -> Result<u64> {
+    segment
+        .source_offset
+        .checked_add((logical - segment.logical_offset) as u64)
+        .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))
+}
+
+/// The part of one entry that lies in one segment, as a slice of the retained
+/// table, or `None` when the entry does not reach into that segment.
+fn sst_table_piece<'t>(
+    table: &'t [u8],
+    table_start: u64,
+    segment: &SharedStringSstSegment,
+    location: SharedStringEntryLocation,
+) -> Result<Option<&'t [u8]>> {
+    let start = location.start.max(segment.logical_offset);
+    let end = location.end.min(sst_segment_end(segment)?);
+    if start >= end {
+        return Ok(None);
+    }
+    let outside = || {
+        SourceBackedError::InvalidData("SST entry lies outside the retained string table".into())
+    };
+    // `checked_sub`, not `saturating_sub`: saturating would index byte zero of
+    // the table and hand the parser a plausible wrong slice. `table_start` is
+    // the least `source_offset` in the segment table, so this cannot subtract
+    // below zero from any segment the locator reaches.
+    let offset = sst_source_offset(segment, start)?
+        .checked_sub(table_start)
+        .ok_or_else(outside)?;
+    let offset = usize::try_from(offset).map_err(|_error| {
+        SourceBackedError::InvalidData("SST entry offset does not fit usize".into())
+    })?;
+    table
+        .get(offset..offset.checked_add(end - start).ok_or_else(outside)?)
+        .map(Some)
+        .ok_or_else(outside)
+}
+
+/// Decodes one entry out of the retained string table.
+///
+/// The slices handed to the parser are the same slices, in the same order, that
+/// the per-entry path copies into fresh `Vec`s, so the `Continue` boundaries the
+/// BIFF8 string grammar depends on are preserved exactly. An entry inside one
+/// `Continue` payload -- every entry that does not straddle a record boundary --
+/// is decoded with no allocation at all.
+fn decode_entry_from_table(
+    table: &[u8],
+    table_start: u64,
+    segments: &[SharedStringSstSegment],
+    first_segment: usize,
+    last_segment: usize,
+    location: SharedStringEntryLocation,
+    execution: Option<&ExecutionContext>,
+) -> Result<litchi_core::sheet::CellValue> {
+    if first_segment == last_segment {
+        if let Some(context) = execution {
+            context.check().map_err(SourceBackedError::from)?;
+        }
+        let Some(piece) = sst_table_piece(table, table_start, &segments[first_segment], location)?
+        else {
+            return Err(SourceBackedError::InvalidData(
+                "SST entry locator has an empty span".to_owned(),
+            ));
+        };
+        return finish_shared_string(decode_shared_string_entry(std::slice::from_ref(&piece)));
+    }
+
+    let span = last_segment - first_segment + 1;
+    let mut slices = Vec::<&[u8]>::new();
+    slices
+        .try_reserve_exact(span)
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "selected SST parser segments",
+            requested: span as u64,
+        })?;
+    for segment in &segments[first_segment..=last_segment] {
+        let start = location.start.max(segment.logical_offset);
+        if start >= location.end.min(sst_segment_end(segment)?) {
+            continue;
+        }
+        // Taken before the piece is located, so both branches of this function
+        // and the per-entry path all observe cancellation at the same point of
+        // the same sequence.
+        if let Some(context) = execution {
+            context.check().map_err(SourceBackedError::from)?;
+        }
+        let Some(piece) = sst_table_piece(table, table_start, segment, location)? else {
+            continue;
+        };
+        slices.push(piece);
+    }
+    finish_shared_string(decode_shared_string_entry(&slices))
+}
+
+fn finish_shared_string(
+    decoded: std::result::Result<String, SharedStringScanError>,
+) -> Result<litchi_core::sheet::CellValue> {
+    match decoded {
+        Ok(value) => Ok(litchi_core::sheet::CellValue::String(value)),
+        Err(error) => Err(map_shared_string_error(error)),
     }
 }
 
@@ -3320,6 +3645,16 @@ impl<'a> SharedStringResolver<'a> {
 /// mutation can provoke. As in `SharedOleFile::finish_stream_range`, only a
 /// `SourceChanged` refusal displaces the original error; an observation that
 /// cannot be taken at all leaves the original error in place.
+///
+/// A resolve served from the retained table takes no read, so it takes no
+/// observation either. That moves the point at which a mutation is reported
+/// from the resolve after it to the **fill** after it, exactly as change 0636
+/// moved it for the validation walk, and it is bounded the same way: every
+/// operation built on `scan_worksheet` ends with `SourceInner::ensure_current`,
+/// and `SourceBackedWorkbook::text` ends with one too, so a mutation anywhere
+/// inside a walk is still refused with the same typed error before any result
+/// reaches a caller. One resolve is never assembled from two reads, because the
+/// table is read whole or not at all.
 fn resolve_shared_string(
     owner: &SourceInner,
     string_index: u32,
@@ -3368,60 +3703,58 @@ fn resolve_shared_string_inner(
         context.check().map_err(SourceBackedError::from)?;
     }
 
-    let mut first_segment = None;
-    for (segment_index, segment) in owner.sst.segments.iter().enumerate() {
-        let segment_end = segment
-            .logical_offset
-            .checked_add(segment.len)
-            .ok_or_else(|| SourceBackedError::InvalidData("SST segment span overflow".into()))?;
-        if location.start >= segment.logical_offset && location.start < segment_end {
-            first_segment = Some(segment_index);
-            break;
-        }
-    }
-    let Some(first_segment) = first_segment else {
-        return Err(SourceBackedError::InvalidData(
-            "SST entry locator is outside its segments".to_owned(),
-        ));
-    };
+    let segments = owner.sst.segments.as_slice();
+    let first_segment = locate_sst_segment(segments, location.start)?;
+    // The last segment the entry reaches into is the last one that starts
+    // before the entry ends, which is where the walk below stops.
+    let last_segment = segments
+        .partition_point(|segment| segment.logical_offset < location.end)
+        .saturating_sub(1)
+        .max(first_segment);
+    // Computed on both paths although only the per-entry one reads it: it is
+    // where `SST source offset overflow` is reported, and the windowed path
+    // must report it at the same point in the sequence.
+    let first_offset = sst_source_offset(&segments[first_segment], location.start)?;
 
-    let first = &owner.sst.segments[first_segment];
-    let first_offset = first
-        .source_offset
-        .checked_add((location.start - first.logical_offset) as u64)
-        .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))?;
+    let table_start = strings.region.map_or(0, |(start, _len)| start);
+    let served = strings.table(owner)?.map(|table| {
+        decode_entry_from_table(
+            table,
+            table_start,
+            segments,
+            first_segment,
+            last_segment,
+            location,
+            execution,
+        )
+    });
+    if let Some(value) = served {
+        return value;
+    }
+
     let mut cursor = owner
         .cfb
         .stream_cursor_at_hinted(strings.path, first_offset, &mut strings.chain)
         .map_err(SourceBackedError::from)?;
+    let span = last_segment - first_segment + 1;
     let mut chunks = Vec::<Vec<u8>>::new();
     chunks
-        .try_reserve_exact(owner.sst.segments.len().saturating_sub(first_segment))
-        .map_err(|_| SourceBackedError::Allocation {
+        .try_reserve_exact(span)
+        .map_err(|_error| SourceBackedError::Allocation {
             resource: "selected SST chunks",
-            requested: owner.sst.segments.len().saturating_sub(first_segment) as u64,
+            requested: span as u64,
         })?;
 
-    for segment in owner.sst.segments.iter().skip(first_segment) {
-        let segment_end = segment
-            .logical_offset
-            .checked_add(segment.len)
-            .ok_or_else(|| SourceBackedError::InvalidData("SST segment span overflow".into()))?;
+    for segment in &segments[first_segment..=last_segment] {
         let start = location.start.max(segment.logical_offset);
-        let end = location.end.min(segment_end);
+        let end = location.end.min(sst_segment_end(segment)?);
         if start >= end {
-            if segment.logical_offset >= location.end {
-                break;
-            }
             continue;
         }
         if let Some(context) = execution {
             context.check().map_err(SourceBackedError::from)?;
         }
-        let source_offset = segment
-            .source_offset
-            .checked_add((start - segment.logical_offset) as u64)
-            .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))?;
+        let source_offset = sst_source_offset(segment, start)?;
         cursor
             .skip_to(source_offset)
             .map_err(SourceBackedError::from)?;
@@ -3429,7 +3762,7 @@ fn resolve_shared_string_inner(
         let mut chunk = Vec::new();
         chunk
             .try_reserve_exact(length)
-            .map_err(|_| SourceBackedError::Allocation {
+            .map_err(|_error| SourceBackedError::Allocation {
                 resource: "selected SST entry",
                 requested: length as u64,
             })?;
@@ -3443,18 +3776,14 @@ fn resolve_shared_string_inner(
     let mut slices = Vec::new();
     slices
         .try_reserve_exact(chunks.len())
-        .map_err(|_| SourceBackedError::Allocation {
+        .map_err(|_error| SourceBackedError::Allocation {
             resource: "selected SST parser segments",
             requested: chunks.len() as u64,
         })?;
     for chunk in &chunks {
         slices.push(chunk.as_slice());
     }
-    let decoded = decode_shared_string_entry(&slices);
-    match decoded {
-        Ok(value) => Ok(litchi_core::sheet::CellValue::String(value)),
-        Err(error) => Err(map_shared_string_error(error)),
-    }
+    finish_shared_string(decode_shared_string_entry(&slices))
 }
 
 fn decode_source_cell(
@@ -3728,5 +4057,122 @@ mod tests {
         assert!(limits.max_input_bytes > 0);
         assert!(limits.max_global_bytes > 0);
         assert!(limits.max_worksheet_scan_bytes > 0);
+    }
+
+    fn sst_scan(segments: &[(u64, usize, usize)]) -> SharedStringSstScan {
+        SharedStringSstScan {
+            segments: segments
+                .iter()
+                .map(
+                    |(source_offset, logical_offset, len)| SharedStringSstSegment {
+                        source_offset: *source_offset,
+                        logical_offset: *logical_offset,
+                        len: *len,
+                    },
+                )
+                .collect(),
+            entries: Vec::new(),
+        }
+    }
+
+    /// The region spans the whole record group, headers included, because those
+    /// four-byte `Continue` headers are inside it and the open read them too.
+    #[test]
+    fn the_sst_region_spans_every_segment_and_the_headers_between_them() {
+        // Two `Continue` payloads of 100 bytes at stream offsets 1,000 and
+        // 1,104: one four-byte header sits between them.
+        let scan = sst_scan(&[(1_000, 0, 100), (1_104, 100, 100)]);
+        assert_eq!(
+            sst_region(&scan, 4_096, SHARED_STRING_MAX_WINDOW_BYTES),
+            Some((1_000, 204))
+        );
+    }
+
+    #[test]
+    fn the_sst_region_is_refused_when_it_does_not_fit_one_window() {
+        let ceiling = SHARED_STRING_MAX_WINDOW_BYTES;
+        let fits = sst_scan(&[(0, 0, ceiling as usize)]);
+        assert_eq!(
+            sst_region(&fits, u64::MAX, ceiling),
+            Some((0, ceiling as usize))
+        );
+        let over = sst_scan(&[(0, 0, ceiling as usize + 1)]);
+        assert_eq!(sst_region(&over, u64::MAX, ceiling), None);
+    }
+
+    #[test]
+    fn the_sst_region_never_reaches_past_the_declared_stream() {
+        // A segment table that claims more than the stream holds disables the
+        // window; it is not clamped into a region that could leave a late entry
+        // outside the retained bytes.
+        let scan = sst_scan(&[(1_000, 0, 100)]);
+        assert_eq!(
+            sst_region(&scan, 1_100, SHARED_STRING_MAX_WINDOW_BYTES),
+            Some((1_000, 100))
+        );
+        assert_eq!(
+            sst_region(&scan, 1_099, SHARED_STRING_MAX_WINDOW_BYTES),
+            None
+        );
+    }
+
+    #[test]
+    fn an_empty_or_unrepresentable_sst_region_disables_the_window() {
+        assert_eq!(
+            sst_region(
+                &SharedStringSstScan::empty(),
+                u64::MAX,
+                SHARED_STRING_MAX_WINDOW_BYTES
+            ),
+            None
+        );
+        let overflowing = sst_scan(&[(u64::MAX, 0, 8)]);
+        assert_eq!(
+            sst_region(&overflowing, u64::MAX, SHARED_STRING_MAX_WINDOW_BYTES),
+            None
+        );
+    }
+
+    /// The binary search finds exactly what the linear walk it replaces found,
+    /// on tables that include empty `Continue` payloads.
+    #[test]
+    fn the_segment_search_agrees_with_a_linear_walk() {
+        let tables: [&[(u64, usize, usize)]; 6] = [
+            &[],
+            &[(0, 0, 10)],
+            &[(0, 0, 10), (14, 10, 10), (28, 20, 10)],
+            &[(0, 0, 0), (4, 0, 10), (18, 10, 0), (22, 10, 5)],
+            &[(0, 0, 5), (9, 5, 0), (13, 5, 0), (17, 5, 7)],
+            // A zero-length `Continue` payload at the very end of the table.
+            &[(0, 0, 6), (10, 6, 4), (18, 10, 0)],
+        ];
+        for table in tables {
+            let scan = sst_scan(table);
+            let segments = scan.segments.as_slice();
+            let total: usize = segments.iter().map(|segment| segment.len).sum();
+            for logical in 0..total + 2 {
+                let linear = segments.iter().position(|segment| {
+                    logical >= segment.logical_offset
+                        && logical < segment.logical_offset + segment.len
+                });
+                let found = locate_sst_segment(segments, logical).ok();
+                assert_eq!(found, linear, "{table:?} at {logical}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_locator_outside_every_segment_is_refused_by_name() {
+        // Both arms: a locator past a table that has segments, and any locator
+        // at all against a table that has none.
+        let scan = sst_scan(&[(0, 0, 10)]);
+        for (segments, logical) in [(scan.segments.as_slice(), 10), (&[][..], 0)] {
+            let error = locate_sst_segment(segments, logical)
+                .expect_err("a locator outside every segment is refused");
+            assert!(
+                format!("{error}").contains("SST entry locator is outside its segments"),
+                "{error}"
+            );
+        }
     }
 }

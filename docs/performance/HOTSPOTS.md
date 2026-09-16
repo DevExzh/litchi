@@ -1,5 +1,33 @@
 # Performance hotspot inventory
 
+## 0648 — the XLS whole-sheet walk's hotspot was the per-string read, and the string table fits one window
+
+Change 0636 attributed `54016.xls`'s whole-sheet walk to the shared-string
+resolver, which builds one fresh `stream_cursor_at_hinted` cursor and reads one
+string per `LabelSst` cell: the walk resolves 16,055 shared strings in 16,077
+chunk reads (change 0621's count) out of 16,105 positional reads in all, 6,214 of
+them three bytes long, jumping backwards 4,444 times. It named the resolver for the queue. The
+cheap-looking answer, a bounded sliding window over those accesses, is wrong,
+and a temporary trace of every resolve says why: the access order has almost no
+spatial locality, so a 64 KiB sliding window cuts that walk to 5,539 reads while
+taking **341,656,514 bytes** of them against 323,234 on the per-entry path, and
+a 4 KiB one takes 34,540,295. The right answer is that the table is **small**:
+across the 108 corpus fixtures that carry one, the extents run from 8 bytes to
+225,003, none above 256 KiB. Reading the whole table once — after eight entry reads, so a
+selected-cell query never pays for it — costs `54016.xls`'s walk **one read and
+225,003 bytes** where the per-entry path took 16,055 reads and 323,234 bytes,
+better on both axes at once because the walk resolves 16,055 strings out of
+7,893 distinct entries. Corpus-wide the walk falls from **26,655 reads to 959**
+and the text projection from **29,708 to 1,226**, both for **fewer bytes**
+(−4.03% and −4.52%), with `open`, `list` and `validate` identical read for read
+and all 565 frozen outcome digests matching. Natively that is −67.85% cycles on
+the walk and −67.64% p50 on an owned source, −80.10% over `FileSource`, and
+change 0627's `xls_range_source_open_all_cells` falls from 16,145 physical
+requests to **77**. The remaining 37 reads of that walk are change 0568's
+worksheet window and the open; the shared-string path is down to one.
+[Change and limitations](0648-xls-shared-string-resolver-window.md);
+[evidence](results/change-0648/README.md).
+
 ## 0649 — the 133.61 ms real-deck shape-text edit is six whole-slide MCE rewrites, and the revision proof is 0.51% of it
 
 Change [0638](0638-facade-and-ordinary-save-selectors.md) measured one `opened_presentation_transaction().set_shape_text(..)` plus `apply_opened_presentation_commit(..)` on the real 108 KB, 103-member `slide-section-test.pptx` at **133.61 ms** — 95.7% of that deck's lifecycle, 490× its complete serialization, 68.7× the same edit on the generated corpus — and said *"Nothing in this record explains it."* It is explained. The edit is four documented public calls, so a retained scratch probe times each one: the **capture (`opened_presentation()`) is 59.900 ms and the commit's recapture 62.928 ms — 95.9% of the 128.123 ms edit** (96.44% of its cycles, 96.08% of its instructions), while the working clone, `set_shape_text` and the publication are the other 4%. Inside a capture, `litchi-pptx` runs **44 markup-compatibility passes over 819,319 bytes — 1.03× the deck's entire uncompressed size, per capture** — and **every one rewrites**: three per slide (`SlidePart::from_part`→`root_name` to learn the root is `p:sld`; `SlidePart::name`→`c_sld_name` to read one attribute of the second element; `notes::load_snapshot`→`root_conformance`→`scan_xml`, on a deck with **no notes slides at all**) plus five over `ppt/presentation.xml`. Change [0588](0588-mce-codec-namespace-emission.md)'s frozen namespace emission then makes each pass produce **16.3× its input**: one edit emits **62,181 start tags carrying 373,086 re-declared namespace bindings — 6.00 per element — and 28,064,911 bytes of markup, 259× the source archive**, all of it thrown away. **The attribution is proved by construction, not by profile share.** A marker-stripped control — the same deck with the MCE namespace URI replaced by an equal-length URI the codec does not recognize, so member count, element count, part-decode count (59), capture count (2), fingerprint bytes (1,568,820) and uncompressed byte total (796,725) are *identical* — costs 7.822 ms: **93.9% of the edit removed** by nothing but which branch of `process_markup_compatibility` each part takes. Natively the MCE codec plus its `memmove` is **80.69%** of the capture's cycles and 79.68% of the edit's. **The complete-package revision proof is not the mechanism**: `sha2::sha256::x86_sha::compress` is **0.51%** of the capture's cycles, about 0.9 ms of 128 — while callgrind, running software SHA-256, puts `package_fingerprint` at 3.24%, a **6.4× overstatement**, and change 0590 measured the same function at 34.94% on a *generated* corpus where every MCE pass borrows. Change 0645's revision-proof design is bounded by that 0.51%. **What makes the generated corpus 68.7× cheaper is measured, not guessed**: 0 of its 61 members mention the MCE namespace against 43 of 103 carrying 93.0% of the real deck's bytes, so all 43 of its capture's passes return `Cow::Borrowed` after the namespace scan — 5.57× fewer bytes on a path 13.9× cheaper per byte (189.8 MB/s against 13.7), and 5.57 × 13.9 = 77 against the capture's measured 77.3×. That is 0587's corpus gap at its sharpest: **every prior PPTX record measured on decks that never reach the code costing 94% of a real deck's edit.** Change [0637](0637-pptx-eager-slide-catalog-memo.md)'s catalog memo was applied to the base and re-counted: **every counter identical**, because the capture builds one borrowed view and makes one query through it. One edit of a 108 KB file allocates **91 MB, 841× the archive**. Four candidates are sized in MCE output bytes and all four frozen: a per-part memo (−62.8%) needs `Copy` off a public view and answers no bounded-resources question; a per-slide recapture delta (−43.5%) and prefix-limited reads (−62.8%) both move when a refusal happens; and the writer fix is 0588's, already withdrawn. `performance_claim: none`; no file under `crates/` changed. OLE2/OOXML remain active; ODF stays deferred; iWork is excluded. [Record and limitations](0649-pptx-opened-transaction-real-deck-edit.md); [retained evidence](results/change-0649/README.md).

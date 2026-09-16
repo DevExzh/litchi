@@ -1,0 +1,64 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0648",
+  "title": "The XLS shared-string resolver reads the string table once, and the whole-sheet walk falls from 16,105 reads to 37",
+  "decision": "retained, implemented in litchi-xls",
+  "code_state": "crates/litchi-xls only; no public API, error type, limit or output byte changed; no new unsafe and no new dependency; litchi-cfb needed no accessor",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0636 attributed 16,055 of the 16,105 positional reads of 54016.xls's whole-sheet walk to one cursor and one read per resolved shared string, and named it for the queue; this removes them",
+    "survey item XLS-10's three per-resolve Vec allocations and its linear segment scan are removed in the same change: 5.24 allocations per resolve falling to 2.24 on that walk",
+    "the design is all-or-nothing by measurement, not by preference: a temporary trace of every resolve shows the access order has almost no spatial locality, so a sliding 64 KiB window cuts that walk's reads by 65% while multiplying its bytes by 1,057, and reading the table once is better on both axes at the same time",
+    "the corpus differential is the oracle: 565 frozen outcomes over 113 fixtures, every one identical, including every typed refusal",
+    "open, list and validate are unchanged corpus-wide read for read, byte for byte and observation for observation, and three of change 0627's five range-source selectors carry identical request-sequence digests",
+    "a second, independent corpus differential through change 0605's xls_source_attribution agrees: 252 rows, every outcome string identical, all-cells reads -89.54% and full-text -88.83% including the open, no row reading more times"
+  ],
+  "accepted_evidence": {
+    "counts": "a scratch attribution probe over one in-process ReadAt, swept across 126 .xls fixtures (113 open, 565 operation rows) for validate/open/list/all-cells/full-text, both legs, with each row's outcome frozen as a digest",
+    "allocations": "the same probe's counting global allocator over one complete lifecycle, three fixtures x three operations, both legs",
+    "sst_extents": "every fixture's SST record-group extent walked out of its Workbook stream: 108 fixtures with a table, 61 distinct sizes, 8 bytes to 225,003, none above the 256 KiB ceiling",
+    "range_source": "change 0627's five XLS range-source selectors on 54016.xls at its transport (1 ms fixed service, 100 MiB/s, 64 KiB maximum range), three retained samples, both legs, compared on physical request counts, bytes, the complete ordered request-sequence SHA-256 and the frozen observation",
+    "instructions": "callgrind isolation pairs N=2 and N=6 differenced and divided by 4, five scenarios; perf stat -r 5 isolation pairs N=20 and N=120 differenced and divided by 100, six scenarios, cycles beside instructions",
+    "timing": "120 samples per leg, order A1 B1 B2 A2 on CPU 23, seven scenarios over owned and FileSource sources, with the A/A and B/B floors of the same window beside every paired delta",
+    "policy_simulation": "the resolve traces replayed against six sliding-window ceilings with and without change 0568's growth schedule, a span-sized window, and the implemented whole-table policy",
+    "attribution_counters": "change 0605's xls_source_attribution binary, an independent instrument with its own counters and its own oracle, on 54016.xls in owned-readat and file-source modes for all-cells and full-text (16,145 reads and 16,117 observations become 77 and 49), and swept over the whole corpus, 252 rows per leg, every outcome string identical and no row reading more times"
+  },
+  "accepted_costs": {
+    "retained_bytes": "one window of at most 256 KiB per resolver, allocated once and released with the scan; measured high-water marks are the fixtures' table sizes, 225,003 bytes at the largest",
+    "over_read_at_the_threshold": "a scan that resolves just past eight strings reads the whole table for them; 59858.xls's walk is the corpus's instance and reads 15,630 more bytes for 17 fewer reads, still 18.73% cheaper in cycles",
+    "observation_width": "a resolve served from the retained table takes no read and so no observation, which moves the point at which a mutation is reported from the resolve after it to the fill after it, bounded by the operation-level ensure_current bracket that is unchanged",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and this change adds one bulk copy, which is why perf stat cycles are reported beside it and the two agree",
+    "modelled_range_service": "the range-source elapsed figures are sleep-driven model arithmetic over a deterministic request count, not observed service",
+    "measurement_windows": "three perf stat windows and three paired-timing windows were run, because two later edits (a defensive sst_region fence, then the review fixes) changed the after binary; all are retained, the instruction column repeats to within 0.53 points and every timing scenario to within 3.3 points at p50, and the third window -- the one whose binaries are named above -- is the one the record quotes"
+  },
+  "known_gaps": {
+    "large_tables": "a workbook whose string table exceeds 256 KiB gains nothing and is not measured; no fixture in this corpus is in that class",
+    "unswept_constants": "the 256 KiB ceiling and the eight-resolve threshold are not swept and are not derived from a cost model",
+    "open_unchanged": "the open still reads and scans the whole string table to build the entry locators; this change is only about what happens afterwards",
+    "peak_rss": "the window's high-water mark is reported as a bound, not as an observation; no RSS measurement was taken",
+    "cold_cache": "the FileSource leg runs over a warm page cache and measures pread/fstat call count, not physical I/O",
+    "window_allocation_failure": "an allocator that cannot hand out the table drops the resolver back to the per-entry path, so the refusal this change introduces cannot make an operation fail that would otherwise succeed; no allocator hook exists in this crate's test binaries to force that branch, so it is argued from the code and not demonstrated"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, concurrency-scaling or cross-platform result",
+    "any claim about workbooks whose string table exceeds the ceiling"
+  ],
+  "provenance": {
+    "base_commit": "9f28ea621bc2e7eead05e7ad52fc76edfe41b761",
+    "branch": "perf/0648-xls-shared-string-resolver-window",
+    "commit": "the tip of perf/0648-xls-shared-string-resolver-window; a commit cannot record its own hash",
+    "host": "AMD EPYC, 32 cores, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 23",
+    "binaries": {
+      "before/cursor-probe": "0b0fca532b24c8ce1eb732fdcc7a754b959aa90ea017d28dadda2a3f22e6cf98",
+      "after/cursor-probe": "21d686606ecfb139c38fe3f93ccbb5ef778675d344ab355b320cf0bd6cc87955",
+      "before/litchi-perf-baseline": "80fdf8139dfc2f6b497766ad4e377d766e2c95207011d43a63c040b2ebf0703e",
+      "after/litchi-perf-baseline": "3e6c1a9a4ef0f5901a2d533017717db6c25c2f886df15694e65cddbd64153d62",
+      "before/xls_source_attribution": "e68d212945bc74052d772f053d794c7a1cd438e930b6d5a8b3dfd9561c2f1a1c",
+      "after/xls_source_attribution": "1cab5f80d77a76dff21774360e8c1b6a3f15dc0125deb018890a5b14b42d000f"
+    },
+    "note": "both legs built with cargo build --release --locked; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-9f28ea621 with its own CARGO_TARGET_DIR, and every binary was staged outside its Cargo target directory before any leg ran"
+  }
+}

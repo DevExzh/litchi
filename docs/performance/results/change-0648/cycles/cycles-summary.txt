@@ -1,0 +1,13 @@
+scenario               metric            before/op       after/op     delta
+allcells-54016         cycles           43,916,443     14,118,360   -67.85%
+allcells-54016         instructions    149,789,641     47,238,842   -68.46%
+allcells-59858         cycles              700,076        568,971   -18.73%
+allcells-59858         instructions      2,338,829      2,130,640    -8.90%
+allcells-cfs           cycles              589,211        428,055   -27.35%
+allcells-cfs           instructions      1,978,425      1,510,126   -23.67%
+allcells-wcv           cycles            3,084,123      1,735,635   -43.72%
+allcells-wcv           instructions     10,944,700      6,815,300   -37.73%
+fulltext-54016         cycles           98,656,309     61,555,387   -37.61%
+fulltext-54016         instructions    333,341,787    230,734,342   -30.78%
+open-54016             cycles              817,486        818,266    +0.10%
+open-54016             instructions      3,990,779      3,991,674    +0.02%
