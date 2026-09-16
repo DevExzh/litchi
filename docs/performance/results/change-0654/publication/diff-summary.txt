@@ -1,0 +1,24 @@
+--- publication outcome transitions (before -> after) ---
+  297  error -> ok
+   13  ok -> ok
+    9  error -> error
+    2  open_error -> open_error
+
+--- packages refused on BOTH legs: identical error text? ---
+   DIFFERS: /home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/bug62513.pptx
+     before: XML publication rejected for '/docProps/app.xml': noncompact XML FormattingWhitespace at byte 55
+     after : source-backed OPC Part overlay is unavailable: source ZIP archive has trailing bytes outside its located archive
+   DIFFERS: /home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/49609.xlsx
+     before: XML publication rejected for '/xl/sharedstrings.xml': noncompact XML FormattingWhitespace at byte 21
+     after : source-backed OPC Part overlay is unavailable: selected Part does not have one canonical UTF-8 source member
+   identical: 7   differing: 2
+     7  signed OPC source requires an explicit signature edit policy
+     1  source-backed OPC Part overlay is unavailable: source ZIP archive has trailing bytes outside its located archi
+     1  source-backed OPC Part overlay is unavailable: selected Part does not have one canonical UTF-8 source member
+
+--- packages that published on BOTH legs: identical output digest? ---
+   identical: 13   differing: 0
+
+--- untouched-member byte identity, every package that published on the after leg ---
+   packages checked: 310   untouched members compared: 6781
+   member-set changes: 0   byte mismatches: 0

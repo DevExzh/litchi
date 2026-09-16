@@ -1,5 +1,48 @@
 # Performance program phase report
 
+## 0654 — the original-bytes audit is loosened, and its price is re-measured on the way
+
+Record: [0654](0654-opc-original-bytes-audit-loosened.md).
+
+Two crates, five source files, +531/−60 tracked. `xml_minifier::audit` gains a
+private three-constant `Policy` in place of one bool and one added public
+function, `verify_source`; `litchi_opc::source_backed` gains one private
+`validate_source_part_xml` and points its seven original-bytes call sites at it.
+No public item is removed or changed, no `unsafe`, no dependency, no widened
+limit. Counts first. **Corpus admission**: 1,403 XML members over 0602's 95
+packages, accepted by the original-bytes audit **25 → 1,403**; 6,981 members
+over 321 OOXML fixtures, **133 → 6,964**, with 17 still refused (16
+byte-order-marked, 1 not UTF-8) and every one keeping its exact error text.
+**Publication**: 321 fixtures through `write_part_overlay_to_stream` on both
+legs — 297 refused → published, 13 published → published with the identical
+SHA-256, 9 → 9 refused (7 identical text, 2 reporting a pre-existing shadowed
+refusal), 2 never open; 6,781 untouched members compared with 0 mismatches.
+**Instructions**, callgrind isolation pairs at `--samples 1`/`--samples 3` on
+`xlsx_source_backed_cell_values_one_edit_save`, differenced and halved:
+publication 187,808,737 → 188,636,450 Ir per iteration; the audit pair
+103,698,462 → 104,258,468 (**+0.54%**), now split as **51,711,971 original
+(27.41% of publication)** and 52,546,497 replacement (27.86%), 55.27% together
+— which is the first direct measurement of the split, since before the change
+both halves are one symbol. Audit call counts are unchanged at 8 per iteration.
+The instruction cost is disclosed: removing compactness verdicts removes
+branches, not loops, and the policy plumbing plus the loss of specialization now
+that `verify_with_policy` has two callers costs slightly more than the verdicts
+saved; a const-generic policy would recover 0.30% of publication and is declined
+as speculative complexity. **Timing**, 30 samples per leg, order A1 B1 B2 A2 A3
+A4 on CPU 9 in one window, five scenarios over three selectors: `one_edit
+/medium` −2.14% (floor 0.03%), `one_edit/dense-sparse` −0.55% (0.85%),
+`batch/dense-sparse` −0.83% (0.53%), `opc_source_overlay_one_part_save
+/few-large` −0.46% (0.17%), and **`batch/medium` +1.20% against a 0.88% floor**,
+reported rather than hidden in a mean and far below the 5% trigger. All six legs
+on all five scenarios produced one output SHA-256 each. Gates: fmt, clippy, doc
+clean; `litchi-opc` + `xml-minifier` 769 passed / 0 failed / 2 ignored;
+`litchi-xlsx` + `litchi-docx` + `litchi-pptx` 3,658 / 0 / 33; the `litchi` facade
+under `docx,xlsx,pptx,xls` 265 / 0 / 7; the harness's own suite 540 / 0 / 1;
+the non-iWork gate. `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until
+completion and iWork excluded.
+[Record](0654-opc-original-bytes-audit-loosened.md);
+[retained evidence](results/change-0654/README.md).
+
 ## 0652 — a decision record, no numbers
 
 Record: [0652](0652-owner-decisions-for-the-third-wave.md). This record

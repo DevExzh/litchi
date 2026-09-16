@@ -1,0 +1,106 @@
+# Gate tails — change 0654
+# worktree /home/zhuhe/code/litchi-worktrees/0654, branch perf/0654-opc-original-bytes-audit-loosened, base 70d7768cc
+# Every gate below exited 0. Workspace lints are deny, so a clippy or rustdoc warning fails.
+
+## fmt
+$ cargo fmt --all --check
+exit=0
+
+## clippy
+$ cargo clippy -p litchi-opc -p xml-minifier --all-targets
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0654/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0654/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0654/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0654/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0654/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.92s
+exit=0
+
+## test-opc
+$ cargo test -p litchi-opc -p xml-minifier
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 1.03s; merged doctests compilation took 1.02s
+   Doc-tests xml_minifier
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+TOTAL: 769 passed, 0 failed, 2 ignored
+exit=0
+
+## doc
+$ cargo doc -p litchi-opc -p xml-minifier --no-deps
+    Checking generic-array v0.14.7
+ Documenting xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0654/crates/xml-minifier)
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0654/crates/soapberry-zip)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0654/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.26s
+   Generated /home/zhuhe/code/litchi-worktrees/0654/target/doc/litchi_opc/index.html and 1 other file
+exit=0
+
+## test-consumers
+$ cargo test -p litchi-xlsx -p litchi-docx -p litchi-pptx
+all doctests ran in 1.08s; merged doctests compilation took 0.95s
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+TOTAL: 3658 passed, 0 failed, 33 ignored
+exit=0
+
+## test-facade
+$ cargo test -p litchi --features docx,xlsx,pptx,xls
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::from_bytes (line 385) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::metadata (line 849) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::open (line 304) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::text (line 722) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.50s; merged doctests compilation took 0.50s
+TOTAL: 265 passed, 0 failed, 7 ignored
+exit=0
+
+## test-harness
+$ cargo test        # in tools/perf-baseline
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+TOTAL: 540 passed, 0 failed, 1 ignored
+exit=0
+
+## non-iwork
+$ python3 tools/non_iwork_gate.py verify
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+exit=0
+

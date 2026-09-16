@@ -1,5 +1,53 @@
 # Performance optimization ADR-compliance matrix
 
+## 0654 — compliant; ADR 0006 is amended by this record, as change 0652 assigned
+
+Record: [0654](0654-opc-original-bytes-audit-loosened.md).
+
+**ADR 0006 is the boundary that moves, and it moves exactly as far as change
+0652 decision 2 authorizes.** The ADR never stated the compactness contract —
+the file contains no occurrence of "compact", "whitespace" or "minif" — so the
+contract on original bytes was implied rather than written, and the paragraph it
+contradicted is the `Preserve` clause's *"lexical details are retained when
+possible"*. Two sentences are added there, under a dated note naming 0652
+decision 2 and this record, saying that the compact output contract binds bytes
+this library authors or regenerates and is not asserted against the original
+bytes of a Part a package already holds, which are audited for encoding,
+well-formedness, a single document element, the absence of a DTD or DOCTYPE and
+the finite budgets. Line 43's *"malformed known payloads fail before
+publication"* is cited in the note as the surviving rule; no other ADR text
+changed, and no ADR status changed. **The rest of ADR 0006 is preserved and
+proved so**: preservation by default (6,781 untouched members byte-identical
+across 310 published packages, 0 mismatches, 0 member-set changes; 13 packages
+publishing the identical SHA-256 on both legs); validation never mutates (both
+helpers take a slice and return a `Report` or an error); determinism (30
+identical digests across six timing legs on five scenarios); and fail-closed
+publication (both new `litchi-opc` tests assert `output.is_empty()` on every
+kept refusal). **ADR 0003's typed-refusal rule holds**: no error variant is
+added, removed or relocated, and both helpers construct the identical
+`OpcError::XmlPublication { part, source }` from the identical
+`xml_minifier::audit::Error`. **ADR 0005's rules are untouched**: no retained
+state, no hidden pool, no ambient I/O, no archive type, raw lock or executor in
+a public signature; the one added public item is a free function over a slice
+and a `Limits` value. **0652's trade-off 2 decided two questions the safe way,
+and the record says which**: change 0650's byte-order-mark defect is reported
+rather than fixed, because it is a `Malformed` refusal that
+`reader_matches_slice_bom_rejection` deliberately pins in the streaming auditor
+and moving it is a contract change decision 2 does not cover (it costs 0 of the
+95 packages and 3 of the 321); and `PackageWriter::validate_authored_xml`
+(`pkgwriter.rs:203`) is left alone, because it audits a Part on
+`is_xml_part(…) && !is_exact_source_xml(part)` with no original/replacement pair,
+so pointing it at the source policy would stop enforcing compactness on
+genuinely authored parts — a measured 59 of 180 `.xlsx` fixtures stay refused on
+change 0610's `xlsx-hide` route, and the witness shows the refused Part's blob is
+byte-identical to its source member. **One compliance cost is stated rather than
+elided**: removing a refusal lets whatever stood behind it surface, and on two
+fixtures it does — a trailing-bytes refusal and a canonical-member refusal, both
+at untouched code strictly after the audit pair and both computed from raw
+member names, with a retained base witness for the first class and a source
+argument for the second. `performance_claim: none`. OLE2/OOXML remain active;
+ODF is deferred until completion and iWork excluded.
+
 ## 0652 — ADR 0030 and ADR 0031 accepted; three amendments assigned to the records that implement them
 
 Record: [0652](0652-owner-decisions-for-the-third-wave.md). Proposed ADRs 0030

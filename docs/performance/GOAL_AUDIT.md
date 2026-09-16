@@ -1,5 +1,41 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0654 — preservation by default, applied to the bytes a producer wrote
+
+Record: [0654](0654-opc-original-bytes-audit-loosened.md).
+
+`docs/GOAL.md` puts correctness and lossless preservation above speed, and ADR
+0006 promised that "lexical details are retained when possible". Publication
+did not keep that promise: a package whose producer indents its XML — which is
+every third-party producer, 94 of 95 by 0602's count — could be opened, read and
+republished unchanged, but the moment one Part was replaced the *untouched*
+spelling of the replaced Part's previous bytes was audited against litchi's own
+byte-minimal output contract and the save was refused. This change separates the
+two contracts and writes the separation into ADR 0006 with a dated note naming
+0652 decision 2, keeping the amendment to the three sentences that change. What
+the goal actually asks for is preserved on every axis that matters: the
+published bytes of an untouched member are still the source's own (6,781
+compared, 0 mismatches), the replacement is still audited in full (0 verdict
+changes over 6,981 members), an exact byte no-op still bypasses both audits and
+copies the source artifact verbatim even when its payload is malformed, and
+every refusal that is not a compactness verdict still fires before any archive
+byte is emitted — twelve malformed shapes, DOCTYPE, encoding and all six finite
+budgets, each with a test. Two refusals the compactness verdict had been
+shadowing now surface on two fixtures (trailing bytes outside the located
+archive; no canonical UTF-8 source member on a package that writes
+`xl\sharedstrings.xml` with backslashes), and the record states that rather than
+averaging it away, with a base witness for the class. The goal's own trade-off
+rule decided two questions the other way: change 0650's byte-order-mark defect
+is **reported, not fixed**, because it is a `Malformed` refusal that the
+streaming auditor pins with a test and moving it is a second contract change
+0652 does not authorize; and the eager writer's audit is **left alone**, because
+that site cannot tell an untouched source blob from an authored one and
+loosening it there would stop enforcing compactness on litchi's own output.
+`performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until
+completion and iWork excluded.
+[Record](0654-opc-original-bytes-audit-loosened.md);
+[retained evidence](results/change-0654/README.md).
+
 ## 0652 — the owner's trade-offs read against the goal: nothing in the definition of done moves, the blocked rows do
 
 Record: [0652](0652-owner-decisions-for-the-third-wave.md). The three

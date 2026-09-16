@@ -263,3 +263,170 @@ fn malformed_and_invalid_encoding_are_typed() {
         Err(audit::Error::Malformed { .. })
     ));
 }
+
+/// Change 0654, under change 0652 decision 2: one witness per compactness
+/// refusal the original-bytes policy removes. Each input is refused by the
+/// authored contract, with the kind named, and accepted by the source policy.
+#[test]
+fn source_policy_accepts_every_noncompact_spelling_the_authored_contract_refuses() {
+    for (kind, xml) in [
+        // A producer's line ending after the XML declaration and its
+        // indentation between elements. This is the spelling 0602 witnessed on
+        // 93 of 95 real packages, at the newline after the declaration.
+        (
+            Kind::FormattingWhitespace,
+            b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<root>\n  <child/>\n</root>".as_slice(),
+        ),
+        // A whitespace-only run of plain spaces, which the authored contract
+        // cannot classify.
+        (
+            Kind::AmbiguousWhitespace,
+            b"<root> <child/></root>".as_slice(),
+        ),
+        // Attribute separators that are not exactly one ASCII space.
+        (
+            Kind::AttributeSeparation,
+            b"<root a=\"1\"\n      b=\"2\"/>".as_slice(),
+        ),
+        (
+            Kind::AttributeSeparation,
+            b"<root a = \"1\"/>".as_slice(),
+        ),
+        // Whitespace immediately before a tag close.
+        (
+            Kind::WhitespaceBeforeClose,
+            b"<root a=\"1\" />".as_slice(),
+        ),
+        (
+            Kind::WhitespaceBeforeClose,
+            b"<root a=\"1\" ></root >".as_slice(),
+        ),
+    ] {
+        let error = audit::verify_authored(xml, limits_for(xml)).unwrap_err();
+        assert!(
+            matches!(error, audit::Error::NotCompact(violation) if violation.kind() == kind),
+            "authored audit must still refuse {xml:?} as {kind:?}, got {error:?}"
+        );
+        let _report = audit::verify_source(xml, limits_for(xml))
+            .unwrap_or_else(|error| panic!("source policy must accept {xml:?}: {error:?}"));
+    }
+}
+
+/// The source policy never returns a compactness verdict, on any input.
+#[test]
+fn source_policy_never_reports_a_compactness_violation() {
+    for xml in [
+        b"<?xml version=\"1.0\"?>\n<root>\n\t<child a=\"1\"  b=\"2\" />\n</root>\n".as_slice(),
+        b"<root>   </root>".as_slice(),
+        b"<root xml:space=\"preserve\">\n a \n</root>".as_slice(),
+        b"<a>\n<b/>\n</a>".as_slice(),
+    ] {
+        match audit::verify_source(xml, limits_for(xml)) {
+            Ok(_report) => {},
+            Err(audit::Error::NotCompact(violation)) => {
+                panic!("source policy reported {violation:?} on {xml:?}")
+            },
+            Err(error) => panic!("unexpected source refusal on {xml:?}: {error:?}"),
+        }
+    }
+}
+
+/// Every refusal that is not a compactness verdict is kept, with the same
+/// variant. These are the checks that protect the published archive.
+#[test]
+fn source_policy_keeps_every_structural_encoding_doctype_and_limit_refusal() {
+    // Well-formedness, from the parser and from this auditor's own rules.
+    for xml in [
+        b"<a>".as_slice(),                      // unclosed document element
+        b"<a/><b/>".as_slice(),                 // two document elements
+        b"<a></b>".as_slice(),                  // mismatched end tag
+        b"</a>".as_slice(),                     // unexpected end element
+        b"text<a/>".as_slice(),                 // character data outside the root
+        b"<![CDATA[x]]><a/>".as_slice(),        // CDATA outside the root
+        b"<a b/>".as_slice(),                   // attribute with no value
+        b"<a b=1/>".as_slice(),                 // unquoted attribute value
+        b"<a b=\"1/>".as_slice(),               // unterminated attribute value
+        b"<a xml:space=\"maybe\"/>".as_slice(), // xml:space is default|preserve
+        b"</a x=\"1\">".as_slice(),             // markup after an end-tag name
+        b"".as_slice(),                         // no document element at all
+    ] {
+        let error = audit::verify_source(xml, limits_for(xml))
+            .expect_err("malformed source XML must stay refused");
+        assert!(
+            matches!(error, audit::Error::Malformed { .. }),
+            "{xml:?} must be Malformed, got {error:?}"
+        );
+    }
+
+    // A DTD or DOCTYPE declaration is ineligible for package XML.
+    let doctype = b"<!DOCTYPE a><a/>";
+    assert!(matches!(
+        audit::verify_source(doctype, limits_for(doctype)),
+        Err(audit::Error::Doctype { .. })
+    ));
+
+    // Encoding.
+    let invalid = b"<a>\xff</a>";
+    assert!(matches!(
+        audit::verify_source(invalid, limits_for(invalid)),
+        Err(audit::Error::Encoding { valid_up_to: 3 })
+    ));
+
+    // A leading byte order mark stays refused exactly as the authored contract
+    // refuses it. Change 0650's frozen question 3 is not decided here.
+    let marked = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><root/>";
+    let authored = audit::verify_authored(marked, limits_for(marked)).unwrap_err();
+    let source = audit::verify_source(marked, limits_for(marked)).unwrap_err();
+    assert!(matches!(source, audit::Error::Malformed { offset: 0, .. }));
+    assert_eq!(source.to_string(), authored.to_string());
+
+    // Every finite budget, each narrowed to one below what the input needs.
+    let nested = b"<?xml version=\"1.0\"?>\n<a>\n  <b c=\"1\">text</b>\n</a>";
+    let _accepted = audit::verify_source(nested, limits_for(nested)).unwrap();
+    for (resource, maximum) in [
+        (Resource::Bytes, nested.len() - 1),
+        (Resource::Depth, 1),
+        (Resource::Events, 3),
+        (Resource::Attributes, 0),
+        (Resource::TokenBytes, 4),
+        (Resource::TextBytes, 1),
+    ] {
+        let narrowed = limits_for(nested).narrow(resource, maximum);
+        let error = audit::verify_source(nested, narrowed)
+            .expect_err("a narrowed budget must still refuse");
+        assert!(
+            matches!(error, audit::Error::Limit { resource: observed, .. } if observed == resource),
+            "{resource:?} budget must refuse with its own resource, got {error:?}"
+        );
+    }
+}
+
+/// The authored contract itself does not move: the same inputs get the same
+/// verdicts they got before the source policy existed.
+#[test]
+fn the_authored_and_default_contracts_are_unchanged_by_the_source_policy() {
+    let compact = b"<?xml version=\"1.0\"?><root a=\"1\"><child/></root>";
+    let _authored = audit::verify_authored(compact, limits_for(compact)).unwrap();
+    let _default = audit::verify(compact, limits_for(compact)).unwrap();
+    let _source = audit::verify_source(compact, limits_for(compact)).unwrap();
+
+    // `verify` keeps admitting a plain-space run that `verify_authored` refuses.
+    let spaces = b"<root> <child/></root>";
+    let _default = audit::verify(spaces, limits_for(spaces)).unwrap();
+    assert!(matches!(
+        audit::verify_authored(spaces, limits_for(spaces)),
+        Err(audit::Error::NotCompact(violation)) if violation.kind() == Kind::AmbiguousWhitespace
+    ));
+
+    // `verify` keeps refusing structural formatting whitespace.
+    let indented = b"<root>\n  <child/>\n</root>";
+    assert!(matches!(
+        audit::verify(indented, limits_for(indented)),
+        Err(audit::Error::NotCompact(violation)) if violation.kind() == Kind::FormattingWhitespace
+    ));
+
+    // Accepted documents report identical accounting under all three policies.
+    let report_authored = audit::verify_authored(compact, limits_for(compact)).unwrap();
+    let report_source = audit::verify_source(compact, limits_for(compact)).unwrap();
+    assert_eq!(report_authored, report_source);
+}

@@ -1,0 +1,180 @@
+/home/zhuhe/code/litchi/test-data/libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx	ok	-	4103f43bff515d4f6aba647efa02ab08e110b158036420b1e8c5fa54ff60119e
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/LambdaAndRelatedFunctions.xlsx	ok	-	cc89d5cc50ff67102ce5768011ce1d303d45e507eb34bb3441460c9c8dbec5c1
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/NamedSheetViews.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/Spill.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/activex_checkbox.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dataValidity.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhanced-protection.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/enhancedProtectionRangeShorthand.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/external-refs.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/freezePaneStartCell.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/invalid_ext_data_validation.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/page_scale.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/queryTableExport.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/3d-reference.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/basic.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/refupdate.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/shared-formula/text-results.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/sheet-tab-color.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/subtotal-above.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf105840_allRowsHidden.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf111980_radioButtons.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf120168.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134455.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf167689_xmlMaps_and_xmlColumnPr.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf66377.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/textLengthDataValidity.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/totalsRowShown.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/office-interop/litchi-changed/date-autofilter-litchi.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx	ok	-	e16b47a1ee8f6f9531dba97e6eaecbeb94380c26b7df159f07dfe4119d524ea5
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/CustomXMLMappings-complex-type.xlsx	ok	-	48a6d65c3cbc5f8e3ffbb224dac67d4e0464022513715a266c125f8d9ac17bb9
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/CustomXMLMappings.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/CustomXmlMappings-inverse-order.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/DataValidationEvaluations.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/DataValidationListTooLong.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/DateFormatNumberTests.xlsx	ok	-	7f100e1b98c5e41b2289fba7fbaa2aa4570c283dd7516a417d45f0cc00f396aa
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/DateFormatTests.xlsx	ok	-	0380959fc1c5cfe7ef70a53f40ad3b09de7b0d3dcf3103fd5210a22aadb9fcfe
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx	ok	-	3443f183e76c2c20b206d408f523a0cf9a16297350fa5a0ec5b003ef486adbf2
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/ExcelTables.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/FormatChoiceTests.xlsx	ok	-	0d9910257c2b63007a57797d10aece50f530b77616f808857ca7edd39afd2488
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/FormatConditionTests.xlsx	ok	-	7d039dad7bca7ba32a2ba3c724375de1ba08a0d0159a9f97fa643f828e4577f7
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Formatting.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/HeaderFooterComplexFormats.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/InlineString.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/InlineStrings.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/MatrixFormulaEvalTestData.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/NewStyleConditionalFormattings.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/NewlineInFormulas.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot1_Row.xlsx	ok	-	5f00e6b74aaf3b4249a8af998dae4cdb22ade7d24181382dc5f29c248c0b1c0f
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet2.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx	ok	-	a9dcccb096332f3729a2ca6a4eb04fe0faa2ab404b3b6e29c36d3751b080f93c
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row.xlsx	ok	-	d96cb0200cb4570bc6945532543a3593b378bfdde5e8aa79abbe808bf7902575
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx	ok	-	30d3abd34c64b83556050ce6fcc53044c728d9c8a30d01cc3a1f40a4ff465c6f
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx	ok	-	325fac2dcbdb9f9281e9c9ab386759e564546686a0375353bb47e68311f3a9a4
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx	ok	-	7dcaab01016fd8ae5613282ce7a2958889fa3d7817fcaf7488606cea146dcf72
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx	ok	-	eafeecf37e81bbe72c5f1d345fcf9509f49b6f0f8ec964966f2330bd2a824d7c
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx	ok	-	0486b8d2b0f11f38c2d190f2c9ea6ae47abbecc7c73fcc8a53014e213c3dd88e
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx	ok	-	4c3278c8a49c2cc5a5edb1270ba4b09deef54a1fbc2c4b81eab5cd8f6010a8dd
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx	ok	-	2375d6eb25f087674e575a9dbf8d4843c4ef342b68c010737ce44efc177dbf83
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleMultiCell.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleNormal.xlsx	ok	-	746f3b7bd9a90181cb29c2fef4bb84a5c6634093d210e7bc5460474ac507354d
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleScatterChart.xlsx	error	Package(XmlPublication { part: "/xl/chartsheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleStrict.xlsx	ok	-	de0d79ffa9bafcad445032b7e4c402e44ce55a7937cbc925ade9121c1023177a
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SimpleWithComments.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/SingleCellTable.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Sparklines.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredReferences.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx	ok	-	a9e2ab1c1f30fcad7cf9f314ff3b7abaf63497bd62665ee29b590686fef923b6
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/Tables.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/TablesWithDifferentHeaders.xlsx	ok	-	50d87c7b60d2b24e1ac09d44865f9b103fec2abf2d36d81b6c41b81b4f492bfa
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/TextColor.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/TwoSheetsNoneHidden.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/TwoSheetsOneHidden.xlsx	ok	-	3e9749837cac5a19a7628d7e60c1a1c6d0ff7657f27fa7904b217b96e0dc534f
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/autofilter-colors-fg.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/autofilter-colors.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/autofilter.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/autofilternamedrange.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/cell-borders.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/cell-multi-line.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/chart_hyperlink.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/column_style.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/condFormat_cellis.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/condformat_databar.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/condformat_theme_color.xlsx	ok	-	cb081363ead88cf3cd0427fb2964f7005c9b380e265e8a89a1318a9fac729822
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/conditional_fmt_checkpriority.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/conditional_fmt_origin.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/conditional_formatting_multiple_ranges.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/customxml.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/decimal-format.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/duplicate-defined-names.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/empty.xlsx	ok	-	dea5115ccabb71a682fdd46634ae14ba5f1b9c19bd0bf999ea85e7173db1b870
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/enhanced-protection.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/external-cache-multi-letter-column.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/external-link-path-missing.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/external-link-path-startup.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/fontSize.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/formats.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/headerFooterTest.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/hyperlink.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/hyperlink_export.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/hyperlink_formula.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/hyperlinks.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/named-ranges-global.xlsx	ok	-	4ad702f51e2e69b0694580bed0d77aa5d8828963d65224d1543fe9304b2034d9
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/named-ranges-hidden.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/noSharedStringTable.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sample.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/shared-strings-malformed-count.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/shared_formulas.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sharedhyperlink.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sheet-names.xlsx	ok	-	73fda7a3235291687d289d3af2ffb6f660360dd62db308997a5d642083f85ef4
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sheet-state-show.xlsx	error	TabEditBlocked { sheet: "стр1", position: 0, reason: LastVisibleTab }	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sheet-tab-color.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sheetProtection_allLocked.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sheetProtection_not_protected.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sortconditionref.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/sortconditionref2.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/style-alternate-content.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/styles.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/table-sample.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/tableStyle.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/test_conditional_formatting.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/ooxml/xlsx/universal-content.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/openxml4j/50154.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/openxml4j/OPCCompliance_NoCoreProperties.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/45540_form_Footer.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/47889.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 38 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/48962.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/49609.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 21 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/54071.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/56169.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/58106.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/60289.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/61060-conditional-number-formatting.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/62834.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/66365.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/AmpersandHeader.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx	ok	-	e16b47a1ee8f6f9531dba97e6eaecbeb94380c26b7df159f07dfe4119d524ea5
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/DataValidationEvaluations.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/DataValidationListTooLong.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/DataValidations-49244.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx	ok	-	3443f183e76c2c20b206d408f523a0cf9a16297350fa5a0ec5b003ef486adbf2
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/Excel_file_with_trash_item.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/FormatKM.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/StructuredRefs-lots-with-lookups.xlsx	ok	-	a9e2ab1c1f30fcad7cf9f314ff3b7abaf63497bd62665ee29b590686fef923b6
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/TestShiftRowSharedFormula.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/WithChartSheet.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/WithEmbeded.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/bug64512_embed.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/chart_sheet.xlsx	ok	-	bc4955f71974d1677d4c28b9e510a2266269fbe4cfbdc44612e09b378451b967
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx	ok	-	6e014f1ac70e7aa569a9b30d72ea5f1194bd9eae398eb1ed0fdbca06b9a92b1f
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/dataValidationTableRange.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/link-external-workbook-b.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/right-to-left.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/sample.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/shared_formulas.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/testSharedFormulasRangeSetBlankBug.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/testSharedFormulasSetBlank.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/workbookProtection-sheet_password-2013.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/workbookProtection-workbook_password-2013.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/xlookup.xlsx	error	Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 55 }) })	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/spreadsheet/xxe_in_schema.xlsx	error	skipped: fewer than two sheets	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/xmldsign/hello-world-signed.xlsx	error	Signed	-
+/home/zhuhe/code/litchi/test-data/poi/test-data/xmldsign/ms-office-2010-signed.xlsx	error	Signed	-
