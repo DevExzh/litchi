@@ -3252,3 +3252,97 @@ fn the_whole_sheet_walk_honours_cancellation() {
         "expected cancellation, got {error:?}"
     );
 }
+
+/// Change 0641: a selected-cell query validates the records it is *not*
+/// looking for through the measure-only path, so the refusal a malformed
+/// non-target record produces has to be the one the materializing parse
+/// produced, at the same position in the scan.
+#[test]
+fn a_query_refuses_a_malformed_record_it_is_not_looking_for() {
+    // A `Number` record whose payload is six bytes instead of fourteen, at a
+    // position no query below asks for.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let malformed =
+        insert_before_worksheet_eof(&original, &frame_bytes(0x0203, &[10, 0, 3, 0, 0, 0]));
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(cfb_with_streams(
+        &[("Workbook", &malformed)],
+    ))))
+    .unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    let walk = worksheet
+        .visit_cells(|_cell| Ok(()))
+        .unwrap_err()
+        .to_string();
+    // (0, 0) is a stored cell and (40, 7) is not; neither is the defect, so
+    // both reach it only through the measure-only path.
+    for (row, column) in [(0_u32, 0_u32), (40, 7)] {
+        assert_eq!(
+            worksheet.cell(row, column).unwrap_err().to_string(),
+            walk,
+            "a query for ({row}, {column}) must carry the walk's error identity"
+        );
+    }
+    assert!(
+        walk.contains("Invalid length"),
+        "unexpected refusal: {walk}"
+    );
+}
+
+/// The XF index of every record is validated whether or not the sink keeps the
+/// record, so a cell that names a reserved style-XF slot is refused wherever it
+/// sits on the sheet.
+#[test]
+fn a_query_refuses_a_bad_cell_format_it_is_not_looking_for() {
+    // A structurally valid `Blank` at (10, 3) naming XF slot 1, which is
+    // reserved for style formats.
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let malformed =
+        insert_before_worksheet_eof(&original, &frame_bytes(0x0201, &[10, 0, 3, 0, 1, 0]));
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(cfb_with_streams(
+        &[("Workbook", &malformed)],
+    ))))
+    .unwrap();
+    let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+
+    let walk = worksheet
+        .visit_cells(|_cell| Ok(()))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        walk.contains("style-XF slot 1"),
+        "unexpected refusal: {walk}"
+    );
+    assert_eq!(worksheet.cell(0, 0).unwrap_err().to_string(), walk);
+    assert_eq!(worksheet.cell(40, 7).unwrap_err().to_string(), walk);
+}
+
+/// The scan decides whether to materialize a record from the `rw`/`col` header
+/// it peeks out of the payload. If that peek named the wrong bytes, queries
+/// would miss cells the walk reports, or materialize the wrong one.
+#[test]
+fn every_cell_the_walk_reports_is_still_found_by_a_query() {
+    for (bytes, sheet) in [
+        (ole_fixture("WithCustomViews.xls"), 0_usize),
+        (fixture("54016.xls"), 0),
+        (ole_fixture("HyperlinksOnManySheets.xls"), 1),
+    ] {
+        let owner = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let cells = visited_cells(&owner, sheet);
+        assert!(!cells.is_empty(), "fixture reports no cells");
+        let mut checked = 0_usize;
+        // Sampled across the sheet rather than exhaustively: each query is a
+        // complete validated scan of the substream.
+        let stride = cells.len().div_ceil(48).max(1);
+        for (row, column, value) in cells.iter().step_by(stride) {
+            let queried = owner.cell_value_by_index(sheet, *row, *column).unwrap();
+            assert_eq!(
+                queried.as_ref(),
+                Some(value),
+                "query ({row}, {column}) disagrees with the walk"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 3, "too few positions checked: {checked}");
+    }
+}

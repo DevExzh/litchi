@@ -1,0 +1,58 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0641",
+  "title": "Validate the cells a selected-cell query is not looking for without building them, and resume the per-sheet cursor's chain walk across a document's worksheets",
+  "decision": "retained, implemented in litchi-xls; the snapshot-scoped form of XLS-8 is frozen as a design and not implemented",
+  "code_state": "crates/litchi-xls only; no public API, error type, limit, fence or output byte changed; no new unsafe anywhere including tests; no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "XLS-5 of change 0587: CellRecord::parse materialized a String for every Label and a Vec<u8> plus Metadata for every Formula a query framed, and process_cell dropped all but the target; CellRecord::measure runs every check the parse runs and builds nothing, and the parse's own checks are the implementation both paths reach",
+    "the census the item asked for first is the reason the change covers all seven single-cell kinds and not only the two that allocate: 54016.xls, the fixture the survey priced drop_in_place<CellRecord> at 2.05% on, carries zero Formula and zero Label records, so that 2.05% is the enum's drop glue and 88-byte moves",
+    "the census also found Label effectively extinct (6 records corpus-wide) and Formula concentrated (14,854 records, 11.69% of cell values, 224,754 Rgce bytes, of which 15228.xls carries 175,054), which is why 15228.xls was added to the measured set",
+    "XLS-8 of change 0587 and the open limitation of change 0585: a second StreamChainHint dedicated to the worksheet region, with a lifetime disjoint from the shared-string resolver's, removes 6.14% of the multi-sheet corpus's text-extraction chain links and 0.00% of the single-sheet corpus's",
+    "change 0585's unmeasured claim that one hint serving both consumers would save nothing is now measured on a third leg: sharing is 1.61% worse than the disjoint pair over the multi-sheet corpus and worse on 16 fixtures, so the claim holds in direction and was overstated in degree",
+    "value identity is established by a corpus differential over 67,422 cell records of 124 fixtures including 142 refusals, 0 divergences, plus 32,884 truncation and bit-flip mutations reaching 9,240 refusals with 0 divergences, and by identical text digests on every chain-link leg of 119 fixtures"
+  ],
+  "accepted_evidence": {
+    "census": "docs/performance/results/change-0641/probe/cell_record_census.py over all 126 .xls/.xlt fixtures: 372 worksheet substreams, 106,689 records, 127,072 cell values, per kind and per sheet; reproduces the survey's 37,929 records for 54016.xls exactly",
+    "counts": "xls_source_attribution, 16 scenarios, 5 samples each, both legs: read calls, read bytes, version() calls and the harness observation identical in all 16 cells",
+    "chain_links": "one instrumented build with three runtime switches (base / hint / shared), full text over every .xls and .xlt fixture, plus one-cell and all-cells on four fixtures; open links identical on all three legs and reproducing change 0585's recorded 2,099 for ConditionalFormattingSamples.xls",
+    "instructions": "callgrind isolation pairs at 2 and 12 harness samples, differenced and divided by 10, per leg, whole-process totals and per-symbol self cost, over 8 scenarios",
+    "cycles": "perf stat isolation pairs at 20 and 120 samples, -r 5, median of five repetitions per leg pinned to CPU 24, with a third before-binary leg giving the A/A floor for the metric in the same window, over 11 scenarios",
+    "timing": "xls_source_attribution elapsed_samples_ns, order A1 B1 B2 A2 A3 on CPU 24 repeated as interleaved rounds and pooled per leg, in two windows: window 2 (the reported one) at host load 6.2 with 60 samples per leg over all 11 scenarios, and window 1 at host load 11-30 retained in full as the confirming window; every row agrees in sign between the windows and the largest disagreement in magnitude is 2.0 percentage points",
+    "differential_oracle": "crates/litchi-xls/src/records.rs cell_measure_tests: every substream of every fixture framed by hand, both paths run over every cell record of all seven kinds; plus 12 mutations applied to the merged tree with the suites re-run"
+  },
+  "accepted_costs": {
+    "full_text_regression": "15228.xls full text is +0.84% in cycles, +0.14% in instructions and +0.28%/+1.24% at p50 against an A/A floor of -0.03%; splitting parse_record_with around frame_record made LLVM outline the CellRecord drop glue that had been inlined into its callers, 412,197 instructions moving into a shared symbol against the 399,641 the chain hint removes from the two chain symbols; its p95 and p99 fall in both windows",
+    "inline_attributes": "three #[inline] attributes are load-bearing; the first measurement, taken without them, showed frame_record out of line costing +595,720 instructions per 15228.xls text extraction and turning the whole-sheet walk from -0.35% into +0.95%. #[inline(always)] was measured as an alternative and rejected: it helps full text and hurts the whole-sheet walk",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte (0604 measured a 35x overstatement), so the memcpy figures are upper bounds and the native cycles are what price them",
+    "chain_links_are_not_latency": "a chain link is a dependent load, not a time; change 0585's caveat applies unchanged",
+    "host_load": "host quiescence is not established; window 1 was taken at load 11-30 with a measured p50 A/A floor of +-2.5% and window 2 at load 6.2 with a floor of +-1.6%"
+  },
+  "known_gaps": {
+    "mulrk_mulblank": "MulRk and MulBlank are 60,575 of the corpus's 127,072 cell values and still build an 88-byte CellRecord per packed cell on a query that does not want it; they allocate nothing, so what is left is the enum move and its drop glue",
+    "label_savings": "Label exists 6 times corpus-wide; its measure path is a correctness obligation, not a saving, and no Label saving is claimed",
+    "snapshot_scoped_hint": "the brief's snapshot-scoped form of XLS-8 is frozen as a design: StreamChainHint borrows its reader, so a snapshot-resident position needs either a reader-independent value that weakens the documented cannot-cross-readers property or interior mutability on an immutable cross-thread snapshot, which ADR 0005 treats as a clean-value cache needing its own record",
+    "hint_records_construction_only": "a sheet resumes from the previous sheet's first sector, not from where the previous sheet's scan ended, because only construction records into the hint; litchi-cfb has no way to publish a live cursor's position",
+    "allocations": "no allocation counter was run; the callgrind malloc/free self costs are the only allocation evidence",
+    "file_source": "no from_path or range-source leg; every XLS harness source is in memory, so XLS-4's per-string fstat cost stays invisible",
+    "corpus_aggregate": "the corpus-wide -1.96% of chain links is dominated by two single-sheet fixtures that are 85% of the total; -6.14% over the 96 multi-sheet fixtures is the figure that describes the change",
+    "second_cell_same_sheet": "the harness's second-cell operation queries two cells of the same worksheet; the brief's second cell on another sheet has no selector and would not have moved, because XLS-8 does not serve repeated queries"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, peak-RSS, allocation-count, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0641-xls-scan-measure-only-cells-and-sheet-hint",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 24",
+    "binaries": {
+      "before/xls_source_attribution": "2aa5a2a47f18f82d8e3bb007074cd76cb06fd1b11dc07dc4686823b657f0917a",
+      "after/xls_source_attribution": "4d48a2dbf86a0fd26900ccc18d0088663d64fb3c93b4a3318efb1b476550df14"
+    },
+    "note": "both legs built with cargo build --release --locked --features xls-source-attribution --bin xls_source_attribution from tools/perf-baseline; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR, and both binaries were staged outside any Cargo target directory before being timed (0627)"
+  }
+}

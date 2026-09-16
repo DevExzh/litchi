@@ -1,5 +1,34 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0641 — two survey items closed, one design frozen, and a prior record's claim retired
+
+`docs/GOAL.md` ranks eliminating unnecessary work first, and both halves of this
+change are that: validation that must happen still happens, and only the
+materialization that nothing reads is removed. Items **XLS-5** and **XLS-8** of
+change 0587 move from open to implemented. XLS-5's precondition — "the corpus
+`Formula`/`Label` record mix is unknown", one of the survey's named measurement
+blockers — is retired with a retained census that reproduces the survey's own
+37,929-record figure for `54016.xls` exactly. XLS-8 closes the per-sheet cursor
+construction term change 0585 recorded as "left open", and closes it with the
+second `StreamChainHint` that record said was required. It also retires a claim
+0585 made and could not measure: that one hint serving both the shared-string
+resolver and the worksheet cursor would "save nothing on either path". A third
+instrumented leg now prices that arrangement, and the claim holds in direction
+and was overstated in degree — sharing is **1.61% worse** than the disjoint pair
+over the 96 multi-sheet fixtures and worse on 16 of them, while still better than
+no worksheet hint at all. One thing is deliberately **not** done: the brief asked
+for the hint to live in the snapshot so that repeated queries resume it, and that
+is frozen as a design rather than implemented, because `StreamChainHint` borrows
+the reader it came from and every way to store one in an immutable snapshot
+either weakens the documented "it cannot cross readers" property or puts a lock
+on the selected-cell path of a `Clone`, cross-thread snapshot — the ADR 0005
+clean-value-cache gate XLS-3 is already behind. No coverage row changes status:
+reads, bytes, `version()` calls and the harness observation are identical on all
+16 measured scenarios. OLE2 and OOXML remain the active priority; ODF stays
+deferred and iWork excluded.
+[Change and limitations](0641-xls-scan-measure-only-cells-and-sheet-hint.md);
+[evidence](results/change-0641/README.md).
+
 ## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
 
 Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).

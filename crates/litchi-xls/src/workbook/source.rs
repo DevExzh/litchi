@@ -14,8 +14,8 @@ use crate::leniency::{Leniency, ToleranceLog};
 use crate::number_format::{DateSystem, Formatting};
 use crate::records::{
     BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue,
-    SharedStringScanError, SharedStringSstScan, SheetType, decode_shared_string_entry,
-    scan_shared_string_records,
+    MeasuredCell, SharedStringScanError, SharedStringSstScan, SheetType,
+    decode_shared_string_entry, scan_shared_string_records,
 };
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
@@ -874,6 +874,13 @@ impl SourceBackedWorkbook {
             // of the same string table; a position that does not apply to a
             // resolve is discarded by the reader, which then walks cold.
             let mut strings = SharedStringResolver::new(&self.inner, &refs);
+            // One worksheet-region chain position for the whole document,
+            // disjoint from the resolver's. `BoundSheet8` positions ascend, so
+            // each sheet's cursor resumes from the previous sheet's start
+            // instead of re-walking the chain from the stream's first sector;
+            // a position that does not apply is discarded by the reader, which
+            // then walks cold exactly as before.
+            let mut sheet_chain = self.inner.cfb.chain_hint();
             for sheet in self
                 .inner
                 .sheets
@@ -882,8 +889,15 @@ impl SourceBackedWorkbook {
             {
                 check_text_state(&self.inner, execution)
                     .map_err(|source| writer.document_error(source))?;
-                let collected = scan_text_sheet(&self.inner, sheet, &refs, execution, &mut strings)
-                    .map_err(|source| writer.document_error(source))?;
+                let collected = scan_text_sheet(
+                    &self.inner,
+                    sheet,
+                    &refs,
+                    execution,
+                    &mut strings,
+                    &mut sheet_chain,
+                )
+                .map_err(|source| writer.document_error(source))?;
                 check_text_state(&self.inner, execution)
                     .map_err(|source| writer.document_error(source))?;
                 write_text_sheet(&collected, &mut writer, execution)?;
@@ -2201,6 +2215,22 @@ struct WorksheetScan<'a> {
 }
 
 impl<'a> WorksheetScan<'a> {
+    /// Opens a scan at `start`, resuming the allocation-chain walk from `chain`.
+    ///
+    /// `stream_cursor_at` reaches `start` by walking the workbook stream's
+    /// allocation chain from its **first** sector, every time: change 0584
+    /// priced that at 28,143 links over a 16-sheet workbook's text extraction,
+    /// about 91% of them re-walks of a prefix an earlier sheet had already
+    /// walked. `chain` is the position change 0585 left open. A document-wide
+    /// operation passes one for all of its sheets; a single-sheet operation
+    /// passes a fresh one, which is exactly `stream_cursor_at`.
+    ///
+    /// It is deliberately **not** the shared-string resolver's hint. A hint
+    /// retains one position and is discarded when it sits past the offset
+    /// asked for, so a single hint alternating between the string table and a
+    /// worksheet region would be discarded on every resolve and again on every
+    /// sheet, saving nothing on either. The two lifetimes are disjoint for that
+    /// reason, and change 0585's record says so.
     fn new(
         cfb: &'a SharedOleFile,
         path: &'a [&'a str],
@@ -2208,9 +2238,10 @@ impl<'a> WorksheetScan<'a> {
         upper_bound: u64,
         limits: SourceBackedLimits,
         execution: Option<&'a ExecutionContext>,
+        chain: &mut StreamChainHint<'_>,
     ) -> Result<Self> {
         let cursor = cfb
-            .stream_cursor_at(path, start)
+            .stream_cursor_at_hinted(path, start, chain)
             .map_err(SourceBackedError::from)?;
         Ok(Self {
             cursor,
@@ -2545,6 +2576,7 @@ fn scan_text_sheet(
     refs: &[&str],
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
+    sheet_chain: &mut StreamChainHint<'_>,
 ) -> Result<SourceTextSheet> {
     let mut collected = SourceTextSheet::new();
     let mut scan = WorksheetScan::new(
@@ -2554,6 +2586,7 @@ fn scan_text_sheet(
         sheet.end,
         owner.limits,
         execution,
+        sheet_chain,
     )?;
     let mut pending_formula = None;
     let mut first = true;
@@ -2864,6 +2897,33 @@ trait CellSink {
     /// cell's value is discarded anyway; a whole-sheet walk holds back all of
     /// them, because it reports every one.
     fn defers_string_formula(&self, record: &CellRecord) -> bool;
+
+    /// Whether the sink reads anything out of the record at this position
+    /// beyond its XF index.
+    ///
+    /// A sink that answers `false` still gets the record **validated** — the
+    /// scan hands the payload to [`CellRecord::measure`], which runs every
+    /// check `CellRecord::parse` runs — and then gets
+    /// [`CellSink::accept_measured`] instead of `accept`. Nothing is skipped;
+    /// what is skipped is the `String` a `Label` transcodes, the `Vec<u8>` a
+    /// `Formula` copies, and the 88-byte record that carries them.
+    ///
+    /// The scan decides this from the four header bytes every cell record
+    /// opens with, which both parses read identically, so the answer can never
+    /// change which bytes are checked.
+    fn wants(&self, row: u16, col: u16) -> bool;
+
+    /// Consumes one validated cell record the sink does not want.
+    ///
+    /// Every implementation validates the XF index, exactly as
+    /// [`CellSink::accept`] does and in the same position, so that a malformed
+    /// cell format is refused wherever it sits whether or not the sink keeps
+    /// the cell.
+    fn accept_measured(&mut self, measured: &MeasuredCell, scan: &ScanContext<'_>) -> Result<()> {
+        scan.formatting
+            .validate_cell_xf(measured.xf_index)
+            .map_err(SourceBackedError::Parse)
+    }
 }
 
 /// The per-scan constants every sink needs, gathered once so that the frame
@@ -2918,6 +2978,11 @@ impl CellSink for TargetCell {
     fn defers_string_formula(&self, record: &CellRecord) -> bool {
         record.row() == self.row && record.col() == self.column
     }
+
+    #[inline]
+    fn wants(&self, row: u16, col: u16) -> bool {
+        row == self.row && col == self.column
+    }
 }
 
 /// The whole-sheet sink: reports every stored cell in stream order and retains
@@ -2959,6 +3024,31 @@ where
     fn defers_string_formula(&self, _record: &CellRecord) -> bool {
         true
     }
+
+    /// A whole-sheet walk reports every stored cell, so it wants every record
+    /// materialized and never reaches the measure-only path.
+    fn wants(&self, _row: u16, _col: u16) -> bool {
+        true
+    }
+}
+
+/// Whether `sink` wants the cell record in `payload` materialized.
+///
+/// Every BIFF8 cell record this scan parses opens with `rw` and `col`, two
+/// little-endian `u16`s at offsets 0 and 2 (`[MS-XLS]` 2.5.19 `Cell`), so the
+/// position is readable before either parse commits. A payload too short to
+/// carry them is answered `true`, which hands it to the materializing parse and
+/// therefore to exactly the refusal it always produced; the measure-only path
+/// never sees a record whose length checks have not been decided by the parse
+/// they belong to.
+#[inline]
+fn wants_record<S: CellSink + ?Sized>(sink: &S, payload: &[u8]) -> bool {
+    payload.get(..4).is_none_or(|head| {
+        sink.wants(
+            u16::from_le_bytes([head[0], head[1]]),
+            u16::from_le_bytes([head[2], head[3]]),
+        )
+    })
 }
 
 /// Scans one worksheet substream to its EOF, handing every parsed cell record
@@ -2990,6 +3080,10 @@ fn scan_worksheet<S: CellSink>(
         formatting: &owner.formatting,
         execution,
     };
+    // A selected-cell query and a whole-sheet walk each construct one cursor,
+    // so there is no earlier position on this stream to resume from: a fresh
+    // hint is exactly the cold walk `stream_cursor_at` performed.
+    let mut sheet_chain = owner.cfb.chain_hint();
     let mut scan = WorksheetScan::new(
         &owner.cfb,
         &refs,
@@ -2997,6 +3091,7 @@ fn scan_worksheet<S: CellSink>(
         sheet.end,
         owner.limits,
         execution,
+        &mut sheet_chain,
     )?;
     let mut first = true;
     loop {
@@ -3069,6 +3164,12 @@ fn scan_worksheet<S: CellSink>(
         match frame.kind {
             0x0006 => {
                 let payload = scan.read_payload(&frame)?;
+                if !wants_record(sink, payload) {
+                    let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
+                        .map_err(SourceBackedError::Parse)?;
+                    sink.accept_measured(&measured, &context)?;
+                    continue;
+                }
                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
                 if matches!(
@@ -3089,6 +3190,12 @@ fn scan_worksheet<S: CellSink>(
             },
             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
                 let payload = scan.read_payload(&frame)?;
+                if !wants_record(sink, payload) {
+                    let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
+                        .map_err(SourceBackedError::Parse)?;
+                    sink.accept_measured(&measured, &context)?;
+                    continue;
+                }
                 let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
                 sink.accept(&cell, &context, &mut strings)?;

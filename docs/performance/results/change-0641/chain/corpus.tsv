@@ -1,0 +1,378 @@
+base	full-text	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	0	open=32	total=108	scenario=76	text:45:ca830f794f81b6b3
+hint	full-text	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	0	open=32	total=108	scenario=76	text:45:ca830f794f81b6b3
+shared	full-text	test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls	0	open=32	total=108	scenario=76	text:45:ca830f794f81b6b3
+base	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	0	open=46	total=115	scenario=69	text:2:08547e07b5084555
+hint	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	0	open=46	total=85	scenario=39	text:2:08547e07b5084555
+shared	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls	0	open=46	total=85	scenario=39	text:2:08547e07b5084555
+base	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	0	open=10	total=51	scenario=41	text:705:76785a09589b287d
+hint	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	0	open=10	total=35	scenario=25	text:705:76785a09589b287d
+shared	full-text	test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls	0	open=10	total=35	scenario=25	text:705:76785a09589b287d
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	0	open=42	total=194	scenario=152	text:732:83f1bbf60298054d
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	0	open=42	total=121	scenario=79	text:732:83f1bbf60298054d
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls	0	open=42	total=163	scenario=121	text:732:83f1bbf60298054d
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	0	open=36	total=57	scenario=21	text:56:6e4618d2b94d8db8
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	0	open=36	total=57	scenario=21	text:56:6e4618d2b94d8db8
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls	0	open=36	total=57	scenario=21	text:56:6e4618d2b94d8db8
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	0	open=6	total=19	scenario=13	text:85:4d70a55e9b62e775
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	0	open=6	total=16	scenario=10	text:85:4d70a55e9b62e775
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls	0	open=6	total=16	scenario=10	text:85:4d70a55e9b62e775
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	0	open=32	total=58	scenario=26	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	0	open=32	total=58	scenario=26	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls	0	open=32	total=58	scenario=26	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	0	open=10	total=17	scenario=7	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	0	open=10	total=17	scenario=7	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls	0	open=10	total=17	scenario=7	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	0	open=65	total=225	scenario=160	text:210:52f84d8d33e68e91
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	0	open=65	total=191	scenario=126	text:210:52f84d8d33e68e91
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls	0	open=65	total=191	scenario=126	text:210:52f84d8d33e68e91
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	0	open=75	total=34589	scenario=34514	text:26291:e9e3b49ce92551d5
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	0	open=75	total=34403	scenario=34328	text:26291:e9e3b49ce92551d5
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls	0	open=75	total=34473	scenario=34398	text:26291:e9e3b49ce92551d5
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	0	open=62	total=152	scenario=90	text:220:7baefe7c54887bbd
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	0	open=62	total=121	scenario=59	text:220:7baefe7c54887bbd
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls	0	open=62	total=144	scenario=82	text:220:7baefe7c54887bbd
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	0	open=63	total=124	scenario=61	text:198:0dfc9b6391e54223
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	0	open=63	total=124	scenario=61	text:198:0dfc9b6391e54223
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls	0	open=63	total=124	scenario=61	text:198:0dfc9b6391e54223
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	0	open=4	total=14	scenario=10	text:1132:57e5ce591da1f3e6
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	0	open=4	total=14	scenario=10	text:1132:57e5ce591da1f3e6
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls	0	open=4	total=14	scenario=10	text:1132:57e5ce591da1f3e6
+base	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	0	open=45	total=75	scenario=30	text:58:b62fbe4857ce6709
+hint	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	0	open=45	total=75	scenario=30	text:58:b62fbe4857ce6709
+shared	full-text	test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls	0	open=45	total=75	scenario=30	text:58:b62fbe4857ce6709
+base	full-text	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	0	open=10	total=51	scenario=41	text:708:eb346c73d4cda030
+hint	full-text	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	0	open=10	total=35	scenario=25	text:708:eb346c73d4cda030
+shared	full-text	test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls	0	open=10	total=35	scenario=25	text:708:eb346c73d4cda030
+base	full-text	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	0	open=10	total=51	scenario=41	text:708:eb346c73d4cda030
+hint	full-text	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	0	open=10	total=35	scenario=25	text:708:eb346c73d4cda030
+shared	full-text	test-data/office-interop/litchi-changed/tdf78897-litchi.xls	0	open=10	total=35	scenario=25	text:708:eb346c73d4cda030
+base	full-text	test-data/ole/xls/ComplexFunctionTestCaseData.xls	0	open=46	total=224	scenario=178	text:1867:4d4bc0a60b63e69a
+hint	full-text	test-data/ole/xls/ComplexFunctionTestCaseData.xls	0	open=46	total=196	scenario=150	text:1867:4d4bc0a60b63e69a
+shared	full-text	test-data/ole/xls/ComplexFunctionTestCaseData.xls	0	open=46	total=222	scenario=176	text:1867:4d4bc0a60b63e69a
+base	full-text	test-data/ole/xls/ConditionalFormattingSamples copy.xls	0	open=2099	total=77362	scenario=75263	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+hint	full-text	test-data/ole/xls/ConditionalFormattingSamples copy.xls	0	open=2099	total=69557	scenario=67458	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+shared	full-text	test-data/ole/xls/ConditionalFormattingSamples copy.xls	0	open=2099	total=72763	scenario=70664	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+base	full-text	test-data/ole/xls/ConditionalFormattingSamples.xls	0	open=2099	total=77362	scenario=75263	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+hint	full-text	test-data/ole/xls/ConditionalFormattingSamples.xls	0	open=2099	total=69557	scenario=67458	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+shared	full-text	test-data/ole/xls/ConditionalFormattingSamples.xls	0	open=2099	total=72763	scenario=70664	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+base	full-text	test-data/ole/xls/DateFormats.xls	0	open=10	total=28	scenario=18	text:72:18fa4cb58a27b1bb
+hint	full-text	test-data/ole/xls/DateFormats.xls	0	open=10	total=21	scenario=11	text:72:18fa4cb58a27b1bb
+shared	full-text	test-data/ole/xls/DateFormats.xls	0	open=10	total=21	scenario=11	text:72:18fa4cb58a27b1bb
+base	full-text	test-data/ole/xls/DateTimeToNumberTestCases.xls	0	open=46	total=209	scenario=163	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+hint	full-text	test-data/ole/xls/DateTimeToNumberTestCases.xls	0	open=46	total=181	scenario=135	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+shared	full-text	test-data/ole/xls/DateTimeToNumberTestCases.xls	0	open=46	total=208	scenario=162	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+base	full-text	test-data/ole/xls/FormulaEvalTestData.xls	0	open=93	total=12127	scenario=12034	text:104620:e90f5498cf5a3484
+hint	full-text	test-data/ole/xls/FormulaEvalTestData.xls	0	open=93	total=11481	scenario=11388	text:104620:e90f5498cf5a3484
+shared	full-text	test-data/ole/xls/FormulaEvalTestData.xls	0	open=93	total=11513	scenario=11420	text:104620:e90f5498cf5a3484
+base	full-text	test-data/ole/xls/FormulaRefs.xls	0	open=41	total=140	scenario=99	text:67:3f9e7b14b54972e3
+hint	full-text	test-data/ole/xls/FormulaRefs.xls	0	open=41	total=92	scenario=51	text:67:3f9e7b14b54972e3
+shared	full-text	test-data/ole/xls/FormulaRefs.xls	0	open=41	total=92	scenario=51	text:67:3f9e7b14b54972e3
+base	full-text	test-data/ole/xls/FormulaSheetRange.xls	0	open=6	total=117	scenario=111	text:423:92fe7c9bfcf6578b
+hint	full-text	test-data/ole/xls/FormulaSheetRange.xls	0	open=6	total=51	scenario=45	text:423:92fe7c9bfcf6578b
+shared	full-text	test-data/ole/xls/FormulaSheetRange.xls	0	open=6	total=51	scenario=45	text:423:92fe7c9bfcf6578b
+base	full-text	test-data/ole/xls/HyperlinksOnManySheets.xls	0	open=6	total=28	scenario=22	text:300:862a1947645ea398
+hint	full-text	test-data/ole/xls/HyperlinksOnManySheets.xls	0	open=6	total=20	scenario=14	text:300:862a1947645ea398
+shared	full-text	test-data/ole/xls/HyperlinksOnManySheets.xls	0	open=6	total=23	scenario=17	text:300:862a1947645ea398
+base	full-text	test-data/ole/xls/Simple.xls	0	open=4	total=16	scenario=12	text:12:b74d15afa1433885
+hint	full-text	test-data/ole/xls/Simple.xls	0	open=4	total=11	scenario=7	text:12:b74d15afa1433885
+shared	full-text	test-data/ole/xls/Simple.xls	0	open=4	total=11	scenario=7	text:12:b74d15afa1433885
+base	full-text	test-data/ole/xls/SimpleChart.xls	0	open=6	total=29	scenario=23	text:154:97d0430cdf24b1ef
+hint	full-text	test-data/ole/xls/SimpleChart.xls	0	open=6	total=19	scenario=13	text:154:97d0430cdf24b1ef
+shared	full-text	test-data/ole/xls/SimpleChart.xls	0	open=6	total=19	scenario=13	text:154:97d0430cdf24b1ef
+base	full-text	test-data/ole/xls/SimpleMacro.xls	0	open=40	total=135	scenario=95	text:27:1c8105104da89452
+hint	full-text	test-data/ole/xls/SimpleMacro.xls	0	open=40	total=88	scenario=48	text:27:1c8105104da89452
+shared	full-text	test-data/ole/xls/SimpleMacro.xls	0	open=40	total=88	scenario=48	text:27:1c8105104da89452
+base	full-text	test-data/ole/xls/SimpleMultiCell.xls	0	open=4	total=16	scenario=12	text:48:fde7c1d7f355ebbb
+hint	full-text	test-data/ole/xls/SimpleMultiCell.xls	0	open=4	total=11	scenario=7	text:48:fde7c1d7f355ebbb
+shared	full-text	test-data/ole/xls/SimpleMultiCell.xls	0	open=4	total=11	scenario=7	text:48:fde7c1d7f355ebbb
+base	full-text	test-data/ole/xls/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+hint	full-text	test-data/ole/xls/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+shared	full-text	test-data/ole/xls/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+base	full-text	test-data/ole/xls/SimpleWithAutofilter copy.xls	0	open=6	total=25	scenario=19	text:26:aed6f7930315c04d
+hint	full-text	test-data/ole/xls/SimpleWithAutofilter copy.xls	0	open=6	total=17	scenario=11	text:26:aed6f7930315c04d
+shared	full-text	test-data/ole/xls/SimpleWithAutofilter copy.xls	0	open=6	total=17	scenario=11	text:26:aed6f7930315c04d
+base	full-text	test-data/ole/xls/SimpleWithAutofilter.xls	0	open=6	total=25	scenario=19	text:26:aed6f7930315c04d
+hint	full-text	test-data/ole/xls/SimpleWithAutofilter.xls	0	open=6	total=17	scenario=11	text:26:aed6f7930315c04d
+shared	full-text	test-data/ole/xls/SimpleWithAutofilter.xls	0	open=6	total=17	scenario=11	text:26:aed6f7930315c04d
+base	full-text	test-data/ole/xls/SimpleWithChoose copy.xls	0	open=4	total=19	scenario=15	text:55:05660469b24874b0
+hint	full-text	test-data/ole/xls/SimpleWithChoose copy.xls	0	open=4	total=13	scenario=9	text:55:05660469b24874b0
+shared	full-text	test-data/ole/xls/SimpleWithChoose copy.xls	0	open=4	total=13	scenario=9	text:55:05660469b24874b0
+base	full-text	test-data/ole/xls/SimpleWithChoose.xls	0	open=4	total=19	scenario=15	text:55:05660469b24874b0
+hint	full-text	test-data/ole/xls/SimpleWithChoose.xls	0	open=4	total=13	scenario=9	text:55:05660469b24874b0
+shared	full-text	test-data/ole/xls/SimpleWithChoose.xls	0	open=4	total=13	scenario=9	text:55:05660469b24874b0
+base	full-text	test-data/ole/xls/SimpleWithColours copy.xls	0	open=73	total=260	scenario=187	text:120:8c051ed52fa9c5a4
+hint	full-text	test-data/ole/xls/SimpleWithColours copy.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+shared	full-text	test-data/ole/xls/SimpleWithColours copy.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+base	full-text	test-data/ole/xls/SimpleWithColours.xls	0	open=73	total=260	scenario=187	text:120:8c051ed52fa9c5a4
+hint	full-text	test-data/ole/xls/SimpleWithColours.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+shared	full-text	test-data/ole/xls/SimpleWithColours.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+base	full-text	test-data/ole/xls/SimpleWithComments copy.xls	0	open=6	total=27	scenario=21	text:22:4ab4cdfa04cfc96e
+hint	full-text	test-data/ole/xls/SimpleWithComments copy.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+shared	full-text	test-data/ole/xls/SimpleWithComments copy.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+base	full-text	test-data/ole/xls/SimpleWithComments.xls	0	open=6	total=27	scenario=21	text:22:4ab4cdfa04cfc96e
+hint	full-text	test-data/ole/xls/SimpleWithComments.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+shared	full-text	test-data/ole/xls/SimpleWithComments.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+base	full-text	test-data/ole/xls/SimpleWithDataFormat copy.xls	0	open=4	total=19	scenario=15	text:7:a7cfa93e812806b3
+hint	full-text	test-data/ole/xls/SimpleWithDataFormat copy.xls	0	open=4	total=13	scenario=9	text:7:a7cfa93e812806b3
+shared	full-text	test-data/ole/xls/SimpleWithDataFormat copy.xls	0	open=4	total=13	scenario=9	text:7:a7cfa93e812806b3
+base	full-text	test-data/ole/xls/SimpleWithDataFormat.xls	0	open=4	total=19	scenario=15	text:7:a7cfa93e812806b3
+hint	full-text	test-data/ole/xls/SimpleWithDataFormat.xls	0	open=4	total=13	scenario=9	text:7:a7cfa93e812806b3
+shared	full-text	test-data/ole/xls/SimpleWithDataFormat.xls	0	open=4	total=13	scenario=9	text:7:a7cfa93e812806b3
+base	full-text	test-data/ole/xls/SimpleWithFormula copy.xls	0	open=4	total=18	scenario=14	text:41:acfd825896d99c8d
+hint	full-text	test-data/ole/xls/SimpleWithFormula copy.xls	0	open=4	total=13	scenario=9	text:41:acfd825896d99c8d
+shared	full-text	test-data/ole/xls/SimpleWithFormula copy.xls	0	open=4	total=13	scenario=9	text:41:acfd825896d99c8d
+base	full-text	test-data/ole/xls/SimpleWithFormula.xls	0	open=4	total=18	scenario=14	text:41:acfd825896d99c8d
+hint	full-text	test-data/ole/xls/SimpleWithFormula.xls	0	open=4	total=13	scenario=9	text:41:acfd825896d99c8d
+shared	full-text	test-data/ole/xls/SimpleWithFormula.xls	0	open=4	total=13	scenario=9	text:41:acfd825896d99c8d
+base	full-text	test-data/ole/xls/SimpleWithImages copy.xls	0	open=113	total=333	scenario=220	text:3:2fd786189d0de06d
+hint	full-text	test-data/ole/xls/SimpleWithImages copy.xls	0	open=113	total=189	scenario=76	text:3:2fd786189d0de06d
+shared	full-text	test-data/ole/xls/SimpleWithImages copy.xls	0	open=113	total=189	scenario=76	text:3:2fd786189d0de06d
+base	full-text	test-data/ole/xls/SimpleWithImages-mac copy.xls	0	open=297	total=805	scenario=508	text:3:2fd786189d0de06d
+hint	full-text	test-data/ole/xls/SimpleWithImages-mac copy.xls	0	open=297	total=470	scenario=173	text:3:2fd786189d0de06d
+shared	full-text	test-data/ole/xls/SimpleWithImages-mac copy.xls	0	open=297	total=470	scenario=173	text:3:2fd786189d0de06d
+base	full-text	test-data/ole/xls/SimpleWithImages-mac.xls	0	open=297	total=805	scenario=508	text:3:2fd786189d0de06d
+hint	full-text	test-data/ole/xls/SimpleWithImages-mac.xls	0	open=297	total=470	scenario=173	text:3:2fd786189d0de06d
+shared	full-text	test-data/ole/xls/SimpleWithImages-mac.xls	0	open=297	total=470	scenario=173	text:3:2fd786189d0de06d
+base	full-text	test-data/ole/xls/SimpleWithImages.xls	0	open=113	total=333	scenario=220	text:3:2fd786189d0de06d
+hint	full-text	test-data/ole/xls/SimpleWithImages.xls	0	open=113	total=189	scenario=76	text:3:2fd786189d0de06d
+shared	full-text	test-data/ole/xls/SimpleWithImages.xls	0	open=113	total=189	scenario=76	text:3:2fd786189d0de06d
+base	full-text	test-data/ole/xls/SimpleWithPageBreaks copy.xls	0	open=4	total=19	scenario=15	text:29:e06b60fb648fe1bd
+hint	full-text	test-data/ole/xls/SimpleWithPageBreaks copy.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+shared	full-text	test-data/ole/xls/SimpleWithPageBreaks copy.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+base	full-text	test-data/ole/xls/SimpleWithPageBreaks.xls	0	open=4	total=19	scenario=15	text:29:e06b60fb648fe1bd
+hint	full-text	test-data/ole/xls/SimpleWithPageBreaks.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+shared	full-text	test-data/ole/xls/SimpleWithPageBreaks.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+base	full-text	test-data/ole/xls/SimpleWithPrintArea copy.xls	0	open=4	total=19	scenario=15	text:23:3c00966405cae6b5
+hint	full-text	test-data/ole/xls/SimpleWithPrintArea copy.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+shared	full-text	test-data/ole/xls/SimpleWithPrintArea copy.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+base	full-text	test-data/ole/xls/SimpleWithPrintArea.xls	0	open=4	total=19	scenario=15	text:23:3c00966405cae6b5
+hint	full-text	test-data/ole/xls/SimpleWithPrintArea.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+shared	full-text	test-data/ole/xls/SimpleWithPrintArea.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+base	full-text	test-data/ole/xls/SimpleWithSkip copy.xls	0	open=4	total=18	scenario=14	text:48:3573f3ff749c9ec5
+hint	full-text	test-data/ole/xls/SimpleWithSkip copy.xls	0	open=4	total=13	scenario=9	text:48:3573f3ff749c9ec5
+shared	full-text	test-data/ole/xls/SimpleWithSkip copy.xls	0	open=4	total=13	scenario=9	text:48:3573f3ff749c9ec5
+base	full-text	test-data/ole/xls/SimpleWithSkip.xls	0	open=4	total=18	scenario=14	text:48:3573f3ff749c9ec5
+hint	full-text	test-data/ole/xls/SimpleWithSkip.xls	0	open=4	total=13	scenario=9	text:48:3573f3ff749c9ec5
+shared	full-text	test-data/ole/xls/SimpleWithSkip.xls	0	open=4	total=13	scenario=9	text:48:3573f3ff749c9ec5
+base	full-text	test-data/ole/xls/SimpleWithStyling copy.xls	0	open=6	total=24	scenario=18	text:42:fd77494a155bdf95
+hint	full-text	test-data/ole/xls/SimpleWithStyling copy.xls	0	open=6	total=17	scenario=11	text:42:fd77494a155bdf95
+shared	full-text	test-data/ole/xls/SimpleWithStyling copy.xls	0	open=6	total=17	scenario=11	text:42:fd77494a155bdf95
+base	full-text	test-data/ole/xls/SimpleWithStyling.xls	0	open=6	total=24	scenario=18	text:42:fd77494a155bdf95
+hint	full-text	test-data/ole/xls/SimpleWithStyling.xls	0	open=6	total=17	scenario=11	text:42:fd77494a155bdf95
+shared	full-text	test-data/ole/xls/SimpleWithStyling.xls	0	open=6	total=17	scenario=11	text:42:fd77494a155bdf95
+base	full-text	test-data/ole/xls/SingleLetterRanges.xls	0	open=10	total=26	scenario=16	text:119:0a7e797fca8636f8
+hint	full-text	test-data/ole/xls/SingleLetterRanges.xls	0	open=10	total=26	scenario=16	text:119:0a7e797fca8636f8
+shared	full-text	test-data/ole/xls/SingleLetterRanges.xls	0	open=10	total=26	scenario=16	text:119:0a7e797fca8636f8
+base	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	0	open=46	total=215	scenario=169	text:1882:a0a0f937c2fbc2a3
+hint	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	0	open=46	total=186	scenario=140	text:1882:a0a0f937c2fbc2a3
+shared	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData.xls	0	open=46	total=213	scenario=167	text:1882:a0a0f937c2fbc2a3
+base	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	0	open=64	total=194	scenario=130	text:1886:6adda479ff750869
+hint	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	0	open=64	total=161	scenario=97	text:1886:6adda479ff750869
+shared	full-text	test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls	0	open=64	total=187	scenario=123	text:1886:6adda479ff750869
+base	full-text	test-data/ole/xls/WithChart.xls	0	open=46	total=136	scenario=90	text:59:904e438c51dec22b
+hint	full-text	test-data/ole/xls/WithChart.xls	0	open=46	total=89	scenario=43	text:59:904e438c51dec22b
+shared	full-text	test-data/ole/xls/WithChart.xls	0	open=46	total=89	scenario=43	text:59:904e438c51dec22b
+base	full-text	test-data/ole/xls/WithCheckBoxes.xls	0	open=62	total=255	scenario=193	text:11:fe2be64996fc6b5b
+hint	full-text	test-data/ole/xls/WithCheckBoxes.xls	0	open=62	total=169	scenario=107	text:11:fe2be64996fc6b5b
+shared	full-text	test-data/ole/xls/WithCheckBoxes.xls	0	open=62	total=169	scenario=107	text:11:fe2be64996fc6b5b
+base	full-text	test-data/ole/xls/WithConditionalFormatting.xls	0	open=45	total=156	scenario=111	text:60:3493f0867b475fe5
+hint	full-text	test-data/ole/xls/WithConditionalFormatting.xls	0	open=45	total=103	scenario=58	text:60:3493f0867b475fe5
+shared	full-text	test-data/ole/xls/WithConditionalFormatting.xls	0	open=45	total=103	scenario=58	text:60:3493f0867b475fe5
+base	full-text	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=55551	scenario=55215	text:107420:c8788833151c9612
+hint	full-text	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=55050	scenario=54714	text:107420:c8788833151c9612
+shared	full-text	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=55050	scenario=54714	text:107420:c8788833151c9612
+base	full-text	test-data/ole/xls/WithEmbeddedObjects.xls	0	open=72	total=290	scenario=218	text:11:e7eee2a7e2b918aa
+hint	full-text	test-data/ole/xls/WithEmbeddedObjects.xls	0	open=72	total=191	scenario=119	text:11:e7eee2a7e2b918aa
+shared	full-text	test-data/ole/xls/WithEmbeddedObjects.xls	0	open=72	total=191	scenario=119	text:11:e7eee2a7e2b918aa
+base	full-text	test-data/ole/xls/WithExtendedStyles.xls	0	open=32	total=165	scenario=133	text:35:8b2c913b03534bdf
+hint	full-text	test-data/ole/xls/WithExtendedStyles.xls	0	open=32	total=114	scenario=82	text:35:8b2c913b03534bdf
+shared	full-text	test-data/ole/xls/WithExtendedStyles.xls	0	open=32	total=114	scenario=82	text:35:8b2c913b03534bdf
+base	full-text	test-data/ole/xls/WithFormattedGraphTitle.xls	0	open=6	total=17	scenario=11	text:45:cf3b29ddc248e2ff
+hint	full-text	test-data/ole/xls/WithFormattedGraphTitle.xls	0	open=6	total=17	scenario=11	text:45:cf3b29ddc248e2ff
+shared	full-text	test-data/ole/xls/WithFormattedGraphTitle.xls	0	open=6	total=17	scenario=11	text:45:cf3b29ddc248e2ff
+base	full-text	test-data/ole/xls/WithHyperlink.xls	0	open=6	total=23	scenario=17	text:93:84298721061fc5d3
+hint	full-text	test-data/ole/xls/WithHyperlink.xls	0	open=6	total=16	scenario=10	text:93:84298721061fc5d3
+shared	full-text	test-data/ole/xls/WithHyperlink.xls	0	open=6	total=16	scenario=10	text:93:84298721061fc5d3
+base	full-text	test-data/ole/xls/WithThreeCharts.xls	0	open=46	total=167	scenario=121	text:128:8a31a6de6501fd91
+hint	full-text	test-data/ole/xls/WithThreeCharts.xls	0	open=46	total=119	scenario=73	text:128:8a31a6de6501fd91
+shared	full-text	test-data/ole/xls/WithThreeCharts.xls	0	open=46	total=119	scenario=73	text:128:8a31a6de6501fd91
+base	full-text	test-data/ole/xls/WithTwoCharts.xls	0	open=46	total=71	scenario=25	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+hint	full-text	test-data/ole/xls/WithTwoCharts.xls	0	open=46	total=71	scenario=25	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+shared	full-text	test-data/ole/xls/WithTwoCharts.xls	0	open=46	total=71	scenario=25	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+base	full-text	test-data/ole/xls/WithTwoHyperLinks.xls	0	open=6	total=25	scenario=19	text:153:d1b9ce44562091bb
+hint	full-text	test-data/ole/xls/WithTwoHyperLinks.xls	0	open=6	total=18	scenario=12	text:153:d1b9ce44562091bb
+shared	full-text	test-data/ole/xls/WithTwoHyperLinks.xls	0	open=6	total=18	scenario=12	text:153:d1b9ce44562091bb
+base	full-text	test-data/ole/xls/empty.xls	0	open=46	total=151	scenario=105	text:3:2fd786189d0de06d
+hint	full-text	test-data/ole/xls/empty.xls	0	open=46	total=96	scenario=50	text:3:2fd786189d0de06d
+shared	full-text	test-data/ole/xls/empty.xls	0	open=46	total=96	scenario=50	text:3:2fd786189d0de06d
+base	full-text	test-data/ole/xls/password.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/ole/xls/password.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/ole/xls/password.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/hpsf/TestUnicode.xls	0	open=4	total=18	scenario=14	text:34:4b88cb2fdde086ab
+hint	full-text	test-data/poi/test-data/hpsf/TestUnicode.xls	0	open=4	total=13	scenario=9	text:34:4b88cb2fdde086ab
+shared	full-text	test-data/poi/test-data/hpsf/TestUnicode.xls	0	open=4	total=13	scenario=9	text:34:4b88cb2fdde086ab
+base	full-text	test-data/poi/test-data/spreadsheet/15228.xls	0	open=86	total=15729	scenario=15643	text:81306:cb6fa85086ddb4ff
+hint	full-text	test-data/poi/test-data/spreadsheet/15228.xls	0	open=86	total=5477	scenario=5391	text:81306:cb6fa85086ddb4ff
+shared	full-text	test-data/poi/test-data/spreadsheet/15228.xls	0	open=86	total=5892	scenario=5806	text:81306:cb6fa85086ddb4ff
+base	full-text	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/1900DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/1904DateWindowing.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/spreadsheet/24207.xls	0	open=4	total=16	scenario=12	text:3:2fd786189d0de06d
+hint	full-text	test-data/poi/test-data/spreadsheet/24207.xls	0	open=4	total=11	scenario=7	text:3:2fd786189d0de06d
+shared	full-text	test-data/poi/test-data/spreadsheet/24207.xls	0	open=4	total=11	scenario=7	text:3:2fd786189d0de06d
+base	full-text	test-data/poi/test-data/spreadsheet/29942.xls	0	open=93	total=815	scenario=722	text:17288:f34f9ed9f4f382c5
+hint	full-text	test-data/poi/test-data/spreadsheet/29942.xls	0	open=93	total=557	scenario=464	text:17288:f34f9ed9f4f382c5
+shared	full-text	test-data/poi/test-data/spreadsheet/29942.xls	0	open=93	total=557	scenario=464	text:17288:f34f9ed9f4f382c5
+base	full-text	test-data/poi/test-data/spreadsheet/35897-type4.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/35897-type4.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/35897-type4.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/spreadsheet/41139.xls	0	open=30	total=219	scenario=189	text:2210:c6885099310d0017
+hint	full-text	test-data/poi/test-data/spreadsheet/41139.xls	0	open=30	total=219	scenario=189	text:2210:c6885099310d0017
+shared	full-text	test-data/poi/test-data/spreadsheet/41139.xls	0	open=30	total=219	scenario=189	text:2210:c6885099310d0017
+base	full-text	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	0	open=22	total=51	scenario=29	text:553:437cd5652badd1f0
+hint	full-text	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	0	open=22	total=51	scenario=29	text:553:437cd5652badd1f0
+shared	full-text	test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls	0	open=22	total=51	scenario=29	text:553:437cd5652badd1f0
+base	full-text	test-data/poi/test-data/spreadsheet/45365-2.xls	0	open=89	total=540	scenario=451	text:67336:987bf86613f15cf0
+hint	full-text	test-data/poi/test-data/spreadsheet/45365-2.xls	0	open=89	total=540	scenario=451	text:67336:987bf86613f15cf0
+shared	full-text	test-data/poi/test-data/spreadsheet/45365-2.xls	0	open=89	total=540	scenario=451	text:67336:987bf86613f15cf0
+base	full-text	test-data/poi/test-data/spreadsheet/45365.xls	0	open=46	total=163	scenario=117	text:14626:d1668438f8ccabc9
+hint	full-text	test-data/poi/test-data/spreadsheet/45365.xls	0	open=46	total=163	scenario=117	text:14626:d1668438f8ccabc9
+shared	full-text	test-data/poi/test-data/spreadsheet/45365.xls	0	open=46	total=163	scenario=117	text:14626:d1668438f8ccabc9
+base	full-text	test-data/poi/test-data/spreadsheet/45492.xls	0	open=10	total=17	scenario=7	text:53:537a48369f214ddd
+hint	full-text	test-data/poi/test-data/spreadsheet/45492.xls	0	open=10	total=17	scenario=7	text:53:537a48369f214ddd
+shared	full-text	test-data/poi/test-data/spreadsheet/45492.xls	0	open=10	total=17	scenario=7	text:53:537a48369f214ddd
+base	full-text	test-data/poi/test-data/spreadsheet/45761.xls	0	open=32	total=157	scenario=125	text:27:174598fd401b2003
+hint	full-text	test-data/poi/test-data/spreadsheet/45761.xls	0	open=32	total=106	scenario=74	text:27:174598fd401b2003
+shared	full-text	test-data/poi/test-data/spreadsheet/45761.xls	0	open=32	total=150	scenario=118	text:27:174598fd401b2003
+base	full-text	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	0	open=4	total=9	scenario=5	text:4:1fab9ff103146f23
+hint	full-text	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	0	open=4	total=9	scenario=5	text:4:1fab9ff103146f23
+shared	full-text	test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls	0	open=4	total=9	scenario=5	text:4:1fab9ff103146f23
+base	full-text	test-data/poi/test-data/spreadsheet/48968.xls	0	open=46	total=102	scenario=56	text:432:de278522b7d8a84a
+hint	full-text	test-data/poi/test-data/spreadsheet/48968.xls	0	open=46	total=102	scenario=56	text:432:de278522b7d8a84a
+shared	full-text	test-data/poi/test-data/spreadsheet/48968.xls	0	open=46	total=102	scenario=56	text:432:de278522b7d8a84a
+base	full-text	test-data/poi/test-data/spreadsheet/50939.xls	0	open=272	total=635	scenario=363	text:2013:53261a982147a1a4
+hint	full-text	test-data/poi/test-data/spreadsheet/50939.xls	0	open=272	total=490	scenario=218	text:2013:53261a982147a1a4
+shared	full-text	test-data/poi/test-data/spreadsheet/50939.xls	0	open=272	total=490	scenario=218	text:2013:53261a982147a1a4
+base	full-text	test-data/poi/test-data/spreadsheet/53109.xls	0	open=45	total=133	scenario=88	text:92:8324cdd10980cc3e
+hint	full-text	test-data/poi/test-data/spreadsheet/53109.xls	0	open=45	total=80	scenario=35	text:92:8324cdd10980cc3e
+shared	full-text	test-data/poi/test-data/spreadsheet/53109.xls	0	open=45	total=80	scenario=35	text:92:8324cdd10980cc3e
+base	full-text	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=1671048	scenario=1669938	text:840804:c7338cf3e8fb0004
+hint	full-text	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=1671048	scenario=1669938	text:840804:c7338cf3e8fb0004
+shared	full-text	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=1671048	scenario=1669938	text:840804:c7338cf3e8fb0004
+base	full-text	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	0	open=46	total=142	scenario=96	text:158:68e26b418867a324
+hint	full-text	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	0	open=46	total=86	scenario=40	text:158:68e26b418867a324
+shared	full-text	test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls	0	open=46	total=86	scenario=40	text:158:68e26b418867a324
+base	full-text	test-data/poi/test-data/spreadsheet/57456.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/57456.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/57456.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/spreadsheet/59858.xls	0	open=2916	total=432546	scenario=429630	text:40551:484b1952430d1e31
+hint	full-text	test-data/poi/test-data/spreadsheet/59858.xls	0	open=2916	total=423074	scenario=420158	text:40551:484b1952430d1e31
+shared	full-text	test-data/poi/test-data/spreadsheet/59858.xls	0	open=2916	total=424560	scenario=421644	text:40551:484b1952430d1e31
+base	full-text	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	0	open=2099	total=77362	scenario=75263	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+hint	full-text	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	0	open=2099	total=69557	scenario=67458	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+shared	full-text	test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls	0	open=2099	total=72763	scenario=70664	refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token
+base	full-text	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	0	open=4	total=20	scenario=16	text:3:2fd786189d0de06d
+hint	full-text	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	0	open=4	total=13	scenario=9	text:3:2fd786189d0de06d
+shared	full-text	test-data/poi/test-data/spreadsheet/DBCSHeader.xls	0	open=4	total=13	scenario=9	text:3:2fd786189d0de06d
+base	full-text	test-data/poi/test-data/spreadsheet/DateFormats.xls	0	open=10	total=28	scenario=18	text:72:18fa4cb58a27b1bb
+hint	full-text	test-data/poi/test-data/spreadsheet/DateFormats.xls	0	open=10	total=21	scenario=11	text:72:18fa4cb58a27b1bb
+shared	full-text	test-data/poi/test-data/spreadsheet/DateFormats.xls	0	open=10	total=21	scenario=11	text:72:18fa4cb58a27b1bb
+base	full-text	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	0	open=46	total=262	scenario=216	text:78:7a74e6ce73043694
+hint	full-text	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	0	open=46	total=175	scenario=129	text:78:7a74e6ce73043694
+shared	full-text	test-data/poi/test-data/spreadsheet/DrawingAndComments.xls	0	open=46	total=175	scenario=129	text:78:7a74e6ce73043694
+base	full-text	test-data/poi/test-data/spreadsheet/Formatting.xls	0	open=43	total=149	scenario=106	text:201:e59fa45f7f7b0f64
+hint	full-text	test-data/poi/test-data/spreadsheet/Formatting.xls	0	open=43	total=97	scenario=54	text:201:e59fa45f7f7b0f64
+shared	full-text	test-data/poi/test-data/spreadsheet/Formatting.xls	0	open=43	total=97	scenario=54	text:201:e59fa45f7f7b0f64
+base	full-text	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	0	open=6	total=28	scenario=22	text:300:862a1947645ea398
+hint	full-text	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	0	open=6	total=20	scenario=14	text:300:862a1947645ea398
+shared	full-text	test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls	0	open=6	total=23	scenario=17	text:300:862a1947645ea398
+base	full-text	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	0	open=46	total=218	scenario=172	text:3111:cbf515058b4cf3e4
+hint	full-text	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	0	open=46	total=153	scenario=107	text:3111:cbf515058b4cf3e4
+shared	full-text	test-data/poi/test-data/spreadsheet/MRExtraLines.xls	0	open=46	total=153	scenario=107	text:3111:cbf515058b4cf3e4
+base	full-text	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	0	open=46	total=136	scenario=90	text:1295:9ddbb225d51a4ecf
+hint	full-text	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	0	open=46	total=136	scenario=90	text:1295:9ddbb225d51a4ecf
+shared	full-text	test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls	0	open=46	total=136	scenario=90	text:1295:9ddbb225d51a4ecf
+base	full-text	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls	0	open=NA	total=NA	scenario=NA	ERROR
+base	full-text	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	0	open=44	total=152	scenario=108	text:64:e64bcb149dd7ed23
+hint	full-text	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	0	open=44	total=101	scenario=57	text:64:e64bcb149dd7ed23
+shared	full-text	test-data/poi/test-data/spreadsheet/ShrinkToFit.xls	0	open=44	total=101	scenario=57	text:64:e64bcb149dd7ed23
+base	full-text	test-data/poi/test-data/spreadsheet/Simple.xls	0	open=4	total=16	scenario=12	text:12:b74d15afa1433885
+hint	full-text	test-data/poi/test-data/spreadsheet/Simple.xls	0	open=4	total=11	scenario=7	text:12:b74d15afa1433885
+shared	full-text	test-data/poi/test-data/spreadsheet/Simple.xls	0	open=4	total=11	scenario=7	text:12:b74d15afa1433885
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	0	open=40	total=135	scenario=95	text:27:1c8105104da89452
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	0	open=40	total=88	scenario=48	text:27:1c8105104da89452
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleMacro.xls	0	open=40	total=88	scenario=48	text:27:1c8105104da89452
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls	0	open=46	total=117	scenario=71	text:16:7684f3b8db15e609
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	0	open=73	total=260	scenario=187	text:120:8c051ed52fa9c5a4
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleWithColours.xls	0	open=73	total=193	scenario=120	text:120:8c051ed52fa9c5a4
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	0	open=6	total=27	scenario=21	text:22:4ab4cdfa04cfc96e
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleWithComments.xls	0	open=6	total=19	scenario=13	text:22:4ab4cdfa04cfc96e
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	0	open=4	total=19	scenario=15	text:29:e06b60fb648fe1bd
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls	0	open=4	total=13	scenario=9	text:29:e06b60fb648fe1bd
+base	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	0	open=4	total=19	scenario=15	text:23:3c00966405cae6b5
+hint	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+shared	full-text	test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls	0	open=4	total=13	scenario=9	text:23:3c00966405cae6b5
+base	full-text	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	0	open=6	total=17	scenario=11	text:18:951c005eb8589dca
+hint	full-text	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	0	open=6	total=14	scenario=8	text:18:951c005eb8589dca
+shared	full-text	test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls	0	open=6	total=13	scenario=7	text:18:951c005eb8589dca
+base	full-text	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	0	open=10	total=23	scenario=13	text:6:a85ceb62a75f140d
+hint	full-text	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	0	open=10	total=16	scenario=6	text:6:a85ceb62a75f140d
+shared	full-text	test-data/poi/test-data/spreadsheet/UncalcedRecord.xls	0	open=10	total=16	scenario=6	text:6:a85ceb62a75f140d
+base	full-text	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	0	open=45	total=156	scenario=111	text:60:3493f0867b475fe5
+hint	full-text	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	0	open=45	total=103	scenario=58	text:60:3493f0867b475fe5
+shared	full-text	test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls	0	open=45	total=103	scenario=58	text:60:3493f0867b475fe5
+base	full-text	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	0	open=6	total=25	scenario=19	text:153:d1b9ce44562091bb
+hint	full-text	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	0	open=6	total=18	scenario=12	text:153:d1b9ce44562091bb
+shared	full-text	test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls	0	open=6	total=18	scenario=12	text:153:d1b9ce44562091bb
+base	full-text	test-data/poi/test-data/spreadsheet/XRefCalc.xls	0	open=44	total=97	scenario=53	text:101:9f5b3eb87ee19f32
+hint	full-text	test-data/poi/test-data/spreadsheet/XRefCalc.xls	0	open=44	total=97	scenario=53	text:101:9f5b3eb87ee19f32
+shared	full-text	test-data/poi/test-data/spreadsheet/XRefCalc.xls	0	open=44	total=97	scenario=53	text:101:9f5b3eb87ee19f32
+base	full-text	test-data/poi/test-data/spreadsheet/colwidth.xls	0	open=4	total=16	scenario=12	text:3:2fd786189d0de06d
+hint	full-text	test-data/poi/test-data/spreadsheet/colwidth.xls	0	open=4	total=11	scenario=7	text:3:2fd786189d0de06d
+shared	full-text	test-data/poi/test-data/spreadsheet/colwidth.xls	0	open=4	total=11	scenario=7	text:3:2fd786189d0de06d
+base	full-text	test-data/poi/test-data/spreadsheet/comments.xls	0	open=10	total=37	scenario=27	text:26:b4abdbd503da9dae
+hint	full-text	test-data/poi/test-data/spreadsheet/comments.xls	0	open=10	total=26	scenario=16	text:26:b4abdbd503da9dae
+shared	full-text	test-data/poi/test-data/spreadsheet/comments.xls	0	open=10	total=26	scenario=16	text:26:b4abdbd503da9dae
+base	full-text	test-data/poi/test-data/spreadsheet/duprich1.xls	0	open=10	total=101	scenario=91	text:2392:b0b3f6290212afb2
+hint	full-text	test-data/poi/test-data/spreadsheet/duprich1.xls	0	open=10	total=88	scenario=78	text:2392:b0b3f6290212afb2
+shared	full-text	test-data/poi/test-data/spreadsheet/duprich1.xls	0	open=10	total=88	scenario=78	text:2392:b0b3f6290212afb2
+base	full-text	test-data/poi/test-data/spreadsheet/duprich2.xls	0	open=10	total=31	scenario=21	text:44:bf8391119290dfb0
+hint	full-text	test-data/poi/test-data/spreadsheet/duprich2.xls	0	open=10	total=23	scenario=13	text:44:bf8391119290dfb0
+shared	full-text	test-data/poi/test-data/spreadsheet/duprich2.xls	0	open=10	total=23	scenario=13	text:44:bf8391119290dfb0
+base	full-text	test-data/poi/test-data/spreadsheet/dvEmpty.xls	0	open=39	total=86	scenario=47	text:119:fc22ca74753a962f
+hint	full-text	test-data/poi/test-data/spreadsheet/dvEmpty.xls	0	open=39	total=86	scenario=47	text:119:fc22ca74753a962f
+shared	full-text	test-data/poi/test-data/spreadsheet/dvEmpty.xls	0	open=39	total=86	scenario=47	text:119:fc22ca74753a962f
+base	full-text	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	0	open=40	total=88	scenario=48	text:58:0f9ded863b629d80
+hint	full-text	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	0	open=40	total=88	scenario=48	text:58:0f9ded863b629d80
+shared	full-text	test-data/poi/test-data/spreadsheet/externalFunctionExample.xls	0	open=40	total=88	scenario=48	text:58:0f9ded863b629d80
+base	full-text	test-data/poi/test-data/spreadsheet/external_name.xls	0	open=73	total=1551	scenario=1478	text:28131:ef628ef9a2b5a99c
+hint	full-text	test-data/poi/test-data/spreadsheet/external_name.xls	0	open=73	total=1315	scenario=1242	text:28131:ef628ef9a2b5a99c
+shared	full-text	test-data/poi/test-data/spreadsheet/external_name.xls	0	open=73	total=1315	scenario=1242	text:28131:ef628ef9a2b5a99c
+base	full-text	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+hint	full-text	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+shared	full-text	test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+base	full-text	test-data/poi/test-data/spreadsheet/named-cell-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+hint	full-text	test-data/poi/test-data/spreadsheet/named-cell-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+shared	full-text	test-data/poi/test-data/spreadsheet/named-cell-test.xls	0	open=32	total=59	scenario=27	refused:source XLS parse error: Invalid record 0x0006: Formula flags contain reserved bits
+base	full-text	test-data/poi/test-data/spreadsheet/namedinput.xls	0	open=4	total=16	scenario=12	text:3:2fd786189d0de06d
+hint	full-text	test-data/poi/test-data/spreadsheet/namedinput.xls	0	open=4	total=10	scenario=6	text:3:2fd786189d0de06d
+shared	full-text	test-data/poi/test-data/spreadsheet/namedinput.xls	0	open=4	total=10	scenario=6	text:3:2fd786189d0de06d
+base	full-text	test-data/poi/test-data/spreadsheet/testNames.xls	0	open=42	total=94	scenario=52	text:86:f647ca4a6bc56768
+hint	full-text	test-data/poi/test-data/spreadsheet/testNames.xls	0	open=42	total=94	scenario=52	text:86:f647ca4a6bc56768
+shared	full-text	test-data/poi/test-data/spreadsheet/testNames.xls	0	open=42	total=94	scenario=52	text:86:f647ca4a6bc56768
+base	full-text	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	0	open=10	total=29	scenario=19	text:26:6005310cf76e0b91
+hint	full-text	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	0	open=10	total=21	scenario=11	text:26:6005310cf76e0b91
+shared	full-text	test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls	0	open=10	total=21	scenario=11	text:26:6005310cf76e0b91
+base	full-text	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	0	open=NA	total=NA	scenario=NA	ERROR
+hint	full-text	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	0	open=NA	total=NA	scenario=NA	ERROR
+shared	full-text	test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls	0	open=NA	total=NA	scenario=NA	ERROR

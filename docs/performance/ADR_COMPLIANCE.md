@@ -1,5 +1,39 @@
 # Performance optimization ADR-compliance matrix
 
+## 0641 — a second validating instantiation, not a second validator
+
+The compliance argument is structural rather than testimonial: **no check was
+rewritten**. Every refusal the measure path can produce is produced by the same
+function the materializing parse calls — one `cell_head` for the fixed-width
+kinds, one `string_record_parts` for `Label`, one `frame_record` and
+`check_token_stream` for `Formula` — so ADR 0005's mandatory validation is met by
+construction, not by a promise that two copies agree, and the corpus differential
+over 67,422 records with 142 refusals is the audit rather than the argument. Two
+divergences exist and both are stated rather than absorbed. First,
+`Ancillary::new`'s `Error::Allocation("retaining Formula RgbExtra")` is
+unreachable on the measure path, because that path makes no reservation; it stays
+reachable, in the same position and with the same text, on the materializing
+path, and it needs an 8,224-byte allocation to fail. This is exactly the
+disposition change 0576 recorded for `cannot allocate shared string characters`,
+and it is the only error whose reachability moves. Second, the UTF-16 refusal is
+*decided* by `char::decode_utf16` and *constructed* by re-running
+`parse_string_record`, so `String::from_utf16`'s wording — the trap 0576 named —
+cannot leak into a `DecodeUtf16Error` message; a test asserts the exact string
+and asserts the absence of the other, and a mutation confirms it. The XF index of
+every record is still validated in the position `accept` validated it, whether or
+not the sink keeps the cell, and a test pins that a reserved style-XF slot on a
+cell no query asked for is still refused. ADR 0003's bounded resources are
+strengthened, not relaxed: the change only removes allocations. ADR 0006 is
+untouched — no execution context, worker pool, ambient I/O or lock is added, and
+the chain hint is a stack value that borrows its reader, so change 0579's three
+properties (it cannot cross readers, cannot cross streams, cannot move a read
+backwards) hold unchanged for the second position exactly as for the first.
+`#![forbid(unsafe_code)]` is unchanged and this change adds no `unsafe` anywhere,
+test code included. No public API, typed error, limit, fence or output byte
+changes; no ADR is amended and no ADR clarification is proposed.
+[Change 0641](0641-xls-scan-measure-only-cells-and-sheet-hint.md);
+`performance_claim: none`.
+
 ## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
 
 Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).

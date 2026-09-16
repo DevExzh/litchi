@@ -1,0 +1,10 @@
+callgrind isolation pairs (samples 2 and 12, differenced, /10): instructions per operation
+scenario                         before          after     delta
+54016-one-cell                 18587922       16206514   -12.81%
+54016-second-cell              31806392       27031160   -15.01%
+flagship-one-cell               2760177        2722473    -1.37%
+customviews-one-cell            1696209        1599314    -5.71%
+15228-one-cell                  3811712        2887629   -24.24%
+15228-second-cell               6682372        4815914   -27.93%
+15228-all-cells                32896484       32782851    -0.35%
+15228-full-text                76284529       76388454     0.14%

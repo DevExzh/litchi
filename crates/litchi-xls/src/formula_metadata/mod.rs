@@ -18,7 +18,7 @@ mod tests;
 pub use model::{Defect, Metadata};
 pub use shared::{Cell, Owner, Range};
 
-pub(crate) use codec::{parse_record, parse_record_preserving};
+pub(crate) use codec::{measure_record, parse_record, parse_record_preserving};
 pub(crate) use extra::{
     FormulaExtraKind, formula_payload_parts, scan_list_extra_kinds, validate_formula_extra,
 };

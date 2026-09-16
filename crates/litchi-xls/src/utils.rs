@@ -48,8 +48,17 @@ pub(crate) fn parse_short_string(data: &[u8], _encoding: &Encoding) -> Result<St
     }
 }
 
-/// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
-pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<String> {
+/// Frame a BIFF8 `XLUnicodeString` with a 16-bit character count.
+///
+/// Every check that stands between a payload and its characters lives here:
+/// the header length, the declared character count, the `fHighByte` flag and
+/// the byte extent the count implies. It returns the character bytes and the
+/// flag rather than a `String`, so that the decoding consumer
+/// ([`parse_string_record`]) and the measuring consumer
+/// ([`measure_string_record`]) share **one** implementation of the framing and
+/// cannot drift apart in which inputs they refuse, in what order, or with what
+/// message.
+fn string_record_parts(data: &[u8]) -> Result<(&[u8], bool)> {
     if data.len() < 3 {
         return Err(Error::InvalidLength {
             expected: 3,
@@ -73,7 +82,12 @@ pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<S
         });
     }
 
-    let string_data = &data[offset..offset + byte_len];
+    Ok((&data[offset..offset + byte_len], high_byte))
+}
+
+/// Parse a BIFF8 `XLUnicodeString` with a 16-bit character count.
+pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<String> {
+    let (string_data, high_byte) = string_record_parts(data)?;
 
     if high_byte {
         let utf16_data: Vec<u16> = string_data
@@ -89,6 +103,43 @@ pub(crate) fn parse_string_record(data: &[u8], _encoding: &Encoding) -> Result<S
         // does not apply to this BIFF8 structure.
         Ok(string_data.iter().map(|&byte| byte as char).collect())
     }
+}
+
+/// Run every check [`parse_string_record`] runs, without building the `String`.
+///
+/// This is change 0576's `MeasuredText` pattern applied to a `Label` cell: the
+/// framing is the shared [`string_record_parts`], and the only validation the
+/// decode itself performs — UTF-16 well-formedness — is decided here as a
+/// boolean by `char::decode_utf16`, which allocates nothing. `String::from_utf16`
+/// is `decode_utf16(..).collect::<Result<_, _>>()`, so it fails on exactly the
+/// inputs on which that iterator yields an error, and both short-circuit at the
+/// first one.
+///
+/// When the boolean says malformed, the refusal is **not** reconstructed here.
+/// The cold path re-runs [`parse_string_record`], so the `Error::Encoding`
+/// message is produced by the identical code, from the identical
+/// `FromUtf16Error`, and stays byte-for-byte what it was. Cost on that path does
+/// not matter: it is reached only by an input that is about to be refused.
+///
+/// The compressed branch performs no validation at all — every byte maps to
+/// `U+00xx` — so there is nothing left to do once the framing has been checked.
+pub(crate) fn measure_string_record(data: &[u8], encoding: &Encoding) -> Result<()> {
+    let (string_data, high_byte) = string_record_parts(data)?;
+
+    if high_byte
+        && char::decode_utf16(
+            string_data
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+        )
+        .any(|unit| unit.is_err())
+    {
+        return parse_string_record(data, encoding).map(|_text| ());
+    }
+
+    Ok(())
 }
 
 /// `fHighByte` option bit of an `XLUnicodeString` (MS-XLS 2.5.294).

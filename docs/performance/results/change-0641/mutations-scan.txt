@@ -1,0 +1,4 @@
+N1 the position peek reads the XF index where the column is    caught by 10 test(s): cached_formula_string_with_multiple_continues_matches_eager_value, date_fixture_matches_eager_date_values, duplicate_cached_formula_keeps_the_latest_value_like_eager_workbook, every_cell_the_walk_reports_is_still_found_by_a_query
+N2 accept_measured skips the XF validation                     caught by 1 test(s): a_query_refuses_a_bad_cell_format_it_is_not_looking_for
+N3 the measure path skips validation entirely                  caught by 1 test(s): the_whole_sheet_walk_refuses_what_a_selected_cell_query_refuses
+N4 the worksheet chain hint is shared with the shared-string resolver SURVIVED

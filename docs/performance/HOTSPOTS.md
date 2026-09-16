@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0641 — the XLS query hotspot is the cell record itself, and the corpus mix says which part
+
+Change 0587's item XLS-5 named `drop_in_place<CellRecord>` at 2.05% of the
+`54016.xls` one-cell query and left the corpus `Formula`/`Label` mix as
+**unknown**, because change 0584's census counted `LabelSst` only. The census is
+now taken — 126 fixtures, 372 worksheet substreams, 106,689 records, **127,072
+cell values** — and it moves the hotspot twice. First, `54016.xls` carries
+**zero `Formula` and zero `Label` records**: its 37,929 records are `LabelSst`,
+`Blank`, `MulBlank` and `RK`, so the 2.05% the survey priced is the 88-byte
+enum's *drop glue and moves*, not heap frees, and a measure-only path limited to
+the two allocating kinds would have saved nothing on the fixture that motivated
+it. Second, the allocating kinds are concentrated somewhere else entirely:
+`Label` exists **6 times in the whole corpus** (42 bytes, two fixtures), while
+`Formula` is 14,854 records carrying 224,754 `Rgce` bytes, of which
+**`15228.xls` alone carries 175,054** across 11,240 records — 73.8% of that
+fixture's worksheet records, a formula density no fixture in the program's
+measured set had. Routing all seven single-cell kinds through a measure-only
+instantiation takes `CellRecord::parse` from 893,405 Ir to **40** on the
+`54016.xls` query and `drop_in_place<CellRecord>` from 662,150 to 158,831; on
+`15228.xls` it takes `parse_record_with` to **0** and `malloc` plus `free` from
+234,890 to 17,551. Natively that is **−27.99%** and **−36.73%** cycles on the two
+one-cell queries and −31.70% / −41.00% on the two-query scenario, against an A/A
+floor of at most 2.24%. What remains on this axis is `MulRk` and `MulBlank`:
+**60,575 of the corpus's 127,072 cell values, 47.7%**, each still built and
+dropped as an 88-byte record by a query that does not want it — no heap traffic,
+only the move and the drop glue. That is the named next item.
+[Change and limitations](0641-xls-scan-measure-only-cells-and-sheet-hint.md);
+[evidence](results/change-0641/README.md).
+
 ## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
 
 Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).

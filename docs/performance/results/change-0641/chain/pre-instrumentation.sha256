@@ -1,0 +1,4 @@
+b3f644db05f89ec53375f80a2780aeec48c7a30eef433548969fad39930537b8  crates/litchi-cfb/src/shared.rs
+384b416d32357ff24d1d6e14b048631210777277485c6aaa08193ec85bdbddf4  crates/litchi-xls/src/workbook/source.rs
+99dea709bb6bc0bc6afd224f9052da97640ba1c39eeceb565e93bbb41307fd55  crates/litchi-xls/src/lib.rs
+a823a1a908782c44213619edfbb3bd0d9b9594ae5570a54dd0dc62a4f93d88fe  crates/litchi-cfb/src/lib.rs
