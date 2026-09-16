@@ -407,12 +407,6 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
     (budget, cancellation_source, context)
 }
 
-fn managed_publication_memory(payload_bytes: u64) -> u64 {
-    payload_bytes
-        .checked_add(MANAGED_PUBLICATION_SCRATCH_BYTES)
-        .expect("managed publication memory fits in u64")
-}
-
 fn with_style_and_theme(bytes: &[u8]) -> Vec<u8> {
     let mut package = OpcPackage::from_bytes(bytes).unwrap();
     package
