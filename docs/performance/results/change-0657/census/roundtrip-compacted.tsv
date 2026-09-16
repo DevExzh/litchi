@@ -1,0 +1,11 @@
+path	verdict	src_members	out_members	identical	differs	added	removed	diff	expected_only
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/NewlineInFormulas.xlsx	publish-failed:OPC package error: source-backed OPC Part overlay is unavailable: existing relationships member 'xl/_rels/workbook.xml.rels' is not canonical	-	-	-	-	-	-	-	-
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/SimpleMultiCell.xlsx	ok	11	11	9	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/Sparklines.xlsx	ok	11	11	9	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/chart_hyperlink.xlsx	ok	25	25	23	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/condFormat_cellis.xlsx	ok	12	12	10	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/condformat_theme_color.xlsx	ok	10	10	8	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/decimal-format.xlsx	ok	12	12	10	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/empty.xlsx	publish-failed:OPC package error: XML publication rejected for '/xl/workbook.xml': noncompact XML FormattingWhitespace at byte 939	-	-	-	-	-	-	-	-
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/named-ranges-global.xlsx	ok	9	9	7	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes
+/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/probe-after/compacted/noSharedStringTable.xlsx	ok	9	9	7	2	0	0	xl/workbook.xml,xl/worksheets/sheet1.xml	yes

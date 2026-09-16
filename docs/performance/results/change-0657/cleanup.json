@@ -1,0 +1,34 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0657",
+  "retained_in_repository": [
+    "docs/performance/0657-xlsx-value-editor-d4-admission.md",
+    "docs/performance/results/change-0657/ (every file the README cites: the three census legs, the republication and re-open evidence, both measurement rounds' summary and Round A's 256 raw leg files, the callgrind counts, the probe source, gates.txt, decision.json, log-sections.md)",
+    "crates/litchi-xlsx/src/cell_values/{validation.rs,snapshot.rs,source.rs,mod.rs,admission_tests.rs,validation_borrow_tests.rs,shared_traversal_tests.rs}",
+    "crates/litchi-xlsx/src/raw/worksheet/{mod.rs,model.rs}, crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs",
+    "crates/litchi-xlsx/src/row_visibility/{rewrite.rs,mod.rs}",
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs and its planning_error_order.rs and public_exact_output.rs modules",
+    "crates/litchi-opc/src/source_backed.rs, crates/litchi-opc/tests/source_xml_publication.rs",
+    "tools/perf-baseline/src/{lib.rs,producer_shape.rs}"
+  ],
+  "removed_after_the_evidence_was_copied": [
+    "/home/zhuhe/code/litchi-worktrees/targets/0657-probe-before and 0657-probe-after (Cargo build output for the first two census legs; their TSVs are in the packet and their binary SHA-256s in the README)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0657-bench-before, 0657-bench-after and 0657-probe-after2 (Cargo build output for superseded measurement rounds)",
+    "/home/zhuhe/code/litchi-worktrees/targets/0657-bench-before2 and 0657-bench-after3 (Cargo build output for the quoted measurement round, deleted after the record was committed)",
+    "the three staged harness binaries in the session scratchpad (177 MiB; their SHA-256s are recorded in bench/binaries.sha256 and in the README)",
+    "the superseded first measurement round's leg files and summary, taken at base 70d7768cc before the wave's merges moved the base",
+    "the whitespace-compacted scratch corpus and every archive published from it or from the real fixtures (derived by a documented transformation from fixtures that are in the repository; the TSVs they produced are retained)",
+    "the raw callgrind profiles, after the cited lines were extracted into bench/counts.txt",
+    "128 zero-byte .err files that the leg runner wrote beside each duration file",
+    "the session scratchpad directory agents/0657 (probe work dirs, gate logs, intermediate record drafts)",
+    "/home/zhuhe/code/litchi-worktrees/0657 (the working worktree; the branch is kept)"
+  ],
+  "kept_for_a_following_batch": [],
+  "notes": [
+    "No worktree, Cargo target directory or fixture copy was ever placed on the tmpfs; the scratchpad held probe outputs, gate logs and, briefly, the three staged binaries, which were deleted once their SHA-256s were recorded.",
+    "The repository ignores *.log everywhere, so every retained log is named .txt, and git ls-files was checked against the README's contents table.",
+    "Two 1 GiB Cargo target directories were left alive while the measurement agent still needed them and were deleted immediately after this record was committed; the host's root filesystem was at 91% at that point, which is why the sweep was run as soon as the evidence was copied rather than at the end of the turn.",
+    "The branch perf/0657-xlsx-value-editor-d4-admission is kept for the coordinator to merge. Its base is ceb0571a8; changes 0659 and 0653 merged after it and are not in it."
+  ]
+}

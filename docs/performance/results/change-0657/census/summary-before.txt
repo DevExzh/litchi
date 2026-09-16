@@ -1,0 +1,87 @@
+change 0657 - XLSX value-only editor admission census, BEFORE leg (base 70d7768cc)
+fixtures: 95 .xlsx - 93 under test-data/ooxml/xlsx + 2 under test-data/office-interop
+probe: xlsx-admission-probe (change-0602 probe + new `roundtrip` and `parts` subcommands)
+all measured processes pinned with `taskset -c 12`
+
+== HEADLINE ==
+Not one of the 95 packages is admitted by either door, and not one completes a
+cycle. 93 of 95 are refused by a single gate - validate_package_relationships
+(crates/litchi-xlsx/src/cell_values/snapshot.rs:1952-1979), which accepts only
+officeDocument / strictOfficeDocument / digital-signature-origin at the package
+level. The remaining 2 never reach the editor: the XLSX reader rejects them.
+No refusal of any other family appears anywhere in the census.
+
+== census-before.tsv - first worksheet of each package ==
+total packages                            : 95
+readable by SourceBackedWorkbook::open    : 93
+  reader-level failures (never reach door): 2
+    duplicate-defined-names.xlsx
+    shared-strings-malformed-count.xlsx
+admitted, single-sheet door (snapshot)    : 0   refused: 93  (all 93 readable, all at the package-relationship gate)
+admitted, multi-sheet door (edit_many)    : 0   refused: 84  (+9 readable packages whose first sheet stores no value cell, so no set could be staged; their snapshot door is refused at the same gate)
+complete plan+commit+publish cycle        : 0   failed: 95
+
+== roundtrip-before.tsv - set+commit+publish to a real file, then member-by-member zip diff ==
+ok       : 0
+refused  : 84   (package-relationship gate, before any part is rewritten)
+error    : 11
+     9  error:no stored value cell
+     1  error:invalid XLSX structure: invalid worksheet dimension '1:5': invalid A1 range '1:5': invalid or out-of-grid A1 cell reference '1'
+     1  error:invalid XLSX structure: shared-string count exceeds 2147483647
+No package published, so the member-by-member diff columns are empty for the
+whole before leg. The diff machinery is exercised and ready for the after leg.
+
+== parts-before.tsv - EVERY worksheet part of EVERY package ==
+worksheet parts examined                  : 208 across 95 packages
+parts admitted by edit_many               : 0
+parts refused (all at the pkg-rel gate)   : 154
+parts with no stored value cell to target : 54  (in packages whose gate already refuses them)
+packages with EVERY sheet admitted        : 0
+packages with SOME sheet admitted         : 0
+The gate is package-scoped and fires before sheet selection, so admission does
+not vary by worksheet part anywhere in this corpus.
+
+== refusal-message frequency, VERBATIM as emitted (multi-sheet door, falling back
+   to the snapshot door for the 9 packages with no cell to stage) ==
+CAVEAT: the message names whichever refused relationship a hash-seeded HashMap
+walk reaches first (snapshot.rs:1961 iterates Relationships::iter, whose
+HashMap order is seeded per collection - the file's own doc comment at line
+~1980 records this). Five consecutive runs of the same binary on
+office-interop/libreoffice-resaved/date-autofilter-litchi.xlsx emitted
+extended-properties, extended-properties, core-properties, core-properties,
+core-properties. This table is therefore RUN-DEPENDENT; the next one is not.
+  50  invalid XLSX structure: value-only edits refuse package relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties'
+  39  invalid XLSX structure: value-only edits refuse package relationship 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties'
+   2  invalid XLSX structure: value-only edits refuse package relationship 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail'
+   1  invalid XLSX structure: value-only edits refuse package relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties'
+   1  invalid XLSX structure: value-only edits refuse package relationship 'http://schemas.dell.com/ddp/2016/relationships/metadataFile'
+
+== refusal-message frequency, DETERMINISTIC - package-relationship messages
+   collapsed to the full sorted set of refused types, read structurally from
+   each package's _rels/.rels (local names only; see refusals-before.tsv for
+   the full URIs) ==
+  82  invalid XLSX structure: value-only edits refuse package relationship(s) {extended-properties, core-properties}
+   5  invalid XLSX structure: value-only edits refuse package relationship(s) {custom-properties, extended-properties, core-properties}
+   3  invalid XLSX structure: value-only edits refuse package relationship(s) {extended-properties, core-properties, thumbnail}
+   2  invalid XLSX structure: value-only edits refuse package relationship(s) {extendedProperties, core-properties}
+   1  invalid XLSX structure: value-only edits refuse package relationship(s) {hmacFile, metadataFile, xenFile, extended-properties, core-properties}
+
+Distinct refused relationship types across the corpus, by package count:
+  92  http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties
+  91  http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties
+   5  http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties
+   3  http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail
+   2  http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperties
+   1  http://schemas.dell.com/ddp/2016/relationships/hmacFile
+   1  http://schemas.dell.com/ddp/2016/relationships/metadataFile
+   1  http://schemas.dell.com/ddp/2016/relationships/xenFile
+   1  http://schemas.openxmlformats.org/officedocument/2006/relationships/metadata/core-properties
+
+-- addendum (after-leg run) --
+roundtrip-before.tsv was regenerated with the extended probe (columns
+identical/differs/added/removed/expected_only, and stage-split verdicts
+refused / commit-failed / publish-failed / error) so the two legs are
+column-comparable. The before-leg tallies are unchanged: 0 ok, 84 refused at
+the door, 11 error (9 no value cell, 2 reader-level failures). The before
+probe binary was rebuilt from the same source as the after probe; its sha256
+is now 49d8d9d0037556d2b9535ee9c2e126b3e6f6c8a88fe025e4a0e6c115f35e8260.

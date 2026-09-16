@@ -1,0 +1,15 @@
+change 0657 - member-diff violations, AFTER-2 leg (real fixtures)
+
+Expectation: a published package may differ only in the edited worksheet part
+and xl/workbook.xml, and - only when the source carried xl/calcChain.xml - may
+drop that part and change xl/_rels/workbook.xml.rels. Nothing may be added.
+
+9 of 95 packages published; 9 checked.
+
+VIOLATIONS: none. Every published package differed only in xl/workbook.xml
+and its edited worksheet part; 0 added, 0 removed.
+
+NOT EXERCISED: no published package carries xl/calcChain.xml, so the
+calcChain-removal branch of the expectation is still untested. The only
+admitted package with a calcChain is NewlineInFormulas.xlsx, which remains
+the one publication failure (non-canonical xl/_rels/workbook.xml.rels).

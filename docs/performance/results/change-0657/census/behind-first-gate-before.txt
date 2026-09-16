@@ -1,0 +1,32 @@
+change 0657 - what lies BEHIND the package-relationship gate (scratch experiment, base 70d7768cc)
+
+Method: each of the 95 fixtures was copied with its package _rels/.rels reduced
+to the single officeDocument relationship, so validate_package_relationships
+cannot fire, then re-censused with the same probe binary. These copies are
+scratch only and were deleted; the table below is the retained result.
+
+Result: STILL 0 of 95 admitted and 0 of 95 complete a cycle. Widening the
+package-relationship gate alone admits nothing - the workbook-XML gates behind
+it refuse every readable package.
+
+== second-gate refusal messages, multi-sheet door, verbatim, by count ==
+     51 invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'workbook'
+     15 invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'
+      9 no-target
+      6 invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'workbookProtection'
+      4 invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'extLst'
+      3 invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'definedNames'
+      2 -
+      1 invalid XLSX structure: value-only edits refuse worksheet relationships
+      1 invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/xmlMaps'
+      1 invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'phoneticPr'
+      1 invalid XLSX structure: value-only edits refuse attribute 'mc:Ignorable' on 'worksheet'
+      1 invalid XLSX structure: value-only edits refuse attribute 'dateCompatibility' on 'workbookPr'
+
+== collapsed families ==
+     53 invalid XLSX structure: value-only edits refuse attribute 'X' on 'X'
+     16 invalid XLSX structure: value-only edits refuse workbook relationship 'X'
+     14 invalid XLSX structure: value-only edits refuse dependency-bearing or unknown element 'X'
+      9 no-target
+      2 -
+      1 invalid XLSX structure: value-only edits refuse worksheet relationships

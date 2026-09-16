@@ -1,0 +1,10 @@
+path	part	len_before	len_after	common_prefix	common_suffix	middle_ranges	before_middle	after_middle
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/SimpleMultiCell.xlsx	xl/worksheets/sheet1.xml	1079	1084	446	632	1	1	424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/Sparklines.xlsx	xl/worksheets/sheet1.xml	2912	2917	1010	1902	1		24242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/chart_hyperlink.xlsx	xl/worksheets/sheet1.xml	1107	1112	660	446	1	1	424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/condFormat_cellis.xlsx	xl/worksheets/sheet1.xml	1622	1627	652	970	1		42424
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/condformat_theme_color.xlsx	xl/worksheets/sheet1.xml	2224	2229	642	1581	1	1	424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/decimal-format.xlsx	xl/worksheets/sheet1.xml	1045	1046	773	251	1	r="A1" s="1"><v>1.005	s="1" r="A1"><v>424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/empty.xlsx	xl/worksheets/sheet1.xml	1772	1770	1039	709	1	r="A1" s="0" t="n"><v>11	s="0" r="A1"><v>424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/named-ranges-global.xlsx	xl/worksheets/sheet1.xml	2725	2724	1077	1625	1	r="A1" s="0" t="n"><v>1	s="0" r="A1"><v>424242
+/home/zhuhe/code/litchi-worktrees/0657/test-data/ooxml/xlsx/noSharedStringTable.xlsx	xl/worksheets/sheet1.xml	882	883	705	156	1	r="A1" s="1"><v>38819	s="1" r="A1"><v>424242

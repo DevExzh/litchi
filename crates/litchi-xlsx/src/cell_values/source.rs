@@ -756,6 +756,7 @@ impl SourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
+                    self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
                 CellValueEdit::SetFormula { formula, .. } => {
@@ -766,6 +767,7 @@ impl SourceEdit {
                     })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.require_formula_target(address)?;
+                    self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
                 CellValueEdit::SetSharedFormula { formula, .. } => {
@@ -776,6 +778,7 @@ impl SourceEdit {
                     })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
+                    self.before.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
                 CellValueEdit::Clear { .. } => {
@@ -787,6 +790,7 @@ impl SourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
+                    self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
                 CellValueEdit::Remove { .. } => {
@@ -798,6 +802,7 @@ impl SourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
+                    self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Remove
                 },
             };
@@ -1024,6 +1029,7 @@ impl MultiSourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
+                    snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
                 CellValueEdit::SetFormula { formula, .. } => {
@@ -1036,6 +1042,7 @@ impl MultiSourceEdit {
                     })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.require_formula_target(address)?;
+                    snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
                 CellValueEdit::SetSharedFormula { formula, .. } => {
@@ -1048,6 +1055,7 @@ impl MultiSourceEdit {
                     })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
+                    snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
                 CellValueEdit::Clear { .. } => {
@@ -1061,6 +1069,7 @@ impl MultiSourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
+                    snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
                 CellValueEdit::Remove { .. } => {
@@ -1074,6 +1083,7 @@ impl MultiSourceEdit {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
+                    snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Remove
                 },
             };

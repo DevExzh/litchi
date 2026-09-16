@@ -1,0 +1,82 @@
+change 0657 - XLSX value-only editor admission census, AFTER-2 leg
+after:  /home/zhuhe/code/litchi-worktrees/0657 @ 4bf4ca8e4 + working tree
+        (rebased onto ab07e2a47 = change 0654; replacement audit now uses
+         verify_source semantics at the seven paired call sites)
+before: /home/zhuhe/code/litchi-worktrees/before-70d7768cc @ 70d7768cc
+95 fixtures, verified byte-identical across checkouts. taskset -c 12 throughout.
+
+== HEADLINE ==
+Publication now works. The cycle count moves for the first time in this change.
+  complete publish cycle : 0/95 (before) -> 0/95 (after-1) -> 9/95 (after-2)
+  snapshot door          : 0 -> 3 -> 3     (unchanged from after-1)
+  edit_many door         : 0 -> 10 -> 10   (unchanged from after-1)
+  worksheet parts        : 0/208 -> 15/208 -> 15/208 (unchanged)
+Admission is exactly as after-1, as predicted. 9 of the 10 admitted packages
+now publish; the 10th (NewlineInFormulas.xlsx) still fails, on a non-canonical
+xl/_rels/workbook.xml.rels, which is not a compactness problem.
+
+== census-after2.tsv ==
+total packages                          : 95
+reader-level failures                   : 2
+admitted, single-sheet door (snapshot)  : 3
+admitted, multi-sheet door (edit_many)  : 10
+  first sheet stores no value cell      : 9
+complete plan+commit+publish cycle      : 9
+
+== roundtrip-after2.tsv (real fixtures, member columns populated) ==
+refused         : 74
+error           : 11
+ok              : 9
+publish-failed  : 1
+
+publish-failed, verbatim:
+   1  OPC package error: source-backed OPC Part overlay is unavailable: existing relationships member 'xl/_rels/workbook.xml.rels' is not canonical
+
+expected_only among the 9 published : yes=9  no=0
+Every published package: 2 members differ (xl/workbook.xml + its edited
+worksheet part), 0 added, 0 removed, all other members byte-identical.
+NOT EXERCISED: no published package carries xl/calcChain.xml, so the
+calcChain-removal branch of the expectation remains untested.
+
+== parts-after2.tsv ==
+parts examined : 208
+admitted       : 15
+refused        : 139
+no target      : 54
+
+== refusal-message frequency, VERBATIM ==
+CAVEAT: still run-dependent. The workbook-relationship gate (snapshot.rs:1852)
+walks Relationships::iter, a hash-seeded HashMap, so a package carrying both a
+sharedStrings and a pivotCacheDefinition relationship reports whichever is
+reached first. Two runs of THIS binary gave 64/8 and 62/10 for that pair.
+  62  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'
+  10  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition'
+   7  invalid XLSX structure: value-only edits currently require exactly one worksheet
+   2  invalid XLSX structure: value-only edits refuse workbook relationship 'http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings'
+
+== refusal-message frequency, DETERMINISTIC ==
+(workbook-relationship messages collapsed to the full sorted set of
+ value-dependent relationship types read from xl/_rels/workbook.xml.rels)
+  62  invalid XLSX structure: value-only edits refuse workbook relationship(s) {sharedStrings}
+  12  invalid XLSX structure: value-only edits refuse workbook relationship(s) {pivotCacheDefinition, sharedStrings}
+   7  invalid XLSX structure: value-only edits currently require exactly one worksheet
+
+== edited-part-diff2.tsv (REAL fixtures) ==
+packages with exactly one differing middle range : 9 of 9
+All 9 edits landed as a single contiguous byte range inside the worksheet
+part; every other byte is a verbatim copy.
+4 of 9 re-order cell attributes (r/s -> s/r) and 2 of those also drop an
+explicit t="n". Semantically neutral, but not byte-minimal against the source.
+
+== reopen-after2.tsv ==
+published packages reopened with SourceBackedWorkbook::open : 9 of 9
+edited cell reads back as 424242                             : 9 of 9
+stored-extent cell count identical to the source             : 9 of 9
+
+== determinism-after2.tsv ==
+byte-identical published archives across two processes : 5 of 5
+
+== regressions against the after-1 run ==
+None. Admission is identical package-for-package (verified: 0 differences across
+both doors for all 95). Publication strictly improved
+(0 -> 9); no package that published in after-1's scratch corpus fails here.

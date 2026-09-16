@@ -174,19 +174,24 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
             ),
             expected: ExpectedError::Invalid("cell edits refuse unknown cells and cell metadata"),
         },
+        // Change 0657 admitted `cm` and `vm` to the vocabulary, because the
+        // writer preserves every attribute of the cell it re-tags. The
+        // refusal did not disappear: it moved to the gate that owns the
+        // dependency, which is the scalar-cell closure for an in-range index
+        // and the raw parser's own Office limit for an out-of-range one.
         ErrorCase {
-            name: "metadata attribute is refused by value-only validator".into(),
+            name: "metadata attribute is refused by the scalar-cell gate".into(),
             worksheet: worksheet(
-                r#"<sheetData><row r="1"><c r="A1" cm="0"><v>1</v></c></row></sheetData>"#,
+                r#"<sheetData><row r="1"><c r="A1" cm="1"><v>1</v></c></row></sheetData>"#,
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'cm' on 'c'"),
+            expected: ExpectedError::Invalid("cell edits refuse unknown cells and cell metadata"),
         },
         ErrorCase {
-            name: "value metadata attribute is refused by value-only validator".into(),
+            name: "out-of-range value metadata is refused by the raw parser".into(),
             worksheet: worksheet(
                 r#"<sheetData><row r="1"><c r="A1" vm="2147483648"><v>1</v></c></row></sheetData>"#,
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'vm' on 'c'"),
+            expected: ExpectedError::Invalid("value metadata index is outside Office limits"),
         },
         ErrorCase {
             name: "raw unsupported XML entity in scalar".into(),
@@ -197,13 +202,17 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
                 "invalid OOXML structure: unsupported XML entity reference '&missing;'",
             ),
         },
+        // `<mergeCells>` after `<sheetData>` is copied through since change
+        // 0657; the span the rewrite composes is what still holds a name to
+        // the modelled vocabulary, so the late validator refusal now lives
+        // inside a cell record.
         ErrorCase {
             name: "validator rejects late dependency element".into(),
             worksheet: worksheet(
-                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><future/></c></row></sheetData>"#,
             ),
             expected: ExpectedError::Invalid(
-                "value-only edits refuse dependency-bearing or unknown element 'mergeCells'",
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
             ),
         },
         ErrorCase {
@@ -213,19 +222,26 @@ fn raw_and_validator_cases() -> Vec<ErrorCase> {
             ),
             expected: ExpectedError::Invalid("value-only XML mixes SpreadsheetML dialects"),
         },
+        // An unfamiliar attribute on a cell is preserved by the writer and
+        // is admitted since change 0657. A relationship reference inside
+        // `<sheetData>` is not: a removed cell record would take it with it.
         ErrorCase {
-            name: "validator rejects unknown unqualified attribute".into(),
-            worksheet: worksheet(
-                r#"<sheetData><row r="1"><c r="A1" future="1"><v>7</v></c></row></sheetData>"#,
+            name: "validator rejects a relationship reference inside sheetData".into(),
+            worksheet: format!(
+                r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData><row r="1"><c r="A1" r:id="rIdSheet"><v>7</v></c></row></sheetData></worksheet>"#
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+            expected: ExpectedError::Invalid(
+                "value-only edits refuse relationship reference 'r:id' on 'c'",
+            ),
         },
         ErrorCase {
-            name: "validator rejects qualified attribute".into(),
+            name: "validator rejects a relationship reference under any prefix".into(),
             worksheet: format!(
-                r#"<worksheet xmlns="{SML}" xmlns:x="urn:fixture:foreign"><sheetData><row r="1"><c r="A1" x:future="1"><v>7</v></c></row></sheetData></worksheet>"#
+                r#"<worksheet xmlns="{SML}" xmlns:x="urn:fixture:foreign"><sheetData><row r="1"><c r="A1" x:id="1"><v>7</v></c></row></sheetData></worksheet>"#
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'x:future' on 'c'"),
+            expected: ExpectedError::Invalid(
+                "value-only edits refuse relationship reference 'x:id' on 'c'",
+            ),
         },
         ErrorCase {
             name: "validator rejects duplicate attribute".into(),
@@ -294,25 +310,31 @@ fn validator_error_wins_when_raw_error_is_earlier_or_later() {
         .map(|(name, raw_cell)| ErrorCase {
             name: format!("{name} before late validator error"),
             worksheet: worksheet(&format!(
-                r#"<sheetData><row r="1">{raw_cell}<c r="B1" future="1"/></row></sheetData>"#
+                r#"<sheetData><row r="1">{raw_cell}<c r="B1"><future/></c></row></sheetData>"#
             )),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+            expected: ExpectedError::Invalid(
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
+            ),
         })
         .collect::<Vec<_>>();
     cases.extend([
         ErrorCase {
             name: "validator error before later raw cell reference".into(),
             worksheet: worksheet(
-                r#"<sheetData><row r="1"><c r="B1" future="1"/><c r="A2"><v>not-a-number</v></c></row></sheetData>"#,
+                r#"<sheetData><row r="1"><c r="B1"><future/></c><c r="A2"><v>not-a-number</v></c></row></sheetData>"#,
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+            expected: ExpectedError::Invalid(
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
+            ),
         },
         ErrorCase {
             name: "validator error before later raw style".into(),
             worksheet: worksheet(
-                r#"<sheetData><row r="1"><c r="B1" future="1"/><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData>"#,
+                r#"<sheetData><row r="1"><c r="B1"><future/></c><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData>"#,
             ),
-            expected: ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+            expected: ExpectedError::Invalid(
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
+            ),
         },
     ]);
     for case in cases {
@@ -386,10 +408,10 @@ fn full_validation_precedes_mce_preprocessing_and_raw_parsing_errors() {
         ErrorCase {
             name: "late validation error overrides MCE and raw errors".into(),
             worksheet: worksheet(&format!(
-                r#"{marker}<sheetData><row r="1"><c r="A2"><v>1</v></c></row></sheetData><?worksheet-test?><mergeCells/>"#,
+                r#"{marker}<?worksheet-test?><sheetData><row r="1"><c r="A2"><v>1</v></c><c r="B1"><future/></c></row></sheetData>"#,
             )),
             expected: ExpectedError::Invalid(
-                "value-only edits refuse dependency-bearing or unknown element 'mergeCells'",
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
             ),
         },
     ];
@@ -409,8 +431,10 @@ fn later_selected_worksheet_failure_does_not_publish_the_first_snapshot() {
         ),
         (
             "second worksheet validation overrides raw failure",
-            r#"<c r="B1" future="1"/>"#,
-            ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+            r#"<c r="B1"><future/></c>"#,
+            ExpectedError::Invalid(
+                "value-only edits refuse dependency-bearing or unknown element 'future'",
+            ),
         ),
     ] {
         let bad = worksheet(&format!(
@@ -440,7 +464,7 @@ fn later_selected_worksheet_failure_does_not_publish_the_first_snapshot() {
 #[test]
 fn first_error_across_selected_worksheets_follows_workbook_order() {
     let first = worksheet(r#"<sheetData><row r="1"><c r="A2"><v>1</v></c></row></sheetData>"#);
-    let second = worksheet(r#"<sheetData><row r="1"><c r="A1" future="1"/></row></sheetData>"#);
+    let second = worksheet(r#"<sheetData><row r="1"><c r="A1"><future/></c></row></sheetData>"#);
     let bytes = source_with_sheets(&first, &second);
     let source = Arc::new(VersionedSource::new(bytes.clone()));
     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
@@ -464,7 +488,9 @@ fn first_error_across_selected_worksheets_follows_workbook_order() {
     };
     assert_expected_error(
         error,
-        ExpectedError::Invalid("value-only edits refuse attribute 'future' on 'c'"),
+        ExpectedError::Invalid(
+            "value-only edits refuse dependency-bearing or unknown element 'future'",
+        ),
         "second validator independently reachable",
     );
     assert_eq!(source.bytes, bytes);

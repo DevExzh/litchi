@@ -7783,7 +7783,7 @@ impl SourceBackedPackage {
                     &part.content_type,
                 ) {
                     validate_source_part_xml(part.partname.as_str(), original.as_bytes())?;
-                    validate_overlay_xml(part.partname.as_str(), &replacement.replacement)?;
+                    validate_source_part_xml(part.partname.as_str(), &replacement.replacement)?;
                 }
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Part(replacement.target),
@@ -8218,7 +8218,7 @@ impl SourceBackedPackage {
             &target_part.content_type,
         ) {
             validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-            validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+            validate_source_part_xml(target_part.partname.as_str(), &replacement)?;
         }
         // Changed publication re-reads unchanged source records and only
         // owns the replacement payload.
@@ -8331,10 +8331,10 @@ impl SourceBackedPackage {
             &target_part.content_type,
         ) {
             validate_source_part_xml(target_part.partname.as_str(), original_part.as_bytes())?;
-            validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+            validate_source_part_xml(target_part.partname.as_str(), &replacement)?;
         }
         validate_source_part_xml(relationship_uri.as_str(), &original_relationships)?;
-        validate_overlay_xml(relationship_uri.as_str(), &relationship_xml)?;
+        validate_source_part_xml(relationship_uri.as_str(), &relationship_xml)?;
         drop(original_part);
 
         let changed = [
@@ -8528,7 +8528,7 @@ impl SourceBackedPackage {
                 .rels_uri()
                 .map_err(OpcError::InvalidPackUri)?;
             validate_source_part_xml(relationship_uri.as_str(), original_relationships.as_slice())?;
-            validate_overlay_xml(relationship_uri.as_str(), relationship_xml)?;
+            validate_source_part_xml(relationship_uri.as_str(), relationship_xml)?;
             relationship_entries.push((*relationship_entry, relationship_xml.len()));
         }
         self.validate_combined_relationship_overlay_limits(
@@ -8552,7 +8552,7 @@ impl SourceBackedPackage {
                 &target_part.content_type,
             ) {
                 validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-                validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+                validate_source_part_xml(target_part.partname.as_str(), &overlay.replacement)?;
             }
             if original.as_bytes() != overlay.replacement.as_slice() {
                 changed.push(ChangedOverlay {
@@ -8800,7 +8800,7 @@ impl SourceBackedPackage {
                 &target_part.content_type,
             ) {
                 validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-                validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
+                validate_source_part_xml(target_part.partname.as_str(), &overlay.replacement)?;
             }
             drop(original);
             replacements.push(ChangedOverlay {
@@ -11020,21 +11020,31 @@ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
         })
 }
 
-/// Audit the source's own bytes for a Part or relationship stream that this
-/// publication is about to replace.
+/// Audit a Part or relationship stream that a source-backed publication
+/// replaces, on either side of the replacement.
 ///
-/// These bytes were written by whatever produced the package; this library did
-/// not author them, so the compact output contract does not apply to them
-/// (change 0654, under change 0652 decision 2). The audit is otherwise the
-/// same one [`validate_overlay_xml`] performs and reports the same
-/// [`OpcError::XmlPublication`]: UTF-8, well-formed XML, exactly one document
-/// element, no DTD or DOCTYPE, and every [`xml_minifier::audit::Limits`]
-/// budget. Indentation, a line ending after the XML declaration, attribute
-/// separators of any length and whitespace before a tag close are accepted as
-/// the producer spelled them.
+/// Change 0654 introduced this for the *original* bytes: they were written by
+/// whatever produced the package, this library did not author them, and the
+/// compact output contract does not apply to them (change 0652, decision 2).
+/// Change 0657 extended it to the *replacement* at the seven paired sites,
+/// because a source-backed replacement is a splice: the XLSX value editor
+/// copies every unedited row and cell record and the whole envelope from the
+/// source and authors compact bytes only for the cells it changed, so holding
+/// the assembled part to the compact contract refuses the producer's own
+/// indentation and, with it, every real third-party package. Compactness is
+/// therefore a property of this library's serializers, asserted by their own
+/// tests, and not a publication refusal on this route.
 ///
-/// The *replacement* is still audited with the authored contract, and the
-/// bytes published for an untouched Part remain the source's own bytes.
+/// Every other check stays, and reports the same
+/// [`OpcError::XmlPublication`] [`validate_overlay_xml`] reports: UTF-8,
+/// well-formed XML, exactly one document element, no DTD or DOCTYPE, and
+/// every [`xml_minifier::audit::Limits`] budget. Indentation, a line ending
+/// after the XML declaration, attribute separators of any length and
+/// whitespace before a tag close are accepted as the producer spelled them.
+///
+/// [`validate_overlay_xml`] keeps the authored contract where this library
+/// composes a whole stream with no source to inherit from: its canonical
+/// relationship XML and a Part a plan *adds*.
 fn validate_source_part_xml(part: &str, bytes: &[u8]) -> Result<()> {
     xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
         .map(|_report| ())

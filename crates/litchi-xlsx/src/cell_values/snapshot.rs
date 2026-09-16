@@ -28,6 +28,10 @@ const STRICT_CHARTSHEET_REL: &str =
 const DIALOGSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
 const MACROSHEET_REL: &str = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
+const QUERY_TABLE_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
+const STRICT_QUERY_TABLE_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
 const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 const CHARTSHEET_CONTENT_TYPE: &str =
@@ -393,9 +397,7 @@ impl Snapshot {
             });
         }
         let worksheet = package.get_part(&sheet_part.uri)?;
-        if !worksheet.rels().is_empty() {
-            return Err(invalid("value-only edits refuse worksheet relationships"));
-        }
+        validate_worksheet_relationships(worksheet.rels())?;
         let worksheet_xml = worksheet.blob_arc();
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
         validation::worksheet_xml(worksheet_xml.as_slice())?;
@@ -448,9 +450,7 @@ impl Snapshot {
             });
         }
         let worksheet = package.part(&sheet_part.uri)?;
-        if !worksheet.rels().is_empty() {
-            return Err(invalid("value-only edits refuse worksheet relationships"));
-        }
+        validate_worksheet_relationships(worksheet.rels())?;
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
         let (cells, facts) = if let Some(admission) =
@@ -539,9 +539,7 @@ impl Snapshot {
             });
         }
         let worksheet = package.part(&sheet_part.uri)?;
-        if !worksheet.rels().is_empty() {
-            return Err(invalid("value-only edits refuse worksheet relationships"));
-        }
+        validate_worksheet_relationships(worksheet.rels())?;
         let sheet_relationship = workbook
             .rels()
             .get(&sheet.relationship_id)
@@ -627,9 +625,7 @@ impl Snapshot {
         if worksheet.content_type() != ct::SML_WORKSHEET {
             return Err(invalid("selected worksheet content type is invalid"));
         }
-        if !worksheet.rels().is_empty() {
-            return Err(invalid("value-only edits refuse worksheet relationships"));
-        }
+        validate_worksheet_relationships(worksheet.rels())?;
         let worksheet_xml = SourcePayload::Owned(worksheet.blob_arc());
         validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
@@ -893,6 +889,32 @@ impl Snapshot {
             return Err(invalid(format!(
                 "cell selector '{address}' already has an existing cell owner"
             )));
+        }
+        Ok(())
+    }
+
+    /// Refuse an edit at an address a merged range covers but does not
+    /// anchor.
+    ///
+    /// `<mergeCells>` is one of the worksheet children change 0657 admitted:
+    /// the rewrite copies it verbatim, and a merged range addresses its cells
+    /// by coordinate, so a value change never moves it. What the range does
+    /// decide is which cell's value the merged rectangle displays — its
+    /// top-left anchor. A value written to any other covered address would be
+    /// stored and never shown, so this module refuses it, exactly as
+    /// [`Self::require_insertable_absence`] already refuses an insert there.
+    pub(super) fn require_unmerged_target(&self, address: litchi_sheet::Cell) -> Result<()> {
+        if self
+            .cells
+            .merge_ranges()
+            .iter()
+            .any(|range| range.contains(address) && range.start() != address)
+        {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::CoveredMerge,
+            });
         }
         Ok(())
     }
@@ -1168,9 +1190,22 @@ impl Snapshot {
         {
             return false;
         }
+        // Change 0602's D3 restates this assertion rather than deleting it:
+        // where it used to require the readback worksheet to carry no
+        // relationship at all, it now requires the readback part's
+        // relationships to equal the ones captured from the source, which is
+        // the strictly stronger preservation statement and the one that
+        // makes the byte-identity gate checkable on a relationship-bearing
+        // worksheet.
+        let Some(captured) = self.source.graph.get(self.sheet_position) else {
+            return false;
+        };
         package
             .get_part(&self.source.worksheet.uri)
-            .is_ok_and(|part| self.source.worksheet.matches_part(part) && part.rels().is_empty())
+            .is_ok_and(|part| {
+                self.source.worksheet.matches_part(part)
+                    && relationships_match(part.rels(), &captured.relationships)
+            })
     }
 
     pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
@@ -1442,6 +1477,12 @@ fn append_worksheet_replacement(
         return Err(invalid("worksheet topology changed during a cell edit"));
     }
     if before.worksheet.bytes != after.worksheet.bytes {
+        // The value-only rewrite copies the head before `<sheetData>`, every
+        // unedited row and every unedited cell record, and the tail after
+        // `</sheetData>`, byte for byte from the source, and authors compact
+        // bytes only for the `<dimension>` tag and the edited `<c>` records.
+        // The replacement therefore carries the producer's own formatting,
+        // which publication audits with source rules since change 0657.
         plan.try_replace_part(
             after.worksheet.uri.clone(),
             copy_payload(
@@ -1464,6 +1505,11 @@ fn append_owner_topology(
         return Err(invalid("workbook topology changed during a cell edit"));
     }
     if before.workbook.bytes != after.workbook.bytes {
+        // `raw::recalc::invalidate` is a span editor: it rewrites the
+        // `<calcPr>` start tag in place, or inserts one compact `<calcPr/>`
+        // at its schema position, and copies every other byte of the workbook
+        // from the source, so the replacement carries the producer's
+        // formatting for the same reason the worksheet's does.
         plan.try_replace_part(
             after.workbook.uri.clone(),
             copy_payload(
@@ -1727,6 +1773,74 @@ fn capture_calculation_chain_owned(
     }))
 }
 
+/// Relationship types whose target's meaning depends on a cell's value.
+///
+/// This is the dependency rule's refusal set, and the reason each member is
+/// in it is that the target stores a copy of, or a name derived from, a value
+/// the editor may replace:
+///
+/// * `sharedStrings` — the text of every `t="s"` cell lives in that part, so
+///   reading or writing such a cell means modelling the table. D2 of change
+///   0602 designs that; decision 7 of change 0652 does not authorize it.
+/// * `pivotCacheDefinition`, `pivotCacheRecords` — the cache holds a copy of
+///   the source cells, which an edit would silently disagree with.
+/// * `table`, `queryTable` — a table column is named after the text of its
+///   header cell, so editing that cell renames a column the part still
+///   spells the old way.
+///
+/// Everything else a package can point at is preserved verbatim by
+/// `litchi-opc` and is never named by the value-only topology plan, so it
+/// needs no permission from this module.
+fn value_dependent_relationship(reltype: &str) -> bool {
+    matches!(
+        reltype,
+        rt::SHARED_STRINGS
+            | rt::STRICT_SHARED_STRINGS
+            | rt::PIVOT_CACHE_DEFINITION
+            | rt::STRICT_PIVOT_CACHE_DEFINITION
+            | rt::PIVOT_CACHE_RECORDS
+            | rt::STRICT_PIVOT_CACHE_RECORDS
+            | rt::TABLE
+            | rt::STRICT_TABLE
+            | QUERY_TABLE_REL
+            | STRICT_QUERY_TABLE_REL
+    )
+}
+
+/// Admit a worksheet relationship the value-only rewrite cannot disturb.
+///
+/// `rewrite_value_only_with_provenance` writes three things: the
+/// `<dimension>` `ref` attribute, the cell records inside `<sheetData>`, and
+/// a byte-verbatim copy of everything before and after that span. In
+/// `CT_Worksheet`'s fixed sequence every child that can carry an `r:id`
+/// follows `sheetData`, and neither `CT_Row` nor `CT_Cell` has an `r:id`
+/// attribute in either dialect — which the value-only validator now also
+/// enforces directly. So a printer setting, a drawing, a hyperlink set or a
+/// legacy VML part is copied with its reference intact, and the part itself
+/// is never named by the topology plan.
+///
+/// What stays refused is an external target, and a target whose meaning
+/// depends on the edited value.
+fn validate_worksheet_relationships(relationships: &Relationships) -> Result<()> {
+    for relationship in relationships.iter() {
+        if relationship.is_external() || value_dependent_relationship(relationship.reltype()) {
+            return Err(invalid(format!(
+                "value-only edits refuse worksheet relationship '{}'",
+                relationship.reltype()
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Admit a workbook relationship the value-only closure does not interpret.
+///
+/// The four types this function counts are the ones the closure models: the
+/// worksheets it edits, the styles table it validates cell style indexes
+/// against, the theme it retains beside it, and the calculation chain it
+/// drops atomically with its relationship. Their cardinalities are unchanged.
+/// Every other type is unfamiliar and is transferred verbatim, except the
+/// value-dependent set above.
 fn validate_workbook_relationships(
     relationships: &Relationships,
     require_single_sheet: bool,
@@ -1741,16 +1855,7 @@ fn validate_workbook_relationships(
                 "value-only edits refuse external workbook relationships",
             ));
         }
-        if !matches!(
-            relationship.reltype(),
-            rt::WORKSHEET
-                | rt::STRICT_WORKSHEET
-                | rt::STYLES
-                | rt::STRICT_STYLES
-                | rt::THEME
-                | rt::CALC_CHAIN
-                | rt::STRICT_CALC_CHAIN
-        ) {
+        if value_dependent_relationship(relationship.reltype()) {
             return Err(invalid(format!(
                 "value-only edits refuse workbook relationship '{}'",
                 relationship.reltype()
@@ -1948,15 +2053,26 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
     })
 }
 
+/// Admit a package-root relationship the value-only closure never names.
+///
+/// A value-only commit's [`SourceTopologyPlan`] names exactly three things:
+/// the worksheet part, the workbook part and the calculation chain. Every
+/// other member is transferred verbatim, so `docProps/app.xml`,
+/// `docProps/core.xml`, a thumbnail or a vendor metadata part is already
+/// preserved byte for byte; refusing it refuses to preserve what is
+/// preserved. Two properties are the closure, and they stay:
+///
+/// * exactly one `officeDocument` owner, so the part the edit rewrites is
+///   the one this package's catalog describes; and
+/// * no external relationship, whose target lies outside the package and
+///   over which no closure can be proved.
+///
+/// The signed-package guard is elsewhere and is unchanged: applying a patch
+/// to a signed package returns [`Error::Signed`] from `Patch::apply_inner`.
 fn validate_package_relationships(relationships: &Relationships) -> Result<()> {
     let mut owners = 0usize;
     for relationship in relationships.iter() {
-        if relationship.is_external()
-            || !matches!(
-                relationship.reltype(),
-                rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT | rt::DIGITAL_SIGNATURE_ORIGIN
-            )
-        {
+        if relationship.is_external() {
             return Err(invalid(format!(
                 "value-only edits refuse package relationship '{}'",
                 relationship.reltype()
@@ -2803,12 +2919,41 @@ mod row_reuse_tests {
     fn malformed_or_mce_candidate_bytes_are_rejected_before_merge() {
         let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
 
-        let mut unknown = proof_for_set(&source, "A1", 42);
-        assert!(!unknown.omitted.is_empty());
-        let root_end = unknown.bytes.iter().position(|byte| *byte == b'>').unwrap();
-        unknown
+        // Change 0657: an unfamiliar attribute on the root is copied through
+        // by the rewrite, so a candidate that carries one is admitted and
+        // still reads back to the same store.
+        let mut unfamiliar = proof_for_set(&source, "A1", 42);
+        assert!(!unfamiliar.omitted.is_empty());
+        let root_end = unfamiliar
+            .bytes
+            .iter()
+            .position(|byte| *byte == b'>')
+            .unwrap();
+        unfamiliar
             .bytes
             .splice(root_end..root_end, b" future=\"unknown\"".iter().copied());
+        let expected = full_store(&unfamiliar.bytes);
+        let admitted = Snapshot::from_rewritten_value_source(&source, unfamiliar)
+            .expect("an unfamiliar root attribute is preserved, not interpreted");
+        assert_store_matches(&admitted.cells, &expected);
+
+        // An unknown element inside the composed sheetData span is not.
+        let mut unknown = proof_for_set(&source, "A1", 42);
+        assert!(!unknown.omitted.is_empty());
+        let data_start = unknown
+            .bytes
+            .windows(13)
+            .position(|window| window == b"<x:sheetData ")
+            .unwrap();
+        let data_end = data_start
+            + unknown.bytes[data_start..]
+                .iter()
+                .position(|byte| *byte == b'>')
+                .unwrap()
+            + 1;
+        unknown
+            .bytes
+            .splice(data_end..data_end, b"<x:future/>".iter().copied());
         assert!(Snapshot::from_rewritten_value_source(&source, unknown).is_err());
 
         let mut mce = proof_for_set(&source, "A1", 42);

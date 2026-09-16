@@ -1,0 +1,87 @@
+# Gates for change 0657, run in the worktree /home/zhuhe/code/litchi-worktrees/0657
+# Base ceb0571a8, branch perf/0657-xlsx-value-editor-d4-admission.
+# Each block is the tail of the gate as it was run; the full outputs are not retained.
+
+$ cargo fmt --all --check
+exit=0 (no output above means clean)
+
+$ cargo clippy -p litchi-xlsx -p litchi-opc -p xml-minifier --all-targets
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0657/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.95s
+clippy exit=0
+
+$ cargo test -p litchi-xlsx
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 9 tests
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+$ cargo test --workspace --lib --bins --tests
+1055 test targets, every one 'test result: ok', no failures.
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.61s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+# --workspace without --lib --bins --tests additionally builds examples and fails
+# in crates/litchi-iwa/examples/create_pages_donut_chart.rs with a pre-existing
+# type mismatch; 'git diff ceb0571a8 -- crates/litchi-iwa' is empty, so it is not
+# this change's, and iWork is out of scope for this programme.
+
+$ cargo doc -p litchi-xlsx -p litchi-opc --no-deps
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.81s
+   Generated /home/zhuhe/code/litchi-worktrees/0657/target/doc/litchi_opc/index.html and 1 other file
+doc exit=0
+
+$ cargo test -p litchi --features docx,xlsx,pptx,xls
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+facade exit=0
+# The six pre-existing clippy warnings in the litchi facade under these features
+# are listed as known in the wave briefing; this gate is the test suite.
+
+$ python3 tools/non_iwork_gate.py verify
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+gate exit=0
+
+$ cd tools/perf-baseline && cargo test
+# Run once before this change's harness fixes and once after.
+# Before: 526 passed, 1 failed, 1 ignored in 716s. The single failure is the
+# row-visibility semantic gate, which asserted that a worksheet relationship is
+# refused; this change admits it. After the gate was rewritten to verify the
+# admission, that test passes:
+test result: FAILED. 526 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 716.07s
+$ cargo test --lib xlsx_row_visibility_matched_controls   # after the fix
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 527 filtered out; finished in 35.59s
+$ cargo test producer_shape                                # after the census fix
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 518 filtered out; finished in 1.32s
+# A complete re-run of the whole suite was still in progress when this change was
+# committed, on a host running eight measurement agents; the two groups this
+# change touches are the two verified above.

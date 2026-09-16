@@ -1,5 +1,33 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0657 — the admission surface was the gap, and four dependency guards were already written for it
+
+Record: [0657](0657-xlsx-value-editor-d4-admission.md).
+
+Change [0587](0587-remaining-opportunity-survey.md)'s item XLSX-2 asked for
+0525's readback to be widened to real worksheets and named two gates;
+change 0602 found that every real file stops at the first of eight and that one
+of the two named gates cannot fire at all. This change closes that: the
+**vocabulary** gates and the **relationship** gates are replaced by the
+dependency rule the owner accepted as decision 7 of change
+[0652](0652-owner-decisions-for-the-third-wave.md), and the corpus goes from 0
+admitted packages to 10. The audit finding worth recording is what was found
+behind the door. Four of the rule's verdicts — a protected sheet, a data
+validation covering the edited address, a shared or array formula covering it,
+a merged range covering it but not anchoring it — were **already implemented**
+in `raw/worksheet/edit/validation.rs::validate_actions` and had never been
+reachable through this door, because the vocabulary refused the elements that
+declare them before the scan ran. The 23 witnesses in
+`cell_values/admission_tests.rs` are the first tests to reach them. The
+remaining gaps are named rather than closed: shared strings (0602's D2, **66 of
+95**), pivot caches, tables and query tables are refused because their meaning
+depends on the value being replaced, and the publication audit (0602's D0)
+still refuses every real package, so this change makes producer files
+**editable, not saveable**. The gate that decides whether this work has any
+user-visible effect is therefore change 0654's, not this one's; re-running
+`results/change-0657/probe` over the corpus after 0654 merges is the check that
+should be recorded.
+
 ## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
 
 Record: [0656](0656-pptx-cross-copy-candidate-budget.md).
