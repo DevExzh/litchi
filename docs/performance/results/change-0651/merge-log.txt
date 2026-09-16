@@ -1,0 +1,20 @@
+perf(ppt): the per-slide re-parse spans the retained document stream (0634)  merged-as c912583a5  from-branch-commit c76a1ea95
+perf(xlsx): cut the value-only fact builder by a third and stop copying every styles event (0635)  merged-as 68ced2acd  from-branch-commit 43e26bbc0
+perf(cfb,xls): serve the XLS validation record walk from a bounded stream window (0636)  merged-as 9f28ea621  from-branch-commit 4d15a128c
+fix(litchi,tools): close two gate-list gaps, the CRUD demo's PPTX update, and a dead whole-input slurp (0639)  merged-as ab9c6549d  from-branch-commit 96b7fe6c7
+perf(pptx): parse the eager slide catalog once per borrowed presentation (0637)  merged-as 0bf8a8b0e  from-branch-commit 0da52bde8
+perf(xls): verify a source-backed numeric target on the parse its own reopen already ran (0633)  merged-as 655e952f6  from-branch-commit db183eab7
+perf(harness): register the facade's .doc and .ppt routes and the ordinary OOXML save (0638)  merged-as 15363b3a8  from-branch-commit dddfc0a53
+perf(zip): read the central directory once, into a buffer sized to it (0632)  merged-as e3f3c1ba6  from-branch-commit 77d9ae6a0
+perf(docx): borrow the sink text events, and attribute 0592's open regression (0643)  merged-as 64a096f86  from-branch-commit cafaea97a
+fix(doc): two field-table refusals read a redundant grffldEnd bit as structure (0640)  merged-as 23bc1bdf7  from-branch-commit 2028c108f
+perf(xlsx): the range visitor stops building the range it is about to visit (0642)  merged-as cfcb3eb12  from-branch-commit 81526b36e
+docs(perf): freeze the memoized per-part PPTX revision proof and price it (0645)  merged-as 09d9fb150  from-branch-commit 444efdb10
+perf(opc): keep the open-time source capture when a relationship call establishes nothing (0647)  merged-as 27f31d743  from-branch-commit 0c9f1058c
+docs(perf): freeze the PPTX cross-copy candidate retention and size it (0646)  merged-as 58a14ef0e  from-branch-commit 2d2a89a05
+perf(xls): a query validates the cells it is not looking for without building them (0641)  merged-as 5d784f3c6  from-branch-commit 7bccdb722
+docs(perf): attribute the 133.61 ms real-deck PPTX opened-transaction edit (0649)  merged-as c59ef12bb  from-branch-commit 5300321c4
+docs(perf): attribute the 133.61 ms real-deck PPTX opened-transaction edit (0649)  merged-as c59ef12bb  from-branch-commit 5300321c4
+perf(xls): read the shared-string table once, not one cursor per string cell (0648)  merged-as ba9b5d8a1  from-branch-commit 40ab12ccd  (import-list conflict with 0641 resolved by union)
+docs(perf): design the OLE2 snapshot source-identity fence, and find four of its six reads load-bearing (0644)  merged-as abd7b655c  from-branch-commit 6c965e044
+fix(docx): parse a byte-order-marked main document at the right offsets (0650)  merged-as f0fc20178  from-branch-commit d546d9ffc

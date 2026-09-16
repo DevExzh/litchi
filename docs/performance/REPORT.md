@@ -1,5 +1,26 @@
 # Performance program phase report
 
+## 0651 — what the second wave delivered, in the numbers of the records that measured it
+
+Record: [0651](0651-queue-refresh-after-the-second-wave.md). This is a
+coordination record: no measurement of its own, `performance_claim: none`, and
+no claim-registry entry for any record of the wave. What a reader can take from
+the wave, each figure scoped as its record scopes it: an XLS whole-sheet walk
+over a file source is 5× faster (0648) and a selected-cell query 1.4× to 1.7×
+(0641); an XLS source-backed numeric commit is 1.6× faster (0633); a warm XLSX
+whole-sheet visit is 6× faster and allocation-free (0642); an XLSX one-edit
+plan's fact builder is a third cheaper (0635); a DOCX text export to a sink is
+15% faster with a tenth of its allocations (0643); every OOXML open over a
+range source costs one request less (0632); a 200-slide PPTX by-index walk costs
+a twentieth of its instructions (0637). What a reader should not take: any of
+the three frozen designs' savings (0644 modelled, 0645 and 0646 measured on
+scratch code that is not on the branch), the documented save's 133.61 ms real
+deck edit as fixed (0649 attributed it to the codec row, which waits on an
+owner), or any cold-cache, physical-device, peak-RSS or cross-platform result,
+none of which the wave measured. The integration gate on the merged head and
+the merge log are in the packet; the rebase onto the upstream branch that
+follows this record is recorded there with a commit map.
+
 ## 0650 — a three-byte mark that made a valid document look broken
 
 Record: [0650](0650-docx-editor-byte-order-mark-admission.md).

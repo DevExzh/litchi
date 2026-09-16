@@ -1,5 +1,38 @@
 # Performance hotspot inventory
 
+## 0651 — the second wave closed: every measurable row landed, every contract row froze with a price, and the codec row moved to the top
+
+Record: [0651](0651-queue-refresh-after-the-second-wave.md). Nineteen records,
+0632 to 0650, worked the queue change 0630 left. Ten landed in production code,
+all value-identical and each measured beside its own floor: the XLS whole-sheet
+walk reads its string table once (16,105 → 37 positional reads on `54016.xls`,
+`all-cells` over a file source −80.1% at p50, 0648) after the validation walk
+took a bounded cursor window (82,727 → 60 reads, 0636); a selected-cell XLS
+query validates its non-target cells without building them (−28% to −41%
+cycles, 0641); the XLS commit's second complete parse is gone (commit −38.5%
+at p50, 0633); the XLSX range visitor stops building the range (a warm
+whole-sheet visit allocates nothing, 6.1× at p50, 0642) and its fact builder
+lost a third (−35% Ir, 0635); the DOCX sink text parser borrows its events
+(−88.8% allocations, −15.6% at p50, 0643); the ZIP locator reads the central
+directory once (one request and a 64 KiB scratch less on every one of 533
+containers, 0632); the eager PPTX slide catalog is parsed once per borrowed
+presentation (a 200-slide by-index walk −95% Ir, 0637); the PPT per-slide
+re-parse spans the retained stream (−5% Ir, 0634); and a relationship call that
+establishes nothing keeps its pristine proof (0647). Three designs froze with
+their price and their gates: the OLE2 snapshot fence (four of six complete
+reads load-bearing, the adopted variant modelled at −13% of the DOC open, 0644),
+the memoized PPTX revision proof (−26% of an opened lifecycle's instructions
+against a durable format bump, 0645) and the cross-copy candidate retention
+(apply phase −72% against a retained whole package, 0646). Three correctness
+findings were fixed (0639, 0640, 0650) and one attribution closed 0592's open
+regression (0643). The finding that reorders the queue is 0649's: the 133.61 ms
+shape-text edit 0638 measured on a real deck is six whole-slide MCE rewrites
+amplified 16× by the namespace emission 0588 withdrew, and every prior PPTX
+record measured on corpora that never exercised that branch. The "Ranked work
+queue" section below is replaced by the twenty-row table of this record: rows
+1 to 10 each wait on an owner or an ADR; rows 11 to 20 are the follow-ons and
+gaps the wave named.
+
 ## 0650 — the DOCX editor's admission hole was three bytes wide, and it is not the only site
 
 Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
@@ -7819,41 +7852,37 @@ pattern elsewhere.
 
 ## Ranked work queue
 
-Refreshed on 2026-09-16 by change [0630](0630-queue-refresh-after-the-first-wave.md)
-after the wave that worked change [0587](0587-remaining-opportunity-survey.md)'s
-queue: of its 36 items, the wave landed, froze, declined or falsified every one
-except the two it left for the next wave, and 0630 carries the outcome and the
-deciding number per item. What remains is mostly a set of prerequisites — human
-decisions on contracts, two proposed ADRs (0030, 0031), and infrastructure that does
-not exist — ordered below by the size of what each unblocks. The 0587 table this
-replaces, and the pre-0190 table before it, are retained in the git history of
-this file.
+Refreshed by change [0651](0651-queue-refresh-after-the-second-wave.md) after the
+second wave (0632 to 0650). The wave landed every row that needed only a
+measurement or a follow-on change and froze every row that moved a contract, so
+what remains is, even more than after 0630, a list of decisions: the first ten
+rows each wait on an owner, an ADR acceptance or an ADR clarification, and the
+records named have already priced what each decision unblocks. Rows 11 to 20 are
+the small follow-ons and gaps the wave itself named, none of which needs a
+decision. Ordered by the size of what each unblocks.
 
 | # | item | what it needs first | priced by |
 | ---: | --- | --- | --- |
-| 1 | the publication audit of original part bytes refuses 94 of 95 real OOXML packages; the same contract is 27.6% of source-backed publication instructions | a human decision on the compactness contract for original bytes (ADR 0006, record 0528); it gates every real-producer edit, XLSX-2, XLSX-3 and the XML-2 gate | 0602, 0613 |
-| 2 | lazy OPC part decode (C2′): an eager XLSX open-edit-save inflates 90 parts to read one | acceptance of proposed ADR 0030, then a migration of 259 sites | 0610, 0581 |
-| 3 | parallel deflate of changed members: 24-62% of every save's cycles | acceptance of proposed ADR 0031, then the measured balance rule, not the survey's threshold | 0624, 0615 |
-| 4 | the MCE codec's namespace-emission rewrite: a further −80% of the codec, −85% of a real-file open plus cell | the slice consumers (`Paragraph::extensions`, `Shape::xml`, five XLSX raw accessors, two publishing writers) must stop depending on per-element re-declaration; 133 sites classified | 0588 |
-| 5 | admission of `mc:Ignorable`/`dyDescent` worksheets to the fused traversal, and the value-only vocabulary that refuses every real worksheet | an admission-surface widening designed with 0602's D1-D4 | 0603, 0602, 0601 |
-| 6 | the XLSX selected-cell ineligibility gate: −63% of an ineligible read | the limit question and an ADR 0005 clarification on which reader owns a lazily loaded payload's refusal, or an observer-detach signal in `litchi-ooxml-common` | 0597 |
-| 7 | PPTX revision proof format: about 23% of what remains in an opened transaction | a frozen design with a magic bump for the `LPRM0001`/`LPCP0002` headers | 0590 |
-| 8 | the cross-package copy still builds and deflates the candidate twice (5.96 G Ir) | retaining the planned archive in the plan, an ADR 0005 memory question | 0598 |
-| 9 | fragment-only DOCX compaction and the main-part copy in `document_snapshot` | the owner's answer on whitespace compaction across untouched paragraphs (defect 5 of 0587) | 0591 |
-| 10 | the DOC and PPT snapshot's remaining hashing: the third identity pass and the duplicate index parse, 2 of the 6 surviving complete reads | an ADR 0006 fence design; until then the facade's `.doc` route stays eager by measurement | 0589, 0609 |
-| 11 | a copy-through OLE2 writer for DOC saves (13-30% of a DOC save) | an ADR clarification of physical sector layout policy | 0617 |
-| 12 | the retained XLS sheet index (repeat queries) | an evictable weighted cache, which no crate has | 0605 |
-| 13 | the XLS commit's second candidate parse (137 M Ir) and `Snapshot::from_bytes`'s double framing | a measured fusion that keeps the coverage proof's order; the readback-owner swap is inadmissible | 0620 |
-| 14 | framing the XLS globals once (1.5% of the flagship open) | nothing; the one survivor of 0574's list | 0612 |
-| 15 | XLSB: `insert_candidate_cell`/`transfer_cell` reparse twice; `apply_sparklines`/`apply_cell_watches` never refresh derived fields | a selector for `apply_workbook_structure`; a correctness answer for the latter | 0599 |
-| 16 | PPT: `SlideFactory`/`NotesIndex` still re-parse each slide through the copying entry point (the +4.7% text-only selector) | a follow-on change in `litchi-ppt` | 0606 |
-| 17 | XLSX facts: the builder is 15-18% of planning; snapshot chains drop facts after the first commit; `<f>` worksheets declined | measurement, then a follow-on | 0622 |
-| 18 | range sources: the whole-sheet XLS walk is request-bound (16,145 requests, 16,061 under 512 bytes); a PPT snapshot open reads 2.02× the file | a cursor read batch for range sources, designed against the fence records | 0627, 0605 |
-| 19 | `SequentialTextWriter`'s two writes per row; `query_cell`'s leading fence | a follow-on in `litchi-xls` | 0621 |
-| 20 | correctness: 86 order-sensitive sites in the consumer crates (three verdict-changing ones taken by 0631), `get_or_add` invalidating the source capture on a no-op reuse, the DOC facade's field-table refusals, the `office_crud_demo` PPTX update, `refine_workbook_format`, MCE output limits on the expanded stream | owners' decisions | 0628, 0587, 0607, 0588 |
-
-Nothing in the table is authorized by 0630; each row names the record that priced
-it and the decision or design it waits on.
+| 1 | the MCE codec's namespace re-declaration, now known to amplify every whole-slide rewrite of a real deck 16×: a marker-stripped control removes 93.9% of a 133.61 ms opened-transaction shape-text edit, and every prior PPTX record measured on corpora whose members never carry the namespace | an owner decision that the slice consumers (`Paragraph::extensions`, `Shape::xml`, five XLSX raw accessors, two publishing writers) may stop seeing per-element re-declarations (0588 withdrew the rewrite on that contract), then the migration design | 0649, 0588, 0630 row 4 |
+| 2 | the publication audit of original part bytes refuses 94 of 95 real OOXML packages; the same contract is 27.6% of source-backed publication instructions | a human decision on the compactness contract for original bytes (ADR 0006, record 0528); it gates every real-producer source-backed save | 0602, 0616, 0528 |
+| 3 | lazy OPC part decode (C2′): an eager XLSX open-edit-save inflates 90 parts to read one | acceptance of proposed ADR 0030, then a migration of 259 sites | 0610, 0581 |
+| 4 | the PPTX memoized revision proof: −26% of an opened lifecycle's instructions, −7.3% at p50, at the price of a durable `LPRM0002`/`LPCP0003` bump with a typed refusal for every serialized patch, and a memo the facade must carry | an owner decision on the format bump and on the facade-carried memo under ADR 0005; the nine admission gates are written | 0645, 0590 |
+| 5 | the cross-package copy's second candidate serialization: deflate calls halve, the apply phase −72%, the media-rich lifecycle −36% at p50, at the price of one whole serialized package retained in a public plan value | a budget for the retained candidate (a breaking `opened::Limits` field, or ADR 0005's hierarchical budget which this path lacks); fourteen gates are written | 0646, 0598 |
+| 6 | parallel deflate of changed members: 24-62% of a save's cycles on the in-memory routes, but at most 0.2-8.7% of the documented ordinary save, which is publication-bound | acceptance of proposed ADR 0031, then the measured balance rule; and an ADR clarification of what durability the documented save promises, since its atomic publication costs 7.7× to 61.7× its serialization | 0624, 0615, 0638 |
+| 7 | admission of `mc:Ignorable`/`dyDescent` worksheets to the fused traversal, and the value-only vocabulary that refuses every real worksheet | an admission-surface widening designed with 0602's D1-D4 | 0603, 0602, 0601 |
+| 8 | the XLSX selected-cell ineligibility gate: −63% of an ineligible read | the limit question and an ADR 0005 clarification on which reader owns a lazily loaded payload's refusal, or an observer-detach signal in `litchi-ooxml-common` | 0597 |
+| 9 | the DOC snapshot's source-identity fence: four of its six complete reads are load-bearing, a `SourceVersion` replaces none of them, and the adopted variant (the open's third identity call dropped, one scan per identity call inside `ensure_current`) is modelled at −13.2% of the DOC open, PPT unchanged | an implementing change under 0644's four admission gates (the before halves of two are in its packet); the cheaper variants cost a second public `litchi-cfb` entry point to keep one typed error's name | 0644, 0589, 0609 |
+| 10 | fragment-only DOCX compaction and the main-part copy in `document_snapshot`; a copy-through OLE2 writer for DOC saves (13-30% of a DOC save) | the owner's answer on whitespace compaction across untouched paragraphs (defect 5 of 0587); an ADR clarification of physical sector layout policy | 0591, 0617 |
+| 11 | XLS cross-query retention: the retained sheet index, and the snapshot-scoped chain hint 0641 froze (a few thousand dependent loads per repeated query) | an evictable weighted cache under ADR 0005's clean-value-cache gate, which no crate has; `StreamChainHint` borrows its reader, so a snapshot-resident position needs a reader-independent value or a lock | 0605, 0641 |
+| 12 | XLS residues: `MulRk`/`MulBlank` cells (47.7% of the corpus's values) still build an 88-byte record each on an unwanted query; the open still scans the whole string table to build its locators; the two framing passes at 1.6% each | follow-ons in `litchi-xls`; the framing fusion must keep the coverage proof's order | 0641, 0648, 0633 |
+| 13 | XLSB: `insert_candidate_cell`/`transfer_cell` reparse twice; `apply_sparklines`/`apply_cell_watches` never refresh derived fields; two resource guards test the part rather than the relationship | a selector for `apply_workbook_structure`; a correctness answer for the latter two | 0599, 0647 |
+| 14 | DOCX residues: seven more `read_event_into` sites with the shape 0643 fixed (one on the `tail_append` save path); one bounded `String` per paragraph on the sink path; a memoized paragraph index across `document()` views (a `DocumentIndexAdmission` charge on the managed route) | pricing, then a follow-on; the memo needs a frozen design | 0643, 0592 |
+| 15 | XLSX residues: the scanner's own `Vec<SelectedRecord>` sets a cold whole-sheet read's peak and cannot yield without moving a refusal past a partial result; `cells` over-allocates 42% on the stored route | an ADR 0006 refusal-order design for the first; a follow-on for the second | 0642 |
+| 16 | correctness follow-ups: the byte-order-mark offset defect 0650 fixed in the DOCX editor also lives in `litchi-opc`'s publication audit (a regenerated marked part is refused at publication) and in the managed DOCX transaction; body-final `w:sectPr` placement and ISO Strict `pt` page sizes keep two reader-admitted fixtures out of the editor; the two DOC refusals 0640 unmasked (`FBKF.ibkl` uniqueness, a `PapxInFkp` pad byte), each provisionally stricter than the format; the `litchi` facade's `.doc` route cannot reach `Leniency::TolerateStylesheetDefects` | two offset fixes with 0650's witnesses; an ECMA-376 `CT_Body` decision; a spec reading for the two DOC refusals; a facade option | 0650, 0640 |
+| 17 | harness gaps: no marker-bearing real-producer PPTX or DOCX corpus (every prior PPTX record measured on the codec's cheap branch); `litchi-perf-baseline-alloc` emits no allocation metrics for the ordinary-save family; no DOCX text-sink selector; no PPTX opened-transaction phase timer | harness work in `tools/perf-baseline`, modelled on 0601 and 0638 | 0649, 0643, 0638 |
+| 18 | the ZIP locator's own 64 KiB scratch (a two-stage locate costs one extra request on the 1 of 533 containers that misses the `len − 22` fast path) | a measurement | 0632 |
+| 19 | gates: the facade's `docx,odt` feature combination compiles three polyglot-detection tests no standing gate runs (stale on this branch until the upstream rewrite the wave's rebase took); `--mode structural` of `check_perf_claims.py` fails on landed `claim-0251`; two flaky allocator tests in the harness; a stale `tools/native-resave/Cargo.lock` | small gate and hygiene changes | 0651, 0641, 0642 |
+| 20 | method: `lto = true` makes the release binaries non-reproducible byte for byte, so a packet's binary digest names the binary timed, not a rebuild of the source | a note in the harness README, or a reproducible measurement profile | 0635 |
 
 ## Evidence still missing
 
