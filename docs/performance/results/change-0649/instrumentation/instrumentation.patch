@@ -1,0 +1,199 @@
+diff --git a/crates/litchi-ooxml-common/src/lib.rs b/crates/litchi-ooxml-common/src/lib.rs
+index 60be5740f..a9c811e41 100644
+--- a/crates/litchi-ooxml-common/src/lib.rs
++++ b/crates/litchi-ooxml-common/src/lib.rs
+@@ -38,6 +38,7 @@ pub mod custom_xml;
+ pub mod embedded;
+ pub mod external_link;
+ pub mod mce;
++pub mod perf0649;
+ #[cfg(feature = "encryption")]
+ pub mod package_encryption;
+ pub mod properties;
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 59a0753f2..c6be0f654 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -562,6 +562,9 @@ pub fn process_markup_compatibility<'a>(
+     caps: &Capabilities,
+     lim: &Limits,
+ ) -> R<Output<'a>> {
++    crate::perf0649::bump(&crate::perf0649::MCE_CALLS, 1);
++    crate::perf0649::bump(&crate::perf0649::MCE_INPUT_BYTES, xml.len() as u64);
++    crate::perf0649::trace(xml.len() as u64);
+     if xml.len() > lim.max_input_bytes {
+         return Err(limit("input bytes"));
+     }
+@@ -577,6 +580,8 @@ pub fn process_markup_compatibility<'a>(
+             report: Report::default(),
+         });
+     }
++    crate::perf0649::bump(&crate::perf0649::MCE_REWRITES, 1);
++    crate::perf0649::bump(&crate::perf0649::MCE_REWRITE_INPUT_BYTES, xml.len() as u64);
+     let mut r = Reader::from_reader(xml);
+     r.config_mut().trim_text(false);
+     let mut stack = Vec::new();
+@@ -660,8 +665,13 @@ pub fn process_markup_compatibility<'a>(
+     if !stack.is_empty() {
+         return Err(bad("unterminated XML"));
+     }
++    let produced = out.into_inner();
++    crate::perf0649::bump(
++        &crate::perf0649::MCE_REWRITE_OUTPUT_BYTES,
++        produced.len() as u64,
++    );
+     Ok(Output {
+-        xml: Cow::Owned(out.into_inner()),
++        xml: Cow::Owned(produced),
+         report: rep,
+     })
+ }
+@@ -1192,6 +1202,7 @@ fn write_start(
+     filter: bool,
+     rep: &mut Report,
+ ) -> R<()> {
++    crate::perf0649::bump(&crate::perf0649::MCE_ELEMENTS, 1);
+     o.push(b'<')?;
+     o.extend_from_slice(q.as_bytes())?;
+     // Every in-scope binding is re-declared on every emitted start tag, so any
+@@ -1200,6 +1211,7 @@ fn write_start(
+     // redundancy is load-bearing, not incidental; see
+     // `namespace_emission_contract_tests`.
+     ctx.ns.for_each_effective(|p, u| {
++        crate::perf0649::bump(&crate::perf0649::MCE_NS_EMISSIONS, 1);
+         o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
+         if !p.is_empty() {
+             o.extend_from_slice(p.as_bytes())?;
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+index 15d2a2171..58ce69522 100644
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -370,6 +370,7 @@ fn capture_internal(
+     physical_source_provenance: bool,
+     known_revision: Option<[u8; 32]>,
+ ) -> Result<Snapshot> {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::CAPTURES, 1);
+     let presentation = PresentationPart::from_package(package)?;
+     let presentation_name = presentation.part().partname().clone();
+     let references = presentation.slide_references()?;
+@@ -431,7 +432,17 @@ fn capture_internal(
+             part_name,
+         });
+     }
++    let notes_before = litchi_ooxml_common::perf0649::MCE_CALLS.load(std::sync::atomic::Ordering::Relaxed);
++    let notes_bytes_before = litchi_ooxml_common::perf0649::MCE_INPUT_BYTES.load(std::sync::atomic::Ordering::Relaxed);
+     let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
++    litchi_ooxml_common::perf0649::bump(
++        &litchi_ooxml_common::perf0649::SITE_NOTES_SNAPSHOT,
++        litchi_ooxml_common::perf0649::MCE_CALLS.load(std::sync::atomic::Ordering::Relaxed) - notes_before,
++    );
++    litchi_ooxml_common::perf0649::bump(
++        &litchi_ooxml_common::perf0649::SITE_NOTES_SNAPSHOT_BYTES,
++        litchi_ooxml_common::perf0649::MCE_INPUT_BYTES.load(std::sync::atomic::Ordering::Relaxed) - notes_bytes_before,
++    );
+     let slide_name_index = SlideNameIndex::build(&slides)?;
+     let revision = match known_revision {
+         Some(revision) => {
+@@ -456,6 +467,7 @@ fn capture_internal(
+ }
+ 
+ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::FINGERPRINTS, 1);
+     let mut parts = Vec::new();
+     parts
+         .try_reserve_exact(package.part_count())
+@@ -516,6 +528,7 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
+ /// Payload comparison short-circuits on `Arc` pointer identity, which the
+ /// opened-transaction path preserves for every part an edit did not rewrite.
+ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::PACKAGES_EQUAL, 1);
+     if left.part_count() != right.part_count()
+         || !relationships_equal(left.rels(), right.rels())
+         || left.non_part_members().len() != right.non_part_members().len()
+@@ -574,6 +587,10 @@ fn feed_relationships(
+ }
+ 
+ fn feed(digest: &mut Sha256, value: &[u8]) {
++    litchi_ooxml_common::perf0649::bump(
++        &litchi_ooxml_common::perf0649::FINGERPRINT_BYTES,
++        value.len() as u64,
++    );
+     digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+     digest.update(value);
+ }
+diff --git a/crates/litchi-pptx/src/parts/mod.rs b/crates/litchi-pptx/src/parts/mod.rs
+index c509f5212..31742f98c 100644
+--- a/crates/litchi-pptx/src/parts/mod.rs
++++ b/crates/litchi-pptx/src/parts/mod.rs
+@@ -24,6 +24,11 @@ pub(crate) const MAX_PART_XML_BYTES: usize = 64 * 1024 * 1024;
+ pub(crate) const MAX_SLIDES: usize = 100_000;
+ 
+ pub(crate) fn processed_xml(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::PART_DECODES, 1);
++    litchi_ooxml_common::perf0649::bump(
++        &litchi_ooxml_common::perf0649::PART_DECODE_BYTES,
++        part.blob().len() as u64,
++    );
+     if part.blob().len() > MAX_PART_XML_BYTES {
+         return Err(Error::Limit {
+             resource: "PresentationML part XML",
+diff --git a/crates/litchi-pptx/src/parts/presentation.rs b/crates/litchi-pptx/src/parts/presentation.rs
+index d806aa6bd..595656c33 100644
+--- a/crates/litchi-pptx/src/parts/presentation.rs
++++ b/crates/litchi-pptx/src/parts/presentation.rs
+@@ -74,6 +74,8 @@ impl<'a> PresentationPart<'a> {
+             });
+         }
+ 
++        litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_PRES_ROOT, 1);
++        litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_PRES_ROOT_BYTES, part.blob().len() as u64);
+         let xml = processed_xml(part)?;
+         let mut reader = NsReader::from_reader(xml.as_ref());
+         loop {
+@@ -116,6 +118,8 @@ impl<'a> PresentationPart<'a> {
+     ///
+     /// Returns an error if the operation fails.
+     pub fn slide_references(&self) -> Result<Vec<SlideReference>> {
++        litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_PRES_SLIDE_REFS, 1);
++        litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_PRES_SLIDE_REFS_BYTES, self.part.blob().len() as u64);
+         let xml = processed_xml(self.part)?;
+         let mut reader = NsReader::from_reader(xml.as_ref());
+         let mut references = Vec::new();
+diff --git a/crates/litchi-pptx/src/parts/slide.rs b/crates/litchi-pptx/src/parts/slide.rs
+index fef4d095d..ad284490b 100644
+--- a/crates/litchi-pptx/src/parts/slide.rs
++++ b/crates/litchi-pptx/src/parts/slide.rs
+@@ -26,6 +26,8 @@ const MAX_SEMANTIC_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
+ const MAX_SEMANTIC_TEXT_BYTES: usize = 16 * 1024 * 1024;
+ 
+ fn root_name(part: &dyn Part) -> Result<String> {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_SLIDE_ROOT_NAME, 1);
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_SLIDE_ROOT_NAME_BYTES, part.blob().len() as u64);
+     let xml = processed_xml(part)?;
+     let mut reader = NsReader::from_reader(xml.as_ref());
+     loop {
+@@ -50,6 +52,8 @@ fn root_name(part: &dyn Part) -> Result<String> {
+ }
+ 
+ fn c_sld_name(part: &dyn Part) -> Result<Option<String>> {
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_SLIDE_CSLD_NAME, 1);
++    litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SITE_SLIDE_CSLD_NAME_BYTES, part.blob().len() as u64);
+     let xml = processed_xml(part)?;
+     crate::namespace::presentation_name(xml.as_ref())
+ }
+diff --git a/crates/litchi-pptx/src/shape/reader.rs b/crates/litchi-pptx/src/shape/reader.rs
+index 74ccfdeef..e46892ff6 100644
+--- a/crates/litchi-pptx/src/shape/reader.rs
++++ b/crates/litchi-pptx/src/shape/reader.rs
+@@ -190,6 +190,11 @@ impl<'a> Scene<'a> {
+     ///
+     /// Returns an error if the input cannot be read or is malformed.
+     pub fn read_with(xml: &'a [u8], limits: Limits) -> Result<Self> {
++        litchi_ooxml_common::perf0649::bump(&litchi_ooxml_common::perf0649::SCENE_READS, 1);
++        litchi_ooxml_common::perf0649::bump(
++            &litchi_ooxml_common::perf0649::SCENE_READ_BYTES,
++            xml.len() as u64,
++        );
+         if xml.len() > limits.input_bytes {
+             return Err(Error::Limit {
+                 resource: "shape owner input bytes",

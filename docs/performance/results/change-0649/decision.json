@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0649",
+  "title": "The 133.61 ms real-deck opened-transaction shape-text edit is six whole-slide MCE rewrites, not the revision proof",
+  "decision": "retained, attribution and frozen design; nothing implemented",
+  "code_state": "no file under crates/ changed; the measurement-only instrumentation leg was reverted before the gates and is retained as a patch in this packet",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0638 measured the row at 133.61 ms and stated that nothing in that record explained it; this record attributes it",
+    "the capture and the commit's recapture are 95.9% of the edit's wall clock, 96.44% of its cycles and 96.08% of its instructions; the working clone, set_shape_text and the publication are the remaining 4%",
+    "a marker-stripped control -- the same deck with the MCE namespace URI replaced by an equal-length URI the codec does not recognize, so member count, element count, part-decode count, capture count, fingerprint bytes and uncompressed byte total are all identical -- removes 120.301 ms of 128.123 ms, 93.9%",
+    "the mechanism is litchi-pptx asking litchi_ooxml_common::mce to rewrite every slide three times per capture and twice per edit: 94 rewriting passes over 1,726,827 bytes producing 28,064,911 bytes of output, 16.25x amplification, 373,086 namespace re-declarations over 62,181 emitted start tags, 6.00 per element",
+    "the complete-package revision proof is NOT the mechanism: package_fingerprint is 0.51% of the capture's native cycles and 0.72% of the whole edit's, about 0.9 ms of 128 ms, so change 0645's design is bounded by that",
+    "every candidate that removes the redundant passes either moves when a refusal happens (B, C), needs a public API change and an unanswered bounded-resources question (A), or is change 0588's already-withdrawn design in a crate outside this record's scope (D); nothing is implemented"
+  ],
+  "accepted_evidence": {
+    "phase_decomposition": "probe0649 phases, p50 of 30 samples, three repeats R1/R2/R3, taskset -c 16, over the real deck, the generated corpus shape and the marker-stripped control; the four documented public calls of the edit timed individually",
+    "aa_floor": "widest p50 spread across the three repeats in the same window: 4.31% on the real edit total, 2.89-4.67% on the three phases above 1 ms, 0.67% generated, 0.80% control",
+    "counts": "instrumented leg (twenty-five AtomicU64 counters and one Mutex<Vec<u64>> trace behind twenty-six bump/trace calls in seven files of litchi-ooxml-common and litchi-pptx), differenced across the six prefix stages open/capture/transaction/settext/commit/apply, on all three decks; plus a per-pass input-length trace mapped onto archive member names",
+    "allocations": "the probe's own counting global allocator, per prefix stage, on the real deck and the generated corpus; litchi-perf-baseline-alloc reports no allocation metrics for 0638's ordinary-save family and that gap is recorded",
+    "cycles_and_instructions": "perf stat -e cycles,instructions isolation pairs at N=2 and N=10 differenced over the eight extra iterations, per prefix stage, taskset -c 16",
+    "native_symbols": "perf record -F 999 (dwarf call graph for the capture stage on CPU 16, frame pointers for the whole edit on CPU 17), self-cycle shares",
+    "instructions_callgrind": "callgrind --cache-sim=no --branch-sim=no isolation pair on the capture stage at N=2 and N=6, taskset -c 18; whole-program inclusive Ir per symbol",
+    "harness_tie_in": "change 0638's own pptx_real_file_ordinary_save_* and pptx_ordinary_save_edit selectors run at this base with 0638's harness-only diff (commit 15363b3a8, no file under crates/) applied, 5 warm-ups and 20 samples, taskset -c 16",
+    "0637_control": "change 0637's crate diff (commit 0bf8a8b0e) applied to the base and the count table re-run: every counter identical, so the eager slide-catalog memo does not reach this path"
+  },
+  "accepted_costs": {
+    "one_fixture": "every number is slide-section-test.pptx on this host at this base; the 16.25x amplification and the 6.00 declarations per element are this deck's, not a producer census",
+    "no_before_after": "no production code changed, so the paired structure is real-versus-control and real-versus-generated, not before-versus-after; no claim is registered",
+    "design_ceilings_are_counts": "the -62.8%, -43.5% and -62.8% ceilings in the design table are MCE output bytes, which the cycle measurements show this path is linear in, but none of A, B or C is implemented, so none is a measured saving",
+    "callgrind_ranks_work": "the per-site inclusive Ir shares (38.95% notes, 27.88% c_sld_name, 27.72% root_name) rank work, not latency; the wall-clock and cycle statements rest on the control and on perf stat",
+    "noisy_sub_millisecond_phases": "Snapshot::edit and apply sit on 28.63% and 8.06% floors; their shares are reported to show they are negligible, not to rank them",
+    "control_is_not_a_proposal": "the marker-stripped deck is not a semantically valid transformation of a .pptx; it exists inside the measurement and is not retained as a fixture"
+  },
+  "known_gaps": {
+    "harness_allocation_metrics": "0638's ordinary-save selector family reports no allocation metrics because the harness-only change that registered it did not reach allocation_metrics.rs; reported, not fixed",
+    "producer_census": "no census of how many real decks declare the MCE namespace; 43 of 103 members of this one do, carrying 93.0% of its bytes, and 0588 reported 61 of 62 .docx fixtures declaring it in word/document.xml",
+    "other_formats": "the DOCX and XLSX ordinary-save edits 0638 measured at 0.51 ms and 3.74 ms were not decomposed here; their editors do not run a whole-package capture",
+    "third_pass_on_strict_decks": "notes::codec::root_conformance runs scan_xml once per conformance in [Transitional, Strict] until one succeeds, so a Strict deck pays the notes pass twice; not measured"
+  },
+  "withheld": [
+    "any registered speedup, any before/after delta, any claim that a candidate in the design table would deliver its ceiling, and any statement about decks other than the one fixture"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0649-pptx-opened-transaction-real-deck-edit",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 16 for counts, allocations, perf stat, the dwarf perf record and the harness legs; -c 17 for the whole-edit perf record; -c 18 for callgrind",
+    "binaries": {
+      "probe0649 (clean leg, --release, debug=1)": "9a36d528d2ab7b3f7bd9474972ecb3bbb49558d8b4efd12a63489b74d2b26fdb",
+      "probe0649 (instrumented leg, --features counts)": "b23aab8a5b180033cb02395f66b549ba7413eab2487e1bb85583866d37471bdb",
+      "probe0649 (clean leg with the counting allocator)": "c364e11478053d4666a038dce604c0cf10931458eea1e29bb2b0eb8dd1101ae6",
+      "probe0649 (instrumented leg with 0637 applied)": "075524837370d6eeabcb97150e8524b0653df27709592338419afa296636bd4e",
+      "litchi-perf-baseline (base + 0638's harness diff)": "e9b627d76f3f9f0cbdc869f12f4a85a9086b6efecdfaed47521a11c3cf00c1e8",
+      "litchi-perf-baseline-alloc (base + 0638's harness diff)": "4c1032716cdcbcb875fd7093ad45453b051bffda28e415bf1e14d6a89a13c5a2"
+    },
+    "note": "the probe is a standalone Cargo project outside the workspace with a path dependency on this worktree's crates/litchi-pptx; every timed binary was copied out of its Cargo target directory before it ran (0627's lesson). The base predates change 0638, whose selectors this record ties into, so 0638's harness-only diff (commit 15363b3a8, touching only tools/) was applied to build the two harness binaries and reverted afterwards; no file under crates/ was touched by it."
+  }
+}

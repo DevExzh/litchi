@@ -1,0 +1,18 @@
+# Every MCE pass inside ONE `opened_presentation()` capture of
+# test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx,
+# identified by input length against the archive member sizes.
+# 44 passes, 819319 input bytes (the deck is 796,725 uncompressed bytes).
+
+  6x  ppt/slides/slide10.xml|ppt/slides/slide6.xml
+  5x  ppt/presentation.xml
+  3x  ppt/slides/slide1.xml
+  3x  ppt/slides/slide11.xml
+  3x  ppt/slides/slide12.xml
+  3x  ppt/slides/slide13.xml
+  3x  ppt/slides/slide2.xml
+  3x  ppt/slides/slide3.xml
+  3x  ppt/slides/slide4.xml
+  3x  ppt/slides/slide5.xml
+  3x  ppt/slides/slide7.xml
+  3x  ppt/slides/slide8.xml
+  3x  ppt/slides/slide9.xml

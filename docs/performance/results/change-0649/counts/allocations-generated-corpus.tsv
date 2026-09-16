@@ -1,0 +1,8 @@
+source	generated:12x8
+stage	allocations	allocated_bytes	reallocations
+open	2584	2839800	285
+capture	12185	3283004	702
+transaction	12880	3336709	702
+settext	14896	3571330	763
+commit	27060	4291210	1308
+apply	28349	4396363	1314

@@ -1,0 +1,8 @@
+source	test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+stage	allocations	allocated_bytes	reallocations
+open	4548	5174952	484
+capture	167311	38215647	14927
+transaction	168357	38299530	14927
+settext	184649	50797873	15569
+commit	361994	95967021	30759
+apply	364317	96187169	30780
