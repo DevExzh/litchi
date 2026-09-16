@@ -7,10 +7,11 @@ use crate::auto_filter::{Column, Definition, parse_auto_filter, write_auto_filte
 use crate::error::Result;
 use crate::sort::{SortBy, SortMethod};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
 use litchi_sheet::Cell as Address;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Writer, XmlVersion};
 use std::borrow::Cow;
@@ -62,8 +63,8 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
-            Event::Start(e) => parser.start(&namespace, &e, decoder)?,
-            Event::Empty(e) => parser.empty(&namespace, &e, decoder)?,
+            Event::Start(e) => parser.start(&namespace, &e, decoder, &resolver)?,
+            Event::Empty(e) => parser.empty(&namespace, &e, decoder, &resolver)?,
             Event::End(e) => parser.end(&namespace, e.local_name().as_ref())?,
             Event::Text(e) => {
                 let text = e.decode().map_err(xml_error)?;
@@ -549,7 +550,13 @@ impl Parser {
     fn parent(&self) -> Ctx {
         self.stack.last().copied().unwrap_or(Ctx::Outside)
     }
-    fn start(&mut self, ns: &ResolveResult<'_>, e: &BytesStart<'_>, d: Decoder) -> Result<()> {
+    fn start(
+        &mut self,
+        ns: &ResolveResult<'_>,
+        e: &BytesStart<'_>,
+        d: Decoder,
+        r: &NamespaceResolver,
+    ) -> Result<()> {
         let local = e.local_name();
         let nsv = exact(ns, NSV);
         match (self.parent(), nsv, local.as_ref()) {
@@ -593,21 +600,21 @@ impl Parser {
             (Ctx::Column, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::Column)?;
 
-                self.begin_capture(Payload::Dxf(DxfOwner::Column), e)?;
+                self.begin_capture(Payload::Dxf(DxfOwner::Column), e, r)?;
                 self.stack.push(Ctx::Captured);
             },
             (Ctx::SortRule, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::SortRule)?;
-                self.begin_capture(Payload::Dxf(DxfOwner::SortRule), e)?;
+                self.begin_capture(Payload::Dxf(DxfOwner::SortRule), e, r)?;
                 self.stack.push(Ctx::Captured);
             },
             (Ctx::Column, true, b"filter") => {
-                self.begin_capture(Payload::Filter, e)?;
+                self.begin_capture(Payload::Filter, e, r)?;
                 self.stack.push(Ctx::Captured);
             },
             (Ctx::ExtList(owner), _, b"ext") if core(ns) => {
                 let x = parse_extension(e, d)?;
-                self.begin_capture(Payload::Extension(owner, x), e)?;
+                self.begin_capture(Payload::Extension(owner, x), e, r)?;
                 self.stack.push(Ctx::Captured);
             },
             (Ctx::Leaf, _, _) => {
@@ -630,7 +637,13 @@ impl Parser {
         }
         Ok(())
     }
-    fn empty(&mut self, ns: &ResolveResult<'_>, e: &BytesStart<'_>, d: Decoder) -> Result<()> {
+    fn empty(
+        &mut self,
+        ns: &ResolveResult<'_>,
+        e: &BytesStart<'_>,
+        d: Decoder,
+        r: &NamespaceResolver,
+    ) -> Result<()> {
         let local = e.local_name();
         let nsv = exact(ns, NSV);
         match (self.parent(), nsv, local.as_ref()) {
@@ -671,16 +684,16 @@ impl Parser {
             },
             (Ctx::Column, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::Column)?;
-                self.empty_markup(Payload::Dxf(DxfOwner::Column), e)?;
+                self.empty_markup(Payload::Dxf(DxfOwner::Column), e, r)?;
             },
             (Ctx::SortRule, true, b"dxf") => {
                 self.prepare_dxf(DxfOwner::SortRule)?;
-                self.empty_markup(Payload::Dxf(DxfOwner::SortRule), e)?;
+                self.empty_markup(Payload::Dxf(DxfOwner::SortRule), e, r)?;
             },
-            (Ctx::Column, true, b"filter") => self.empty_markup(Payload::Filter, e)?,
+            (Ctx::Column, true, b"filter") => self.empty_markup(Payload::Filter, e, r)?,
             (Ctx::ExtList(owner), _, b"ext") if core(ns) => {
                 let x = parse_extension(e, d)?;
-                self.empty_markup(Payload::Extension(owner, x), e)?;
+                self.empty_markup(Payload::Extension(owner, x), e, r)?;
             },
             (Ctx::Leaf, _, _) => {
                 return Err(invalid(
@@ -1046,10 +1059,15 @@ impl Parser {
         }
         Ok(())
     }
-    fn begin_capture(&mut self, payload: Payload, e: &BytesStart<'_>) -> Result<()> {
+    fn begin_capture(
+        &mut self,
+        payload: Payload,
+        e: &BytesStart<'_>,
+        r: &NamespaceResolver,
+    ) -> Result<()> {
         let mut writer = Writer::new(Vec::new());
         writer
-            .write_event(Event::Start(e.clone()))
+            .write_event(Event::Start(retained_root(e, r)))
             .map_err(xml_error)?;
         self.capture = Some(Capture {
             depth: 1,
@@ -1058,10 +1076,15 @@ impl Parser {
         });
         Ok(())
     }
-    fn empty_markup(&mut self, payload: Payload, e: &BytesStart<'_>) -> Result<()> {
+    fn empty_markup(
+        &mut self,
+        payload: Payload,
+        e: &BytesStart<'_>,
+        r: &NamespaceResolver,
+    ) -> Result<()> {
         let mut writer = Writer::new(Vec::new());
         writer
-            .write_event(Event::Empty(e.clone()))
+            .write_event(Event::Empty(retained_root(e, r)))
             .map_err(xml_error)?;
         self.attach(payload, writer.into_inner())
     }
@@ -1220,6 +1243,23 @@ impl Parser {
         validate_view_collection(&root.views)?;
         Ok(root)
     }
+}
+
+/// The element that opens a retained fragment, carrying every namespace
+/// declaration it inherits from the part.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so a retained fragment
+/// resolved on its own by accident. The writer now declares each namespace
+/// once, where XML requires it, so the inherited declarations are added here,
+/// at the one element that becomes the fragment's root. Declarations the
+/// element already makes itself are left alone, and the elements captured
+/// below the root keep the declarations they carry in the part.
+fn retained_root<'element>(
+    e: &BytesStart<'element>,
+    r: &NamespaceResolver,
+) -> BytesStart<'element> {
+    with_in_scope_namespaces(e, &in_scope_declarations(r))
 }
 
 fn parse_filter_payload(markup: &[u8]) -> Result<Column> {
@@ -1740,6 +1780,7 @@ mod tests {
     use super::*;
     use crate::auto_filter::{Calendar, DateGroup, Grouping, Icon, Item, Payload, Top10, Values};
     use litchi_opc::{OpcPackage, PackURI};
+    use quick_xml::name::ResolveResult as Resolved;
 
     fn libreoffice_fixture() -> OpcPackage {
         OpcPackage::from_bytes(include_bytes!(
@@ -2037,6 +2078,70 @@ mod tests {
                 .is_none()
         )
     }
+    /// Every name in `markup` that does not resolve the way it resolves in the part
+    /// the fragment was cut from: an element whose name reaches no namespace at
+    /// all, or a prefixed name whose prefix has no declaration in the fragment.
+    ///
+    /// A fragment cut out of a processed part has to carry the declarations it
+    /// inherits, so this is empty for the markup the accessors publish.
+    fn unresolved_names(markup: &[u8]) -> Vec<String> {
+        let mut reader = NsReader::from_reader(markup);
+        let mut unresolved = Vec::new();
+        loop {
+            let event = reader.read_event().unwrap().into_owned();
+            let resolver = reader.resolver().clone();
+            let (namespace, event) = resolver.resolve_event(event);
+            match event {
+                Event::Start(element) | Event::Empty(element) => {
+                    if !matches!(namespace, Resolved::Bound(_)) {
+                        unresolved
+                            .push(String::from_utf8_lossy(element.name().as_ref()).into_owned());
+                    }
+                    for attribute in element.attributes() {
+                        let attribute = attribute.unwrap();
+                        if matches!(
+                            resolver.resolve_attribute(attribute.key).0,
+                            Resolved::Unknown(_)
+                        ) {
+                            unresolved
+                                .push(String::from_utf8_lossy(attribute.key.as_ref()).into_owned());
+                        }
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        unresolved
+    }
+
+    #[test]
+    fn retained_markup_resolves_standalone() {
+        let xml = br#"<namedSheetViews xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p="urn:payload"><namedSheetView name="View" id="{01234567-89AB-CDEF-0123-456789ABCDEF}"><nsvFilter filterId="{11111111-2222-3333-4444-555555555555}" ref="A1:B9"><columnFilter colId="0"><dxf><p:hint p:v="1"/></dxf></columnFilter></nsvFilter><extLst><x:ext uri="urn:test"><p:payload/></x:ext></extLst></namedSheetView></namedSheetViews>"#;
+        let views = parse_named_sheet_views(xml).unwrap();
+        let view = &views.views()[0];
+        for markup in [
+            view.filters()[0].column_filters()[0]
+                .differential_format()
+                .unwrap()
+                .xml(),
+            view.extensions()[0].markup().xml(),
+        ] {
+            assert!(
+                unresolved_names(markup).is_empty(),
+                "{}",
+                String::from_utf8_lossy(markup)
+            );
+            assert!(String::from_utf8_lossy(markup).contains(r#"xmlns:p="urn:payload""#));
+        }
+        // Writing and reading back adds nothing: the retained roots already
+        // declare everything the part put in scope for them.
+        assert_eq!(
+            parse_named_sheet_views(&write_named_sheet_views(&views).unwrap()).unwrap(),
+            views
+        );
+    }
+
     #[test]
     fn parses_mce_rich_sort_and_extensions() {
         let xml=br#"<namedSheetViews xmlns="http://schemas.microsoft.com/office/spreadsheetml/2019/namedsheetviews" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:no"><namedSheetView name="Rich View" id="{01234567-89AB-CDEF-0123-456789ABCDEF}"><mc:AlternateContent><mc:Choice Requires="u"><u:no/></mc:Choice><mc:Fallback><nsvFilter filterId="{11111111-2222-3333-4444-555555555555}" ref="A1:B9" tableId="0"><sortRules sortMethod="pinYin" caseSensitive="1"><sortRule colId="1"><richSortCondition ref="B1:B9" descending="1" richSortKey="City"/></sortRule></sortRules></nsvFilter></mc:Fallback></mc:AlternateContent><extLst><x:ext uri="urn:test"><u:payload/></x:ext></extLst></namedSheetView></namedSheetViews>"#;

@@ -58,7 +58,9 @@ pub mod xml_name;
 /// model.
 #[doc(hidden)]
 pub mod private {
-    pub use super::binding_tracker::{BindingTracker, BindingTrackerError};
+    pub use super::binding_tracker::{
+        BindingTracker, BindingTrackerError, in_scope_declarations, with_in_scope_namespaces,
+    };
 }
 
 pub use error::{Error, Result};

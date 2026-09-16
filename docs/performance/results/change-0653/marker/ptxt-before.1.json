@@ -1,0 +1,653 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0653-bin/marker-baseline.before",
+    "binary_sha256": "4fb8aa3ddb635e3937ec259e9603e80d4ea92ccef956a249ceae5ef8f993a0dd",
+    "binary_bytes": 61748040,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "8",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 5,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "pptx_marker_eager_full_text",
+      "pptx_marker_control_eager_full_text",
+      "pptx_marker_source_full_text",
+      "pptx_marker_control_source_full_text"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "pptx_marker_eager_full_text",
+        "corpus_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_source_full_text",
+        "corpus_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_control_eager_full_text",
+        "corpus_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_control_source_full_text",
+        "corpus_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "pptx_marker_eager_full_text",
+      "corpus": {
+        "name": "pptx-marker-deck-marker",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-bearing-producer-shape",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49161,
+        "archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "target_entry": "marker-deck-marker",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          59414381,
+          59451781,
+          59505402,
+          59521501,
+          59531342,
+          59617492,
+          59617641,
+          59634732,
+          59678322,
+          59682362,
+          59687992,
+          59710212,
+          59721593,
+          59735642,
+          59738482,
+          59763873,
+          59767712,
+          59779502,
+          59796512,
+          59810543,
+          59815203,
+          59819793,
+          59844164,
+          59858253,
+          59878153,
+          59887934,
+          59896494,
+          59944683,
+          59958684,
+          59967623
+        ],
+        "sample_order": [
+          6,
+          1,
+          2,
+          3,
+          4,
+          0,
+          11,
+          7,
+          28,
+          27,
+          16,
+          8,
+          29,
+          15,
+          17,
+          5,
+          26,
+          19,
+          18,
+          9,
+          13,
+          10,
+          25,
+          23,
+          22,
+          20,
+          14,
+          12,
+          21,
+          24
+        ],
+        "min": 59414381,
+        "p50": 59751177,
+        "p95": 59958684,
+        "p99": 59967623,
+        "max": 59967623,
+        "mean": 59734600.099999994,
+        "standard_deviation": 148741.25868731237,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 59679065.43745094,
+          "upper": 59790134.76254905
+        }
+      },
+      "sink": null,
+      "output_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9"
+    },
+    {
+      "case": "pptx_marker_source_full_text",
+      "corpus": {
+        "name": "pptx-marker-deck-marker",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-bearing-producer-shape",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49161,
+        "archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "target_entry": "marker-deck-marker",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          59378590,
+          59457012,
+          59459121,
+          59488581,
+          59499092,
+          59537731,
+          59593132,
+          59618032,
+          59620691,
+          59636972,
+          59645372,
+          59656112,
+          59737442,
+          59753273,
+          59770733,
+          59782383,
+          59789523,
+          59805523,
+          59805533,
+          59813923,
+          59824163,
+          59848974,
+          59869264,
+          59878273,
+          59878683,
+          59882413,
+          59885674,
+          59942054,
+          60005904,
+          60051764
+        ],
+        "sample_order": [
+          1,
+          9,
+          11,
+          0,
+          2,
+          13,
+          7,
+          18,
+          10,
+          28,
+          15,
+          25,
+          4,
+          27,
+          6,
+          12,
+          3,
+          23,
+          21,
+          5,
+          14,
+          22,
+          16,
+          8,
+          17,
+          26,
+          29,
+          19,
+          24,
+          20
+        ],
+        "min": 59378590,
+        "p50": 59776558,
+        "p95": 60005904,
+        "p99": 60051764,
+        "max": 60051764,
+        "mean": 59730531.23333333,
+        "standard_deviation": 173208.05171869718,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 59665861.54593208,
+          "upper": 59795200.92073458
+        }
+      },
+      "sink": null,
+      "output_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9"
+    },
+    {
+      "case": "pptx_marker_control_eager_full_text",
+      "corpus": {
+        "name": "pptx-marker-deck-control",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-stripped-control",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49589,
+        "archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "target_entry": "marker-deck-control",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          4526424,
+          4534074,
+          4534885,
+          4537515,
+          4540245,
+          4541584,
+          4544205,
+          4545085,
+          4545234,
+          4546075,
+          4546885,
+          4548335,
+          4549815,
+          4549955,
+          4550035,
+          4550175,
+          4550945,
+          4551355,
+          4552715,
+          4553094,
+          4553174,
+          4554285,
+          4554324,
+          4557564,
+          4560864,
+          4562805,
+          4563145,
+          4568844,
+          4569815,
+          4575655
+        ],
+        "sample_order": [
+          7,
+          9,
+          14,
+          3,
+          19,
+          15,
+          10,
+          29,
+          21,
+          6,
+          22,
+          13,
+          8,
+          28,
+          20,
+          23,
+          5,
+          26,
+          2,
+          12,
+          18,
+          25,
+          24,
+          4,
+          27,
+          11,
+          16,
+          1,
+          17,
+          0
+        ],
+        "min": 4526424,
+        "p50": 4550105,
+        "p95": 4569815,
+        "p99": 4575655,
+        "max": 4575655,
+        "mean": 4550637.000000001,
+        "standard_deviation": 10892.48033879451,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 4546570.137683011,
+          "upper": 4554703.862316991
+        }
+      },
+      "sink": null,
+      "output_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9"
+    },
+    {
+      "case": "pptx_marker_control_source_full_text",
+      "corpus": {
+        "name": "pptx-marker-deck-control",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-stripped-control",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49589,
+        "archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "target_entry": "marker-deck-control",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          4417184,
+          4419684,
+          4422404,
+          4426234,
+          4426534,
+          4426733,
+          4429134,
+          4432764,
+          4434834,
+          4437494,
+          4437664,
+          4437914,
+          4438304,
+          4440264,
+          4441454,
+          4441504,
+          4442473,
+          4442984,
+          4445294,
+          4447584,
+          4448554,
+          4448714,
+          4451034,
+          4453494,
+          4454734,
+          4458884,
+          4467004,
+          4468774,
+          4468934,
+          4471194
+        ],
+        "sample_order": [
+          25,
+          23,
+          22,
+          10,
+          18,
+          5,
+          28,
+          3,
+          4,
+          8,
+          12,
+          26,
+          13,
+          7,
+          27,
+          11,
+          6,
+          0,
+          2,
+          1,
+          9,
+          17,
+          24,
+          19,
+          29,
+          15,
+          16,
+          14,
+          21,
+          20
+        ],
+        "min": 4417184,
+        "p50": 4441479,
+        "p95": 4468934,
+        "p99": 4471194,
+        "max": 4471194,
+        "mean": 4442658.599999999,
+        "standard_deviation": 14730.760646138373,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 4437158.661188172,
+          "upper": 4448158.538811825
+        }
+      },
+      "sink": null,
+      "output_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9"
+    }
+  ]
+}

@@ -28,6 +28,19 @@ impl CommentXmlData {
             Self::Shared(slice) => slice.as_bytes(),
         }
     }
+
+    fn self_contained_xml(&self) -> Result<Vec<u8>> {
+        match self {
+            Self::Owned(bytes) => Ok(bytes.to_vec()),
+            Self::Shared(slice) => crate::namespace::self_contained_element_xml(
+                slice.arc().as_slice(),
+                slice.start(),
+                u32::try_from(slice.len()).map_err(|_source_error| {
+                    Error::InvalidFormat("Word comment range exceeds u32".to_string())
+                })?,
+            ),
+        }
+    }
 }
 
 /// A comment in a Word document.
@@ -136,10 +149,27 @@ impl Comment {
     }
 
     /// Get the XML bytes of this comment.
+    ///
+    /// The bytes are an XML fragment whose namespace declarations are those in
+    /// scope in `word/comments.xml`, which since change 0653 are not repeated
+    /// on the fragment's own root element. Use
+    /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[inline]
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
+    }
+
+    /// This comment's XML with every namespace declaration it inherits from
+    /// `word/comments.xml` re-declared on its own `w:comment`, so that it
+    /// parses standalone.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained range or the part around it cannot be
+    /// read, or when a bound on the namespace scan is reached.
+    pub fn self_contained_xml(&self) -> Result<Vec<u8>> {
+        self.xml_data.self_contained_xml()
     }
 
     /// Extract all text content from this comment.

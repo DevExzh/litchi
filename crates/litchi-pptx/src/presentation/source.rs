@@ -2405,7 +2405,9 @@ impl SourceSlide {
                 .checked_add(1)
                 .ok_or_else(|| Error::Invalid("source-backed picture count overflow".into()))?;
             let common = picture.common();
-            let relationship = parse_picture_relationship(common.xml()?)?;
+            // The descriptor is parsed standalone, so the span needs the
+            // namespace bindings it inherits from the processed slide.
+            let relationship = parse_picture_relationship(common.self_contained_xml()?.as_ref())?;
             let target = resolve_picture_target(&self.owner.package, &view, &relationship)?;
             let descriptor = match mode {
                 PictureQueryMode::All => Some(SourceImageDescriptor {
@@ -5311,5 +5313,76 @@ mod tests {
             Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
         ));
         assert!(SourceBackedPresentation::from_path(&path).is_err());
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod picture_fragment_tests {
+    use crate::Error;
+    use crate::shape::{Scene, Shape};
+
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+
+    /// One markup-compatibility slide holding a single picture, with the
+    /// producer's namespace aliases chosen by the caller so that a deck
+    /// outside the conventional `p`/`a`/`r` spelling is covered too.
+    fn slide(p: &str, a: &str, r: &str) -> String {
+        format!(
+            r#"<{p}:sld xmlns:{a}="{DML}" xmlns:{r}="{REL}" xmlns:{p}="{PML}" xmlns:mc="{MCE}" xmlns:p14="{P14}" mc:Ignorable="p14">
+  <{p}:cSld><{p}:spTree>
+    <{p}:nvGrpSpPr/><{p}:grpSpPr/>
+    <{p}:pic>
+      <{p}:nvPicPr><{p}:cNvPr id="4" name="Photo" p14:dummy="retained"/></{p}:nvPicPr>
+      <{p}:blipFill><{a}:blip {r}:embed="rId3"/><{a}:stretch><{a}:fillRect/></{a}:stretch></{p}:blipFill>
+      <{p}:spPr/>
+    </{p}:pic>
+  </{p}:spTree></{p}:cSld>
+</{p}:sld>"#
+        )
+    }
+
+    #[test]
+    fn self_contained_picture_descriptors_parse_for_any_producer_prefix() {
+        for (p, a, r) in [("p", "a", "r"), ("q", "d", "rel")] {
+            let xml = slide(p, a, r);
+            let scene = Scene::read(xml.as_bytes()).unwrap();
+            assert!(scene.is_rewritten(), "{p}: the MCE input must be rewritten");
+            let shape = scene.at(0).unwrap();
+            assert!(matches!(shape, Shape::Picture(_)));
+            let descriptor = shape.self_contained_xml().unwrap();
+            let relationship = super::parse_picture_relationship(descriptor.as_ref()).unwrap();
+            assert_eq!(relationship.id, "rId3", "{p}: embedded relationship");
+            assert!(!relationship.external, "{p}: embedded, not linked");
+        }
+    }
+
+    #[test]
+    fn a_borrowed_span_does_not_re_declare_an_unconventional_ancestor_prefix() {
+        let xml = slide("q", "d", "rel");
+        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let borrowed = scene.at(0).unwrap().xml().unwrap();
+        assert!(
+            !borrowed
+                .windows(PML.len())
+                .any(|window| window == PML.as_bytes()),
+            "the borrowed span inherits its bindings instead of repeating them"
+        );
+        match super::parse_picture_relationship(borrowed) {
+            Err(Error::Invalid(message)) => assert_eq!(
+                message, "picture descriptor XML does not have a p:pic root",
+                "unexpected refusal text"
+            ),
+            Err(other) => panic!("unexpected refusal: {other}"),
+            Ok(_) => panic!("a span without its bindings must not parse standalone"),
+        }
     }
 }

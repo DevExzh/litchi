@@ -1,0 +1,190 @@
+change 0653 — OOXML corpus publication evidence
+==============================================================================
+
+BEFORE rows : rows-before.tsv.gz
+AFTER rows  : rows-after.tsv.gz
+
+PROVENANCE
+------------------------------------------------------------------------------
+base commit                 : 70d7768cc (both legs read the BEFORE checkout's test-data, so the inputs are identical)
+BEFORE leg                  : /home/zhuhe/code/litchi-worktrees/before-70d7768cc (read-only detached checkout of 70d7768cc)
+AFTER leg                   : /home/zhuhe/code/litchi-worktrees/0653 (HEAD 70d7768cc + uncommitted work)
+AFTER crates/ diff sha256   : 57b4a34fcd087d8d87a0f58d71b407f0895467728a4a8d232dde6a7da1684f76
+corpus root                 : <BEFORE checkout>/test-data
+probe binary sha256, BEFORE : c7a8c32f14cdc4c8453aaed2bcc0a98b108ba3ff833143753bdffc1f5ba35254
+probe binary sha256, AFTER  : 098c625f64193261794676ba0dca6f87ab097a6671e98a1f3571a809da3f76e3
+probe source                : saveprobe/src/main.rs; manifest saveprobe/Cargo.toml.example with <checkout> replaced by each leg's path
+nothing here is timed; every number is a deterministic function of the input bytes
+
+Column meaning: `identical-to-source` compares the UNCOMPRESSED member
+payload of the published archive against the same-named member's
+uncompressed payload in the source archive. The compressed (stored)
+payload hash is carried in a separate column and is never what
+`identical-to-source` means.
+
+CORPUS
+------------------------------------------------------------------------------
+fixtures scanned            : 320
+  classified DOCX          : 62
+  classified PPTX          : 78
+  classified UNCLASSIFIED  : 1
+  classified XLSX          : 179
+classification differs      : 0
+routes                      : 12
+  docx_edit_save
+  docx_noop_save
+  docx_source_backed_document
+  docx_source_backed_section_layout
+  pptx_edit_save
+  pptx_guides_publish
+  pptx_noop_save
+  pptx_source_backed_slide
+  xlsx_edit_save
+  xlsx_noop_save
+  xlsx_source_backed_cell_values
+  xlsx_source_backed_tab_state
+
+1. PRISTINE-PART PROOF
+------------------------------------------------------------------------------
+Definition A (declared): a member is 'the edited part' for a route when
+its name matches that route's documented target set; every other member
+is pristine. `*_noop_save` makes no edit, so it has no edited part.
+
+member rows, BEFORE         : 20421
+member rows, AFTER          : 20421
+rows present on one leg only: 0
+
+non-edited-part member rows : 19165
+  identical-to-source, BEFORE: 18876
+  identical-to-source, AFTER : 18876
+  identical flag DIFFERS     : 0
+
+Definition B (observed): a member is pristine when the BEFORE leg
+published it byte for byte as the source archive held it.
+pristine member rows, BEFORE: 19896
+  no longer identical AFTER  : 0
+  published hash moved       : 0
+  newly identical on AFTER   : 0
+
+Per route (member rows / identical-to-source / not identical):
+  route                                           BEFORE             AFTER
+  docx_edit_save                           745/821           745/821      
+  docx_noop_save                           859/865           859/865      
+  docx_source_backed_document                6/6               6/6        
+  docx_source_backed_section_layout          6/6               6/6        
+  pptx_edit_save                          3192/3214         3192/3214     
+  pptx_guides_publish                      252/256           252/256      
+  pptx_noop_save                          3417/3417         3417/3417     
+  pptx_source_backed_slide                2895/2895         2895/2895     
+  xlsx_edit_save                          2518/2935         2518/2935     
+  xlsx_noop_save                          3003/3003         3003/3003     
+  xlsx_source_backed_tab_state            3003/3003         3003/3003     
+
+2. REGENERATED-PART ENUMERATION (published hash differs between legs)
+------------------------------------------------------------------------------
+member rows whose published UNCOMPRESSED hash differs : 4
+member rows whose published COMPRESSED hash differs   : 4
+
+by route:
+  pptx_guides_publish                      4
+by member-name pattern (digit runs collapsed to N):
+  ppt/presentation.xml                     4
+
+every differing row:
+  fixture                                                                 route                   member                     before-bytes after-bytes
+  test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx pptx_guides_publish     ppt/presentation.xml              24166        3235
+  test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx           pptx_guides_publish     ppt/presentation.xml               4737        1377
+  test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx         pptx_guides_publish     ppt/presentation.xml               6108        1488
+  test-data/ooxml/pptx/shape-soft-edges.pptx                              pptx_guides_publish     ppt/presentation.xml               8603        1883
+
+canonical XML comparison (namespace-resolving, declarations removed):
+  EQUAL     test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx  [ppt/presentation.xml]  24166 -> 3235 bytes (0.134x), xmlns: decls 309 -> 10
+  EQUAL     test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx  [ppt/presentation.xml]  4737 -> 1377 bytes (0.291x), xmlns: decls 58 -> 10
+  EQUAL     test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx  [ppt/presentation.xml]  6108 -> 1488 bytes (0.244x), xmlns: decls 76 -> 10
+  EQUAL     test-data/ooxml/pptx/shape-soft-edges.pptx  [ppt/presentation.xml]  8603 -> 1883 bytes (0.219x), xmlns: decls 106 -> 10
+
+  canonically EQUAL     : 4
+  canonically NOT EQUAL : 0
+
+3. REFUSAL IDENTITY
+------------------------------------------------------------------------------
+outcome rows per leg        : 1276 / 1276
+  OK,  BEFORE / AFTER       : 867 / 867
+  ERR, BEFORE / AFTER       : 409 / 409
+outcomes differing, raw text: 91
+outcomes differing, normalized for the unordered-set message: 4
+  of those, an ERR outcome on either leg (a refusal difference): 0
+  of those, OK on both legs (only the published byte count moved): 4
+    ('test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx', 'pptx_guides_publish')  published bytes 108559 -> 108334
+    ('test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx', 'pptx_guides_publish')  published bytes 24860 -> 24811
+    ('test-data/office-interop/libreoffice-resaved/shapes-litchi.pptx', 'pptx_guides_publish')  published bytes 53480 -> 53426
+    ('test-data/ooxml/pptx/shape-soft-edges.pptx', 'pptx_guides_publish')  published bytes 50347 -> 50279
+outcomes whose OK/ERR status differs: 0
+
+determinism control — the BEFORE binary run twice over the same corpus:
+  outcome rows differing, raw text     : 92
+  outcome rows differing, normalized   : 0
+  member rows differing                : 0
+  (a raw-text outcome difference that also appears here is run-to-run
+   nondeterminism in the message, not a difference between the legs.)
+  The control's own row file is not among this packet's retained
+  deliverables; its outcome rows are retained, side by side with the
+  two legs, in refusals.tsv.
+  routes affected: ['xlsx_source_backed_cell_values']
+
+ERR outcomes by route and Debug identity (variant before the first '(' or '{'):
+  route                               Debug variant               BEFORE   AFTER
+  docx_edit_save                      Common                           6       6
+  docx_edit_save                      Io                               3       3
+  docx_edit_save                      Opc                              2       2
+  docx_noop_save                      Common                           6       6
+  docx_noop_save                      Opc                              2       2
+  docx_source_backed_document         Document                        59      59
+  docx_source_backed_document         Opc                              2       2
+  docx_source_backed_section_layout   Opc                              2       2
+  docx_source_backed_section_layout   UnsafeEdit                      59      59
+  pptx_edit_save                      Opc                              3       3
+  pptx_guides_publish                 XmlPublication                  74      74
+  pptx_source_backed_slide            UnsafeEdit                      10      10
+  xlsx_edit_save                      Package                          2       2
+  xlsx_source_backed_cell_values      Invalid                        179     179
+
+edit-outcome rows (X):
+  rows per leg               : 867 / 867
+  admitted, BEFORE / AFTER   : 796 / 796
+  refused,  BEFORE / AFTER   : 71 / 71
+  differing                  : 0
+
+4. BYTE TOTALS (sum of published archive bytes over successful saves)
+------------------------------------------------------------------------------
+  route                                 saves    BEFORE bytes     AFTER bytes       delta    ratio
+  docx_edit_save                           51         4147579         4147579           0 1.000000
+  docx_noop_save                           54         4218619         4218619           0 1.000000
+  docx_source_backed_document               1            3009            3009           0 1.000000
+  docx_source_backed_section_layout         1            3009            3009           0 1.000000
+  pptx_edit_save                           75         5226113         5226113           0 1.000000
+  pptx_guides_publish                       4          237246          236850        -396 0.998331
+  pptx_noop_save                           78         5688205         5688205           0 1.000000
+  pptx_source_backed_slide                 68         5189558         5189558           0 1.000000
+  xlsx_edit_save                          177         4971951         4971951           0 1.000000
+  xlsx_noop_save                          179         5073329         5073329           0 1.000000
+  xlsx_source_backed_cell_values            0               0               0           0        -
+  xlsx_source_backed_tab_state            179         5073329         5073329           0 1.000000
+  ALL ROUTES                                         39831947        39831551        -396 0.999990
+
+published uncompressed member payload totals:
+  route                                   BEFORE bytes     AFTER bytes       delta
+  docx_edit_save                               9903492         9903492           0
+  docx_noop_save                              10065959        10065959           0
+  docx_source_backed_document                     9297            9297           0
+  docx_source_backed_section_layout               9297            9297           0
+  pptx_edit_save                              14490719        14490719           0
+  pptx_guides_publish                          1382758         1347127      -35631
+  pptx_noop_save                              15351717        15351717           0
+  pptx_source_backed_slide                    13154550        13154550           0
+  xlsx_edit_save                              20444991        20444991           0
+  xlsx_noop_save                              20906269        20906269           0
+  xlsx_source_backed_cell_values                     0               0           0
+  xlsx_source_backed_tab_state                20906269        20906269           0
+
+end of summary

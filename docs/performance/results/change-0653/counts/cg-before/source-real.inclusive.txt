@@ -1,0 +1,40 @@
+651,068,133 (100.0%)  PROGRAM TOTALS
+309,078,352 (47.47%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+292,028,174 (44.85%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+258,161,559 (39.65%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+235,478,102 (36.17%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+178,099,287 (27.35%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+152,589,475 (23.44%)  /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/stream.rs:litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+ 61,354,398 ( 9.42%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 29,498,129 ( 4.53%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+ 27,851,278 ( 4.28%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}>
+ 27,736,934 ( 4.26%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<litchi_ooxml_common::mce::stream::EventMeter>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+ 17,534,291 ( 2.69%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+ 17,185,761 ( 2.64%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 15,310,378 ( 2.35%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,669,521 ( 1.95%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 12,634,441 ( 1.94%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 12,554,385 ( 1.93%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+ 12,248,264 ( 1.88%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+ 11,468,672 ( 1.76%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+ 11,468,672 ( 1.76%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+ 10,028,144 ( 1.54%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+  9,524,803 ( 1.46%)  ???:__rustc::__rust_realloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.before]
+  9,138,272 ( 1.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:<quick_xml::reader::Reader<litchi_ooxml_common::mce::stream::EventMeter>>::read_event_impl::<&mut alloc::vec::Vec<u8>>
+  8,601,504 ( 1.32%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc
+  7,014,968 ( 1.08%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+  570,215 ( 0.09%)          __rust_alloc(layout.size(), layout.alignment())
+    1,485 ( 0.00%)  => ???:__rustc::__rust_alloc (19x)
+  107,342 ( 0.02%)      unsafe { __rust_realloc(ptr, layout.size(), layout.alignment(), new_size) }
+      294 ( 0.00%)  => ???:__rustc::__rust_realloc (2x)
+       36 ( 0.00%)          __rust_alloc_zeroed(layout.size(), layout.alignment())
+   33,068 ( 0.01%)  => ???:__rustc::__rust_alloc_zeroed (1x)
+     .                           String::from_utf8_lossy(name)
+27,200 ( 0.00%)      let row = std::str::from_utf8(&bytes[split..])
+311,456 ( 0.05%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (5,440x)
+         .               fn for_each_effective(&self, mut visit: impl FnMut(&str, &str) -> R<()>) -> R<()> {
+         .           impl BoundedOutput {
+        32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+        15 ( 0.00%)      let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+289,410,341 (44.45%)  => /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (11,620x)
+ 2,617,833 ( 0.40%)  => /home/zhuhe/code/litchi-worktrees/before-70d7768cc/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (94x)

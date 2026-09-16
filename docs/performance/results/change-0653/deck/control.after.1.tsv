@@ -1,0 +1,11 @@
+source	/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0653/measure/deck/marker-stripped.pptx
+archive_bytes	106536
+target	slide:1/shape:1
+iterations	30
+phase	p50_ns	mean_ns	p95_ns	min_ns
+opened_presentation (capture)	3539559	3539600	3595730	3483639
+Snapshot::edit (working clone)	22390	23233	29230	21440
+set_shape_text	614073	615046	628584	602484
+Transaction::commit	4090852	4096642	4169332	4026952
+apply_opened_presentation_commit	88261	91223	110731	85601
+edit total	8365575	8365745	8499776	8242894

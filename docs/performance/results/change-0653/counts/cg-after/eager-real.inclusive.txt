@@ -1,0 +1,40 @@
+154,479,583 (100.0%)  PROGRAM TOTALS
+ 62,720,263 (40.60%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 45,013,096 (29.14%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 19,707,235 (12.76%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 12,670,013 ( 8.20%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 12,554,877 ( 8.13%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 10,090,297 ( 6.53%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  9,190,836 ( 5.95%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+  4,695,194 ( 3.04%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  4,563,163 ( 2.95%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:litchi_ooxml_common::mce::codec::start
+  4,280,386 ( 2.77%)  /rust/deps/hashbrown-0.17.1/src/set.rs:litchi_ooxml_common::mce::codec::start
+  3,254,417 ( 2.11%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  2,134,725 ( 1.38%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+  2,116,683 ( 1.37%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::reserve [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  1,926,285 ( 1.25%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:litchi_ooxml_common::mce::codec::start
+  1,821,178 ( 1.18%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  1,695,397 ( 1.10%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:litchi_ooxml_common::mce::codec::start
+184 ( 0.00%)              let Ok(name) = std::str::from_utf8(raw_name) else {
+2,700 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+    69 ( 0.00%)      match std::str::from_utf8(path.as_ref()) {
+ 2,700 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+ 2 ( 0.00%)          let content = std::str::from_utf8(processed.as_ref())
+85,191 ( 0.06%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+ .               let content = std::str::from_utf8(processed.as_ref())
+48,545 ( 0.03%)          let decoded = Ok(Cow::Borrowed(std::str::from_utf8(bytes)?));
+281,123 ( 0.18%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (5,577x)
+     .                   buf.push_str(std::str::from_utf8(bytes)?);
+     11 ( 0.00%)      memchr::memmem::find(content, b"dyDescent").is_some()
+    913 ( 0.00%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:memchr::memmem::find (1x)
+      .               /// that it is valid UTF-8. `from_utf8()` checks to ensure that the bytes are valid
+115,136 ( 0.07%)          self.read_event_impl(buf)
+12,554,877 ( 8.13%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> (28,784x)
+      .           macro_rules! read_event_impl {
+869,235 ( 0.56%)      fn read_event_impl<'i, B>(&mut self, mut buf: B) -> Result<Event<'i>, Error>
+      .                   read_event_impl!(self, buf, self.reader, read_until_close)
+     .                           String::from_utf8_lossy(name)
+27,200 ( 0.02%)      let row = std::str::from_utf8(&bytes[split..])
+311,456 ( 0.20%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (5,440x)
+      .                               String::from_utf8_lossy(name)
+223,096 ( 0.14%)          __rust_alloc(layout.size(), layout.alignment())

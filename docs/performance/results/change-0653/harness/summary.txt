@@ -1,0 +1,19 @@
+selector / shape                                         before p50      after p50     delta       A/A
+xlsx_first_cell [dense-wide]                               30689384       30575663    -0.37%     0.85%
+xlsx_first_cell [medium]                                     478368         484188    +1.22%     0.94%
+xlsx_first_cell [tiny]                                        36290          36410    +0.33%     0.58%
+xlsx_full_cell_scan [dense-wide]                           30920210       30367492    -1.79%     1.16%
+xlsx_full_cell_scan [medium]                                 484802         483603    -0.25%     1.38%
+xlsx_full_cell_scan [tiny]                                    36720          36265    -1.24%     1.38%
+xlsx_narrow_column_range_scan [dense-wide]                    12345          11805    -4.37%     6.06%
+xlsx_narrow_column_range_scan [medium]                          430            440    +2.33%     2.33%
+xlsx_narrow_column_range_scan [tiny]                            110            110    +0.00%     0.00%
+xlsx_open_owned [dense-wide]                                1351777        1357348    +0.41%     1.94%
+xlsx_open_owned [medium]                                     103110         102366    -0.72%     2.16%
+xlsx_open_owned [tiny]                                        50910          50505    -0.80%     2.25%
+
+selector / shape                                         before p50      after p50     delta       A/A
+pptx_real_file_ordinary_save_counting_publish [real-file]         271171         327597   +20.81%     5.54%
+pptx_real_file_ordinary_save_edit [real-file]             133438301       22960854   -82.79%     4.77%
+pptx_real_file_ordinary_save_lifecycle [real-file]        129960346       24680588   -81.01%     1.68%
+

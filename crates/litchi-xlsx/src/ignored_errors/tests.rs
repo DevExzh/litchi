@@ -2,8 +2,12 @@ use super::codec::MAX_DEPTH;
 use super::*;
 use crate::error::Result;
 use litchi_opc::{OpcPackage, PackURI};
+use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
 const NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 fn parse(child: &str) -> Result<Option<IgnoredErrors>> {
     parse_worksheet_ignored_errors(
@@ -148,4 +152,69 @@ fn reads_poi_ignored_error_fixtures() {
     )));
     assert_eq!(large.entries()[0].ranges()[0].as_str(), "A1:J7577");
     assert!(large.entries()[0].ignores(IgnoredErrorType::NumberStoredAsText));
+}
+
+/// Every name in `markup` that does not resolve the way it resolves in the part
+/// the fragment was cut from: an element whose name reaches no namespace at
+/// all, or a prefixed name whose prefix has no declaration in the fragment.
+///
+/// A fragment cut out of a processed part has to carry the declarations it
+/// inherits, so this is empty for the markup the accessors publish.
+fn unresolved_names(markup: &[u8]) -> Vec<String> {
+    let mut reader = NsReader::from_reader(markup);
+    let mut unresolved = Vec::new();
+    loop {
+        let event = reader.read_event().unwrap().into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(_)) {
+                    unresolved.push(String::from_utf8_lossy(element.name().as_ref()).into_owned());
+                }
+                for attribute in element.attributes() {
+                    let attribute = attribute.unwrap();
+                    if matches!(
+                        resolver.resolve_attribute(attribute.key).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        unresolved
+                            .push(String::from_utf8_lossy(attribute.key.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    unresolved
+}
+
+#[test]
+fn retained_extension_markup_resolves_standalone() {
+    let xml = format!(
+        concat!(
+            r#"<worksheet xmlns="{}" xmlns:mc="{}" xmlns:p="urn:payload"><ignoredErrors>"#,
+            r#"<ignoredError sqref="A1" formula="1"/><extLst><ext uri="urn:open">"#,
+            r#"<p:payload p:flag="1"/></ext><ext uri="urn:empty"/></extLst>"#,
+            r#"</ignoredErrors></worksheet>"#,
+        ),
+        NS, MCE
+    );
+    let value = parse_worksheet_ignored_errors(xml.as_bytes())
+        .unwrap()
+        .unwrap();
+    assert_eq!(value.extensions().len(), 2);
+    for extension in value.extensions() {
+        let markup = extension.markup();
+        assert!(
+            unresolved_names(markup).is_empty(),
+            "{}",
+            String::from_utf8_lossy(markup)
+        );
+    }
+    assert!(
+        String::from_utf8_lossy(value.extensions()[0].markup())
+            .contains(r#"xmlns:p="urn:payload""#)
+    );
 }

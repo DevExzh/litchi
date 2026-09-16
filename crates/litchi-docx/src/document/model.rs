@@ -77,7 +77,24 @@ impl OpaqueBlock {
         }
     }
 
+    /// The retained active XML element with every namespace declaration it
+    /// inherits from the document re-declared on its own root element, so that
+    /// it parses standalone.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained range or the document around it
+    /// cannot be read, or when a bound on the namespace scan is reached.
+    pub fn self_contained_xml(&self) -> crate::error::Result<Vec<u8>> {
+        crate::namespace::self_contained_element_xml(&self.source, self.start, self.length)
+    }
+
     /// Borrow the retained active XML element exactly as selected by MCE.
+    ///
+    /// The bytes are an XML fragment whose namespace declarations are those in
+    /// scope where it appears in the document, which since change 0653 are not
+    /// repeated on the fragment's own root element. Use
+    /// [`self_contained_xml`](Self::self_contained_xml) to parse it on its own.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
         let Ok(start) = usize::try_from(self.start) else {

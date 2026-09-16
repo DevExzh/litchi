@@ -1,0 +1,230 @@
+change 0653 semantic-read comparison
+========================================================================
+
+0. Probe binaries (built from readprobe/, one leg each)
+   e6293faf7705f157a23c029f0eb5ed3c1fabb1bf29300ac060dc8e9073eb39f3  readprobe.before
+   938665736c8e986fd676d7d175f33218dcfc5c92329b13abe31f7a5a1236d441  readprobe.after
+
+1. Corpus and observation counts
+   fixtures processed (before leg): 320
+   fixtures processed (after leg):  320
+   observation lines (before leg):  179205
+   observation lines (after leg):   179205
+   (fixture, key) sequence identical between legs: True
+   timeouts recorded: before=0 after=0
+   refusals (ERR) recorded: before=122 after=118
+   panics recorded: before=0 after=0
+
+2. Differing lines
+   differing observation lines: 1890
+   fixtures with at least one differing line: 241
+
+   key group docx.par.N.inline.N.xml: 1045 lines across 23 fixtures (c-markup-canonical-same=1045)
+      example fixture: libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx
+         key:    docx.par.0.inline.1.xml  [c-markup-canonical-same]
+         before: len=1094;sha=8f2dabd319cee3ed52becb0b4d1424a4057d55998d2ad0c3b86932df9f902500
+         after:  len=61;sha=8cc03916b6d9de119ef6faba85fd87db3d3237faf25614205c1aa8ce62116b79
+      example fixture: libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx
+         key:    docx.par.0.inline.2.xml  [c-markup-canonical-same]
+         before: len=1073;sha=bb37e41e959752eab9d07a8cd74d1b855d99b5c765060ee94c68a61a2c225898
+         after:  len=40;sha=3c9ca5657f8cf78835b65a55b64fe233571d32430ebdb63afdb89063ca30da86
+      example fixture: libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx
+         key:    docx.par.0.inline.1.xml  [c-markup-canonical-same]
+         before: len=1356;sha=03a77cb3b3173e262dbf2af70703c878cf0d7bd99764be5d8b7d06f97b85849f
+         after:  len=44;sha=24d5d4f1988da84d4ae8c3f19a734cc04fd0bdbf96dd7503a4f1d6e328cfe1c5
+
+   key group xlsx.sheet.N.view.N.retained_xml: 389 lines across 178 fixtures (c-markup-canonical-same=389)
+      example fixture: libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx
+         key:    xlsx.sheet.0.view.0.retained_xml  [c-markup-canonical-same]
+         before: len=1148;sha=afbfded947864ce1062a67d89bef963a6b650dd4984794135410ca03c9b7f032
+         after:  len=630;sha=b432dc6440fb5cb9879595e79600b9f895e3b05107eb090b8f483d06372179d8
+      example fixture: libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx
+         key:    xlsx.sheet.0.view.0.retained_xml  [c-markup-canonical-same]
+         before: len=1166;sha=739c96278f6be298ac58782f329510c838677721b3842596834c2cc919b29218
+         after:  len=648;sha=70cb2de22dd288072a93e1bef80ca37f05c8a53ae629d174bbf5dbcba90be11b
+      example fixture: libreoffice-core/sc/qa/unit/data/functions/dynamic_array/xlsx/DynamicArrayFixture.xlsx
+         key:    xlsx.sheet.0.view.0.retained_xml  [c-markup-canonical-same]
+         before: len=1148;sha=3ab3e6e31adf689b3317ebcc5361875ebccf21341d8368e64ab9afcbf98cdc3b
+         after:  len=630;sha=085798635e1bb2f1064dae7614febcada1d4c9dd9589e41eeac8e1731ac96a71
+
+   key group pptx.sld.N.shp.N.xml: 322 lines across 10 fixtures (c-markup-canonical-same=322)
+      example fixture: libreoffice-core/oox/qa/unit/data/import-mce.pptx
+         key:    pptx.sld.0.shp.0.xml  [c-markup-canonical-same]
+         before: len=7509;sha=36ccb8e1eb704b325fef84afbb9d09c68c1390ca2093648fa866fb160c3b1aff
+         after:  len=812;sha=b80a2d4689a8eb1eef74fa05f783d421a5d0fcb6089c0b2d66845d4e7b22e99b
+      example fixture: libreoffice-core/sd/qa/unit/data/pptx/ole.pptx
+         key:    pptx.sld.0.shp.0.xml  [c-markup-canonical-same]
+         before: len=4382;sha=1dc150a510a4e2c7178d02b5efd1ab870df51eee673f039ea76343886ea50f13
+         after:  len=895;sha=cdb9cbdb1f8b7bb5f82deb86d2437cf5cd05c322d719c056d4301a44269ce70e
+      example fixture: libreoffice-core/sd/qa/unit/data/pptx/ole.pptx
+         key:    pptx.sld.0.shp.1.xml  [c-markup-canonical-same]
+         before: len=6494;sha=768b18832759919db11f1f7589dee0c8b24b0523f754281567d2d74a498ffcd9
+         after:  len=797;sha=bc8b6efd5e5ea7579cfef8d2dcefb9fbce99c2e27c67d89cd2031459b3ca0dee
+
+   key group docx.block.N.xml: 66 lines across 52 fixtures (c-markup-canonical-same=66)
+      example fixture: libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx
+         key:    docx.block.1.xml  [c-markup-canonical-same]
+         before: len=5477;sha=f4913e97a6daa40857f46376319c812190eeefbbb25226cef8f15b1373a8957c
+         after:  len=312;sha=51309cf23e42c1afd5c85fe7a0a37d0cb6e33effa2816fa3288621e533dd8a79
+      example fixture: libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx
+         key:    docx.block.31.xml  [c-markup-canonical-same]
+         before: len=6887;sha=d8a3bb3f4fbb884a7a238c84f502458bfe76ca462949cffdbe044ae1b4c0aa63
+         after:  len=327;sha=ee9a4f01deb0087e378844e37537ff723ea7d48a5f65c5fcc453fa2b6d4c976a
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx
+         key:    docx.block.5.xml  [c-markup-canonical-same]
+         before: len=6574;sha=1eea64e815ecec52a879a30b29d23875a10344f35264d3e945977447eb960e08
+         after:  len=376;sha=2306b86ad603180a357d39cbd22f2e02d48970300ebfbccb986d2da9c33a7030
+
+   key group docx.par.N.run.N.content.N.xml: 53 lines across 18 fixtures (c-markup-canonical-same=53)
+      example fixture: libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx
+         key:    docx.par.0.run.0.content.0.xml  [c-markup-canonical-same]
+         before: len=9984;sha=1fa2f31821c1a6f141dab837092c2f63558c41c917d21e35c5c47bb2960de793
+         after:  len=637;sha=6f31217030d02620910a95cf11d5afc4dae86774d6a305d1c8d102186b62992e
+      example fixture: libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx
+         key:    docx.par.26.run.0.content.0.xml  [c-markup-canonical-same]
+         before: len=23228;sha=de0fe3de0cd2e924b78afd1302e59ae1c9e42001aa6d1b6a9cf8cc739e218eb2
+         after:  len=4860;sha=d6a315013a386effa848bda4619ce7835aa624b0ac84947538bd108a9b3bd1e7
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx
+         key:    docx.par.1.run.0.content.0.xml  [c-markup-canonical-same]
+         before: len=2219;sha=23e97215474481899e9ba4486b7680101ee2d6e122414c6821fb76cb2dc5bdc1
+         after:  len=153;sha=b932c10be22bec6b978c6953980f638d7aec0bd6cd22f2cdbeb332f33468669b
+
+   key group docx.par.N.ext: 4 lines across 1 fixtures (b-outcome=4)
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx
+         key:    docx.par.0.ext  [b-outcome]
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx
+         key:    docx.par.1.ext  [b-outcome]
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx
+         key:    docx.par.2.ext  [b-outcome]
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+
+   key group docx.en.N.xml: 4 lines across 3 fixtures (c-markup-canonical-same=4)
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx
+         key:    docx.en.0.xml  [c-markup-canonical-same]
+         before: len=58522;sha=a1b7d4341cca854e1775ef181bdd0417c5d42477289d8859ac8db486380e027b
+         after:  len=1707;sha=a0579f221bfb1d022c7e1207c7dd9a58cbe47e672b727ddb60da5c30969ad4cd
+      example fixture: libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx
+         key:    docx.en.1.xml  [c-markup-canonical-same]
+         before: len=58422;sha=d4f1c0a129ab58edd22130c440ccad6235983a2848838353edfb4105730b314f
+         after:  len=1607;sha=977ffc2187b8547ff7aa89b816792f0bacb85ae471137672affe2b86253ddf5d
+      example fixture: ooxml/docx/endnotes.docx
+         key:    docx.en.0.xml  [c-markup-canonical-same]
+         before: len=9620;sha=fb6d7d9e77725f88b9e115b6fa47472a8a2a0911959a18495def6d08250d2293
+         after:  len=404;sha=21176b57dc7fcb8e4c18677ee779c724f32844ac31a5dd1712d715d1782b1307
+
+   key group docx.cmt.N.xml: 4 lines across 4 fixtures (c-markup-canonical-same=4)
+      example fixture: libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx
+         key:    docx.cmt.0.xml  [c-markup-canonical-same]
+         before: len=25133;sha=dfd579eb83fe0d5534de23f1b8c61b9e7d4a9d105b3640e5d3e05ffb1d2d4ca5
+         after:  len=363;sha=a9c65340db50d6241ef25bcef88a67a408b44814b72b82ce90e56418e97cbc35
+      example fixture: ooxml/docx/comment.docx
+         key:    docx.cmt.0.xml  [c-markup-canonical-same]
+         before: len=69276;sha=691ebee9b57a26203882291b3d1df4ae64accbd8108932e7a99969b4184ae35b
+         after:  len=3060;sha=7ff8cb57b190231691b3f2650678dbbd89db582d4276e3130fd864ea570391d8
+      example fixture: ooxml/docx/testComment.docx
+         key:    docx.cmt.0.xml  [c-markup-canonical-same]
+         before: len=126155;sha=cc6ad2bd35997dc274f07a63b864051ad03e3af498783405e02e00ab8b37428f
+         after:  len=2099;sha=41a11b6a10492da20cd69d06e506d2725e76c4fde6ad5efe712ab569824e29b5
+
+   key group docx.fn.N.xml: 3 lines across 3 fixtures (c-markup-canonical-same=3)
+      example fixture: ooxml/docx/footnotes.docx
+         key:    docx.fn.0.xml  [c-markup-canonical-same]
+         before: len=9627;sha=d2323c208d2cfc7afdf13a69ee4be46f88fce5b7dd6375ed65c5e8ea11908b72
+         after:  len=411;sha=9592a897beee3cc909d220f3f549065361da02704771455d18cfa5281290b3b6
+      example fixture: ooxml/docx/table_footnotes.docx
+         key:    docx.fn.0.xml  [c-markup-canonical-same]
+         before: len=9646;sha=a4167a4e4219fdb74b505b3280614e49aeb60c3f964bc85bb3072d58261565fc
+         after:  len=430;sha=cad5d34fade4f5b01b41ba9e5d2de078551a6ac59b0ee07f353f3ec6bdc99c40
+      example fixture: poi/test-data/document/Bug54849.docx
+         key:    docx.fn.0.xml  [c-markup-canonical-same]
+         before: len=22322;sha=e205d621aa13bf9592554f50cd354e915fd24d5e06ab609f47b934c91a0669f4
+         after:  len=629;sha=d4cfb9098282947f792759506628e15d33d1ac0d00759cffb4ccfcd2ccfa74ee
+
+3. Classes
+   a-value                      0
+   b-outcome                    4
+   c-markup-canonical-same      1886
+   d-markup-canonical-differs   0
+
+   Every class-b line (outcome changed):
+      libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx  docx.par.0.ext
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+      libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx  docx.par.1.ext
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+      libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx  docx.par.2.ext
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+      libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx  docx.par.3.ext
+         before: ERR | InvalidFormat("Word extension XML must have one [112] root")
+         after:  para_id=none;text_id=none;no_spell_err=none
+
+   Every class-d line (canonical form changed - blocking):
+      (none)
+
+   canonicalization diagnostics
+      prefixes bound to a synthetic URI because neither leg's
+      fragment declared them: 0 []
+      canonical XML parse failures: 0
+      markup lines with no dump-mode bytes: 0
+
+4. Markup accessor bytes
+   markup accessor observations per leg: before=2209 after=2209
+   total bytes returned (before): 13250784
+   total bytes returned (after):  1615294
+   change: -11635490 bytes (-87.81%)
+   before/after ratio: 8.20x
+
+   markup accessor observations by key family (before leg):
+      docx.par.N.inline.N.xml              n=1045  fixtures=23   before=854475    after=52907
+      pptx.sld.N.shp.N.xml                 n=644   fixtures=76   before=10512261  after=1341738
+      xlsx.sheet.N.view.N.retained_xml     n=389   fixtures=178  before=220710    after=157315
+      docx.block.N.xml                     n=67    fixtures=53   before=824066    after=30026
+      docx.par.N.run.N.content.N.xml       n=53    fixtures=18   before=304224    after=19956
+      docx.en.N.xml                        n=4     fixtures=3    before=146734    after=4261
+      docx.cmt.N.xml                       n=4     fixtures=4    before=346719    after=7621
+      docx.fn.N.xml                        n=3     fixtures=3    before=41595     after=1470
+
+5. Coverage of the accessors change 0653 migrated
+   worksheet sheetView retained markup        observations=389    with-bytes=389   fixtures=178  refusals=0
+   worksheet sheetView ext markup             observations=0      with-bytes=0     fixtures=0    refusals=0
+   worksheet sheetViews collection ext markup observations=0      with-bytes=0     fixtures=0    refusals=0
+   worksheet pivotArea markup                 observations=0      with-bytes=0     fixtures=0    refusals=0
+   worksheet ignoredErrors present            observations=2      with-bytes=0     fixtures=2    refusals=0
+   worksheet ignoredErrors ext markup         observations=0      with-bytes=0     fixtures=0    refusals=0
+   named sheet views present                  observations=1      with-bytes=0     fixtures=1    refusals=0
+   named sheet views ext markup               observations=0      with-bytes=0     fixtures=0    refusals=0
+   calculation chain present                  observations=51     with-bytes=0     fixtures=51   refusals=0
+   calculation chain extLst markup            observations=51     with-bytes=0     fixtures=51   refusals=0
+   conditional formatting inline dxf markup   observations=0      with-bytes=0     fixtures=0    refusals=0
+   pptx shape xml span                        observations=644    with-bytes=644   fixtures=76   refusals=0
+   pptx source-backed slide images            observations=110    with-bytes=0     fixtures=68   refusals=0
+   docx comment xml_bytes                     observations=4      with-bytes=4     fixtures=4    refusals=0
+   docx footnote xml_bytes                    observations=3      with-bytes=3     fixtures=3    refusals=0
+   docx endnote xml_bytes                     observations=4      with-bytes=4     fixtures=3    refusals=0
+   docx opaque block xml_bytes                observations=67     with-bytes=67    fixtures=53   refusals=0
+   docx opaque inline xml_bytes               observations=1045   with-bytes=1045  fixtures=23   refusals=0
+   docx opaque run content xml_bytes          observations=53     with-bytes=53    fixtures=18   refusals=0
+   docx paragraph extensions                  observations=580    with-bytes=0     fixtures=54   refusals=4
+   docx table row extension ids               observations=38     with-bytes=0     fixtures=7    refusals=0
+
+   PowerPoint cross-check: the source-backed picture inventory is
+   the one migrated read whose fragment is only re-declared when the
+   owner was MCE-rewritten, so it is only covered on such a slide.
+      slides whose images() succeeded: 110; of those, MCE-rewritten: 0
+      slides with at least one picture: 3; of those, MCE-rewritten: 0
+      slides whose package-side scene was MCE-rewritten at all: 34
+
+6. Canonicalizer self-test (negative controls)
+      control pair: libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx xlsx.sheet.0.view.0.retained_xml
+      attribute value changed                canonical differs=True  PASS
+      attribute added                        canonical differs=True  PASS
+      root namespace rebound                 canonical differs=True  PASS
+      unperturbed copy                       canonical differs=False PASS
+

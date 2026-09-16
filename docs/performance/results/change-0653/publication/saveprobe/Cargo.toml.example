@@ -1,0 +1,22 @@
+[workspace]
+
+[package]
+name = "saveprobe"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "saveprobe"
+path = "src/main.rs"
+
+[dependencies]
+litchi-docx = { path = "<checkout>/crates/litchi-docx" }
+litchi-opc = { path = "<checkout>/crates/litchi-opc" }
+litchi-xlsx = { path = "<checkout>/crates/litchi-xlsx" }
+litchi-pptx = { path = "<checkout>/crates/litchi-pptx" }
+sha2 = "0.10"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+
+[profile.release]
+debug = false

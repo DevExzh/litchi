@@ -498,7 +498,27 @@ fn mce_limits_and_partial_sink_are_checked() {
     );
     let mce = fixture(mce_sheet, "", false);
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
-    assert!(editor.edit("Sheet1").is_err());
+    // Until change 0653 this refused, and the refusal was an artifact of the
+    // markup-compatibility writer rather than a property of the worksheet: the
+    // writer re-declared every in-scope namespace on every element it emitted,
+    // so the `printOptions` it selected out of the `mc:Fallback` carried a
+    // redundant `xmlns="..."`, and `parse_options` reported it as
+    // `unknown printOptions attribute 'xmlns'`. Every worksheet whose
+    // `printOptions` sat inside an `mc:AlternateContent` was unreadable for
+    // that reason. The writer now declares each namespace once, so the
+    // selected element carries no declaration and the Fallback's value is
+    // read. The old shape is still refused, which
+    // `the_old_writers_redundant_declaration_was_refused_by_this_parser`
+    // below pins.
+    let edit = editor
+        .edit("Sheet1")
+        .expect("the selected fallback is readable");
+    assert_eq!(
+        edit.before()
+            .print_options()
+            .map(PrintOptions::horizontal_centered),
+        Some(true)
+    );
 
     let limits = ReadLimits::builder()
         .max_part_bytes(1)
@@ -558,4 +578,46 @@ fn chartsheet_selection_is_refused() {
         editor.edit("Sheet1"),
         Err(Error::NotWorksheet { .. })
     ));
+}
+
+/// Change 0653: the markup-compatibility writer's redundant re-declaration was
+/// not only wasteful, it made this parser refuse its own preprocessor's output.
+///
+/// The two byte strings below are the codec's output for the `mc:Fallback`
+/// worksheet in `mce_limits_and_partial_sink_are_checked`, before and after the
+/// rewrite. Only the declarations on the selected `printOptions` differ.
+#[test]
+fn the_old_writers_redundant_declaration_was_refused_by_this_parser() {
+    let old = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future">"#,
+            r#"<printOptions xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" horizontalCentered="1"></printOptions>"#,
+            r#"</worksheet>"#,
+        ),
+        SML = SML,
+    );
+    let error = litchi_xlsx::print_options::parse_print_options(old.as_bytes())
+        .expect_err("a redundant default declaration was reported as an unknown attribute");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown printOptions attribute 'xmlns'"),
+        "unexpected refusal: {error}"
+    );
+
+    let new = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future">"#,
+            r#"<printOptions horizontalCentered="1"></printOptions>"#,
+            r#"</worksheet>"#,
+        ),
+        SML = SML,
+    );
+    assert_eq!(
+        litchi_xlsx::print_options::parse_print_options(new.as_bytes())
+            .expect("the rewritten shape is readable")
+            .as_ref()
+            .map(PrintOptions::horizontal_centered),
+        Some(true)
+    );
 }

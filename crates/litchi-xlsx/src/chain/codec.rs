@@ -752,17 +752,37 @@ fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
         .map_err(|_source| invalid("calculation-chain XML offset overflow"))
 }
 
+/// The `extLst` span of the processed part, with every namespace declaration it
+/// inherits from the chain root re-declared on its own root element.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so a retained span
+/// resolved on its own by accident. The writer now declares each namespace
+/// once, where XML requires it, so the inherited declarations are added here,
+/// at the slice boundary. The size bound still applies to the span as it
+/// appears in the part, so the refusal it produces is unchanged.
 fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {
     if end < start || end - start > MAX_EXTENSION_BYTES {
         return Err(invalid("calculation-chain extension list is too large"));
     }
-    std::str::from_utf8(
+    let span = std::str::from_utf8(
         bytes
             .get(start..end)
             .ok_or_else(|| invalid("invalid calculation-chain extension range"))?,
     )
-    .map(str::to_owned)
-    .map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}")))
+    .map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}")))?;
+    let declared = litchi_ooxml_common::mce::self_contained_fragment(
+        bytes,
+        start,
+        end - start,
+        &litchi_ooxml_common::mce::Limits::default(),
+    )
+    .map_err(|error| invalid(format!("calculation-chain MCE error: {error}")))?;
+    match declared {
+        Cow::Borrowed(_) => Ok(span.to_owned()),
+        Cow::Owned(declared) => String::from_utf8(declared)
+            .map_err(|error| invalid(format!("calculation-chain extension is not UTF-8: {error}"))),
+    }
 }
 
 fn enforce_budget(start: usize, current: usize, limit: usize, message: &'static str) -> Result<()> {

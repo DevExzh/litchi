@@ -11,15 +11,19 @@ use super::model::{
 
 use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 
+use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
+
 use quick_xml::encoding::Decoder;
 
 use quick_xml::events::{BytesStart, Event};
 
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 
 use quick_xml::reader::NsReader;
 
 use quick_xml::{Writer, XmlVersion};
+
+use std::borrow::Cow;
 
 use std::collections::{HashMap, HashSet};
 
@@ -45,6 +49,23 @@ pub(crate) struct Captured {
     pub(crate) source: Source,
     pub(crate) prefix: Vec<u8>,
     pub(crate) bytes: Vec<u8>,
+}
+
+/// Whether a captured fragment re-declares the namespaces it inherits.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so a fragment cut out of a
+/// processed part resolved on its own by accident. The writer now declares each
+/// namespace once, where XML requires it, so a fragment cut out of processed
+/// bytes asks for the inherited declarations at its own root element.
+/// A fragment cut out of the source bytes, or out of a synthetic wrapper built
+/// from them, is copied unchanged as before.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Inherited {
+    /// Add every in-scope declaration the fragment root does not make itself.
+    Redeclare,
+    /// Copy the fragment exactly as it appears in the buffer it is cut from.
+    Verbatim,
 }
 
 pub fn parse_conditional_formattings(
@@ -78,11 +99,20 @@ pub fn parse_conditional_formattings(
 
 pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let Some(fragment) = capture_first(processed.as_ref(), CORE, STRICT, b"dxfs")? else {
+    let Some(fragment) = capture_first(
+        processed.as_ref(),
+        CORE,
+        STRICT,
+        b"dxfs",
+        Inherited::Redeclare,
+    )?
+    else {
         return Ok(Vec::new());
     };
-    let wrapped = wrap(&fragment.prefix, &fragment.bytes);
-    let mut reader = NsReader::from_reader(wrapped.as_slice());
+    // The captured dxfs element re-declares everything it inherits from the
+    // part, so it resolves on its own and needs no synthetic wrapper: every
+    // fragment cut out of it below inherits the part's own bindings.
+    let mut reader = NsReader::from_reader(fragment.bytes.as_slice());
     let mut expected = None;
     let mut values = Vec::new();
     let mut capture: Option<(usize, Vec<u8>, Writer<Vec<u8>>)> = None;
@@ -115,7 +145,7 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
                 if raw.len() > MAX_FRAGMENT_BYTES {
                     return Err(invalid("differential format is too large"));
                 }
-                values.push(parse_dxf(&raw)?);
+                values.push(parse_dxf(&raw, Inherited::Redeclare)?);
             }
             continue;
         }
@@ -128,7 +158,7 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
                     depth -= 1;
                     let mut writer = Writer::new(Vec::new());
                     writer
-                        .write_event(Event::Start(element))
+                        .write_event(Event::Start(retained_root(&element, &resolver)))
                         .map_err(xml_error)?;
                     capture = Some((1, Vec::new(), writer));
                 }
@@ -138,9 +168,9 @@ pub fn parse_differential_formats(xml: &[u8]) -> Result<Vec<Differential>> {
             {
                 let mut writer = Writer::new(Vec::new());
                 writer
-                    .write_event(Event::Empty(element))
+                    .write_event(Event::Empty(retained_root(&element, &resolver)))
                     .map_err(xml_error)?;
-                values.push(parse_dxf(&writer.into_inner())?);
+                values.push(parse_dxf(&writer.into_inner(), Inherited::Redeclare)?);
             },
             Event::End(_) => {
                 depth = depth
@@ -439,8 +469,8 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
         return Err(invalid("conditional-formatting rule is too large"));
     }
     let wrapped = wrap(if source == Source::Core { b"" } else { b"x14" }, raw);
-    let inline_dxf = capture_first(&wrapped, CORE, STRICT, b"dxf")?
-        .map(|value| parse_dxf(&value.bytes))
+    let inline_dxf = capture_first(&wrapped, CORE, STRICT, b"dxf", Inherited::Verbatim)?
+        .map(|value| parse_dxf(&value.bytes, Inherited::Verbatim))
         .transpose()?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
     let mut rule = Rule {
@@ -984,13 +1014,14 @@ pub(crate) fn validate_and_associate(values: &mut [Formatting], dxf_count: usize
     Ok(())
 }
 
-fn parse_dxf(raw: &[u8]) -> Result<Differential> {
-    let fragment = Captured {
-        source: Source::Core,
-        prefix: Vec::new(),
-        bytes: raw.to_vec(),
+fn parse_dxf(raw: &[u8], inherited: Inherited) -> Result<Differential> {
+    // A dxf cut out of a processed part re-declares everything it inherits, so
+    // it resolves on its own; one cut out of the source bytes is given the
+    // shared SpreadsheetML bindings by the synthetic wrapper instead.
+    let wrapped: Cow<'_, [u8]> = match inherited {
+        Inherited::Redeclare => Cow::Borrowed(raw),
+        Inherited::Verbatim => Cow::Owned(wrap(b"", raw)),
     };
-    let wrapped = wrap(&fragment.prefix, &fragment.bytes);
     let mut value = Differential {
         raw_xml: raw.to_vec().into_boxed_slice(),
         ..Default::default()
@@ -1004,7 +1035,7 @@ fn parse_dxf(raw: &[u8]) -> Result<Differential> {
         b"protection",
         b"extLst",
     ] {
-        let fragments = capture_all(&wrapped, CORE, STRICT, name)?;
+        let fragments = capture_all(wrapped.as_ref(), CORE, STRICT, name, inherited)?;
         if fragments.len() > 1 {
             return Err(invalid(format!(
                 "dxf has duplicate {}",
@@ -1053,10 +1084,24 @@ fn parse_dxf(raw: &[u8]) -> Result<Differential> {
     Ok(value)
 }
 
-fn capture_first(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Option<Captured>> {
-    Ok(capture_all(xml, ns1, ns2, name)?.into_iter().next())
+fn capture_first(
+    xml: &[u8],
+    ns1: &[u8],
+    ns2: &[u8],
+    name: &[u8],
+    inherited: Inherited,
+) -> Result<Option<Captured>> {
+    Ok(capture_all(xml, ns1, ns2, name, inherited)?
+        .into_iter()
+        .next())
 }
-fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Captured>> {
+fn capture_all(
+    xml: &[u8],
+    ns1: &[u8],
+    ns2: &[u8],
+    name: &[u8],
+    inherited: Inherited,
+) -> Result<Vec<Captured>> {
     let mut reader = NsReader::from_reader(xml);
     let mut out = Vec::new();
     let mut cap: Option<(usize, Vec<u8>, Writer<Vec<u8>>)> = None;
@@ -1097,8 +1142,9 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                     && e.local_name().as_ref() == name =>
             {
                 let p = prefix(e.name().as_ref());
+                let root = fragment_root(e, &resolver, inherited);
                 let mut w = Writer::new(Vec::new());
-                w.write_event(Event::Start(e)).map_err(xml_error)?;
+                w.write_event(Event::Start(root)).map_err(xml_error)?;
                 cap = Some((1, p, w));
             },
             Event::Empty(e)
@@ -1106,8 +1152,9 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
                     && e.local_name().as_ref() == name =>
             {
                 let p = prefix(e.name().as_ref());
+                let root = fragment_root(e, &resolver, inherited);
                 let mut w = Writer::new(Vec::new());
-                w.write_event(Event::Empty(e)).map_err(xml_error)?;
+                w.write_event(Event::Empty(root)).map_err(xml_error)?;
                 out.push(Captured {
                     source: Source::Core,
                     prefix: p,
@@ -1132,6 +1179,32 @@ fn capture_all(xml: &[u8], ns1: &[u8], ns2: &[u8], name: &[u8]) -> Result<Vec<Ca
         return Err(invalid("unterminated XML fragment"));
     }
     Ok(out)
+}
+
+/// The element that opens a retained fragment, carrying every namespace
+/// declaration it inherits from the buffer it is cut from.
+///
+/// Declarations the element already makes itself are left alone, and the
+/// elements captured below the root keep the declarations they carry in that
+/// buffer, so the fragment resolves standalone exactly as it resolves in place.
+fn retained_root<'element>(
+    element: &BytesStart<'element>,
+    resolver: &NamespaceResolver,
+) -> BytesStart<'element> {
+    with_in_scope_namespaces(element, &in_scope_declarations(resolver))
+}
+
+/// [`retained_root`] when `inherited` asks for it, and `element` unchanged
+/// otherwise.
+fn fragment_root<'element>(
+    element: BytesStart<'element>,
+    resolver: &NamespaceResolver,
+    inherited: Inherited,
+) -> BytesStart<'element> {
+    match inherited {
+        Inherited::Redeclare => retained_root(&element, resolver),
+        Inherited::Verbatim => element,
+    }
 }
 
 fn wrap(prefix: &[u8], fragment: &[u8]) -> Vec<u8> {

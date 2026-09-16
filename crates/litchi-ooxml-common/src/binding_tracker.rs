@@ -19,9 +19,12 @@
 
 use memchr::memmem;
 use quick_xml::events::BytesStart;
+use quick_xml::events::attributes::Attribute;
 use quick_xml::name::{
-    LocalName, Namespace, NamespaceError, Prefix, PrefixDeclaration, QName, ResolveResult,
+    LocalName, Namespace, NamespaceError, NamespaceResolver, Prefix, PrefixDeclaration, QName,
+    ResolveResult,
 };
+use std::borrow::Cow;
 use std::fmt;
 
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
@@ -238,6 +241,44 @@ impl BindingTracker {
         }
     }
 
+    /// How many declarations the tracker currently holds, including the two
+    /// predefined reserved bindings.
+    ///
+    /// Callers that bound namespace growth compare this against their own
+    /// limit after each [`push`](Self::push).
+    #[must_use]
+    pub fn declaration_count(&self) -> usize {
+        self.bindings.len()
+    }
+
+    /// Visit every binding in scope, innermost first and each prefix at most
+    /// once, as `(prefix, namespace)` with an empty prefix for the default
+    /// namespace.
+    ///
+    /// The reserved `xml` and `xmlns` prefixes are never visited: re-declaring
+    /// the first is redundant and re-declaring the second is forbidden. A
+    /// prefix whose innermost declaration undeclares it (`xmlns=""`) is not
+    /// visited either, and neither is the outer binding it hides, so the
+    /// visited set is exactly what a fragment has to carry to resolve every
+    /// name the way it resolves here.
+    pub fn for_each_in_scope(&self, mut visit: impl FnMut(&[u8], &[u8])) {
+        let mut seen: Vec<&[u8]> = Vec::new();
+        for binding in self.bindings.iter().rev() {
+            let prefix = binding.prefix(&self.buffer).unwrap_or_default();
+            if matches!(prefix, b"xml" | b"xmlns") {
+                continue;
+            }
+            if seen.contains(&prefix) {
+                continue;
+            }
+            seen.push(prefix);
+            if binding.value_len == 0 {
+                continue;
+            }
+            visit(prefix, binding.value(&self.buffer));
+        }
+    }
+
     /// Resolve an element name with the default namespace enabled.
     #[must_use]
     pub fn resolve_element<'name>(
@@ -283,6 +324,100 @@ impl BindingTracker {
             },
         }
     }
+}
+
+/// Every namespace binding in scope in one quick-xml resolver, innermost first
+/// and each prefix at most once, as `(prefix, namespace)` with an empty prefix
+/// for the default namespace.
+///
+/// `NamespaceResolver::bindings` yields declarations outermost first and keeps
+/// the ones an inner element shadows, so a caller that re-declares them
+/// verbatim would emit the same prefix twice and pick the wrong binding. This
+/// resolves the shadowing once, and drops a prefix whose innermost declaration
+/// undeclares it (`xmlns=""`), so what it returns is exactly what a fragment
+/// has to carry for every name in it to resolve the way it resolves here.
+#[must_use]
+pub fn in_scope_declarations(resolver: &NamespaceResolver) -> Vec<(Box<[u8]>, Box<[u8]>)> {
+    let mut bindings: Vec<(Box<[u8]>, Box<[u8]>)> = Vec::new();
+    for (prefix, namespace) in resolver.bindings() {
+        let prefix: Box<[u8]> = match prefix {
+            PrefixDeclaration::Default => Box::default(),
+            PrefixDeclaration::Named(named) => named.into(),
+        };
+        let namespace: Box<[u8]> = namespace.as_ref().into();
+        match bindings
+            .iter()
+            .position(|(candidate, _)| *candidate == prefix)
+        {
+            Some(index) => bindings[index] = (prefix, namespace),
+            None => bindings.push((prefix, namespace)),
+        }
+    }
+    bindings.retain(|(_, namespace)| !namespace.is_empty());
+    bindings
+}
+
+/// `element` with every declaration of `bindings` it does not make itself
+/// added to its own start tag.
+///
+/// This is the re-serializing counterpart of
+/// [`mce::InScopeNamespaces::make_self_contained`](crate::mce::InScopeNamespaces::make_self_contained):
+/// a capture that rebuilds a fragment through a `Writer` adds the inherited
+/// declarations here, at the one element that becomes the fragment's root, so
+/// the retained markup resolves standalone.
+#[must_use]
+pub fn with_in_scope_namespaces<'element>(
+    element: &BytesStart<'element>,
+    bindings: &[(Box<[u8]>, Box<[u8]>)],
+) -> BytesStart<'element> {
+    if bindings.is_empty() {
+        return element.clone();
+    }
+    let mut declared: Vec<&[u8]> = Vec::new();
+    for attribute in element.attributes().with_checks(false) {
+        let Ok(attribute) = attribute else {
+            break;
+        };
+        match attribute.key.as_namespace_binding() {
+            Some(PrefixDeclaration::Default) => declared.push(b""),
+            Some(PrefixDeclaration::Named(prefix)) => declared.push(prefix),
+            None => {},
+        }
+    }
+    let mut rewritten = element.clone();
+    for (prefix, namespace) in bindings {
+        if declared.contains(&prefix.as_ref()) {
+            continue;
+        }
+        let mut key = Vec::from(b"xmlns".as_slice());
+        if !prefix.is_empty() {
+            key.push(b':');
+            key.extend_from_slice(prefix);
+        }
+        rewritten.push_attribute(Attribute {
+            key: QName(&key),
+            value: Cow::Owned(escape_attribute_value(namespace)),
+        });
+    }
+    rewritten.into_owned()
+}
+
+/// Quote a namespace URI as a double-quoted attribute value.
+///
+/// A resolver keeps a declaration's bytes exactly as the source wrote them
+/// between its quotes, so they are already in attribute-value form and a `&`
+/// must not be escaped a second time. Only a literal `"`, legal inside a
+/// single-quoted source declaration, has to change.
+fn escape_attribute_value(value: &[u8]) -> Vec<u8> {
+    let mut escaped = Vec::with_capacity(value.len());
+    for byte in value {
+        if *byte == b'"' {
+            escaped.extend_from_slice(b"&quot;");
+        } else {
+            escaped.push(*byte);
+        }
+    }
+    escaped
 }
 
 impl Default for BindingTracker {

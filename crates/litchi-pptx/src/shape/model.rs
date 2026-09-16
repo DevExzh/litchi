@@ -1,5 +1,6 @@
 //! Borrowed semantic shape views.
 
+use std::borrow::Cow;
 use std::ops::Range;
 
 use crate::{Error, Result};
@@ -218,6 +219,18 @@ impl<'a> Common<'a> {
 
     /// Exact borrowed element XML without a per-shape copy.
     ///
+    /// The returned bytes are an inner fragment of
+    /// [`Scene::xml`](super::Scene::xml), reproduced exactly. The namespace
+    /// declarations that govern it are the ones in scope at its position in
+    /// that processed owner XML, and the markup-compatibility codec declares
+    /// each namespace once, where XML requires it, so a binding an ancestor
+    /// makes is not necessarily repeated on the fragment's own root element.
+    /// Parsing the fragment on its own can therefore leave its prefixes
+    /// unresolved; a caller that does so should use
+    /// [`self_contained_xml`](Self::self_contained_xml) instead. Use this
+    /// accessor to read or copy the shape's exact source bytes, and whenever
+    /// the surrounding owner XML is parsed along with them.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -226,6 +239,37 @@ impl<'a> Common<'a> {
         self.xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape XML span became invalid".into()))
+    }
+
+    /// The same element XML with every inherited namespace declared on its
+    /// root, so that it parses standalone.
+    ///
+    /// [`xml`](Self::xml) borrows the span exactly as it appears in the
+    /// processed owner XML, where a prefix the shape uses may be bound by an
+    /// ancestor outside the span. This accessor re-declares on the fragment's
+    /// own root element every binding in scope at the span that the root does
+    /// not already bind, so each qualified name resolves to the namespace it
+    /// resolves to in the owner. The fragment is returned borrowed when
+    /// nothing has to be added, which is the case whenever the root already
+    /// carries every in-scope binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the recorded span is no longer inside
+    /// its processed owner XML, and
+    /// [`Error::MarkupCompatibility`](crate::Error::MarkupCompatibility) when
+    /// the owner XML is not well formed before the span, the span does not
+    /// begin with an element, a bound of the shared fragment helper is
+    /// reached, or the re-declared copy cannot be reserved.
+    pub fn self_contained_xml(self) -> Result<Cow<'a, [u8]>> {
+        let range = self.record.span.range(self.xml.len())?;
+        let length = range.len();
+        Ok(litchi_ooxml_common::mce::self_contained_fragment(
+            self.xml,
+            range.start,
+            length,
+            &litchi_ooxml_common::mce::Limits::default(),
+        )?)
     }
 
     /// Decoded producer name from `cNvPr`.
@@ -404,12 +448,40 @@ impl<'a> Shape<'a> {
         self.common().span()
     }
 
+    /// Exact borrowed element XML without a per-shape copy.
+    ///
+    /// The returned bytes are an inner fragment of
+    /// [`Scene::xml`](super::Scene::xml) whose namespace declarations are the
+    /// ones in scope at its position in that processed owner XML, not
+    /// necessarily repeated on the fragment's own root element. A caller that
+    /// parses the fragment standalone should use
+    /// [`self_contained_xml`](Self::self_contained_xml) instead. See
+    /// [`Common::xml`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     #[inline]
     pub fn xml(self) -> Result<&'a [u8]> {
         self.common().xml()
+    }
+
+    /// The same element XML with every inherited namespace declared on its
+    /// root, so that it parses standalone.
+    ///
+    /// See [`Common::self_contained_xml`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the recorded span is no longer inside
+    /// its processed owner XML, and
+    /// [`Error::MarkupCompatibility`](crate::Error::MarkupCompatibility) when
+    /// the owner XML is not well formed before the span, the span does not
+    /// begin with an element, a bound of the shared fragment helper is
+    /// reached, or the re-declared copy cannot be reserved.
+    #[inline]
+    pub fn self_contained_xml(self) -> Result<Cow<'a, [u8]>> {
+        self.common().self_contained_xml()
     }
 
     #[inline]

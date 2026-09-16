@@ -1,0 +1,131 @@
+===== cargo fmt --all --check (first run: two long lines, reformatted in place) =====
+     // `the_old_writers_redundant_declaration_was_refused_by_this_parser`
+     // below pins.
+-    let edit = editor.edit("Sheet1").expect("the selected fallback is readable");
++    let edit = editor
++        .edit("Sheet1")
++        .expect("the selected fallback is readable");
+     assert_eq!(
+         edit.before()
+             .print_options()
+Diff in /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-xlsx/tests/source_backed_print_options.rs:597:
+     let error = litchi_xlsx::print_options::parse_print_options(old.as_bytes())
+         .expect_err("a redundant default declaration was reported as an unknown attribute");
+     assert!(
+-        error.to_string().contains("unknown printOptions attribute 'xmlns'"),
++        error
++            .to_string()
++            .contains("unknown printOptions attribute 'xmlns'"),
+         "unexpected refusal: {error}"
+     );
+ 
+exit=0
+===== cargo clippy -p litchi-ooxml-common --all-targets =====
+    Checking bitflags v2.13.2
+    Checking rustix v1.1.4
+    Checking tempfile v3.27.0
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.64s
+===== cargo clippy -p litchi-docx --all-targets =====
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.35s
+===== cargo clippy -p litchi-pptx --all-targets =====
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+===== cargo clippy -p litchi-xlsx --all-targets =====
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s
+===== cargo fmt --all --check =====
+clean, no diff
+===== cargo test -p litchi-ooxml-common =====
+      1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 261 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.94s
+      1 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+      1 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+===== cargo test -p litchi-docx =====
+      1 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      3 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 952 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s
+===== cargo test -p litchi-pptx =====
+      1 test result: ok. 565 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+      1 test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+      1 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.65s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+===== cargo test -p litchi-xlsx =====
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+      1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+      1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+===== cargo test -p litchi-xlsb =====
+      1 test result: ok. 573 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+      1 test result: ok. 6 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      2 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+===== cargo test -p litchi-drawingml =====
+      3 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 117 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+      4 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+===== cargo test -p litchi-spreadsheet-drawing =====
+      1 test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+      1 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+===== cargo test -p litchi-opc =====
+      1 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+      1 test result: ok. 437 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.53s
+      2 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      2 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+      3 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+===== cargo doc --no-deps (four touched crates) =====
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-pptx)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0653/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.94s
+   Generated /home/zhuhe/code/litchi-worktrees/0653/target/doc/litchi_docx/index.html and 3 other files
+===== cargo test -p litchi --features docx,xlsx,pptx,xls =====
+     22 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 205 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+      1 test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      2 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+      1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+===== cargo test (tools/perf-baseline) =====
+     15 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+      1 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+      1 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.54s
+      1 test result: ok. 522 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 730.25s
+===== python3 tools/non_iwork_gate.py verify =====
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+
+===== change 0664's harness diff, applied and reverted =====
+The two marker-selector binaries were built from a fresh detached checkout of
+the base and from this worktree with commit e76897b0e (tools/ only) applied.
+It was reverted with `git checkout -- tools/` plus removal of the untracked
+tools/perf-baseline/src/marker_shape.rs before these gates and before the
+commit; `git status --short tools/` reports nothing.
+
+===== known pre-existing failures, none of which reproduced here =====
+check_perf_claims.py --mode structural on claim-0251; tools/test_perf_claims.py;
+test_check_crate_boundaries.py; test_native_odf_resave.py; two flaky allocator
+tests in the harness's docx_bounded_tail_append_compare (this run: 522 passed,
+0 failed, 1 ignored); six clippy warnings in the litchi facade under
+--features docx,xlsx,pptx,xls (this run: clippy was not run on the facade, only
+its test suite, which passes); a stale tools/native-resave/Cargo.lock.

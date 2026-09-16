@@ -3,6 +3,7 @@
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
 use litchi_sheet::view::{
     Color, Display, Mode, Pane, Position, Scale, Selection, Split, State, View, Window,
 };
@@ -174,7 +175,7 @@ impl Parser {
             },
             (Context::SheetViews, true, b"sheetView") => {
                 self.begin_view(element, decoder)?;
-                self.begin_sheet_view_capture(element, false)?;
+                self.begin_sheet_view_capture(element, resolver, false)?;
                 self.stack.push(Context::SheetView);
             },
             (Context::SheetViews, true, b"extLst") => {
@@ -206,13 +207,13 @@ impl Parser {
                     return Err(invalid("duplicate pivotArea in pivotSelection"));
                 }
                 let area = parse_pivot_area(element, decoder)?;
+                let root = retained_root(element, resolver);
+                let bytes = root.len();
                 let mut writer = Writer::new(Vec::new());
-                writer
-                    .write_event(Event::Start(element.clone()))
-                    .map_err(xml_error)?;
+                writer.write_event(Event::Start(root)).map_err(xml_error)?;
                 self.capture = Some(Capture {
                     depth: 1,
-                    bytes: element.len(),
+                    bytes,
                     writer,
                     payload: CapturePayload::PivotArea(area),
                 });
@@ -220,13 +221,13 @@ impl Parser {
             },
             (Context::ExtList(owner), true, b"ext") => {
                 let extension = parse_extension(element, decoder)?;
+                let root = retained_root(element, resolver);
+                let bytes = root.len();
                 let mut writer = Writer::new(Vec::new());
-                writer
-                    .write_event(Event::Start(element.clone()))
-                    .map_err(xml_error)?;
+                writer.write_event(Event::Start(root)).map_err(xml_error)?;
                 self.capture = Some(Capture {
                     depth: 1,
-                    bytes: element.len(),
+                    bytes,
                     writer,
                     payload: CapturePayload::Extension(owner, extension),
                 });
@@ -263,7 +264,7 @@ impl Parser {
             },
             (Context::SheetViews, true, b"sheetView") => {
                 self.begin_view(element, decoder)?;
-                self.begin_sheet_view_capture(element, true)?;
+                self.begin_sheet_view_capture(element, resolver, true)?;
                 self.finish_view()?;
             },
             (Context::SheetViews, true, b"extLst") => self.begin_ext_list(Owner::Collection)?,
@@ -284,7 +285,7 @@ impl Parser {
                 let mut area = parse_pivot_area(element, decoder)?;
                 let mut writer = Writer::new(Vec::new());
                 writer
-                    .write_event(Event::Empty(element.clone()))
+                    .write_event(Event::Empty(retained_root(element, resolver)))
                     .map_err(xml_error)?;
                 area.markup = writer.into_inner();
                 self.retain(area.markup.len(), MAX_PIVOT_AREA_MARKUP)?;
@@ -297,7 +298,7 @@ impl Parser {
                 let mut extension = parse_extension(element, decoder)?;
                 let mut writer = Writer::new(Vec::new());
                 writer
-                    .write_event(Event::Empty(element.clone()))
+                    .write_event(Event::Empty(retained_root(element, resolver)))
                     .map_err(xml_error)?;
                 extension.markup = writer.into_inner();
                 self.retain(extension.markup.len(), MAX_RETAINED_MARKUP)?;
@@ -316,7 +317,6 @@ impl Parser {
             },
             _ => {},
         }
-        let _ = resolver;
         Ok(())
     }
 
@@ -409,29 +409,29 @@ impl Parser {
             .push(view);
         Ok(())
     }
-    fn begin_sheet_view_capture(&mut self, element: &BytesStart<'_>, empty: bool) -> Result<()> {
+    fn begin_sheet_view_capture(
+        &mut self,
+        element: &BytesStart<'_>,
+        resolver: &NamespaceResolver,
+        empty: bool,
+    ) -> Result<()> {
         if self.sheet_view_capture.is_some() {
             return Err(invalid("nested sheetView retained markup"));
         }
-        if element.len() > MAX_RETAINED_SHEET_VIEW_XML {
+        let root = retained_root(element, resolver);
+        if root.len() > MAX_RETAINED_SHEET_VIEW_XML {
             return Err(invalid(
                 "worksheet-view retained sheetView XML exceeds resource limit",
             ));
         }
+        let bytes = root.len();
         let mut writer = Writer::new(Vec::new());
         if empty {
-            writer
-                .write_event(Event::Empty(element.clone()))
-                .map_err(xml_error)?;
+            writer.write_event(Event::Empty(root)).map_err(xml_error)?;
         } else {
-            writer
-                .write_event(Event::Start(element.clone()))
-                .map_err(xml_error)?;
+            writer.write_event(Event::Start(root)).map_err(xml_error)?;
         }
-        self.sheet_view_capture = Some(SheetViewCapture {
-            bytes: element.len(),
-            writer,
-        });
+        self.sheet_view_capture = Some(SheetViewCapture { bytes, writer });
         Ok(())
     }
     fn capture_sheet_view_event(&mut self, event: Event<'static>) -> Result<()> {
@@ -640,6 +640,23 @@ impl Parser {
         }
         Ok(())
     }
+}
+
+/// The element that opens a retained fragment, carrying every namespace
+/// declaration it inherits from the part.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so a retained span
+/// resolved on its own by accident. The writer now declares each namespace
+/// once, where XML requires it, so the inherited declarations are added here,
+/// at the one element that becomes the fragment's root. Declarations the
+/// element already makes itself are left alone, and the elements captured
+/// below the root keep the declarations they carry in the part.
+fn retained_root<'element>(
+    element: &BytesStart<'element>,
+    resolver: &NamespaceResolver,
+) -> BytesStart<'element> {
+    with_in_scope_namespaces(element, &in_scope_declarations(resolver))
 }
 
 #[allow(
