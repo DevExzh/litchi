@@ -1,0 +1,47 @@
+change 0656 gates, run in the branch worktree /home/zhuhe/code/litchi-worktrees/0656
+branch perf/0656-pptx-cross-copy-candidate-budget on base 70d7768cc6dada420ede063f72c88dc99ad30383
+
+=== cargo fmt --all --check ===
+(clean; exit 0)
+
+=== cargo clippy -p litchi-pptx -p litchi-opc --all-targets ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.88s
+
+=== cargo doc -p litchi-pptx -p litchi-opc --no-deps ===
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.45s
+   Generated /home/zhuhe/code/litchi-worktrees/0656/target/doc/litchi_opc/index.html and 1 other file
+
+=== cargo test -p litchi-pptx (after) ===
+78 suites: 885 passed, 0 failed, 2 ignored
+
+=== cargo test -p litchi-pptx --release --lib retention (the release half of the substitution proof) ===
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.03s
+
+=== cargo test -p litchi-pptx (before, base 70d7768cc in a detached worktree) ===
+78 suites: 875 passed, 0 failed, 2 ignored
+
+=== cargo test -p litchi-opc ===
+27 suites: 712 passed, 0 failed, 1 ignored
+
+=== cargo test -p litchi --features docx,xlsx,pptx,xls ===
+29 suites: 265 passed, 0 failed, 7 ignored
+
+=== cargo test in tools/perf-baseline ===
+19 suites: 540 passed, 0 failed, 1 ignored
+
+=== python3 tools/non_iwork_gate.py verify ===
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+
+=== cargo check --workspace --all-targets ===
+exit 101: one pre-existing failure outside this change's scope, in an iWork example
+error[E0308]: mismatched types
+error: could not compile `litchi-iwa` (example "create_keynote_pie_chart") due to 1 previous error
+reproduced on the untouched base checkout of 70d7768cc:
+error[E0308]: mismatched types
+error: could not compile `litchi-iwa` (example "create_pages_pie_chart") due to 1 previous error
+(litchi-iwa examples; iWork is excluded from this programme and this change touches no iWork crate)

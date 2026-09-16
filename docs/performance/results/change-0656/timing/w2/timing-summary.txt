@@ -1,0 +1,91 @@
+binary sha256 per leg:
+  A1: 325c9d6e1aa18a5425a97eb7a90f42ab59c0c871d4f43de41039e4cdc062a51b
+  B1: 2818d8913ebf77d4493499eb25ff2855ede5aa2dee41add31c5e511ad3214281
+  B2: 2818d8913ebf77d4493499eb25ff2855ede5aa2dee41add31c5e511ad3214281
+  A2: 325c9d6e1aa18a5425a97eb7a90f42ab59c0c871d4f43de41039e4cdc062a51b
+
+################ pptx_cross_copy_plain ################
+   leg    n       p50 ms      mean ms       p95 ms       p99 ms
+    A1   30       7.8949       7.9034       8.1144       8.1202
+    B1   30       7.7176       7.7432       7.8808       7.8949
+    B2   30       7.6927       7.6598       7.8499       7.8621
+    A2   30       7.9465       7.9401       8.1436       8.1596
+BEFORE   60       7.9365       7.9218       8.1144       8.1436
+ AFTER   60       7.7058       7.7015       7.8621       7.8808
+  after vs before p50: -2.91%   before vs after: +2.99%
+  after vs before mean: -2.78%   before vs after: +2.86%
+  after vs before p95: -3.11%   before vs after: +3.21%
+  after vs before p99: -3.23%   before vs after: +3.33%
+  A/A floor (A2 vs A1): p50 +0.65%, mean +0.46%, p95 +0.36%, p99 +0.49%
+  B/B floor (B2 vs B1): p50 -0.32%, mean -1.08%, p95 -0.39%, p99 -0.42%
+  distinct output_sha256 across all four legs: ['3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22']
+               phase    before p50 us     after p50 us      delta
+           commit_ns         4387.661         4155.051     -5.30%
+             plan_ns         3543.138         3548.637     +0.16%
+      publication_ns            0.740            1.090    +47.30%
+           reopen_ns          650.894          642.623     -1.27%
+
+################ pptx_cross_copy_media_rich ################
+   leg    n       p50 ms      mean ms       p95 ms       p99 ms
+    A1   30     627.3683     627.8973     629.9616     637.4712
+    B1   30     410.0574     410.0976     411.8246     413.2027
+    B2   30     394.1788     394.4243     396.8107     398.9186
+    A2   30     631.2763     650.6854     735.8020     948.2414
+BEFORE   60     628.5766     639.2914     675.7555     735.8020
+ AFTER   60     408.3491     402.2609     411.2757     411.8246
+  after vs before p50: -35.04%   before vs after: +53.93%
+  after vs before mean: -37.08%   before vs after: +58.92%
+  after vs before p95: -39.14%   before vs after: +64.31%
+  after vs before p99: -44.03%   before vs after: +78.67%
+  A/A floor (A2 vs A1): p50 +0.62%, mean +3.63%, p95 +16.80%, p99 +48.75%
+  B/B floor (B2 vs B1): p50 -3.87%, mean -3.82%, p95 -3.65%, p99 -3.46%
+  distinct output_sha256 across all four legs: ['6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f']
+               phase    before p50 us     after p50 us      delta
+           commit_ns       329240.243        96052.643    -70.83%
+             plan_ns       297596.882       305509.127     +2.66%
+      publication_ns         1514.517         6456.967   +326.34%
+           reopen_ns        23986.187        21209.140    -11.58%
+
+################ pptx_cross_copy_plain_lifecycle ################
+   leg    n       p50 ms      mean ms       p95 ms       p99 ms
+    A1   30       9.2385       9.2644       9.5440       9.5963
+    B1   30       8.9795       9.0015       9.2017       9.2397
+    B2   30       8.9698       8.9666       9.1168       9.2567
+    A2   30       9.0836       9.1216       9.4904       9.5131
+BEFORE   60       9.1603       9.1930       9.5174       9.5440
+ AFTER   60       8.9775       8.9840       9.1527       9.2397
+  after vs before p50: -2.00%   before vs after: +2.04%
+  after vs before mean: -2.27%   before vs after: +2.33%
+  after vs before p95: -3.83%   before vs after: +3.98%
+  after vs before p99: -3.19%   before vs after: +3.29%
+  A/A floor (A2 vs A1): p50 -1.68%, mean -1.54%, p95 -0.56%, p99 -0.87%
+  B/B floor (B2 vs B1): p50 -0.11%, mean -0.39%, p95 -0.92%, p99 +0.18%
+  distinct output_sha256 across all four legs: ['3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22']
+               phase    before p50 us     after p50 us      delta
+           commit_ns         4359.797         4160.680     -4.57%
+        lifecycle_ns         9160.305         8977.520     -2.00%
+             plan_ns         3531.857         3538.797     +0.20%
+      publication_ns            0.790            0.780     -1.27%
+           reopen_ns          657.564          649.824     -1.18%
+
+################ pptx_cross_copy_media_rich_lifecycle ################
+   leg    n       p50 ms      mean ms       p95 ms       p99 ms
+    A1   30     648.5227     645.4469     654.7288     655.6609
+    B1   30     432.8760     432.8021     436.0402     437.8838
+    B2   30     429.9952     432.8003     455.9237     470.4771
+    A2   30     648.6140     660.4442     757.0792     978.6738
+BEFORE   60     648.9412     652.9455     655.6609     757.0792
+ AFTER   60     432.3085     432.8012     439.2141     455.9237
+  after vs before p50: -33.38%   before vs after: +50.11%
+  after vs before mean: -33.72%   before vs after: +50.86%
+  after vs before p95: -33.01%   before vs after: +49.28%
+  after vs before p99: -39.78%   before vs after: +66.05%
+  A/A floor (A2 vs A1): p50 +0.01%, mean +2.32%, p95 +15.63%, p99 +49.27%
+  B/B floor (B2 vs B1): p50 -0.67%, mean -0.00%, p95 +4.56%, p99 +7.44%
+  distinct output_sha256 across all four legs: ['6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f']
+               phase    before p50 us     after p50 us      delta
+           commit_ns       327989.535        96581.436    -70.55%
+        lifecycle_ns       648941.224       432308.461    -33.38%
+             plan_ns       297260.382       312675.179     +5.19%
+      publication_ns         1522.387         1544.287     +1.44%
+           reopen_ns        21326.635        21412.625     +0.40%

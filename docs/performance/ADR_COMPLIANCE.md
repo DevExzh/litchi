@@ -1,5 +1,58 @@
 # Performance optimization ADR-compliance matrix
 
+## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
+
+Record: [0656](0656-pptx-cross-copy-candidate-budget.md).
+
+**ADR 0005 (I/O, memory, measured performance) — amended by this change, under
+0652 decision 5.** The amendment is narrow and dated 2026-09-16. It says that
+"cache behavior is semantically invisible" does not license retained state whose
+size is the point; that such state is declared, bounded, observable and
+releasable, with its ceiling in the operation's own finite limit policy where the
+path has no execution context, and that those ceilings move to the execution
+context when ADR 0031 reaches the path; and that exceeding such a ceiling falls
+back to recomputation rather than refusing, because the typed `Limit` error has
+nothing to protect a caller from when recomputation is always available.
+Ceilings whose alternative is not recomputation keep their typed refusal. The
+scratch-storage clause is untouched and is the reason the fallback is
+recomputation rather than a spill: a candidate archive is a complete
+presentation package, and a source ratchet test now refuses fourteen filesystem,
+temporary-file, scratch-provider and mmap markers in `cross_copy_plan.rs`. The
+limit-error clause ("resource, observed value, limit, and object path") is
+unaffected here because this change adds no limit error; `litchi_pptx::Error::Limit`
+still carries no observed value, which 0646 named as a pre-existing gap and this
+change does not close.
+
+**ADR 0003 (snapshots, edits, patches).** No revision value, proof format or
+durable encoding changes. `CrossSlideCopyPatch`, its magic and its six 32-byte
+revisions are untouched by *this* change and `apply_patch` retains nothing,
+pinned by a test that compares the encoded patch byte for byte with and without
+retention; change 0655 bumps that magic in the same wave for reasons unrelated
+to retention, and the test checks the `LPCP` family prefix so it survives the
+bump. The plan
+remains an immutable value: the new field is private and plan equality ignores
+it, so releasing the archive preserves the plan's value.
+
+**ADR 0011 (OOXML physical package ownership) and the 2026-08-21 OPC
+exact-source amendment.** The retained archive is the exact source the candidate
+reopen already authorized, and `OpcPackage::exact_source_shared` returns that
+authorization's own handle without changing what authorizes it; a later
+revocation does not retract a handle already taken, which the accessor's
+documentation states. Nothing about preservation provenance or the "planning
+evidence only" rule changes. The one place this brushes ADR 0011 is the copy at
+application, which remains: eliminating it needs a shared-bytes ingress
+(`OpcPackage::from_shared_vec`), an ownership decision this change does not take.
+
+**ADR 0001 and ADR 0005's no-leakage rule.** No archive type, raw lock or
+executor enters a public API. `exact_source_shared` returns `Arc<Vec<u8>>` —
+shared immutable bytes, not an archive type — and the plan exposes the hold as a
+`usize` and nothing else.
+
+**`docs/GOAL.md`.** Optimization-order step 2 (unnecessary I/O, decompression,
+recompression). No new `unsafe`, no weakened limit or malformed-input defence,
+no hidden global pool, no ambient I/O. Proposed ADRs are not cited as authority;
+ADR 0031 is named only as where the ceiling goes when it arrives.
+
 ## 0653 — a byte-visible writer change with no contract movement: no signature, no error, no limit, and two refusals removed only where the writer itself manufactured them
 
 Record: [0653](0653-mce-namespace-emission-rewrite.md). Authority: decision 1 of change [0652](0652-owner-decisions-for-the-third-wave.md), which assigns this change **no ADR amendment**; none is made.

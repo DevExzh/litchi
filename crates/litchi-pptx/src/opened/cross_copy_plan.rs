@@ -8,7 +8,9 @@
 //! destination graph is captured as an exact, complete-revision-bound patch.
 
 use std::collections::{HashMap, HashSet, TryReserveError};
+use std::fmt;
 use std::io::{self, Write};
+use std::sync::Arc;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
@@ -58,6 +60,11 @@ const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relatio
 /// retained exactly.  The destination's selected slide supplies the layout
 /// boundary; the source layout, master, and theme are never copied or
 /// rewritten.  Planning validates a complete candidate before returning.
+///
+/// The plan is immutable *in value*: every proof it carries is fixed when it
+/// is returned, and the one `&mut self` method,
+/// [`Self::release_retained_candidate`], gives back memory without changing
+/// what the plan proves, publishes or compares equal to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrossSlideCopyPlan {
     source: Slide,
@@ -77,9 +84,107 @@ pub struct CrossSlideCopyPlan {
     destination_physical_revision: [u8; 32],
     target_physical_revision: [u8; 32],
     patch: CrossSlideCopyPatch,
+    candidate: RetainedCandidateSlot,
+}
+
+/// The serialized candidate archive a plan retains for its own application.
+///
+/// `archive` is the handle the candidate reopen already holds: planning
+/// serializes the candidate into a bounded `Vec`, owned ingress takes that
+/// exact allocation as the reopened package's authorized source, and retention
+/// takes a second owner of it.  Retention is therefore a decision not to free
+/// an allocation, not a second copy of the archive.
+///
+/// `bound` is the archive bound the bytes were accepted under.  A later build
+/// under a different bound is not a reuse.
+///
+/// This type deliberately does **not** derive `Debug`: a derived one would
+/// print the whole archive, and the slot below formats the retained length
+/// instead.
+#[derive(Clone)]
+struct RetainedCandidate {
+    archive: Arc<Vec<u8>>,
+    bound: usize,
+}
+
+/// A plan's retained candidate archive, which is not part of the plan's value.
+///
+/// The archive is derived state: a plan holding it and the same plan after
+/// [`CrossSlideCopyPlan::release_retained_candidate`] prove the same six
+/// revisions, carry the same durable patch and publish the same bytes.
+/// Equality therefore ignores this slot entirely, which keeps
+/// `plan_a == plan_b` the comparison it has always been and makes releasing
+/// the archive value-preserving.  `Debug` reports the retained length rather
+/// than the bytes.
+#[derive(Clone, Default)]
+struct RetainedCandidateSlot(Option<RetainedCandidate>);
+
+impl fmt::Debug for RetainedCandidateSlot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RetainedCandidateSlot")
+            .field(
+                "retained_bytes",
+                &self.0.as_ref().map(|held| held.archive.len()),
+            )
+            .field("bound", &self.0.as_ref().map(|held| held.bound))
+            .finish()
+    }
+}
+
+impl PartialEq for RetainedCandidateSlot {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for RetainedCandidateSlot {}
+
+/// What one candidate build does about its serialized archive.
+///
+/// This reaches [`build_candidate`] as a single argument because that function
+/// already takes the crate's maximum and `clippy::too_many_arguments` is deny.
+#[derive(Clone, Copy)]
+enum CandidateArchive<'a> {
+    /// Serialize the archive and drop it with the candidate package.
+    Build,
+    /// Serialize the archive and hand it back for the plan to retain, when the
+    /// operation's retained-candidate budget admits its length.
+    BuildAndRetain,
+    /// Reuse the archive a plan retained under the same bound.
+    Reuse(&'a RetainedCandidate),
 }
 
 impl CrossSlideCopyPlan {
+    /// Bytes of the serialized candidate archive this plan is holding, if any.
+    ///
+    /// A plan retains the archive it built at planning when its length fits
+    /// the intersected [`Limits::max_retained_candidate_bytes`] of the two
+    /// snapshots, so that applying the plan can reuse those bytes instead of
+    /// serializing and deflating the candidate a second time.  `None` means
+    /// the plan holds nothing and application rebuilds the archive: either the
+    /// candidate was larger than the budget, or the archive was released, or
+    /// the candidate reopen did not authorize an exact source.
+    ///
+    /// The bytes are released by [`Self::release_retained_candidate`] and by
+    /// dropping the plan.  Applying a plan does not release them, because a
+    /// plan may be applied to more than one destination that proves the same
+    /// six revisions.
+    #[must_use]
+    pub fn retained_candidate_bytes(&self) -> Option<usize> {
+        self.candidate.0.as_ref().map(|held| held.archive.len())
+    }
+
+    /// Release the retained candidate archive, if this plan holds one.
+    ///
+    /// The plan keeps its value: it proves the same revisions, carries the
+    /// same durable patch, compares equal to the plan it was, and still
+    /// applies.  Only the reuse is given up, so a later application rebuilds
+    /// and re-deflates the candidate as it does for an unretained plan.
+    pub fn release_retained_candidate(&mut self) {
+        self.candidate.0 = None;
+    }
+
     /// Source semantic slide captured by the immutable source snapshot.
     #[must_use]
     pub const fn source(&self) -> &Slide {
@@ -466,7 +571,14 @@ impl Snapshot {
     ) -> Result<CrossSlideCopyPlan> {
         let source_slide = resolve_slide(source, source_slide.into())?;
         let destination_slide = resolve_slide(self, destination_slide.into())?;
-        plan_cross_slide_copy_for_slides(source, self, source_slide, destination_slide, position)
+        plan_cross_slide_copy_for_slides(
+            source,
+            self,
+            source_slide,
+            destination_slide,
+            position,
+            CandidateArchive::BuildAndRetain,
+        )
     }
 
     /// Compatibility-oriented alias for [`Self::plan_cross_slide_copy`].
@@ -537,6 +649,10 @@ pub(crate) fn apply_plan(
         plan.source.clone(),
         plan.destination.clone(),
         plan.position,
+        plan.candidate
+            .0
+            .as_ref()
+            .map_or(CandidateArchive::Build, CandidateArchive::Reuse),
     )?;
     if fresh.source_revision != plan.source_revision
         || fresh.destination_revision != plan.destination_revision
@@ -629,6 +745,7 @@ pub(crate) fn apply_patch(
         source_slide.clone(),
         destination_slide.clone(),
         patch.position,
+        CandidateArchive::Build,
     )
     .ok()
     .and_then(|(fresh, candidate)| {
@@ -677,6 +794,7 @@ pub(crate) fn apply_patch(
                         source_slide,
                         restored_destination,
                         patch.position,
+                        CandidateArchive::Build,
                     )
                     .ok()?;
                     Some(forward.patch.inverse() == *patch)
@@ -771,6 +889,7 @@ fn plan_cross_slide_copy_for_slides(
     source_slide: Slide,
     destination_slide: Slide,
     position: usize,
+    archive: CandidateArchive<'_>,
 ) -> Result<CrossSlideCopyPlan> {
     prepare_cross_slide_copy_for_slides(
         source,
@@ -778,6 +897,7 @@ fn plan_cross_slide_copy_for_slides(
         source_slide,
         destination_slide,
         position,
+        archive,
     )
     .map(|(plan, _candidate)| plan)
 }
@@ -790,6 +910,7 @@ fn prepare_cross_slide_copy_for_slides(
     source_slide: Slide,
     destination_slide: Slide,
     position: usize,
+    archive: CandidateArchive<'_>,
 ) -> Result<(CrossSlideCopyPlan, OpcPackage)> {
     if position > destination.slides.len() {
         return Err(Error::SlideIndexOutOfBounds {
@@ -958,19 +1079,21 @@ fn prepare_cross_slide_copy_for_slides(
     preflight_parts(destination, &parts, planned_bytes)?;
     let source_physical_revision = snapshot_physical_revision(source, limits)?;
     let destination_physical_revision = snapshot_physical_revision(destination, limits)?;
-    let (candidate, candidate_revision, candidate_archive_revision) = build_candidate(
-        source,
-        destination,
-        &source_slide,
-        &destination_slide,
-        position,
-        slide_id,
-        &presentation_relationship_id,
-        &source_layout,
-        &destination_layout,
-        &parts,
-        limits.max_patch_bytes(),
-    )?;
+    let (candidate, candidate_revision, candidate_archive_revision, retained_candidate) =
+        build_candidate(
+            source,
+            destination,
+            &source_slide,
+            &destination_slide,
+            position,
+            slide_id,
+            &presentation_relationship_id,
+            &source_layout,
+            &destination_layout,
+            &parts,
+            limits,
+            archive,
+        )?;
     let patch = Patch::capture(
         destination.package.as_ref(),
         &candidate,
@@ -1025,6 +1148,7 @@ fn prepare_cross_slide_copy_for_slides(
             destination_physical_revision,
             target_physical_revision,
             patch: cross_patch,
+            candidate: retained_candidate,
         },
         candidate,
     ))
@@ -1041,8 +1165,15 @@ fn build_candidate(
     source_layout: &PackURI,
     destination_layout: &PackURI,
     parts: &[super::SlideCopyPart],
-    archive_limit: usize,
-) -> Result<(OpcPackage, [u8; 32], Option<[u8; 32]>)> {
+    limits: Limits,
+    archive: CandidateArchive<'_>,
+) -> Result<(
+    OpcPackage,
+    [u8; 32],
+    Option<[u8; 32]>,
+    RetainedCandidateSlot,
+)> {
+    let archive_limit = limits.max_patch_bytes();
     let mut mapping = HashMap::new();
     mapping
         .try_reserve(parts.len())
@@ -1129,7 +1260,45 @@ fn build_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let (serialized, archive_digest) = bounded_package_bytes(&candidate, archive_limit)?;
+    // A retained candidate archive is the serialization of this exact graph.
+    // Both input packages were proved unchanged before this call -- semantic
+    // graph and serialized archive alike -- and `to_stream` is a deterministic
+    // function of the package, so a fresh serialization reproduces the
+    // retained bytes. The `debug_assert` re-derives exactly that on every
+    // reuse in debug and test builds; a release build rests on the argument
+    // plus the recomputed archive and graph revisions taken below from the
+    // bytes it is about to publish.
+    let (serialized, archive_digest) = match archive {
+        CandidateArchive::Reuse(held)
+            if held.bound == archive_limit && held.archive.len() <= archive_limit =>
+        {
+            debug_assert!(
+                bounded_package_bytes(&candidate, archive_limit)
+                    .is_ok_and(|(fresh, _)| fresh == *held.archive),
+                "cross-slide reused a retained candidate archive a fresh serialization does not reproduce"
+            );
+            // The copy is fallible, exactly as `BoundedVecWriter::into_bytes`
+            // is: an infallible `Vec::clone` would abort the process where the
+            // route it replaces returns `Error::Allocation`.
+            let mut serialized = Vec::new();
+            serialized
+                .try_reserve_exact(held.archive.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "cross-slide candidate archive",
+                    source,
+                })?;
+            serialized.extend_from_slice(&held.archive);
+            // The digest is recomputed over the retained bytes rather than
+            // carried beside them, so the sealed physical revision stays a
+            // hash of the bytes this call publishes. That hash is the one
+            // `bounded_package_bytes` takes anyway, so what reuse removes is
+            // exactly the serialization and its deflate.
+            let mut digest = Sha256::new();
+            digest.update(&serialized);
+            (serialized, digest.finalize().into())
+        },
+        _ => bounded_package_bytes(&candidate, archive_limit)?,
+    };
     let serialized_bytes = serialized.len();
     // Clean owned ingress proves the destination has built-in parts. Keep
     // the existing path for caller-defined parts and revoked authorization.
@@ -1150,6 +1319,22 @@ fn build_candidate(
         .is_unmodified_owned_source()
         .then(|| seal_physical_revision(archive_digest, serialized_bytes))
         .transpose()?;
+    // Owned ingress took the very allocation `serialized` occupied and keeps
+    // it behind a shared handle, so retention is a second owner of those
+    // bytes rather than a second copy of them. A candidate above the
+    // operation's retained-candidate budget is simply not retained: rebuilding
+    // is always available, so the budget is a ceiling on what may be held and
+    // never a reason to refuse a plan.
+    let retained_candidate = RetainedCandidateSlot(
+        (matches!(archive, CandidateArchive::BuildAndRetain)
+            && serialized_bytes <= limits.max_retained_candidate_bytes())
+        .then(|| reopened.exact_source_shared())
+        .flatten()
+        .map(|shared| RetainedCandidate {
+            archive: shared,
+            bound: archive_limit,
+        }),
+    );
     let captured = super::model::capture(
         &reopened,
         destination.limits,
@@ -1172,7 +1357,7 @@ fn build_candidate(
         ));
     }
     let revision = captured.revision;
-    Ok((reopened, revision, archive_revision))
+    Ok((reopened, revision, archive_revision, retained_candidate))
 }
 
 fn preflight_parts(
@@ -1693,6 +1878,8 @@ fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
         left.max_text_bytes().min(right.max_text_bytes()),
         left.max_history_entries().min(right.max_history_entries()),
         left.max_history_bytes().min(right.max_history_bytes()),
+        left.max_retained_candidate_bytes()
+            .min(right.max_retained_candidate_bytes()),
     )
     .ok_or_else(|| invalid("cross-slide copy limits are invalid"))
 }
@@ -2324,5 +2511,7 @@ impl<'a> WireInput<'a> {
 
 #[cfg(test)]
 mod bounded_writer_tests;
+#[cfg(test)]
+mod retention_tests;
 #[cfg(test)]
 mod revision_cache_tests;

@@ -1,0 +1,2 @@
+run-window load before:  06:51:57 up 5 days,  4:19,  3 users,  load average: 26.37, 30.56, 21.87
+run-window load after:  06:56:13 up 5 days,  4:23,  3 users,  load average: 59.09, 52.37, 33.17

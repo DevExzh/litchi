@@ -1,5 +1,40 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
+
+Record: [0656](0656-pptx-cross-copy-candidate-budget.md).
+
+Change 0656 is the answer to the gate change 0646 could not clear, and the shape
+of the answer is worth recording. 0646 stopped at "an optimization that changes
+how long memory lives must be opt-in until something is charging for it." The
+owner's decision 5 supplied the charge, and the charge turned out not to be a
+budget at all: it is a **declared ceiling in the operation's own finite limit
+policy**, `opened::Limits::max_retained_candidate_bytes`, the sibling of the
+`max_history_bytes` that `History::push` already enforces. The crate now has two
+enforced live-memory ceilings instead of one, both in `Limits`, both intersected
+by `intersect_limits`, and both reached by no `Budget` — which is exactly the
+gap ADR 0005 names and exactly the interim location the amendment now writes
+down until ADR 0031's execution context reaches this path.
+
+Two rules came out of the implementation that generalize past this change.
+**First: a retention ceiling whose alternative is recomputation must not
+refuse.** 0646 specified a `Require` route with a typed `Error::Limit`; decision
+5 removed it, and it was right to. A typed limit error protects a caller from
+work or memory it did not ask for, and there is nothing to protect it from when
+the fallback is the path the library takes anyway. The over-budget case
+therefore changes no result, no refusal and no published byte, and it is
+observable through `retained_candidate_bytes()` rather than through an error.
+**Second: derived state must not be part of a value's identity.** 0646's scratch
+compared a stored digest in `PartialEq`, which made a plan that had released its
+archive unequal to the plan it was; this implementation's equality ignores the
+slot entirely, so `release_retained_candidate` is value-preserving and
+`plan_a == plan_b` can never become a byte comparison of two archives. The same
+discipline caught a second trap: a derived `Debug` would have printed 33.6 MB of
+archive, so `Debug` reports the retained length instead. **The measured cost is
+disclosed rather than netted out**: a media-rich plan-plus-apply lifecycle now
+peaks 12.18% higher, a plain one peaks 5.45% lower, and the budget is the knob
+that buys the old profile back.
+
 ## 0653 — clause (b)'s "no unnecessary intermediate" is enforced on the OOXML read path for the first time: 197.8 MB of intermediate markup over the corpus becomes 36.8 MB
 
 Record: [0653](0653-mce-namespace-emission-rewrite.md).

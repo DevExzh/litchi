@@ -1118,6 +1118,28 @@ impl OpcPackage {
             .retain(|_, part| !is_signature_infrastructure(&**part));
     }
 
+    /// Shared handle to the exact owned source archive, while the
+    /// exact-source authorization is intact.
+    ///
+    /// The returned handle borrows nothing: it is a second owner of the very
+    /// allocation an owned ingress (`from_vec`, `from_vec_reusing_payloads`,
+    /// `open`, `from_reader`) moved into this package, so a caller may keep
+    /// the archive alive after the package is dropped without copying it.
+    /// The bytes are immutable through the handle and are exactly the bytes
+    /// this package republishes verbatim.
+    ///
+    /// Returns `None` for a package that was not opened from owned bytes, and
+    /// for one whose exact-source authorization has been revoked by an edit;
+    /// a later revocation does not retract a handle already taken, so a caller
+    /// that holds one must not treat it as evidence about the package's
+    /// current state.
+    #[must_use]
+    pub fn exact_source_shared(&self) -> Option<Arc<Vec<u8>>> {
+        self.exact_source_authorized
+            .then(|| self.source_archive.clone())
+            .flatten()
+    }
+
     pub(crate) fn exact_source(&self) -> Option<&[u8]> {
         self.exact_source_authorized
             .then(|| self.source_archive.as_deref().map(Vec::as_slice))
