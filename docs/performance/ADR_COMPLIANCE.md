@@ -1,5 +1,42 @@
 # Performance optimization ADR-compliance matrix
 
+## 0659 — the first reduction of an ADR 0006 fence, admitted by the caller's bracket and by nothing else
+
+ADR 0005 requires that a mutation during a read return `SourceChanged`, ADR 0006
+binds a splice to the bytes it was planned against, and ADR 0003 makes the
+fingerprint diagnostic while exact byte equality authorizes application. All
+three are preserved, and the argument is deliberately narrow. The removed
+confirming scans are admissible **only** because each reduced call's comparison
+partner is a scan the same operation already takes; the retained
+`ensure_source_identity` (a `version()`, a `len()` and a `version()`) carries no
+part of the argument, stays at all five fence points of the open and all three
+inside `ensure_current`, and is proved insufficient by change 0644's `FileSource`
+witness, rerun here identically. The new entry point's rustdoc states the
+condition as a contract — a caller with no outer comparison must keep using
+`plan_same_length_stream_splices` — and the PPT open, which is such a caller, is
+untouched and measured to be byte-identical read for read on all 30 fixtures.
+ADR 0003's composed reopen is retained by both the reduced and the paired call,
+so Option D stays rejected and 14 of the FAT sweep's 17 `Overlay(Ole(..))` rows
+keep both wrapper and site. ADR 0005's `SourceChanged` rule holds at every
+ordinal the sweeps cover, with the two movements the record enumerates: Option
+C's six relocated ordinals, refused at the first access with the same variant on
+the payload witness and with the composed reopen's own `Overlay(Ole(..))` on the
+FAT witness; and one re-typed ordinal where a structural CFB failure of the
+retained index parse over moved bytes is now attributed to the movement rather
+than to the file. That second movement is change 0621's relocation rule, scoped
+to that parse's error, to the four `OleError` variants describing structure —
+a limit refusal, an I/O failure, an allocation failure and an already-typed
+`SourceChanged` keep their own error exactly — and conditioned on a recomputed
+digest actually differing, so it cannot fire on a file that was malformed before
+anything was read, and it cannot fire on the composed reopen's own error, which
+is the inversion change 0644's gate fails an implementation for. No limit was
+relaxed, no `unsafe` added, no dependency added, no archive type, raw lock or
+executor leaked, and the facade is untouched. No ADR text is amended, because
+decision 9 of change 0652 assigns this change none; ADRs 0030 and 0031, now
+Accepted, are not cited because nothing here is lazy or budgeted.
+[Change 0659](0659-cfb-single-scan-identity-entry-point.md);
+`performance_claim: none`.
+
 ## 0655 — one durable format boundary moved, with a typed refusal; ADR 0005 amended for the memo
 
 Record: [0655](0655-pptx-memoized-revision-proof.md).

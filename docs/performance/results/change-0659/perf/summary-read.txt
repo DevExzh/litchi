@@ -1,0 +1,10 @@
+mode	fixture	bytes	before_cyc	after_cyc	delta%	predicted_after	residual%	AA_before%	AA_after%
+doc-open-read	documentProperties.doc	9728	715547	539590	-24.59	610323	-11.59	-0.02	-0.03
+doc-open-read	noheadfoot-litchi.doc	10240	729834	550382	-24.59	619072	-11.10	+0.31	+0.02
+doc-open-read	lists-margins.doc	10752	750940	560722	-25.33	634640	-11.65	+0.48	-0.05
+doc-open-read	duplicate-style-names.doc	64512	2354752	1595917	-32.23	1656954	-3.68	+0.01	-0.04
+
+# doc-open-read: 4 fixtures; delta median -24.96%, range -32.23%..-24.59%; residual against 0644's prediction median -11.34%, range -11.65%..-3.68%
+#   worst |residual| -11.65%  -> gate FAIL (+-5%)
+
+# A/A floor over 8 same-leg pairs: median -0.01%, range -0.05%..+0.48%, p95 of |delta| 0.31%

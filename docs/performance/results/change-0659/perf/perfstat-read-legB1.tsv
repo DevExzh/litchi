@@ -1,0 +1,5 @@
+mode	fixture	bytes	cycles_per_op	instructions_per_op	cycles_per_byte	instructions_per_byte
+doc-open-read	noheadfoot-litchi.doc	10240	550317	1179239	53.7419	115.1601
+doc-open-read	documentProperties.doc	9728	539681	1159760	55.4771	119.2188
+doc-open-read	duplicate-style-names.doc	64512	1596213	2525889	24.7429	39.1538
+doc-open-read	lists-margins.doc	10752	560859	1200177	52.1633	111.6236

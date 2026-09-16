@@ -1,0 +1,9 @@
+doc-open-read: saving = 10.631666 * bytes + 72,996   (4 fixtures, OLS)
+  per-scan constant = 2.1263 cycles per byte per scan (5 scans removed); change 0644's DOC OLS constant is 2.1633
+  fixed term = 72,996 cycles per operation
+fixture_bytes	measured_saving	fitted_saving	residual%
+9728	175957	176421	+0.26
+10240	179451	181865	+1.34
+10752	190218	187308	-1.53
+64512	758834	758866	+0.00
+# fit residual median +0.13%, range -1.53%..+1.34%

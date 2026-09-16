@@ -1,0 +1,815 @@
+# Run-length bands of every `.doc` change-under-read sweep, both legs.
+# A band is a maximal run of ordinals reporting the same outcome class.
+
+=== corpus-doc-open-documentProperties-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-documentProperties-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-documentProperties-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-duplicate-style-names-dir.tsv
+--- before
+  0-4	OK
+  5-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31	OK
+--- after
+  0-4	OK
+  5-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24	OK
+
+=== corpus-doc-open-duplicate-style-names-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-21	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  22-24	open-ERR Overlay(SourceFingerprintChanged {..}
+  25-27	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  28-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24	OK
+
+=== corpus-doc-open-duplicate-style-names-payload.tsv
+--- before
+  0-4	OK
+  5-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31	OK
+--- after
+  0-4	OK
+  5-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24	OK
+
+=== corpus-doc-open-endingnote-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-endingnote-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-endingnote-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-footnote-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-footnote-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-footnote-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-lists-margins-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-lists-margins-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-lists-margins-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-noheadfoot-litchi-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-noheadfoot-litchi-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-noheadfoot-litchi-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-picture-dir.tsv
+--- before
+  0-7	OK
+  8-45	open-ERR Overlay(SourceFingerprintChanged {..}
+  46	OK
+--- after
+  0-7	OK
+  8-33	open-ERR Overlay(SourceFingerprintChanged {..}
+  34	OK
+
+=== corpus-doc-open-picture-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-9	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  10-14	open-ERR Overlay(SourceFingerprintChanged {..}
+  15-17	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  18-29	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  30-34	open-ERR Overlay(SourceFingerprintChanged {..}
+  35-39	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  40-44	open-ERR Overlay(SourceFingerprintChanged {..}
+  45-46	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-9	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  10-15	open-ERR Overlay(SourceFingerprintChanged {..}
+  16-27	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  28-32	open-ERR Overlay(SourceFingerprintChanged {..}
+  33-34	OK
+
+=== corpus-doc-open-picture-payload.tsv
+--- before
+  0-7	OK
+  8-45	open-ERR Overlay(SourceFingerprintChanged {..}
+  46	OK
+--- after
+  0-7	OK
+  8-33	open-ERR Overlay(SourceFingerprintChanged {..}
+  34	OK
+
+=== corpus-doc-open-table-merged-cells-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-table-merged-cells-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-open-table-merged-cells-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== corpus-doc-read-documentProperties-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-documentProperties-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-49	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  50-52	read-ERR Overlay(SourceFingerprintChanged {..}
+  53-55	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  56-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-46	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  47-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-documentProperties-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-duplicate-style-names-dir.tsv
+--- before
+  0-4	OK
+  5-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31-59	read-ERR Overlay(SourceFingerprintChanged {..}
+  60	OK
+--- after
+  0-4	OK
+  5-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-50	read-ERR Overlay(SourceFingerprintChanged {..}
+  51	OK
+
+=== corpus-doc-read-duplicate-style-names-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-21	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  22-24	open-ERR Overlay(SourceFingerprintChanged {..}
+  25-27	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  28-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31-33	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  34-36	read-ERR Overlay(SourceFingerprintChanged {..}
+  37-39	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  40-42	read-ERR Overlay(SourceFingerprintChanged {..}
+  43-50	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  51-53	read-ERR Overlay(SourceFingerprintChanged {..}
+  54-56	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  57-59	read-ERR Overlay(SourceFingerprintChanged {..}
+  60	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-31	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  32-34	read-ERR Overlay(SourceFingerprintChanged {..}
+  35-47	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  48-50	read-ERR Overlay(SourceFingerprintChanged {..}
+  51	OK
+
+=== corpus-doc-read-duplicate-style-names-payload.tsv
+--- before
+  0-4	OK
+  5-30	open-ERR Overlay(SourceFingerprintChanged {..}
+  31-59	read-ERR Overlay(SourceFingerprintChanged {..}
+  60	OK
+--- after
+  0-4	OK
+  5-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-50	read-ERR Overlay(SourceFingerprintChanged {..}
+  51	OK
+
+=== corpus-doc-read-endingnote-dir.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-endingnote-fat.tsv
+--- before
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-endingnote-payload.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-footnote-dir.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-footnote-fat.tsv
+--- before
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-footnote-payload.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-lists-margins-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-lists-margins-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-49	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  50-52	read-ERR Overlay(SourceFingerprintChanged {..}
+  53-55	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  56-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-46	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  47-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-lists-margins-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-noheadfoot-litchi-dir.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-noheadfoot-litchi-fat.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-49	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  50-52	read-ERR Overlay(SourceFingerprintChanged {..}
+  53-55	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  56-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-46	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  47-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-noheadfoot-litchi-payload.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== corpus-doc-read-picture-dir.tsv
+--- before
+  0-7	read-ERR Refused(StructuralContent)
+  8-45	open-ERR Overlay(SourceFingerprintChanged {..}
+  46-65	read-ERR Overlay(SourceFingerprintChanged {..}
+  66-68	read-ERR Refused(StructuralContent)
+--- after
+  0-7	read-ERR Refused(StructuralContent)
+  8-33	open-ERR Overlay(SourceFingerprintChanged {..}
+  34-51	read-ERR Overlay(SourceFingerprintChanged {..}
+  52-54	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-picture-fat.tsv
+--- before
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-9	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  10-14	open-ERR Overlay(SourceFingerprintChanged {..}
+  15-17	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  18-29	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  30-34	open-ERR Overlay(SourceFingerprintChanged {..}
+  35-39	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  40-44	open-ERR Overlay(SourceFingerprintChanged {..}
+  45-49	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  50-54	read-ERR Overlay(SourceFingerprintChanged {..}
+  55-59	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  60-64	read-ERR Overlay(SourceFingerprintChanged {..}
+  65-68	read-ERR Refused(StructuralContent)
+--- after
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-9	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  10-15	open-ERR Overlay(SourceFingerprintChanged {..}
+  16-27	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  28-32	open-ERR Overlay(SourceFingerprintChanged {..}
+  33-45	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  46-50	read-ERR Overlay(SourceFingerprintChanged {..}
+  51-54	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-picture-payload.tsv
+--- before
+  0-7	read-ERR Refused(StructuralContent)
+  8-45	open-ERR Overlay(SourceFingerprintChanged {..}
+  46-65	read-ERR Overlay(SourceFingerprintChanged {..}
+  66-68	read-ERR Refused(StructuralContent)
+--- after
+  0-7	read-ERR Refused(StructuralContent)
+  8-33	open-ERR Overlay(SourceFingerprintChanged {..}
+  34-51	read-ERR Overlay(SourceFingerprintChanged {..}
+  52-54	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-table-merged-cells-dir.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-table-merged-cells-fat.tsv
+--- before
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-32	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  33-35	read-ERR Overlay(SourceFingerprintChanged {..}
+  36-38	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  39-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0	read-ERR Refused(StructuralContent)
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-30	read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  31-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== corpus-doc-read-table-merged-cells-payload.tsv
+--- before
+  0-4	read-ERR Refused(StructuralContent)
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-41	read-ERR Overlay(SourceFingerprintChanged {..}
+  42-43	read-ERR Refused(StructuralContent)
+--- after
+  0-4	read-ERR Refused(StructuralContent)
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-33	read-ERR Overlay(SourceFingerprintChanged {..}
+  34-35	read-ERR Refused(StructuralContent)
+
+=== sweep-documentProperties-doc-open-fat-region.tsv
+--- before
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-9	open-ERR Overlay(SourceFingerprintChanged {..}
+  10-11	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  12-20	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  21-23	open-ERR Overlay(SourceFingerprintChanged {..}
+  24-26	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  27-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0	OK
+  1	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))
+  2-6	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  7-10	open-ERR Overlay(SourceFingerprintChanged {..}
+  11-19	open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length")))
+  20-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== sweep-documentProperties-doc-open-index-region.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK
+
+=== sweep-documentProperties-doc-open-read.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30-58	read-ERR Overlay(SourceFingerprintChanged {..}
+  59	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23-49	read-ERR Overlay(SourceFingerprintChanged {..}
+  50	OK
+
+=== sweep-documentProperties-doc-open.tsv
+--- before
+  0-4	OK
+  5-29	open-ERR Overlay(SourceFingerprintChanged {..}
+  30	OK
+--- after
+  0-4	OK
+  5-22	open-ERR Overlay(SourceFingerprintChanged {..}
+  23	OK

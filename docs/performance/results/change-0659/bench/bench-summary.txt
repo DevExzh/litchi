@@ -1,0 +1,21 @@
+scenario	n	before_p50	after_p50	delta_p50%	before_mean	after_mean	before_p95	after_p95	before_p99	after_p99	AA_before%	AA_after%
+doc-snapshot-open-documentProperties	240	72890	47860	-34.34	73422	48279	79021	52540	80141	55260	-0.55	-0.47
+#   doc-snapshot-open-documentProperties: after against before -34.34%; before against after +52.30%
+doc-snapshot-open-duplicate-style-names	240	229662	126120	-45.08	231163	127103	236661	132761	238311	137961	+0.25	-0.07
+#   doc-snapshot-open-duplicate-style-names: after against before -45.08%; before against after +82.10%
+doc-snapshot-open-lists-margins	240	76260	49765	-34.74	76886	50235	82361	54770	84610	57390	+0.71	+0.10
+#   doc-snapshot-open-lists-margins: after against before -34.74%; before against after +53.24%
+doc-snapshot-open-picture	240	4256411	2150101	-49.49	4258728	2150914	4270591	2159230	4284401	2163500	-0.07	+0.06
+#   doc-snapshot-open-picture: after against before -49.49%; before against after +97.96%
+doc-snapshot-resolve-documentProperties	240	157551	120601	-23.45	158459	121524	164151	126941	166641	129120	-0.64	+0.84
+#   doc-snapshot-resolve-documentProperties: after against before -23.45%; before against after +30.64%
+doc-snapshot-resolve-duplicate-style-names	240	526103	356326	-32.27	525270	358140	529373	363212	531573	363772	+0.23	-0.19
+#   doc-snapshot-resolve-duplicate-style-names: after against before -32.27%; before against after +47.65%
+doc-snapshot-resolve-lists-margins	240	163610	124746	-23.75	164815	125581	170371	131380	178621	137870	+0.23	-0.70
+#   doc-snapshot-resolve-lists-margins: after against before -23.75%; before against after +31.16%
+ppt-textedit-open-45543	240	378342	378807	+0.12	380272	380638	385271	385892	386632	386312	-0.24	+0.14
+#   ppt-textedit-open-45543: after against before +0.12%; before against after -0.12%
+ppt-textedit-open-SampleShow	240	134250	134531	+0.21	135243	135590	140801	141231	145001	144781	+0.39	+0.23
+#   ppt-textedit-open-SampleShow: after against before +0.21%; before against after -0.21%
+
+# A/A floor over 18 same-leg pairs: median +0.08%, range -0.70%..+0.84%, p95 of |delta| 0.71%

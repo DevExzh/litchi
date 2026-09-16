@@ -1,5 +1,51 @@
 # Performance program phase report
 
+## 0659 — B2 + C landed, with both public entry points change 0644 priced
+
+Two public items are added to `litchi-cfb`'s `SharedOleFile`:
+`caller_bracketed_identity_fingerprint`, the empty-splice identity capture that
+takes one complete scan and keeps the composed CFB reopen, whose rustdoc states
+that the caller owns the read-twice-compare and when the method may not be used;
+and `unbracketed_source_fingerprint`, a digest-only path with no reopen whose
+rustdoc states that it is a failure-path diagnostic and never an identity
+capture. The first is the empty-splice specialization of the existing
+`finish_overlay_plan_with_owner`, factored into one private helper so it cannot
+drift from it; the second calls the private `fingerprints` directly, and the
+`SourceSnapshot` both construct becomes one accessor shared with the three
+planners that used to write it out inline. `litchi-doc` applies the first to its
+three identity calls that
+are not the last of their operation, deletes the open's third identity call while
+keeping its `ensure_source_identity`, and gives the retained index parse an error
+branch that uses the second. `litchi-ppt` is unchanged. Evidence is deterministic
+first: complete scans **6 → 3** for the DOC open on all 8 admitted fixtures,
+**14 → 9** for `open` plus `paragraph(0)` where the read is admitted and
+**10 → 6** where it is refused, **2 → 2** for the PPT open on all 30 — the
+counts change 0644's gate G3 requires for the declared variant, and the
+`version()`/`len()` reductions (108/32 → 73/22 on `documentProperties.doc`,
+132/32 → 87/22 on `picture.doc`) are reconciled term by term against the removed
+`fingerprints` calls and the removed composed reopen with nothing left over, the
+five `ensure_source_identity` sites untouched. A held mutation was placed after
+**every** read ordinal of a clean run on three witness placements — outside every
+parsed range, inside the first FAT sector, inside the first directory sector —
+over 8 `.doc` in two modes and all 30 `.ppt`, on both legs: 144 sweeps and 3,444
+mutated opens before, 3,009 after. No interior ordinal became `OK`, the leading
+window is identical everywhere, the trailing window is one ordinal on both legs
+of every DOC sweep, and all **92** PPT sweep files have the same sha256 on both
+legs. Change 0589's 87-artifact publication differential is **byte-identical**.
+Native `perf stat -r 3` isolation pairs in the order A1 B1 B2 A2 give a DOC open
+median of **−35.41%** (−34.90%…−49.45%), a readback median of −24.96%, and PPT
+−0.12% with not one fixture adverse by more than 0.16%, against an A/A floor of
++0.06% median and 0.62% at p95 over 76 same-leg pairs. Paired timing over 120
+samples a leg agrees: DOC open p50 −34.34%…−49.49% (before against after
++52.30%…+97.96%), readback −23.45%…−32.27%, PPT +0.12% and +0.21% — the only two
+scenarios that got worse, both inside the 0.71% p95 floor. Gate G4's literal ±5% band against change 0644's predicted after-value
+**fails** on 7 of 8 DOC fixtures and the record says so: the prediction omitted
+the fixed term, the count proves no further scan was removed, and the
+decomposition fits the whole corpus to ±0.7%. No claim-registry entry;
+`performance_claim: none`.
+[Change and limitations](0659-cfb-single-scan-identity-entry-point.md);
+[evidence](results/change-0659/README.md).
+
 ## 0655 — the memoized per-part revision proof, landed with its format bump
 
 Change 0655 implements change 0645's design under change 0652 decision 4. `package_fingerprint` becomes `H("litchi-pptx-opened-v2" ‖ root relationships ‖ non-part members ‖ "parts" ‖ u32 count ‖ Dᵖ(p₁) ‖ …)` over per-part digests `Dᵖ(p) = H("litchi-pptx-opened-part-v2" ‖ name ‖ content type ‖ Dᵇ(payload) ‖ relationships)`, of which only the payload tier `Dᵇ(b) = H("litchi-pptx-opened-payload-v2" ‖ len ‖ b)` is memoized — keyed by `(payload address, length)`, retaining the payload `Arc` so the key cannot be recycled, and skipped entirely for any `Part` whose `blob_arc()` does not alias its `blob()`. Both durable patch families bump (`LPRM0002`, `LPCP0003`) and a patch under a recognized superseded magic is refused in `from_bytes` with the new typed `Error::DurablePatchRevisionFormat { found, expected }` before any header field is read; an unrecognized magic keeps its existing `Error::Invalid`. The `litchi_pptx::Package` facade carries the memo across opened-presentation publications, which is what makes a bare durable-patch replay cheap, and **releases** it at every mutation that publishes no snapshot to adopt, so the retention invariant holds unconditionally rather than only between publications. **Measured** by callgrind isolation pair on CPU 10: per lifecycle `pptx_eager_batch_edit_save` **−27.65%**, `pptx_eager_multi_slide_batch_edit_save` −27.53%, `pptx_slide_move_boundary_save` −7.87%, `pptx_slide_remove_boundary_save` **+2.80%**; a memoized fingerprint of the 229-part deck is 7,149,543 `Ir` against 922,730,402 cold, and the flat tier costs 13,579 `Ir` per part on that deck and 12,384 on the 25-part boundary deck. **Correctness** is gated, not argued: the pairwise oracle agrees with `packages_equal` and with the retained v1 revision on **9,396 ordered pairs over 78 repository `.pptx` fixtures** and on change 0645's synthetic 121, with zero disagreements; the alias, ABA and retention gates assert their invariants directly; the superseded-format refusal is proved by name for the forward and the inverse of both families; and every capture in the suite re-derives its revision the cold way through a `debug_assert!`. Gates: `cargo test -p litchi-pptx` **885 passed, 0 failed**, `cargo test -p litchi --features docx,xlsx,pptx,xls` **265 passed, 0 failed**, `cargo test` in `tools/perf-baseline` **540 passed, 0 failed**, plus `fmt`, Clippy, rustdoc and `non_iwork_gate.py verify`. See [Change 0655](0655-pptx-memoized-revision-proof.md); `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.

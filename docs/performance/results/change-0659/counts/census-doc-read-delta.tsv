@@ -1,0 +1,60 @@
+file	bytes	outcome	reads	read_x	len	version
+insert-file-config.doc	22016	open-ERR Refused(Drawing)	19->18	2.43->1.43	14->12	46->40
+redline-1.doc	8319	open-ERR Ole(InvalidFormat("Invali	1->1	0.06->0.06	2->2	3->3
+bookmark-delete-redline.doc	66048	open-ERR Refused(Drawing)	16->15	2.14->1.14	14->12	44->38
+changes-in-footnote.doc	13312	open-ERR Refused(Revision)	16->15	2.68->1.68	14->12	44->38
+noheadfoot-litchi.doc	10240	OK	59->50	16.53->11.28	70->56	241->194
+noheadfoot-litchi.doc	27648	open-ERR Refused(Drawing)	16->15	2.34->1.34	14->12	44->38
+3endnotes.doc	35328	open-ERR Refused(Drawing)	19->18	2.27->1.27	14->12	46->40
+DiffFirstPageHeadFoot.doc	27648	open-ERR Refused(Drawing)	16->15	2.34->1.34	14->12	44->38
+FancyFoot.doc	27136	open-ERR Refused(Drawing)	16->15	2.35->1.35	14->12	44->38
+FloatingPictures.doc	335360	open-ERR Refused(Drawing)	29->28	2.06->1.05	14->12	52->46
+HeaderFooterProblematic.doc	61440	open-ERR Refused(Drawing)	14->13	2.12->1.12	14->12	42->36
+HeaderFooterUnicode.doc	28672	open-ERR Refused(Drawing)	16->15	2.33->1.33	14->12	44->38
+Lists.doc	27648	open-ERR Refused(Drawing)	16->15	2.34->1.34	14->12	44->38
+NoHeadFoot.doc	26112	open-ERR Refused(Drawing)	16->15	2.36->1.36	14->12	44->38
+PasswordProtected.doc	19968	open-ERR Refused(Encrypted)	15->14	2.39->1.39	14->12	43->37
+PngPicture.doc	14336	open-ERR Refused(Drawing)	17->16	2.54->1.54	14->12	44->38
+ThreeColFoot.doc	27136	open-ERR Refused(Drawing)	16->15	2.35->1.35	14->12	44->38
+ThreeColHead.doc	27136	open-ERR Refused(Drawing)	16->15	2.35->1.35	14->12	44->38
+ThreeColHeadFoot.doc	27136	open-ERR Refused(Drawing)	16->15	2.35->1.35	14->12	44->38
+cfb-truncated-final-sector.doc	24065	open-ERR Refused(Field)	16->15	2.39->1.39	14->12	44->38
+cfb-v3-uninitialized-size-high-word.doc	15360	open-ERR Refused(AmbiguousTopology	17->16	2.50->1.50	14->12	44->38
+cjklist30.doc	24064	open-ERR Refused(Drawing)	16->15	2.39->1.39	14->12	44->38
+cjklist31.doc	24064	open-ERR Refused(Drawing)	16->15	2.39->1.39	14->12	44->38
+cjklist34.doc	24064	open-ERR Refused(Drawing)	16->15	2.39->1.39	14->12	44->38
+cjklist35.doc	24064	open-ERR Refused(Drawing)	16->15	2.39->1.39	14->12	44->38
+commented-table.doc	27136	open-ERR Refused(Drawing)	19->18	2.35->1.35	14->12	46->40
+documentProperties.doc	9728	OK	59->50	16.64->11.37	70->56	241->194
+duplicate-style-names.doc	64512	OK	60->51	14.40->9.36	70->56	241->194
+empty.doc	19456	open-ERR Refused(Drawing)	14->13	2.39->1.39	14->12	42->36
+endingnote.doc	9728	read-ERR Refused(StructuralContent	43->35	12.00->7.74	51->39	173->132
+equation.doc	13824	open-ERR Refused(Drawing)	17->16	2.89->1.89	14->12	44->38
+first-header-footer.doc	23552	open-ERR Refused(Drawing)	16->15	2.40->1.40	14->12	44->38
+footnote.doc	9728	read-ERR Refused(StructuralContent	43->35	12.00->7.74	51->39	173->132
+hyperlink.doc	9728	open-ERR Refused(Field)	16->15	2.93->1.93	14->12	44->38
+image-comment-at-char.doc	24064	open-ERR Refused(Drawing)	19->18	2.39->1.39	14->12	46->40
+inline-endnote-and-footnote.doc	24576	open-ERR Refused(Drawing)	14->13	2.38->1.38	14->12	42->36
+lists-margins.doc	10752	OK	59->50	16.41->11.17	70->56	241->194
+picture.doc	1448448	read-ERR Refused(StructuralContent	68->54	10.07->6.06	51->39	213->160
+pictures_escher.doc	120320	open-ERR Refused(Drawing)	17->16	2.09->1.09	14->12	44->38
+table-merged-cells.doc	17408	read-ERR Refused(StructuralContent	43->35	11.13->6.98	51->39	173->132
+tdf71749_with_footnote.doc	20480	open-ERR Refused(Drawing)	14->13	2.38->1.38	14->12	42->36
+testPictures.doc	315904	open-ERR Refused(Field)	16->15	2.05->1.05	14->12	44->38
+watermark.doc	20480	open-ERR Refused(Drawing)	14->13	2.45->1.45	14->12	42->36
+word6-no-table-stream.doc	6656	open-ERR Refused(AmbiguousTopology	14->13	3.15->2.15	14->12	42->36
+47950_normal.doc	27136	open-ERR Refused(Drawing)	16->15	2.35->1.35	14->12	44->38
+Bug53453Section.doc	26112	open-ERR Refused(Drawing)	16->15	2.36->1.36	14->12	44->38
+au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc	86528	open-ERR Refused(Macro)	17->16	2.14->1.14	14->12	44->38
+ca.kwsymphony.www_education_School_Concert_Seat_Booking_Form_2011-12.doc	1619457	open-ERR Refused(Field)	18->16	2.03->1.03	14->12	48->40
+password_password_cryptoapi.doc	27136	open-ERR Refused(Encrypted)	15->14	2.29->1.29	14->12	43->37
+password_tika_binaryrc4.doc	22016	open-ERR Refused(Encrypted)	15->14	2.36->1.36	14->12	43->37
+saved-by-table.doc	65024	open-ERR Refused(Drawing)	14->13	2.12->1.12	14->12	42->36
+test.doc	32768	open-ERR Refused(Drawing)	17->16	2.23->1.23	14->12	44->38
+word_with_embeded.doc	117248	open-ERR Refused(Drawing)	41->40	2.18->1.18	14->12	60->54
+TestBug52117.doc	7168	open-ERR Refused(AmbiguousTopology	14->13	3.07->2.07	14->12	42->36
+TestGermanWord90.doc	19456	open-ERR Refused(Drawing)	14->13	2.39->1.39	14->12	42->36
+TestMickey.doc	12288	open-ERR Refused(AmbiguousTopology	17->16	2.62->1.62	14->12	44->38
+TestNon4ByteBoundary.doc	11776	open-ERR Refused(Revision)	16->15	2.92->1.92	14->12	44->38
+# admitted: 4 fixtures; bytes read 14.40x-16.64x -> 9.36x-11.37x; reduction median 31.8%, range 31.6%-35.0%
+# refused: 53 fixtures; bytes read 0.06x-12.00x -> 0.06x-7.74x; reduction median 42.1%, range 0.0%-49.3%

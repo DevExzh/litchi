@@ -1,0 +1,78 @@
+# Gate tails for change 0659
+
+Run in /home/zhuhe/code/litchi-worktrees/0659 (branch
+perf/0659-cfb-single-scan-identity-entry-point, base 70d7768cc), on a host where
+eight agents were building concurrently. Every gate below was run twice: once on
+the first measurement window and again after the review-driven, behaviour-
+preserving cleanups; these are the second run's.
+
+$ cargo fmt --all --check
+exit=0
+
+### cargo clippy -p litchi-cfb -p litchi-doc -p litchi-ppt --all-targets
+      Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+### cargo test -p litchi-cfb -p litchi-doc -p litchi-ppt
+    passed=2776 failed=0 ignored=25
+  0
+### cargo doc -p litchi-cfb -p litchi-doc -p litchi-ppt --no-deps
+   Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0659/crates/litchi-doc)
+      Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.42s
+     Generated /home/zhuhe/code/litchi-worktrees/0659/target/doc/litchi_cfb/index.html and 2 other files
+
+### cargo test -p litchi-ole-common -p litchi-vba -p litchi-xls -p litchi-crypto -p litchi-sign -p litchi-ograph -p litchi-docx -p litchi-pptx  (consumers)
+    passed=4081 failed=0 ignored=34
+### cargo test -p litchi --features docx,xlsx,pptx,xls
+    passed=265 failed=0 ignored=7
+### python3 tools/non_iwork_gate.py verify
+  verified_bulk_tree_roots=45
+  verified_facade_safe_trees=35
+  verified_facade_combined_tree=1
+### cargo test in tools/perf-baseline
+    passed=540 failed=0 ignored=1
+  (the two allocator tests change 0651 lists as flaky did not fail in this run)
+
+### admission gate G1 — change-under-read sweeps (scripts/gate1.py)
+  144 sweeps per leg: 8 admitted .doc x 3 witness placements x 2 modes,
+  30 .ppt x 3 placements, plus change 0644's six named sweeps.
+  3,444 mutated opens on the before leg, 3,009 on the after.
+  
+  G1 mechanical half: PASS — every leg pair agrees on the leading OK window, the trailing OK window, and has no interior OK.
+  PPT byte-identity (sweeps/manifest.tsv): 92 of 92 identical; 52 of 52 DOC files differ (fewer ordinals).
+
+### admission gate G2 — 87-artifact publication differential (change 0589's probe)
+  $ diff differential/digest-before.tsv differential/digest-after.tsv
+  (empty — byte-identical over all 87 .doc and .ppt artifacts)
+  $ diff differential/digest-before.tsv ../change-0589/differential/digest-before.tsv
+  (empty — the before leg reproduces change 0589's retained file)
+
+### admission gate G3 — deterministic read counts (trace/scans-{before,after}.tsv)
+      8   doc-open	scans 6 -> 3
+      4   doc-open-read	scans 10 -> 6
+      4   doc-open-read	scans 14 -> 9
+     30   ppt-open	scans 2 -> 2
+
+### admission gate G4 — native cycles (perf/summary-{open,read}.txt)
+  # doc-open: 8 fixtures; delta median -35.41%, range -49.45%..-34.90%; residual against 0644's prediction median -19.51%, range -19.93%..+0.17%
+  #   worst |residual| -19.93%  -> gate FAIL (+-5%)
+  # ppt-open: 30 fixtures; delta median -0.12%, range -0.89%..+0.16%; residual against 0644's prediction median -0.12%, range -0.89%..+0.16%
+  #   worst |residual| -0.89%  -> gate PASS (+-5%)
+  #   worst adverse delta +0.16% -> gate PASS (<=+5%)
+  # A/A floor over 76 same-leg pairs: median +0.06%, range -0.84%..+0.76%, p95 of |delta| 0.62%
+  # doc-open-read: 4 fixtures; delta median -24.96%, range -32.23%..-24.59%; residual against 0644's prediction median -11.34%, range -11.65%..-3.68%
+  #   worst |residual| -11.65%  -> gate FAIL (+-5%)
+  # A/A floor over 8 same-leg pairs: median -0.01%, range -0.05%..+0.48%, p95 of |delta| 0.31%
+  The +-5% band against change 0644's predicted after-value fails on the DOC
+  open; gate G3's count shows no further scan was removed and perf/fit-open.txt
+  decomposes the excess into one fixed term that fits the corpus to +-0.7%.
+
+### paired timing (bench/bench-summary.txt)
+  #   doc-snapshot-open-documentProperties: after against before -34.34%; before against after +52.30%
+  #   doc-snapshot-open-duplicate-style-names: after against before -45.08%; before against after +82.10%
+  #   doc-snapshot-open-lists-margins: after against before -34.74%; before against after +53.24%
+  #   doc-snapshot-open-picture: after against before -49.49%; before against after +97.96%
+  #   doc-snapshot-resolve-documentProperties: after against before -23.45%; before against after +30.64%
+  #   doc-snapshot-resolve-duplicate-style-names: after against before -32.27%; before against after +47.65%
+  #   doc-snapshot-resolve-lists-margins: after against before -23.75%; before against after +31.16%
+  #   ppt-textedit-open-45543: after against before +0.12%; before against after -0.12%
+  #   ppt-textedit-open-SampleShow: after against before +0.21%; before against after -0.21%
+  # A/A floor over 18 same-leg pairs: median +0.08%, range -0.70%..+0.84%, p95 of |delta| 0.71%

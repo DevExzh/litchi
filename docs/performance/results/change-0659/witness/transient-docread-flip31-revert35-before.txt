@@ -1,0 +1,8 @@
+# fixture=/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc mode=doc-open-read
+flip_after_read	31
+revert_after_read	35
+offset	8703
+reads	59
+mutations_applied	2
+restored_byte_identical	true
+outcome	OK

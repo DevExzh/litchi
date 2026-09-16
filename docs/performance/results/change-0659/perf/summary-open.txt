@@ -1,0 +1,47 @@
+mode	fixture	bytes	before_cyc	after_cyc	delta%	predicted_after	residual%	AA_before%	AA_after%
+doc-open	documentProperties.doc	9728	333288	216956	-34.90	270153	-19.69	-0.16	+0.01
+doc-open	endingnote.doc	9728	333896	216796	-35.07	270762	-19.93	-0.01	+0.22
+doc-open	footnote.doc	9728	333954	217382	-34.91	270820	-19.73	+0.56	+0.36
+doc-open	noheadfoot-litchi.doc	10240	340895	220344	-35.36	274438	-19.71	-0.84	+0.27
+doc-open	lists-margins.doc	10752	348928	225202	-35.46	279148	-19.33	+0.14	-0.07
+doc-open	table-merged-cells.doc	17408	429232	263490	-38.61	316256	-16.68	-0.29	-0.25
+doc-open	duplicate-style-names.doc	64512	1038393	571184	-44.99	619714	-7.83	-0.01	+0.03
+doc-open	picture.doc	1448448	18974070	9590476	-49.45	9573734	+0.17	+0.06	+0.01
+ppt-open	incorrect_slide_order.ppt	9728	111531	110997	-0.48	111531	-0.48	-0.19	+0.11
+ppt-open	empty.ppt	10240	115735	115293	-0.38	115735	-0.38	+0.62	-0.52
+ppt-open	empty.ppt	10240	116478	116536	+0.05	116478	+0.05	+0.27	+0.31
+ppt-open	Password_Protected-56-hello.ppt	10752	116141	116025	-0.10	116141	-0.10	+0.10	-0.24
+ppt-open	Password_Protected-hello.ppt	10752	116014	115664	-0.30	116014	-0.30	-0.19	+0.27
+ppt-open	Password_Protected-np-hello.ppt	10752	116432	115392	-0.89	116432	-0.89	+0.76	+0.62
+ppt-open	WithComments.ppt	10752	116690	116615	-0.06	116690	-0.06	+0.64	+0.12
+ppt-open	text_shapes.ppt	11264	118811	118075	-0.62	118811	-0.62	-0.79	+0.39
+ppt-open	empty_textbox.ppt	11776	119749	119804	+0.05	119749	+0.05	-0.35	+0.21
+ppt-open	bug58144-headers-footers-2003.ppt	11776	120612	120783	+0.14	120612	+0.14	+0.15	+0.01
+ppt-open	headers_footers.ppt	12800	124430	124384	-0.04	124430	-0.04	+0.41	+0.55
+ppt-open	basic_test_ppt_file.ppt	15360	136034	135873	-0.12	136034	-0.12	-0.27	-0.06
+ppt-open	WithLinks.ppt	20992	163688	162446	-0.76	163688	-0.76	-0.28	+0.08
+ppt-open	ppt_with_png.ppt	39424	241682	239996	-0.70	241682	-0.70	-0.01	+0.19
+ppt-open	ole2-embedding-2003.ppt	40448	246710	245540	-0.47	246710	-0.47	-0.05	+0.04
+ppt-open	sound.ppt	43520	259762	258394	-0.53	259762	-0.53	+0.07	-0.32
+ppt-open	text-margins.ppt	44032	258980	258516	-0.18	258980	-0.18	+0.12	+0.48
+ppt-open	text-margins.ppt	44032	258928	258414	-0.20	258928	-0.20	+0.10	+0.06
+ppt-open	testPPT_oleWorkbook.ppt	98304	497362	496740	-0.13	497362	-0.13	+0.07	+0.04
+ppt-open	54880_chinese.ppt	103936	520002	518741	-0.24	520002	-0.24	+0.23	+0.19
+ppt-open	datetime.ppt	114176	565225	565386	+0.03	565225	+0.03	-0.06	-0.07
+ppt-open	SampleShow.ppt	125440	610412	609633	-0.13	610412	-0.13	+0.03	+0.07
+ppt-open	bug58144-headers-footers-2007.ppt	142848	687494	688620	+0.16	687494	+0.16	-0.18	+0.25
+ppt-open	headers_footers_2007.ppt	169472	786781	786332	-0.06	786781	-0.06	+0.18	+0.05
+ppt-open	ppt_with_embeded.ppt	180736	836660	836402	-0.03	836660	-0.03	-0.06	-0.08
+ppt-open	41246-1.ppt	275456	1259939	1256245	-0.29	1259939	-0.29	-0.11	-0.26
+ppt-open	45543.ppt	385024	1707650	1710168	+0.15	1707650	+0.15	+0.14	-0.11
+ppt-open	45543-transition-litchi.ppt	397312	1769922	1771596	+0.09	1769922	+0.09	+0.19	+0.14
+ppt-open	45543-transition-litchi.ppt	842240	3746960	3748002	+0.03	3746960	+0.03	+0.19	-0.15
+ppt-open	cryptoapi-proc2356.ppt	1341952	5884146	5887948	+0.06	5884146	+0.06	+0.34	-0.32
+
+# doc-open: 8 fixtures; delta median -35.41%, range -49.45%..-34.90%; residual against 0644's prediction median -19.51%, range -19.93%..+0.17%
+#   worst |residual| -19.93%  -> gate FAIL (+-5%)
+# ppt-open: 30 fixtures; delta median -0.12%, range -0.89%..+0.16%; residual against 0644's prediction median -0.12%, range -0.89%..+0.16%
+#   worst |residual| -0.89%  -> gate PASS (+-5%)
+#   worst adverse delta +0.16% -> gate PASS (<=+5%)
+
+# A/A floor over 76 same-leg pairs: median +0.06%, range -0.84%..+0.76%, p95 of |delta| 0.62%

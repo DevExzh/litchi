@@ -1,0 +1,147 @@
+sweep	leadOK	trailOK	ordinals	refused	class_counts_changed
+corpus-doc-open-documentProperties-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-documentProperties-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-documentProperties-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-duplicate-style-names-dir.tsv	5->5	1->1	32->25	26->19	open-ERR Overlay(SourceFingerprintChanged {..} 26->19
+corpus-doc-open-duplicate-style-names-fat.tsv	1->1	1->1	32->25	30->23	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 18->15 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-duplicate-style-names-payload.tsv	5->5	1->1	32->25	26->19	open-ERR Overlay(SourceFingerprintChanged {..} 26->19
+corpus-doc-open-endingnote-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-endingnote-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-endingnote-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-footnote-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-footnote-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-footnote-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-lists-margins-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-lists-margins-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-lists-margins-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-noheadfoot-litchi-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-noheadfoot-litchi-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-noheadfoot-litchi-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-picture-dir.tsv	8->8	1->1	47->35	38->26	open-ERR Overlay(SourceFingerprintChanged {..} 38->26
+corpus-doc-open-picture-fat.tsv	1->1	2->2	47->35	44->32	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 4->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 25->20 | open-ERR Overlay(SourceFingerprintChanged {..} 15->11
+corpus-doc-open-picture-payload.tsv	8->8	1->1	47->35	38->26	open-ERR Overlay(SourceFingerprintChanged {..} 38->26
+corpus-doc-open-table-merged-cells-dir.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-open-table-merged-cells-fat.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+corpus-doc-open-table-merged-cells-payload.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+corpus-doc-read-documentProperties-dir.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-documentProperties-fat.tsv	1->1	1->1	60->51	58->49	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->21 | read-ERR Overlay(SourceFingerprintChanged {..} 12->6
+corpus-doc-read-documentProperties-payload.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-duplicate-style-names-dir.tsv	5->5	1->1	61->52	55->46	open-ERR Overlay(SourceFingerprintChanged {..} 26->19 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-duplicate-style-names-fat.tsv	1->1	1->1	61->52	59->50	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 18->15 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->21 | read-ERR Overlay(SourceFingerprintChanged {..} 12->6
+corpus-doc-read-duplicate-style-names-payload.tsv	5->5	1->1	61->52	55->46	open-ERR Overlay(SourceFingerprintChanged {..} 26->19 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-endingnote-dir.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-doc-read-endingnote-fat.tsv	0->0	0->0	44->36	44->36	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 6->8 | read-ERR Overlay(SourceFingerprintChanged {..} 6->3
+corpus-doc-read-endingnote-payload.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-doc-read-footnote-dir.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-doc-read-footnote-fat.tsv	0->0	0->0	44->36	44->36	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 6->8 | read-ERR Overlay(SourceFingerprintChanged {..} 6->3
+corpus-doc-read-footnote-payload.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-doc-read-lists-margins-dir.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-lists-margins-fat.tsv	1->1	1->1	60->51	58->49	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->21 | read-ERR Overlay(SourceFingerprintChanged {..} 12->6
+corpus-doc-read-lists-margins-payload.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-noheadfoot-litchi-dir.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-noheadfoot-litchi-fat.tsv	1->1	1->1	60->51	58->49	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->21 | read-ERR Overlay(SourceFingerprintChanged {..} 12->6
+corpus-doc-read-noheadfoot-litchi-payload.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+corpus-doc-read-picture-dir.tsv	0->0	0->0	69->55	69->55	open-ERR Overlay(SourceFingerprintChanged {..} 38->26 | read-ERR Overlay(SourceFingerprintChanged {..} 20->18
+corpus-doc-read-picture-fat.tsv	0->0	0->0	69->55	69->55	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 4->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 25->20 | open-ERR Overlay(SourceFingerprintChanged {..} 15->11 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 10->13 | read-ERR Overlay(SourceFingerprintChanged {..} 10->5
+corpus-doc-read-picture-payload.tsv	0->0	0->0	69->55	69->55	open-ERR Overlay(SourceFingerprintChanged {..} 38->26 | read-ERR Overlay(SourceFingerprintChanged {..} 20->18
+corpus-doc-read-table-merged-cells-dir.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-doc-read-table-merged-cells-fat.tsv	0->0	0->0	44->36	44->36	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7 | read-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 6->8 | read-ERR Overlay(SourceFingerprintChanged {..} 6->3
+corpus-doc-read-table-merged-cells-payload.tsv	0->0	0->0	44->36	44->36	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 12->11
+corpus-ppt-open-41246-1-dir.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-41246-1-fat.tsv	1->1	1->1	17->17	15->15	none
+corpus-ppt-open-41246-1-payload.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-45543-dir.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-45543-fat.tsv	1->1	1->1	9->9	7->7	none
+corpus-ppt-open-45543-payload.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-45543-transition-litchi-dir.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-45543-transition-litchi-fat.tsv	1->1	1->1	9->9	7->7	none
+corpus-ppt-open-45543-transition-litchi-payload.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-54880_chinese-dir.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-54880_chinese-fat.tsv	1->1	1->1	15->15	13->13	none
+corpus-ppt-open-54880_chinese-payload.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-Password_Protected-56-hello-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-Password_Protected-56-hello-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-Password_Protected-56-hello-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-Password_Protected-hello-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-Password_Protected-hello-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-Password_Protected-hello-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-Password_Protected-np-hello-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-Password_Protected-np-hello-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-Password_Protected-np-hello-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-SampleShow-dir.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-SampleShow-fat.tsv	1->1	1->1	15->15	13->13	none
+corpus-ppt-open-SampleShow-payload.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-WithComments-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-WithComments-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-WithComments-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-WithLinks-dir.tsv	5->5	1->1	11->11	5->5	none
+corpus-ppt-open-WithLinks-fat.tsv	1->1	1->1	11->11	9->9	none
+corpus-ppt-open-WithLinks-payload.tsv	5->5	1->1	11->11	5->5	none
+corpus-ppt-open-basic_test_ppt_file-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-basic_test_ppt_file-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-basic_test_ppt_file-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-bug58144-headers-footers-2003-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-bug58144-headers-footers-2003-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-bug58144-headers-footers-2003-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-bug58144-headers-footers-2007-dir.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-bug58144-headers-footers-2007-fat.tsv	1->1	1->1	17->17	15->15	none
+corpus-ppt-open-bug58144-headers-footers-2007-payload.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-cryptoapi-proc2356-dir.tsv	5->5	1->1	11->11	5->5	none
+corpus-ppt-open-cryptoapi-proc2356-fat.tsv	1->1	1->1	11->11	9->9	none
+corpus-ppt-open-cryptoapi-proc2356-payload.tsv	5->5	1->1	11->11	5->5	none
+corpus-ppt-open-data-empty-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-data-empty-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-data-empty-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-datetime-dir.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-datetime-fat.tsv	1->1	1->1	17->17	15->15	none
+corpus-ppt-open-datetime-payload.tsv	8->8	1->1	17->17	8->8	none
+corpus-ppt-open-empty-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-empty-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-empty-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-empty_textbox-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-empty_textbox-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-empty_textbox-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-headers_footers-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-headers_footers-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-headers_footers-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-headers_footers_2007-dir.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-headers_footers_2007-fat.tsv	1->1	1->1	9->9	7->7	none
+corpus-ppt-open-headers_footers_2007-payload.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-incorrect_slide_order-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-incorrect_slide_order-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-incorrect_slide_order-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-litchi-changed-45543-transition-litchi-dir.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-litchi-changed-45543-transition-litchi-fat.tsv	1->1	1->1	9->9	7->7	none
+corpus-ppt-open-litchi-changed-45543-transition-litchi-payload.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-ole2-embedding-2003-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-ole2-embedding-2003-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-ole2-embedding-2003-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-ppt_with_embeded-dir.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-ppt_with_embeded-fat.tsv	1->1	1->1	9->9	7->7	none
+corpus-ppt-open-ppt_with_embeded-payload.tsv	4->4	1->1	9->9	4->4	none
+corpus-ppt-open-ppt_with_png-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-ppt_with_png-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-ppt_with_png-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-slideshow-text-margins-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-slideshow-text-margins-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-slideshow-text-margins-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-sound-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-sound-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-sound-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-testPPT_oleWorkbook-dir.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-testPPT_oleWorkbook-fat.tsv	1->1	1->1	15->15	13->13	none
+corpus-ppt-open-testPPT_oleWorkbook-payload.tsv	7->7	1->1	15->15	7->7	none
+corpus-ppt-open-text-margins-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-text-margins-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-text-margins-payload.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-text_shapes-dir.tsv	6->6	1->1	13->13	6->6	none
+corpus-ppt-open-text_shapes-fat.tsv	1->1	1->1	13->13	11->11	none
+corpus-ppt-open-text_shapes-payload.tsv	6->6	1->1	13->13	6->6	none
+sweep-45543-ppt-open-index-region.tsv	1->1	1->1	9->9	7->7	none
+sweep-45543-ppt-open.tsv	4->4	1->1	9->9	4->4	none
+sweep-documentProperties-doc-open-fat-region.tsv	1->1	1->1	31->24	29->22	open-ERR Ole(CorruptedFile("MiniFAT chain exceeds its declared length")) 3->1 | open-ERR Overlay(Ole(CorruptedFile("MiniFAT chain exceeds its declared length"))) 17->14 | open-ERR Overlay(SourceFingerprintChanged {..} 9->7
+sweep-documentProperties-doc-open-index-region.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+sweep-documentProperties-doc-open-read.tsv	5->5	1->1	60->51	54->45	open-ERR Overlay(SourceFingerprintChanged {..} 25->18 | read-ERR Overlay(SourceFingerprintChanged {..} 29->27
+sweep-documentProperties-doc-open.tsv	5->5	1->1	31->24	25->18	open-ERR Overlay(SourceFingerprintChanged {..} 25->18
+
+G1 mechanical half: PASS — every leg pair agrees on the leading OK window, the trailing OK window, and has no interior OK.

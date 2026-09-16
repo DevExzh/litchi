@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-16T07:25:00Z",
+  "batch": [
+    "0659-cfb-single-scan-identity-entry-point"
+  ],
+  "removed": [
+    "the session scratch directory /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0659 in full (25 MiB at its peak): both probe source trees and their manifests, the staged probe binaries, and the before and after legs' raw outputs after the files this packet retains were copied in",
+    "the four probe build directories /home/zhuhe/code/litchi-worktrees/targets/0659-{before,after,digest-before,digest-after} (582 MiB each, 2.3 GiB in total); the after pair was rebuilt once after a review-driven cleanup and both builds' outputs were compared",
+    "the worktree /home/zhuhe/code/litchi-worktrees/0659 and its build output, with git worktree remove --force after the batch was committed; the branch perf/0659-cfb-single-scan-identity-entry-point is kept"
+  ],
+  "retained_in_the_repository": [
+    "docs/performance/0659-cfb-single-scan-identity-entry-point.md",
+    "docs/performance/results/change-0659/: README.md, gates.txt, decision.json, log-sections.md, this file, and the trace/, sweeps/, counts/, witness/, perf/, bench/, differential/ and scripts/ directories -- every raw output the record cites",
+    "no *.log file is retained; every retained output is .txt, .tsv, .json or .md, so the repository's *.log ignore rule excludes nothing this packet's README cites"
+  ],
+  "repository_state": "the shared working copy /home/zhuhe/code/litchi was never built, tested or modified; all work happened in the worktree",
+  "background_tasks": "none; two duplicate tools/perf-baseline cargo test processes this agent had started were killed by PID (never by pattern) once one run was left to finish, and that run completed",
+  "notes": [
+    "the before leg is the shared read-only detached checkout /home/zhuhe/code/litchi-worktrees/before-70d7768cc, which this change did not create and did not remove",
+    "neither probe's source is copied into this packet: both already live in results/change-0644/probe/ and results/change-0589/probe/, and the README pins the reuse by sha256",
+    "144 change-under-read sweeps per leg were run; the packet keeps change 0644's six named sweeps in full on both legs, a sha256 manifest of all 288 files and the run-length bands of every .doc sweep, and scripts/run-legs.sh regenerates the rest in about three seconds per leg",
+    "the worktree's own target/ reached 54 GiB and tools/perf-baseline/target 17 GiB, both gitignored build output; they go with the worktree when it is removed",
+    "the review that followed the first measurement window produced three behaviour-preserving cleanups and two rustdoc corrections; every leg was re-run and all 156 deterministic after-leg outputs proved byte-identical between the two builds, so only the second window's raw files are retained and the README states the first window's medians for comparison"
+  ]
+}
