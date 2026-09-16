@@ -2287,3 +2287,39 @@ owners: Number, Percentage, Currency, Scientific, Fraction, Text, and Date &
 Time. This amendment updates the current count without rewriting that prior
 resource record; the shared physical-entry index and its bounded resource
 claims remain unchanged.
+
+## 2026-09-16 amendment: retained per-part digest memos on an opened-presentation snapshot and its facade
+
+Authorized by change
+[0652](../performance/0652-owner-decisions-for-the-third-wave.md) decision 4
+and written by change
+[0655](../performance/0655-pptx-memoized-revision-proof.md). It refines the
+"cache behaviour is semantically invisible" rule above for one shape of
+retained state this ADR did not previously describe: a memo that is not an
+evictable weighted cache of parsed values, but a bounded table of digests over
+bytes the owner already holds.
+
+An immutable snapshot, and a package facade that publishes snapshots, may
+retain such a memo across operations under all of the following, each of which
+the implementing record proves rather than asserts. The memo is keyed on the
+identity of an allocation the owner already holds and retains a strong
+reference to it, so a key cannot be recycled by a different payload and a hit
+proves byte identity. Every entry names an allocation the owning snapshot's own
+package holds; the process retains no payload solely because a memo names it,
+and a memo carried onto another package is re-projected onto that package's own
+allocations rather than inherited. A facade that retains such a memo across
+operations adopts the memo of the snapshot each publication produces and
+releases it at every mutation that produces no snapshot to adopt, so the memo
+never outlives the graph it describes. A miss is an ordinary recomputation, so no
+value, refusal, limit or published byte depends on which entries a memo holds.
+The memo is rebuilt or projected, never mutated in place, and it holds no limit
+and raises no error the unmemoized path would not raise. Its resident cost is
+bounded by the part count, is stated in the implementing record, and is charged
+through fallible reservation, so exhaustion is a typed resource error and not
+an abort. A reused value is re-derived by a `debug_assert!` in test and debug
+builds, so the owning crate's suite proves value identity rather than only
+compilation.
+
+This amendment does not weaken the eviction rules for semantic payload caches,
+does not permit ambient process-wide state, and changes no other sentence of
+this ADR.

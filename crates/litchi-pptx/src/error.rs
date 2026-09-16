@@ -54,6 +54,56 @@ pub enum SlideCopyRefusal {
     UnknownPhysicalMember,
 }
 
+/// Durable `PresentationML` patch families, each naming the complete-package
+/// revision proof its serialized header carries.
+///
+/// A durable patch embeds complete-package revisions computed by one exact
+/// algorithm. Change 0655 redefined that algorithm (`litchi-pptx-opened-v1` →
+/// `litchi-pptx-opened-v2`), so the two durable families carry a new magic and
+/// a patch serialized under the superseded magic is refused by name rather
+/// than compared across algebras. See
+/// [`Error::DurablePatchRevisionFormat`].
+///
+/// This enum never carries attacker-supplied bytes: an unrecognized magic is
+/// not classified here at all and keeps the existing
+/// [`Error::Invalid`] refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DurablePatchFormat {
+    /// `LPRM0001`: slide removal, superseded `litchi-pptx-opened-v1` proof.
+    SlideRemovalV1,
+    /// `LPRM0002`: slide removal, current `litchi-pptx-opened-v2` proof.
+    SlideRemovalV2,
+    /// `LPCP0002`: cross-presentation slide copy, superseded semantic proof.
+    CrossSlideCopyV2,
+    /// `LPCP0003`: cross-presentation slide copy, current semantic proof.
+    CrossSlideCopyV3,
+}
+
+impl DurablePatchFormat {
+    /// Eight-byte durable header magic that identifies this format.
+    #[must_use]
+    pub const fn magic(self) -> &'static [u8; 8] {
+        match self {
+            Self::SlideRemovalV1 => b"LPRM0001",
+            Self::SlideRemovalV2 => b"LPRM0002",
+            Self::CrossSlideCopyV2 => b"LPCP0002",
+            Self::CrossSlideCopyV3 => b"LPCP0003",
+        }
+    }
+}
+
+impl std::fmt::Display for DurablePatchFormat {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::SlideRemovalV1 => "LPRM0001",
+            Self::SlideRemovalV2 => "LPRM0002",
+            Self::CrossSlideCopyV2 => "LPCP0002",
+            Self::CrossSlideCopyV3 => "LPCP0003",
+        })
+    }
+}
+
 /// Stable classification for a whole-slide removal plan that cannot prove a
 /// complete, independent deletion boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -405,6 +455,22 @@ pub enum Error {
     /// A source-backed slide patch was created against different exact slide bytes.
     #[error("source-backed PPTX slide patch source is stale")]
     StaleSource,
+
+    /// A durable patch carries a superseded complete-package revision proof.
+    ///
+    /// Refused while parsing the durable header, before any package is read or
+    /// mutated, so no caller ever holds a patch whose public revision
+    /// accessors return values from a superseded algebra.
+    #[error(
+        "PresentationML durable patch carries the superseded revision proof of format {found}; \
+         this build reads {expected}. Re-plan the edit against the source package."
+    )]
+    DurablePatchRevisionFormat {
+        /// Recognized but superseded durable format found in the input.
+        found: DurablePatchFormat,
+        /// Durable format this build reads for that patch family.
+        expected: DurablePatchFormat,
+    },
 
     /// Managed package encryption or decryption failed.
     #[cfg(feature = "encryption")]

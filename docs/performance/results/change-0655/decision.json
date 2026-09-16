@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0655",
+  "title": "The memoized per-part revision proof lands: the durable formats bump, an old patch is refused by name, and an eager PPTX lifecycle loses a quarter of its instructions",
+  "decision": "retained, implemented in crates/litchi-pptx",
+  "code_state": "crates/litchi-pptx: opened/model.rs (the two-tier proof and the PartDigests memo), opened/transaction.rs, opened/patch.rs, opened/mod.rs, opened/remove_plan.rs and opened/cross_copy_plan.rs (the magic bump and the typed refusal), error.rs and lib.rs (DurablePatchFormat and Error::DurablePatchRevisionFormat), package/model.rs and package/codec.rs (the facade carry and its release). docs/adr/0005 amended. No other crate is touched.",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0652 decision 4 authorizes change 0645's design in full: 'PPTX memoized revision: invalidate the old patches and make the path faster'",
+    "the proof is two tiers with three domain strings: a memoized payload digest, a per-part digest over name, content type, payload digest and relationships, and the revision over the sorted per-part digests under litchi-pptx-opened-v2",
+    "only the payload tier is memoized, because a part's content type and relationships are not behind its payload Arc and memoizing the whole part digest on that key would answer stalely",
+    "the memo retains the payload Arc it keys, which removes the ABA hazard of an address key and is load-bearing rather than an optimization",
+    "Part is a public trait whose blob_arc() need not agree with blob(), so a part failing the alias test is never memoized and is hashed exactly as the unmemoized path hashes it",
+    "the durable formats bump to LPRM0002 and LPCP0003 and a superseded magic is refused in from_bytes with a new typed error before any header field is read, because a proof in a superseded algebra cannot be source-checked and a silent mismatch would report the package as moved when the format moved",
+    "the facade carries the memo, without which the two bare durable-patch replays of an eager lifecycle hash from cold and the design is worth a third of its value",
+    "the facade releases the memo at every mutation that publishes no opened-presentation snapshot, so the retention invariant holds unconditionally instead of only between publications"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs at --warmup 0 --samples 1 and 3, differenced over the two extra samples, per leg for pptx_eager_batch_edit_save, pptx_eager_multi_slide_batch_edit_save, pptx_slide_move_boundary_save, pptx_slide_remove_boundary_save, pptx_real_file_ordinary_save_edit and pptx_real_file_ordinary_save_lifecycle; whole-child totals plus inclusive Ir for the fingerprint subtree and sha2::sha256::compress256, and a per-call-site isolation pair that separates a cold fingerprint from a memoized one on the same leg",
+    "memo_accounting": "a reverted probe build with per-fingerprint hit/miss and bytes-fed counters, run at --samples 1 and 3 on every selector and differenced into an exact per-lifecycle table: the eager deck's commit and both durable-patch replays answer 228 of 229 parts and feed 93,763 bytes against 17,668,953 (0.53%); the 0638/0649 real deck's commit answers 57 of 58 and feeds 37,618 against 792,152 (4.75%); pptx_slide_remove_boundary_save's nine fingerprints per lifecycle collect zero hits",
+    "memo_resident_bytes": "HashMap::capacity accounting at 29, 85 and 221 parts (3,192 / 6,384 / 12,768 bytes), asserted under a bound of 228 bytes per memoized payload",
+    "timing": "PLACEHOLDER",
+    "native_counters": "PLACEHOLDER",
+    "verdict_identity": "a pairwise oracle over every .pptx fixture under test-data/ (78 fixtures, expanded to 856 packages by the base, a byte-identical re-allocation and nine single-input mutations each): 9,396 ordered pairs agree between packages_equal, the retained v1 revision and the v2 revision, 0 disagreements; plus change 0645's synthetic 11-package corpus at 121 ordered pairs, 0 disagreements",
+    "format_refusal": "a_superseded_slide_removal_patch_is_refused_by_name and a_superseded_cross_slide_copy_patch_is_refused_by_name: forward and inverse of both families under the superseded magic are refused by from_bytes and from_bytes_with_limits with Error::DurablePatchRevisionFormat naming both magics; an unrecognized magic still returns Error::Invalid; the durable byte limit still refuses an over-long superseded input with Error::Limit first",
+    "suite": "cargo test -p litchi-pptx 885 passed 0 failed; cargo test -p litchi --features docx,xlsx,pptx,xls 265 passed 0 failed; cargo test in tools/perf-baseline 540 passed 0 failed 1 ignored; cargo fmt --all --check, cargo clippy -p litchi-pptx --all-targets, cargo doc -p litchi-pptx --no-deps and python3 tools/non_iwork_gate.py verify all clean. Every capture re-derives its revision the cold way through a debug_assert! and every reused payload digest is recomputed and compared"
+  },
+  "accepted_costs": {
+    "durable_format": "LPRM0001 -> LPRM0002 and LPCP0002 -> LPCP0003. Every patch of either format serialized by an earlier build stops applying and must be re-planned; there is no migration and no dual read, because the public revision accessors are untyped [u8; 32] and two algebras behind one type would produce a silent false conflict",
+    "error_identity": "an input whose first eight bytes are a superseded magic, and which is within the durable byte limit, now returns Error::DurablePatchRevisionFormat from from_bytes instead of parsing (if it was well formed) or instead of its previous refusal (if it was not). Error is #[non_exhaustive] so the variant is additive",
+    "per_part_tier": "two extra SHA-256 initialize/finalize pairs and one hash-map insert per part per fingerprint: +3,109,701 Ir per cold fingerprint of the 229-part eager deck (+0.34%, 13,579 Ir per part) and +309,589 Ir per cold fingerprint of the 25-part boundary deck (12,384 Ir per part)",
+    "regression": "PLACEHOLDER",
+    "memory": "about 57 bytes per part of resident table per snapshot (12,768 bytes at 221 parts, asserted under a bound of 228 bytes per entry), plus one Arc refcount per memoized payload; the retention invariant keeps the payload bytes themselves at zero extra cost and is asserted directly",
+    "released_memo": "the facade releases its memo at every mutation that publishes no opened-presentation snapshot (a typed edit, a presentation materialization, a change-tracking publication), so a caller that interleaves typed edits with opened publications pays a cold hash after each typed edit. This is the safe direction, chosen over change 0645's looser rule, and it is why the retention invariant holds unconditionally",
+    "collision_margin": "the tiering offers 2k+1 hash instances instead of one, about 9 bits of the generic 128-bit collision margin at the default max_parts of 256"
+  },
+  "known_gaps": {
+    "callgrind_pricing": "callgrind runs SHA-256 in software and counts rep movsb per byte, so the instruction percentages here overstate the native cycle share of hashing; the perf stat cycles in timing/ are the counterweight",
+    "corpus_reach": "the pairwise oracle compares every ordered pair within each fixture's own mutation corpus, not every pair across fixtures; distinctness across unrelated packages rests on the injectivity argument",
+    "cold_fingerprint_subtraction": "the eager deck's cold-fingerprint cost on the after leg is obtained by subtracting two memoized fingerprints from the capture_internal call-site total, because both a cold capture and a memoized replay enter through capture_internal; the probe justifies the subtraction",
+    "unmeasured": "no allocation-count, RSS, cold-cache, range-source, concurrency, producer-shaped or cross-platform measurement; the memo's resident cost comes from HashMap::capacity rather than an allocator counter; the harness's allocation binary has no metrics for the ordinary-save family",
+    "cross_copy": "the cross-package copy path's physical revisions and change 0598's physical_revision cache are untouched and unmeasured; change 0656 owns that path and may consume Snapshot::part_digests directly"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling or cross-platform result",
+    "any claim about allocation counts or resident set size: the memo's resident cost comes from HashMap::capacity rather than an allocator counter"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc",
+    "branch": "perf/0655-pptx-memoized-revision-proof",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 10",
+    "binaries": {
+      "before/litchi-perf-baseline": "d13fbe7365abdbe1a6c1aefb0ebb4b9536ac90be22bf80b8ac0ade34d09d4527",
+      "after/litchi-perf-baseline": "d217cd3b9a5b58d0199c55fe78e15584af388fc039a72abba04bdbcaa6789ee2",
+      "probe/litchi-perf-baseline": "478928c779616ca6a7cef2b411cd9ef6319cdac67e2f1ef188090a3f98e03500"
+    }
+  }
+}

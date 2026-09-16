@@ -755,7 +755,7 @@ pub(crate) fn apply(
     patch: &Patch,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None, None, physical_source_provenance)
+    apply_with_revision(package, patch, None, None, physical_source_provenance, None)
 }
 
 /// Apply a patch whose committing transaction already captured the staged
@@ -770,13 +770,27 @@ pub(crate) fn apply(
 /// physical-source provenance or resource limits differ — the candidate is
 /// captured from scratch, so no refusal, no snapshot field and no published
 /// byte depends on the reuse.
+///
+/// `parent` is the facade's retained payload-digest memo of the package being
+/// patched. It is consulted only when the candidate has to be captured from
+/// scratch, and only to skip re-hashing payload allocations the candidate
+/// shares with it; a memo that names nothing the candidate holds costs one
+/// lookup per part and changes no value.
 pub(crate) fn apply_committed(
     package: &mut OpcPackage,
     patch: &Patch,
     committed: Option<&Snapshot>,
     physical_source_provenance: bool,
+    parent: &super::model::PartDigests,
 ) -> Result<Snapshot> {
-    apply_with_revision(package, patch, None, committed, physical_source_provenance)
+    apply_with_revision(
+        package,
+        patch,
+        None,
+        committed,
+        physical_source_provenance,
+        Some(parent),
+    )
 }
 
 pub(crate) fn apply_exact_revision(
@@ -791,6 +805,7 @@ pub(crate) fn apply_exact_revision(
         Some(result_revision),
         None,
         physical_source_provenance,
+        None,
     )
 }
 
@@ -801,6 +816,7 @@ fn capture_candidate(
     limits: Limits,
     physical_source_provenance: bool,
     committed: Option<&Snapshot>,
+    parent: Option<&super::model::PartDigests>,
 ) -> Result<Snapshot> {
     if let Some(committed) = committed
         && committed.limits == limits
@@ -809,7 +825,21 @@ fn capture_candidate(
     {
         return Ok(committed.rebound_to(candidate));
     }
-    capture(candidate, limits, physical_source_provenance)
+    // A candidate that drifted outside the write set still shares most
+    // payload allocations with the committed package, so the fallback capture
+    // consults that memo rather than hashing every payload from cold.
+    match committed
+        .map(|snapshot| snapshot.part_digests.as_ref())
+        .or(parent)
+    {
+        Some(parent) => super::model::capture_with_parent_digests(
+            candidate,
+            limits,
+            physical_source_provenance,
+            parent,
+        ),
+        None => capture(candidate, limits, physical_source_provenance),
+    }
 }
 
 /// Validate a detached candidate already constructed from a freshly proven
@@ -848,6 +878,7 @@ fn apply_with_revision(
     result_revision: Option<[u8; 32]>,
     committed: Option<&Snapshot>,
     physical_source_provenance: bool,
+    parent: Option<&super::model::PartDigests>,
 ) -> Result<Snapshot> {
     let current_main = crate::parts::PresentationPart::from_package(package)?
         .part()
@@ -860,8 +891,13 @@ fn apply_with_revision(
     }
     validate_before(package, patch)?;
     if patch.is_empty() {
-        let snapshot =
-            capture_candidate(package, patch.limits, physical_source_provenance, committed)?;
+        let snapshot = capture_candidate(
+            package,
+            patch.limits,
+            physical_source_provenance,
+            committed,
+            parent,
+        )?;
         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
             return Err(invalid(
                 "opened-presentation candidate has an unexpected complete-package revision",
@@ -905,6 +941,7 @@ fn apply_with_revision(
         patch.limits,
         physical_source_provenance,
         committed,
+        parent,
     )?;
     validate_after(&candidate, patch)?;
     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {

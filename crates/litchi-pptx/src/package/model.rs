@@ -16,6 +16,17 @@ pub struct Package {
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
+    /// Payload digests of `opc`'s parts, refreshed at every
+    /// opened-presentation publication and offered as the parent memo of the
+    /// next one.
+    ///
+    /// This is the accelerator that makes a durable-patch application cheap:
+    /// without it every bare-patch replay re-hashes the complete package. It
+    /// is keyed on payload allocation identity and retains each payload it
+    /// names, so a memo left over from an earlier package state can only miss,
+    /// never answer for bytes that no longer exist. Nothing observable depends
+    /// on it: a miss is an ordinary hash.
+    pub(crate) part_digests: std::sync::Arc<crate::opened::PartDigests>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "automatic-fonts")]
@@ -233,6 +244,7 @@ impl Package {
         }
         let snapshot =
             crate::opened::apply(&mut self.opc, plan.patch(), self.physical_source_provenance)?;
+        self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -288,6 +300,7 @@ impl Package {
             source.physical_source_provenance,
             self.physical_source_provenance,
         )?;
+        self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -338,6 +351,7 @@ impl Package {
             source.physical_source_provenance,
             self.physical_source_provenance,
         )?;
+        self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -400,6 +414,7 @@ impl Package {
             "apply_slide_removal_patch",
             self.physical_source_provenance,
         )?;
+        self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
@@ -462,7 +477,13 @@ impl Package {
             patch,
             committed,
             self.physical_source_provenance,
+            &self.part_digests,
         )?;
+        // The published snapshot describes the package now held in `self.opc`,
+        // and every entry of its memo names one of that package's own payload
+        // allocations, so adopting it retains nothing this facade does not
+        // already own.
+        self.part_digests = std::sync::Arc::clone(&snapshot.part_digests);
         if changed {
             self.mutable_pres = None;
         }
@@ -503,6 +524,7 @@ impl Package {
         self.ensure_plain_mutation("apply_change_tracking_commit")?;
         let changed = commit.is_changed();
         let snapshot = crate::change_tracking::apply_commit(&mut self.opc, commit)?;
+        self.release_part_digests();
         if changed {
             self.mutable_pres = None;
         }
@@ -523,6 +545,7 @@ impl Package {
         self.ensure_plain_mutation("apply_change_tracking_patch")?;
         let changed = patch.is_changed();
         let snapshot = crate::change_tracking::apply_patch(&mut self.opc, patch)?;
+        self.release_part_digests();
         if changed {
             self.mutable_pres = None;
         }
@@ -1460,6 +1483,25 @@ impl Package {
             self.encryption = litchi_ooxml_common::package_encryption::PackageEncryption::plain();
         }
         Ok(value)
+    }
+
+    /// Adopt `snapshot`'s payload-digest memo as this package's.
+    ///
+    /// Every entry of a snapshot's memo names an allocation that snapshot's own
+    /// package holds, and the snapshot was captured from the graph now in
+    /// `self.opc`, so adopting it retains nothing this package does not hold.
+    fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
+        self.part_digests = std::sync::Arc::clone(&snapshot.part_digests);
+    }
+
+    /// Drop the retained payload-digest memo.
+    ///
+    /// Called by every mutation that does not produce an opened-presentation
+    /// snapshot to adopt, so the facade never retains a payload allocation its
+    /// own graph has replaced. The next capture hashes from cold, which costs
+    /// time and can never change a value.
+    pub(crate) fn release_part_digests(&mut self) {
+        self.part_digests = std::sync::Arc::default();
     }
 
     pub(crate) fn ensure_plain_mutation(&self, operation: &'static str) -> Result<()> {

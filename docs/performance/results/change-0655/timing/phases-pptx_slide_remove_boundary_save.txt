@@ -1,0 +1,8 @@
+leg	A1	plan_ns=606.3us	commit_ns=1244.3us	publication_ns=123.5us	reopen_ns=686.8us
+leg	B1	plan_ns=618.6us	commit_ns=1284.5us	publication_ns=121.3us	reopen_ns=693.4us
+leg	B2	plan_ns=615.3us	commit_ns=1280.9us	publication_ns=123.5us	reopen_ns=692.2us
+leg	A2	plan_ns=604.2us	commit_ns=1237.5us	publication_ns=126.0us	reopen_ns=684.9us
+phase	plan_ns	before=605.3us	after=616.9us	delta=+1.93%
+phase	commit_ns	before=1240.9us	after=1282.7us	delta=+3.37%
+phase	publication_ns	before=124.7us	after=122.4us	delta=-1.89%
+phase	reopen_ns	before=685.8us	after=692.8us	delta=+1.01%

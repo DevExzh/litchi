@@ -23,7 +23,13 @@ const STRICT_DML: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const REL: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
-const PATCH_MAGIC: &[u8; 8] = b"LPRM0001";
+/// Current durable slide-removal header magic.
+///
+/// Bumped from `LPRM0001` by change 0655 because the complete-package revision
+/// this header embeds is now `litchi-pptx-opened-v2`.
+const PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::SlideRemovalV2.magic();
+/// Recognized but superseded durable slide-removal header magic.
+const SUPERSEDED_PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::SlideRemovalV1.magic();
 const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + 32 + 32 + 8;
 
 /// Durable exact-source slide-removal patch bound to complete package revisions.
@@ -72,7 +78,10 @@ impl SlideRemovalPatch {
         }
     }
 
-    /// Serialize this removal patch into the stable `LPRM0001` format.
+    /// Serialize this removal patch into the stable `LPRM0002` format.
+    ///
+    /// The header embeds the `litchi-pptx-opened-v2` complete-package
+    /// revisions of the source and target packages.
     ///
     /// # Errors
     ///
@@ -116,16 +125,27 @@ impl SlideRemovalPatch {
     ///
     /// # Errors
     ///
-    /// Returns an error for malformed, trailing, or unbounded input.
+    /// Returns an error for malformed, trailing, or unbounded input, and
+    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
+    /// superseded `LPRM0001` format.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, super::Limits::default())
     }
 
     /// Parse a durable removal patch under caller-selected finite limits.
     ///
+    /// A patch whose header carries the superseded `LPRM0001` magic is refused
+    /// here, before any header field is read: its embedded revisions come from
+    /// the `litchi-pptx-opened-v1` algebra and cannot be compared against a
+    /// revision this build computes. Re-plan the edit against the source
+    /// package; there is no migration, because producing a patch under the
+    /// current proof requires holding the packages it binds.
+    ///
     /// # Errors
     ///
-    /// Returns an error for malformed, trailing, or unbounded input.
+    /// Returns an error for malformed, trailing, or unbounded input, and
+    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
+    /// superseded `LPRM0001` format.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: super::Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
@@ -135,6 +155,17 @@ impl SlideRemovalPatch {
             return Err(Error::Limit {
                 resource: "slide-removal durable patch bytes",
                 limit,
+            });
+        }
+        // A patch serialized under the superseded magic carries revisions from
+        // a different algebra. It is refused by name here, before any header
+        // field is read and long before any package is opened, so no caller
+        // ever holds a patch whose public `source_revision` cannot be compared
+        // against a snapshot of this build.
+        if bytes.get(..SUPERSEDED_PATCH_MAGIC.len()) == Some(SUPERSEDED_PATCH_MAGIC.as_slice()) {
+            return Err(Error::DurablePatchRevisionFormat {
+                found: crate::DurablePatchFormat::SlideRemovalV1,
+                expected: crate::DurablePatchFormat::SlideRemovalV2,
             });
         }
         if bytes.len() < PATCH_HEADER_BYTES || &bytes[..PATCH_MAGIC.len()] != PATCH_MAGIC {

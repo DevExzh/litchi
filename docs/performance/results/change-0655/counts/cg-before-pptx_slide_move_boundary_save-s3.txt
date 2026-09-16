@@ -1,0 +1,12 @@
+==2787166== Callgrind, a call-graph generating cache profiler
+==2787166== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==2787166== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2787166== Command: /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0655/stage/before --warmup 0 --samples 3 --case pptx_slide_move_boundary_save --json /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0655/out/cg-before-pptx_slide_move_boundary_save-s3.json
+==2787166== 
+==2787166== For interactive control, run 'callgrind_control -h'.
+==2787166== 
+==2787166== Events    : Ir
+==2787166== Collected : 4693861725
+==2787166== 
+==2787166== I   refs:      4,693,861,725
+exit=0

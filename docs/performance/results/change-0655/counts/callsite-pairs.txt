@@ -1,0 +1,39 @@
+## before pptx_slide_remove_boundary_save
+   Sn                           calls/life   2.0  Ir/life       9,883,312  Ir/call     4,941,656
+   apply_patch                  calls/life   1.0  Ir/life       5,027,550  Ir/call     5,027,550
+   capture_internal             calls/life   6.0  Ir/life      29,816,484  Ir/call     4,969,414
+## after pptx_slide_remove_boundary_save
+   Sn                           calls/life   2.0  Ir/life      10,483,171  Ir/call     5,241,585
+   apply_patch                  calls/life   1.0  Ir/life       5,348,331  Ir/call     5,348,331
+   capture_internal             calls/life   6.0  Ir/life      31,656,824  Ir/call     5,276,137
+   package_fingerprint          calls/life   3.0  Ir/life      15,829,823  Ir/call     5,276,607
+## before pptx_slide_move_boundary_save
+   capture_internal             calls/life   2.0  Ir/life      10,071,543  Ir/call     5,035,771
+   commit                       calls/life   1.0  Ir/life       5,024,159  Ir/call     5,024,159
+## after pptx_slide_move_boundary_save
+   capture_internal             calls/life   2.0  Ir/life      10,690,720  Ir/call     5,345,360
+   commit                       calls/life   1.0  Ir/life         735,551  Ir/call       735,551
+## before pptx_eager_batch_edit_save
+   capture_internal             calls/life   3.0  Ir/life   2,758,862,105  Ir/call   919,620,701
+   commit                       calls/life   1.0  Ir/life     919,620,607  Ir/call   919,620,607
+## after pptx_eager_batch_edit_save
+   capture_internal             calls/life   3.0  Ir/life     937,029,488  Ir/call   312,343,162
+   commit                       calls/life   1.0  Ir/life       7,149,543  Ir/call     7,149,543
+## before pptx_eager_multi_slide_batch_edit_save
+   capture_internal             calls/life   3.0  Ir/life   2,758,881,272  Ir/call   919,627,090
+   commit                       calls/life   1.0  Ir/life     919,631,286  Ir/call   919,631,286
+## after pptx_eager_multi_slide_batch_edit_save
+   capture_internal             calls/life   3.0  Ir/life     939,758,067  Ir/call   313,252,689
+   commit                       calls/life   1.0  Ir/life       8,502,902  Ir/call     8,502,902
+## before pptx_real_file_ordinary_save_edit
+   capture_internal             calls/life   1.0  Ir/life      41,130,626  Ir/call    41,130,626
+   commit                       calls/life   1.0  Ir/life      41,139,251  Ir/call    41,139,251
+## after pptx_real_file_ordinary_save_edit
+   capture_internal             calls/life   1.0  Ir/life      41,797,443  Ir/call    41,797,443
+   commit                       calls/life   1.0  Ir/life       2,455,718  Ir/call     2,455,718
+## before pptx_real_file_ordinary_save_lifecycle
+   capture_internal             calls/life   1.0  Ir/life      41,162,727  Ir/call    41,162,727
+   commit                       calls/life   1.0  Ir/life      41,140,676  Ir/call    41,140,676
+## after pptx_real_file_ordinary_save_lifecycle
+   capture_internal             calls/life   1.0  Ir/life      41,819,179  Ir/call    41,819,179
+   commit                       calls/life   1.0  Ir/life       2,457,313  Ir/call     2,457,313

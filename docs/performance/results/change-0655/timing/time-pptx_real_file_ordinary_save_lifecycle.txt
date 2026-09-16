@@ -1,0 +1,15 @@
+case	pptx_real_file_ordinary_save_lifecycle
+leg	A1	n=30	p50=132.773ms	mean=158.991ms	p95=267.584ms	p99=290.731ms
+leg	B1	n=30	p50=126.765ms	mean=126.722ms	p95=129.760ms	p99=133.062ms
+leg	B2	n=30	p50=126.163ms	mean=126.229ms	p95=129.084ms	p99=136.067ms
+leg	A2	n=30	p50=129.248ms	mean=128.901ms	p95=131.130ms	p99=132.188ms
+pooled	before(A1+A2)	n=60	p50=129.751ms	mean=143.946ms	p95=263.268ms	p99=290.731ms
+pooled	after(B1+B2)	n=60	p50=126.176ms	mean=126.475ms	p95=129.760ms	p99=136.067ms
+delta	p50	after_vs_before=-2.76%	before_vs_after=+2.83%
+delta	p95	after_vs_before=-50.71%	before_vs_after=+102.89%
+delta	p99	after_vs_before=-53.20%	before_vs_after=+113.67%
+delta	mean	after_vs_before=-12.14%	before_vs_after=+13.81%
+floor	A/A_p50	A2_vs_A1=-2.65%
+floor	B/B_p50	B2_vs_B1=-0.48%
+floor	A/A_p95	A2_vs_A1=-50.99%
+floor	A/A_p99	A2_vs_A1=-54.53%

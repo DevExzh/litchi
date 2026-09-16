@@ -4,9 +4,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{
-    Slide, SlideNameIndex, Snapshot, capture, capture_with_revision, invalid, package_fingerprint,
-};
+use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
 use super::patch::Patch;
 use crate::{Error, Result};
 
@@ -54,7 +52,8 @@ impl Transaction {
     /// Whether any managed resource differs from the source root.
     #[must_use]
     pub fn is_changed(&self) -> bool {
-        package_fingerprint(&self.working).is_ok_and(|revision| revision != self.source.revision)
+        super::model::package_fingerprint_with_memo(&self.working, Some(&self.source.part_digests))
+            .is_ok_and(|(revision, _digests)| revision != self.source.revision)
     }
 
     /// Move one slide between checked zero-based positions.
@@ -1197,7 +1196,11 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         let mut working = self.working;
         compact_changed_slides(&mut working, self.source.package.as_ref(), &self.slides)?;
-        let mut revision = package_fingerprint(&working)?;
+        // The staged package shares every untouched payload allocation with
+        // the source snapshot, so the source memo answers every part the
+        // transaction did not rewrite; the rewritten ones miss and are hashed.
+        let (mut revision, mut digests) =
+            super::model::package_fingerprint_with_memo(&working, Some(&self.source.part_digests))?;
         if revision != self.source.revision {
             // `unsign` rewrites fingerprint inputs only when signature
             // infrastructure is present: it strips signature parts and the
@@ -1208,7 +1211,12 @@ impl Transaction {
             let signed = working.is_signed();
             working.unsign();
             if signed {
-                revision = package_fingerprint(&working)?;
+                let recomputed = super::model::package_fingerprint_with_memo(
+                    &working,
+                    Some(&self.source.part_digests),
+                )?;
+                revision = recomputed.0;
+                digests = recomputed.1;
             }
         }
         let patch = Patch::capture(
@@ -1223,11 +1231,12 @@ impl Transaction {
                 patch,
             });
         }
-        let snapshot = capture_with_revision(
+        let snapshot = super::model::capture_with_revision_and_digests(
             &working,
             self.source.limits,
             self.source.physical_source_provenance,
             revision,
+            digests,
         )?;
         Ok(Commit { snapshot, patch })
     }

@@ -1,0 +1,8 @@
+sha256 of the three staged litchi-perf-baseline binaries (change 0627's rule:
+staged outside every Cargo target directory before measurement).
+before = 70d7768cc; after = this branch; probe = this branch plus
+instrumentation/memo-accounting.patch, never timed.
+
+d13fbe7365abdbe1a6c1aefb0ebb4b9536ac90be22bf80b8ac0ade34d09d4527  before
+d217cd3b9a5b58d0199c55fe78e15584af388fc039a72abba04bdbcaa6789ee2  after
+478928c779616ca6a7cef2b411cd9ef6319cdac67e2f1ef188090a3f98e03500  probe
