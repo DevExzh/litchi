@@ -1967,15 +1967,21 @@ mod streaming_0361_raw_recovery_tests {
 
 #[cfg(test)]
 mod namespace_emission_contract_tests {
-    //! Change 0588 pins what the MCE writer's namespace emission guarantees.
+    //! Change 0653 pins what the MCE writer's namespace emission guarantees.
     //!
-    //! `write_start` re-declares every in-scope binding on every emitted start
-    //! tag. That makes any element span of the processed buffer namespace
-    //! self-contained, and consumers slice inner spans out of it and parse them
-    //! standalone, so the redundancy is part of the contract rather than an
-    //! accident of the writer. These tests fix that property, the refusal
-    //! identities of the borrowed name resolver, and the exact output bound, so
-    //! a future writer that emits fewer declarations has to confront them.
+    //! Until change 0653 `write_start` re-declared every in-scope binding on
+    //! every emitted start tag, which made any element span of the processed
+    //! buffer accidentally namespace self-contained and expanded real producer
+    //! parts 16x. It now emits an element's own declarations, plus the
+    //! declarations of ancestors the output drops, hoisted onto the first
+    //! emitted descendant. These tests fix the new contract — the in-scope
+    //! binding set at every emitted element is unchanged while each declaration
+    //! appears once — together with the refusal identities of the borrowed name
+    //! resolver and the exact output bound.
+    //!
+    //! The property consumers relied on is restored at the slice boundary by
+    //! `mce::self_contained_fragment`; `self_contained_fragment_tests` below
+    //! pins that.
 
     use super::super::model::{Capabilities, Error, Limits, NAMESPACE};
     use super::process_markup_compatibility;
@@ -2133,26 +2139,228 @@ mod namespace_emission_contract_tests {
     }
 
     #[test]
-    fn every_element_span_of_the_output_is_namespace_self_contained() {
-        // The shape litchi-docx slices: a prefix bound once on the root and
-        // used by descendants several levels down.
+    fn each_namespace_is_declared_once_and_every_name_still_resolves() {
+        // The shape litchi-docx slices: prefixes bound once on the root and
+        // used by descendants several levels down. Before change 0653 the
+        // writer repeated all four declarations on all eight elements.
         let xml = format!(
             r#"<w:document xmlns:mc="{MC}" xmlns:w="urn:w" xmlns:w14="urn:w14" mc:Ignorable="q" xmlns:q="urn:q"><w:body><w:p w14:paraId="1"><w:r><w:t>text</w:t></w:r></w:p><w:tbl><w:tr w14:textId="2"><w:tc/></w:tr></w:tbl></w:body></w:document>"#
         );
         let output = run(&xml);
-        let spans = element_spans(output.as_bytes());
-        assert_eq!(spans.len(), 8);
-        for (start, end) in spans {
-            let fragment = output
-                .as_bytes()
-                .get(start..end)
-                .expect("element span is inside the output");
-            assert!(
-                fragment_is_self_contained(fragment),
-                "sliced span stopped resolving: {}",
-                String::from_utf8_lossy(fragment)
+        for declaration in ["xmlns:mc=", "xmlns:w=", "xmlns:w14=", "xmlns:q="] {
+            assert_eq!(
+                output.matches(declaration).count(),
+                1,
+                "{declaration} is declared more than once in {output}"
             );
         }
+        // The projection a namespace-aware consumer sees is unchanged except
+        // for the `mc:Ignorable` directive the codec consumes, and the output
+        // is no longer larger than its input.
+        let mut expected = resolved(xml.as_bytes());
+        expected.retain(|name| !name.starts_with(&format!("@{{{MC}}}")));
+        assert_eq!(resolved(output.as_bytes()), expected);
+        assert!(
+            output.len() < xml.len(),
+            "the rewrite must not expand this part: {} -> {}",
+            xml.len(),
+            output.len()
+        );
+    }
+
+    #[test]
+    fn an_inner_span_is_no_longer_self_contained_but_becomes_so_at_the_boundary() {
+        // The property change 0653 removes from the writer, and where it is
+        // restored: `mce::self_contained_fragment` re-declares the inherited
+        // bindings on the span's own root, which is what every slicing
+        // consumer now calls.
+        let xml = format!(
+            r#"<w:document xmlns:mc="{MC}" xmlns:w="urn:w" xmlns:w14="urn:w14"><w:body><w:p w14:paraId="1"><w:r><w:t>text</w:t></w:r></w:p></w:body></w:document>"#
+        );
+        let output = run(&xml);
+        let spans = element_spans(output.as_bytes());
+        assert_eq!(spans.len(), 5);
+        let bytes = output.as_bytes();
+        let mut inner = 0usize;
+        for (start, end) in spans {
+            let fragment = bytes.get(start..end).expect("span is inside the output");
+            if start != 0 {
+                inner += 1;
+                assert!(
+                    !fragment_is_self_contained(fragment),
+                    "an inner span still carries every binding: {}",
+                    String::from_utf8_lossy(fragment)
+                );
+            }
+            let repaired = super::super::self_contained_fragment(
+                bytes,
+                start,
+                end - start,
+                &Limits::default(),
+            )
+            .expect("every element span can be made self-contained");
+            assert!(
+                fragment_is_self_contained(&repaired),
+                "repaired span still does not resolve: {}",
+                String::from_utf8_lossy(&repaired)
+            );
+        }
+        assert_eq!(inner, 4);
+    }
+
+    #[test]
+    fn hoisted_declarations_reach_every_emitted_child_of_a_dropped_wrapper() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:z"><mc:Choice Requires="s"><one z:flag="1"/><two z:flag="2"/></mc:Choice><mc:Fallback><f/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        let mut caps = Capabilities::new();
+        caps.understand_namespace("urn:s");
+        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
+        assert!(!output.contains("AlternateContent"));
+        assert_eq!(output.matches("xmlns:z=").count(), 2);
+        assert_eq!(
+            resolved(output.as_bytes()),
+            vec![
+                "<r".to_owned(),
+                "<one".to_owned(),
+                "@{urn:z}flag=1".to_owned(),
+                "<two".to_owned(),
+                "@{urn:z}flag=2".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_unwrapped_element_hoists_its_default_namespace_onto_its_content() {
+        // `ProcessContent` drops the wrapper but keeps its children, so the
+        // default namespace the wrapper bound has to travel with them.
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap xmlns="urn:default"><one/><two/></x:wrap></r>"#
+        );
+        let output = run(&xml);
+        assert!(!output.contains("x:wrap"));
+        assert_eq!(output.matches(r#"xmlns="urn:default""#).count(), 2);
+        assert_eq!(
+            resolved(output.as_bytes()),
+            vec![
+                "<r".to_owned(),
+                "<{urn:default}one".to_owned(),
+                "<{urn:default}two".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn alternate_content_hoists_wrapper_and_branch_declarations() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:q="urn:q"><mc:Choice Requires="s" xmlns:w="urn:w"><e q:a="1" w:b="2"/></mc:Choice><mc:Fallback><f/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        let mut caps = Capabilities::new();
+        caps.understand_namespace("urn:s");
+        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
+        assert!(output.contains("<e "));
+        assert!(!output.contains("<f"));
+        assert_eq!(
+            resolved(output.as_bytes()),
+            vec![
+                "<r".to_owned(),
+                "<e".to_owned(),
+                "@{urn:q}a=1".to_owned(),
+                "@{urn:w}b=2".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_child_redeclaration_shadows_the_hoisted_binding() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:outer"><mc:Choice Requires="s"><one xmlns:z="urn:inner" z:flag="1"/></mc:Choice></mc:AlternateContent></r>"#
+        );
+        let mut caps = Capabilities::new();
+        caps.understand_namespace("urn:s");
+        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
+        assert_eq!(output.matches("xmlns:z=").count(), 1);
+        assert!(output.contains(r#"xmlns:z="urn:inner""#));
+        assert_eq!(
+            resolved(output.as_bytes()),
+            vec![
+                "<r".to_owned(),
+                "<one".to_owned(),
+                "@{urn:inner}flag=1".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn nested_dropped_wrappers_hoist_the_innermost_binding() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent xmlns:z="urn:outer" xmlns:k="urn:k"><mc:Choice Requires="s" xmlns:z="urn:inner"><leaf z:flag="1" k:other="2"/></mc:Choice></mc:AlternateContent></r>"#
+        );
+        let mut caps = Capabilities::new();
+        caps.understand_namespace("urn:s");
+        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
+        assert_eq!(
+            resolved(output.as_bytes()),
+            vec![
+                "<r".to_owned(),
+                "<leaf".to_owned(),
+                "@{urn:inner}flag=1".to_owned(),
+                "@{urn:k}other=2".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn skipped_branches_do_not_leak_declarations_into_the_output() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:s="urn:s"><mc:AlternateContent><mc:Choice Requires="s" xmlns:dead="urn:dead"><taken/></mc:Choice><mc:Fallback xmlns:alsodead="urn:also"><skipped/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        let mut caps = Capabilities::new();
+        caps.understand_namespace("urn:s");
+        let output = run_with(&xml, &caps, &Limits::default()).expect("selects the choice");
+        assert!(output.contains("<taken"));
+        assert!(!output.contains("skipped"));
+        assert!(!output.contains("urn:also"));
+        // The taken branch still re-declares what its own wrapper bound.
+        assert!(output.contains(r#"xmlns:dead="urn:dead""#));
+    }
+
+    #[test]
+    fn an_unchanged_start_tag_is_copied_from_the_source() {
+        let xml = format!(r#"<r xmlns:mc="{MC}"><a b='1' c = "2" /></r>"#);
+        let output = run(&xml);
+        assert!(
+            output.contains(r#"<a b='1' c = "2" >"#),
+            "start tag was rebuilt instead of copied: {output}"
+        );
+    }
+
+    #[test]
+    fn the_output_bound_is_no_longer_consumed_by_redundant_redeclaration() {
+        // A worksheet-shaped part whose root declares many namespaces. The
+        // previous writer repeated every in-scope binding on every start tag,
+        // so a part that fits its own bound was refused as oversized output.
+        let mut xml = format!(r#"<r xmlns:mc="{MC}""#);
+        for index in 0..24 {
+            xml.push_str(&format!(
+                r#" xmlns:n{index}="urn:namespace-number-{index}""#
+            ));
+        }
+        xml.push('>');
+        for _ in 0..200 {
+            xml.push_str("<cell/>");
+        }
+        xml.push_str("</r>");
+
+        let limits = Limits {
+            max_output_bytes: xml.len().saturating_mul(2),
+            ..Limits::default()
+        };
+        let output = run_with(&xml, &Capabilities::new(), &limits)
+            .expect("a part that fits its own bound is not oversized output");
+        assert!(output.len() <= limits.max_output_bytes);
+        assert_eq!(output.matches("xmlns:n0=").count(), 1);
+        assert_eq!(resolved(output.as_bytes()), resolved(xml.as_bytes()));
     }
 
     #[test]
@@ -2436,5 +2644,207 @@ mod streaming_0658_active_stop_tests {
             }) => {},
             other => panic!("expected the retained raw observer error, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod self_contained_fragment_tests {
+    //! Change 0653 restores, at the slice boundary, the property the writer's
+    //! namespace redundancy used to provide for free.
+
+    use super::super::model::{Error, Limits};
+    use super::super::{InScopeNamespaces, self_contained_fragment};
+    use quick_xml::events::Event;
+    use quick_xml::name::ResolveResult;
+
+    /// Whether every name in one standalone fragment resolves.
+    fn resolves(fragment: &[u8]) -> bool {
+        let mut reader = quick_xml::NsReader::from_reader(fragment);
+        reader.config_mut().trim_text(false);
+        let mut buffer = Vec::new();
+        loop {
+            let Ok(event) = reader.read_event_into(&mut buffer) else {
+                return false;
+            };
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element) => {
+                    if matches!(
+                        reader.resolver().resolve_element(element.name()).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        return false;
+                    }
+                    for attribute in element.attributes() {
+                        let Ok(attribute) = attribute else {
+                            return false;
+                        };
+                        if attribute.key.as_ref() == b"xmlns"
+                            || attribute.key.as_ref().starts_with(b"xmlns:")
+                        {
+                            continue;
+                        }
+                        if matches!(
+                            reader.resolver().resolve_attribute(attribute.key).0,
+                            ResolveResult::Unknown(_)
+                        ) {
+                            return false;
+                        }
+                    }
+                },
+                Event::Eof => return true,
+                _ => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
+    }
+
+    fn span(document: &[u8], needle: &[u8], end: &[u8]) -> (usize, usize) {
+        let start = document
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .expect("fragment start");
+        let stop = document
+            .windows(end.len())
+            .position(|window| window == end)
+            .expect("fragment end")
+            + end.len();
+        (start, stop - start)
+    }
+
+    #[test]
+    fn the_root_declarations_reach_a_deep_span() {
+        let document =
+            br#"<w:document xmlns:w="urn:w" xmlns:w14="urn:w14"><w:body><w:p w14:paraId="1"><w:r/></w:p></w:body></w:document>"#;
+        let (start, len) = span(document, b"<w:p ", b"</w:p>");
+        assert!(!resolves(&document[start..start + len]));
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert!(resolves(&fragment));
+        // Declarations are appended to the span's own start tag, innermost
+        // binding first.
+        assert_eq!(
+            fragment.as_ref(),
+            br#"<w:p w14:paraId="1" xmlns:w14="urn:w14" xmlns:w="urn:w"><w:r/></w:p>"#
+        );
+    }
+
+    #[test]
+    fn an_intermediate_declaration_is_carried_too() {
+        // The case the cheap root-only path must not answer: a prefix bound on
+        // an ancestor between the root and the span.
+        let document =
+            br#"<w:document xmlns:w="urn:w"><w:body><w:tbl xmlns:x="urn:x"><w:tr x:flag="1"><w:tc/></w:tr></w:tbl></w:body></w:document>"#;
+        let (start, len) = span(document, b"<w:tr ", b"</w:tr>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert!(resolves(&fragment));
+        assert!(contains(&fragment, br#"xmlns:x="urn:x""#));
+        assert!(contains(&fragment, br#"xmlns:w="urn:w""#));
+    }
+
+    #[test]
+    fn a_span_that_redeclares_a_prefix_keeps_its_own_binding() {
+        let document =
+            br#"<r xmlns:p="urn:outer"><mid><leaf xmlns:p="urn:inner" p:a="1"/></mid></r>"#;
+        let (start, len) = span(document, b"<leaf ", b"/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert_eq!(
+            fragment
+                .windows(b"xmlns:p=".len())
+                .filter(|w| *w == b"xmlns:p=")
+                .count(),
+            1
+        );
+        assert!(contains(&fragment, br#"xmlns:p="urn:inner""#));
+    }
+
+    #[test]
+    fn a_sibling_declaration_does_not_leak_into_the_span() {
+        let document = br#"<r xmlns:w="urn:w"><a xmlns:z="urn:z"/><b w:k="1"/></r>"#;
+        let (start, len) = span(document, b"<b ", b"<b w:k=\"1\"/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert!(resolves(&fragment));
+        assert!(!contains(&fragment, b"urn:z"));
+    }
+
+    #[test]
+    fn a_default_namespace_undeclared_by_an_ancestor_is_not_reinstated() {
+        let document = br#"<r xmlns="urn:d"><mid xmlns=""><leaf/></mid></r>"#;
+        let (start, len) = span(document, b"<leaf/>", b"<leaf/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert_eq!(fragment.as_ref(), b"<leaf/>");
+    }
+
+    #[test]
+    fn an_empty_element_span_takes_its_declarations_before_the_slash() {
+        let document = br#"<r xmlns:w="urn:w"><leaf w:k="1"/></r>"#;
+        let (start, len) = span(document, b"<leaf ", b"/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert_eq!(fragment.as_ref(), br#"<leaf w:k="1" xmlns:w="urn:w"/>"#);
+        assert!(resolves(&fragment));
+    }
+
+    #[test]
+    fn a_document_with_no_declaration_borrows_its_span() {
+        let document = br#"<r><a><b/></a></r>"#;
+        let (start, len) = span(document, b"<b/>", b"<b/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert!(matches!(fragment, std::borrow::Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn a_range_outside_the_document_is_refused_by_name() {
+        let document = br#"<r xmlns:w="urn:w"><a/></r>"#;
+        assert!(matches!(
+            self_contained_fragment(document, 4, document.len(), &Limits::default()),
+            Err(Error::NonConformant(message))
+                if message == "fragment range is outside the document"
+        ));
+        assert!(matches!(
+            self_contained_fragment(document, 2, 4, &Limits::default()),
+            Err(Error::NonConformant(message))
+                if message == "fragment does not begin with an element"
+        ));
+    }
+
+    #[test]
+    fn the_namespace_binding_bound_is_enforced() {
+        let mut document = String::from("<r");
+        for index in 0..8 {
+            document.push_str(&format!(r#" xmlns:n{index}="urn:{index}""#));
+        }
+        document.push_str("><leaf/></r>");
+        let limits = Limits {
+            max_namespace_bindings: 4,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            InScopeNamespaces::at_offset(document.as_bytes(), document.len() - 12, &limits),
+            Err(Error::LimitExceeded(message)) if message == "namespace bindings"
+        ));
+    }
+
+    #[test]
+    fn an_escaped_namespace_value_round_trips() {
+        let document = br#"<r xmlns:w="urn:a&amp;b"><leaf w:k="1"/></r>"#;
+        let (start, len) = span(document, b"<leaf ", b"/>");
+        let fragment = self_contained_fragment(document, start, len, &Limits::default())
+            .expect("the span can be made self-contained");
+        assert_eq!(
+            fragment.as_ref(),
+            br#"<leaf w:k="1" xmlns:w="urn:a&amp;b"/>"#
+        );
+        assert!(resolves(&fragment));
     }
 }

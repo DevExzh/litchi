@@ -1,0 +1,13 @@
+[package]
+name = "sinkprobe"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "<checkout>/crates/litchi-core" }
+litchi-docx = { path = "<checkout>/crates/litchi-docx" }
+
+[profile.release]
+debug = 1

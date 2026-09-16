@@ -7,6 +7,7 @@ use super::model::{
 use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -212,7 +213,7 @@ impl Parser {
                 let extension = parse_extension(element, decoder, resolver)?;
                 let mut writer = Writer::new(Vec::new());
                 writer
-                    .write_event(Event::Start(element.clone()))
+                    .write_event(Event::Start(retained_root(element, resolver)))
                     .map_err(xml_error)?;
                 self.capture = Some(Capture {
                     depth: 1,
@@ -265,7 +266,7 @@ impl Parser {
                 let mut extension = parse_extension(element, decoder, resolver)?;
                 let mut writer = Writer::new(Vec::new());
                 writer
-                    .write_event(Event::Empty(element.clone()))
+                    .write_event(Event::Empty(retained_root(element, resolver)))
                     .map_err(xml_error)?;
                 extension.markup = writer.into_inner();
                 self.add_extension(extension)?;
@@ -590,6 +591,22 @@ fn validate_cell_reference(value: &str) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// The `ext` element that opens a retained extension, carrying every namespace
+/// declaration the element inherits from the part.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so a retained extension
+/// resolved on its own by accident. The writer now declares each namespace
+/// once, where XML requires it, so the declarations the fragment inherits are
+/// added here, at the one element that becomes its root. Declarations the
+/// element already makes itself are left alone.
+fn retained_root<'element>(
+    element: &BytesStart<'element>,
+    resolver: &NamespaceResolver,
+) -> BytesStart<'element> {
+    with_in_scope_namespaces(element, &in_scope_declarations(resolver))
 }
 
 fn parse_extension(

@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0653/measure/cg-after/eager-real.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 30722064
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after eager /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0653/measure/real.xlsx H680 (PID 3388912, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+154,479,583 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+7,180,529 ( 4.65%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::next [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+3,791,303 ( 2.45%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+2,884,074 ( 1.87%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+2,830,732 ( 1.83%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/pattern.rs:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,563,911 ( 1.66%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,364,589 ( 1.53%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+2,261,984 ( 1.46%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_event [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,215,589 ( 1.43%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,134,725 ( 1.38%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+2,124,637 ( 1.38%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs:<memchr::arch::x86_64::avx2::memchr::One>::find_raw [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,079,736 ( 1.35%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::check_for_duplicates [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+2,024,733 ( 1.31%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/hash/sip.rs:<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,979,995 ( 1.28%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,941,368 ( 1.26%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+1,759,059 ( 1.14%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::resolve_prefix [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,756,787 ( 1.14%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_ncname [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,739,571 ( 1.13%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,693,738 ( 1.10%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:<quick_xml::events::attributes::IterState>::next
+1,642,696 ( 1.06%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+1,494,032 ( 0.97%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs:<memchr::arch::x86_64::avx2::memchr::Three>::find_raw [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]

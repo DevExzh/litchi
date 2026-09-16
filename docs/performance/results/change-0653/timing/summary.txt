@@ -1,0 +1,20 @@
+== eager-control
+  before (pooled)              n=80   p50=    4407803 mean=    4425572 p95=    4608345 p99=    4702955
+  after (pooled)               n=80   p50=    4110072 mean=    4215310 p95=    4199992 p99=    7187528
+  after vs before p50: -6.75%   before vs after p50: +7.24%
+  A/A floor (widest p50 spread over 6 before blocks): 2.83%   blocks: 4416963, 4405274, 4371284, 4495134, 4372453, 4385374
+== eager-real
+  before (pooled)              n=120  p50=  108007161 mean=  101130441 p95=  201925611 p99=  213703165
+  after (pooled)               n=240  p50=   36185212 mean=   30502632 p95=   66378493 p99=   84427277
+  after vs before p50: -66.50%   before vs after p50: +198.48%
+  A/A floor (widest p50 spread over 4 before blocks): 622.68%   blocks: 180260726, 168236025, 191659897, 26520583
+== source-control
+  before (pooled)              n=80   p50=   14009836 mean=   14153329 p95=   14243817 p99=   19112153
+  after (pooled)               n=80   p50=   13568563 mean=   13570246 p95=   13703804 p99=   13780524
+  after vs before p50: -3.15%   before vs after p50: +3.25%
+  A/A floor (widest p50 spread over 6 before blocks): 4.13%   blocks: 14073965, 13991515, 14121056, 14504258, 14458188, 14569598
+== source-real
+  before (pooled)              n=80   p50=   36332254 mean=   36468076 p95=   36794887 p99=   43038020
+  after (pooled)               n=80   p50=   19458014 mean=   19816479 p95=   20033838 p99=   25500397
+  after vs before p50: -46.44%   before vs after p50: +86.72%
+  A/A floor (widest p50 spread over 6 before blocks): 2.41%   blocks: 36497775, 35797392, 36103923, 36540795, 35896942, 35680421

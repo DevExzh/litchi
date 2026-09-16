@@ -1,0 +1,2321 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/0653-bin/marker-baseline.before",
+    "binary_sha256": "4fb8aa3ddb635e3937ec259e9603e80d4ea92ccef956a249ceae5ef8f993a0dd",
+    "binary_bytes": 61748040,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "8",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 5,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "pptx_marker_ordinary_save_edit",
+      "pptx_marker_control_ordinary_save_edit",
+      "pptx_marker_ordinary_save_lifecycle",
+      "pptx_marker_control_ordinary_save_lifecycle"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "pptx_marker_ordinary_save_edit",
+        "corpus_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_ordinary_save_lifecycle",
+        "corpus_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_control_ordinary_save_edit",
+        "corpus_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_marker_control_ordinary_save_lifecycle",
+        "corpus_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "pptx_marker_ordinary_save_edit",
+      "corpus": {
+        "name": "pptx-marker-deck-marker",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-bearing-producer-shape",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49161,
+        "archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "target_entry": "marker-deck-marker",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          153361382,
+          154887791,
+          157425224,
+          158005867,
+          158027928,
+          159048803,
+          159198454,
+          159338264,
+          159486675,
+          159555996,
+          159582626,
+          159641467,
+          159782187,
+          159809578,
+          159962509,
+          160057668,
+          160096568,
+          160206299,
+          160263539,
+          160285730,
+          160501281,
+          160543932,
+          160573241,
+          160638772,
+          160669312,
+          160962624,
+          161113544,
+          161768129,
+          162454552,
+          174061945
+        ],
+        "sample_order": [
+          25,
+          29,
+          5,
+          23,
+          26,
+          27,
+          17,
+          19,
+          28,
+          12,
+          10,
+          9,
+          13,
+          11,
+          7,
+          14,
+          21,
+          20,
+          0,
+          6,
+          8,
+          3,
+          1,
+          18,
+          24,
+          2,
+          4,
+          15,
+          16,
+          22
+        ],
+        "min": 153361382,
+        "p50": 160010088,
+        "p95": 162454552,
+        "p99": 174061945,
+        "max": 174061945,
+        "mean": 160043729.5666667,
+        "standard_deviation": 3208132.9957884676,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 158845927.52501434,
+          "upper": 161241531.60831904
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "ordinary_save": {
+          "format": "PPTX",
+          "origin": "marker-bearing-producer-shape",
+          "phase": "edit",
+          "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock",
+          "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+          "corpus": {
+            "generator": "litchi-pptx-marker-shape-v1",
+            "format": "PPTX",
+            "origin": "marker-bearing-producer-shape",
+            "save_entry_point": "litchi_pptx::Package::save",
+            "sink_entry_point": "litchi_pptx::Package::to_bytes",
+            "source_archive_bytes": 49161,
+            "source_archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+            "source_member_count": 63,
+            "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+            "edit_admitted": true,
+            "edit_outcome": "admitted",
+            "published_bytes": 49175,
+            "published_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "output_total_bytes": 49175,
+              "payload_bytes_deflated": 39539,
+              "payload_bytes_stored": 0,
+              "payload_bytes_identical_to_source": 38473,
+              "payload_bytes_regenerated": 1066,
+              "uncompressed_payload_bytes_compressed": 351086,
+              "uncompressed_payload_bytes_regenerated": 19035,
+              "framing_bytes": 9636,
+              "output_member_count": 63,
+              "deflate_member_count": 63,
+              "stored_member_count": 0,
+              "members_identical_to_source": 62,
+              "members_regenerated": 1
+            },
+            "repeated_cycle_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "repeated_cycles_identical": true,
+            "repeated_save_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "repeated_saves_identical": true
+          },
+          "published_sha256": [],
+          "publications_identical": true,
+          "edit_outcome_sha256": [
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+          ],
+          "edit_outcomes_identical": true
+        }
+      },
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          25,
+          29,
+          5,
+          23,
+          26,
+          27,
+          17,
+          19,
+          28,
+          12,
+          10,
+          9,
+          13,
+          11,
+          7,
+          14,
+          21,
+          20,
+          0,
+          6,
+          8,
+          3,
+          1,
+          18,
+          24,
+          2,
+          4,
+          15,
+          16,
+          22
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "unavailable",
+          "user_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "system_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "clock_ticks_per_second": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "minor_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "major_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "voluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "rss_delta_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
+          },
+          "peak_rss_bytes": {
+            "status": "unavailable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "not_applicable",
+          "accepted_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "status": "not_applicable",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "not_applicable",
+            "bytes_0": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        },
+        "allocation": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "reallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "failed_allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "allocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "region_peak_live_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          }
+        }
+      }
+    },
+    {
+      "case": "pptx_marker_ordinary_save_lifecycle",
+      "corpus": {
+        "name": "pptx-marker-deck-marker",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-bearing-producer-shape",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49161,
+        "archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+        "target_entry": "marker-deck-marker",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          150869298,
+          151355771,
+          151778603,
+          152085255,
+          153382672,
+          153654593,
+          153792854,
+          154381328,
+          154401017,
+          155223832,
+          155317203,
+          155537614,
+          155813136,
+          155969796,
+          156690760,
+          156944631,
+          157503235,
+          157552035,
+          157735586,
+          158078488,
+          158392810,
+          159584346,
+          159800258,
+          159867207,
+          160337690,
+          162361631,
+          164402303,
+          208315763,
+          219254833,
+          229526430
+        ],
+        "sample_order": [
+          20,
+          19,
+          26,
+          27,
+          17,
+          25,
+          23,
+          21,
+          24,
+          28,
+          13,
+          18,
+          3,
+          22,
+          29,
+          0,
+          12,
+          14,
+          4,
+          11,
+          2,
+          1,
+          16,
+          5,
+          15,
+          7,
+          6,
+          8,
+          10,
+          9
+        ],
+        "min": 150869298,
+        "p50": 156817695,
+        "p95": 219254833,
+        "p99": 229526430,
+        "max": 229526430,
+        "mean": 162663699.26666665,
+        "standard_deviation": 19571340.65443621,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 155356461.12394243,
+          "upper": 169970937.40939087
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "ordinary_save": {
+          "format": "PPTX",
+          "origin": "marker-bearing-producer-shape",
+          "phase": "open+edit+save",
+          "timing_scope": "open the path through the documented reader, make one semantic edit, save to a path; destination preparation, readback, digest and cleanup are outside the clock",
+          "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+          "corpus": {
+            "generator": "litchi-pptx-marker-shape-v1",
+            "format": "PPTX",
+            "origin": "marker-bearing-producer-shape",
+            "save_entry_point": "litchi_pptx::Package::save",
+            "sink_entry_point": "litchi_pptx::Package::to_bytes",
+            "source_archive_bytes": 49161,
+            "source_archive_sha256": "09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5",
+            "source_member_count": 63,
+            "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+            "edit_admitted": true,
+            "edit_outcome": "admitted",
+            "published_bytes": 49175,
+            "published_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "output_total_bytes": 49175,
+              "payload_bytes_deflated": 39539,
+              "payload_bytes_stored": 0,
+              "payload_bytes_identical_to_source": 38473,
+              "payload_bytes_regenerated": 1066,
+              "uncompressed_payload_bytes_compressed": 351086,
+              "uncompressed_payload_bytes_regenerated": 19035,
+              "framing_bytes": 9636,
+              "output_member_count": 63,
+              "deflate_member_count": 63,
+              "stored_member_count": 0,
+              "members_identical_to_source": 62,
+              "members_regenerated": 1
+            },
+            "repeated_cycle_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "repeated_cycles_identical": true,
+            "repeated_save_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "repeated_saves_identical": true
+          },
+          "published_sha256": [
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+            "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174"
+          ],
+          "publications_identical": true,
+          "edit_outcome_sha256": [
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+          ],
+          "edit_outcomes_identical": true
+        }
+      },
+      "output_sha256": "95d87c6c398db9480e53690f1595831b5af3be5e82ec9f16c29b76974221b174",
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          20,
+          19,
+          26,
+          27,
+          17,
+          25,
+          23,
+          21,
+          24,
+          28,
+          13,
+          18,
+          3,
+          22,
+          29,
+          0,
+          12,
+          14,
+          4,
+          11,
+          2,
+          1,
+          16,
+          5,
+          15,
+          7,
+          6,
+          8,
+          10,
+          9
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "unavailable",
+          "user_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "system_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "clock_ticks_per_second": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "minor_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "major_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "voluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "rss_delta_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
+          },
+          "peak_rss_bytes": {
+            "status": "unavailable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "not_applicable",
+          "accepted_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "status": "not_applicable",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "not_applicable",
+            "bytes_0": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        },
+        "allocation": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "reallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "failed_allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "allocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "region_peak_live_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          }
+        }
+      }
+    },
+    {
+      "case": "pptx_marker_control_ordinary_save_edit",
+      "corpus": {
+        "name": "pptx-marker-deck-control",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-stripped-control",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49589,
+        "archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "target_entry": "marker-deck-control",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          7700113,
+          7711933,
+          7720723,
+          7722483,
+          7725013,
+          7733213,
+          7737943,
+          7739572,
+          7750313,
+          7751333,
+          7752563,
+          7757762,
+          7758183,
+          7758533,
+          7760043,
+          7760883,
+          7767202,
+          7768343,
+          7769793,
+          7771492,
+          7774113,
+          7779443,
+          7780583,
+          7787003,
+          7789433,
+          7794883,
+          7801323,
+          7807233,
+          7812233,
+          7815233
+        ],
+        "sample_order": [
+          22,
+          13,
+          19,
+          12,
+          27,
+          20,
+          21,
+          23,
+          26,
+          18,
+          3,
+          8,
+          10,
+          15,
+          14,
+          29,
+          5,
+          25,
+          28,
+          4,
+          9,
+          6,
+          16,
+          7,
+          24,
+          11,
+          17,
+          2,
+          0,
+          1
+        ],
+        "min": 7700113,
+        "p50": 7760463,
+        "p95": 7812233,
+        "p99": 7815233,
+        "max": 7815233,
+        "mean": 7761963.866666665,
+        "standard_deviation": 29764.862599512042,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 7750850.732255467,
+          "upper": 7773077.001077863
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "ordinary_save": {
+          "format": "PPTX",
+          "origin": "marker-stripped-control",
+          "phase": "edit",
+          "timing_scope": "the semantic edit and its commit only; the documented open and every verification are outside the clock",
+          "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+          "corpus": {
+            "generator": "litchi-pptx-marker-shape-v1",
+            "format": "PPTX",
+            "origin": "marker-stripped-control",
+            "save_entry_point": "litchi_pptx::Package::save",
+            "sink_entry_point": "litchi_pptx::Package::to_bytes",
+            "source_archive_bytes": 49589,
+            "source_archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+            "source_member_count": 63,
+            "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+            "edit_admitted": true,
+            "edit_outcome": "admitted",
+            "published_bytes": 49606,
+            "published_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "output_total_bytes": 49606,
+              "payload_bytes_deflated": 39970,
+              "payload_bytes_stored": 0,
+              "payload_bytes_identical_to_source": 38890,
+              "payload_bytes_regenerated": 1080,
+              "uncompressed_payload_bytes_compressed": 351086,
+              "uncompressed_payload_bytes_regenerated": 19035,
+              "framing_bytes": 9636,
+              "output_member_count": 63,
+              "deflate_member_count": 63,
+              "stored_member_count": 0,
+              "members_identical_to_source": 62,
+              "members_regenerated": 1
+            },
+            "repeated_cycle_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "repeated_cycles_identical": true,
+            "repeated_save_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "repeated_saves_identical": true
+          },
+          "published_sha256": [],
+          "publications_identical": true,
+          "edit_outcome_sha256": [
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+          ],
+          "edit_outcomes_identical": true
+        }
+      },
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          22,
+          13,
+          19,
+          12,
+          27,
+          20,
+          21,
+          23,
+          26,
+          18,
+          3,
+          8,
+          10,
+          15,
+          14,
+          29,
+          5,
+          25,
+          28,
+          4,
+          9,
+          6,
+          16,
+          7,
+          24,
+          11,
+          17,
+          2,
+          0,
+          1
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "unavailable",
+          "user_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "system_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "clock_ticks_per_second": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "minor_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "major_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "voluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "rss_delta_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
+          },
+          "peak_rss_bytes": {
+            "status": "unavailable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "not_applicable",
+          "accepted_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "status": "not_applicable",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "not_applicable",
+            "bytes_0": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        },
+        "allocation": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "reallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "failed_allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "allocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "region_peak_live_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          }
+        }
+      }
+    },
+    {
+      "case": "pptx_marker_control_ordinary_save_lifecycle",
+      "corpus": {
+        "name": "pptx-marker-deck-control",
+        "generator": "litchi-pptx-marker-shape-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "marker-deck",
+        "payload_kind": "marker-stripped-control",
+        "compression": "deflate",
+        "entry_count": 13,
+        "archive_member_count": 63,
+        "entry_bytes": 33071,
+        "uncompressed_payload_bytes": 351108,
+        "archive_bytes": 49589,
+        "archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+        "target_entry": "marker-deck-control",
+        "target_payload_bytes": 33071,
+        "target_payload_sha256": "4a05cd2b0a76f4799f6e0d0a8881cfbbca182f9e23d9da0610e6c39b6726b8e9",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          8518537,
+          8535217,
+          8538147,
+          8542957,
+          8547437,
+          8547517,
+          8552157,
+          8552277,
+          8553537,
+          8555807,
+          8562217,
+          8562357,
+          8567137,
+          8569517,
+          8570207,
+          8570327,
+          8575207,
+          8580667,
+          8581497,
+          8590197,
+          8594227,
+          8599297,
+          8601368,
+          8609118,
+          8610658,
+          8619457,
+          8621687,
+          8668287,
+          8682587,
+          8723978
+        ],
+        "sample_order": [
+          17,
+          6,
+          8,
+          1,
+          21,
+          15,
+          19,
+          24,
+          5,
+          7,
+          20,
+          10,
+          28,
+          23,
+          9,
+          4,
+          25,
+          2,
+          27,
+          11,
+          22,
+          13,
+          18,
+          14,
+          0,
+          26,
+          3,
+          29,
+          12,
+          16
+        ],
+        "min": 8518537,
+        "p50": 8570267,
+        "p95": 8682587,
+        "p99": 8723978,
+        "max": 8723978,
+        "mean": 8583452.799999999,
+        "standard_deviation": 45439.77733174572,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 8566487.21343247,
+          "upper": 8600418.386567527
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "ordinary_save": {
+          "format": "PPTX",
+          "origin": "marker-stripped-control",
+          "phase": "open+edit+save",
+          "timing_scope": "open the path through the documented reader, make one semantic edit, save to a path; destination preparation, readback, digest and cleanup are outside the clock",
+          "atomic_publication_steps": "litchi_opc::atomic::replace_with: destination permission probe, sibling temporary creation in the destination's own directory, the publication write, permission preservation, sync_all on the temporary, persist (rename) over the destination, parent-directory sync",
+          "corpus": {
+            "generator": "litchi-pptx-marker-shape-v1",
+            "format": "PPTX",
+            "origin": "marker-stripped-control",
+            "save_entry_point": "litchi_pptx::Package::save",
+            "sink_entry_point": "litchi_pptx::Package::to_bytes",
+            "source_archive_bytes": 49589,
+            "source_archive_sha256": "3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070",
+            "source_member_count": 63,
+            "edit_description": "Package::opened_presentation_transaction().set_shape_text(0, 0, \"litchi-perf-0638-ordinary-save\") and apply",
+            "edit_admitted": true,
+            "edit_outcome": "admitted",
+            "published_bytes": 49606,
+            "published_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "byte_split": {
+              "accounting_scope": "derived from the published archive and the source archive, not from production counters: litchi-opc's OpcOperationAccounting excludes PartWriter and the topology publishers, which is the path a documented save takes. `payload_bytes_identical_to_source` is an upper bound on what a copy-through publisher could have avoided re-deflating, not an observation that this writer copied anything.",
+              "output_total_bytes": 49606,
+              "payload_bytes_deflated": 39970,
+              "payload_bytes_stored": 0,
+              "payload_bytes_identical_to_source": 38890,
+              "payload_bytes_regenerated": 1080,
+              "uncompressed_payload_bytes_compressed": 351086,
+              "uncompressed_payload_bytes_regenerated": 19035,
+              "framing_bytes": 9636,
+              "output_member_count": 63,
+              "deflate_member_count": 63,
+              "stored_member_count": 0,
+              "members_identical_to_source": 62,
+              "members_regenerated": 1
+            },
+            "repeated_cycle_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "repeated_cycles_identical": true,
+            "repeated_save_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "repeated_saves_identical": true
+          },
+          "published_sha256": [
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+            "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e"
+          ],
+          "publications_identical": true,
+          "edit_outcome_sha256": [
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4",
+            "52563f898870e6ce7817b3ffbd430df2104719a74fc408cbe24eb9f481078ce4"
+          ],
+          "edit_outcomes_identical": true
+        }
+      },
+      "output_sha256": "c48a0433fe685b6fb67104e524947a88d86819419a52fb401814d1e65d44871e",
+      "operation_metrics": {
+        "sample_count": 30,
+        "sample_indices": [
+          17,
+          6,
+          8,
+          1,
+          21,
+          15,
+          19,
+          24,
+          5,
+          7,
+          20,
+          10,
+          28,
+          23,
+          9,
+          4,
+          25,
+          2,
+          27,
+          11,
+          22,
+          13,
+          18,
+          14,
+          0,
+          26,
+          3,
+          29,
+          12,
+          16
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "unavailable",
+          "user_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "system_cpu_ticks": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "clock_ticks_per_second": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "minor_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "major_faults": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "voluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "rss_delta_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
+          },
+          "peak_rss_bytes": {
+            "status": "unavailable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "unavailable",
+            "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "not_applicable",
+          "accepted_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "status": "not_applicable",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "status": "not_applicable",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "not_applicable",
+            "bytes_0": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "status": "not_applicable",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        },
+        "allocation": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "reallocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "failed_allocation_calls": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "allocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "deallocated_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_before": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "peak_live_bytes_after": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          },
+          "region_peak_live_bytes": {
+            "status": "unavailable",
+            "scope": "operation_global_system_allocator"
+          }
+        }
+      }
+    }
+  ]
+}

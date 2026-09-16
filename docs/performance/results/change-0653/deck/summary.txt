@@ -1,0 +1,13 @@
+deck / phase                                   before p50      after p50     delta       A/A
+control / opened_presentation (capture)           3550738        3552107    +0.04%    85.09%
+control / Snapshot::edit (working clone)            22380          22260    -0.54%     4.30%
+control / set_shape_text                           618863         614073    -0.77%     2.56%
+control / Transaction::commit                     4178361        4093971    -2.02%    73.64%
+control / apply_opened_presentation_commit          91181          88261    -3.20%     9.66%
+control / edit total                             11297565        8365575   -25.95%    72.82%
+real / opened_presentation (capture)             59719392       11056451   -81.49%     3.93%
+real / Snapshot::edit (working clone)               28690          24200   -15.65%    27.96%
+real / set_shape_text                             4803917        1183656   -75.36%     2.84%
+real / Transaction::commit                       62763016       11822591   -81.16%     3.29%
+real / apply_opened_presentation_commit            236411         121801   -48.48%    23.87%
+real / edit total                               127442488       24188616   -81.02%     3.72%

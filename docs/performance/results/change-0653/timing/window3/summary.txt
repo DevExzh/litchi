@@ -1,0 +1,6 @@
+== eager-real, window 3 (quiet host, load average 9.5)
+  before (pooled)    n=120  p50=   24980930 mean=   24976864 p95=   25328992 p99=   25442023
+  after (pooled)     n=240  p50=    8748352 mean=    8745248 p95=    8836603 p99=    8901353
+  after vs before p50: -64.98%   before vs after p50: +185.55%
+  A/A floor (widest p50 spread over 12 before blocks): 2.17%
+  before blocks: 24730610, 25241252, 24725360, 25074341, 24942330, 25091881, 24981161, 24797559, 24705350, 25026071, 24843271, 24898051

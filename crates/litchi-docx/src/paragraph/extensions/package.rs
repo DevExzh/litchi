@@ -20,7 +20,12 @@ impl Paragraph {
     /// Returns an error if the operation cannot be completed.
     pub fn extensions(&self) -> Result<Extensions> {
         let _parser_admission = self.parser_admission()?;
-        parse_paragraph(self.xml_bytes())
+        // The `w:p` span is parsed standalone and its root has to resolve into
+        // the wordprocessing namespace, so the declarations it inherits from
+        // `word/document.xml` are re-declared on it first. Change 0653 stopped
+        // the markup-compatibility writer from repeating them on every element.
+        let xml = self.self_contained_xml()?;
+        parse_paragraph(&xml)
     }
 }
 
@@ -32,7 +37,9 @@ impl Row {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn extension_ids(&self) -> Result<Ids> {
-        parse_row(self.xml_bytes())
+        // As for `Paragraph::extensions`: the `w:tr` span is parsed standalone.
+        let xml = self.self_contained_xml()?;
+        parse_row(&xml)
     }
 }
 

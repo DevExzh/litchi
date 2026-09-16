@@ -1,0 +1,21 @@
+# Scratch semantic-read probe for change 0653.
+#
+# `<checkout>` is the worktree whose crates are measured: the shared read-only
+# base checkout for the BEFORE leg, and the change's own worktree for the AFTER
+# leg. The probe source is identical on both legs, so it only calls API that
+# exists on both.
+[package]
+name    = "readprobe"
+version = "0.0.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+litchi-docx = { path = "<checkout>/crates/litchi-docx" }
+litchi-pptx = { path = "<checkout>/crates/litchi-pptx" }
+litchi-xlsx = { path = "<checkout>/crates/litchi-xlsx" }
+litchi-opc  = { path = "<checkout>/crates/litchi-opc" }
+
+[profile.release]
+debug = false

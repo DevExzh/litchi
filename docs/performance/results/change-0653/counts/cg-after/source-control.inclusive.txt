@@ -1,0 +1,40 @@
+208,766,384 (100.0%)  PROGRAM TOTALS
+138,763,605 (66.47%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/stream.rs:litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 27,370,916 (13.11%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}>
+ 27,256,572 (13.06%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<litchi_ooxml_common::mce::stream::EventMeter>>::read_event_impl::<&mut alloc::vec::Vec<u8>> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 12,414,506 ( 5.95%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  9,969,277 ( 4.78%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  9,250,235 ( 4.43%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/buffered_reader.rs:<quick_xml::reader::Reader<litchi_ooxml_common::mce::stream::EventMeter>>::read_event_impl::<&mut alloc::vec::Vec<u8>>
+  6,409,813 ( 3.07%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  5,915,116 ( 2.83%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+  4,626,825 ( 2.22%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+  4,124,947 ( 1.98%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+  3,773,473 ( 1.81%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+  3,003,760 ( 1.44%)  ???:__rustc::__rust_realloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+      4 ( 0.00%)      let result = process_markup_compatibility_stream_with_observers(
+138,763,605 (66.47%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/stream.rs:litchi_ooxml_common::mce::stream::process_markup_compatibility_stream_with_observers::<litchi_xlsx::error::Error, litchi_xlsx::error::Error, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#0}, litchi_xlsx::raw::worksheet::x14ac::capture_stream_with_active<litchi_xlsx::raw::worksheet::selected::scan_stream::{closure#0}>::{closure#1}> (1x)
+      6 ( 0.00%)      memchr::memmem::find(content, b"dyDescent").is_some()
+ 91,659 ( 0.04%)  => /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/memmem/mod.rs:memchr::memmem::find (1x)
+     .                           String::from_utf8_lossy(name)
+27,200 ( 0.01%)      let row = std::str::from_utf8(&bytes[split..])
+311,456 ( 0.15%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (5,440x)
+  434,200 ( 0.21%)          __rust_alloc(layout.size(), layout.alignment())
+    7,449 ( 0.00%)  => ???:__rustc::__rust_alloc (45x)
+   32,699 ( 0.02%)      unsafe { __rust_realloc(ptr, layout.size(), layout.alignment(), new_size) }
+      147 ( 0.00%)  => ???:__rustc::__rust_realloc (1x)
+       36 ( 0.00%)          __rust_alloc_zeroed(layout.size(), layout.alignment())
+  363,782 ( 0.17%)  => ???:__rustc::__rust_alloc_zeroed (11x)
+    .           impl BoundedOutput {
+1,944 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::reserve (81x)
+6,456 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::reserve (269x)
+   32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+   10 ( 0.00%)      let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+511,335 ( 0.24%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (55x)
+479,384 ( 0.23%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (81x)
+4,345 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (55x)
+4,207 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice (55x)
+2,640 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::push (55x)
+    .               out: &mut BoundedOutput,
+  680 ( 0.00%)      let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
+12,073 ( 0.01%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (136x)
+1,004 ( 0.00%)              key: str::from_utf8(a.key.into_inner()).map_err(xerr)?,

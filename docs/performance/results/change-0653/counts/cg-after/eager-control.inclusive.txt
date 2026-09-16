@@ -1,0 +1,40 @@
+70,355,722 (100.0%)  PROGRAM TOTALS
+ 9,969,433 (14.17%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()> [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 5,915,590 ( 8.41%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 4,626,817 ( 6.58%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+ 3,773,473 ( 5.36%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/cmp.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+ 2,687,344 ( 3.82%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+ 1,380,581 ( 1.96%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+   990,971 ( 1.41%)  /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start [/home/zhuhe/code/litchi-worktrees/0653-bin/xmlprobe.after]
+   941,943 ( 1.34%)  /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/validations.rs:core::str::converts::from_utf8
+     .                           String::from_utf8_lossy(name)
+27,200 ( 0.04%)      let row = std::str::from_utf8(&bytes[split..])
+311,456 ( 0.44%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (5,440x)
+184 ( 0.00%)              let Ok(name) = std::str::from_utf8(raw_name) else {
+2,646 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+    69 ( 0.00%)      match std::str::from_utf8(path.as_ref()) {
+ 2,646 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (23x)
+ 2 ( 0.00%)          let content = std::str::from_utf8(processed.as_ref())
+85,031 ( 0.12%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+ .               let content = std::str::from_utf8(processed.as_ref())
+     1 ( 0.00%)      let content = std::str::from_utf8(processed.as_ref())
+ 2,134 ( 0.00%)  => /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/str/converts.rs:core::str::converts::from_utf8 (1x)
+     .                       String::from_utf8_lossy(name)
+     .                       String::from_utf8_lossy(name)
+      .           macro_rules! read_event_impl {
+268,821 ( 0.38%)      fn read_event_impl<'i, B>(&mut self, mut buf: B) -> Result<Event<'i>, Error>
+      .                   read_event_impl!(self, buf, self.reader, read_until_close)
+94,613 ( 0.13%)          __rust_alloc(layout.size(), layout.alignment())
+    40 ( 0.00%)  => ???:__rustc::__rust_alloc (1x)
+ 1,461 ( 0.00%)      unsafe { __rust_realloc(ptr, layout.size(), layout.alignment(), new_size) }
+   530 ( 0.00%)  => ???:__rustc::__rust_realloc (2x)
+    24 ( 0.00%)          __rust_alloc_zeroed(layout.size(), layout.alignment())
+33,068 ( 0.05%)  => ???:__rustc::__rust_alloc_zeroed (1x)
+      .                               String::from_utf8_lossy(name)
+    .           impl BoundedOutput {
+  168 ( 0.00%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::reserve (7x)
+6,456 ( 0.01%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::reserve (269x)
+   32 ( 0.00%)  pub fn process_markup_compatibility<'a>(
+   10 ( 0.00%)      let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+511,884 ( 0.73%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (55x)
+479,087 ( 0.68%)  => /home/zhuhe/code/litchi-worktrees/0653/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start (81x)

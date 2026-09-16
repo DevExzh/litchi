@@ -43,6 +43,33 @@ pub(crate) fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool
     )
 }
 
+/// One retained element span of `source`, with every namespace declaration it
+/// inherits from `source` re-declared on its own root element.
+///
+/// Until change 0653 the shared markup-compatibility writer repeated every
+/// in-scope declaration on every element it emitted, so any span cut out of a
+/// processed part happened to resolve on its own. The writer now declares each
+/// namespace once, where XML requires it, so a consumer that hands a span out
+/// or parses it standalone asks for the inherited declarations here instead.
+pub(crate) fn self_contained_element_xml(
+    source: &[u8],
+    start: u32,
+    length: u32,
+) -> Result<Vec<u8>> {
+    let start = usize::try_from(start)
+        .map_err(|_source_error| Error::InvalidFormat("Word XML offset exceeds usize".into()))?;
+    let length = usize::try_from(length).map_err(|_source_error| {
+        Error::InvalidFormat("Word XML range length exceeds usize".into())
+    })?;
+    Ok(litchi_ooxml_common::mce::self_contained_fragment(
+        source,
+        start,
+        length,
+        &litchi_ooxml_common::mce::Limits::default(),
+    )?
+    .into_owned())
+}
+
 pub(crate) fn word_attribute_value(
     element: &BytesStart<'_>,
     name: &[u8],
@@ -476,4 +503,60 @@ fn emit_word_element_range(
         Error::InvalidFormat("Word element length exceeds u32".to_string())
     })?;
     emit(target, start, length)
+}
+
+#[cfg(test)]
+mod tests {
+    use quick_xml::events::Event;
+    use quick_xml::name::ResolveResult;
+    use quick_xml::reader::NsReader;
+
+    /// Whether the fragment's root element resolves into a namespace.
+    fn root_is_bound(fragment: &[u8]) -> bool {
+        let mut reader = NsReader::from_reader(fragment);
+        let mut buffer = Vec::new();
+        loop {
+            match reader.read_event_into(&mut buffer) {
+                Ok(Event::Start(ref element) | Event::Empty(ref element)) => {
+                    return matches!(
+                        reader.resolver().resolve_element(element.name()).0,
+                        ResolveResult::Bound(_)
+                    );
+                },
+                Ok(Event::Eof) | Err(_) => return false,
+                Ok(_) => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    /// Change 0653: a `w:p` span cut out of a real, marker-bearing
+    /// `word/document.xml` no longer carries `xmlns:w`, because the shared
+    /// markup-compatibility writer stopped repeating every in-scope
+    /// declaration on every element. `Paragraph::self_contained_xml` restores
+    /// it at the slice boundary, which is what `Paragraph::extensions` and
+    /// `Row::extension_ids` now parse.
+    #[test]
+    fn a_retained_span_resolves_only_after_the_inherited_declarations_return() {
+        let package = crate::Package::open("../../test-data/ooxml/docx/table-alignment.docx")
+            .expect("a Word-authored fixture opens");
+        let document = package.document().expect("the document part is readable");
+        let paragraph = document
+            .paragraph(0)
+            .expect("the first paragraph is readable")
+            .expect("the fixture has a paragraph");
+
+        assert!(
+            !root_is_bound(paragraph.xml_bytes()),
+            "the retained span still carries every in-scope declaration"
+        );
+        let repaired = paragraph
+            .self_contained_xml()
+            .expect("the span can be made self-contained");
+        assert!(
+            root_is_bound(&repaired),
+            "the repaired span still does not resolve: {}",
+            String::from_utf8_lossy(&repaired[..repaired.len().min(200)])
+        );
+    }
 }

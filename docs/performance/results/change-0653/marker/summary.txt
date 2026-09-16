@@ -1,0 +1,24 @@
+selector                                             before p50      after p50     delta       A/A
+docx_marker_control_eager_full_text                      254121         259356    +2.06%     4.47%
+docx_marker_control_ordinary_save_edit                   594098         606968    +2.17%     1.13%
+docx_marker_control_source_full_text                     214561         214621    +0.03%     6.38%
+docx_marker_eager_full_text                             6779992         525727   -92.25%     4.60%
+docx_marker_ordinary_save_edit                          8016434        1081966   -86.50%     1.09%
+docx_marker_source_full_text                            6450520         480192   -92.56%     3.58%
+pptx_marker_control_eager_full_text                     4579070        4581255    +0.05%     1.49%
+pptx_marker_control_ordinary_save_edit                  7479806        7263614    -2.89%     5.71%
+pptx_marker_control_ordinary_save_lifecycle             8549744        8138019    -4.82%     4.89%
+pptx_marker_control_source_full_text                    4441479        4448969    +0.17%     0.84%
+pptx_marker_eager_full_text                            60072104        8999773   -85.02%     2.01%
+pptx_marker_ordinary_save_edit                        155537122       21340230   -86.28%     2.96%
+pptx_marker_ordinary_save_lifecycle                   157658453       22290470   -85.86%     2.34%
+pptx_marker_source_full_text                           59776558        8804368   -85.27%     1.86%
+
+marker / control ratio                         before        after
+docx_eager_full_text                           26.68x        2.03x
+docx_ordinary_save_edit                        13.49x        1.78x
+docx_source_full_text                          30.06x        2.24x
+pptx_eager_full_text                           13.12x        1.96x
+pptx_ordinary_save_edit                        20.79x        2.94x
+pptx_ordinary_save_lifecycle                   18.44x        2.74x
+pptx_source_full_text                          13.46x        1.98x

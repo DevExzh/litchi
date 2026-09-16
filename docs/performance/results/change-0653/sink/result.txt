@@ -1,0 +1,10 @@
+=== BEFORE ===
+<fixtures>/sink-marker.docx	ERR	semantic text conversion failed after 0 bytes and 0 objects: invalid DOCX format: semantic DOCX XML exceeds 4096 namespace bindings
+<fixtures>/sink-control.docx	OK	2689 bytes	TextOutputReport { bytes_written: 2689, objects_written: 200 }
+=== AFTER ===
+<fixtures>/sink-marker.docx	OK	2689 bytes	TextOutputReport { bytes_written: 2689, objects_written: 200 }
+<fixtures>/sink-control.docx	OK	2689 bytes	TextOutputReport { bytes_written: 2689, objects_written: 200 }
+
+[exited with code 0]
+7424e070f2207b18d7249c4c77781c2329ddf05ed1304281e14ac01620df4eeb  /home/zhuhe/code/litchi-worktrees/0653-bin/sinkprobe.after
+b2ead2ef5a554fc50acdee3935ffc3d1dfec90497ac5017e3ba3fc31526d60ef  /home/zhuhe/code/litchi-worktrees/0653-bin/sinkprobe.before

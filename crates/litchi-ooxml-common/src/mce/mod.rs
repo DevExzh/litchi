@@ -4,6 +4,7 @@ pub mod alternative;
 pub mod stream;
 
 mod codec;
+mod fragment;
 mod model;
 
 #[cfg(test)]
@@ -13,6 +14,7 @@ pub use codec::{
     active_offsets, process_markup_compatibility, process_ooxml, process_part, process_part_arc,
     process_str,
 };
+pub use fragment::{InScopeNamespaces, self_contained_fragment};
 pub use model::{Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report};
 pub use stream::{
     ActiveFlow, EventLimitExceeded, InputLimitExceeded, RawAttribute, RawElement, RawElementKind,

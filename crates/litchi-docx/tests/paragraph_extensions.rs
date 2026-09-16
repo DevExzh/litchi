@@ -57,3 +57,40 @@ fn package_round_trip_preserves_extension_state_and_hyperlink_relationships() {
     assert_eq!(ids.para_id(), Id::new(0x9abc));
     assert_eq!(ids.text_id(), Id::new(0xdef0));
 }
+
+/// Change 0653: the markup-compatibility writer stopped re-declaring every
+/// in-scope namespace on every element it emits, so a `w:p` span sliced out of
+/// the processed `word/document.xml` no longer carries `xmlns:w` by accident.
+/// `Paragraph::extensions` re-declares what the span inherits before it parses
+/// it, so a real marker-bearing document still reads its `w14:paraId`.
+#[test]
+fn extensions_read_word_2010_ids_from_a_real_marker_bearing_document() {
+    let path = "../../test-data/ooxml/docx/table-alignment.docx";
+    let package = Package::open(path).unwrap();
+    let document = package.document().unwrap();
+
+    let mut seen = 0usize;
+    for index in 0..document.paragraph_count().unwrap() {
+        let Some(paragraph) = document.paragraph(index).unwrap() else {
+            continue;
+        };
+        let extensions = paragraph.extensions().unwrap();
+        if extensions.ids().para_id().is_some() {
+            seen += 1;
+        }
+    }
+    assert!(
+        seen > 0,
+        "no paragraph of a Word-authored document reported a w14:paraId"
+    );
+
+    let mut rows = 0usize;
+    for table in document.tables().unwrap() {
+        for row in table.rows().unwrap() {
+            if row.extension_ids().unwrap().para_id().is_some() {
+                rows += 1;
+            }
+        }
+    }
+    assert!(rows > 0, "no table row reported a w14:paraId");
+}

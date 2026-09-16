@@ -1,0 +1,11 @@
+source	/home/zhuhe/code/litchi-worktrees/before-70d7768cc/test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+archive_bytes	108164
+target	slide:1/shape:1
+iterations	30
+phase	p50_ns	mean_ns	p95_ns	min_ns
+opened_presentation (capture)	11044547	11062071	11202638	10919867
+Snapshot::edit (working clone)	21800	22108	24700	21040
+set_shape_text	1167576	1167176	1178966	1155486
+Transaction::commit	11787041	11773855	11869821	11605850
+apply_opened_presentation_commit	103790	105567	114281	101941
+edit total	24152475	24130779	24341286	23937715

@@ -1,0 +1,4 @@
+before n=20 cycles=25699774739 instructions=114954655910 
+before n=120 cycles=84331185988 instructions=381704477852 
+after n=20 cycles=6361760363 instructions=21451079557 
+after n=120 cycles=16804368776 instructions=66022974841 

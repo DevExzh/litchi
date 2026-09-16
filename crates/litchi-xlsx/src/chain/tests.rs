@@ -4,6 +4,9 @@ use super::model::{
 };
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_sheet::Cell as Address;
+use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
 use super::package::{MAX_WORKBOOK_SHEETS, process_workbook_mce_with_limit};
 use super::*;
@@ -29,7 +32,9 @@ fn parses_writes_typed_sheets_steps_strict_and_extensions() {
     let strict = String::from_utf8(write(&chain, Conformance::Strict).unwrap()).unwrap();
     assert!(strict.contains(STRICT_NS));
     assert!(strict.contains("x:cell=\"kept\""));
-    assert!(strict.contains("<extLst>"));
+    // The retained extension list re-declares what it inherits from the chain
+    // root, so it parses standalone (change 0653).
+    assert!(strict.contains("<extLst"));
     let reparsed = read(strict.as_bytes()).unwrap();
     assert_eq!(reparsed, chain);
     assert_eq!(
@@ -526,4 +531,59 @@ fn synthetic_package(
         package.add_part(Box::new(chain));
     }
     package
+}
+
+/// Every name in `markup` that does not resolve the way it resolves in the part
+/// the fragment was cut from: an element whose name reaches no namespace at
+/// all, or a prefixed name whose prefix has no declaration in the fragment.
+///
+/// A fragment cut out of a processed part has to carry the declarations it
+/// inherits, so this is empty for the markup the accessors publish.
+fn unresolved_names(markup: &[u8]) -> Vec<String> {
+    let mut reader = NsReader::from_reader(markup);
+    let mut unresolved = Vec::new();
+    loop {
+        let event = reader.read_event().unwrap().into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(_)) {
+                    unresolved.push(String::from_utf8_lossy(element.name().as_ref()).into_owned());
+                }
+                for attribute in element.attributes() {
+                    let attribute = attribute.unwrap();
+                    if matches!(
+                        resolver.resolve_attribute(attribute.key).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        unresolved
+                            .push(String::from_utf8_lossy(attribute.key.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    unresolved
+}
+
+#[test]
+fn retained_extension_list_resolves_standalone() {
+    let xml = br#"<calcChain xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><c r="A1" i="1"/><extLst><ext uri="urn:test"><x:data x:value="inert"/></ext></extLst></calcChain>"#;
+    let chain = read(xml).unwrap();
+    let extension = chain.extension_list_xml().unwrap();
+    assert!(
+        unresolved_names(extension.as_bytes()).is_empty(),
+        "{extension}"
+    );
+    assert!(extension.contains(r#"xmlns:x="urn:test""#));
+    // Re-declaring what the span already carries adds nothing, so a chain read
+    // back from its own output keeps the same bytes.
+    let written = write(&chain, Conformance::Transitional).unwrap();
+    assert_eq!(
+        read(&written).unwrap().extension_list_xml(),
+        Some(extension)
+    );
 }

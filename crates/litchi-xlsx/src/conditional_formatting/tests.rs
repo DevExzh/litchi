@@ -5,6 +5,9 @@ use super::*;
 
 use crate::color::Rgb;
 use litchi_opc::PackURI;
+use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 
 use std::mem::size_of;
 
@@ -202,4 +205,69 @@ fn parses_poi_and_libreoffice_conditional_formatting_fixtures() {
             .iter()
             .any(|format| format.number_format.is_some())
     );
+}
+
+/// Every name in `markup` that does not resolve the way it resolves in the part
+/// the fragment was cut from: an element whose name reaches no namespace at
+/// all, or a prefixed name whose prefix has no declaration in the fragment.
+///
+/// A fragment cut out of a processed part has to carry the declarations it
+/// inherits, so this is empty for the markup the accessors publish.
+fn unresolved_names(markup: &[u8]) -> Vec<String> {
+    let mut reader = NsReader::from_reader(markup);
+    let mut unresolved = Vec::new();
+    loop {
+        let event = reader.read_event().unwrap().into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(_)) {
+                    unresolved.push(String::from_utf8_lossy(element.name().as_ref()).into_owned());
+                }
+                for attribute in element.attributes() {
+                    let attribute = attribute.unwrap();
+                    if matches!(
+                        resolver.resolve_attribute(attribute.key).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        unresolved
+                            .push(String::from_utf8_lossy(attribute.key.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    unresolved
+}
+
+#[test]
+fn retained_differential_markup_resolves_standalone() {
+    let styles = concat!(
+        r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" "#,
+        r#"xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" "#,
+        r#"xmlns:p="urn:payload"><dxfs count="1"><dxf><font><p:hint p:v="1"/></font>"#,
+        r#"<extLst><ext uri="urn:test"><p:payload/></ext></extLst></dxf></dxfs></styleSheet>"#,
+    )
+    .as_bytes();
+    let values = parse_differential_formats(styles).unwrap();
+    let value = &values[0];
+    for markup in [
+        value.raw_xml(),
+        value.font.as_ref().unwrap().raw_xml(),
+        value.extensions[0].raw_xml(),
+    ] {
+        assert!(
+            unresolved_names(markup).is_empty(),
+            "{}",
+            String::from_utf8_lossy(markup)
+        );
+        assert!(
+            String::from_utf8_lossy(markup)
+                .contains(r#"xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main""#)
+        );
+    }
+    assert!(String::from_utf8_lossy(value.raw_xml()).contains(r#"xmlns:p="urn:payload""#));
 }

@@ -49,6 +49,25 @@ impl XmlData {
             XmlData::Shared(slice) => (slice.arc(), slice.start()),
         }
     }
+
+    /// This span with every namespace declaration it inherits from its part
+    /// re-declared on its own root element, so that it parses standalone.
+    ///
+    /// Change 0653 stopped the markup-compatibility writer from repeating
+    /// every in-scope declaration on every element, so a span that is parsed
+    /// on its own asks for the inherited ones here.
+    fn self_contained_xml(&self) -> Result<Vec<u8>> {
+        match self {
+            XmlData::Owned(bytes) => Ok(bytes.to_vec()),
+            XmlData::Shared(slice) => crate::namespace::self_contained_element_xml(
+                slice.arc().as_slice(),
+                slice.start(),
+                u32::try_from(slice.len()).map_err(|_source_error| {
+                    Error::InvalidFormat("Word table range exceeds u32".to_string())
+                })?,
+            ),
+        }
+    }
 }
 
 fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
@@ -340,6 +359,12 @@ impl Row {
             xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
             cached_cells: OnceLock::new(),
         }
+    }
+
+    /// This row's XML with every namespace declaration it inherits from its
+    /// part re-declared on its own `w:tr`, so that it parses standalone.
+    pub(crate) fn self_contained_xml(&self) -> Result<Vec<u8>> {
+        self.xml_data.self_contained_xml()
     }
 
     #[inline]

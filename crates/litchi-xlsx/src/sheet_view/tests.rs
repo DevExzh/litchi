@@ -3,8 +3,12 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_sheet::Cell;
 use litchi_sheet::Rect;
 use litchi_sheet::view::{Color, Display, Mode, Position, Scale, Split, State};
+use quick_xml::events::Event;
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
 const T: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 fn fixture(bytes: &[u8]) -> Collection {
     let package = OpcPackage::from_bytes(bytes).unwrap();
     let part = package
@@ -98,9 +102,11 @@ fn accepts_spec_absolute_a1_references() {
         Cell::from_a1("$A$1").unwrap()
     );
     let retained = std::str::from_utf8(parsed.entries()[0].retained_xml()).unwrap();
-    assert!(retained.starts_with(
-        r#"<sheetView workbookViewId="0" topLeftCell="$XFD$1048576" zoomScaleNormal="0">"#
-    ));
+    // The retained sheetView re-declares what it inherits from the worksheet
+    // root, so it parses standalone (change 0653).
+    assert!(retained.starts_with(&format!(
+        r#"<sheetView workbookViewId="0" topLeftCell="$XFD$1048576" zoomScaleNormal="0" xmlns="{T}">"#
+    )));
     assert!(retained.contains(r#"topLeftCell="A1""#));
     assert!(retained.contains(r#"sqref="$A$1:$XFD$1048576""#));
     assert!(retained.find("<pane").unwrap() < retained.find("<selection").unwrap());
@@ -129,4 +135,72 @@ fn rejects_invalid_view_grammar_values_and_security() {
     for xml in cases {
         assert!(parse_worksheet_views(xml.as_bytes()).is_err(), "{xml}");
     }
+}
+
+/// Every name in `markup` that does not resolve the way it resolves in the part
+/// the fragment was cut from: an element whose name reaches no namespace at
+/// all, or a prefixed name whose prefix has no declaration in the fragment.
+///
+/// A fragment cut out of a processed part has to carry the declarations it
+/// inherits, so this is empty for the markup the accessors publish.
+fn unresolved_names(markup: &[u8]) -> Vec<String> {
+    let mut reader = NsReader::from_reader(markup);
+    let mut unresolved = Vec::new();
+    loop {
+        let event = reader.read_event().unwrap().into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !matches!(namespace, ResolveResult::Bound(_)) {
+                    unresolved.push(String::from_utf8_lossy(element.name().as_ref()).into_owned());
+                }
+                for attribute in element.attributes() {
+                    let attribute = attribute.unwrap();
+                    if matches!(
+                        resolver.resolve_attribute(attribute.key).0,
+                        ResolveResult::Unknown(_)
+                    ) {
+                        unresolved
+                            .push(String::from_utf8_lossy(attribute.key.as_ref()).into_owned());
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    unresolved
+}
+
+#[test]
+fn retained_view_markup_resolves_standalone() {
+    let xml = format!(
+        concat!(
+            r#"<worksheet xmlns="{}" xmlns:mc="{}" xmlns:p="urn:payload"><sheetViews>"#,
+            r#"<sheetView workbookViewId="0"><pivotSelection pane="topLeft">"#,
+            r#"<pivotArea dataOnly="0"><p:hint p:v="1"/></pivotArea></pivotSelection>"#,
+            r#"<extLst><ext uri="urn:view"><p:payload/></ext></extLst>"#,
+            r#"</sheetView></sheetViews></worksheet>"#,
+        ),
+        T, MCE
+    );
+    let collection = parse_worksheet_views(xml.as_bytes()).unwrap().unwrap();
+    let entry = &collection.entries()[0];
+    for markup in [
+        entry.retained_xml(),
+        entry.pivot_selections()[0].area().markup(),
+        entry.extensions()[0].markup(),
+    ] {
+        assert!(
+            unresolved_names(markup).is_empty(),
+            "{}",
+            String::from_utf8_lossy(markup)
+        );
+        assert!(String::from_utf8_lossy(markup).contains(&format!(r#"xmlns="{T}""#)));
+    }
+    assert!(
+        String::from_utf8_lossy(entry.pivot_selections()[0].area().markup())
+            .contains(r#"xmlns:p="urn:payload""#)
+    );
 }
