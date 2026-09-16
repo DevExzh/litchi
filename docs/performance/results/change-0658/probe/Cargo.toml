@@ -1,0 +1,23 @@
+# Change 0658 scratch probe. The path dependencies point at the measurement
+# worktree, which is removed after the commit: retarget them at a checkout of
+# the leg you want to profile (the before leg used
+# /home/zhuhe/code/litchi-worktrees/before-70d7768cc).
+[package]
+name = "probe0658"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "probe0658"
+path = "main.rs"
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-xlsx" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-core" }
+litchi-ooxml-common = { path = "/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common" }
+litchi-sheet = { path = "/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-sheet" }
+
+[profile.release]
+debug = 1

@@ -2245,3 +2245,196 @@ mod namespace_emission_contract_tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod streaming_0658_active_stop_tests {
+    use super::super::{
+        Capabilities,
+        stream::{
+            ActiveFlow, SemanticEvent, StreamError, StreamLimits, StreamReport,
+            process_markup_compatibility_stream_with_observers,
+            process_markup_compatibility_stream_with_stoppable_observers,
+        },
+    };
+    use std::io::Cursor;
+
+    type Outcome = Result<StreamReport, StreamError<&'static str, &'static str>>;
+
+    fn local_name(event: &SemanticEvent<'_>) -> Option<String> {
+        match event {
+            SemanticEvent::Start(element) | SemanticEvent::Empty(element) => {
+                Some(element.expanded_name.local_name.clone())
+            },
+            SemanticEvent::End(end) => Some(format!("/{}", end.expanded_name.local_name)),
+            _ => None,
+        }
+    }
+
+    /// Run the stoppable entry point, stopping at the first start named `stop`.
+    fn run_stopping_at(xml: &str, stop: Option<&str>) -> (Vec<String>, Vec<String>, Outcome) {
+        let mut input = Cursor::new(xml.as_bytes());
+        let mut raw_names = Vec::new();
+        let mut active_names = Vec::new();
+        let result = process_markup_compatibility_stream_with_stoppable_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                raw_names.push(element.expanded_name.local_name.clone());
+                Ok::<(), &'static str>(())
+            },
+            |event| {
+                let name = local_name(&event);
+                if let Some(name) = name.clone() {
+                    active_names.push(name);
+                }
+                Ok::<ActiveFlow, &'static str>(match (stop, name) {
+                    (Some(stop), Some(name)) if name == stop => ActiveFlow::Stop,
+                    _ => ActiveFlow::Continue,
+                })
+            },
+        );
+        (raw_names, active_names, result)
+    }
+
+    const DOC: &str = "<r><keep/><stop/><after/></r>";
+
+    #[test]
+    fn a_continuing_observer_is_indistinguishable_from_the_plain_entry_point() {
+        let (raw_names, active_names, result) = run_stopping_at(DOC, None);
+        let report = result.expect("a stream that never stops reaches EOF");
+
+        let mut input = Cursor::new(DOC.as_bytes());
+        let mut plain_raw = Vec::new();
+        let mut plain_active = Vec::new();
+        let plain = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                plain_raw.push(element.expanded_name.local_name.clone());
+                Ok::<(), &'static str>(())
+            },
+            |event| {
+                if let Some(name) = local_name(&event) {
+                    plain_active.push(name);
+                }
+                Ok::<(), &'static str>(())
+            },
+        )
+        .expect("the plain entry point reaches EOF");
+
+        assert_eq!(report, plain);
+        assert_eq!(raw_names, plain_raw);
+        assert_eq!(active_names, plain_active);
+    }
+
+    #[test]
+    fn a_stop_ends_the_stream_at_that_event_and_reports_success() {
+        let (raw_names, active_names, result) = run_stopping_at(DOC, Some("stop"));
+        let report = result.expect("a stopped stream reports success for its prefix");
+
+        // Neither observer sees anything after the stopping event, and the
+        // bytes after it are not parsed at all.
+        assert_eq!(
+            raw_names,
+            vec!["r".to_owned(), "keep".to_owned(), "stop".to_owned()]
+        );
+        assert_eq!(
+            active_names,
+            vec!["r".to_owned(), "keep".to_owned(), "stop".to_owned()]
+        );
+        // Three counted events: `<r>`, `<keep/>` and `<stop/>`; `<after/>` and
+        // `</r>` are never read.
+        assert_eq!(report.events, 3);
+    }
+
+    #[test]
+    fn a_stopped_stream_does_not_run_the_end_of_document_checks() {
+        // The document root is never closed from this stream's point of view,
+        // and the input is truncated after the stopping event; a stream that
+        // ran to EOF would refuse both with `unterminated XML`.
+        let truncated = "<r><stop/><unclosed>";
+        let (_, _, result) = run_stopping_at(truncated, Some("stop"));
+        assert!(result.is_ok(), "a stop suppresses the EOF checks");
+    }
+
+    #[test]
+    fn a_stop_never_suppresses_a_failure_already_observed_on_that_event() {
+        // The raw observer refuses the very element the active observer stops
+        // on. A stop ends the stream, it does not turn an observed failure
+        // into success: the retained raw error is still the result.
+        let mut input = Cursor::new(DOC.as_bytes());
+        let result = process_markup_compatibility_stream_with_stoppable_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                if element.expanded_name.local_name == "stop" {
+                    Err("raw refused the stopping element")
+                } else {
+                    Ok::<(), &'static str>(())
+                }
+            },
+            |event| {
+                Ok::<ActiveFlow, &'static str>(match local_name(&event).as_deref() {
+                    Some("stop") => ActiveFlow::Stop,
+                    _ => ActiveFlow::Continue,
+                })
+            },
+        );
+        match result {
+            Err(StreamError::Callback {
+                raw_error: Some("raw refused the stopping element"),
+                active_error: None,
+            }) => {},
+            other => panic!("expected the retained raw observer error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_primary_failure_on_a_later_event_is_unreachable_once_the_stream_has_stopped() {
+        // The document is malformed after the stopping event. Without the stop
+        // the stream refuses it; with the stop those bytes are never read, so
+        // the caller owns their validation. This is the movement change 0652
+        // decision 8 authorises, pinned here so it cannot widen silently.
+        let malformed = "<r><stop/></wrong></r>";
+        let (_, _, unstopped) = run_stopping_at(malformed, None);
+        assert!(
+            matches!(unstopped, Err(StreamError::Mce { .. })),
+            "without a stop the mismatched end tag is refused, got {unstopped:?}"
+        );
+        let (_, _, stopped) = run_stopping_at(malformed, Some("stop"));
+        assert!(
+            stopped.is_ok(),
+            "the stopped stream never reads those bytes"
+        );
+    }
+
+    #[test]
+    fn an_observer_error_before_a_stop_still_surfaces() {
+        let mut input = Cursor::new(DOC.as_bytes());
+        let mut seen = 0usize;
+        let result = process_markup_compatibility_stream_with_stoppable_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |_| Err::<(), &'static str>("raw refused"),
+            |_| {
+                seen += 1;
+                Ok::<ActiveFlow, &'static str>(if seen >= 2 {
+                    ActiveFlow::Stop
+                } else {
+                    ActiveFlow::Continue
+                })
+            },
+        );
+        match result {
+            Err(StreamError::Callback {
+                raw_error: Some("raw refused"),
+                active_error: None,
+            }) => {},
+            other => panic!("expected the retained raw observer error, got {other:?}"),
+        }
+    }
+}

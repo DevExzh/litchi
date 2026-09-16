@@ -7,6 +7,21 @@
 //! callers must discard it and fall back to the existing materialized
 //! worksheet parser, which performs the complete mandatory validation.
 //!
+//! # The ineligibility gate (change 0658)
+//!
+//! Once the scanner records an ineligibility reason the verdict is settled:
+//! nothing the rest of the worksheet contains can make the scan eligible
+//! again, and the caller is already required to discard the outcome and read
+//! the worksheet through the materialized parser. The scanner therefore stops
+//! the stream at that event with [`ActiveFlow::Stop`] instead of running it to
+//! EOF. Every byte up to and including the marking event is parsed and
+//! validated exactly as before, so every typed refusal located there keeps its
+//! identity and still outranks the verdict; the bytes after it are read and
+//! validated once, by the materialized parser that owns this worksheet's
+//! mandatory validation and its first typed error (ADR 0005; change 0362).
+//! The verified OPC reader still drains and CRC/size-verifies the whole part,
+//! because that fence belongs to the reader and not to this scan.
+//!
 //! The implementation retains only physical records inside the requested
 //! rectangle, one active-cell lexical scratch area, and bounded parser state.
 //! It makes no fixed-memory, RSS, or OOM-safety claim. quick-xml, the MCE
@@ -16,7 +31,9 @@
 
 use std::io::BufRead;
 
-use litchi_ooxml_common::mce::{Capabilities, SemanticElement, SemanticEvent, StreamLimits};
+use litchi_ooxml_common::mce::{
+    ActiveFlow, Capabilities, SemanticElement, SemanticEvent, StreamLimits,
+};
 use litchi_sheet::{Cell as Address, Rect};
 use quick_xml::events::BytesRef;
 
@@ -149,7 +166,9 @@ pub enum ScanOutcome {
     Eligible(SelectedCell),
     /// Full worksheet semantics were deferred; the caller must use the
     /// materialized parser, which owns the mandatory validation and the first
-    /// typed error for this worksheet. The scan itself still reaches XML EOF.
+    /// typed error for this worksheet. The scan stops at the event that
+    /// settled the verdict and does not read the rest of the worksheet
+    /// (change 0658).
     NotEligible(NotEligibleReason),
 }
 
@@ -161,7 +180,9 @@ pub enum RangeScanOutcome {
     Eligible(SelectedCells),
     /// Full worksheet semantics were deferred; the caller must use the
     /// materialized parser, which owns the mandatory validation and the first
-    /// typed error for this worksheet. The scan itself still reaches XML EOF.
+    /// typed error for this worksheet. The scan stops at the event that
+    /// settled the verdict and does not read the rest of the worksheet
+    /// (change 0658).
     NotEligible(NotEligibleReason),
 }
 
@@ -179,7 +200,9 @@ pub type StreamResult<T> =
 /// is not a semantic success, and callers are required to fall back to the
 /// existing materialized parser, which owns the mandatory validation. Input,
 /// XML/MCE, raw x14ac, and allocation failures observed by the stream remain
-/// typed stream errors and are never converted to `NotEligible`.
+/// typed stream errors and are never converted to `NotEligible`, and an
+/// ineligible outcome is published only after every such failure located up to
+/// and including the marking event has had its chance to outrank it.
 #[expect(
     clippy::result_large_err,
     reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
@@ -204,7 +227,10 @@ fn scan_stream(
     requested: Rect,
 ) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
     let mut scanner = Scanner::new(requested);
-    let result = x14ac::capture_stream_with_active(
+    // Change 0658: `Scanner::event` answers `ActiveFlow::Stop` for the event
+    // that settles an ineligible verdict, so the stream ends there instead of
+    // running to EOF. `Scanner::finish` reports that verdict unchanged.
+    let result = x14ac::capture_stream_with_stoppable_active(
         input,
         capabilities,
         limits,
@@ -527,19 +553,33 @@ impl Scanner {
         ))
     }
 
-    fn event(&mut self, event: &SemanticEvent<'_>) -> Result<()> {
+    /// Consume one selected semantic event and say whether the stream is
+    /// still needed.
+    ///
+    /// Change 0658: the answer is [`ActiveFlow::Stop`] from the moment an
+    /// ineligibility reason is recorded. The verdict cannot change after that
+    /// — [`Self::mark`] keeps the first reason and [`Self::finish`] returns it
+    /// without looking at any other state — and the caller is required to
+    /// re-read the worksheet through the materialized parser, so the remaining
+    /// events would only duplicate work that parser is about to do. Failures
+    /// raised while the marking event itself is being processed are returned
+    /// from this call and still outrank the verdict.
+    fn event(&mut self, event: &SemanticEvent<'_>) -> Result<ActiveFlow> {
+        // Defensive: a stream that keeps delivering events after a stop must
+        // not restart the scan, and must not re-ask worksheet-structure
+        // questions from state frozen at the mark.
         if self.not_eligible.is_some() {
-            if let SemanticEvent::Start(element) | SemanticEvent::Empty(element) = event
-                && self.stack.last() == Some(&Frame::Worksheet)
-            {
-                if is_spreadsheetml_element(element, "dimension") {
-                    self.validate_dimension_placement()?;
-                } else if is_spreadsheetml_element(element, "mergeCells") {
-                    self.validate_marked_merge_cells_placement()?;
-                }
-            }
-            return Ok(());
+            return Ok(ActiveFlow::Stop);
         }
+        self.dispatch(event)?;
+        Ok(if self.not_eligible.is_some() {
+            ActiveFlow::Stop
+        } else {
+            ActiveFlow::Continue
+        })
+    }
+
+    fn dispatch(&mut self, event: &SemanticEvent<'_>) -> Result<()> {
         match event {
             SemanticEvent::Start(element) => self.start(element, false),
             SemanticEvent::Empty(element) => self.start(element, true),
@@ -780,31 +820,6 @@ impl Scanner {
         if !self.seen_sheet_data {
             return Err(invalid("worksheet mergeCells appears before sheetData"));
         }
-        if self.seen_merge_cells {
-            return Err(invalid("worksheet has duplicate mergeCells elements"));
-        }
-        if self.merge_window_closed {
-            return Err(invalid(
-                "worksheet mergeCells appears after a schema successor",
-            ));
-        }
-        Ok(())
-    }
-
-    /// Merge-placement rules that stay exact after the worksheet is marked.
-    ///
-    /// Change 0597: after [`Self::mark`] this scanner stops observing document
-    /// structure, so `seen_sheet_data` can no longer advance and a
-    /// `<sheetData>` that follows the mark is never recorded. Asking the
-    /// "appears before sheetData" question here therefore refused every
-    /// correctly placed `<mergeCells>` on a worksheet marked at worksheet
-    /// level before its `<sheetData>` — 434 reads over 24 of this
-    /// repository's 180 `.xlsx` fixtures, each of which the mandatory
-    /// materialized parser accepts. That clause is dropped; the materialized
-    /// parser still refuses a genuinely early `<mergeCells>` with the same
-    /// message (`raw::worksheet::codec`). The two remaining clauses read
-    /// state that was complete when the mark was taken, so they stay exact.
-    fn validate_marked_merge_cells_placement(&self) -> Result<()> {
         if self.seen_merge_cells {
             return Err(invalid("worksheet has duplicate mergeCells elements"));
         }

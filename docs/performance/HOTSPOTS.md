@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0658 — XLSX selected-cell ineligibility gate, landed
+
+Survey item XML-2 is closed. The selected-cell scan no longer runs an ineligible worksheet to XML EOF: `Scanner::event` answers a new `mce::ActiveFlow::Stop` for the event that records an ineligibility reason, and the MCE driver ends the stream there. `raw::worksheet::selected::scan_stream` falls from 140,956,112 to 292,990 Ir on the marker-stripped control fixture and from 153,241,477 to 353,599 on the real one (−99.8%), taking the whole source-backed one-cell read from 215,630,939 to 76,698,964 (−64.43%) and from 652,726,610 to 501,712,792 (−23.14%); `SourceWorksheet::store`, the mandatory fallback parse, is unchanged to within 0.1% and is now 93% of the control read. The reach is the whole corpus: all 326 worksheet parts of the 180 `.xlsx` fixtures are ineligible (325 `UnsupportedStructure`, one `RichInlineText`), with identical verdicts on both legs, and the bytes the scan pulls from the part reader fall from 9,324,342 to 795,708. Logical source reads and bytes are unchanged — the verified OPC reader still drains and CRC/size-verifies the whole member, so this removes parsing, not I/O. What remains in this read is the mandatory materialized parse, and inside it the MCE byte codec (item XML-1) is 310,161,586 Ir of the real fixture's 501,712,792, unchanged by this batch. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0658-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0658/README.md).
+
 ## 0654 — the queue's first row is cleared: 297 of 321 real packages now publish, and the eager route is the next one
 
 Record: [0654](0654-opc-original-bytes-audit-loosened.md).

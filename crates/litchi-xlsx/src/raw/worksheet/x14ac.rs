@@ -19,8 +19,9 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use litchi_ooxml_common::mce::{
-    Capabilities, Name, RawElement, RawElementKind, SemanticElement, SemanticEvent, StreamError,
-    StreamLimits, process_markup_compatibility_stream_with_observers,
+    ActiveFlow, Capabilities, Name, RawElement, RawElementKind, SemanticElement, SemanticEvent,
+    StreamError, StreamLimits, process_markup_compatibility_stream_with_observers,
+    process_markup_compatibility_stream_with_stoppable_observers,
 };
 
 use super::{
@@ -174,6 +175,54 @@ where
         Ok(_) => Ok(state.into_inner().finish()),
         Err(error) => Err(error),
     }
+}
+
+/// Validate x14ac while composing one active observer that may stop the stream.
+///
+/// This is [`capture_stream_with_active`] for a caller whose observer can
+/// decide, part-way through the worksheet, that it needs no further events.
+/// The raw and x14ac observers still run ahead of that observer for every
+/// event the stream does deliver, so every byte up to and including the
+/// stopping event is validated exactly as it is for a stream that runs to EOF.
+/// The captured extension values are deliberately **not** returned: after an
+/// early stop they would describe only the processed prefix, and the one
+/// caller that can stop discards them. Change 0658.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+pub(super) fn capture_stream_with_stoppable_active<Active>(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    row_mode: RowMode,
+    mut active: Active,
+) -> StreamResult<()>
+where
+    Active: for<'a> FnMut(&SemanticEvent<'a>) -> Result<ActiveFlow>,
+{
+    let state = RefCell::new(StreamObserverState::new(row_mode));
+    process_markup_compatibility_stream_with_stoppable_observers(
+        input,
+        capabilities,
+        limits,
+        |element| {
+            let mut state = state
+                .try_borrow_mut()
+                .map_err(|_| invalid("worksheet extension observers were re-entered"))?;
+            state.raw(element)
+        },
+        |event| {
+            {
+                let mut state = state
+                    .try_borrow_mut()
+                    .map_err(|_| invalid("worksheet extension observers were re-entered"))?;
+                state.active(&event)?;
+            }
+            active(&event)
+        },
+    )
+    .map(|_report| ())
 }
 
 /// Capture only the selected worksheet default from a callback-scoped stream.

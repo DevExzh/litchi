@@ -1,0 +1,93 @@
+
+## leg 1: A1 (base) vs B1 (change)  (A1-base -> B1-chg; negative = B1-chg slower)
+case / shape                                   stat       A1-base       B1-chg   delta %
+xlsx_file_selected_cell / medium               p50        3360224      3362320    -0.062
+xlsx_file_selected_cell / medium               mean       3367950      3375742    -0.231
+xlsx_file_selected_cell / medium               p95        3438399      3531271    -2.701
+xlsx_file_selected_cell / medium               p99        3475879      3594381    -3.409
+xlsx_narrow_column_range_scan / dense-wide     p50          11210        11380    -1.521
+xlsx_narrow_column_range_scan / dense-wide     mean         11501        11471     0.259
+xlsx_narrow_column_range_scan / dense-wide     p95          12180        11820     2.956
+xlsx_narrow_column_range_scan / dense-wide     p99          18310        14000    23.539
+xlsx_narrow_column_range_scan / medium         p50            470          430     8.511
+xlsx_narrow_column_range_scan / medium         mean           501          430    14.229
+xlsx_narrow_column_range_scan / medium         p95            670          440    34.328
+xlsx_narrow_column_range_scan / medium         p99            710          460    35.211
+xlsx_narrow_column_range_scan / tiny           p50            110          110     0.000
+xlsx_narrow_column_range_scan / tiny           mean           108          112    -3.715
+xlsx_narrow_column_range_scan / tiny           p95            110          120    -9.091
+xlsx_narrow_column_range_scan / tiny           p99            120          130    -8.333
+xlsx_range_source_first_cell / dense-wide      p50      105899235    104595864     1.231
+xlsx_range_source_first_cell / dense-wide      mean     109268470    105718941     3.248
+xlsx_range_source_first_cell / dense-wide      p95      131608247    111599527    15.203
+xlsx_range_source_first_cell / dense-wide      p99      142343396    114002680    19.910
+xlsx_range_source_first_cell / medium          p50        3342388      3311594     0.921
+xlsx_range_source_first_cell / medium          mean       3718056      3314503    10.854
+xlsx_range_source_first_cell / medium          p95        5711392      3438929    39.788
+xlsx_range_source_first_cell / medium          p99        6615837      3616350    45.338
+xlsx_range_source_first_cell / tiny            p50        1934361      1920010     0.742
+xlsx_range_source_first_cell / tiny            mean       1939639      1914286     1.307
+xlsx_range_source_first_cell / tiny            p95        1970820      1927391     2.204
+xlsx_range_source_first_cell / tiny            p99        1992481      1929090     3.182
+
+## leg 2: A2 (base) vs B2 (change)  (A2-base -> B2-chg; negative = B2-chg slower)
+case / shape                                   stat       A2-base       B2-chg   delta %
+xlsx_file_selected_cell / medium               p50        3298234      3355854    -1.747
+xlsx_file_selected_cell / medium               mean       3523067      3968058   -12.631
+xlsx_file_selected_cell / medium               p95        4871307      7814533   -60.420
+xlsx_file_selected_cell / medium               p99        8479507     16097908   -89.845
+xlsx_narrow_column_range_scan / dense-wide     p50          11635        11365     2.321
+xlsx_narrow_column_range_scan / dense-wide     mean         11660        11409     2.153
+xlsx_narrow_column_range_scan / dense-wide     p95          12150        11630     4.280
+xlsx_narrow_column_range_scan / dense-wide     p99          12950        11660     9.961
+xlsx_narrow_column_range_scan / medium         p50            430          430     0.000
+xlsx_narrow_column_range_scan / medium         mean           462          459     0.714
+xlsx_narrow_column_range_scan / medium         p95            550          520     5.455
+xlsx_narrow_column_range_scan / medium         p99            560          581    -3.750
+xlsx_narrow_column_range_scan / tiny           p50            110          110     0.000
+xlsx_narrow_column_range_scan / tiny           mean           122          109    10.137
+xlsx_narrow_column_range_scan / tiny           p95            150          120    20.000
+xlsx_narrow_column_range_scan / tiny           p99            420          120    71.429
+xlsx_range_source_first_cell / dense-wide      p50      110893207    105225914     5.111
+xlsx_range_source_first_cell / dense-wide      mean     112155506    106298140     5.223
+xlsx_range_source_first_cell / dense-wide      p95      119133317    110791669     7.002
+xlsx_range_source_first_cell / dense-wide      p99      122550966    124083024    -1.250
+xlsx_range_source_first_cell / medium          p50        3376408      3314418     1.836
+xlsx_range_source_first_cell / medium          mean       3473201      3338370     3.882
+xlsx_range_source_first_cell / medium          p95        4515915      3367148    25.438
+xlsx_range_source_first_cell / medium          p99        4925907      4215223    14.427
+xlsx_range_source_first_cell / tiny            p50        1923396      1917926     0.284
+xlsx_range_source_first_cell / tiny            mean       1999039      1913393     4.284
+xlsx_range_source_first_cell / tiny            p95        2025011      1924921     4.943
+xlsx_range_source_first_cell / tiny            p99        4178133      1931420    53.773
+
+## A/A floor (four base runs in the same window)
+case / shape                                   stat   spread %  (max-min)/min over F1..F4
+xlsx_file_selected_cell / medium               p50      48.260
+xlsx_file_selected_cell / medium               mean     79.729
+xlsx_file_selected_cell / medium               p95     285.274
+xlsx_file_selected_cell / medium               p99     309.808
+xlsx_narrow_column_range_scan / dense-wide     p50       8.520
+xlsx_narrow_column_range_scan / dense-wide     mean      8.852
+xlsx_narrow_column_range_scan / dense-wide     p95      66.638
+xlsx_narrow_column_range_scan / dense-wide     p99      62.154
+xlsx_narrow_column_range_scan / medium         p50      19.767
+xlsx_narrow_column_range_scan / medium         mean     42.337
+xlsx_narrow_column_range_scan / medium         p95     166.038
+xlsx_narrow_column_range_scan / medium         p99     229.630
+xlsx_narrow_column_range_scan / tiny           p50       0.000
+xlsx_narrow_column_range_scan / tiny           mean     17.737
+xlsx_narrow_column_range_scan / tiny           p95      90.909
+xlsx_narrow_column_range_scan / tiny           p99     366.667
+xlsx_range_source_first_cell / dense-wide      p50      89.368
+xlsx_range_source_first_cell / dense-wide      mean     70.041
+xlsx_range_source_first_cell / dense-wide      p95      91.222
+xlsx_range_source_first_cell / dense-wide      p99     143.696
+xlsx_range_source_first_cell / medium          p50       3.203
+xlsx_range_source_first_cell / medium          mean     11.326
+xlsx_range_source_first_cell / medium          p95      51.524
+xlsx_range_source_first_cell / medium          p99     200.607
+xlsx_range_source_first_cell / tiny            p50       1.600
+xlsx_range_source_first_cell / tiny            mean     41.355
+xlsx_range_source_first_cell / tiny            p95     374.000
+xlsx_range_source_first_cell / tiny            p99     851.764
