@@ -1,5 +1,40 @@
 # Performance program phase report
 
+## 0642 — a whole-sheet visit that allocates nothing, and the peak it does not move
+
+Record: [0642](0642-xlsx-visit-cells-streaming.md).
+
+Two operations on the XLSX source-backed door read a rectangle of cells:
+`cells`, which returns an owning `Vec<SourceCell>`, and `visit_cells`, which
+hands each cell to a callback. Until this change the second was the first plus a
+loop — it built the whole vector, then iterated it — so a visitor that was
+documented as never outliving the read paid 80 bytes per cell for a copy it
+threw away, and on the materialized-store route it cloned every cell to make
+that copy. This change gives the two operations a shared private route selector
+and lets the visitor produce one cell at a time. On a walk over a worksheet whose
+store is already materialized — the thing a visitor is for — the operation now
+allocates **nothing at all**: zero allocation calls, zero bytes, zero peak live
+bytes, down from 65,551 calls and 5,608,448 bytes on a 65,536-cell integer sheet
+and from 10,485,760 bytes on `no_drawing_patriarch.xlsx`'s 75,770-cell
+worksheet. That is 81.7% and 46.9% fewer instructions and a 6.1× and 4.1–4.6× p50
+speedup, measured in both directions of an A1 B1 B2 A2 pair in two windows, with
+an A/A floor of at most 3.9% in each. The report should be equally clear about
+the two boundaries. First, on a **cold** read — open, scan, resolve, convert —
+the same 5.2 MB or 10.5 MB disappears from the allocated-byte total but the
+**peak live bytes do not change**, because the scan's own record vector and the
+worksheet payload set the peak before the removed vector exists; a reader who
+wants the cold peak down is waiting for a different change. Second, that cold
+read is **0.19% to 0.20% more instructions**, and the record reports it rather
+than averaging it away: 29% is the new pass that validates every retained record
+before the first callback, which is what keeps a refusal in a later row from
+arriving after a cell has been visited. Value identity is not asserted but
+measured: a four-way differential — cold `visit_cells`, cold `cells`,
+warm-store `visit_cells`, and the eager `Workbook` store — over **397 worksheets
+of 182 `.xlsx` files** produces one table per binary, and the two tables are
+byte-identical, including the thirteen worksheets that refuse and the exact text
+of each refusal. `performance_claim: none`; the numbers above are evidence.
+OLE2 and OOXML remain the active priority; ODF is deferred; iWork is excluded.
+
 ## 0640 — a bit that says what the structure already said
 
 Change 0640 answers change 0587's correctness defect 4 for all seven refused `.doc` fixtures by decoding each one. The tool is a probe that walks every `Plcfld` straight from the Table stream, independently of `litchi-doc`'s field parser, and annotates each end marker's `fNested` and `fHasSep` against the structure the markers describe — the same probe carries change 0596's `digest-doc` oracle **verbatim**, and its before digest is **byte-identical to 0596's retained after digest**, which cross-checks both the oracle and the claim that nothing since 0596 moved any DOC observation. Two refusals go: `watermark.doc`'s five nested `HYPERLINK` end markers all carry `grffldEnd = 0x80` with `fNested` clear, and `poi/.../test.doc`'s single ` SEQ CHAPTER \h \r 1` field carries `fHasSep` with no separator marker and no separator character in the text between CP 0 and CP 21. Across the corpus, **98 end markers**, `fNested` set on **zero** including the **five** that are nested, `fHasSep` correct on **97 of 98** — a check whose positive evidence is 0 of 5 on the only nested fields available is not distinguishing damaged files from sound ones. Five refusals stay: the same duplicated name, `"Absatz-Standardschriftart"` on `istd` 10 and `istd` 15, in all five stylesheets, which MS-DOC 2.9 forbids and which the existing `Leniency::TolerateStylesheetDefects` already admits — **290, 59, 175, 1772 and 1014 bytes of text** and **16, 7, 4, 1 and 12 paragraphs** respectively, on the unmodified base. Those five lenient reads were checked against an independent reader: LibreOffice 26.2.5.2's text export is **word-for-word identical** on `duplicate-style-names.doc` and `picture.doc`, and the three differences are the known categories and nothing else — LibreOffice adds `lists-margins.doc`'s four generated list labels (every one of litchi's 32 words appears in LibreOffice's text), litchi returns `pictures_escher.doc`'s stored `HYPERLINK` instructions where LibreOffice returns only the results (**105 of 109** words match), and litchi returns `footnote.doc`'s footnote, endnote and comment stories. The containment proof is the corpus differential over all **57** fixtures: `digest-diff.txt` is **two changed records**, both on files that were already refused and still are, and all **42** admitted fixtures — 42 admitted and 15 refused on each leg — are unchanged in text, paragraph hash, `paragraph_count()`, section table, subdocument ranges and FIB bytes. **Nothing was newly admitted**, because each witness reaches a further refusal — `bookmark ibkl values must be unique and in range` and `truncated SPRM opcode at byte 3` — decoded and queued in `follow-ups.md`, not acted on. Counts: the syscall census for one eager open is **identical** before and after on both an 86.5 KB, 67-field form and `FloatingPictures.doc`; the callgrind isolation pairs read **−2,802 Ir (−0.0675%)** and **−11,992 (−0.4041%)**, and **both are code-layout drift** — the change removes two comparisons per end marker, at most about 300 instructions on the larger fixture, and a first pass of the same pair through a driver differing only by one unused subcommand put that fixture at **+339 Ir (+0.0082%)**, the opposite sign. Seven gates, all passing: `cargo fmt --all --check`, clippy/test/doc for `litchi-doc`, clippy and the feature-bearing `cargo test -p litchi --features docx,xlsx,pptx,xls`, and `cargo test --locked` in `tools/perf-baseline` (531 passed, 0 failed, including the five legacy-DOC selector tests) — the two gaps the first wave found, both run because `litchi-doc` is a shared crate. The six `litchi` clippy warnings under that feature set are **pre-existing**: the same invocation on the untouched `before-c7326f680` checkout emits the identical six, and none is in `litchi-doc`. `performance_claim: none`. [Change and limitations](0640-doc-field-table-flag-refusals.md); [retained evidence](results/change-0640/README.md).

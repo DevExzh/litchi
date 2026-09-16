@@ -1,5 +1,43 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0642 — a documented visitor made to behave like one, with the refusal order proved rather than assumed
+
+Record: [0642](0642-xlsx-visit-cells-streaming.md).
+
+`docs/GOAL.md` puts correctness and bounded resources above speed and says a
+typed refusal may never be traded for a partial result, and this change is a
+small test of exactly that rule, because the obvious version of it breaks the
+rule. `SourceBackedWorksheet::visit_cells` built a whole-range
+`Vec<SourceCell>` and then iterated it; the cheapest way to stop doing that is
+to let the bounded scan yield cells to the callback as it parses. That would
+move every refusal in the rows *after* the requested rectangle to after the
+first visit, and the scan's own contract — "the returned eligible value is
+published only after the shared MCE/XML stream reaches EOF" — is what makes
+today's behaviour refuse-before-visit. **That version was not implemented.** What
+landed keeps the scan running to EOF, keeps the dependency resolution and both
+source/execution fences where they were, and *adds* a pass that validates every
+retained record before the first callback, so the guarantee holds structurally
+rather than by an argument about which arms are reachable. The two refusals that
+pass hoists are provably unreachable — `SelectedCells` is only built by
+`Scanner::finish` from `retain_selected`, whose two call sites each set exactly
+one of the two fields — and they were hoisted anyway, so that a future scanner
+change cannot quietly start refusing mid-walk. The audit should note the price:
+that pass costs 13 instructions per record, 852,085 per 65,536-cell cold read,
+and the cold path is **+0.19% to +0.20%** of instructions overall. It should also
+note what the change buys on the resource axis the goal document cares about: the
+warm walk's peak live bytes go to zero, which is a bounded-resource improvement
+rather than a latency one, while the **cold** read's peak does not move at all
+because the scan's own record vector still sets it. Evidence tiers: **measured**
+for every allocation, byte, peak, instruction count and timing quartile, and for
+the 397-worksheet differential; **modelled**: nothing; **unknown**: whether the
+scan's record vector can be removed without moving a refusal, which is the
+frozen-design question this change deliberately left open. One gate reports
+warnings and they are pre-existing: `cargo clippy -p litchi --features
+docx,xlsx,pptx,xls --all-targets` emits six warnings (`passing a unit value`,
+one unused function, one needless `mut`) reproduced with identical text on the
+untouched before checkout. `performance_claim: none`. OLE2/OOXML remain the
+active priority; ODF stays deferred; iWork is excluded.
+
 ## 0640 — "refusals must be correct, not merely conservative", and what a redundant flag bit is worth
 
 Record: [0640](0640-doc-field-table-flag-refusals.md).

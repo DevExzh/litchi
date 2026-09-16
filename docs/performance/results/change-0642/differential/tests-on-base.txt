@@ -1,0 +1,24 @@
+# Change 0642: the three added tests, run against the UNMODIFIED base
+#
+# Procedure: in the change worktree, the after `source.rs` was set aside, the
+# file restored with `git checkout --` to base c7326f68, and only the
+# `streaming_0642_tests` module appended to it. The tests therefore ran against
+# base's `visit_cells`, `cells`, `eager_cells` and `stream_cells`. The after
+# file was restored afterwards.
+#
+# All three pass, which is what they are for: they pin behaviour this change
+# preserves (the visited sequence on both routes, a refusal from a row after
+# the requested rectangle arriving before any callback, and the stored route's
+# stop-and-count), not behaviour it introduces. The "994 filtered out" line is
+# base's own unit-test count; after the change the lib carries 997.
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running unittests src/lib.rs (target/debug/deps/litchi_xlsx-2ed5e5870b2aee0f)
+
+running 3 tests
+test workbook::source::tests::streaming_0642_tests::visit_cells_0642_stops_on_the_stored_route_at_the_failing_cell ... ok
+test workbook::source::tests::streaming_0642_tests::visit_cells_0642_refuses_a_later_row_before_any_visit ... ok
+test workbook::source::tests::streaming_0642_tests::visit_cells_0642_matches_cells_on_both_routes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 994 filtered out; finished in 0.00s
+

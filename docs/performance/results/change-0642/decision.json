@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0642",
+  "title": "The XLSX source-backed range visitor produces each cell as it visits it instead of building the whole range first",
+  "decision": "retained, implemented in litchi-xlsx",
+  "code_state": "crates/litchi-xlsx/src/workbook/source.rs only; no public API, error type, limit, defence or output byte changed; no new unsafe and no new dependency; raw/worksheet/selected.rs untouched",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587 item XLSX-7 (survey item R7) observed that visit_cells is documented as a visitor but materializes the whole range first, modelling the vector at over 5.2 MB for 65,536 cells; this removes that vector and nothing else",
+    "on the materialized-store route the visit becomes allocation-free: 65,551 allocation calls and 5,608,448 bytes fall to zero on the dense probe, 16 calls and 10,485,760 bytes fall to zero on no_drawing_patriarch, and peak live bytes of the walk fall to zero in both",
+    "instructions for that walk fall 81.66% on the dense probe (622.5 to 114.2 per cell) and 46.93% on no_drawing_patriarch (222.0 to 117.8 per cell), and paired timing puts the reduction at 75.3-83.9% of p50 in both directions across two windows against a floor of at most 3.9%",
+    "the order-of-refusal contract is preserved structurally, not by argument: the bounded scan still reaches worksheet EOF and resolves its dependencies before select_cells returns, and a record-validation pass was added so that every refusal a whole-range read of the rectangle can raise is raised before the first callback",
+    "value and refusal identity are proved by a four-way differential (cold visit_cells, cold cells, warm-store visit_cells, eager Workbook store) over 397 worksheets of 182 .xlsx files: all four legs agree on every worksheet, and the two 397-row tables are byte-identical between the before and after binaries, including all thirteen refusals"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs on a retained probe, --cache-sim=no --branch-sim=no, N=2/N=6 for the warm walks and N=1/N=3 for the cold reads, differenced and divided by M; the probe's counts repeat to within about 100 instructions",
+    "allocations": "a counting global allocator (shape taken from the change 0634 driver) reporting allocation calls, allocated bytes, peak live-byte delta and retained live-byte delta, with one untimed warm-up outside the measured window, for visit, cells, visit-warm and cells-warm on both corpora and both legs",
+    "timing": "the retained probe's bench mode, order A1 B1 B2 A2, one process per leg, 40 samples per leg warm and 30 cold, taskset -c 17, with an A/A floor in each window; three windows retained, plus tools/perf-baseline --case xlsx_narrow_column_range_scan,xlsx_source_narrow_column_range_scan --xlsx-shape dense-wide --warmup 3 --samples 30 in two windows each with its own A/A floor",
+    "differential_oracle": "probe/probe.rs diff mode: for every worksheet of every .xlsx in the tree plus the probe corpus, four legs each from a freshly opened workbook, each producing a visited count plus an FNV-1a digest over the Debug rendering of every (address, cell) pair in production order, or the refusal's Display text",
+    "tests": "three new tests in crates/litchi-xlsx/src/workbook/source.rs streaming_0642_tests, all three also run green against the unmodified base to show they pin preserved behavior",
+    "code_identity": ".text and .rodata section sha256 for every measured binary. The probe was rebuilt after one doc comment was corrected and the rebuild's sections are byte-identical to the measured binary's, with the differential and the warm allocation counts re-run on it; the harness was rebuilt after a cargo fmt whitespace reflow, whose pre-reflow file hash is recorded in the packet README and whose two timing windows straddle the rebuild and agree."
+  },
+  "accepted_costs": {
+    "cold_instructions": "a cold whole-sheet read costs +0.186% (visit) and +0.203% (cells) more instructions on the eligible-scan route; per-symbol differencing attributes 852,085 of the 2,907,323 per read (29%) to the new record-validation pass, 13 instructions per record over 65,536, and the remainder to drop-glue and inlining attribution churn from routing both readers through one conversion helper",
+    "cold_peak_unchanged": "peak live bytes do not move on a cold whole-sheet read on either route: the peak is set by the worksheet payload plus the scan's record vector, or by the eager parse, before the removed vector is allocated",
+    "instruction_counts": "instructions rank work, not latency; callgrind prices rep movsb/rep stosb per byte, so the copy-heavy before leg of the warm walk is over-counted relative to native cycles, and the paired timing is the native check",
+    "inline_always": "resolve_selected_record carries #[inline(always)], measured at 688,015 instructions per 65,536-cell read against the out-of-line form on the pinned toolchain; the attribute is a measured decision, not a hint left in by habit"
+  },
+  "known_gaps": {
+    "scan_still_materializes": "the bounded scan still retains one SelectedRecord per selected cell before publishing; making scan_range yield to the visitor would remove that too but would move refusals after the first visit, which is a contract change needing its own frozen design record and was deliberately not taken",
+    "cells_over_allocates": "collect_stored_cells keeps the original try_reserve(1) growth loop, which reached a 131,072-slot capacity for 75,770 cells on no_drawing_patriarch, a 42% over-allocation; this change was scoped to leaving cells returning the same vector",
+    "cold_timing_unresolved": "the cold scenarios sit inside this host's floor, which reached 14.57% at p50 in one window; no cold timing result is claimed",
+    "corpus_reach": "two corpora, each a single worksheet read whole; nothing is measured for narrow ranges through visit_cells, for the one-cell cell() door, for range-source transports, cold caches, RSS, throughput, other formats or other platforms",
+    "probe_corpus_not_harness_corpus": "the dense probe corpus follows the harness dense-wide shape (two sheets of 256x256 integers) and is 294 bytes smaller; it is built by the retained probe but is not byte-identical to litchi-xlsx-synthetic-v1",
+    "harness_counts_nondeterministic": "three callgrind isolation pairs of the identical before harness binary spread 0.34%, so the harness selector's instruction pair bounds rather than measures the work"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, RSS, concurrency-scaling, real-producer or cross-platform result",
+    "any cold-path timing result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0642-xlsx-visit-cells-streaming",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0 (59807616e 2026-04-14), valgrind 3.26.0",
+    "cpu_pin": "taskset -c 17",
+    "binaries": {
+      "before/xlsx0642": "60c9ab8026eccfc4dd289003cc943c573adcc525afd2e470a3f16ae754eacb0e",
+      "after/xlsx0642": "fe2bb4fd9e2fa6b8add834bf909a64fb69278e8d4eecaf0d6790acfb5aee847b",
+      "before/xlsx0642_alloc": "89c0954a22aa55725c74893ff78aa690ee738b483fe612978ef6b441b35a62b8",
+      "after/xlsx0642_alloc": "8f83a6561a9fd93e9f41ecafbbcb752f42d14bc5eda0401117f3f0b0308f421c",
+      "before/litchi-perf-baseline": "37a5ff229f14b35d7c5544a6a7108dc5328536c55982dcd9f36b5de0deadbf9e",
+      "after/litchi-perf-baseline": "7bac48499f2a323c8bd09f71b88c701df8a83d22e00ec3c7f51b076aff83a68b",
+      "dense-wide-probe.xlsx": "8591744a8f5365d183c0cef283964e97402c920d5e50af749729b84666fadf55",
+      "after/litchi-perf-baseline (pre-fmt, used by the first harness timing window and the harness callgrind pair)": "73392b60bb30f436baa2906e39de1f4b26026b22ed4346c144c8dcbb58331209"
+    },
+    "note": "the probe legs were built with cargo build --release from results/change-0642/probe, one manifest per leg, each with its own CARGO_TARGET_DIR, under the workspace's pinned rust-toolchain.toml; the before leg's path dependency is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680. Every measured binary was staged outside its Cargo target directory before being run. One doc comment was corrected after the measurements, so the after probe's file hash above is a rebuild whose .text and .rodata are byte-identical to the measured binary's; both section hashes are in probe-sha256.txt."
+  }
+}

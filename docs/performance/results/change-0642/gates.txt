@@ -1,0 +1,140 @@
+Change 0642 gates
+=================
+Run in /home/zhuhe/code/litchi-worktrees/0642 (branch perf/0642-xlsx-visit-cells-streaming,
+base c7326f68065edf6f2198ca3cb39c38c48cf00ed9), rustc 1.95.0 (59807616e 2026-04-14).
+Touched crate: litchi-xlsx. Consumers checked: litchi, tools/perf-baseline,
+tools/native-resave (the three Cargo.toml files that name litchi-xlsx).
+
+--------------------------------------------------------------------------
+$ cargo fmt --all --check
+--------------------------------------------------------------------------
+(no output)
+exit 0
+
+--------------------------------------------------------------------------
+$ cargo clippy -p litchi-xlsx --all-targets
+--------------------------------------------------------------------------
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0642/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.06s
+exit 0   (workspace clippy lints are deny; no warning was emitted)
+
+--------------------------------------------------------------------------
+$ cargo doc -p litchi-xlsx --no-deps
+--------------------------------------------------------------------------
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0642/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.75s
+   Generated /home/zhuhe/code/litchi-worktrees/0642/target/doc/litchi_xlsx/index.html
+exit 0   (rustdoc lints are deny; no warning was emitted)
+
+--------------------------------------------------------------------------
+$ cargo test -p litchi-xlsx
+--------------------------------------------------------------------------
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.18s
+
+Totals across all 60 test binaries and doctests: 1,311 passed, 0 failed.
+The base carries 1,308; the three added are streaming_0642_tests.
+
+--------------------------------------------------------------------------
+$ cargo test -p litchi --features docx,xlsx,pptx,xls
+--------------------------------------------------------------------------
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.61s; merged doctests compilation took 0.61s
+
+Totals: 266 passed, 0 failed. (`litchi`'s default = [] compiles almost none of
+the facade's own tests, which is the gap change 0629 found and change 0639
+wired into tools/non_iwork_gate.py as `facade-format-tests`.)
+
+--------------------------------------------------------------------------
+$ cargo clippy -p litchi --features docx,xlsx,pptx,xls --all-targets
+--------------------------------------------------------------------------
+warning: `litchi` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p litchi -- ` to apply 2 suggestions)
+warning: `litchi` (lib test) generated 6 warnings (3 duplicates) (run `cargo clippy --fix --lib -p litchi --tests -- ` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 37.14s
+exit 0
+
+PRE-EXISTING. The six are: four `passing a unit value to a function`, one
+`function missing_ooxml_catalog_part_error is never used`, one `variable does
+not need to be mutable`. Reproduced with identical counts and text on the
+untouched before checkout:
+
+  $ cd /home/zhuhe/code/litchi-worktrees/before-c7326f680
+  $ cargo clippy -p litchi --features docx,xlsx,pptx,xls --all-targets
+        1 warning: `litchi` (lib test) generated 6 warnings (3 duplicates) ...
+        1 warning: `litchi` (lib) generated 3 warnings ...
+        1 warning: function `missing_ooxml_catalog_part_error` is never used
+        4 warning: passing a unit value to a function
+        1 warning: variable does not need to be mutable
+
+None is in litchi-xlsx and none is in a file this change touches.
+
+--------------------------------------------------------------------------
+$ cargo test -p litchi-xlsx --all-features
+--------------------------------------------------------------------------
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.22s; merged doctests compilation took 0.22s
+
+Totals: 1,330 passed, 0 failed (the `encryption` and `vba-inspection` features).
+
+--------------------------------------------------------------------------
+$ cd tools/perf-baseline && cargo test --no-fail-fast
+  (the harness's own suite; a separate Cargo project with its own [workspace]
+   table, which change 0639 wired into tools/non_iwork_gate.py as
+   `harness-tests` because no --workspace or --package selection reaches it)
+--------------------------------------------------------------------------
+test result: ok. 513 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 710.40s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.04s
+exit 0
+
+Totals across the lib suite and both integration suites: 531 passed, 0 failed,
+1 ignored. The lib suite alone runs 514 tests in 710.40 s on this loaded host.
+
+--------------------------------------------------------------------------
+$ cd tools/native-resave && cargo test
+  (the third Cargo.toml that names litchi-xlsx)
+--------------------------------------------------------------------------
+warning: `litchi-native-resave-evidence` (bin "litchi-native-resave-evidence" test) generated 4 warnings (run `cargo fix --bin "litchi-native-resave-evidence" -p litchi-native-resave-evidence --tests` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-worktrees/targets/0642-native-resave/debug/deps/litchi_native_resave_evidence-7d98ad5772670dc0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+PRE-EXISTING, four warnings: one `unused import: std::fs`, two `unused
+variable` (`input`, `output`), one `function fixture is never used`. Reproduced
+with identical counts and text in the untouched before checkout. The binary
+carries no tests, so this gate is a build-and-link check.
+
+Note for whoever runs this gate next: `tools/native-resave/Cargo.lock` is stale
+at this base (it omits `xml-minifier` from one package's dependency list), so
+any cargo invocation there regenerates it. That regeneration was reverted in
+both this worktree and the shared before checkout, and is not part of this
+change.
+
+--------------------------------------------------------------------------
+Differential and corpus checks the record cites
+--------------------------------------------------------------------------
+$ xlsx0642 diff <181 .xlsx files in the tree> dense-wide-probe.xlsx   # both legs
+# worksheets=397 disagreements=0
+$ diff differential/diff-before.tsv differential/diff-after.tsv
+(no output)
+exit 0
+
+$ xlsx0642_alloc visit-warm dense-wide-probe.xlsx Sheet1              # after leg
+visit-warm  dense-wide-probe.xlsx  Sheet1  visited=65536  allocations=0
+  allocated_bytes=0  peak_live_delta=0  retained_live_delta=0

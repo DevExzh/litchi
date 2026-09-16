@@ -1,0 +1,25 @@
+# Change 0642: the harness selector's instruction count is not deterministic
+#
+# `litchi-perf-baseline --case xlsx_source_narrow_column_range_scan
+#  --xlsx-shape dense-wide --warmup 0 --samples N --json /dev/null`
+# under callgrind, --cache-sim=no --branch-sim=no, taskset -c 17.
+#
+# Three isolation pairs of the SAME before binary
+# (sha256 37a5ff229f14b35d7c5544a6a7108dc5328536c55982dcd9f36b5de0deadbf9e):
+
+  run              N=1              N=3        per iteration
+  original  10,795,222,465   16,304,741,056    2,754,759,296
+  repeat 1  10,798,016,065   16,295,612,706    2,748,798,321
+  repeat 2  10,782,423,603   16,298,780,605    2,758,178,501
+
+  spread across three runs of one binary: 9,380,180 instructions, 0.34%.
+
+# The after binary, once:
+
+  after     10,803,789,640   16,297,153,670    2,746,682,015
+
+  The after reading is 0.08% below the lowest before repeat and 0.34% below the
+  highest, i.e. inside the before binary's own spread. The harness uses hashed
+  containers whose seeds vary per process, so this pair bounds the work rather
+  than measuring it; the change's own deterministic counts are in
+  `isolation-pairs.txt`, taken with the probe.
