@@ -1,0 +1,23 @@
+fixtures 126, opened 93, refused at open 33
+rows per run 591 (297 typed refusals, 294 publishing)
+rows compared in total 3546
+oracle 1, refusal-text mismatches: 0
+oracle 2, non-digest field mismatches: 0
+oracle 3, digest mismatches over 591 reproducible rows: 0
+          rows excluded as not reproducible within one binary: 0
+
+16-run repetition, before leg:
+  59858.xls                            noop-generic           1 distinct digest(s)
+  59858.xls                            number-generic         1 distinct digest(s)
+  59858.xls                            string-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        noop-generic           1 distinct digest(s)
+  pivottable_dates_grouping.xls        number-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        string-generic         1 distinct digest(s)
+
+16-run repetition, after leg:
+  59858.xls                            noop-generic           1 distinct digest(s)
+  59858.xls                            number-generic         1 distinct digest(s)
+  59858.xls                            string-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        noop-generic           1 distinct digest(s)
+  pivottable_dates_grouping.xls        number-generic         1 distinct digest(s)
+  pivottable_dates_grouping.xls        string-generic         1 distinct digest(s)

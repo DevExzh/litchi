@@ -1,0 +1,6 @@
+host: AMD EPYC 9R45 , 32 cores, 123 GiB, Linux 7.0.0-1012-aws
+toolchain: rustc 1.95.0 (59807616e 2026-04-14), cargo 1.95.0 (f2d3ce0bd 2026-03-21), valgrind-3.26.0
+base commit: c7326f680 (branch feat/office-format-completeness)
+branch: perf/0633-xls-commit-single-framing
+before checkout: /home/zhuhe/code/litchi-worktrees/before-c7326f680 (shared, read-only, detached at the base)
+pinning: taskset -c 9 under setarch x86_64 -R, RAYON_NUM_THREADS=1, OMP_NUM_THREADS=1

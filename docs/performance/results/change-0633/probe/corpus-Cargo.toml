@@ -1,0 +1,18 @@
+[package]
+name = "xls-edit-corpus"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xls_edit_corpus"
+path = "src/main.rs"
+
+[dependencies]
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-xls" }
+sha2 = "0.11"
+
+[profile.release]
+debug = 0

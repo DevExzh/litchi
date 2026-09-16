@@ -1,5 +1,57 @@
 # Performance hotspot inventory
 
+## 0633 — the XLS commit's second complete target parse deleted; the open's two framing passes priced at 1.6% each and frozen
+
+Takes the two items change [0620](0620-xls-edit-save-attribution.md) left on the
+table for queue item **XLS-9** and resolves both, in opposite directions. **The
+one 0620 could not remove is removed.** `commit_source_backed` materialized its
+target, reopened it through `Snapshot::from_bytes` — which runs a complete
+`Workbook::new` and then *drops it* — and then ran a **second** complete
+`Workbook::new` over the identical bytes inside
+`verify_source_backed_numeric_target`. 0620 recorded that removing it needed
+"the snapshot retaining its reader", an ADR 0005 subsystem. It does not: the
+verification moves *into* the target's own construction, where the first parse is
+still a live local, and every check keeps its order and its position relative to
+`parse_workbook_stream`, `Workbook::new`, `SourcePolicyFacts::from_workbook` and
+`resolve_shared_strings` — so `require_public_worksheet_coverage` still runs
+against the **source's** sheet list before `carry_fixed_numeric_inventory`
+proves the two lists agree, which was 0620's exact blocker. The chain
+`Workbook::new'verify_source_backed_numeric_target'commit_source_backed` is
+**130,182,770 Ir before and 0 after** (12,109,922 → 0 on `WithCustomViews.xls`),
+its drop glue 9,024,905 → 0, and the checks themselves cost the same
+(4,419,288 → 4,420,759). One source-backed numeric commit falls **−15.71% in
+instructions, −28.23% in native cycles, −24.80% in allocation calls and −22.46%
+in allocated bytes**, and its `commit` p50 moves **−38.50% forward / −38.25%
+reverse** on `54016.xls` and −34.88% / −36.75% on `WithCustomViews.xls` against
+an A/A floor of −0.15% and +1.92%, on a host eight agents shared throughout —
+the six p50 readings across three retained rounds span −38.1% to −44.1%. **The one the brief asked for is frozen,
+because the mechanism is not where the cost is.** Reading the same annotations
+down to their sub-1% rows prices the two framing passes of one
+`Snapshot::from_bytes` at **2,579,172 and 2,579,104 Ir — 1.60% of the open each**
+(0.92%/0.91% on `WithCustomViews.xls`), against `add_cell` at 33.82%,
+`BTreeMap::insert` at 20.17% and the discarded `Workbook`'s drop glue at 4.68%:
+both owners walk every record, only one pays for it. A new 29-case 0541-style
+first-error matrix shows by row why the fusion is not value-identical — the
+inventory frames first, so `cell XF index 4095 is outside 21 workbook resources`
+shadows the eager parser's own XF validation, and the eager parser's `Err(_) =>
+{}` per-worksheet arm turns two distinct defects into one generic
+`worksheet at tab position 0 was not published by the complete XLS reader`. Two
+smaller redundancies are named with their prices and frozen with the contract
+question each raises: the Workbook stream is **extracted from the CFB twice**
+(1.21% of an open) and the `LabelSst` text is **copied per cell by both owners**
+(2.26%). One is implemented because it is value-identical as it stands: the
+snapshot now retains the shared-string property table the reader already owns
+behind an `Arc` instead of deep-copying it (2 to 58 allocation calls and 0.04% to
+0.24% of allocated bytes per open, on four fixtures). Two findings for the area:
+0620's CFB storage-order nondeterminism is **resolved at this base** by change
+[0625](0625-cfb-writer-deterministic-storage-order.md) — all 591 corpus rows are
+digest-reproducible where 0620 had to exclude four — and 0620's `analyze.py`
+regex dropped every callgrind row under 10% because `callgrind_annotate`
+right-aligns the percentage; the fixed copy is in this packet. OLE2/OOXML
+optimization remains active; ODF is deferred until completion and iWork excluded.
+[Change and limitations](0633-xls-commit-single-framing.md); [retained
+evidence](results/change-0633/README.md).
+
 ## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
 
 Record: [0637](0637-pptx-eager-slide-catalog-memo.md).

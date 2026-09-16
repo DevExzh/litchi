@@ -1,0 +1,29 @@
+{"case":"00-control-unmodified","outcome":"ok","message":"worksheets=1"}
+{"case":"01-control-repackaged","outcome":"ok","message":"worksheets=1"}
+{"case":"10-globals-bof-kind","outcome":"ok","message":"worksheets=1"}
+{"case":"11-globals-bof-payload-truncated","outcome":"refused","message":"Invalid length: expected 4, found 2"}
+{"case":"12-globals-bof-substream-kind","outcome":"refused","message":"Invalid record 0x0809: expected BIFF8 substream 0x0005, found version 0x0600 and substream 0x0006"}
+{"case":"13-globals-no-eof","outcome":"refused","message":"Invalid record 0x0809: expected BIFF8 substream 0x0010, found version 0x4F5A and substream 0x07CD"}
+{"case":"14-globals-file-pass","outcome":"refused","message":"Workbook password is required"}
+{"case":"15-globals-duplicate-sst","outcome":"refused","message":"Invalid record 0x00FC: SST header is truncated or duplicated"}
+{"case":"16-globals-truncated-sst","outcome":"refused","message":"Invalid record 0x00FC: SST header is truncated or duplicated"}
+{"case":"17-globals-no-xf","outcome":"refused","message":"Unsafe edit refused: opened-workbook transaction requires at least one XF resource"}
+{"case":"18-globals-unknown-codepage","outcome":"refused","message":"Encoding error: unsupported code page 57005"}
+{"case":"20-boundsheet-position-past-end","outcome":"refused","message":"Invalid record 0x0085: BoundSheet8 points outside the Workbook stream"}
+{"case":"21-boundsheet-duplicate-position","outcome":"refused","message":"Invalid record 0x0085: multiple BoundSheet8 records point to one substream"}
+{"case":"22-boundsheet-duplicate-name","outcome":"refused","message":"Invalid record 0x0085: duplicate case-insensitive BoundSheet8 name: \"Sheet1\""}
+{"case":"30-worksheet-bof-substream-kind","outcome":"refused","message":"Invalid record 0x0809: expected BIFF8 substream 0x0010, found version 0x0600 and substream 0x0005"}
+{"case":"31-worksheet-bof-kind","outcome":"refused","message":"Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"}
+{"case":"32-worksheet-no-eof","outcome":"refused","message":"End of file: worksheet EOF"}
+{"case":"40-number-payload-truncated","outcome":"refused","message":"Invalid length: expected 14, found 10"}
+{"case":"41-number-nan","outcome":"refused","message":"Invalid record 0x0203: Number contains an Xnum forbidden by MS-XLS 2.5.342"}
+{"case":"42-cell-xf-index-past-end","outcome":"refused","message":"Invalid record 0x0203: cell XF index 4095 is outside 21 workbook resources"}
+{"case":"43-labelsst-index-past-sst","outcome":"refused","message":"Invalid record 0x00FD: LabelSst index 32767 is outside the SST"}
+{"case":"44-boolerr-bad-flag","outcome":"refused","message":"Invalid record 0x0205: BoolErr has an invalid Boolean value or error flag"}
+{"case":"45-formula-string-cache-without-string","outcome":"refused","message":"Invalid record 0x00D7: string-valued Formula is not followed by its String record"}
+{"case":"46-formula-payload-truncated","outcome":"refused","message":"Invalid length: expected 22, found 20"}
+{"case":"47-stray-string-after-numeric-formula","outcome":"refused","message":"Unsafe edit refused: worksheet at tab position 0 was not published by the complete XLS reader"}
+{"case":"50-trailing-partial-header","outcome":"ok","message":"worksheets=1"}
+{"case":"51-record-payload-overruns","outcome":"refused","message":"Invalid data: record bytes limit exceeded: observed 65520, maximum 8224"}
+{"case":"60-no-workbook-stream","outcome":"refused","message":"Invalid data: XLS package has no Workbook or Book stream"}
+{"case":"61-book-stream-alias","outcome":"ok","message":"worksheets=1"}

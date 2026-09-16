@@ -1,5 +1,62 @@
 # Performance program phase report
 
+## 0633 — the XLS commit's second complete target parse deleted; the open's two framing passes priced at 1.6% each and frozen
+
+Three files changed in `litchi-xls` — one constructor split in two, one private
+struct, one helper, one deleted function, one `pub(crate)` accessor and three
+tests — `performance_claim: none`. The changed scenario is `commit_source_backed`
+on a fixed-width numeric edit: commit p50 **25,781,630 → 15,856,600 ns** on
+`54016.xls` (−38.50% forward, −38.25% reverse, p95 −39.48%/−41.33%, p99
+−38.49%/−40.70%) and **2,432,018 → 1,583,743 ns** on `WithCustomViews.xls`
+(−34.88%/−36.75%), against same-binary floors of −0.15%/+0.25% and
++1.92%/−1.01%. Deterministic counters on `54016.xls`: allocation calls 161,751 →
+121,641 (−24.80%), allocated bytes 76,204,234 → 59,090,612 (−22.46%), peak live
+bytes 26,082,823 → 25,628,658 (−1.74%); callgrind 887,985,767 → 748,473,025 Ir
+(−15.71%) and native cycles 179,110,791 → 128,547,808 (**−28.23%**). Controls:
+`peak_live_bytes`, `published_bytes` and the complete source-backed diagnostics
+object are identical on all 20 (fixture, operation) rows; the `open`,
+`number-plan`, `number-generic`, `string-generic` and `noop-generic` controls
+move −0.41% to +0.98% in instructions and −4.55% to +3.35% in native cycles.
+**One comparison exceeded the +5% review trigger and was chased rather than
+explained away**: the three `xls_owned_source_open*` registered selectors moved
++7.06% to +9.07% forward and +4.35% to +8.30% reverse at p50 against floors under
+2.5%, on a path this change does not touch, and a callgrind isolation pair prices
+one of their operations at **3,978,024 Ir before and 3,978,917 Ir after, +0.02%**
+— identical work, host noise. The unchanged `54016.xls` commit controls likewise
+cover −4.29% to +24.89% at p50 across the three retained timing rounds with
+same-binary floors from −10.4% to +11.9% and instruction counts flat to within
+0.5%, and the record says plainly that none of them is a result in either
+direction. The single instruction-count regression is
+`FormulaEvalTestData` at +0.38% to +0.98%, entirely inside the renamed
+constructor's own inlined body with no named callee moving by more than 20,000
+Ir, and it does not reproduce natively (−0.28% instructions). The **registered
+selectors again cannot resolve the change and are reported saying so**: the two
+source-backed cases move +0.32%/−1.86% and −1.94%/−1.84% on a function that moves
+35-44% on a real workbook, because their corpora's Workbook stream is 0.48% and
+0.82% of the archive — the second independent confirmation of change 0601's
+open brief. Correctness: 126 fixtures × five publication paths × three runs per
+leg — 591 rows per run and **3,546 rows compared, 0 refusal-text mismatches, 0
+mismatches on every reported field except the digest, and 0 digest mismatches
+over all 591 rows with none excluded** (0620 had to exclude four; change 0625
+fixed the CFB storage order and sixteen runs per leg now yield one digest each).
+A new 29-case 0541-style first-error matrix over synthetic malformed Workbook
+streams is **identical on both legs**, and all twelve registered selector cases
+keep their `output_sha256` across all four rounds, including the Number
+`f8f37064…` and RK/MulRK `ddf5d5b8…` digests change 0138 recorded. Gates: `cargo
+fmt --all --check`, `cargo clippy -p litchi-xls --all-targets`, `cargo test -p
+litchi-xls` (72 suites, 1,402 tests), `cargo doc -p litchi-xls --no-deps`, `cargo
+test -p litchi --features docx,xlsx,pptx,xls` (26 suites, 266 tests) and the
+harness's own `cargo test` in `tools/perf-baseline` (19 suites, 531 tests), all
+clean. **A defect in this program's own tooling is reported and fixed in the
+packet copy**: change 0620's `analyze.py` matched `\(([\d.]+)%\)` while
+`callgrind_annotate` right-aligns the percentage, so every retained row under 10%
+was silently dropped; nothing 0620 reported depended on those rows, and
+everything this record's framing attribution says does. No cold-cache,
+physical-device, range-source, RSS, concurrency-scaling, real-producer or
+cross-platform result is claimed. [Change and
+limitations](0633-xls-commit-single-framing.md); [retained
+evidence](results/change-0633/README.md).
+
 ## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
 
 Record: [0637](0637-pptx-eager-slide-catalog-memo.md).
