@@ -1,0 +1,45 @@
+# MutableDocument::from_xml on each retained witness, both legs.
+# before = c7326f680 (shared read-only checkout); after = perf/0650 worktree.
+
+witness alt-chunk-header-document.xml
+  before from_xml refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+  after  from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+witness b1-nobom.xml
+  before from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+  after  from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+witness b3-noaltchunk.xml
+  before from_xml ok
+  after  from_xml ok
+witness b4-noignorable.xml
+  before from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+  after  from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+witness b5-nosectpr.xml
+  before from_xml ok
+  after  from_xml ok
+witness bom-w1-paragraph.xml
+  before from_xml refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+  after  from_xml ok
+witness bom-w2-altchunk.xml
+  before from_xml refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+  after  from_xml ok
+witness bom-w4-altchunk-then-sect.xml
+  before from_xml refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+  after  from_xml ok
+witness bom-w5-altchunk-only.xml
+  before from_xml ok
+  after  from_xml ok
+witness w1-paragraph.xml
+  before from_xml ok
+  after  from_xml ok
+witness w2-altchunk.xml
+  before from_xml ok
+  after  from_xml ok
+witness w3-sect-then-altchunk.xml
+  before from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+  after  from_xml refused:invalid DOCX format: body-final section properties are not the final body child
+witness w4-altchunk-then-sect.xml
+  before from_xml ok
+  after  from_xml ok
+witness w5-altchunk-only.xml
+  before from_xml ok
+  after  from_xml ok

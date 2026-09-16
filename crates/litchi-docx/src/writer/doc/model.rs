@@ -1690,7 +1690,28 @@ impl MutableDocument {
             self.section.write_xml(&mut xml, None)?;
         }
         self.write_document_suffix(&mut xml);
-        compact_changed_document_xml(&xml)
+        Self::compact_preserving_byte_order_mark(&xml)
+    }
+
+    /// Compact one whole main-document payload, carrying a leading UTF-8 byte
+    /// order mark across the compaction that `quick-xml` would otherwise
+    /// consume before its first event.
+    ///
+    /// Only this route can see such a mark: it reaches the serializer through
+    /// the preserved prefix that [`Self::from_xml`] splits off, and
+    /// `compact_changed_document_xml`'s other callers pass a paragraph
+    /// fragment or an already source-backed projection. Keeping the carry here
+    /// rather than inside the shared compactor leaves those two callers
+    /// byte-for-byte unchanged.
+    fn compact_preserving_byte_order_mark(xml: &str) -> Result<String> {
+        let Some(rest) = xml.strip_prefix(super::BYTE_ORDER_MARK) else {
+            return compact_changed_document_xml(xml);
+        };
+        let compact = compact_changed_document_xml(rest)?;
+        let mut output = String::with_capacity(super::BYTE_ORDER_MARK.len() + compact.len());
+        output.push_str(super::BYTE_ORDER_MARK);
+        output.push_str(&compact);
+        Ok(output)
     }
 
     /// Generate XML with actual relationship IDs from the mapper.
@@ -1715,7 +1736,7 @@ impl MutableDocument {
         }
 
         self.write_document_suffix(&mut xml);
-        compact_changed_document_xml(&xml)
+        Self::compact_preserving_byte_order_mark(&xml)
     }
 }
 

@@ -1,0 +1,630 @@
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx open ok
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx reader ok paragraphs=1 text=0bytes
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx reader_bom part=false view=false
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx sections ok count=1
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx document_mut ok
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx noop_save 9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89 bytes=26014
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx touch_save 9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89 bytes=26014
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx managed_edit c1614765d653c38b3754f8a5057d7f3520fae3cf4d634709961d03db12549e32 bytes=25998
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx edit_save 6482cff22b469af248cbd43cf41cba0dcba90b0bc87efe1ee414b7c00503c2f1 bytes=25709
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx reopen ok paragraphs=2 text=17bytes
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx open ok
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx reader ok paragraphs=31 text=2268bytes
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx sections ok count=1
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx document_mut ok
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx noop_save 06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13 bytes=21260
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx touch_save 06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13 bytes=21260
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx managed_edit 3c4b92fb57b623c6efa0250f4b3885b487d64a7381702db4d58b9fab611cd048 bytes=20942
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx edit_save b22451f7586f10929369f340c09124813f273acea6740a4eb368e0e2a4eb6b94 bytes=20569
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx reopen ok paragraphs=32 text=2285bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx reader ok paragraphs=12 text=71bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx noop_save ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88 bytes=55519
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx touch_save ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88 bytes=55519
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx managed_edit 9722970a63944ffe7b578ab7b312f03d747f5c308390e627a406c12260dcc657 bytes=55412
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx edit_save f45094d315376f60bb56fc16eba7446eb5dc3a7ce0198531b9a02bfc1712b8a5 bytes=55113
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx reopen ok paragraphs=13 text=88bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx reader ok paragraphs=1 text=5bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx noop_save 33d8229124a25622cf8c497564dab93d24e5047f42dba2feb6d06266430a99e4 bytes=13517
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx touch_save 33d8229124a25622cf8c497564dab93d24e5047f42dba2feb6d06266430a99e4 bytes=13517
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx managed_edit c9444bec6e8d1305425f50b476e4ff0dad64ad510211ecc8a7e3e00407b7b3f0 bytes=13520
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx edit_save 4a9fede9906e951e64116049f383ea6b615d7f7f2c997814ae8691b19f72fabb bytes=13533
+libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx reopen ok paragraphs=2 text=22bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx reader ok paragraphs=4 text=6bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx noop_save 13fd0f120e2c7ea578c098e03f2d5bf871d24f6494c7df73c0aaed3cf246f7b9 bytes=3009
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx touch_save 13fd0f120e2c7ea578c098e03f2d5bf871d24f6494c7df73c0aaed3cf246f7b9 bytes=3009
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx managed_edit 88cf8f80e00fd71917602094d04bfa998ed528041fbee802b1f5ff43ee9658f8 bytes=2990
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx edit_save 2b7cb89568820a191313a7a1898cbaa1d8a8678f30bc8c8865ac552a18ed5a58 bytes=3046
+libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx reopen ok paragraphs=5 text=23bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx reader ok paragraphs=16 text=327bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx noop_save c3d8821ad7c2a0bced52881dbb3d317f7aa29f4363349bc9b665d9dd03517ca0 bytes=32450
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx touch_save c3d8821ad7c2a0bced52881dbb3d317f7aa29f4363349bc9b665d9dd03517ca0 bytes=32450
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx managed_edit badd19ca5503c02de575f18d105536577f609e4fba35be539d57f0681b2e7019 bytes=31954
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx edit_save d7e01aaba93a5e3d28c8d6bb2472a9a7a403f2291de52dbd2887051160027044 bytes=31655
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx reopen ok paragraphs=17 text=344bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx reader ok paragraphs=1 text=12bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx noop_save 94f76ba6a717d33eb1bd48e122ca25fc3aedff3b87498165dc7ed78595535e19 bytes=17580
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx touch_save 94f76ba6a717d33eb1bd48e122ca25fc3aedff3b87498165dc7ed78595535e19 bytes=17580
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx managed_edit c630b9a9e4cc80ef57cca2f934db633f93008cb24e1df18b3fb780aca96921b2 bytes=17612
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx edit_save 33fc28836b4a3218a04fa5c6bb95ea46eeaf080cd5b4b566f77b61ad7f3aa85d bytes=17340
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx reopen ok paragraphs=2 text=29bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx reader ok paragraphs=5 text=65bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx document_mut refused:invalid DOCX format: invalid page width value '612pt'
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx noop_save 6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e bytes=25636
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx touch_save refused:invalid DOCX format: invalid page width value '612pt'
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx managed_edit d715f7432c796f990b4f6b9a804f56d229fc1be1664f7e2a04ca196605afb7aa bytes=25661
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx edit_save refused:invalid DOCX format: invalid page width value '612pt'
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx reopen skipped
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx reader ok paragraphs=8 text=283bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx noop_save f1ee43208fa25ac26f4708a38516ab86051bd23cd3c0bdc6209ca7718351dd5c bytes=37407
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx touch_save f1ee43208fa25ac26f4708a38516ab86051bd23cd3c0bdc6209ca7718351dd5c bytes=37407
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx managed_edit 3c8192fbfde082171a0cba64ee65145a2d85b6617ff67e7d7183a5ccb8ccfe76 bytes=37396
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx edit_save a84bf3af813ab3fd8dacdd8407201b293104688748f8083721b7888daaada574 bytes=37403
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx reopen ok paragraphs=9 text=300bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx reader ok paragraphs=3 text=56bytes
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx noop_save 8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9 bytes=25741
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx touch_save 8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9 bytes=25741
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx managed_edit 2f17145466c8b01d1f76bf5ca2dc94b4c7b5a2d5fc3c090ca829f171e1cb7ec4 bytes=25703
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx edit_save b6eb374824fe6441328fccddf7ae4a95828ab0883326501cd90e1291fecd82ae bytes=25407
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx reopen ok paragraphs=4 text=73bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx reader ok paragraphs=1 text=5bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx noop_save 4c61fc7730baecf784d392e9ab50a83a1538c33df5b629a180da7dc2764e5467 bytes=4952
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx touch_save 4c61fc7730baecf784d392e9ab50a83a1538c33df5b629a180da7dc2764e5467 bytes=4952
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx managed_edit 36ddbc5b8061a25e99f423a6d6ec4979f04bfec2f9c5cbb9404a4472601d3465 bytes=4983
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx edit_save 7b265141331b8e69e25b9e1cc6d50764750e2a7e0c1ec48a61b93dd70b1c69ee bytes=4998
+libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx reopen ok paragraphs=2 text=22bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx reader ok paragraphs=2 text=5bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx noop_save 68e19d06420bfb93bd66c280b96f3095a40f753da4658634a778e474496148d3 bytes=28843
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx touch_save 68e19d06420bfb93bd66c280b96f3095a40f753da4658634a778e474496148d3 bytes=28843
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx managed_edit 6da09b735a6ad8085386b7c22f2c5e9d9807b512ab36dbc704ba130394ff7c41 bytes=28869
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx edit_save 8da52e07c81feea51f96f4082b8b119d25aa3b377fa00e3eed3c411162ec4e38 bytes=28593
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx reopen ok paragraphs=3 text=22bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx open ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx reader ok paragraphs=3 text=0bytes
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx sections ok count=1
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx document_mut ok
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx noop_save cf00dab76363981763545dce5cb62eefa84e24d77fc2abe28ae5163538f52607 bytes=13876
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx touch_save cf00dab76363981763545dce5cb62eefa84e24d77fc2abe28ae5163538f52607 bytes=13876
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx managed_edit 4ea005439998062d2ee2cdbb2414e0507ecca3400a92bcdd1175c4bad919f7fc bytes=13904
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx edit_save 6fc35625faedfe141aec6b0659c97e301136a571f92d62e880ed34d11a8ebae1 bytes=13645
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx reopen ok paragraphs=4 text=17bytes
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx open ok
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx reader ok paragraphs=2 text=43bytes
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx reader_bom part=false view=false
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx sections ok count=1
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx document_mut ok
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx noop_save 3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f bytes=18470
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx touch_save 3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f bytes=18470
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx managed_edit 38ef02466956eeb4e7a7be90bc48f0269f5e06aebb9804a409e6fcde70f25894 bytes=18497
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx edit_save 9c254cd74a8d9840231e98807b2622645554ee218c83a160d5f67eab1a554ed6 bytes=18512
+libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx reopen ok paragraphs=3 text=60bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx reader ok paragraphs=1 text=5bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx reader_bom part=true view=false
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx sections ok count=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx document_mut refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx noop_save 8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122 bytes=77370
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx touch_save refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx managed_edit refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx edit_save refused:invalid DOCX format: body-final section properties are not the final body child
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx reopen skipped
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx reader ok paragraphs=2 text=24bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx sections ok count=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx document_mut ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx noop_save 9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8 bytes=2344
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx touch_save 9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8 bytes=2344
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx managed_edit ecf467b92a070841a5aca286d204cdbac51e1e4d30489d050e8d172045f3dc26 bytes=2324
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx edit_save 1faf0de07d6f5f678dae9b5e09e111de3c6f2be0a13ddbebb6c8f17623568d07 bytes=2436
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx reopen ok paragraphs=3 text=41bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx reader ok paragraphs=2 text=47bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx sections ok count=2
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx document_mut ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx noop_save d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379 bytes=22007
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx touch_save d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379 bytes=22007
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx managed_edit ea1a244fabd757f080afc014e8d0fafd85cd2b2cc49cd733b56b6344a44a9100 bytes=21969
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx edit_save 1a2af1ffa3993cdacfe2d07fe0b4b82639ec3e3f64fcbd16eef527c719b8b213 bytes=21979
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx reopen ok paragraphs=3 text=64bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx reader ok paragraphs=4 text=3bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx sections ok count=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx document_mut ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx noop_save 4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad bytes=66189
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx touch_save 4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad bytes=66189
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx managed_edit 16e88db24ed0be2af077a7c98efdd7cef594ea960df4ee48c032fe724cd017e9 bytes=66212
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx edit_save 26728d9acc465665717dc7eb459d0f652333d6ad90c80acda25445061eb99305 bytes=65944
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx reopen ok paragraphs=5 text=20bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx open ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx reader ok paragraphs=1 text=0bytes
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx reader_bom part=false view=false
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx sections ok count=1
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx document_mut ok
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx noop_save 27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98 bytes=17713
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx touch_save 27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98 bytes=17713
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx managed_edit b68737ece3d3498dd7ba3d52e45aaa36668fa9dee2db7243ef9132ee524a59df bytes=17670
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx edit_save 0f183c3d12a9814bb60e9a55c23938c72adcec1599ce808baabd232756866c71 bytes=17671
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx reopen ok paragraphs=2 text=17bytes
+office-interop/libreoffice-resaved/document-properties-litchi.docx open ok
+office-interop/libreoffice-resaved/document-properties-litchi.docx reader ok paragraphs=1 text=31bytes
+office-interop/libreoffice-resaved/document-properties-litchi.docx reader_bom part=false view=false
+office-interop/libreoffice-resaved/document-properties-litchi.docx sections ok count=1
+office-interop/libreoffice-resaved/document-properties-litchi.docx document_mut ok
+office-interop/libreoffice-resaved/document-properties-litchi.docx noop_save a0ad84ab78a73090028d33fede42cc3cbb698d19218cc185e24e96a7d1da70e9 bytes=6514
+office-interop/libreoffice-resaved/document-properties-litchi.docx touch_save a0ad84ab78a73090028d33fede42cc3cbb698d19218cc185e24e96a7d1da70e9 bytes=6514
+office-interop/libreoffice-resaved/document-properties-litchi.docx managed_edit 931466618e057fab866e68effe304491251779b42f0112c8b2ffd9dc00bd1043 bytes=6544
+office-interop/libreoffice-resaved/document-properties-litchi.docx edit_save f1caa4cb344e5cdf04841e31a0c6ba09655fa927fa45279eccc0c38dfb4600f8 bytes=6555
+office-interop/libreoffice-resaved/document-properties-litchi.docx reopen ok paragraphs=2 text=48bytes
+office-interop/litchi-changed/document-properties-litchi.docx open ok
+office-interop/litchi-changed/document-properties-litchi.docx reader ok paragraphs=1 text=31bytes
+office-interop/litchi-changed/document-properties-litchi.docx reader_bom part=false view=false
+office-interop/litchi-changed/document-properties-litchi.docx sections ok count=1
+office-interop/litchi-changed/document-properties-litchi.docx document_mut ok
+office-interop/litchi-changed/document-properties-litchi.docx noop_save e4c76a4cd17a2cc5e66d52fe2109ec62f0a09aa510e97fd291b87073b84697f2 bytes=11143
+office-interop/litchi-changed/document-properties-litchi.docx touch_save e4c76a4cd17a2cc5e66d52fe2109ec62f0a09aa510e97fd291b87073b84697f2 bytes=11143
+office-interop/litchi-changed/document-properties-litchi.docx managed_edit 83dd9a38a3bf56bc70255b663bf5cbc1f8b4114678c7d71cba1e0171f4f55374 bytes=11165
+office-interop/litchi-changed/document-properties-litchi.docx edit_save 57e346b0ccf7267d6507cf38a832303eae9ff5760f743e068dfa5311c18a960a bytes=11178
+office-interop/litchi-changed/document-properties-litchi.docx reopen ok paragraphs=2 text=48bytes
+ooxml/docx/ComplexNumberedLists.docx open ok
+ooxml/docx/ComplexNumberedLists.docx reader ok paragraphs=17 text=226bytes
+ooxml/docx/ComplexNumberedLists.docx reader_bom part=false view=false
+ooxml/docx/ComplexNumberedLists.docx sections ok count=1
+ooxml/docx/ComplexNumberedLists.docx document_mut ok
+ooxml/docx/ComplexNumberedLists.docx noop_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6 bytes=14458
+ooxml/docx/ComplexNumberedLists.docx touch_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6 bytes=14458
+ooxml/docx/ComplexNumberedLists.docx managed_edit d4e995fccd3cd40ac9e423df3d6203d894f5dc64b5226dd4d021a018e3a50493 bytes=14404
+ooxml/docx/ComplexNumberedLists.docx edit_save 90008e5137fc991f716edf26ff522d683c94ac3aba626d28184f084959b14f2e bytes=14410
+ooxml/docx/ComplexNumberedLists.docx reopen ok paragraphs=18 text=243bytes
+ooxml/docx/FancyFoot.docx open ok
+ooxml/docx/FancyFoot.docx reader ok paragraphs=10 text=199bytes
+ooxml/docx/FancyFoot.docx reader_bom part=false view=false
+ooxml/docx/FancyFoot.docx sections ok count=1
+ooxml/docx/FancyFoot.docx document_mut ok
+ooxml/docx/FancyFoot.docx noop_save 1cfd2b4fb1f7233062671b0f58789e1b0b437fbf79deb7d62167cffb85191f7a bytes=12876
+ooxml/docx/FancyFoot.docx touch_save 1cfd2b4fb1f7233062671b0f58789e1b0b437fbf79deb7d62167cffb85191f7a bytes=12876
+ooxml/docx/FancyFoot.docx managed_edit e81769e70dcec8d930f6d24de5bd340e8c286ddee20e5efd955e47c7eeea1676 bytes=12838
+ooxml/docx/FancyFoot.docx edit_save 44604631c1ee8457719a81f5c9f06c6fe17d185a74fb2a770865330e7b2fd206 bytes=12564
+ooxml/docx/FancyFoot.docx reopen ok paragraphs=11 text=216bytes
+ooxml/docx/Headers.docx open ok
+ooxml/docx/Headers.docx reader ok paragraphs=5 text=0bytes
+ooxml/docx/Headers.docx reader_bom part=false view=false
+ooxml/docx/Headers.docx sections ok count=3
+ooxml/docx/Headers.docx document_mut ok
+ooxml/docx/Headers.docx noop_save bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b bytes=13076
+ooxml/docx/Headers.docx touch_save bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b bytes=13076
+ooxml/docx/Headers.docx managed_edit 536b9adbc06dbd24afecf12ace4f5fb0dd274ca98801d4007a81cac7de232c20 bytes=13068
+ooxml/docx/Headers.docx edit_save 1694a04fc0ff046874c8245ea1b56e9bd3ca6d228c44599dfb8680b28c69c76e bytes=12795
+ooxml/docx/Headers.docx reopen ok paragraphs=6 text=17bytes
+ooxml/docx/Hyperlink.docx open ok
+ooxml/docx/Hyperlink.docx reader ok paragraphs=2 text=38bytes
+ooxml/docx/Hyperlink.docx reader_bom part=false view=false
+ooxml/docx/Hyperlink.docx sections ok count=1
+ooxml/docx/Hyperlink.docx document_mut ok
+ooxml/docx/Hyperlink.docx noop_save ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66 bytes=11478
+ooxml/docx/Hyperlink.docx touch_save ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66 bytes=11478
+ooxml/docx/Hyperlink.docx managed_edit dbf0c07b7e5e946b2ab5d37deae3169d5f323ef5f9806c96f5443b6da59bac4d bytes=11512
+ooxml/docx/Hyperlink.docx edit_save 8497d9a7fc6ef36287e6ec53663c5b44fee62b5be3ee06aea5708c831976f96a bytes=11238
+ooxml/docx/Hyperlink.docx reopen ok paragraphs=3 text=55bytes
+ooxml/docx/comment.docx open ok
+ooxml/docx/comment.docx reader ok paragraphs=1 text=0bytes
+ooxml/docx/comment.docx reader_bom part=false view=false
+ooxml/docx/comment.docx sections ok count=1
+ooxml/docx/comment.docx document_mut ok
+ooxml/docx/comment.docx noop_save 23bbfe33e1acf7073253bd87552cbee5be0a07cbd08a479a4bf139f09b1dd6dc bytes=4926
+ooxml/docx/comment.docx touch_save 23bbfe33e1acf7073253bd87552cbee5be0a07cbd08a479a4bf139f09b1dd6dc bytes=4926
+ooxml/docx/comment.docx managed_edit 93c7cd2f9d679ba09a359c38c0566c17fa80b84ec41f796437e18c13ea832505 bytes=4958
+ooxml/docx/comment.docx edit_save 2b08f9f3040ba886be8cbc6ef32dccb99798a5a1f5b2d998893ae533070a4a02 bytes=4972
+ooxml/docx/comment.docx reopen ok paragraphs=2 text=17bytes
+ooxml/docx/documentProperties.docx open ok
+ooxml/docx/documentProperties.docx reader ok paragraphs=1 text=12bytes
+ooxml/docx/documentProperties.docx reader_bom part=false view=false
+ooxml/docx/documentProperties.docx sections ok count=1
+ooxml/docx/documentProperties.docx document_mut ok
+ooxml/docx/documentProperties.docx noop_save 1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5 bytes=23503
+ooxml/docx/documentProperties.docx touch_save 1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5 bytes=23503
+ooxml/docx/documentProperties.docx managed_edit e8ab0f19743383ae211b75da1b1397d490226e49babb0df559b1ef3b6c7c0aa3 bytes=23512
+ooxml/docx/documentProperties.docx edit_save 472e67aa0bbaa1577505fcd42e0d3769eb3b19265fdf7e5870a107de8f674f70 bytes=23525
+ooxml/docx/documentProperties.docx reopen ok paragraphs=2 text=29bytes
+ooxml/docx/documentProtection_comments_no_password.docx open ok
+ooxml/docx/documentProtection_comments_no_password.docx reader ok paragraphs=1 text=24bytes
+ooxml/docx/documentProtection_comments_no_password.docx reader_bom part=false view=false
+ooxml/docx/documentProtection_comments_no_password.docx sections ok count=1
+ooxml/docx/documentProtection_comments_no_password.docx document_mut ok
+ooxml/docx/documentProtection_comments_no_password.docx noop_save d15cd04edecf3489c2028864e70736494a1c5259b6e92097e50457efd934d78c bytes=9868
+ooxml/docx/documentProtection_comments_no_password.docx touch_save d15cd04edecf3489c2028864e70736494a1c5259b6e92097e50457efd934d78c bytes=9868
+ooxml/docx/documentProtection_comments_no_password.docx managed_edit f12ad8506386cb3044450a07c6bbf23e03f066a6d8a60c4cf98423ea6d7f6bfc bytes=9884
+ooxml/docx/documentProtection_comments_no_password.docx edit_save 8d97853e45cda4dbfecda36604fdde3d16b94a2e90c14fc9d8cd893cd331e792 bytes=9901
+ooxml/docx/documentProtection_comments_no_password.docx reopen ok paragraphs=2 text=41bytes
+ooxml/docx/documentProtection_forms_no_password.docx open ok
+ooxml/docx/documentProtection_forms_no_password.docx reader ok paragraphs=1 text=29bytes
+ooxml/docx/documentProtection_forms_no_password.docx reader_bom part=false view=false
+ooxml/docx/documentProtection_forms_no_password.docx sections ok count=1
+ooxml/docx/documentProtection_forms_no_password.docx document_mut ok
+ooxml/docx/documentProtection_forms_no_password.docx noop_save 5c299d134577cb3a752548e6891701d2b3447570bd2bb0b38bf16efc026ee0a2 bytes=9924
+ooxml/docx/documentProtection_forms_no_password.docx touch_save 5c299d134577cb3a752548e6891701d2b3447570bd2bb0b38bf16efc026ee0a2 bytes=9924
+ooxml/docx/documentProtection_forms_no_password.docx managed_edit c966bbab75cbe3edd5ce4e0d7ceee84bdec5c319d6db5e011d53b3225a03d605 bytes=9939
+ooxml/docx/documentProtection_forms_no_password.docx edit_save 2a68e6859dbd2a98998274e81a81addf5b4fe753bb6d4c32135c5e99c60937ee bytes=9956
+ooxml/docx/documentProtection_forms_no_password.docx reopen ok paragraphs=2 text=46bytes
+ooxml/docx/documentProtection_no_protection.docx open ok
+ooxml/docx/documentProtection_no_protection.docx reader ok paragraphs=1 text=13bytes
+ooxml/docx/documentProtection_no_protection.docx reader_bom part=false view=false
+ooxml/docx/documentProtection_no_protection.docx sections ok count=1
+ooxml/docx/documentProtection_no_protection.docx document_mut ok
+ooxml/docx/documentProtection_no_protection.docx noop_save 5d1cce05b576fc527981c56dd9844df3b6669967bcd9b981adfc043bd516f62c bytes=9884
+ooxml/docx/documentProtection_no_protection.docx touch_save 5d1cce05b576fc527981c56dd9844df3b6669967bcd9b981adfc043bd516f62c bytes=9884
+ooxml/docx/documentProtection_no_protection.docx managed_edit aed915547e551613c07e10fc6caee570f1772f24c627cb5cf8f49a263ca308eb bytes=9897
+ooxml/docx/documentProtection_no_protection.docx edit_save 144902ab9f239c30ddd8fea15e160dd61b084e8f25b8b847f00990bbf2122e4d bytes=9915
+ooxml/docx/documentProtection_no_protection.docx reopen ok paragraphs=2 text=30bytes
+ooxml/docx/documentProtection_readonly_no_password.docx open ok
+ooxml/docx/documentProtection_readonly_no_password.docx reader ok paragraphs=1 text=24bytes
+ooxml/docx/documentProtection_readonly_no_password.docx reader_bom part=false view=false
+ooxml/docx/documentProtection_readonly_no_password.docx sections ok count=1
+ooxml/docx/documentProtection_readonly_no_password.docx document_mut ok
+ooxml/docx/documentProtection_readonly_no_password.docx noop_save 5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544 bytes=9856
+ooxml/docx/documentProtection_readonly_no_password.docx touch_save 5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544 bytes=9856
+ooxml/docx/documentProtection_readonly_no_password.docx managed_edit 9e797db67bfaf046f98dbc43adfd031c9bdba27d181fb67532f320909a5e7d7a bytes=9872
+ooxml/docx/documentProtection_readonly_no_password.docx edit_save def10da774a6e4392e114f65b2692310690ee25b8648bc5de1eabdce24589dd0 bytes=9889
+ooxml/docx/documentProtection_readonly_no_password.docx reopen ok paragraphs=2 text=41bytes
+ooxml/docx/drawing.docx open ok
+ooxml/docx/drawing.docx reader ok paragraphs=227 text=105241bytes
+ooxml/docx/drawing.docx reader_bom part=false view=false
+ooxml/docx/drawing.docx sections ok count=1
+ooxml/docx/drawing.docx document_mut ok
+ooxml/docx/drawing.docx noop_save 5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8 bytes=95247
+ooxml/docx/drawing.docx touch_save 5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8 bytes=95247
+ooxml/docx/drawing.docx managed_edit 5ded472bb85f6e1da782922f099c6b34cdc4eac3c4d348b6e56b895cb89da780 bytes=76788
+ooxml/docx/drawing.docx edit_save db5d9f641e5796039d8128c0cac8f600b57298b473fd01a159285eba721276b4 bytes=76033
+ooxml/docx/drawing.docx reopen ok paragraphs=228 text=105258bytes
+ooxml/docx/endnotes.docx open ok
+ooxml/docx/endnotes.docx reader ok paragraphs=12 text=962bytes
+ooxml/docx/endnotes.docx reader_bom part=false view=false
+ooxml/docx/endnotes.docx sections ok count=1
+ooxml/docx/endnotes.docx document_mut ok
+ooxml/docx/endnotes.docx noop_save 6e2e1b2dabb0ae6b9b26ddd613dca446ba0710ecc8b4008722abc4ed592934e3 bytes=13553
+ooxml/docx/endnotes.docx touch_save 6e2e1b2dabb0ae6b9b26ddd613dca446ba0710ecc8b4008722abc4ed592934e3 bytes=13553
+ooxml/docx/endnotes.docx managed_edit ccc50a2f260a20d01202fd8fe211506f8623377cd72ab1d410adad27b9e4a9b1 bytes=13505
+ooxml/docx/endnotes.docx edit_save 135155eb57f10e0ca40fde3b3c320cdef77e36f6d7206dd6102d3ddf604991c6 bytes=13224
+ooxml/docx/endnotes.docx reopen ok paragraphs=13 text=979bytes
+ooxml/docx/footnotes.docx open ok
+ooxml/docx/footnotes.docx reader ok paragraphs=1 text=33bytes
+ooxml/docx/footnotes.docx reader_bom part=false view=false
+ooxml/docx/footnotes.docx sections ok count=1
+ooxml/docx/footnotes.docx document_mut ok
+ooxml/docx/footnotes.docx noop_save 9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1 bytes=12823
+ooxml/docx/footnotes.docx touch_save 9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1 bytes=12823
+ooxml/docx/footnotes.docx managed_edit f51c56f42267d6a87f3bcbf920d0b2d5dcc68dcc971a77df0a1111adb22076b4 bytes=12836
+ooxml/docx/footnotes.docx edit_save c321e7285983bd1899a8d1528a009f502449c825f60d39e5cdfff5f2727313d4 bytes=12554
+ooxml/docx/footnotes.docx reopen ok paragraphs=2 text=50bytes
+ooxml/docx/headerFooter.docx open ok
+ooxml/docx/headerFooter.docx reader ok paragraphs=1 text=0bytes
+ooxml/docx/headerFooter.docx reader_bom part=false view=false
+ooxml/docx/headerFooter.docx sections ok count=1
+ooxml/docx/headerFooter.docx document_mut ok
+ooxml/docx/headerFooter.docx noop_save 0ad90c6ee8ec8b9fab1ae8219387eca8d934b739580918d76a1b6c911bc41913 bytes=28423
+ooxml/docx/headerFooter.docx touch_save 0ad90c6ee8ec8b9fab1ae8219387eca8d934b739580918d76a1b6c911bc41913 bytes=28423
+ooxml/docx/headerFooter.docx managed_edit f507fe67507759e107607b3f6d4489a8d453d0997faa865fbf3678ad8b3434e6 bytes=28445
+ooxml/docx/headerFooter.docx edit_save 1230ea98f8c358e52fea339f168ecf9bee252f865137b242c998ece9d447ce10 bytes=28461
+ooxml/docx/headerFooter.docx reopen ok paragraphs=2 text=17bytes
+ooxml/docx/headerPic.docx open ok
+ooxml/docx/headerPic.docx reader ok paragraphs=1 text=0bytes
+ooxml/docx/headerPic.docx reader_bom part=false view=false
+ooxml/docx/headerPic.docx sections ok count=1
+ooxml/docx/headerPic.docx document_mut ok
+ooxml/docx/headerPic.docx noop_save 50d9b17f7575c8a91129fd8a3e6a70feec886480ab9f089e29a7f8ac7e5ed51a bytes=16206
+ooxml/docx/headerPic.docx touch_save 50d9b17f7575c8a91129fd8a3e6a70feec886480ab9f089e29a7f8ac7e5ed51a bytes=16206
+ooxml/docx/headerPic.docx managed_edit 71a7ea8b9aa0447fc3e2fe09d4afd74e8dd7aaa96b554587eb2a2541910e3cbe bytes=16230
+ooxml/docx/headerPic.docx edit_save 0527765d9462b09d12c0188bc45c45e3b858fa683865921c3d21e0cb7759602b bytes=15964
+ooxml/docx/headerPic.docx reopen ok paragraphs=2 text=17bytes
+ooxml/docx/table-alignment.docx open ok
+ooxml/docx/table-alignment.docx reader ok paragraphs=60 text=342bytes
+ooxml/docx/table-alignment.docx reader_bom part=false view=false
+ooxml/docx/table-alignment.docx sections ok count=1
+ooxml/docx/table-alignment.docx document_mut ok
+ooxml/docx/table-alignment.docx noop_save ee36729e0d050e529fea0b444006a194bea72b35cf8958ae58c6624c26156b41 bytes=15519
+ooxml/docx/table-alignment.docx touch_save ee36729e0d050e529fea0b444006a194bea72b35cf8958ae58c6624c26156b41 bytes=15519
+ooxml/docx/table-alignment.docx managed_edit 9391ccb3727588c964029e5a5e2c34556ce45b361dad5b59f35c4d81546b5dc7 bytes=15181
+ooxml/docx/table-alignment.docx edit_save b5cd740511a7def94f998501dd6c6f0d1ea6b1899bf1d3c021ec02895cb2be6c bytes=15194
+ooxml/docx/table-alignment.docx reopen ok paragraphs=61 text=359bytes
+ooxml/docx/table-indent.docx open refused:shared OOXML error: invalid OOXML relationship: core-properties part '/docProps/core.xml' is orphaned
+ooxml/docx/table-indent.docx reader skipped
+ooxml/docx/table-indent.docx reader_bom skipped
+ooxml/docx/table-indent.docx sections skipped
+ooxml/docx/table-indent.docx document_mut skipped
+ooxml/docx/table-indent.docx noop_save skipped
+ooxml/docx/table-indent.docx touch_save skipped
+ooxml/docx/table-indent.docx managed_edit skipped
+ooxml/docx/table-indent.docx edit_save skipped
+ooxml/docx/table-indent.docx reopen skipped
+ooxml/docx/table_footnotes.docx open ok
+ooxml/docx/table_footnotes.docx reader ok paragraphs=7 text=17bytes
+ooxml/docx/table_footnotes.docx reader_bom part=false view=false
+ooxml/docx/table_footnotes.docx sections ok count=1
+ooxml/docx/table_footnotes.docx document_mut ok
+ooxml/docx/table_footnotes.docx noop_save 69666500a7dd00600da64cc7676f8939c84df8804967ec2fc75567fad41f21a9 bytes=13177
+ooxml/docx/table_footnotes.docx touch_save 69666500a7dd00600da64cc7676f8939c84df8804967ec2fc75567fad41f21a9 bytes=13177
+ooxml/docx/table_footnotes.docx managed_edit 2ba9443b2c40ac2f736847b5a4d00e25ee53b766291058999dd4aaefc9e475b0 bytes=13153
+ooxml/docx/table_footnotes.docx edit_save e638c2b200c883c10c939fb9b62ca3146762f47616a869396fa0666d9d4fa5e3 bytes=12872
+ooxml/docx/table_footnotes.docx reopen ok paragraphs=8 text=34bytes
+ooxml/docx/testComment.docx open ok
+ooxml/docx/testComment.docx reader ok paragraphs=1 text=28bytes
+ooxml/docx/testComment.docx reader_bom part=false view=false
+ooxml/docx/testComment.docx sections ok count=1
+ooxml/docx/testComment.docx document_mut ok
+ooxml/docx/testComment.docx noop_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97 bytes=65298
+ooxml/docx/testComment.docx touch_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97 bytes=65298
+ooxml/docx/testComment.docx managed_edit 24d88f6ba8c2ae5107e92a055fea74cc12a2aae94c2c3f2622dc4c9d12891d57 bytes=65321
+ooxml/docx/testComment.docx edit_save a16ad72f3942cbbb4ec2a53af69ab38ac2110a42db6c66029a2cc834f8d44f3b bytes=65323
+ooxml/docx/testComment.docx reopen ok paragraphs=2 text=45bytes
+poi/test-data/document/61745.docx open ok
+poi/test-data/document/61745.docx reader ok paragraphs=2 text=0bytes
+poi/test-data/document/61745.docx reader_bom part=false view=false
+poi/test-data/document/61745.docx sections ok count=1
+poi/test-data/document/61745.docx document_mut ok
+poi/test-data/document/61745.docx noop_save ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2 bytes=37030
+poi/test-data/document/61745.docx touch_save ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2 bytes=37030
+poi/test-data/document/61745.docx managed_edit 047d62d884872d31a7c20377463e75f15860d7f65bd4f8c01eef112a450b0c32 bytes=37063
+poi/test-data/document/61745.docx edit_save a3b10db09cb23aef0742d12b744010f0bf7d86595237d5c4caeab49671fc8c50 bytes=37071
+poi/test-data/document/61745.docx reopen ok paragraphs=3 text=17bytes
+poi/test-data/document/Bug54849.docx open ok
+poi/test-data/document/Bug54849.docx reader ok paragraphs=43 text=294bytes
+poi/test-data/document/Bug54849.docx reader_bom part=false view=false
+poi/test-data/document/Bug54849.docx sections ok count=1
+poi/test-data/document/Bug54849.docx document_mut ok
+poi/test-data/document/Bug54849.docx noop_save f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3 bytes=27566
+poi/test-data/document/Bug54849.docx touch_save f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3 bytes=27566
+poi/test-data/document/Bug54849.docx managed_edit 65c45a96e1472adf306c149669a36bc4b6e48eee901661ed4c40af12b7f23eba bytes=27216
+poi/test-data/document/Bug54849.docx edit_save c4e2aece695ab1fa01bdb65269d1905d8cc71e959f1a8651c13acc2536f0b5e4 bytes=26914
+poi/test-data/document/Bug54849.docx reopen ok paragraphs=44 text=311bytes
+poi/test-data/document/ComplexNumberedLists.docx open ok
+poi/test-data/document/ComplexNumberedLists.docx reader ok paragraphs=17 text=226bytes
+poi/test-data/document/ComplexNumberedLists.docx reader_bom part=false view=false
+poi/test-data/document/ComplexNumberedLists.docx sections ok count=1
+poi/test-data/document/ComplexNumberedLists.docx document_mut ok
+poi/test-data/document/ComplexNumberedLists.docx noop_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6 bytes=14458
+poi/test-data/document/ComplexNumberedLists.docx touch_save 297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6 bytes=14458
+poi/test-data/document/ComplexNumberedLists.docx managed_edit d4e995fccd3cd40ac9e423df3d6203d894f5dc64b5226dd4d021a018e3a50493 bytes=14404
+poi/test-data/document/ComplexNumberedLists.docx edit_save 90008e5137fc991f716edf26ff522d683c94ac3aba626d28184f084959b14f2e bytes=14410
+poi/test-data/document/ComplexNumberedLists.docx reopen ok paragraphs=18 text=243bytes
+poi/test-data/document/EmbeddedDocument.docx open ok
+poi/test-data/document/EmbeddedDocument.docx reader ok paragraphs=3 text=48bytes
+poi/test-data/document/EmbeddedDocument.docx reader_bom part=false view=false
+poi/test-data/document/EmbeddedDocument.docx sections ok count=1
+poi/test-data/document/EmbeddedDocument.docx document_mut ok
+poi/test-data/document/EmbeddedDocument.docx noop_save 3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2 bytes=13268
+poi/test-data/document/EmbeddedDocument.docx touch_save 3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2 bytes=13268
+poi/test-data/document/EmbeddedDocument.docx managed_edit ae6255d80784f4f6ae23b72beb37e1e0004f86f37d95fed25156dd0f7faa4eeb bytes=13288
+poi/test-data/document/EmbeddedDocument.docx edit_save a5803c0c40dd68a02e481198e581ec168a320dcbcd71baec82f81b7adedd6440 bytes=13296
+poi/test-data/document/EmbeddedDocument.docx reopen ok paragraphs=4 text=65bytes
+poi/test-data/document/Numbering.docx open ok
+poi/test-data/document/Numbering.docx reader ok paragraphs=22 text=95bytes
+poi/test-data/document/Numbering.docx reader_bom part=false view=false
+poi/test-data/document/Numbering.docx sections ok count=1
+poi/test-data/document/Numbering.docx document_mut ok
+poi/test-data/document/Numbering.docx noop_save 776a59dcf0e290f1988602e6305e2d9cb2e31f631dc4aa751593c23cddbaad4d bytes=13808
+poi/test-data/document/Numbering.docx touch_save 776a59dcf0e290f1988602e6305e2d9cb2e31f631dc4aa751593c23cddbaad4d bytes=13808
+poi/test-data/document/Numbering.docx managed_edit 1686e1609443358e40f7208d4a69a6046d30b0bcee5d0e5a5cfac71b8ffbfea0 bytes=13828
+poi/test-data/document/Numbering.docx edit_save 45dc0b261a4f363ccbd3d9dc2f0ba3a995d2d8f51f6877175a5638d2d2eaa80b bytes=13829
+poi/test-data/document/Numbering.docx reopen ok paragraphs=23 text=112bytes
+poi/test-data/document/NumberingWOverrides.docx open ok
+poi/test-data/document/NumberingWOverrides.docx reader ok paragraphs=10 text=32bytes
+poi/test-data/document/NumberingWOverrides.docx reader_bom part=false view=false
+poi/test-data/document/NumberingWOverrides.docx sections ok count=1
+poi/test-data/document/NumberingWOverrides.docx document_mut ok
+poi/test-data/document/NumberingWOverrides.docx noop_save 3754dee43880ce4c9e962eca41ac78c353999888282c9ada528efbb826e2bee6 bytes=15190
+poi/test-data/document/NumberingWOverrides.docx touch_save 3754dee43880ce4c9e962eca41ac78c353999888282c9ada528efbb826e2bee6 bytes=15190
+poi/test-data/document/NumberingWOverrides.docx managed_edit 035a65d911086586aee123e65650daca6142d3d1fcf5ef7b080b41d2e0025ad7 bytes=15216
+poi/test-data/document/NumberingWOverrides.docx edit_save 63dc2435795f9b6f366678e03b8465d82d04ed3123a4ff801b922f041672b4cb bytes=15222
+poi/test-data/document/NumberingWOverrides.docx reopen ok paragraphs=11 text=49bytes
+poi/test-data/document/NumberingWithOutOfOrderId.docx open ok
+poi/test-data/document/NumberingWithOutOfOrderId.docx reader ok paragraphs=1 text=7bytes
+poi/test-data/document/NumberingWithOutOfOrderId.docx reader_bom part=false view=false
+poi/test-data/document/NumberingWithOutOfOrderId.docx sections ok count=1
+poi/test-data/document/NumberingWithOutOfOrderId.docx document_mut ok
+poi/test-data/document/NumberingWithOutOfOrderId.docx noop_save fa2843a6297bb3e874f9c6dc8aac944704fba4d0d631b94627be7dbeaf12ed0f bytes=12978
+poi/test-data/document/NumberingWithOutOfOrderId.docx touch_save fa2843a6297bb3e874f9c6dc8aac944704fba4d0d631b94627be7dbeaf12ed0f bytes=12978
+poi/test-data/document/NumberingWithOutOfOrderId.docx managed_edit 9f865214831383561d376a540d82a98a9ee03758e2ecad7b63b6ab95c33c2e32 bytes=12959
+poi/test-data/document/NumberingWithOutOfOrderId.docx edit_save 47b6cff27ae6426638e2a7ed18b0db86c26e2094341197054435430dcf52ec60 bytes=12970
+poi/test-data/document/NumberingWithOutOfOrderId.docx reopen ok paragraphs=2 text=24bytes
+poi/test-data/document/heading123.docx open ok
+poi/test-data/document/heading123.docx reader ok paragraphs=6 text=1797bytes
+poi/test-data/document/heading123.docx reader_bom part=false view=false
+poi/test-data/document/heading123.docx sections ok count=1
+poi/test-data/document/heading123.docx document_mut ok
+poi/test-data/document/heading123.docx noop_save dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550 bytes=74810
+poi/test-data/document/heading123.docx touch_save dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550 bytes=74810
+poi/test-data/document/heading123.docx managed_edit 4209972d04a4f44f9ea88a63de974f440136f24266170b4c40f8d2304e8e9a96 bytes=74185
+poi/test-data/document/heading123.docx edit_save e591d6fa7b6aa99f214e6582b2573df7b9b1351bf0e30f998c68c30f8d57b6fc bytes=74193
+poi/test-data/document/heading123.docx reopen ok paragraphs=7 text=1814bytes
+poi/test-data/document/saut_page.docx open ok
+poi/test-data/document/saut_page.docx reader ok paragraphs=5 text=29bytes
+poi/test-data/document/saut_page.docx reader_bom part=false view=false
+poi/test-data/document/saut_page.docx sections ok count=1
+poi/test-data/document/saut_page.docx document_mut ok
+poi/test-data/document/saut_page.docx noop_save bfb60b6218e151c0d6f226f6cb716db67b8a96aed2e487e9141e638617e1bd51 bytes=2959250
+poi/test-data/document/saut_page.docx touch_save bfb60b6218e151c0d6f226f6cb716db67b8a96aed2e487e9141e638617e1bd51 bytes=2959250
+poi/test-data/document/saut_page.docx managed_edit 0365076607dee711e9170ed96593fb920af70f4ee2e48fff3c91d7e707d4a242 bytes=2959278
+poi/test-data/document/saut_page.docx edit_save 18367067c75ffe206b77fae7353c8406172fc80e2bc016184e11a7fe8496afa3 bytes=2959290
+poi/test-data/document/saut_page.docx reopen ok paragraphs=6 text=46bytes
+poi/test-data/document/testComment.docx open ok
+poi/test-data/document/testComment.docx reader ok paragraphs=1 text=28bytes
+poi/test-data/document/testComment.docx reader_bom part=false view=false
+poi/test-data/document/testComment.docx sections ok count=1
+poi/test-data/document/testComment.docx document_mut ok
+poi/test-data/document/testComment.docx noop_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97 bytes=65298
+poi/test-data/document/testComment.docx touch_save 06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97 bytes=65298
+poi/test-data/document/testComment.docx managed_edit 24d88f6ba8c2ae5107e92a055fea74cc12a2aae94c2c3f2622dc4c9d12891d57 bytes=65321
+poi/test-data/document/testComment.docx edit_save a16ad72f3942cbbb4ec2a53af69ab38ac2110a42db6c66029a2cc834f8d44f3b bytes=65323
+poi/test-data/document/testComment.docx reopen ok paragraphs=2 text=45bytes
+poi/test-data/integration/test_recursive_embedded.docx open ok
+poi/test-data/integration/test_recursive_embedded.docx reader ok paragraphs=3 text=9bytes
+poi/test-data/integration/test_recursive_embedded.docx reader_bom part=false view=false
+poi/test-data/integration/test_recursive_embedded.docx sections ok count=1
+poi/test-data/integration/test_recursive_embedded.docx document_mut ok
+poi/test-data/integration/test_recursive_embedded.docx noop_save c4b7fab030a8b6a9d6691f6699ac8e6f82bc53764a0f1430d134ae3b70c32654 bytes=27082
+poi/test-data/integration/test_recursive_embedded.docx touch_save c4b7fab030a8b6a9d6691f6699ac8e6f82bc53764a0f1430d134ae3b70c32654 bytes=27082
+poi/test-data/integration/test_recursive_embedded.docx managed_edit a8aadcbe3787c3a52f7aa01b28dc4827c0bfc776dac6a9f89a8c22b56524324d bytes=27112
+poi/test-data/integration/test_recursive_embedded.docx edit_save a3e333b38991207de161dbb96e0643a26c708dc301b4fba46687675bd531e7e2 bytes=26823
+poi/test-data/integration/test_recursive_embedded.docx reopen ok paragraphs=4 text=26bytes
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx open ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx reader ok paragraphs=11 text=1196bytes
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx reader_bom part=false view=false
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx sections ok count=1
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx document_mut ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx noop_save 2d1856ab17ee065074572a6d16f7823e5416a69d97863f5d7c91406b0d4628c3 bytes=13159
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx touch_save 2d1856ab17ee065074572a6d16f7823e5416a69d97863f5d7c91406b0d4628c3 bytes=13159
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx managed_edit 09843a4c248a8a9b43bdb21d11748491863352e37c08f8de24bd0ea653e16ef6 bytes=13143
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx edit_save b467e10b988a1513dc4c00aa5843d1c8439327729ad1fcbaf14354ff0b386fcc bytes=13088
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx reopen ok paragraphs=12 text=1213bytes
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.3 permits only dcterms:created and dcterms:modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type on created and modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type="dcterms:W3CDTF"
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx open refused:OPC error: A package cannot contain more than one core-properties relationship
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx open ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx reader ok paragraphs=1 text=0bytes
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx reader_bom part=false view=false
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx sections ok count=1
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx document_mut ok
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx noop_save e2e8b6c95a034bbcb6f9239ce1519b7814e45d165d261775ac2ff58eef0a2b60 bytes=10058
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx touch_save e2e8b6c95a034bbcb6f9239ce1519b7814e45d165d261775ac2ff58eef0a2b60 bytes=10058
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx managed_edit c8426fe7f79c5f52b9694cb9b8a2bf1f3c9d51309cbab3165a9c29baca50c6ec bytes=10086
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx edit_save 644f6f569917130e7ab18aad5db6ab030c9534f55d2e18a5580193c9c2ed65ee bytes=10101
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx reopen ok paragraphs=2 text=17bytes
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx open refused:shared OOXML error: invalid OOXML data: OPC M4.4 forbids xml:lang in core properties
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx reopen skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx open refused:OPC error: Derived OPC part names coexist: '/word/document.xml' and '/word/document.xml/image1.gif'
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx reader skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx reader_bom skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx sections skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx document_mut skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx noop_save skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx touch_save skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx managed_edit skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx edit_save skipped
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx reopen skipped
+poi/test-data/xmldsign/hello-world-signed-twice.docx open ok
+poi/test-data/xmldsign/hello-world-signed-twice.docx reader ok paragraphs=2 text=11bytes
+poi/test-data/xmldsign/hello-world-signed-twice.docx reader_bom part=false view=false
+poi/test-data/xmldsign/hello-world-signed-twice.docx sections ok count=1
+poi/test-data/xmldsign/hello-world-signed-twice.docx document_mut ok
+poi/test-data/xmldsign/hello-world-signed-twice.docx noop_save e95ff2845328a023bb326f99c01a6acbe156a834aec4dd965944adbd03a5277a bytes=16099
+poi/test-data/xmldsign/hello-world-signed-twice.docx touch_save e95ff2845328a023bb326f99c01a6acbe156a834aec4dd965944adbd03a5277a bytes=16099
+poi/test-data/xmldsign/hello-world-signed-twice.docx managed_edit e95eb229c426b507e093dde909fde57090ad125da9f0940dc04852c0825a90c7 bytes=8902
+poi/test-data/xmldsign/hello-world-signed-twice.docx edit_save refused:I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+poi/test-data/xmldsign/hello-world-signed-twice.docx reopen skipped
+poi/test-data/xmldsign/hello-world-signed.docx open ok
+poi/test-data/xmldsign/hello-world-signed.docx reader ok paragraphs=2 text=11bytes
+poi/test-data/xmldsign/hello-world-signed.docx reader_bom part=false view=false
+poi/test-data/xmldsign/hello-world-signed.docx sections ok count=1
+poi/test-data/xmldsign/hello-world-signed.docx document_mut ok
+poi/test-data/xmldsign/hello-world-signed.docx noop_save 9b29a40d57508d1f53d1066792c2da0064a4c36110949d1fad52119ede0ab05e bytes=13244
+poi/test-data/xmldsign/hello-world-signed.docx touch_save 9b29a40d57508d1f53d1066792c2da0064a4c36110949d1fad52119ede0ab05e bytes=13244
+poi/test-data/xmldsign/hello-world-signed.docx managed_edit e95eb229c426b507e093dde909fde57090ad125da9f0940dc04852c0825a90c7 bytes=8902
+poi/test-data/xmldsign/hello-world-signed.docx edit_save refused:I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+poi/test-data/xmldsign/hello-world-signed.docx reopen skipped
+poi/test-data/xmldsign/ms-office-2010-signed.docx open ok
+poi/test-data/xmldsign/ms-office-2010-signed.docx reader ok paragraphs=1 text=11bytes
+poi/test-data/xmldsign/ms-office-2010-signed.docx reader_bom part=false view=false
+poi/test-data/xmldsign/ms-office-2010-signed.docx sections ok count=1
+poi/test-data/xmldsign/ms-office-2010-signed.docx document_mut ok
+poi/test-data/xmldsign/ms-office-2010-signed.docx noop_save bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f bytes=16142
+poi/test-data/xmldsign/ms-office-2010-signed.docx touch_save bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f bytes=16142
+poi/test-data/xmldsign/ms-office-2010-signed.docx managed_edit 2e5404591e1fb8f9e8082cf8b96ed4c6b83fb7ddedfa74b7ef3cdd21d6c11c2f bytes=11597
+poi/test-data/xmldsign/ms-office-2010-signed.docx edit_save refused:I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+poi/test-data/xmldsign/ms-office-2010-signed.docx reopen skipped

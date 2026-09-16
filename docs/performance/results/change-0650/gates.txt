@@ -1,0 +1,60 @@
+Gates for change 0650. All run in /home/zhuhe/code/litchi-worktrees/0650 with
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0650-after (crates) or
+.../0650-harness (the two tool packages), pinned with taskset -c 18.
+Toolchain rustc 1.95.0 (59807616e 2026-04-14), cargo 1.95.0 (f2d3ce0bd 2026-03-21).
+
+=== cargo fmt --all --check ===
+(no output) exit=0
+
+=== cargo clippy -p litchi-docx --all-targets ===
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0650/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.12s
+exit=0 (workspace lints are deny; no warning emitted)
+
+=== cargo test -p litchi-docx ===
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+52 suites, all ok; 1468 passed, 0 failed. exit=0
+Includes the three tests this change adds in src/writer/doc/tests.rs:
+  test writer::doc::tests::a_byte_order_mark_shifts_no_preserved_body_range ... ok
+  test writer::doc::tests::a_byte_order_mark_survives_one_appended_paragraph ... ok
+  test writer::doc::tests::body_final_section_properties_must_remain_the_last_body_child ... ok
+
+=== cargo doc -p litchi-docx --no-deps ===
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0650/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.45s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0650-after/doc/litchi_docx/index.html
+exit=0 (rustdoc lints are deny)
+
+=== cargo test -p litchi --features docx,xlsx,pptx,xls ===
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+26 suites, all ok; 266 passed, 0 failed. exit=0
+
+=== cargo test, in tools/perf-baseline ===
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 127.35s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+19 suites, all ok; 531 passed, 0 failed. exit=0
+
+=== cargo test, in tools/native-resave ===
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0 (the tool declares no tests; built and linked against the changed crate)
+Pre-existing drift, reverted and not committed: running this gate rewrites
+tools/native-resave/Cargo.lock to add "xml-minifier" under litchi-docx.
+crates/litchi-docx/Cargo.toml:43 already declares that dependency on the
+untouched base checkout and this change edits no manifest, so the lockfile was
+stale before this change; it is left as the base has it.
+
+=== corpus checks the record cites ===
+Census: 63 DOCX-family fixtures under test-data/ x 10 aspects = 630 lines per leg.
+  diff census-before.txt census-after.txt -> 3 changed lines, all on
+  alt-chunk-header.docx, all refusal text; every published sha256 identical.
+Variants: 4 constructed packages x 10 aspects = 40 lines per leg.
+  diff variants-before.txt variants-after.txt -> 6 changed lines, all on the
+  two byte-order-marked members.
+Witnesses: 14 retained XML inputs through MutableDocument::from_xml on both
+  legs; see witness/witness-outcomes.txt.

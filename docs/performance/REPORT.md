@@ -1,5 +1,41 @@
 # Performance program phase report
 
+## 0650 — a three-byte mark that made a valid document look broken
+
+Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
+
+`litchi-docx`: Microsoft Word puts a three-byte invisible marker at the very
+start of the XML files inside a `.docx`, saying "this text is UTF-8". Litchi's
+DOCX *reader* has always coped with it. Litchi's DOCX *editor* did not: the XML
+parser it uses quietly skips that marker but does not tell the caller it did, so
+the editor's idea of where every paragraph, table and section began was three
+bytes behind the truth. Every piece of the document it tried to keep verbatim was
+snipped three characters short — cut off inside its own closing tag — and the
+editor then reported the document as malformed. Change 0638 had noticed this on
+one file and could not chase it; this change chases it. The extent, measured over
+**all 63** Word-family test documents in the repository: the package opener
+accepts 55 and the editor accepts 53 of those, refusing two; the reader refuses
+none. **Exactly one** of the 63 carries the marker, which is why only one file
+ever showed the fault — the repository's documents come from LibreOffice and
+Apache POI, which do not write it, while Word does. The smallest document that
+reproduces it is five tags long. The fix is a single line that sets the marker
+aside before parsing and puts it back on the way out, so nothing is silently
+dropped. Nothing else moved: over 630 recorded observations on those 63 files,
+**three lines changed and all three are the wording of a refusal on the one
+marked file** — every saved document is byte-for-byte identical, and the file
+that started all this is **still refused**, now with an accurate explanation (its
+section settings are not the last thing in the body, which the format does not
+allow) instead of a false claim that its XML is broken. What this does **not**
+do: editing a marked Word document and saving it still fails, at a later step, in
+a different crate that has the same three-byte blind spot — that is reported with
+a witness for its own change, not fixed here, along with two other places the
+same pattern appears. Three new tests; `cargo fmt`, clippy, 1,468 `litchi-docx`
+tests, rustdoc, the 266-test feature-bearing facade suite and the two tool
+packages that link this crate all pass. `performance_claim: none`; no timing was
+taken and none is claimed. [Change and
+limitations](0650-docx-editor-byte-order-mark-admission.md); [retained
+evidence](results/change-0650/README.md).
+
 ## 0644 — one scan per identity call, where the caller owns the bracket
 
 No crate file changed; `git diff --name-only c7326f680 -- crates/` is empty and

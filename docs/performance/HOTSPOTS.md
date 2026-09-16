@@ -1,5 +1,51 @@
 # Performance hotspot inventory
 
+## 0650 — the DOCX editor's admission hole was three bytes wide, and it is not the only site
+
+Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
+
+**Change [0638](0638-facade-and-ordinary-save-selectors.md)'s admission fact is
+characterized, and it is a parser defect, not a contract.** 0638 found
+`Package::document_mut()` refusing `alt-chunk-header.docx` with *"invalid DOCX
+XML: syntax error: tag not closed"* although `Package::open` admits it and
+`Package::save` republishes it, over 600 retained samples, and could change no
+file under `crates/`. The extent is now counted: **63** DOCX-family fixtures
+live under `test-data/` — not hundreds; `.docm` and `.dotm` are absent —
+`Package::open` admits **55** and refuses **8**, all eight at the OPC or shared
+OOXML layer and none in the DOCX editor; of the 55, `document_mut()` admits
+**53** and refuses **2**; the reader refuses **none**, so **there is no fixture
+the editor admits and the reader refuses**. The mechanism is quick-xml 0.41.0
+removing a leading UTF-8 byte order mark from the slice (`reader/slice_reader.rs:257`)
+**without counting it in `Reader::buffer_position`**, so every caller that mixes
+reported offsets with slices of its own buffer reads **three bytes low for the
+whole document**: `DocumentBody::from_xml`'s preserved body ranges begin and end
+three bytes early and each child is truncated inside its own closing tag. The
+reader is immune only because `DocumentPart::from_part` parses the
+markup-compatibility-normalized output, which carries no mark — the probe
+asserts `reader_bom part=true view=false` on every marked input. The minimal
+witness is **five elements**: a marked document with one paragraph, refused
+before and accepted after; its unmarked twin is accepted on both legs. **Exactly
+one of the 63 fixtures is marked**, which is why 0638 saw one file; the corpus is
+LibreOffice and POI output, and Word marks its parts. The fix is one split in
+`DocumentBody::from_xml` plus a carry through `MutableDocument`'s serializer,
+and value identity is total: `diff` of two 630-line censuses is **three changed
+lines, all refusal text on the one marked fixture**, with all 55 no-op, 53
+editor-touched, 54 managed-route and 50 edited published SHA-256 digests
+identical. **Three further sites of the same defect class are witnessed and left
+open**: `crates/xml-minifier/src/audit.rs:1319` (the authored-XML publication
+audit, which therefore refuses a *regenerated* marked part with *"malformed XML
+at byte 0: invalid XML declaration boundary"* while its own streaming auditor
+handles the mark explicitly), `crate::document::Snapshot` in the managed
+transaction (refusing a marked dense body with `expected '</w:bo<w:p>'`
+identically on both legs), and — a different defect — the writer's section parse
+at `writer/section/codec/xml.rs:409`, which rejects ISO Strict's `w:pgSz
+w:w="612pt"` because it admits only `ST_UnsignedDecimalNumber`. Editing a marked
+DOCX end to end still does not work; this removes the first of four obstacles
+and makes the diagnosis accurate. `performance_claim: none`; no timing taken.
+OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.
+[Record and limitations](0650-docx-editor-byte-order-mark-admission.md);
+[retained evidence](results/change-0650/README.md).
+
 ## 0644 — the DOC snapshot's six complete reads are three pairs, and four of them turn out to be load-bearing
 
 Change 0589 halved the *hashing* on the DOC and PPT source-backed opens and left

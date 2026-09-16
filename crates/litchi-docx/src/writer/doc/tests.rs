@@ -4,6 +4,38 @@ use crate::settings::ProtectionType;
 
 use super::*;
 
+/// A pretty-printed main document whose body children are indented, so a
+/// three-byte offset shift truncates every preserved range it produces.
+const INDENTED_BODY: &str = concat!(
+    "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n",
+    "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"",
+    " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n",
+    "  <w:body>\n",
+    "    <w:p w:rsidR=\"00A1\"><w:r><w:t>start</w:t></w:r></w:p>\n",
+    "    <w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>\n",
+    "    <w:altChunk r:id=\"rId1\" />\n",
+    "    <w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/></w:sectPr>\n",
+    "  </w:body>\n",
+    "</w:document>\n",
+);
+
+/// The same body with the final section properties before, not after, the
+/// alternative-format anchor, as `alt-chunk-header.docx` writes them.
+const SECTION_BEFORE_ALT: &str = concat!(
+    "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"",
+    " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n",
+    "  <w:body>\n",
+    "    <w:p><w:r><w:t>start</w:t></w:r></w:p>\n",
+    "    <w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/></w:sectPr>\n",
+    "    <w:altChunk r:id=\"rId1\" />\n",
+    "  </w:body>\n",
+    "</w:document>\n",
+);
+
+/// The UTF-8 byte order mark, spelled here so the tests read the same way the
+/// parser does.
+const MARK: &str = "\u{feff}";
+
 #[test]
 fn test_create_empty_document() {
     let doc = MutableDocument::new();
@@ -175,4 +207,51 @@ fn protection_patching_removes_only_protection_and_handles_empty_roots() {
         output,
         r#"<settings xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:documentProtection xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:edit="readOnly" w:enforcement="1"/></settings>"#
     );
+}
+
+#[test]
+fn a_byte_order_mark_shifts_no_preserved_body_range() {
+    let marked = format!("{MARK}{INDENTED_BODY}");
+    let plain = MutableDocument::from_xml(INDENTED_BODY).unwrap();
+    let with_mark = MutableDocument::from_xml(&marked).unwrap();
+
+    assert_eq!(with_mark.paragraph_count(), plain.paragraph_count());
+    assert_eq!(with_mark.table_count(), plain.table_count());
+    assert_eq!(with_mark.alts().len(), plain.alts().len());
+
+    let plain_xml = plain.to_xml().unwrap();
+    assert!(plain_xml.contains(r#"<w:p w:rsidR="00A1"><w:r><w:t>start</w:t></w:r></w:p>"#));
+    assert!(plain_xml.contains(r#"<w:altChunk r:id="rId1"/>"#));
+    assert_eq!(with_mark.to_xml().unwrap(), format!("{MARK}{plain_xml}"));
+}
+
+#[test]
+fn a_byte_order_mark_survives_one_appended_paragraph() {
+    let mut document = MutableDocument::from_xml(&format!("{MARK}{INDENTED_BODY}")).unwrap();
+    document.add_paragraph_with_text("appended");
+
+    let output = document.to_xml().unwrap();
+    assert!(output.starts_with(MARK));
+    assert_eq!(output.matches(MARK).count(), 1);
+    assert!(output.contains(r#"<w:p w:rsidR="00A1"><w:r><w:t>start</w:t></w:r></w:p>"#));
+    assert!(output.contains("appended"));
+    assert!(output.ends_with("</w:body></w:document>"), "{output}");
+}
+
+#[test]
+fn body_final_section_properties_must_remain_the_last_body_child() {
+    let refusal = match MutableDocument::from_xml(SECTION_BEFORE_ALT) {
+        Ok(_) => panic!("out-of-order section properties were admitted"),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        refusal.contains("body-final section properties are not the final body child"),
+        "{refusal}"
+    );
+    let marked = format!("{MARK}{SECTION_BEFORE_ALT}");
+    let marked_refusal = match MutableDocument::from_xml(&marked) {
+        Ok(_) => panic!("a byte order mark admitted out-of-order section properties"),
+        Err(error) => error.to_string(),
+    };
+    assert_eq!(marked_refusal, refusal);
 }
