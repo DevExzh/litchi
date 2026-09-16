@@ -2323,3 +2323,51 @@ compilation.
 This amendment does not weaken the eviction rules for semantic payload caches,
 does not permit ambient process-wide state, and changes no other sentence of
 this ADR.
+
+## 2026-09-16 amendment: retained state that is not a cache, and its ceiling
+
+Authorized by [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md)
+decision 5 ("Cross-package copy: add a budget for that") and written by change
+[0656](../performance/0656-pptx-cross-copy-candidate-budget.md), which is the
+first construct to hold a whole serialized document inside a public value for a
+caller-controlled lifetime.
+
+This amendment changes two sentences of this ADR's reading and nothing else.
+
+"Cache behavior is semantically invisible" continues to describe evictable
+parsed values behind a handle. It does **not** license retained state whose
+size is the point. State that a public value owns after the operation that
+produced it has returned, whose bytes a caller therefore holds for as long as
+it keeps that value, is a retention policy rather than a cache, and it is
+declared, bounded and observable:
+
+- its ceiling is a member of the operation's own finite limit policy, of the
+  same kind as the already-enforced live-memory ceilings there, intersected
+  with every other member when two policies meet;
+- the value exposes what it is holding, and exposes a way to release it
+  without changing what the value means;
+- the retained allocation is one an operation already made, not a new copy of
+  it; retention is a decision not to free.
+
+"Every operation charges a hierarchical resource budget supplied by an
+execution context" remains the target, and where a path has such a context that
+context is still the authority. Where a path has **no** execution context, as
+the PPTX opened-presentation path does not, the operation's finite limit policy
+carries the ceiling. That is an interim location, not a second budget system:
+when a path gains an execution context under
+[ADR 0031](0031-execution-context-budgets.md), its retention ceilings move
+there.
+
+Exceeding such a ceiling is **not** a refusal when the work the retention
+avoids is always available by recomputation. The typed limit error of this ADR
+protects a caller from work or memory it did not ask for; there is nothing to
+protect it from when the alternative is the path the library takes anyway. A
+retention ceiling that is exceeded therefore falls back to recomputation
+silently and observably — the value reports that it is holding nothing — and
+the ceiling never changes any result, refusal or published byte. Ceilings whose
+alternative is *not* recomputation keep the typed `Limit` refusal they have
+today; this reading applies only to retention that is a pure optimization.
+
+The scratch-storage clause is untouched and is the reason the fallback is
+recomputation rather than a spill: a retained document archive is document
+content, and litchi never writes it anywhere automatically.

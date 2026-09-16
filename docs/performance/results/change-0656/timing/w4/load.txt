@@ -1,0 +1,3 @@
+load before timing:  08:13:23 up 5 days,  5:41,  3 users,  load average: 19.48, 29.06, 27.75
+load after timing:  08:16:55 up 5 days,  5:44,  3 users,  load average: 18.20, 23.56, 25.74
+load after perf:  08:18:17 up 5 days,  5:45,  3 users,  load average: 11.51, 20.20, 24.37

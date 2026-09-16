@@ -1587,7 +1587,7 @@ fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result
             "rIdImage".into(),
             TargetMode::Internal,
         )?;
-    let limits = Limits::new(1, 1024 * 1024, 1024, 4, 1024 * 1024)
+    let limits = Limits::new(1, 1024 * 1024, 1024, 4, 1024 * 1024, 64 * 1024 * 1024)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(matches!(
         limited
@@ -1948,8 +1948,15 @@ fn slide_copy_application_refuses_stale_complete_graph() -> Result<()> {
 fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result<()> {
     let package = opened_plain_slide_package()?;
     let current_parts = package.opc.part_count();
-    let limits = Limits::new(current_parts, 128 * 1024 * 1024, 1024, 1, 1024)
-        .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
+    let limits = Limits::new(
+        current_parts,
+        128 * 1024 * 1024,
+        1024,
+        1,
+        1024,
+        64 * 1024 * 1024,
+    )
+    .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(matches!(
         package
             .opened_presentation_with_limits(limits)?
@@ -2479,7 +2486,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     ));
 
     let limited = opened_plain_slides_package(2)?;
-    let limits = Limits::new(4_096, 1, 1024, 1, 1024)
+    let limits = Limits::new(4_096, 1, 1024, 1, 1024, 64 * 1024 * 1024)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(matches!(
         limited
@@ -2791,7 +2798,7 @@ fn durable_decoder_and_history_enforce_finite_bounds() -> Result<()> {
     let mut trailing = patch.to_bytes()?;
     trailing.push(0);
     assert!(Patch::from_bytes(&trailing).is_err());
-    let tiny = Limits::new(1, 16, 1, 1, 1)
+    let tiny = Limits::new(1, 16, 1, 1, 1, 1)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(Patch::from_bytes_with_limits(&patch.to_bytes()?, tiny).is_err());
 
@@ -2801,6 +2808,7 @@ fn durable_decoder_and_history_enforce_finite_bounds() -> Result<()> {
         8 * 1024 * 1024,
         2,
         256 * 1024 * 1024,
+        64 * 1024 * 1024,
     )
     .ok_or_else(|| Error::Invalid("test history limits are invalid".into()))?;
     let mut history = History::new(history_limits);

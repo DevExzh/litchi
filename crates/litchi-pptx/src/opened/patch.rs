@@ -1065,6 +1065,8 @@ fn intersect_limits(left: Limits, right: Limits) -> Result<Limits> {
         left.max_text_bytes().min(right.max_text_bytes()),
         left.max_history_entries().min(right.max_history_entries()),
         left.max_history_bytes().min(right.max_history_bytes()),
+        left.max_retained_candidate_bytes()
+            .min(right.max_retained_candidate_bytes()),
     )
     .ok_or_else(|| invalid("opened-presentation patch limits are invalid"))
 }

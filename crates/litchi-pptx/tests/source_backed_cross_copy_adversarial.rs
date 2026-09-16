@@ -100,7 +100,7 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
     assert_unsafe_edit(error);
     assert_eq!(serialized(&mut destination)?, before);
 
-    let tiny_limits = Limits::new(4_096, 1, 1_024, 1, 1_024)
+    let tiny_limits = Limits::new(4_096, 1, 1_024, 1, 1_024, 64 * 1024 * 1024)
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     let error = CrossSlideCopyPatch::from_bytes_with_limits(&plan.patch().to_bytes()?, tiny_limits)
         .expect_err("a restrictive durable-patch byte limit must be enforced");
@@ -230,6 +230,7 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
             8 * 1024 * 1024,
             64,
             256 * 1024 * 1024,
+            64 * 1024 * 1024,
         )
         .ok_or_else(|| Error::Invalid("test limits are invalid".into()))
     };

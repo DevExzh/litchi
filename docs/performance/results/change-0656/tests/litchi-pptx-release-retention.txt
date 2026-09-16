@@ -1,0 +1,20 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0656/crates/litchi-pptx)
+    Finished `release` profile [optimized] target(s) in 1m 21s
+     Running unittests src/lib.rs (target/release/deps/litchi_pptx-ef4830bc5f791344)
+
+running 12 tests
+test opened::cross_copy_plan::retention_tests::the_retention_path_never_spills ... ok
+test transition::tests::input_depth_node_and_retention_limits_are_enforced ... ok
+test tag::shape::tests::inactive_mce_anchor_forces_replacement_fork_and_removal_retention ... ok
+test opened::cross_copy_plan::retention_tests::debug_does_not_print_the_retained_archive ... ok
+test opened::cross_copy_plan::retention_tests::a_substituted_retained_archive_is_refused_and_publishes_nothing ... ok
+test opened::cross_copy_plan::retention_tests::a_plan_retains_the_archive_its_application_publishes ... ok
+test opened::cross_copy_plan::retention_tests::the_durable_patch_is_untouched_by_retention ... ok
+test opened::cross_copy_plan::retention_tests::releasing_and_dropping_return_the_retained_bytes ... ok
+test opened::cross_copy_plan::retention_tests::a_dirty_planning_destination_and_a_clean_applying_one_agree ... ok
+test opened::cross_copy_plan::retention_tests::the_tighter_retained_candidate_budget_binds ... ok
+test opened::cross_copy_plan::retention_tests::a_candidate_above_the_budget_falls_back_to_the_rebuild ... ok
+test opened::cross_copy_plan::retention_tests::retention_changes_no_apply_verdict ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 561 filtered out; finished in 0.03s
+

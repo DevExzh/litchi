@@ -1,5 +1,38 @@
 # Performance hotspot inventory
 
+## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
+
+Record: [0656](0656-pptx-cross-copy-candidate-budget.md).
+
+**Queue row 5 is closed, and the cross-package copy's hotspot has moved to
+planning.** 0646 priced the second candidate build and this change removes it:
+`bounded_package_bytes` falls from two calls per lifecycle to one,
+`zlib_rs::deflate::deflate` from 1,112 calls to 556 on the media-rich corpus and
+from 40 to 20 on the plain one, and every other call count on the path — eight
+`package_fingerprint`, four `physical_package_fingerprint`, eight
+`capture_internal`, two `build_candidate`, two `from_vec_reusing_payloads` — is
+identical in both legs. Per lifecycle that is −11.44% of instructions on the
+media-rich corpus and −2.42% on the plain one; natively it is −24.6% to −27.1%
+of whole-child cycles against A/A floors of 0.8–1.7% in three independent
+windows, and the phase it lands in, apply, falls **70.55–73.41%**
+(328.2 → 89.4/90.6 ms p50) across four. The `Ir`-versus-cycles gap is SHA-NI, exactly as 0646 predicted:
+valgrind masks the CPUID bit, so every instruction share this area's records
+attribute to hashing is about five times its native cycle share. **Rank this
+path off `perf stat`, not off the `Ir` tables.** What the second serialization
+was hiding is now the top term: **planning is the largest remaining native cost
+on a media-rich lifecycle**, a p50 of about 297 ms against apply's 94 ms, and it
+still builds, deflates and reopens a whole candidate — with no way to avoid it,
+because the plan's whole purpose is to prove that candidate exists. The next
+item in this area remains 0587's PPTX-1(c), the per-part digests with a redefined
+complete-package revision, which change 0655 lands in this wave. One new
+observation for the queue: `publication_ns` on the media-rich selectors is
+**bimodal at ≈1.5 ms and ≈6.4 ms independently of which binary runs it**, and
+this change has two within-window witnesses — one leg of each binary in each
+mode inside one run, and an after *pair* split across the two modes in
+another. It executes no code either 0646 or 0656
+changed and it is unexplained; any later record that reads that phase should
+expect the ±4× and not attribute it.
+
 ## 0653 — the MCE writer stops re-declaring every namespace on every element: 16.86× expansion becomes 0.93×, the 133.61 ms real-deck edit becomes 22.96 ms, and the marker/control ratio falls from 20.79× to 2.94×
 
 Change [0588](0588-mce-codec-namespace-emission.md) designed, implemented, measured and then **withdrew** this rewrite, because the writer's redundancy was load-bearing — any element span of the processed buffer happened to be namespace self-contained, `litchi-docx` sliced such spans and parsed them standalone, and two writers publish the processed bytes. Change [0649](0649-pptx-opened-transaction-real-deck-edit.md) then priced the redundancy on a real deck: **93.9%** of a 133.61 ms `set_shape_text` plus commit, six whole-slide rewrites per edit each amplified **16.25×**, **28,064,911 bytes of markup produced and thrown away per edit, 259× the source archive**. Decision 1 of change [0652](0652-owner-decisions-for-the-third-wave.md) authorized both halves, and this lands them. `write_start` now emits an element's **own** `xmlns`/`xmlns:*` attributes in source order, plus — only when the output drops an `mc:AlternateContent` wrapper, a `Choice`/`Fallback` branch or a `ProcessContent` element between this element and its nearest emitted ancestor — the declarations those dropped ancestors made, innermost binding winning; `Frame` carries `emitted_ns` and "is there anything to hoist" is one `Arc::ptr_eq`, so the common element pays nothing. A start tag that drops no attribute, hoists nothing, holds no unescaped value and contains no `&` or `<` is **copied verbatim** from the source. The property the consumers relied on is restored **at the slice boundary** instead, by a new shared `mce::self_contained_fragment` that re-declares on one element exactly what it inherits — the shape `litchi-xlsb`'s drawing transfer and `litchi-docx`'s section inventory already used, generalized. **Measured**: the 209,931-byte real worksheet goes from **3,540,261 to 194,508 output bytes**, exactly 0588's predicted figure; over the whole corpus, 6,964 parts, **197,811,418 → 36,761,542 bytes, −81.42%, with 0 parts growing**; the codec's per-call cost falls **305,273,402 → 61,464,892 Ir (−79.87%)**, a public eager open plus one cell **496,700,777 → 154,479,583 (−68.90%)** and a source-backed read **651,068,133 → 304,172,603 (−53.28%)**. In the before profile the codec's self cost is `BoundedOutput::extend_from_slice` 21.81%, `__memcpy_avx_unaligned_erms` 16.45% and `esc` 9.10%; **none of the three appears in the after profile at all**. On 0649's real deck the edit total falls **127.44 ms → 24.19 ms (−81.02%, A/A 3.72%)** and through 0638's harness `pptx_real_file_ordinary_save_edit` falls **133,438,301 → 22,960,854 ns (−82.79%, floor 4.77%)** — two independent instruments, and the before leg reproduces 0638's 133.61 ms to 0.13%. The marker-free control deck is unchanged (8.32–8.46 ms both legs), so the remaining 24.19 ms is the six parse passes 0649 found, which this change does not remove: **2.9× the control rather than 15.4×**. Two accidental refusals disappear with the expansion that manufactured them: `LimitExceeded("output bytes")` on parts that fit their own bound, and `litchi-xlsx`'s `unknown printOptions attribute 'xmlns'`, which meant **every worksheet whose `printOptions` sat inside an `mc:AlternateContent` was unreadable** because the parser refused its own preprocessor's output. Change [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md)'s marker-bearing selectors, which landed after this change's own measurement window and price the codec branch against a **byte-identical** marker-stripped control, agree from an independent corpus: `pptx_marker_ordinary_save_edit` **155,537,122 → 21,340,230 ns (−86.28%, A/A 2.96%)**, `docx_marker_eager_full_text` **−92.25%**, `docx_marker_source_full_text` **−92.56%**, and the **marker/control ratio collapses from 20.79× to 2.94×** on the PPTX edit and from 30.06× to 2.24× on the DOCX source-backed full text — while **every one of the seven byte-identical control selectors moves less than its own floor**, which is what makes those rows a measurement of the branch and not of the corpus. 0664 also found that `Document::write_text_to` refuses a marker-bearing DOCX with `semantic DOCX XML exceeds 4096 namespace bindings` while its byte-identical control is admitted, because that limit counts `xmlns:` attributes cumulatively and a 33-declaration root exhausted it after about 124 elements; a retained witness shows that refusal **gone with the limit untouched** — the marker package now projects the control's exact 2,689 bytes over 200 objects. One regression is reported and chased: `pptx_real_file_ordinary_save_counting_publish` is +20.81% (+13.2% isolated) against A/A block spreads of 20% and 36%, on identical published bytes, +56 µs on a route whose edit falls by 110 ms. `performance_claim: none`. OLE2/OOXML remain active; ODF stays deferred; iWork is excluded. [Record and limitations](0653-mce-namespace-emission-rewrite.md); [retained evidence](results/change-0653/README.md).

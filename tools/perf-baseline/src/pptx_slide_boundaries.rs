@@ -606,7 +606,7 @@ fn verify_refusal_gates(
     );
 
     let limits =
-        Limits::new(64, 1, 1_024, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
+        Limits::new(64, 1, 1_024, 1, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
     let remove_limited = Package::from_vec(corpus.archive.clone())?
         .opened_presentation_with_limits(limits)?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)

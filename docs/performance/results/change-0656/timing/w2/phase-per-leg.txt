@@ -1,0 +1,27 @@
+change 0656 - per-leg phase medians (us), run order A1 B1 B2 A2 = before after after before
+
+### pptx_cross_copy_plain
+  plan_ns           A1    3535.287  B1    3562.128  B2    3536.407  A2    3552.057
+  commit_ns         A1    4371.136  B1    4161.810  B2    4150.855  A2    4392.967
+  publication_ns    A1       0.720  B1       1.285  B2       0.715  A2       0.820
+  reopen_ns         A1     649.269  B1     642.723  B2     641.813  A2     651.909
+
+### pptx_cross_copy_media_rich
+  plan_ns           A1  297473.528  B1  307259.302  B2  298493.029  A2  298788.851
+  commit_ns         A1  328661.570  B1   96332.444  B2   89390.830  A2  330307.236
+  publication_ns    A1    1500.101  B1    6500.792  B2    6231.820  A2    1546.863
+  reopen_ns         A1   23926.472  B1   21269.395  B2   21129.849  A2   24460.765
+
+### pptx_cross_copy_plain_lifecycle
+  plan_ns           A1    3573.553  B1    3535.510  B2    3543.358  A2    3471.501
+  commit_ns         A1    4385.092  B1    4186.979  B2    4157.430  A2    4327.831
+  publication_ns    A1       0.760  B1       0.775  B2       0.780  A2       0.805
+  reopen_ns         A1     662.997  B1     649.009  B2     652.548  A2     655.644
+  lifecycle_ns      A1    9250.675  B1    9001.371  B2    8971.154  A2    9085.100
+
+### pptx_cross_copy_media_rich_lifecycle
+  plan_ns           A1  297304.874  B1  314700.187  B2  308447.442  A2  297171.382
+  commit_ns         A1  328064.280  B1   94300.360  B2   97478.961  A2  327925.308
+  publication_ns    A1    1517.492  B1    1491.887  B2    1575.598  A2    1522.562
+  reopen_ns         A1   21352.835  B1   21169.794  B2   21572.706  A2   21316.035
+  lifecycle_ns      A1  648731.944  B1  432882.468  B2  430134.377  A2  648861.457

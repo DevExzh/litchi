@@ -1,0 +1,14 @@
+change 0656 - per-leg phase medians (us), run order A1 B1 B2 A2 = before after after before
+
+### pptx_cross_copy_media_rich
+  plan_ns           A1  289351.290  B1  293161.333  B2  305716.904  A2  299732.590
+  commit_ns         A1  321504.384  B1   90256.134  B2   93039.774  A2  331862.641
+  publication_ns    A1    6361.631  B1    1663.508  B2    6888.316  A2    1621.574
+  reopen_ns         A1   21228.690  B1   21481.841  B2   22075.890  A2   21882.247
+
+### pptx_cross_copy_media_rich_lifecycle
+  plan_ns           A1  289866.952  B1  294416.997  B2  305708.928  A2  296649.319
+  commit_ns         A1  321850.077  B1   89980.160  B2   92544.630  A2  329182.377
+  publication_ns    A1    6401.477  B1    1661.653  B2    6804.885  A2    1551.224
+  reopen_ns         A1   21285.536  B1   21431.402  B2   21878.410  A2   21774.096
+  lifecycle_ns      A1  640702.919  B1  408437.311  B2  430135.443  A2  651503.173

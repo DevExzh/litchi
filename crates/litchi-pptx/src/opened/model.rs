@@ -61,6 +61,7 @@ pub struct Limits {
     max_text_bytes: usize,
     max_history_entries: usize,
     max_history_bytes: usize,
+    max_retained_candidate_bytes: usize,
 }
 
 impl Limits {
@@ -71,6 +72,7 @@ impl Limits {
         max_text_bytes: 8 * 1024 * 1024,
         max_history_entries: 64,
         max_history_bytes: 256 * 1024 * 1024,
+        max_retained_candidate_bytes: 64 * 1024 * 1024,
     };
 
     /// Construct a finite, nonzero policy.
@@ -81,12 +83,14 @@ impl Limits {
         max_text_bytes: usize,
         max_history_entries: usize,
         max_history_bytes: usize,
+        max_retained_candidate_bytes: usize,
     ) -> Option<Self> {
         if max_parts == 0
             || max_patch_bytes == 0
             || max_text_bytes == 0
             || max_history_entries == 0
             || max_history_bytes == 0
+            || max_retained_candidate_bytes == 0
         {
             None
         } else {
@@ -96,6 +100,7 @@ impl Limits {
                 max_text_bytes,
                 max_history_entries,
                 max_history_bytes,
+                max_retained_candidate_bytes,
             })
         }
     }
@@ -128,6 +133,36 @@ impl Limits {
     #[must_use]
     pub const fn max_history_bytes(self) -> usize {
         self.max_history_bytes
+    }
+
+    /// Maximum serialized candidate archive a cross-presentation slide-copy
+    /// plan may retain for its own application.
+    ///
+    /// A plan whose candidate archive fits this ceiling keeps the archive it
+    /// already built, and applying the plan reuses those bytes instead of
+    /// serializing and deflating the candidate a second time.  A candidate
+    /// above the ceiling is not retained: the plan is returned unretained and
+    /// application rebuilds the archive exactly as it does without retention.
+    /// Exceeding this ceiling is therefore never a refusal, because rebuilding
+    /// is always available.
+    ///
+    /// The retained bytes are observable through
+    /// [`CrossSlideCopyPlan::retained_candidate_bytes`] and released by
+    /// [`CrossSlideCopyPlan::release_retained_candidate`] or by dropping the
+    /// plan.  The default is 64 MiB.  This ceiling bounds what a plan *holds*;
+    /// applying the plan copies the retained archive into the package it
+    /// opens, so the transient peak during one application carries the
+    /// retained bytes twice.
+    ///
+    /// Zero is not a policy: like every other member, it is rejected by
+    /// [`Self::new`].  Pass `1` to turn retention off, since no ZIP archive is
+    /// one byte long.
+    ///
+    /// [`CrossSlideCopyPlan::retained_candidate_bytes`]: crate::opened::CrossSlideCopyPlan::retained_candidate_bytes
+    /// [`CrossSlideCopyPlan::release_retained_candidate`]: crate::opened::CrossSlideCopyPlan::release_retained_candidate
+    #[must_use]
+    pub const fn max_retained_candidate_bytes(self) -> usize {
+        self.max_retained_candidate_bytes
     }
 }
 

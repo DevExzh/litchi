@@ -1,0 +1,69 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0656",
+  "title": "The PPTX cross-package copy retains its planned candidate archive under a declared opened::Limits budget and stops deflating it twice",
+  "decision": "retained, implemented in litchi-pptx with one new accessor in litchi-opc",
+  "code_state": "crates/litchi-pptx (opened::Limits, the cross-copy plan and its apply path) and one public shared-handle accessor in crates/litchi-opc; one harness call site follows the constructor change; no new unsafe, no new dependency, no new refusal, no error type or message changed, no published byte changed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0652 decision 5 authorized 0646's design with a retained-candidate budget as a public opened::Limits field and a fallback to the rebuild above the budget",
+    "the saving is exact on counts: bounded_package_bytes 2 -> 1 and PackageWriter::write_to_stream 7 -> 6 calls per lifecycle, zlib_rs::deflate::deflate 1,112 -> 556 on the media-rich corpus and 40 -> 20 on the plain one, and every other call count unchanged",
+    "the memory price is measured exactly rather than estimated: the plan's live bytes rise by the archive plus a 40-byte Arc header and by nothing else, and return to parity when the plan is dropped",
+    "the apply phase falls 70.55-73.41% across four windows and whole-child native cycles fall 24.6-27.1% against A/A floors of 0.8-1.7%, so the archive copy the reuse trades into does not eat the deflate it removes",
+    "the budget's two branches are exercised by test: one byte below the candidate the plan retains nothing and still applies with identical bytes and revisions, and exactly at the candidate it retains",
+    "the substituted-archive proof holds in both build modes: the debug_assert in debug, and Invalid(\"cross-slide candidate did not publish the reserved slide identity\") in release, leaving the destination byte-identical"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs at --samples 1 and 3, differenced over the two extra samples, per leg and selector; call counts per callee and inclusive Ir for the twelve symbols the record names",
+    "allocations": "litchi-perf-baseline-alloc retention --api owned, 5 samples after 1 warmup per leg on both corpora, with the nine ownership checkpoints, the observer-ordered region peak and the absolute allocator counters",
+    "timing": "tools/perf-baseline --warmup 3 --samples 30 over all four cross-copy selectors in one process, order A1 B1 B2 A2 on CPU 11, with the A/A and B/B floors from the repeated legs in the same window; four windows, the quoted one (w4) built from the committed tree with A/A p50 floors under 5% on every selector, quoted beside w2 whose floors are the tightest (A/A p50 under 2%)",
+    "native_cycles": "perf stat -e cycles,instructions whole child, the same A1 B1 B2 A2 order at --warmup 1 --samples 10, in three independent windows reading -24.64%, -27.01% and -27.08% against A/A floors of 1.71%, 1.46% and 0.82%",
+    "value_identity": "one output_sha256 per corpus across every timing leg, every perf stat leg and all eight callgrind profiles, identical between the legs",
+    "verdicts_unchanged": "cargo test -p litchi-pptx on a detached worktree of the untouched base (875 passed) and on the branch (885 passed, the ten added tests), with the debug assertion re-serializing the candidate on every reuse; plus litchi-opc (712), the litchi facade under docx,xlsx,pptx,xls (265) and tools/perf-baseline (540)"
+  },
+  "accepted_costs": {
+    "plan_memory": "a plan holds one whole serialized candidate archive for its lifetime, bounded by opened::Limits::max_retained_candidate_bytes, 64 MiB by default; the default worst case per plan is max_patch_bytes (128 MiB) plus 64 MiB",
+    "region_peak": "on the media-rich corpus the lifecycle's peak live bytes rise 12.18% (about one archive); on the plain corpus they fall 5.45%, because the removed writer's growth buffer is worth more than the retained 31 KB",
+    "apply_copy": "OpcPackage::from_vec takes an owned Vec, so the retained handle is copied once per application; removing that needs a shared-bytes ingress in litchi-opc, which is an ADR 0011 question and is not taken",
+    "breaking_api": "Limits::new takes six arguments instead of five and Limits::DEFAULT changes value; CrossSlideCopyPlan's Debug gains a field",
+    "unproved_step": "a fresh to_stream of the in-memory candidate is no longer compared against the retained bytes; its proof is the four staleness checks plus determinism of to_stream, re-derived by a debug assertion in debug and test builds only",
+    "debug_builds_are_slower": "the debug assertion re-runs the serialization it removes, so a debug or test build does strictly more work than the base",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte (0604) and runs SHA-256 in software (0649), so perf stat cycles are the counterweight and they are whole-child"
+  },
+  "known_gaps": {
+    "no_real_deck": "the largest .pptx under test-data/ is 972,788 bytes, so no real fixture exercises the large end of the budget; both corpora are synthetic and the media-rich one is deliberately incompressible",
+    "default_not_swept": "64 MiB is argued from the measured archive sizes, the server memory profile and 0646's measurement configuration; no other value was measured",
+    "planning_phase": "one window read the planning phase +5.19% on one selector; two later windows read the same phase +1.54% and -3.47% with the per-leg medians overlapping, so no planning result is claimed in either direction",
+    "publication_bimodal": "publication_ns on the media-rich selectors sits at about 1.5 ms or about 6.4 ms independently of the binary; a within-window witness is recorded and no explanation",
+    "apply_patch": "retention is implemented for CrossSlideCopyPlan only; the durable CrossSlideCopyPatch carries no archive and apply_patch is unchanged and unmeasured",
+    "repeated_application": "applying one plan to more than one destination is the case the retained archive pays for most and it is not measured; neither is a plan that is never applied, the case retention costs most and saves nothing",
+    "preservation_provenance": "the candidate is published through the destination's preservation source, which the four staleness proofs do not pin; one test covers the reachable divergence (plan against an edited owned destination, apply to a clean reopen of its bytes) and finds verdict and bytes identical, but the general statement is argued rather than proved",
+    "source_backed": "no source-backed cross-copy selector exists, so SourceBackedCrossSlideCopyPlan is not measured"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result",
+    "any statement about the planning phase in either direction",
+    "any explanation of the bimodal publication phase"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "branch": "perf/0656-pptx-cross-copy-candidate-budget",
+    "commit": "the tip of perf/0656-pptx-cross-copy-candidate-budget; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 11",
+    "binaries": {
+      "before/litchi-perf-baseline": "325c9d6e1aa18a5425a97eb7a90f42ab59c0c871d4f43de41039e4cdc062a51b",
+      "after/litchi-perf-baseline (windows 1-3)": "2818d8913ebf77d4493499eb25ff2855ede5aa2dee41add31c5e511ad3214281",
+      "after/litchi-perf-baseline (committed tree, window 4 and counts-final)": "96c7a42e96eb20a65685eeb20cd1840662050bd15631c026c98c6943fc6c4bef",
+      "before/litchi-perf-baseline-alloc": "6e288e4ab87f4a22437ea32b36dfdb41744596bfeff1700801111cea2c35a770",
+      "after/litchi-perf-baseline-alloc (alloc/)": "10e39fc6fb30941669327795afa61be6cf978c640a7d8f6c5efbe67edc7e8b8e",
+      "after/litchi-perf-baseline-alloc (committed tree, alloc-final/)": "c5efdf2aa6beb473e5d375c5bc66085e55ab72a0ec14c6389b09d41fa474aaa2"
+    },
+    "note": "both legs built with cargo build --release --locked from tools/perf-baseline (plus --features allocator-metrics --bin litchi-perf-baseline-alloc for the allocator legs); the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-70d7768cc with its own CARGO_TARGET_DIR; every binary was staged outside both target directories before measurement. The after leg was built twice, because three behaviour-free edits (two doc comments, a derive(Debug) removed from a private struct nothing formats, test code) landed after the first three timing windows; window 4, counts-final/ and alloc-final/ use the committed tree's binary, and the re-run callgrind isolation pairs reproduce the first build's call counts exactly and its per-lifecycle totals within 0.11% (plain) and 0.0001% (media-rich)."
+  },
+  "adr_amendments": [
+    "docs/adr/0005-io-memory-and-performance.md gains a 2026-09-16 amendment, authorized by 0652 decision 5 and written by this record: retained state whose size is the point is a declared, intersected, observable, releasable ceiling in the operation's own finite limit policy where the path has no execution context, and exceeding such a ceiling falls back to recomputation rather than refusing when recomputation is always available"
+  ]
+}

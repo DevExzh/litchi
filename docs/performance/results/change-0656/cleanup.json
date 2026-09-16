@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0656",
+  "policy": "temporary artefacts live in the session scratchpad, never in the repository or /tmp's shared roots; only the evidence this change record cites is retained in the repository; build output is named where it is kept for a following batch",
+  "retained_in_repository": {
+    "path": "docs/performance/results/change-0656/",
+    "bytes": 4047789,
+    "files": 126,
+    "note": "every file the record and this packet's README cite; `git ls-files` lists all of them, and no name ends in `.log` (the repository ignores that suffix everywhere), so nothing the README cites was silently excluded"
+  },
+  "removed_during_the_turn": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0656-before",
+      "what": "a detached worktree of the base commit, created only because the workspace `Cargo.lock` is gitignored and so the shared read-only before checkout has none, which made `cargo test --locked` impossible there without writing into a checkout eight agents share",
+      "bytes": 7100000000,
+      "when": "as soon as the before leg's `cargo test -p litchi-pptx` output and the pre-existing iWork example failure had been copied into the packet"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0656-before-tests",
+      "what": "the Cargo target directory for that before-leg test run",
+      "bytes": 12000000000,
+      "when": "with the worktree above"
+    },
+    {
+      "path": "scratchpad/agents/0656/counts/cg-*.out and counts-final/cg-*.out",
+      "what": "the twelve raw callgrind profiles; the annotations, the per-callee call counts and the generated summaries derived from them are retained in the packet",
+      "bytes": 6600000,
+      "when": "after each set of count tables was generated"
+    }
+  ],
+  "removed_at_the_end_of_the_turn": [
+    {
+      "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0656",
+      "what": "the whole agent scratchpad: the six staged measured binaries (350 MB), the raw callgrind profiles, the four timing windows' working copies, the gate logs and the record's draft sections",
+      "bytes": 360000000
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0656",
+      "what": "the branch worktree, including its own 35 GB Cargo target directory; the branch `perf/0656-pptx-cross-copy-candidate-budget` is kept",
+      "bytes": 42000000000
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0656-before and /home/zhuhe/code/litchi-worktrees/targets/0656-after",
+      "what": "the two perf-harness Cargo target directories",
+      "bytes": 19300000000
+    }
+  ],
+  "not_removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/before-70d7768cc",
+      "why": "the shared read-only detached checkout of the base, used by every agent of this wave; it was never modified (its `git status` is clean and its `tools/perf-baseline/Cargo.lock` is tracked, so the `--locked` harness build wrote nothing into it)"
+    },
+    {
+      "path": "branch perf/0656-pptx-cross-copy-candidate-budget",
+      "why": "the coordinator merges it"
+    }
+  ],
+  "tmpfs_note": "/tmp on this host is a 62 GiB RAM-backed tmpfs shared by eight concurrent agents; this change's scratchpad peaked at about 360 MB, no worktree, Cargo target directory or fixture copy was ever placed there, and the disk-backed worktrees were swept during the turn rather than only at the end"
+}

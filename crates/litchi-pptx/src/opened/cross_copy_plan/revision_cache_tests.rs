@@ -125,6 +125,7 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
         limits.max_text_bytes(),
         limits.max_history_entries(),
         limits.max_history_bytes(),
+        limits.max_retained_candidate_bytes(),
     )
     .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert_eq!(snapshot_physical_revision(&snapshot, wider)?, fresh);
@@ -137,6 +138,7 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
         limits.max_text_bytes(),
         limits.max_history_entries(),
         limits.max_history_bytes(),
+        limits.max_retained_candidate_bytes(),
     )
     .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(matches!(

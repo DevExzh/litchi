@@ -1,0 +1,14 @@
+# per-callee call counts summed over the shared fn/cfn name-compression table
+# /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0656/counts-final/cg-after-pptx_cross_copy_plain_lifecycle-s1.out
+        40  litchi_pptx::opened::model::package_fingerprint
+        17  litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+        16  litchi_pptx::opened::cross_copy_plan::snapshot_physical_revision
+         6  litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+         8  litchi_pptx::opened::cross_copy_plan::build_candidate
+        10  litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides
+        36  litchi_pptx::opened::model::capture_internal
+        24  litchi_opc::pkgwriter::PackageWriter::write_to_stream
+         7  litchi_opc::package::OpcPackage::from_vec_reusing_payloads
+       812  zlib_rs::deflate::deflate
+      8969  sha2::sha256::compress256
+        12  soapberry_zip::preserve::PreservationIndex<R>::write_to
