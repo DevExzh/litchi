@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0664 — the codec's rewriting branch is on a selector at last: 77.21× the generated corpus, 20.23× a byte-identical control
+
+Record: [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md).
+Change 0649 found that every prior PPTX record measured on corpora whose members
+never mention the markup-compatibility namespace, so the branch that costs 93.9%
+of a real deck's edit was never on a harness selector. Four new corpora close
+that: a marker-bearing PPTX deck and DOCX document derived from three real
+tracked fixtures by a retained script, each with a **marker-stripped control**
+whose members, member lengths, start-tag counts, attribute counts and projected
+text are proved identical and whose only difference is which branch of
+`process_markup_compatibility` each part takes. `pptx_marker_ordinary_save_edit`
+— 0649's phase — is **150.368 ms at a 0.73% A/A floor, 77.21× the generated
+corpus's 1.948 ms and 20.23× its own control's 7.432 ms**, decomposing 3.82 ×
+20.23 = 77.3 where 0649's real deck decomposed 5.57 × 13.9 = 77. The read
+scenarios give the cleanest per-byte figures the program has: PPTX eager and
+source-backed full text at **12.88× and 13.20×** their controls (0649 measured
+13.9× natively on the real deck with a different instrument), DOCX at **25.55×
+and 30.59×**, where the roots carry 33 declarations instead of 6. The allocator
+agrees: the marker edit allocates **146,233,844 bytes over 418,273 calls**
+against the control's 6,986,277 over 99,367 — a 20.93× byte ratio against the
+clock's 20.23× — and 2,975× its own 49 KB archive. Change 0653 now has a
+selector to land its codec change against. Two facts the census settles: the
+deck's 43 marker-bearing members are its slides, layouts, masters and
+`presentation.xml` but **not** its themes, and the deck carries **no
+`mc:Ignorable` at all** — the bare `xmlns:mc` declaration is the whole trigger.
+
 ## 0660 — the DOCX edit's last whole-document pass is gone, and the thing that now bounds it is the publication audit
 
 Record: [0660](0660-docx-compaction-policy.md).

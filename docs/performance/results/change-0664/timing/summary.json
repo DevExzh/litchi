@@ -1,0 +1,746 @@
+{
+  "allocation": {
+    "docx_marker_control_ordinary_save_atomic_publish": {
+      "allocated_bytes": 1022366.0,
+      "allocation_calls": 7141.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 980973.0,
+      "reallocation_calls": 1276.0,
+      "region_peak_live_bytes": 1456355.0,
+      "retained_live_bytes": 41393.0
+    },
+    "docx_marker_control_ordinary_save_counting_publish": {
+      "allocated_bytes": 956337.0,
+      "allocation_calls": 7136.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 914944.0,
+      "reallocation_calls": 1274.0,
+      "region_peak_live_bytes": 1493132.0,
+      "retained_live_bytes": 41393.0
+    },
+    "docx_marker_control_ordinary_save_edit": {
+      "allocated_bytes": 5454751.0,
+      "allocation_calls": 8292.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 5046872.0,
+      "reallocation_calls": 852.0,
+      "region_peak_live_bytes": 773719.0,
+      "retained_live_bytes": 407879.0
+    },
+    "docx_marker_control_ordinary_save_lifecycle": {
+      "allocated_bytes": 7004259.0,
+      "allocation_calls": 16231.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 6459120.0,
+      "reallocation_calls": 2277.0,
+      "region_peak_live_bytes": 1365575.0,
+      "retained_live_bytes": 545139.0
+    },
+    "docx_marker_ordinary_save_atomic_publish": {
+      "allocated_bytes": 1022366.0,
+      "allocation_calls": 7141.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 980973.0,
+      "reallocation_calls": 1276.0,
+      "region_peak_live_bytes": 1282308.0,
+      "retained_live_bytes": 41393.0
+    },
+    "docx_marker_ordinary_save_counting_publish": {
+      "allocated_bytes": 956337.0,
+      "allocation_calls": 7136.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 914944.0,
+      "reallocation_calls": 1274.0,
+      "region_peak_live_bytes": 1328235.0,
+      "retained_live_bytes": 41393.0
+    },
+    "docx_marker_ordinary_save_edit": {
+      "allocated_bytes": 8886818.0,
+      "allocation_calls": 11848.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 8478939.0,
+      "reallocation_calls": 877.0,
+      "region_peak_live_bytes": 1875978.0,
+      "retained_live_bytes": 407879.0
+    },
+    "docx_marker_ordinary_save_lifecycle": {
+      "allocated_bytes": 10436205.0,
+      "allocation_calls": 19787.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 9891187.0,
+      "reallocation_calls": 2302.0,
+      "region_peak_live_bytes": 1835102.0,
+      "retained_live_bytes": 545018.0
+    },
+    "docx_ordinary_save_atomic_publish": {
+      "allocated_bytes": 867437.0,
+      "allocation_calls": 6528.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 845862.0,
+      "reallocation_calls": 1266.0,
+      "region_peak_live_bytes": 1192323.0,
+      "retained_live_bytes": 21575.0
+    },
+    "docx_ordinary_save_counting_publish": {
+      "allocated_bytes": 801408.0,
+      "allocation_calls": 6523.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 779833.0,
+      "reallocation_calls": 1264.0,
+      "region_peak_live_bytes": 1238236.0,
+      "retained_live_bytes": 21575.0
+    },
+    "docx_ordinary_save_edit": {
+      "allocated_bytes": 1768329.0,
+      "allocation_calls": 8277.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 1380268.0,
+      "reallocation_calls": 837.0,
+      "region_peak_live_bytes": 544685.0,
+      "retained_live_bytes": 388061.0
+    },
+    "docx_ordinary_save_lifecycle": {
+      "allocated_bytes": 3139880.0,
+      "allocation_calls": 15603.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 2657405.0,
+      "reallocation_calls": 2252.0,
+      "region_peak_live_bytes": 1110727.0,
+      "retained_live_bytes": 482475.0
+    },
+    "pptx_marker_control_ordinary_save_atomic_publish": {
+      "allocated_bytes": 642041.0,
+      "allocation_calls": 615.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 642041.0,
+      "reallocation_calls": 99.0,
+      "region_peak_live_bytes": 1473915.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_marker_control_ordinary_save_counting_publish": {
+      "allocated_bytes": 711927.0,
+      "allocation_calls": 618.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 711927.0,
+      "reallocation_calls": 104.0,
+      "region_peak_live_bytes": 1643602.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_marker_control_ordinary_save_edit": {
+      "allocated_bytes": 6986277.0,
+      "allocation_calls": 99367.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 6969218.0,
+      "reallocation_calls": 1244.0,
+      "region_peak_live_bytes": 1026706.0,
+      "retained_live_bytes": 17059.0
+    },
+    "pptx_marker_control_ordinary_save_lifecycle": {
+      "allocated_bytes": 11355385.0,
+      "allocation_calls": 103987.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 10874983.0,
+      "reallocation_calls": 2180.0,
+      "region_peak_live_bytes": 1383091.0,
+      "retained_live_bytes": 480402.0
+    },
+    "pptx_marker_ordinary_save_atomic_publish": {
+      "allocated_bytes": 642041.0,
+      "allocation_calls": 615.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 642041.0,
+      "reallocation_calls": 99.0,
+      "region_peak_live_bytes": 1299219.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_marker_ordinary_save_counting_publish": {
+      "allocated_bytes": 711927.0,
+      "allocation_calls": 618.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 711927.0,
+      "reallocation_calls": 104.0,
+      "region_peak_live_bytes": 1476332.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_marker_ordinary_save_edit": {
+      "allocated_bytes": 146233844.0,
+      "allocation_calls": 418273.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 146216785.0,
+      "reallocation_calls": 27576.0,
+      "region_peak_live_bytes": 2074589.0,
+      "retained_live_bytes": 17059.0
+    },
+    "pptx_marker_ordinary_save_lifecycle": {
+      "allocated_bytes": 150648260.0,
+      "allocation_calls": 423025.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 150168286.0,
+      "reallocation_calls": 28523.0,
+      "region_peak_live_bytes": 2033691.0,
+      "retained_live_bytes": 479974.0
+    },
+    "pptx_ordinary_save_atomic_publish": {
+      "allocated_bytes": 607345.0,
+      "allocation_calls": 362.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 607345.0,
+      "reallocation_calls": 95.0,
+      "region_peak_live_bytes": 1210664.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_ordinary_save_counting_publish": {
+      "allocated_bytes": 676211.0,
+      "allocation_calls": 365.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 676211.0,
+      "reallocation_calls": 100.0,
+      "region_peak_live_bytes": 1345127.0,
+      "retained_live_bytes": 0.0
+    },
+    "pptx_ordinary_save_edit": {
+      "allocated_bytes": 1614311.0,
+      "allocation_calls": 26794.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 1612754.0,
+      "reallocation_calls": 1029.0,
+      "region_peak_live_bytes": 776921.0,
+      "retained_live_bytes": 1557.0
+    },
+    "pptx_ordinary_save_lifecycle": {
+      "allocated_bytes": 5533803.0,
+      "allocation_calls": 31032.0,
+      "constant_across_samples": true,
+      "deallocated_bytes": 5288591.0,
+      "reallocation_calls": 1931.0,
+      "region_peak_live_bytes": 1119856.0,
+      "retained_live_bytes": 245212.0
+    }
+  },
+  "ratios": {
+    "docx eager text marker/control": 25.549029144069216,
+    "docx edit marker/control": 12.753872199772253,
+    "docx edit marker/generated": 19.62903605208126,
+    "docx lifecycle marker/control": 2.055647526808718,
+    "docx source text marker/control": 30.58835635277707,
+    "pptx atomic marker/control": 1.1004888562029276,
+    "pptx counting marker/control": 1.2338618412609523,
+    "pptx eager text marker/control": 12.877094673971909,
+    "pptx edit control/generated": 3.8161265560858393,
+    "pptx edit marker/control": 20.23174578315182,
+    "pptx edit marker/generated": 77.20690235906336,
+    "pptx lifecycle marker/control": 10.87417110516805,
+    "pptx lifecycle marker/generated": 20.369819693126022,
+    "pptx source text marker/control": 13.198515142658493
+  },
+  "timing": {
+    "docx_marker_control_eager_full_text": {
+      "aa_floor": 0.008345147039430305,
+      "mean_ns": 246146.90000000002,
+      "p50_median_ns": 244681,
+      "p50_spread": 0.04048941711723592,
+      "p95_ns": 252572,
+      "p99_ns": 254221,
+      "repeats": {
+        "A1": 244681,
+        "A2": 242656,
+        "R1": 243106,
+        "R2": 246051,
+        "R3": 252481
+      },
+      "samples": 50
+    },
+    "docx_marker_control_ordinary_save_atomic_publish": {
+      "aa_floor": null,
+      "mean_ns": 7798840.460000001,
+      "p50_median_ns": 6977551,
+      "p50_spread": 0.6747955163990346,
+      "p95_ns": 14080006,
+      "p99_ns": 17658725,
+      "repeats": {
+        "R1": 5452760,
+        "R2": 6977551,
+        "R3": 9132258
+      },
+      "samples": 50
+    },
+    "docx_marker_control_ordinary_save_counting_publish": {
+      "aa_floor": null,
+      "mean_ns": 601439.3,
+      "p50_median_ns": 561772,
+      "p50_spread": 0.037958537318949555,
+      "p95_ns": 582893,
+      "p99_ns": 2317992,
+      "repeats": {
+        "R1": 551918,
+        "R2": 561772,
+        "R3": 572868
+      },
+      "samples": 50
+    },
+    "docx_marker_control_ordinary_save_edit": {
+      "aa_floor": null,
+      "mean_ns": 594579.02,
+      "p50_median_ns": 595398,
+      "p50_spread": 0.040900682897609605,
+      "p95_ns": 613773,
+      "p99_ns": 616834,
+      "repeats": {
+        "R1": 595398,
+        "R2": 587643,
+        "R3": 611678
+      },
+      "samples": 50
+    },
+    "docx_marker_control_ordinary_save_lifecycle": {
+      "aa_floor": null,
+      "mean_ns": 6920508.719999998,
+      "p50_median_ns": 6743049,
+      "p50_spread": 0.5947473792767153,
+      "p95_ns": 9517179,
+      "p99_ns": 10479264,
+      "repeats": {
+        "R1": 6246558,
+        "R2": 6743049,
+        "R3": 9961682
+      },
+      "samples": 50
+    },
+    "docx_marker_control_source_full_text": {
+      "aa_floor": 0.0010069701985941713,
+      "mean_ns": 204960.43999999997,
+      "p50_median_ns": 203596,
+      "p50_spread": 0.023133974599537813,
+      "p95_ns": 210622,
+      "p99_ns": 211321,
+      "repeats": {
+        "A1": 203786,
+        "A2": 203581,
+        "R1": 202516,
+        "R2": 203596,
+        "R3": 207201
+      },
+      "samples": 50
+    },
+    "docx_marker_eager_full_text": {
+      "aa_floor": 0.00709222921393753,
+      "mean_ns": 6249712.0200000005,
+      "p50_median_ns": 6251362,
+      "p50_spread": 0.03815975793422873,
+      "p95_ns": 6323553,
+      "p99_ns": 6344313,
+      "repeats": {
+        "A1": 6251208,
+        "A2": 6295543,
+        "R1": 6271693,
+        "R2": 6064137,
+        "R3": 6251362
+      },
+      "samples": 50
+    },
+    "docx_marker_ordinary_save_atomic_publish": {
+      "aa_floor": null,
+      "mean_ns": 6634860.419999999,
+      "p50_median_ns": 6149927,
+      "p50_spread": 1.0716134816177882,
+      "p95_ns": 9000797,
+      "p99_ns": 10575325,
+      "repeats": {
+        "R1": 5516964,
+        "R2": 6149927,
+        "R3": 11429017
+      },
+      "samples": 50
+    },
+    "docx_marker_ordinary_save_counting_publish": {
+      "aa_floor": null,
+      "mean_ns": 601966.8599999996,
+      "p50_median_ns": 586463,
+      "p50_spread": 0.06489431851216347,
+      "p95_ns": 616213,
+      "p99_ns": 623324,
+      "repeats": {
+        "R1": 564148,
+        "R2": 600758,
+        "R3": 586463
+      },
+      "samples": 50
+    },
+    "docx_marker_ordinary_save_edit": {
+      "aa_floor": null,
+      "mean_ns": 7682151.300000002,
+      "p50_median_ns": 7593630,
+      "p50_spread": 0.42669658169422625,
+      "p95_ns": 8223263,
+      "p99_ns": 8270933,
+      "repeats": {
+        "R1": 7556960,
+        "R2": 7593630,
+        "R3": 10781489
+      },
+      "samples": 50
+    },
+    "docx_marker_ordinary_save_lifecycle": {
+      "aa_floor": null,
+      "mean_ns": 14296629.12,
+      "p50_median_ns": 13861332,
+      "p50_spread": 0.7598680700657915,
+      "p95_ns": 16950428,
+      "p99_ns": 18975882,
+      "repeats": {
+        "R1": 13542643,
+        "R2": 13861332,
+        "R3": 23833265
+      },
+      "samples": 50
+    },
+    "docx_marker_source_full_text": {
+      "aa_floor": 0.0010427323013570717,
+      "mean_ns": 6195738.779999998,
+      "p50_median_ns": 6227667,
+      "p50_spread": 0.041028848603676366,
+      "p95_ns": 6263974,
+      "p99_ns": 6287133,
+      "repeats": {
+        "A1": 6185672,
+        "A2": 6192122,
+        "R1": 6229979,
+        "R2": 6227667,
+        "R3": 6439463
+      },
+      "samples": 50
+    },
+    "docx_ordinary_save_atomic_publish": {
+      "aa_floor": null,
+      "mean_ns": 7594901.2,
+      "p50_median_ns": 6211892,
+      "p50_spread": 0.38737469673031905,
+      "p95_ns": 10466974,
+      "p99_ns": 11387009,
+      "repeats": {
+        "R1": 5256048,
+        "R2": 6211892,
+        "R3": 7292108
+      },
+      "samples": 50
+    },
+    "docx_ordinary_save_counting_publish": {
+      "aa_floor": null,
+      "mean_ns": 380566.42,
+      "p50_median_ns": 381037,
+      "p50_spread": 0.02403479523090759,
+      "p95_ns": 395362,
+      "p99_ns": 401773,
+      "repeats": {
+        "R1": 380282,
+        "R2": 381037,
+        "R3": 389422
+      },
+      "samples": 50
+    },
+    "docx_ordinary_save_edit": {
+      "aa_floor": null,
+      "mean_ns": 387407.6200000001,
+      "p50_median_ns": 386857,
+      "p50_spread": 0.03416791162491168,
+      "p95_ns": 396012,
+      "p99_ns": 398172,
+      "repeats": {
+        "R1": 383547,
+        "R2": 386857,
+        "R3": 396652
+      },
+      "samples": 50
+    },
+    "docx_ordinary_save_lifecycle": {
+      "aa_floor": null,
+      "mean_ns": 6150638.400000001,
+      "p50_median_ns": 6041171,
+      "p50_spread": 0.701823960811372,
+      "p95_ns": 7309359,
+      "p99_ns": 8641517,
+      "repeats": {
+        "R1": 5897221,
+        "R2": 6041171,
+        "R3": 10036032
+      },
+      "samples": 50
+    },
+    "docx_semantic_text_to_sink": {
+      "aa_floor": null,
+      "mean_ns": 197569.03999999998,
+      "p50_median_ns": 197061,
+      "p50_spread": 0.02949281644785732,
+      "p95_ns": 204241,
+      "p99_ns": 207341,
+      "repeats": {
+        "R1": 193776,
+        "R2": 197061,
+        "R3": 199491
+      },
+      "samples": 50
+    },
+    "docx_source_text_to_sink": {
+      "aa_floor": null,
+      "mean_ns": 284318.62000000005,
+      "p50_median_ns": 281506,
+      "p50_spread": 0.03883160503967497,
+      "p95_ns": 289951,
+      "p99_ns": 291212,
+      "repeats": {
+        "R1": 272716,
+        "R2": 283306,
+        "R3": 281506
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_eager_full_text": {
+      "aa_floor": 0.030734339528845807,
+      "mean_ns": 4519704.400000002,
+      "p50_median_ns": 4516574,
+      "p50_spread": 0.030734339528845807,
+      "p95_ns": 4546364,
+      "p99_ns": 4735075,
+      "repeats": {
+        "A1": 4636174,
+        "A2": 4497933,
+        "R1": 4516574,
+        "R2": 4508063,
+        "R3": 4597228
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_ordinary_save_atomic_publish": {
+      "aa_floor": 2.405606613079819,
+      "mean_ns": 6942687.46,
+      "p50_median_ns": 6674969,
+      "p50_spread": 2.405606613079819,
+      "p95_ns": 9973362,
+      "p99_ns": 10882529,
+      "repeats": {
+        "A1": 18435887,
+        "A2": 5413393,
+        "R1": 5470514,
+        "R2": 6674969,
+        "R3": 10028910
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_ordinary_save_counting_publish": {
+      "aa_floor": 0.6070206529888896,
+      "mean_ns": 177742.92000000004,
+      "p50_median_ns": 171426,
+      "p50_spread": 0.6070206529888896,
+      "p95_ns": 197511,
+      "p99_ns": 218111,
+      "repeats": {
+        "A1": 235766,
+        "A2": 146710,
+        "R1": 166120,
+        "R2": 175881,
+        "R3": 171426
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_ordinary_save_edit": {
+      "aa_floor": 0.8656384746031125,
+      "mean_ns": 7491802.98,
+      "p50_median_ns": 7432269,
+      "p50_spread": 0.8737726528563157,
+      "p95_ns": 8128783,
+      "p99_ns": 8205613,
+      "repeats": {
+        "A1": 13865927,
+        "A2": 7432269,
+        "R1": 7400005,
+        "R2": 7408724,
+        "R3": 7676598
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_ordinary_save_lifecycle": {
+      "aa_floor": 1.190843154261277,
+      "mean_ns": 16122303.860000001,
+      "p50_median_ns": 15031913,
+      "p50_spread": 1.2043231288351814,
+      "p95_ns": 21646373,
+      "p99_ns": 25095311,
+      "repeats": {
+        "A1": 29647390,
+        "A2": 13532411,
+        "R1": 13449657,
+        "R2": 15031913,
+        "R3": 22393772
+      },
+      "samples": 50
+    },
+    "pptx_marker_control_source_full_text": {
+      "aa_floor": 0.03294180933360397,
+      "mean_ns": 4408062.54,
+      "p50_median_ns": 4406888,
+      "p50_spread": 0.036334956176811976,
+      "p95_ns": 4423743,
+      "p99_ns": 4437724,
+      "repeats": {
+        "A1": 4523999,
+        "A2": 4379723,
+        "R1": 4406888,
+        "R2": 4365383,
+        "R3": 4469543
+      },
+      "samples": 50
+    },
+    "pptx_marker_eager_full_text": {
+      "aa_floor": 0.003444565810501546,
+      "mean_ns": 58487232.62000001,
+      "p50_median_ns": 58160351,
+      "p50_spread": 0.03866240562146477,
+      "p95_ns": 59365427,
+      "p99_ns": 59466688,
+      "repeats": {
+        "A1": 57632808,
+        "A2": 57831328,
+        "R1": 58160351,
+        "R2": 58778801,
+        "R3": 59861031
+      },
+      "samples": 50
+    },
+    "pptx_marker_ordinary_save_atomic_publish": {
+      "aa_floor": 0.8264024870188779,
+      "mean_ns": 7627219.0200000005,
+      "p50_median_ns": 7345729,
+      "p50_spread": 2.8871356524985727,
+      "p95_ns": 11471152,
+      "p99_ns": 11875893,
+      "repeats": {
+        "A1": 10038014,
+        "A2": 5496058,
+        "R1": 7345729,
+        "R2": 5540130,
+        "R3": 21363923
+      },
+      "samples": 50
+    },
+    "pptx_marker_ordinary_save_counting_publish": {
+      "aa_floor": 0.13133346176855298,
+      "mean_ns": 213030.25999999995,
+      "p50_median_ns": 211516,
+      "p50_spread": 0.23743084999538547,
+      "p95_ns": 225651,
+      "p99_ns": 232111,
+      "repeats": {
+        "A1": 223151,
+        "A2": 197246,
+        "R1": 184201,
+        "R2": 211516,
+        "R3": 227936
+      },
+      "samples": 50
+    },
+    "pptx_marker_ordinary_save_edit": {
+      "aa_floor": 0.0072519659842865064,
+      "mean_ns": 152335865.34000006,
+      "p50_median_ns": 150367777,
+      "p50_spread": 0.03387506111212018,
+      "p95_ns": 157638824,
+      "p99_ns": 158171324,
+      "repeats": {
+        "A1": 148536411,
+        "A2": 149613592,
+        "R1": 150367777,
+        "R2": 152273974,
+        "R3": 153568091
+      },
+      "samples": 50
+    },
+    "pptx_marker_ordinary_save_lifecycle": {
+      "aa_floor": 0.0036920490320067455,
+      "mean_ns": 164717820.76000002,
+      "p50_median_ns": 163459594,
+      "p50_spread": 0.0792333735234974,
+      "p95_ns": 188125888,
+      "p99_ns": 213889166,
+      "repeats": {
+        "A1": 163750263,
+        "A2": 164354837,
+        "R1": 163459594,
+        "R2": 152288505,
+        "R3": 162530595
+      },
+      "samples": 50
+    },
+    "pptx_marker_source_full_text": {
+      "aa_floor": 0.016802194088268177,
+      "mean_ns": 58166132.42000002,
+      "p50_median_ns": 58164378,
+      "p50_spread": 0.02516144361944251,
+      "p95_ns": 58626445,
+      "p99_ns": 59679143,
+      "repeats": {
+        "A1": 58649238,
+        "A2": 57680086,
+        "R1": 57628013,
+        "R2": 58164378,
+        "R3": 59078017
+      },
+      "samples": 50
+    },
+    "pptx_ordinary_save_atomic_publish": {
+      "aa_floor": null,
+      "mean_ns": 5438599.399999999,
+      "p50_median_ns": 5445924,
+      "p50_spread": 0.4136532486320624,
+      "p95_ns": 5597080,
+      "p99_ns": 5622319,
+      "repeats": {
+        "R1": 5174578,
+        "R2": 5445924,
+        "R3": 7315059
+      },
+      "samples": 50
+    },
+    "pptx_ordinary_save_counting_publish": {
+      "aa_floor": null,
+      "mean_ns": 114587.54000000001,
+      "p50_median_ns": 124095,
+      "p50_spread": 0.5187663000340175,
+      "p95_ns": 132490,
+      "p99_ns": 135031,
+      "repeats": {
+        "R1": 124095,
+        "R2": 88190,
+        "R3": 133940
+      },
+      "samples": 50
+    },
+    "pptx_ordinary_save_edit": {
+      "aa_floor": null,
+      "mean_ns": 1948440.22,
+      "p50_median_ns": 1947595,
+      "p50_spread": 1.5972330919095814,
+      "p95_ns": 1960380,
+      "p99_ns": 1971980,
+      "repeats": {
+        "R1": 1928145,
+        "R2": 1947595,
+        "R3": 5007842
+      },
+      "samples": 50
+    },
+    "pptx_ordinary_save_lifecycle": {
+      "aa_floor": null,
+      "mean_ns": 8420751.34,
+      "p50_median_ns": 8024597,
+      "p50_spread": 0.2797336460292077,
+      "p95_ns": 11252068,
+      "p99_ns": 11778111,
+      "repeats": {
+        "R1": 7680306,
+        "R2": 8024597,
+        "R3": 9828746
+      },
+      "samples": 50
+    }
+  }
+}

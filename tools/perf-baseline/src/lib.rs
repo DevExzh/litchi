@@ -22,6 +22,7 @@ mod docx_story_hyperlinks;
 mod docx_streaming_create;
 mod facade_ole2;
 mod filesystem;
+mod marker_shape;
 pub mod odp_append_attribution;
 mod odp_buffered_create;
 mod odp_existing_append;
@@ -1438,6 +1439,32 @@ enum Case {
     PptxRealFileOrdinarySaveEdit,
     PptxRealFileOrdinarySaveAtomicPublish,
     PptxRealFileOrdinarySaveCountingPublish,
+    PptxMarkerEagerFullText,
+    PptxMarkerSourceFullText,
+    PptxMarkerControlEagerFullText,
+    PptxMarkerControlSourceFullText,
+    DocxMarkerEagerFullText,
+    DocxMarkerSourceFullText,
+    DocxMarkerControlEagerFullText,
+    DocxMarkerControlSourceFullText,
+    DocxMarkerOrdinarySaveLifecycle,
+    DocxMarkerOrdinarySaveEdit,
+    DocxMarkerOrdinarySaveAtomicPublish,
+    DocxMarkerOrdinarySaveCountingPublish,
+    DocxMarkerControlOrdinarySaveLifecycle,
+    DocxMarkerControlOrdinarySaveEdit,
+    DocxMarkerControlOrdinarySaveAtomicPublish,
+    DocxMarkerControlOrdinarySaveCountingPublish,
+    PptxMarkerOrdinarySaveLifecycle,
+    PptxMarkerOrdinarySaveEdit,
+    PptxMarkerOrdinarySaveAtomicPublish,
+    PptxMarkerOrdinarySaveCountingPublish,
+    PptxMarkerControlOrdinarySaveLifecycle,
+    PptxMarkerControlOrdinarySaveEdit,
+    PptxMarkerControlOrdinarySaveAtomicPublish,
+    PptxMarkerControlOrdinarySaveCountingPublish,
+    DocxSemanticTextToSink,
+    DocxSourceTextToSink,
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
@@ -2114,6 +2141,48 @@ impl Case {
             Self::PptxRealFileOrdinarySaveCountingPublish => {
                 "pptx_real_file_ordinary_save_counting_publish"
             },
+            Self::PptxMarkerEagerFullText => "pptx_marker_eager_full_text",
+            Self::PptxMarkerSourceFullText => "pptx_marker_source_full_text",
+            Self::PptxMarkerControlEagerFullText => "pptx_marker_control_eager_full_text",
+            Self::PptxMarkerControlSourceFullText => "pptx_marker_control_source_full_text",
+            Self::DocxMarkerEagerFullText => "docx_marker_eager_full_text",
+            Self::DocxMarkerSourceFullText => "docx_marker_source_full_text",
+            Self::DocxMarkerControlEagerFullText => "docx_marker_control_eager_full_text",
+            Self::DocxMarkerControlSourceFullText => "docx_marker_control_source_full_text",
+            Self::DocxMarkerOrdinarySaveLifecycle => "docx_marker_ordinary_save_lifecycle",
+            Self::DocxMarkerOrdinarySaveEdit => "docx_marker_ordinary_save_edit",
+            Self::DocxMarkerOrdinarySaveAtomicPublish => "docx_marker_ordinary_save_atomic_publish",
+            Self::DocxMarkerOrdinarySaveCountingPublish => {
+                "docx_marker_ordinary_save_counting_publish"
+            },
+            Self::DocxMarkerControlOrdinarySaveLifecycle => {
+                "docx_marker_control_ordinary_save_lifecycle"
+            },
+            Self::DocxMarkerControlOrdinarySaveEdit => "docx_marker_control_ordinary_save_edit",
+            Self::DocxMarkerControlOrdinarySaveAtomicPublish => {
+                "docx_marker_control_ordinary_save_atomic_publish"
+            },
+            Self::DocxMarkerControlOrdinarySaveCountingPublish => {
+                "docx_marker_control_ordinary_save_counting_publish"
+            },
+            Self::PptxMarkerOrdinarySaveLifecycle => "pptx_marker_ordinary_save_lifecycle",
+            Self::PptxMarkerOrdinarySaveEdit => "pptx_marker_ordinary_save_edit",
+            Self::PptxMarkerOrdinarySaveAtomicPublish => "pptx_marker_ordinary_save_atomic_publish",
+            Self::PptxMarkerOrdinarySaveCountingPublish => {
+                "pptx_marker_ordinary_save_counting_publish"
+            },
+            Self::PptxMarkerControlOrdinarySaveLifecycle => {
+                "pptx_marker_control_ordinary_save_lifecycle"
+            },
+            Self::PptxMarkerControlOrdinarySaveEdit => "pptx_marker_control_ordinary_save_edit",
+            Self::PptxMarkerControlOrdinarySaveAtomicPublish => {
+                "pptx_marker_control_ordinary_save_atomic_publish"
+            },
+            Self::PptxMarkerControlOrdinarySaveCountingPublish => {
+                "pptx_marker_control_ordinary_save_counting_publish"
+            },
+            Self::DocxSemanticTextToSink => "docx_semantic_text_to_sink",
+            Self::DocxSourceTextToSink => "docx_source_text_to_sink",
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
@@ -2633,6 +2702,8 @@ impl Case {
                 | Self::DocxSemanticOneParagraph
                 | Self::DocxSemanticOneParagraphText
                 | Self::DocxSemanticFullText
+                | Self::DocxSemanticTextToSink
+                | Self::DocxSourceTextToSink
                 | Self::DocxSemanticCreateSmall
                 | Self::DocxSemanticNoopEditSave
                 | Self::DocxSemanticOneEditSave
@@ -3466,6 +3537,54 @@ impl Case {
             Self::PptxRealFileOrdinarySaveCountingPublish => {
                 Some((Format::Pptx, Origin::RealFile, Phase::CountingPublish))
             },
+            Self::DocxMarkerOrdinarySaveLifecycle => {
+                Some((Format::Docx, Origin::MarkerShape, Phase::Lifecycle))
+            },
+            Self::DocxMarkerOrdinarySaveEdit => {
+                Some((Format::Docx, Origin::MarkerShape, Phase::Edit))
+            },
+            Self::DocxMarkerOrdinarySaveAtomicPublish => {
+                Some((Format::Docx, Origin::MarkerShape, Phase::AtomicPublish))
+            },
+            Self::DocxMarkerOrdinarySaveCountingPublish => {
+                Some((Format::Docx, Origin::MarkerShape, Phase::CountingPublish))
+            },
+            Self::DocxMarkerControlOrdinarySaveLifecycle => {
+                Some((Format::Docx, Origin::MarkerControl, Phase::Lifecycle))
+            },
+            Self::DocxMarkerControlOrdinarySaveEdit => {
+                Some((Format::Docx, Origin::MarkerControl, Phase::Edit))
+            },
+            Self::DocxMarkerControlOrdinarySaveAtomicPublish => {
+                Some((Format::Docx, Origin::MarkerControl, Phase::AtomicPublish))
+            },
+            Self::DocxMarkerControlOrdinarySaveCountingPublish => {
+                Some((Format::Docx, Origin::MarkerControl, Phase::CountingPublish))
+            },
+            Self::PptxMarkerOrdinarySaveLifecycle => {
+                Some((Format::Pptx, Origin::MarkerShape, Phase::Lifecycle))
+            },
+            Self::PptxMarkerOrdinarySaveEdit => {
+                Some((Format::Pptx, Origin::MarkerShape, Phase::Edit))
+            },
+            Self::PptxMarkerOrdinarySaveAtomicPublish => {
+                Some((Format::Pptx, Origin::MarkerShape, Phase::AtomicPublish))
+            },
+            Self::PptxMarkerOrdinarySaveCountingPublish => {
+                Some((Format::Pptx, Origin::MarkerShape, Phase::CountingPublish))
+            },
+            Self::PptxMarkerControlOrdinarySaveLifecycle => {
+                Some((Format::Pptx, Origin::MarkerControl, Phase::Lifecycle))
+            },
+            Self::PptxMarkerControlOrdinarySaveEdit => {
+                Some((Format::Pptx, Origin::MarkerControl, Phase::Edit))
+            },
+            Self::PptxMarkerControlOrdinarySaveAtomicPublish => {
+                Some((Format::Pptx, Origin::MarkerControl, Phase::AtomicPublish))
+            },
+            Self::PptxMarkerControlOrdinarySaveCountingPublish => {
+                Some((Format::Pptx, Origin::MarkerControl, Phase::CountingPublish))
+            },
             _ => None,
         }
     }
@@ -3485,7 +3604,7 @@ impl Case {
 
     /// Every ordinary-save selector, in registration order.
     #[cfg(test)]
-    const ORDINARY_SAVE: [Self; 24] = [
+    const ORDINARY_SAVE: [Self; 40] = [
         Self::DocxOrdinarySaveLifecycle,
         Self::DocxOrdinarySaveEdit,
         Self::DocxOrdinarySaveAtomicPublish,
@@ -3510,6 +3629,22 @@ impl Case {
         Self::PptxRealFileOrdinarySaveEdit,
         Self::PptxRealFileOrdinarySaveAtomicPublish,
         Self::PptxRealFileOrdinarySaveCountingPublish,
+        Self::DocxMarkerOrdinarySaveLifecycle,
+        Self::DocxMarkerOrdinarySaveEdit,
+        Self::DocxMarkerOrdinarySaveAtomicPublish,
+        Self::DocxMarkerOrdinarySaveCountingPublish,
+        Self::DocxMarkerControlOrdinarySaveLifecycle,
+        Self::DocxMarkerControlOrdinarySaveEdit,
+        Self::DocxMarkerControlOrdinarySaveAtomicPublish,
+        Self::DocxMarkerControlOrdinarySaveCountingPublish,
+        Self::PptxMarkerOrdinarySaveLifecycle,
+        Self::PptxMarkerOrdinarySaveEdit,
+        Self::PptxMarkerOrdinarySaveAtomicPublish,
+        Self::PptxMarkerOrdinarySaveCountingPublish,
+        Self::PptxMarkerControlOrdinarySaveLifecycle,
+        Self::PptxMarkerControlOrdinarySaveEdit,
+        Self::PptxMarkerControlOrdinarySaveAtomicPublish,
+        Self::PptxMarkerControlOrdinarySaveCountingPublish,
     ];
 
     /// Producer-shape selectors whose corpus is a caller-named real file.
@@ -3518,6 +3653,52 @@ impl Case {
             self,
             Self::XlsxRealFileSourceOpen | Self::XlsxRealFileSourceSelectedCell
         )
+    }
+
+    /// Opt-in read selectors over the marker-bearing corpora and their
+    /// marker-stripped controls (change 0664).  Each pair prices the markup-
+    /// compatibility codec's rewriting branch against its borrowing branch on
+    /// packages whose members, member lengths, element counts and attribute
+    /// counts are identical.  None is in `Case::DEFAULT`.
+    const fn is_marker_shape(self) -> bool {
+        self.marker_shape_plan().is_some()
+    }
+
+    const fn marker_shape_plan(
+        self,
+    ) -> Option<(
+        marker_shape::Family,
+        marker_shape::Variant,
+        marker_shape::Scenario,
+    )> {
+        use marker_shape::{Family, Scenario, Variant};
+        match self {
+            Self::PptxMarkerEagerFullText => {
+                Some((Family::Pptx, Variant::Marker, Scenario::EagerFullText))
+            },
+            Self::PptxMarkerSourceFullText => {
+                Some((Family::Pptx, Variant::Marker, Scenario::SourceFullText))
+            },
+            Self::PptxMarkerControlEagerFullText => {
+                Some((Family::Pptx, Variant::Control, Scenario::EagerFullText))
+            },
+            Self::PptxMarkerControlSourceFullText => {
+                Some((Family::Pptx, Variant::Control, Scenario::SourceFullText))
+            },
+            Self::DocxMarkerEagerFullText => {
+                Some((Family::Docx, Variant::Marker, Scenario::EagerFullText))
+            },
+            Self::DocxMarkerSourceFullText => {
+                Some((Family::Docx, Variant::Marker, Scenario::SourceFullText))
+            },
+            Self::DocxMarkerControlEagerFullText => {
+                Some((Family::Docx, Variant::Control, Scenario::EagerFullText))
+            },
+            Self::DocxMarkerControlSourceFullText => {
+                Some((Family::Docx, Variant::Control, Scenario::SourceFullText))
+            },
+            _ => None,
+        }
     }
 
     const fn producer_shape_scenario(self) -> Option<producer_shape::Scenario> {
@@ -3897,6 +4078,8 @@ struct Options {
     real_file: Option<PathBuf>,
     /// Sidecar path for the producer-shape marker and refusal census.
     producer_evidence: Option<PathBuf>,
+    /// Sidecar path for the marker-shape per-member census of change 0664.
+    marker_evidence: Option<PathBuf>,
     /// Caller-named OLE2 fixtures for the opt-in `*_range_source_*` and
     /// `*_owned_source_control_*` selectors of change 0627.  The flag is
     /// repeatable and each file is bound to its format by its CFB stream
@@ -9595,6 +9778,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_root_file()
                     && !case.is_xlsx_bytes_root_file()
                     && !case.is_producer_shape()
+                    && !case.is_marker_shape()
                     && !case.is_ole2_range_source()
                     && !case.is_facade_ole2()
                     && !case.is_ordinary_save()
@@ -11535,6 +11719,54 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // Opt-in marker-bearing selectors (change 0664).  Each (family, variant)
+    // pair builds its corpus once; the pair is proved byte-comparable before
+    // any sample runs, so the two legs differ only in the codec branch.
+    if options.cases.iter().any(|case| case.is_marker_shape()) {
+        let mut marker_evidence = Vec::new();
+        for family in marker_shape::Family::ALL {
+            let mut built: Vec<(marker_shape::Variant, marker_shape::MarkerCorpus)> = Vec::new();
+            for variant in marker_shape::Variant::ALL {
+                if !options.cases.iter().any(|case| {
+                    case.marker_shape_plan()
+                        .is_some_and(|(plan_family, plan_variant, _)| {
+                            plan_family == family && plan_variant == variant
+                        })
+                }) {
+                    continue;
+                }
+                built.push((variant, marker_shape::build(family, variant)?));
+            }
+            if built.len() == 2 {
+                marker_shape::prove_control_is_byte_comparable(&built[0].1, &built[1].1)?;
+            }
+            for (variant, corpus) in &built {
+                marker_evidence.push(corpus.evidence.clone());
+                for case in options.cases.iter().copied().filter(|case| {
+                    case.marker_shape_plan()
+                        .is_some_and(|(plan_family, plan_variant, _)| {
+                            plan_family == family && plan_variant == *variant
+                        })
+                }) {
+                    let (_, _, scenario) = case
+                        .marker_shape_plan()
+                        .ok_or("marker-shape case has no plan")?;
+                    results.push(marker_shape::run_case(
+                        case,
+                        scenario,
+                        family,
+                        corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?);
+                }
+            }
+        }
+        if let Some(path) = options.marker_evidence.as_deref() {
+            marker_shape::write_evidence(path, &marker_evidence)?;
+        }
+    }
+
     if options.cases.iter().any(|case| case.is_ole2_range_source()) {
         if options.ole2_files.is_empty() {
             return Err(
@@ -11664,7 +11896,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
                 let real_file = match origin {
-                    ordinary_save::Origin::Generated => None,
+                    ordinary_save::Origin::Generated
+                    | ordinary_save::Origin::MarkerShape
+                    | ordinary_save::Origin::MarkerControl => None,
                     ordinary_save::Origin::RealFile => Some(
                         ooxml_inputs
                             .get(format)
@@ -12006,6 +12240,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut corpus_manifest = None;
     let mut real_file = None;
     let mut producer_evidence = None;
+    let mut marker_evidence = None;
     let mut ole2_files: Vec<PathBuf> = Vec::new();
     let mut ooxml_files: Vec<PathBuf> = Vec::new();
     let mut arguments = std::env::args().skip(1);
@@ -12122,6 +12357,11 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                         .ok_or("--producer-evidence requires PATH")?,
                 ));
             },
+            "--marker-evidence" => {
+                marker_evidence = Some(PathBuf::from(
+                    arguments.next().ok_or("--marker-evidence requires PATH")?,
+                ));
+            },
             "--ole2-file" => {
                 ole2_files.push(PathBuf::from(
                     arguments.next().ok_or("--ole2-file requires PATH")?,
@@ -12162,6 +12402,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         corpus_manifest,
         real_file,
         producer_evidence,
+        marker_evidence,
         ole2_files,
         ooxml_files,
     })
@@ -12724,6 +12965,52 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_real_file_ordinary_save_counting_publish" => {
             Some(Case::PptxRealFileOrdinarySaveCountingPublish)
         },
+        "pptx_marker_eager_full_text" => Some(Case::PptxMarkerEagerFullText),
+        "pptx_marker_source_full_text" => Some(Case::PptxMarkerSourceFullText),
+        "pptx_marker_control_eager_full_text" => Some(Case::PptxMarkerControlEagerFullText),
+        "pptx_marker_control_source_full_text" => Some(Case::PptxMarkerControlSourceFullText),
+        "docx_marker_eager_full_text" => Some(Case::DocxMarkerEagerFullText),
+        "docx_marker_source_full_text" => Some(Case::DocxMarkerSourceFullText),
+        "docx_marker_control_eager_full_text" => Some(Case::DocxMarkerControlEagerFullText),
+        "docx_marker_control_source_full_text" => Some(Case::DocxMarkerControlSourceFullText),
+        "docx_marker_ordinary_save_lifecycle" => Some(Case::DocxMarkerOrdinarySaveLifecycle),
+        "docx_marker_ordinary_save_edit" => Some(Case::DocxMarkerOrdinarySaveEdit),
+        "docx_marker_ordinary_save_atomic_publish" => {
+            Some(Case::DocxMarkerOrdinarySaveAtomicPublish)
+        },
+        "docx_marker_ordinary_save_counting_publish" => {
+            Some(Case::DocxMarkerOrdinarySaveCountingPublish)
+        },
+        "docx_marker_control_ordinary_save_lifecycle" => {
+            Some(Case::DocxMarkerControlOrdinarySaveLifecycle)
+        },
+        "docx_marker_control_ordinary_save_edit" => Some(Case::DocxMarkerControlOrdinarySaveEdit),
+        "docx_marker_control_ordinary_save_atomic_publish" => {
+            Some(Case::DocxMarkerControlOrdinarySaveAtomicPublish)
+        },
+        "docx_marker_control_ordinary_save_counting_publish" => {
+            Some(Case::DocxMarkerControlOrdinarySaveCountingPublish)
+        },
+        "pptx_marker_ordinary_save_lifecycle" => Some(Case::PptxMarkerOrdinarySaveLifecycle),
+        "pptx_marker_ordinary_save_edit" => Some(Case::PptxMarkerOrdinarySaveEdit),
+        "pptx_marker_ordinary_save_atomic_publish" => {
+            Some(Case::PptxMarkerOrdinarySaveAtomicPublish)
+        },
+        "pptx_marker_ordinary_save_counting_publish" => {
+            Some(Case::PptxMarkerOrdinarySaveCountingPublish)
+        },
+        "pptx_marker_control_ordinary_save_lifecycle" => {
+            Some(Case::PptxMarkerControlOrdinarySaveLifecycle)
+        },
+        "pptx_marker_control_ordinary_save_edit" => Some(Case::PptxMarkerControlOrdinarySaveEdit),
+        "pptx_marker_control_ordinary_save_atomic_publish" => {
+            Some(Case::PptxMarkerControlOrdinarySaveAtomicPublish)
+        },
+        "pptx_marker_control_ordinary_save_counting_publish" => {
+            Some(Case::PptxMarkerControlOrdinarySaveCountingPublish)
+        },
+        "docx_semantic_text_to_sink" => Some(Case::DocxSemanticTextToSink),
+        "docx_source_text_to_sink" => Some(Case::DocxSourceTextToSink),
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
@@ -13213,6 +13500,32 @@ fn usage_text() -> String {
                                        pptx_real_file_ordinary_save_edit,\n\
                                        pptx_real_file_ordinary_save_atomic_publish,\n\
                                        pptx_real_file_ordinary_save_counting_publish,\n\
+                                       docx_marker_ordinary_save_lifecycle,\n\
+                                       docx_marker_ordinary_save_edit,\n\
+                                       docx_marker_ordinary_save_atomic_publish,\n\
+                                       docx_marker_ordinary_save_counting_publish,\n\
+                                       docx_marker_control_ordinary_save_lifecycle,\n\
+                                       docx_marker_control_ordinary_save_edit,\n\
+                                       docx_marker_control_ordinary_save_atomic_publish,\n\
+                                       docx_marker_control_ordinary_save_counting_publish,\n\
+                                       pptx_marker_ordinary_save_lifecycle,\n\
+                                       pptx_marker_ordinary_save_edit,\n\
+                                       pptx_marker_ordinary_save_atomic_publish,\n\
+                                       pptx_marker_ordinary_save_counting_publish,\n\
+                                       pptx_marker_control_ordinary_save_lifecycle,\n\
+                                       pptx_marker_control_ordinary_save_edit,\n\
+                                       pptx_marker_control_ordinary_save_atomic_publish,\n\
+                                       pptx_marker_control_ordinary_save_counting_publish,\n\
+                                       pptx_marker_eager_full_text,\n\
+                                       pptx_marker_source_full_text,\n\
+                                       pptx_marker_control_eager_full_text,\n\
+                                       pptx_marker_control_source_full_text,\n\
+                                       docx_marker_eager_full_text,\n\
+                                       docx_marker_source_full_text,\n\
+                                       docx_marker_control_eager_full_text,\n\
+                                       docx_marker_control_source_full_text,\n\
+                                       docx_semantic_text_to_sink,\n\
+                                       docx_source_text_to_sink,\n\
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
@@ -13406,6 +13719,8 @@ fn usage_text() -> String {
                                        include its additive reference in the report\n\
            --real-file PATH            Office file for the opt-in xlsx_real_file_* selectors\n\
            --producer-evidence PATH    Write the producer-shape marker/refusal census\n\
+           --marker-evidence PATH      Write the marker-shape per-member census of the\n\
+                                       *_marker_* and *_marker_control_* corpora\n\
            --ole2-file PATH            OLE2 file for the opt-in *_range_source_*,\n\
                                        *_owned_source_control_* and *_facade_file_*\n\
                                        selectors; repeatable, at most one DOC, one XLS\n\
@@ -24272,6 +24587,16 @@ fn run_case_with_config(
         Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
             run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
+        Case::PptxMarkerEagerFullText
+        | Case::PptxMarkerSourceFullText
+        | Case::PptxMarkerControlEagerFullText
+        | Case::PptxMarkerControlSourceFullText
+        | Case::DocxMarkerEagerFullText
+        | Case::DocxMarkerSourceFullText
+        | Case::DocxMarkerControlEagerFullText
+        | Case::DocxMarkerControlSourceFullText => {
+            Err("marker-shape cases use their own corpus runner".into())
+        },
         Case::XlsxProducerMediumSourceOpen
         | Case::XlsxProducerMediumSourceSelectedCell
         | Case::XlsxProducerMediumSourcePlanning
@@ -24337,7 +24662,23 @@ fn run_case_with_config(
         | Case::PptxRealFileOrdinarySaveLifecycle
         | Case::PptxRealFileOrdinarySaveEdit
         | Case::PptxRealFileOrdinarySaveAtomicPublish
-        | Case::PptxRealFileOrdinarySaveCountingPublish => {
+        | Case::PptxRealFileOrdinarySaveCountingPublish
+        | Case::DocxMarkerOrdinarySaveLifecycle
+        | Case::DocxMarkerOrdinarySaveEdit
+        | Case::DocxMarkerOrdinarySaveAtomicPublish
+        | Case::DocxMarkerOrdinarySaveCountingPublish
+        | Case::DocxMarkerControlOrdinarySaveLifecycle
+        | Case::DocxMarkerControlOrdinarySaveEdit
+        | Case::DocxMarkerControlOrdinarySaveAtomicPublish
+        | Case::DocxMarkerControlOrdinarySaveCountingPublish
+        | Case::PptxMarkerOrdinarySaveLifecycle
+        | Case::PptxMarkerOrdinarySaveEdit
+        | Case::PptxMarkerOrdinarySaveAtomicPublish
+        | Case::PptxMarkerOrdinarySaveCountingPublish
+        | Case::PptxMarkerControlOrdinarySaveLifecycle
+        | Case::PptxMarkerControlOrdinarySaveEdit
+        | Case::PptxMarkerControlOrdinarySaveAtomicPublish
+        | Case::PptxMarkerControlOrdinarySaveCountingPublish => {
             Err("ordinary-save cases use their own corpus runner".into())
         },
         Case::XlsxStreamingCreate
@@ -24403,7 +24744,9 @@ fn run_case_with_config(
         | Case::RtfLogicalTailPlanNoopSave => {
             run_rtf_logical_tail_publication(case, corpus, warmup_iterations, samples)
         },
-        Case::DocxSemanticOpen
+        Case::DocxSemanticTextToSink
+        | Case::DocxSourceTextToSink
+        | Case::DocxSemanticOpen
         | Case::DocxSemanticListParagraphs
         | Case::DocxSemanticOneParagraph
         | Case::DocxSemanticOneParagraphText
@@ -32793,12 +33136,104 @@ fn run_docx_section_inventory(
     ))
 }
 
+/// The DOCX text-sink selectors change 0643 named as missing.
+///
+/// Change 0643 measured `write_text_to` on both DOCX facades with a throwaway
+/// probe and recorded that "the harness has no DOCX text-sink selector, so no
+/// `tools/perf-baseline` case covers this path".  These two selectors cover it,
+/// in the shape the RTF, ODT, ODS and ODP `*_semantic_text_to_sink` selectors
+/// already use: a bounded hashing discard sink, the documented
+/// `litchi_core::TextOutputOptions` limits, and the open outside the clock.
+fn run_docx_text_to_sink(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let paragraph_count = shape.docx_paragraphs();
+    let expected_text = (0..paragraph_count)
+        .map(|index| semantic_docx_text(index, false))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected_bytes = u64::try_from(expected_text.len())?;
+    let expected_objects = u64::try_from(paragraph_count)?;
+    let expected_digest = sha256_hex(expected_text.as_bytes());
+    let source_backed = case == Case::DocxSourceTextToSink;
+
+    // Freeze the oracle before any sample runs. `verify_semantic_docx` checks
+    // every paragraph's text against the generator's specification and checks
+    // that `Document::text` is their concatenation; the sink projection is the
+    // same paragraphs joined by the separator `options` selects, which is why
+    // the two digests differ and only this one is the sink's oracle.
+    let package = litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+    verify_semantic_docx(&package, shape, &[])?;
+    let paragraphs = package.document()?.paragraphs()?;
+    if paragraphs.len() != paragraph_count {
+        return Err("DOCX sink oracle paragraph count differs from the corpus".into());
+    }
+    drop(package);
+
+    let options = litchi_core::TextOutputOptions::new("\n", "", expected_bytes, expected_objects);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = HashingDiscardSink::without_authoring_window(expected_bytes);
+        let (duration, report) = if source_backed {
+            let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+                OwnedSource::new(corpus.archive.clone()),
+            ))?;
+            let started = Instant::now();
+            let report = package.write_text_to(&mut sink, options)?;
+            (started.elapsed(), report)
+        } else {
+            let package = litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+            let document = package.document()?;
+            let started = Instant::now();
+            let report = document.write_text_to(&mut sink, options)?;
+            (started.elapsed(), report)
+        };
+        let (summary, digest) = sink.finish();
+        if report.bytes_written() != expected_bytes
+            || report.objects_written() != expected_objects
+            || summary.accepted_bytes != expected_bytes
+            || digest != expected_digest
+        {
+            return Err("DOCX text sink evidence differs from expected semantics".into());
+        }
+        if summary.retained_output_bytes != Some(0)
+            || summary.write_calls == 0
+            || summary.largest_write == 0
+        {
+            return Err("DOCX text sink did not expose bounded write evidence".into());
+        }
+        std::hint::black_box(&report);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "semantic DOCX sequential text")?;
+    if sink.retained_output_bytes != Some(0) || sink.write_calls == 0 || sink.largest_write == 0 {
+        return Err("DOCX text sink summary is incomplete".into());
+    }
+    let mut result = result(case, corpus, elapsed, Some(sink));
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
+}
+
 fn run_semantic_docx(
     case: Case,
     corpus: &Corpus,
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    if matches!(
+        case,
+        Case::DocxSemanticTextToSink | Case::DocxSourceTextToSink
+    ) {
+        return run_docx_text_to_sink(case, corpus, warmup_iterations, samples);
+    }
     let shape = semantic_shape(corpus)?;
     let updates = semantic_update_indices(shape.docx_paragraphs())?;
     let selected = match case {
@@ -60158,7 +60593,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 501);
+        assert_eq!(selectable_count, 527);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 

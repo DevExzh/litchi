@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## 0664 — no boundary moved, and two defences recorded firing on new input
+
+Record: [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md).
+Nothing under `crates/` changed, so no ADR boundary could move: no public item,
+no error identity, no limit, no defence and no output byte differs from the base
+commit. ADR 0001's layering is untouched — the new module lives in `tools/` and
+depends on the published facades only. ADR 0005's no-leakage rules hold: the
+module holds no archive type, no raw lock and no executor, and the harness
+library keeps `#![forbid(unsafe_code)]`, with the single `unsafe` boundary still
+confined to the allocator binary's `GlobalAlloc` wrapper. ADR 0003's
+measurement discipline is what this change is for, and it is applied to itself:
+every corpus proves its own determinism and its control's byte-comparability
+before any sample runs, every oracle is read back out of the built package
+rather than asserted by the generator, and every floor is published beside its
+ratio including the four that disqualify their own rows. Two production defences
+are recorded **firing**, neither weakened nor relocated: the DOCX sink parser's
+cumulative `MAX_SEMANTIC_TEXT_NAMESPACE_BINDINGS` refuses the marker corpus with
+its typed `InvalidFormat` while admitting the byte-identical control, and
+`source_stream_eligible` is defeated on every marker-bearing part. Both are
+frozen as outcomes in the corpus census (`sink_refusal`,
+`markup_compatibility_namespace`) rather than omitted, which is change 0627's
+and 0638's rule applied to a corpus instead of a selector. The four
+harness-internal shapes that grew — `ordinary_save::Origin` from two variants to
+four, `Case` by 26 — are not public API and are covered by the harness's own
+registry tests.
+
 ## 0660 — compliant; ADR 0006 chooses the default, and a contract this record consults rather than moves
 
 Record: [0660](0660-docx-compaction-policy.md).

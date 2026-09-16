@@ -1,0 +1,26 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0664",
+  "scratch_directory": "session scratchpad, agents/0664",
+  "removed": [
+    "build-warm.txt, relbuild.txt — warm and release build transcripts; superseded by the gate tails",
+    "libtests.txt — a debug-profile `cargo test --lib --tests` transcript taken mid-wiring; superseded by the release run in gates.txt",
+    "smoke.json, smoke-census.json, smoke2.json, one.json — two-sample smoke runs taken while wiring the selectors; superseded by timing/ and census/marker-census.json",
+    "gates-driver.txt — the gate driver's own stdout; the tails it produced are retained in gates.txt",
+    "baseline.txt — the capture driver's stdout; every report it produced is retained in timing/",
+    "runs/*.txt — the harness's own stdout during each capture, empty on every run because the harness writes its report to --json",
+    "runs/census-run.json — the one-sample run that produced the census; the census itself is retained and the run carries no timing",
+    "a scratch `dump_census`/`dump_skeletons` unit test used to inspect the production writers' own packages and to probe the two real DOCX fixtures through the sink; removed from marker_shape.rs before the gates, its findings recorded in the record"
+  ],
+  "retained_outside_the_repository": [
+    "/home/zhuhe/code/litchi-worktrees/0664 — the worktree, removed after the commit",
+    "tools/perf-baseline/target inside that worktree — about 6 GiB of build output, removed with the worktree",
+    "/home/zhuhe/code/litchi-worktrees/targets/0664-stage — the staged binaries and the ordinary-save filesystem root, removed after the capture"
+  ],
+  "not_created": [
+    "no before-leg build directory under litchi-worktrees/targets: this change modifies no production code, so there is no before/after pair to build and the base checkout was never built",
+    "no profiler output: no callgrind or perf run was taken for this batch",
+    "no fixture copy: the derivation script reads the three fixtures in place and the harness reads no file at all"
+  ]
+}

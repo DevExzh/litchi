@@ -277,3 +277,69 @@ be asserted by a static map. These corpora are not in the default matrix and not
 in the checked default catalog, so neither `catalog_sha256` nor
 `content_set_sha256` moves for them. The archive identities measured by change
 0638 are recorded in [`results/change-0638/`](results/change-0638/README.md).
+
+## Opt-in marker-bearing corpora and their controls (change 0664)
+
+Change 0664 adds two generator identifiers and four corpora. They are the first
+generated corpora in this document whose point is that their members **mention
+the markup-compatibility namespace**, and the first that ship a byte-comparable
+counterpart that does not.
+
+| Generator ID | Family | Built from | What it adds |
+|---|---|---|---|
+| `litchi-pptx-marker-shape-v1` | `pptx` | `litchi_pptx::Package::new()` at 13 slides x 48 text boxes | `xmlns:p14`, `xmlns:p15` and `xmlns:mc` on the root of every slide, layout, master, notes master and `ppt/presentation.xml` (six bindings, as the fixture declares), and one `mc:AlternateContent` per slide wrapping a `p14:dur` transition |
+| `litchi-docx-marker-shape-v1` | `docx` | `semantic_docx_bytes(Medium)` | the 32-declaration Word root set with `mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"` on `word/document.xml`, the 10-declaration set on `styles.xml` and `webSettings.xml`, and `w14:paraId`/`w14:textId`/`w:rsidR` on every paragraph |
+
+`tools/perf-baseline/src/marker_shape.rs` is the generator source for both. The
+shape is **derived from real fixtures that are ordinary tracked files in this
+repository** by
+[`results/change-0664/scripts/derive_marker_shape.py`](results/change-0664/scripts/derive_marker_shape.py),
+whose `verify` mode re-derives the declaration sets and fails if the generator
+drifts from them: `slide-section-test.pptx` (change 0649's deck: 43 of 103
+members marker-bearing, 93.03% of its uncompressed bytes, six root bindings and
+no `mc:Ignorable` at all), `tdf89064.pptx` (the only PPTX fixture whose marker
+coverage reaches the notes parts) and `layout-in-cell-2.docx` (real Word output:
+10 of 21 members, 95.01% of its bytes, 32 root declarations on `document.xml`).
+The corpora themselves are still generated in memory and are a pure function of
+the family and variant; the generator reads no file.
+
+Each family is built in two variants. The **control** is the marker variant with
+every occurrence of the namespace URI replaced by an inert URI of exactly the
+same length, so member names, per-member uncompressed lengths, start-tag counts,
+attribute counts and the projected text are identical and are proved so before
+any sample runs. Only the compressed archive differs, because deflate sees
+different bytes — so unlike every other pair in this document, the two corpora
+of a pair have the **same** `uncompressed_payload_bytes` and different
+`archive_sha256`.
+
+| Corpus | Shape | Archive SHA-256 |
+|---|---|---|
+| `pptx-marker-deck-marker` | 13 slides x 48 text boxes | `09d80c6ccb1159fe3abfe56db0aaf2c548f4bbd7147a9ae3223bb50c14b112d5` |
+| `pptx-marker-deck-control` | the same, marker stripped | `3a33dd743d91f05a7a207dd537342154816d8e16993e84552519dea04c486070` |
+| `docx-marker-medium-marker` | 200 paragraphs | `1762bd514f05cb944874bd318f2a9302786e99f879a93ea46a59e2ee1ec67711` |
+| `docx-marker-medium-control` | the same, marker stripped | `c61354b61d9b9b82c0baf472289e09f643d772c94ee76f335ffdfad9e09d38a4` |
+
+Corpus IDs follow the ordinary rule, `pptx-opc-zip:sha256:<archive hash>` and
+`docx-opc-zip:sha256:<archive hash>`.
+
+Neither identifier is added to the generator family map in
+`tools/generate_corpus_manifest_v2.py` or `corpus_manifest.rs`, for the reason
+changes 0601, 0627 and 0638 gave: that map is the source-audited contract for
+the **default** catalog. These corpora are not in the default matrix and not in
+the checked default catalog, so neither `catalog_sha256` nor
+`content_set_sha256` moves for them.
+
+`--marker-evidence PATH` writes a sidecar under the schema
+`litchi.perf-baseline.marker-shape-evidence.v1` carrying, per corpus and per
+part, the marker census, the root declaration count, the start-tag and attribute
+counts, the corpus totals, what the production writer's own package already
+carried before the generator marked anything, and the frozen scenario oracles
+including any typed refusal. It is a harness output, not a catalog document, and
+does not participate in either catalog hash.
+
+One correction this census records. Change 0032's "the generated corpora are
+marker free" is true of the XLSX worksheets it measured and **not** of the DOCX
+writer: `litchi_docx::Package::new()` already declares `xmlns:mc` on
+`word/settings.xml`, `word/numbering.xml` and `word/fontTable.xml`. Every marker
+corpus reports its skeleton's own marker census beside the generator's, so the
+baseline is stated rather than assumed.

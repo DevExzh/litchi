@@ -1,0 +1,986 @@
+{
+  "derived_by": "docs/performance/results/change-0664/scripts/derive_marker_shape.py",
+  "docx": {
+    "census": {
+      "archive_bytes": 66189,
+      "archive_sha256": "4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad",
+      "markup_compatibility_byte_share": 0.950136,
+      "markup_compatibility_bytes": 440450,
+      "markup_compatibility_member_count": 10,
+      "member_count": 21,
+      "uncompressed_bytes": 463565
+    },
+    "fixture": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx",
+    "kinds": {
+      "docx-document": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 32,
+        "declarations": [
+          [
+            "wpc",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+          ],
+          [
+            "cx",
+            "http://schemas.microsoft.com/office/drawing/2014/chartex"
+          ],
+          [
+            "cx1",
+            "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex"
+          ],
+          [
+            "cx2",
+            "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex"
+          ],
+          [
+            "cx3",
+            "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex"
+          ],
+          [
+            "cx4",
+            "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex"
+          ],
+          [
+            "cx5",
+            "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex"
+          ],
+          [
+            "cx6",
+            "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex"
+          ],
+          [
+            "cx7",
+            "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex"
+          ],
+          [
+            "cx8",
+            "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "aink",
+            "http://schemas.microsoft.com/office/drawing/2016/ink"
+          ],
+          [
+            "am3d",
+            "http://schemas.microsoft.com/office/drawing/2017/model3d"
+          ],
+          [
+            "o",
+            "urn:schemas-microsoft-com:office:office"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "m",
+            "http://schemas.openxmlformats.org/officeDocument/2006/math"
+          ],
+          [
+            "v",
+            "urn:schemas-microsoft-com:vml"
+          ],
+          [
+            "wp14",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+          ],
+          [
+            "wp",
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+          ],
+          [
+            "w10",
+            "urn:schemas-microsoft-com:office:word"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ],
+          [
+            "wpg",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+          ],
+          [
+            "wpi",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+          ],
+          [
+            "wne",
+            "http://schemas.microsoft.com/office/word/2006/wordml"
+          ],
+          [
+            "wps",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          ]
+        ],
+        "example_part": "word/document.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"
+      },
+      "docx-endnotes": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 32,
+        "declarations": [
+          [
+            "wpc",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+          ],
+          [
+            "cx",
+            "http://schemas.microsoft.com/office/drawing/2014/chartex"
+          ],
+          [
+            "cx1",
+            "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex"
+          ],
+          [
+            "cx2",
+            "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex"
+          ],
+          [
+            "cx3",
+            "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex"
+          ],
+          [
+            "cx4",
+            "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex"
+          ],
+          [
+            "cx5",
+            "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex"
+          ],
+          [
+            "cx6",
+            "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex"
+          ],
+          [
+            "cx7",
+            "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex"
+          ],
+          [
+            "cx8",
+            "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "aink",
+            "http://schemas.microsoft.com/office/drawing/2016/ink"
+          ],
+          [
+            "am3d",
+            "http://schemas.microsoft.com/office/drawing/2017/model3d"
+          ],
+          [
+            "o",
+            "urn:schemas-microsoft-com:office:office"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "m",
+            "http://schemas.openxmlformats.org/officeDocument/2006/math"
+          ],
+          [
+            "v",
+            "urn:schemas-microsoft-com:vml"
+          ],
+          [
+            "wp14",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+          ],
+          [
+            "wp",
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+          ],
+          [
+            "w10",
+            "urn:schemas-microsoft-com:office:word"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ],
+          [
+            "wpg",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+          ],
+          [
+            "wpi",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+          ],
+          [
+            "wne",
+            "http://schemas.microsoft.com/office/word/2006/wordml"
+          ],
+          [
+            "wps",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          ]
+        ],
+        "example_part": "word/endnotes.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"
+      },
+      "docx-font-table": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 10,
+        "declarations": [
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ]
+        ],
+        "example_part": "word/fontTable.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh"
+      },
+      "docx-footnotes": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 32,
+        "declarations": [
+          [
+            "wpc",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+          ],
+          [
+            "cx",
+            "http://schemas.microsoft.com/office/drawing/2014/chartex"
+          ],
+          [
+            "cx1",
+            "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex"
+          ],
+          [
+            "cx2",
+            "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex"
+          ],
+          [
+            "cx3",
+            "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex"
+          ],
+          [
+            "cx4",
+            "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex"
+          ],
+          [
+            "cx5",
+            "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex"
+          ],
+          [
+            "cx6",
+            "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex"
+          ],
+          [
+            "cx7",
+            "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex"
+          ],
+          [
+            "cx8",
+            "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "aink",
+            "http://schemas.microsoft.com/office/drawing/2016/ink"
+          ],
+          [
+            "am3d",
+            "http://schemas.microsoft.com/office/drawing/2017/model3d"
+          ],
+          [
+            "o",
+            "urn:schemas-microsoft-com:office:office"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "m",
+            "http://schemas.openxmlformats.org/officeDocument/2006/math"
+          ],
+          [
+            "v",
+            "urn:schemas-microsoft-com:vml"
+          ],
+          [
+            "wp14",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+          ],
+          [
+            "wp",
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+          ],
+          [
+            "w10",
+            "urn:schemas-microsoft-com:office:word"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ],
+          [
+            "wpg",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+          ],
+          [
+            "wpi",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+          ],
+          [
+            "wne",
+            "http://schemas.microsoft.com/office/word/2006/wordml"
+          ],
+          [
+            "wps",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          ]
+        ],
+        "example_part": "word/footnotes.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"
+      },
+      "docx-numbering": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 32,
+        "declarations": [
+          [
+            "wpc",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+          ],
+          [
+            "cx",
+            "http://schemas.microsoft.com/office/drawing/2014/chartex"
+          ],
+          [
+            "cx1",
+            "http://schemas.microsoft.com/office/drawing/2015/9/8/chartex"
+          ],
+          [
+            "cx2",
+            "http://schemas.microsoft.com/office/drawing/2015/10/21/chartex"
+          ],
+          [
+            "cx3",
+            "http://schemas.microsoft.com/office/drawing/2016/5/9/chartex"
+          ],
+          [
+            "cx4",
+            "http://schemas.microsoft.com/office/drawing/2016/5/10/chartex"
+          ],
+          [
+            "cx5",
+            "http://schemas.microsoft.com/office/drawing/2016/5/11/chartex"
+          ],
+          [
+            "cx6",
+            "http://schemas.microsoft.com/office/drawing/2016/5/12/chartex"
+          ],
+          [
+            "cx7",
+            "http://schemas.microsoft.com/office/drawing/2016/5/13/chartex"
+          ],
+          [
+            "cx8",
+            "http://schemas.microsoft.com/office/drawing/2016/5/14/chartex"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "aink",
+            "http://schemas.microsoft.com/office/drawing/2016/ink"
+          ],
+          [
+            "am3d",
+            "http://schemas.microsoft.com/office/drawing/2017/model3d"
+          ],
+          [
+            "o",
+            "urn:schemas-microsoft-com:office:office"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "m",
+            "http://schemas.openxmlformats.org/officeDocument/2006/math"
+          ],
+          [
+            "v",
+            "urn:schemas-microsoft-com:vml"
+          ],
+          [
+            "wp14",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+          ],
+          [
+            "wp",
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+          ],
+          [
+            "w10",
+            "urn:schemas-microsoft-com:office:word"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ],
+          [
+            "wpg",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+          ],
+          [
+            "wpi",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+          ],
+          [
+            "wne",
+            "http://schemas.microsoft.com/office/word/2006/wordml"
+          ],
+          [
+            "wps",
+            "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+          ]
+        ],
+        "example_part": "word/numbering.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh wp14"
+      },
+      "docx-settings": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 15,
+        "declarations": [
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "o",
+            "urn:schemas-microsoft-com:office:office"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "m",
+            "http://schemas.openxmlformats.org/officeDocument/2006/math"
+          ],
+          [
+            "v",
+            "urn:schemas-microsoft-com:vml"
+          ],
+          [
+            "w10",
+            "urn:schemas-microsoft-com:office:word"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ],
+          [
+            "sl",
+            "http://schemas.openxmlformats.org/schemaLibrary/2006/main"
+          ]
+        ],
+        "example_part": "word/settings.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh"
+      },
+      "docx-styles": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 10,
+        "declarations": [
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ]
+        ],
+        "example_part": "word/styles.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh"
+      },
+      "docx-web-settings": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 10,
+        "declarations": [
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "w",
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          ],
+          [
+            "w14",
+            "http://schemas.microsoft.com/office/word/2010/wordml"
+          ],
+          [
+            "w15",
+            "http://schemas.microsoft.com/office/word/2012/wordml"
+          ],
+          [
+            "w16cex",
+            "http://schemas.microsoft.com/office/word/2018/wordml/cex"
+          ],
+          [
+            "w16cid",
+            "http://schemas.microsoft.com/office/word/2016/wordml/cid"
+          ],
+          [
+            "w16",
+            "http://schemas.microsoft.com/office/word/2018/wordml"
+          ],
+          [
+            "w16sdtdh",
+            "http://schemas.microsoft.com/office/word/2020/wordml/sdtdatahash"
+          ],
+          [
+            "w16se",
+            "http://schemas.microsoft.com/office/word/2015/wordml/symex"
+          ]
+        ],
+        "example_part": "word/webSettings.xml",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh"
+      }
+    }
+  },
+  "generator": "tools/perf-baseline/src/marker_shape.rs",
+  "markup_compatibility_namespace": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+  "markup_compatibility_namespace_bytes": 59,
+  "pptx": {
+    "alternate_content_template": "<mc:AlternateContent><mc:Choice Requires=\"p14\"><p:transition spd=\"slow\" p14:dur=\"2000\"></p:transition></mc:Choice><mc:Fallback><p:transition spd=\"slow\"></p:transition></mc:Fallback></mc:AlternateContent>",
+    "census": {
+      "archive_bytes": 108164,
+      "archive_sha256": "aebee5a724a9b5b8020c41fe789df9b3805265f20bf9a87dd28d8b0ed556deb0",
+      "markup_compatibility_byte_share": 0.930252,
+      "markup_compatibility_bytes": 741155,
+      "markup_compatibility_member_count": 43,
+      "member_count": 103,
+      "uncompressed_bytes": 796725
+    },
+    "fixture": "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+    "kinds": {
+      "pptx-notes-master": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/notesMasters/notesMaster1.xml",
+        "fixture": "test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+        "mc_ignorable": null
+      },
+      "pptx-notes-slide": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/notesSlides/notesSlide1.xml",
+        "fixture": "test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+        "mc_ignorable": null
+      },
+      "pptx-presentation": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/presentation.xml",
+        "mc_ignorable": null
+      },
+      "pptx-slide": {
+        "alternate_content_occurrences": 1,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/slides/slide12.xml",
+        "mc_ignorable": null
+      },
+      "pptx-slide-layout": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/slideLayouts/slideLayout9.xml",
+        "mc_ignorable": null
+      },
+      "pptx-slide-master": {
+        "alternate_content_occurrences": 0,
+        "declaration_count": 6,
+        "declarations": [
+          [
+            "a",
+            "http://schemas.openxmlformats.org/drawingml/2006/main"
+          ],
+          [
+            "p",
+            "http://schemas.openxmlformats.org/presentationml/2006/main"
+          ],
+          [
+            "r",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          ],
+          [
+            "p14",
+            "http://schemas.microsoft.com/office/powerpoint/2010/main"
+          ],
+          [
+            "p15",
+            "http://schemas.microsoft.com/office/powerpoint/2012/main"
+          ],
+          [
+            "mc",
+            "http://schemas.openxmlformats.org/markup-compatibility/2006"
+          ]
+        ],
+        "example_part": "ppt/slideMasters/slideMaster13.xml",
+        "mc_ignorable": null
+      }
+    }
+  },
+  "schema": "litchi.perf-baseline.marker-shape-derivation.v1"
+}

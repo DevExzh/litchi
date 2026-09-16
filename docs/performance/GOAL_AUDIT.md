@@ -1,5 +1,28 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0664 — two named harness gaps closed, and one `docs/GOAL.md` measurement rule finally satisfied for PPTX
+
+Record: [0664](0664-perf-harness-marker-bearing-corpora-and-save-allocations.md).
+`docs/GOAL.md`'s scoping rule — every claim is scoped to scenario, corpus,
+machine, build and metric — has been formally satisfied by every PPTX record in
+this program and substantively defeated by one of those five: the corpus. Change
+0649 measured that the generated PPTX corpus takes a path **13.9× cheaper per
+byte** than a real deck because none of its members mentions the
+markup-compatibility namespace, so a PPTX number measured on it was scoped
+correctly and generalized wrongly. This change removes the excuse: 26 opt-in
+selectors, four generated corpora, and a derivation script that fails if the
+corpora stop matching the real fixtures they were derived from. Change 0649's
+second gap is closed in the same batch: `litchi-perf-baseline-alloc` emitted no
+allocation metrics for the 24 `*_ordinary_save_*` selectors because change 0638
+registered them without opening an allocation region; all **forty** (24 existing
+plus 16 new) now open one, bounded to exactly the interval each phase reports,
+and every work counter is identical across all 20 retained samples of every
+selector. Change 0643's third gap — *"the harness has no DOCX text-sink
+selector"* — is closed by `docx_semantic_text_to_sink` (0.1971 ms) and
+`docx_source_text_to_sink` (0.2815 ms), both under a 4% floor. The registry goes
+from 501 to 527 selectors; `Case::DEFAULT` is unchanged at 41 and neither
+catalog hash moves, so no existing baseline is re-based.
+
 ## 0660 — preservation by default reaches inside the part it edits, and stops exactly where the writer's contract does
 
 Record: [0660](0660-docx-compaction-policy.md).

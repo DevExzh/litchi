@@ -49,6 +49,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.ordinary_save = (PERF_BASELINE / "src" / "ordinary_save.rs").read_text(
             encoding="utf-8"
         )
+        cls.marker_shape = (PERF_BASELINE / "src" / "marker_shape.rs").read_text(
+            encoding="utf-8"
+        )
         cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
             encoding="utf-8"
         )
@@ -423,6 +426,86 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             "PptxRealFileOrdinarySaveEdit",
             "PptxRealFileOrdinarySaveAtomicPublish",
             "PptxRealFileOrdinarySaveCountingPublish",
+        ):
+            self.assertIn(f"Self::{case}", self.library)
+            self.assertNotIn(case, default_matrix)
+
+    def test_marker_shape_module_owns_no_unsafe_or_ambient_surface(self):
+        # Change 0664's module generates its corpora in memory from packages
+        # the production writers emit. It reads no file, reaches for no
+        # ambient state and owns no allocator.
+        self.assertIn("mod marker_shape;", self.library)
+        self.assertNotIn("unsafe", self.marker_shape)
+        self.assertNotIn("#[global_allocator]", self.marker_shape)
+        self.assertNotIn("std::env", self.marker_shape)
+        self.assertNotIn("Command", self.marker_shape)
+        self.assertNotIn("fs::read(", self.marker_shape)
+
+    def test_marker_shape_states_its_derivation_and_its_control(self):
+        # The shape is derived from real tracked fixtures by a retained
+        # script, and the control is a same-length namespace substitution so
+        # the pair differs only in the codec branch. Both facts are
+        # structural, not narrative.
+        for fixture in (
+            "test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx",
+            "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx",
+            "test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf89064.pptx",
+        ):
+            self.assertIn(fixture, self.marker_shape)
+        self.assertIn(
+            "docs/performance/results/change-0664/scripts/derive_marker_shape.py",
+            self.marker_shape,
+        )
+        self.assertIn("fn prove_control_is_byte_comparable(", self.marker_shape)
+        self.assertIn("fn strip_markers(", self.marker_shape)
+        self.assertIn("marked_byte_share_basis_points", self.marker_shape)
+        self.assertIn("skeleton_marked_member_count", self.marker_shape)
+        self.assertIn("sink_refusal", self.marker_shape)
+
+    def test_ordinary_save_reports_allocation_regions(self):
+        # Change 0649's harness gap (b): the ordinary-save family emitted no
+        # allocation metrics because it never opened a region. It does now,
+        # and the region is exactly the timed interval.
+        self.assertIn("allocation_metrics::begin()", self.ordinary_save)
+        self.assertIn("operation_metrics::InProcessObservation", self.ordinary_save)
+        self.assertIn(
+            "from_in_process_observations_without_sink", self.ordinary_save
+        )
+        self.assertEqual(
+            self.ordinary_save.count("allocation_metrics::begin()"), 4
+        )
+
+    def test_change_0664_selectors_are_absent_from_the_default_matrix(self):
+        start = self.library.index("const DEFAULT: ")
+        end = self.library.index("];", start)
+        default_matrix = self.library[start:end]
+        for case in (
+            "PptxMarkerEagerFullText",
+            "PptxMarkerSourceFullText",
+            "PptxMarkerControlEagerFullText",
+            "PptxMarkerControlSourceFullText",
+            "DocxMarkerEagerFullText",
+            "DocxMarkerSourceFullText",
+            "DocxMarkerControlEagerFullText",
+            "DocxMarkerControlSourceFullText",
+            "DocxMarkerOrdinarySaveLifecycle",
+            "DocxMarkerOrdinarySaveEdit",
+            "DocxMarkerOrdinarySaveAtomicPublish",
+            "DocxMarkerOrdinarySaveCountingPublish",
+            "DocxMarkerControlOrdinarySaveLifecycle",
+            "DocxMarkerControlOrdinarySaveEdit",
+            "DocxMarkerControlOrdinarySaveAtomicPublish",
+            "DocxMarkerControlOrdinarySaveCountingPublish",
+            "PptxMarkerOrdinarySaveLifecycle",
+            "PptxMarkerOrdinarySaveEdit",
+            "PptxMarkerOrdinarySaveAtomicPublish",
+            "PptxMarkerOrdinarySaveCountingPublish",
+            "PptxMarkerControlOrdinarySaveLifecycle",
+            "PptxMarkerControlOrdinarySaveEdit",
+            "PptxMarkerControlOrdinarySaveAtomicPublish",
+            "PptxMarkerControlOrdinarySaveCountingPublish",
+            "DocxSemanticTextToSink",
+            "DocxSourceTextToSink",
         ):
             self.assertIn(f"Self::{case}", self.library)
             self.assertNotIn(case, default_matrix)
