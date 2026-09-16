@@ -1,0 +1,148 @@
+change 0635: callgrind isolation pairs, N=1 and N=11, totals differenced and divided by 10.
+Legs: before = base c7326f680; after = the retained change; afterB = the retained change
+plus patch/0635-chain-facts.patch (the rejected snapshot-chain capture).
+Inclusive Ir per operation. taskset -c 11, one deterministic run per leg.
+
+case                       symbol                                         before            after    delta%           afterB    chain%
+one_edit-medium            WHOLE ITERATION                         1,221,585,678    1,219,949,175    -0.13%    1,222,413,911    +0.20%
+one_edit-medium            from_source_selected                       28,438,972       26,986,772    -5.11%       26,826,962    -0.59%
+one_edit-medium            worksheet_xml_and_parse_source             27,568,032       26,115,666    -5.27%       25,956,188    -0.61%
+one_edit-medium            parse_source_with_observer                 54,441,107       51,521,308    -5.36%       51,202,494    -0.62%
+one_edit-medium            observe                                     4,059,686        2,620,777   -35.44%        5,236,547   +99.81%
+one_edit-medium            element                                     3,339,051        1,895,861   -43.22%        3,791,741  +100.00%
+one_edit-medium            cell                                        1,852,146        1,158,672   -37.44%        2,317,344  +100.00%
+one_edit-medium            raw_attribute                               1,121,155          843,468   -24.77%        1,686,955  +100.00%
+one_edit-medium            push_cell                                           -                -         -          228,797         -
+one_edit-medium            capture_auxiliary_source                      242,822          225,830    -7.00%                -         -
+one_edit-medium            from_package_with_styles                      948,916          949,640    +0.08%          948,621    -0.11%
+one_edit-medium            from_rewritten_value_source                13,305,846       13,303,694    -0.02%       16,064,078   +20.75%
+one_edit-medium            validate_xml                               11,712,882       11,713,552    +0.01%           92,767   -99.21%
+one_edit-medium            worksheet_xml_with_facts                            -                -         -       14,377,627         -
+one_edit-medium            rewrite_value_only_with_provenance            206,403          159,536   -22.71%          207,395   +30.00%
+one_edit-medium            is_spreadsheetml_name                       7,291,127        7,291,326    +0.00%        7,290,416    -0.01%
+
+one_edit-dense-sparse      WHOLE ITERATION                         1,832,019,098    1,819,881,048    -0.66%    1,839,426,325    +1.07%
+one_edit-dense-sparse      from_source_selected                      198,167,407      187,746,474    -5.26%      187,581,707    -0.09%
+one_edit-dense-sparse      worksheet_xml_and_parse_source            192,813,112      182,392,725    -5.40%      182,227,609    -0.09%
+one_edit-dense-sparse      parse_source_with_observer                380,735,064      359,785,603    -5.50%      359,455,318    -0.09%
+one_edit-dense-sparse      observe                                    28,947,191       18,538,306   -35.96%       37,081,778  +100.03%
+one_edit-dense-sparse      element                                    24,056,617       13,648,438   -43.27%       27,296,895  +100.00%
+one_edit-dense-sparse      cell                                       13,655,096        8,540,928   -37.45%       17,081,856  +100.00%
+one_edit-dense-sparse      raw_attribute                               7,936,794        5,988,240   -24.55%       11,976,499  +100.00%
+one_edit-dense-sparse      push_cell                                     621,390          620,500    -0.14%        1,246,625  +100.91%
+one_edit-dense-sparse      from_package_with_styles                      949,425          949,885    +0.05%          948,690    -0.13%
+one_edit-dense-sparse      from_rewritten_value_source                91,433,500       91,433,642    +0.00%      110,954,165   +21.35%
+one_edit-dense-sparse      validate_xml                               82,238,743       82,238,898    +0.00%           92,860   -99.89%
+one_edit-dense-sparse      worksheet_xml_with_facts                            -                -         -      101,664,242         -
+one_edit-dense-sparse      rewrite_value_only_with_provenance          1,319,981          991,714   -24.87%        1,334,839   +34.60%
+one_edit-dense-sparse      scan_with_limit                                 3,342            4,728   +41.48%            5,122    +8.33%
+one_edit-dense-sparse      is_spreadsheetml_name                      18,216,001       18,216,129    +0.00%       18,215,426    -0.00%
+
+one_edit-noncompact        WHOLE ITERATION                         1,242,436,652    1,240,015,798    -0.19%                -         -
+one_edit-noncompact        from_source_selected                       30,985,516       29,426,923    -5.03%                -         -
+one_edit-noncompact        worksheet_xml_and_parse_source             30,049,902       28,491,886    -5.18%                -         -
+one_edit-noncompact        parse_source_with_observer                 59,398,573       56,264,653    -5.28%                -         -
+one_edit-noncompact        observe                                     4,440,877        2,885,399   -35.03%                -         -
+one_edit-noncompact        element                                     3,719,027        2,164,253   -41.81%                -         -
+one_edit-noncompact        cell                                        2,246,436        1,417,872   -36.88%                -         -
+one_edit-noncompact        raw_attribute                               1,518,586        1,102,668   -27.39%                -         -
+one_edit-noncompact        capture_auxiliary_source                      243,011                -         -                -         -
+one_edit-noncompact        from_package_with_styles                      942,223          944,189    +0.21%                -         -
+one_edit-noncompact        from_rewritten_value_source                14,111,433       14,110,976    -0.00%                -         -
+one_edit-noncompact        validate_xml                               12,635,315       12,635,468    +0.00%                -         -
+one_edit-noncompact        rewrite_value_only_with_provenance            208,304          161,275   -22.58%                -         -
+one_edit-noncompact        is_spreadsheetml_name                       7,374,081        7,374,176    +0.00%                -         -
+
+one_percent-medium         WHOLE ITERATION                         1,425,238,012    1,419,609,742    -0.39%                -         -
+one_percent-medium         from_source_selected                      115,218,171      109,420,310    -5.03%                -         -
+one_percent-medium         worksheet_xml_and_parse_source            111,658,799      105,861,653    -5.19%                -         -
+one_percent-medium         parse_source_with_observer                220,528,858      208,870,490    -5.29%                -         -
+one_percent-medium         observe                                    16,237,087       10,469,982   -35.52%                -         -
+one_percent-medium         element                                    13,348,304        7,583,443   -43.19%                -         -
+one_percent-medium         cell                                        7,400,655        4,634,688   -37.37%                -         -
+one_percent-medium         raw_attribute                               4,484,572        3,373,871   -24.77%                -         -
+one_percent-medium         push_cell                                     570,370          568,247    -0.37%                -         -
+one_percent-medium         from_package_with_styles                      948,648          949,267    +0.07%                -         -
+one_percent-medium         from_rewritten_value_source                57,586,142       57,586,085    -0.00%                -         -
+one_percent-medium         validate_xml                               46,809,628       46,809,822    +0.00%                -         -
+one_percent-medium         rewrite_value_only_with_provenance          2,816,234        2,569,803    -8.75%                -         -
+one_percent-medium         materialize_cell                              372,290          372,021    -0.07%                -         -
+one_percent-medium         write_sheet_data_from_facts                 1,043,450        1,045,333    +0.18%                -         -
+one_percent-medium         is_spreadsheetml_name                       9,772,694        9,772,746    +0.00%                -         -
+
+one_percent-dense-sparse   WHOLE ITERATION                         1,912,433,202    1,900,423,833    -0.63%                -         -
+one_percent-dense-sparse   from_source_selected                      218,095,112      206,754,162    -5.20%                -         -
+one_percent-dense-sparse   worksheet_xml_and_parse_source            211,888,878      200,548,893    -5.35%                -         -
+one_percent-dense-sparse   parse_source_with_observer                418,430,896      395,630,652    -5.45%                -         -
+one_percent-dense-sparse   observe                                    31,641,673       20,272,036   -35.93%                -         -
+one_percent-dense-sparse   element                                    26,296,019       14,922,041   -43.25%                -         -
+one_percent-dense-sparse   cell                                       14,826,022        9,272,758   -37.46%                -         -
+one_percent-dense-sparse   raw_attribute                               8,697,474        6,561,595   -24.56%                -         -
+one_percent-dense-sparse   push_cell                                     672,240          676,979    +0.70%                -         -
+one_percent-dense-sparse   from_package_with_styles                      948,684          948,554    -0.01%                -         -
+one_percent-dense-sparse   from_rewritten_value_source               110,589,013      110,591,328    +0.00%                -         -
+one_percent-dense-sparse   validate_xml                               89,970,529       89,970,575    +0.00%                -         -
+one_percent-dense-sparse   rewrite_value_only_with_provenance          7,354,386        6,795,646    -7.60%                -         -
+one_percent-dense-sparse   scan_with_limit                                -2,191                -         -                -         -
+one_percent-dense-sparse   materialize_cell                              745,362          745,984    +0.08%                -         -
+one_percent-dense-sparse   write_sheet_data_from_facts                 2,733,966        2,726,394    -0.28%                -         -
+one_percent-dense-sparse   is_spreadsheetml_name                      18,821,131       18,821,474    +0.00%                -         -
+
+managed_one_edit-medium    WHOLE ITERATION                         1,222,566,978    1,220,630,888    -0.16%                -         -
+managed_one_edit-medium    from_source_selected                       28,924,472       27,592,381    -4.61%                -         -
+managed_one_edit-medium    worksheet_xml_and_parse_source             28,051,918       26,719,754    -4.75%                -         -
+managed_one_edit-medium    parse_source_with_observer                 55,409,001       52,729,429    -4.84%                -         -
+managed_one_edit-medium    observe                                     4,064,158        2,617,901   -35.59%                -         -
+managed_one_edit-medium    element                                     3,339,026        1,895,861   -43.22%                -         -
+managed_one_edit-medium    cell                                        1,852,146        1,158,672   -37.44%                -         -
+managed_one_edit-medium    raw_attribute                               1,121,140          843,468   -24.77%                -         -
+managed_one_edit-medium    capture_auxiliary_source                      279,344          259,900    -6.96%                -         -
+managed_one_edit-medium    from_package_with_styles                      948,150          948,936    +0.08%                -         -
+managed_one_edit-medium    from_rewritten_value_source                13,302,384       13,304,478    +0.02%                -         -
+managed_one_edit-medium    validate_xml                               11,713,171       11,712,515    -0.01%                -         -
+managed_one_edit-medium    rewrite_value_only_with_provenance            206,348          159,368   -22.77%                -         -
+managed_one_edit-medium    is_spreadsheetml_name                       7,291,009        7,291,125    +0.00%                -         -
+
+producer_medium_edit       WHOLE ITERATION                            39,555,809       38,910,480    -1.63%       40,105,663    +3.07%
+producer_medium_edit       from_source_selected                       14,331,081       13,716,308    -4.29%       13,678,165    -0.28%
+producer_medium_edit       worksheet_xml_and_parse_source             13,865,859       13,251,234    -4.43%       13,213,235    -0.29%
+producer_medium_edit       parse_source_with_observer                 27,418,825       26,182,510    -4.51%       26,106,543    -0.29%
+producer_medium_edit       observe                                     1,799,277        1,161,012   -35.47%        2,310,410   +99.00%
+producer_medium_edit       element                                     1,494,841          851,258   -43.05%        1,702,539  +100.00%
+producer_medium_edit       cell                                          804,584          504,160   -37.34%        1,008,320  +100.00%
+producer_medium_edit       raw_attribute                                 518,984          387,407   -25.35%          774,837  +100.01%
+producer_medium_edit       push_cell                                      38,067           43,305   +13.76%           70,505   +62.81%
+producer_medium_edit       row                                            40,027                -         -           48,861         -
+producer_medium_edit       capture_auxiliary_source                      172,875          192,769   +11.51%          192,572    -0.10%
+producer_medium_edit       from_rewritten_value_source                11,636,754       11,647,080    +0.09%       12,857,623   +10.39%
+producer_medium_edit       validate_xml                                5,503,980        5,503,618    -0.01%          111,896   -97.97%
+producer_medium_edit       worksheet_xml_with_facts                            -                -         -        6,622,851         -
+producer_medium_edit       rewrite_value_only_with_provenance            112,387           89,818   -20.08%          113,654   +26.54%
+producer_medium_edit       is_spreadsheetml_name                         367,279          367,294    +0.00%          367,104    -0.05%
+
+producer_dense_edit        WHOLE ITERATION                           490,455,049      479,720,265    -2.19%      499,201,974    +4.06%
+producer_dense_edit        from_source_selected                      218,486,540      208,133,601    -4.74%      207,974,195    -0.08%
+producer_dense_edit        worksheet_xml_and_parse_source            213,022,206      202,669,213    -4.86%      202,509,965    -0.08%
+producer_dense_edit        parse_source_with_observer                421,150,203      400,334,896    -4.94%      400,016,469    -0.08%
+producer_dense_edit        observe                                    28,930,653       18,460,231   -36.19%       36,950,292  +100.16%
+producer_dense_edit        element                                    24,156,824       13,685,560   -43.35%       27,371,121  +100.00%
+producer_dense_edit        cell                                       13,699,342        8,540,928   -37.65%       17,081,856  +100.00%
+producer_dense_edit        raw_attribute                               7,994,569        6,023,862   -24.65%       12,047,725  +100.00%
+producer_dense_edit        push_cell                                     503,826          504,458    +0.13%        1,039,306  +106.02%
+producer_dense_edit        row                                           163,092                -         -          199,543         -
+producer_dense_edit        capture_auxiliary_source                      207,523          193,228    -6.89%          192,819    -0.21%
+producer_dense_edit        from_rewritten_value_source               115,824,357      115,773,993    -0.04%      135,084,681   +16.68%
+producer_dense_edit        validate_xml                               84,750,562       84,750,279    -0.00%                -         -
+producer_dense_edit        worksheet_xml_with_facts                            -                -         -      104,112,287         -
+producer_dense_edit        rewrite_value_only_with_provenance          1,317,896          990,155   -24.87%        1,334,228   +34.75%
+producer_dense_edit        write_sheet_data_from_facts                         -          108,842         -                -         -
+producer_dense_edit        is_spreadsheetml_name                       5,740,640        5,740,727    +0.00%        5,740,516    -0.00%
+
+Notes:
+* `observe`, `element`, `cell` and `raw_attribute` roughly double in the afterB leg because the
+  rejected capture runs the same builder a second time, on the rewritten worksheet.
+* `capture_auxiliary_source` is the stylesheet count plus reading the styles and theme parts;
+  its per-operation attribution varies between profiles (four of five cases fall 6.9-7.0%,
+  producer-medium rises 11.5%), so the exact allocation figures in alloc/ carry that part.
+* `from_package_with_styles` is the harness's own untimed verification reopen, shown because it
+  is a second, independent caller of raw::styles::parse.

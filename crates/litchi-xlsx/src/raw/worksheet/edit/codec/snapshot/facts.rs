@@ -21,17 +21,16 @@
 //! would accept identically. A decline is never an error: the commit then
 //! runs today's scan and produces today's bytes and today's diagnostics.
 
-use litchi_sheet::{COLUMNS, Cell as Address, Rect};
+use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect};
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::Reader;
 
 use super::super::wire::{cell_tag, tag};
 use super::model::{CellFact, CellSlot, DimensionFact, RowFact, SourceFacts, Span, Tag};
 use crate::error::{Result, allocation, invalid};
-use crate::raw::namespace::is_spreadsheetml_name;
+use crate::raw::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
 use crate::raw::worksheet::model::{MAX_XML_DEPTH, MAX_XML_EVENTS};
-use crate::raw::worksheet::{parse_a1, parse_one_based_row};
 
 /// Source byte range of one traversal event.
 #[derive(Debug, Clone, Copy)]
@@ -74,6 +73,7 @@ struct PendingCell {
 #[derive(Debug)]
 pub(crate) struct FactsBuilder {
     declined: bool,
+    ampersand_free: bool,
     events: usize,
     stack: Vec<Kind>,
     root_seen: bool,
@@ -97,9 +97,18 @@ pub(crate) struct FactsBuilder {
 }
 
 impl FactsBuilder {
-    pub(crate) fn new() -> Self {
+    /// Start observing the traversal of `content`.
+    ///
+    /// One `memchr` over the whole part answers the ampersand question for
+    /// every start tag at once: when the worksheet carries no `&` anywhere,
+    /// no tag can carry one either, and [`Self::element`] skips its per-tag
+    /// probe. `content` must be the same slice every [`Self::observe`] and
+    /// [`Self::finish`] call is given — the spans the builder retains already
+    /// index into it.
+    pub(crate) fn new(content: &[u8]) -> Self {
         Self {
             declined: false,
+            ampersand_free: memchr::memchr(b'&', content).is_none(),
             events: 0,
             stack: Vec::new(),
             root_seen: false,
@@ -209,17 +218,20 @@ impl FactsBuilder {
         // Every tag the scanner materializes is decoded and normalized. An
         // ampersand is the only byte that can make that decode fail, so a
         // tag that carries one is not provably reproducible and the builder
-        // declines rather than risk losing the scanner's diagnostic.
-        if memchr::memchr(b'&', content.get(span.start..span.end)?).is_some() {
+        // declines rather than risk losing the scanner's diagnostic. The
+        // whole-part probe taken in `new` answers this for every tag of an
+        // ampersand-free worksheet, so the per-tag probe runs only where the
+        // part carries an `&` somewhere.
+        let bytes = content.get(span.start..span.end)?;
+        if !self.ampersand_free && memchr::memchr(b'&', bytes).is_some() {
+            return None;
+        }
+        if !is_spreadsheetml(namespace) {
             return None;
         }
         let name = element.name();
         let local = name.local_name();
         let local = local.as_ref();
-        let sml = is_spreadsheetml_name(namespace, name, local);
-        if !sml {
-            return None;
-        }
         let parent = self.stack.last().copied();
         match parent {
             None => {
@@ -358,10 +370,7 @@ impl FactsBuilder {
 
     fn row(&mut self, element: &BytesStart<'_>, span: EventSpan, empty: bool) -> Option<()> {
         let reference = raw_attribute(element, b"r")?;
-        if !reference.iter().all(u8::is_ascii_digit) {
-            return None;
-        }
-        let number = parse_one_based_row(std::str::from_utf8(reference).ok()?).ok()?;
+        let number = row_number(reference)?;
         if self.previous_row != 0 && number <= self.previous_row {
             return None;
         }
@@ -392,11 +401,8 @@ impl FactsBuilder {
     fn cell(&mut self, element: &BytesStart<'_>, span: EventSpan, empty: bool) -> Option<()> {
         let row = self.row.as_ref()?.number;
         let reference = raw_attribute(element, b"r")?;
-        if !reference.iter().all(u8::is_ascii_alphanumeric) {
-            return None;
-        }
-        let (reference_row, column) = parse_a1(std::str::from_utf8(reference).ok()?).ok()?;
-        if reference_row != row || column <= self.last_column {
+        let column = cell_column(reference, row)?;
+        if column <= self.last_column {
             return None;
         }
         self.last_column = column;
@@ -526,6 +532,75 @@ impl FactsBuilder {
     }
 }
 
+/// Whether the element is bound to either `SpreadsheetML` dialect.
+///
+/// `is_spreadsheetml_name` also compares the element's local name against a
+/// caller-supplied one; every call here passed the element's own local name,
+/// so that half was a comparison of a value with itself. Testing the namespace
+/// directly admits exactly the same elements while dropping one
+/// `QName::local_name` colon scan and one comparison per element.
+fn is_spreadsheetml(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == SPREADSHEETML_NAMESPACE || *value == STRICT_SPREADSHEETML_NAMESPACE
+    )
+}
+
+/// Parse a `<row r="…">` value, exactly as `parse_one_based_row` would.
+///
+/// One pass replaces the alphabet check, the UTF-8 validation and the integer
+/// parse the shared helper performs, and no diagnostic string is formatted on
+/// the decline path: the builder never reports one.
+fn row_number(reference: &[u8]) -> Option<u32> {
+    let (first, rest) = reference.split_first()?;
+    let mut number = u32::from(ascii_digit(*first)?);
+    for byte in rest {
+        number = number
+            .checked_mul(10)?
+            .checked_add(u32::from(ascii_digit(*byte)?))?;
+    }
+    (1..=ROWS).contains(&number).then_some(number)
+}
+
+const fn ascii_digit(byte: u8) -> Option<u8> {
+    let digit = byte.wrapping_sub(b'0');
+    if digit > 9 { None } else { Some(digit) }
+}
+
+/// Parse a `<c r="…">` value against the row the builder already resolved and
+/// return its one-based column.
+///
+/// This is `parse_a1` specialized to the two facts the builder already holds:
+/// the enclosing `<row r="…">` has been accepted, so the reference's row part
+/// only has to *agree* with it, and the value has to stay inside the alphabet
+/// on which attribute-value normalization is the identity. Letters then digits is a subset of that
+/// alphabet, so the single pass below subsumes the separate alphanumeric
+/// check the builder used to run first, and it admits and refuses exactly
+/// what `parse_a1` followed by the row comparison admitted and refused.
+fn cell_column(reference: &[u8], row: u32) -> Option<u32> {
+    let mut column = 0u32;
+    let mut index = 0usize;
+    while let Some(byte) = reference.get(index) {
+        if !byte.is_ascii_alphabetic() {
+            break;
+        }
+        let offset = u32::from(byte.to_ascii_uppercase().checked_sub(b'A')?);
+        column = column
+            .checked_mul(26)?
+            .checked_add(offset)?
+            .checked_add(1)?;
+        index = index.checked_add(1)?;
+    }
+    if index == 0 || column == 0 || column > COLUMNS {
+        return None;
+    }
+    if row_number(reference.get(index..)?)? != row {
+        return None;
+    }
+    Some(column)
+}
+
 /// Return the raw bytes of one unprefixed attribute, refusing duplicates.
 ///
 /// The caller has already proved the element carries no ampersand, so these
@@ -537,7 +612,13 @@ fn raw_attribute<'a>(element: &'a BytesStart<'a>, name: &[u8]) -> Option<&'a [u8
     let mut found = None;
     for attribute in attributes {
         let attribute = attribute.ok()?;
-        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
+        // `name` carries no colon, so comparing the whole attribute key is the
+        // same test as "unprefixed, and its local name is `name`": a key
+        // without a colon *is* its own local name and has no prefix, and a key
+        // with one can never equal a colon-free `name`. One comparison
+        // replaces the two colon scans `prefix` and `local_name` each make.
+        debug_assert!(!name.contains(&b':'));
+        if attribute.key.as_ref() == name {
             if found.is_some() {
                 return None;
             }
@@ -721,4 +802,92 @@ pub(crate) fn materialize_tag(content: &[u8], span: Span) -> Result<Option<Tag>>
 fn relative_position(reader: &Reader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_source| invalid("worksheet XML position does not fit usize"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cell_column, row_number};
+    use crate::raw::worksheet::{parse_a1, parse_one_based_row};
+
+    /// Everything the shared helpers can be asked, as the builder asks it.
+    ///
+    /// `row_number` and `cell_column` replace `parse_one_based_row` and
+    /// `parse_a1` on the builder's hot path, so the only thing that matters is
+    /// that they admit and refuse the same values. These two tests compare
+    /// them directly over an alphabet that covers every branch of both: the
+    /// letter/digit split, the empty halves, a leading digit, a trailing
+    /// letter, lowercase, separators, the column and row ceilings and the
+    /// overflow paths.
+    const PIECES: [&str; 22] = [
+        "",
+        "A",
+        "a",
+        "Z",
+        "AA",
+        "XFD",
+        "XFE",
+        "ZZZ",
+        "ZZZZ",
+        "ZZZZZZZ",
+        "0",
+        "1",
+        "01",
+        "9",
+        "10",
+        "1048576",
+        "1048577",
+        "99999999",
+        "4294967296",
+        "-",
+        ":",
+        "&",
+    ];
+
+    fn combinations() -> Vec<String> {
+        let mut values = Vec::new();
+        for left in PIECES {
+            values.push(left.to_owned());
+            for right in PIECES {
+                values.push(format!("{left}{right}"));
+            }
+        }
+        values
+    }
+
+    #[test]
+    fn change_0635_row_number_agrees_with_the_shared_row_parser() {
+        for value in combinations() {
+            let expected = std::str::from_utf8(value.as_bytes())
+                .ok()
+                .filter(|text| text.bytes().all(|byte| byte.is_ascii_digit()))
+                .and_then(|text| parse_one_based_row(text).ok());
+            assert_eq!(
+                row_number(value.as_bytes()),
+                expected,
+                "row reference '{value}' parses differently"
+            );
+        }
+    }
+
+    #[test]
+    fn change_0635_cell_column_agrees_with_the_shared_a1_parser() {
+        for value in combinations() {
+            // The builder only ever asks about the row it has already
+            // accepted, so compare against `parse_a1` followed by that same
+            // comparison, for a row that occurs in the alphabet and one that
+            // does not.
+            for row in [1u32, 10, 1_048_576] {
+                let expected = std::str::from_utf8(value.as_bytes())
+                    .ok()
+                    .filter(|text| text.bytes().all(|byte| byte.is_ascii_alphanumeric()))
+                    .and_then(|text| parse_a1(text).ok())
+                    .and_then(|(parsed_row, column)| (parsed_row == row).then_some(column));
+                assert_eq!(
+                    cell_column(value.as_bytes(), row),
+                    expected,
+                    "cell reference '{value}' in row {row} parses differently"
+                );
+            }
+        }
+    }
 }

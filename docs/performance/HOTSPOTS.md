@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## 0635 — the XLSX fact builder, the stylesheet count, and a chain that nothing reaches
+
+Record: [0635](0635-xlsx-facts-builder-and-chains.md).
+
+**The hotspot change 0622 named is reduced (change 0635).** 0622 closed by pointing
+at its own successor: "with the second scan gone, the planning traversal is the whole
+cost of an XLSX value commit, and the fact builder is 15-18% of it; the next
+reduction on this route is the builder's per-cell `r` parse and per-element ampersand
+probe, not the writer." Both are gone. The `<c r="…">` and `<row r="…">` values are
+now parsed in one pass against the row the builder already holds, in place of an
+alphabet sweep, a UTF-8 validation and `parse_a1`/`parse_one_based_row` with their
+`format!` diagnostics; the ampersand question is answered once per part with one
+`memchr` instead of once per start tag; and two name comparisons that compared a
+value with itself are gone. Measured on `taskset -c 11`, callgrind isolation pairs
+(N=1, N=11): the builder falls **35.0-36.2%** on every one of eight scenarios (`FactsBuilder::element` −41.8 to −43.4%, `FactsBuilder::cell` −36.9 to −37.7%, `raw_attribute` −24.6 to −27.4%), planning falls **4.29-5.26%**, and the whole harness iteration falls **0.13-2.19%** — the largest on the 0601 producer-shaped edit selectors, which are not dominated by the cell-CRUD corpora's 4 MB of media. The builder's share of planning goes from 13.2-14.3% to 8.9-9.7%. No scenario got worse. The builder's decline set is unchanged — change
+0622's corpus funnel is identical at 391 worksheet parts, 207 admitted, 1 accepted, 1
+publishing facts — and two new tests compare the fused parsers against the shared
+ones over 484 byte strings. **XLSX-5 of the 0587 survey is answered**:
+`raw::styles::parse` already retained only a count, so what the survey measured was
+the traversal, and that traversal copied every event twice (`Event::into_owned` plus
+a `NamespaceResolver` clone) and discarded both copies. Removing them takes exactly
+**80 allocation calls and 6,457 allocated bytes out of every planning**, on every
+case and shape, with the same events, checks and messages; on the 603-byte harness
+stylesheet the instruction saving is inside the symbol's own variation. **The
+remaining XLSX hotspot on this route is now the shared traversal itself**, not the
+builder: the fused traversal `worksheet_xml_and_parse_source` is 96.7-97.4% of
+planning after this change, and the builder is now 8.9-9.7% of it rather than
+13.2-14.3%. **One hotspot is closed by
+measurement rather than by code**: the "snapshot chains drop facts after the first
+commit" item is *not* worth closing — see `GOAL_AUDIT.md`.
+
 ## 0634 — PPT per-slide re-parse borrows the retained stream
 
 Retained. After 0606 a `Presentation` held its `PowerPoint Document` stream as an `Arc<Vec<u8>>` and the top-level record tree spanned it, but three paths re-parsed that same stream through the copying `&[u8]` entry point: `SlideFactory::parse_slide_at_offset` once per slide, `SpeakerNotes::parse_with_limits` once per notes page, and `NotesIndex::try_build_with_limits` — a whole `DocumentContainer` re-parse — lazily on the first `parse_slide` and therefore paid by `slides`, `slide_at`, `text` and `extract_text_fast` alike. All three now take the `PayloadStore` 0606 introduced and borrow. On `45543.ppt` (311,524-byte stream, 286 records, 11 slides): `slides()` loses **160 allocations and 160 `memcpy` calls** per operation (531 → 371 allocations, 625,445 → 467,494 allocated bytes, 561,052 → 416,036 retained bytes, 899.3 → 738.5 `memcpy` calls, 1,711,522 → 1,607,248 `Ir`, −6.09%); full text 806 → 646 allocations and −4.89% `Ir`; a speaker-notes read on `headers_footers_2007.ppt` 467 → 369 allocations and −5.31% `Ir`; edit-and-save −160 allocations and −1.52% `Ir`. Eager and source-backed **opens are bit-identical** in every count, which is the proof that only the re-parse changed. Single-shot native: list slides −5.35% instructions and −3.57% cycles, full text −2.40%, edit-and-save −7.22% instructions and −5.52% cycles. Paired p50 against an A/A floor of 0.02–1.71%: `ppt_semantic_list_slides` **−23.48%** (floor 0.82%), `ppt_semantic_full_text` −3.29% (floor 0.15%), `ppt_semantic_one_edit_save` −0.58%; on the real fixture, list slides −67.81% under glibc defaults and −8.29% with the allocator thresholds pinned, full text −4.22%, notes −4.99%, edit-and-save −3.80%. **The glibc heap-trim artifact 0606 characterized but did not eliminate is gone**: the 1,000-iteration `open + list slides` loop falls from 171,889 to 667 minor faults and from 1,523,645,307 to 551,758,441 instructions, landing on the same count as a run with the thresholds pinned — it was the per-iteration churn of those 160 payload allocations that pushed the main arena past glibc's dynamic trim threshold. Reported against it: the untouched open path drifts +0.25% `Ir` and +0.61%/+0.81% p50 with every call and allocation count identical, which is inlining drift, and `ppt_semantic_open`'s −4.64% is the allocator state left by that selector's untimed per-iteration verification, not a faster open. Next in this area: the strict entry points on the editor paths, and `Record`'s own size on record-dense files. `performance_claim: none`. [Change and limitations](0634-ppt-slide-factory-borrowed-reparse.md); [retained evidence](results/change-0634/README.md).

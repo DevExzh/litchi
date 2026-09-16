@@ -1,0 +1,490 @@
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -26,6 +26,29 @@
+     validate_xml(content, XmlOwner::Worksheet)
+ }
+ 
++/// Validate a worksheet part and capture the compact planning facts for it.
++///
++/// Every snapshot that rebinds its worksheet bytes already validates the new
++/// bytes with [`worksheet_xml`]. Change 0622 captured facts only on the walk
++/// the *first* load performs, so the second commit of a snapshot chain paid
++/// the complete layout scan again. This runs the same builder over the same
++/// events of the same walk, so a rewritten worksheet carries the same facts a
++/// fresh load of those bytes would have carried, at the cost of the builder
++/// alone and no extra traversal.
++///
++/// The facts are published only after validation has returned `Ok`, so a
++/// refused rewrite never leaves provisional state behind, and a builder that
++/// declined simply yields `None` and the next commit scans as before.
++pub(super) fn worksheet_xml_with_facts(
++    content: &[u8],
++) -> Result<Option<raw::worksheet::SourceFacts>> {
++    let mut builder = raw::worksheet::FactsBuilder::new(content);
++    validate_xml_observed(content, XmlOwner::Worksheet, &mut |namespace, event, span| {
++        builder.observe(namespace, event, span, content);
++    })?;
++    Ok(builder.finish(content))
++}
++
+ #[derive(Clone, Copy)]
+ enum XmlOwner {
+     Workbook,
+@@ -242,19 +265,40 @@
+ }
+ 
+ fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {
++    validate_xml_observed(content, owner, &mut |_namespace, _event, _span| {})
++}
++
++/// Validate one part exactly as [`validate_xml`] does while giving an observer
++/// a borrowed view of every event the validator has already accepted.
++///
++/// The observer cannot change the outcome: it sees an event only after that
++/// event has been accepted, it returns nothing, and it never stops the walk.
++/// [`validate_xml`] passes a closure that does nothing, so the validating path
++/// every other caller takes is this one with its observation compiled away.
++fn validate_xml_observed<O>(content: &[u8], owner: XmlOwner, observe: &mut O) -> Result<()>
++where
++    O: FnMut(&ResolveResult<'_>, &Event<'_>, raw::worksheet::EventSpan),
++{
+     let mut reader = NsReader::from_reader(content);
+     let mut depth = 0usize;
+     let mut elements = Vec::<Box<[u8]>>::new();
+     let mut dialect = None::<Box<[u8]>>;
+     let mut saw_root = false;
+     loop {
++        // A position outside `usize` cannot occur on a part this crate can
++        // hold in memory; if it ever did the span would be out of range and
++        // every observer refuses such a span. Validation is unaffected either
++        // way, so no new refusal is introduced here.
++        let event_start = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+         let event = reader
+             .read_event()
+             .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
++        let event_end = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+         // Events borrow the input slice; namespaces are inspected before the
+         // next read advances the resolver's scope.
+         let (namespace, event) = reader.resolver().resolve_event(event);
+-        match event {
++        let end_of_input = matches!(event, Event::Eof);
++        match &event {
+             Event::Start(element) => {
+                 bind_dialect(&namespace, &mut dialect)?;
+                 let local = element
+@@ -266,7 +310,7 @@
+                 validate_element(
+                     owner,
+                     &namespace,
+-                    &element,
++                    element,
+                     &local,
+                     elements.last().map(AsRef::as_ref),
+                     depth,
+@@ -283,7 +327,7 @@
+                 validate_element(
+                     owner,
+                     &namespace,
+-                    &element,
++                    element,
+                     &local,
+                     elements.last().map(AsRef::as_ref),
+                     depth,
+@@ -310,7 +354,7 @@
+                     "value-only edits refuse XML document type declarations",
+                 ));
+             },
+-            Event::Eof => break,
++            Event::Eof => {},
+             Event::Text(value) => {
+                 let decoded = value
+                     .decode()
+@@ -340,6 +384,17 @@
+             },
+             Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+         }
++        observe(
++            &namespace,
++            &event,
++            raw::worksheet::EventSpan {
++                start: event_start,
++                end: event_end,
++            },
++        );
++        if end_of_input {
++            break;
++        }
+     }
+     if !saw_root || depth != 0 {
+         return Err(invalid("value-only XML has no complete root element"));
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -713,12 +713,11 @@
+ 
+     pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+         source.source.check_execution()?;
+-        validation::worksheet_xml(&bytes)?;
++        let facts = validation::worksheet_xml_with_facts(&bytes)?;
+         let cells = raw::worksheet::parse(&bytes, || Ok(None))?;
+         let mut result = source.clone();
+         result.cells = Arc::new(cells);
+-        result.facts = None;
+-        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        (result.source.worksheet.bytes, result.facts) = rebound_worksheet(bytes, facts);
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -738,7 +737,7 @@
+             return Self::from_rewritten_source(source, rewrite.bytes);
+         }
+         source.source.check_execution()?;
+-        validation::worksheet_xml(&rewrite.bytes)?;
++        let facts = validation::worksheet_xml_with_facts(&rewrite.bytes)?;
+         // Speculative buffers are dropped before the complete parser fallback.
+         let cells = match Self::try_rewritten_value_cells(source, &rewrite) {
+             Some(cells) => cells,
+@@ -746,8 +745,7 @@
+         };
+         let mut result = source.clone();
+         result.cells = Arc::new(cells);
+-        result.facts = None;
+-        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
++        (result.source.worksheet.bytes, result.facts) = rebound_worksheet(rewrite.bytes, facts);
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -816,10 +814,9 @@
+     ) -> Result<Self> {
+         source.source.check_execution()?;
+         let bytes = rewrite.into_bytes_for(source.source_xml())?;
+-        validation::worksheet_xml(&bytes)?;
++        let facts = validation::worksheet_xml_with_facts(&bytes)?;
+         let mut result = source.clone();
+-        result.facts = None;
+-        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
++        (result.source.worksheet.bytes, result.facts) = rebound_worksheet(bytes, facts);
+         result.source.check_execution()?;
+         Ok(result)
+     }
+@@ -2078,6 +2075,28 @@
+     Ok((style_count, auxiliary.into_boxed_slice()))
+ }
+ 
++/// Publish rewritten worksheet bytes together with the facts captured while
++/// the same bytes were validated.
++///
++/// Change 0622 cleared the facts on every rebinding constructor, so only the
++/// first commit of a snapshot chain could use them. The facts index into the
++/// `Vec`'s heap buffer, and moving that `Vec` into an `Arc` does not move the
++/// buffer, so the retained spans still describe the published slice. That is
++/// checked rather than assumed: `describes` compares the address and length
++/// the builder recorded against the slice actually published, and any
++/// disagreement drops the facts, which costs the next commit nothing but its
++/// established complete scan.
++fn rebound_worksheet(
++    bytes: Vec<u8>,
++    facts: Option<raw::worksheet::SourceFacts>,
++) -> (SourcePayload, Option<Arc<raw::worksheet::SourceFacts>>) {
++    let bytes = Arc::new(bytes);
++    let facts = facts
++        .filter(|facts| facts.describes(bytes.as_slice()))
++        .map(Arc::new);
++    (SourcePayload::Owned(bytes), facts)
++}
++
+ fn validate_style_references(cells: &Store, style_count: u32) -> Result<()> {
+     let invalid_cell = cells
+         .entries()
+--- a/crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs
++++ b/crates/litchi-xlsx/src/cell_values/facts_oracle_tests.rs
+@@ -17,6 +17,13 @@
+ //!
+ //! The route counters make the comparison non-vacuous: a test that only ever
+ //! declined would compare the scan route against itself.
++//!
++//! Change 0635 extends the same oracle to *snapshot chains*. A snapshot that
++//! rebinds its worksheet bytes now captures facts from the validation walk it
++//! already runs over the rewritten worksheet, so the second commit of a chain
++//! no longer pays the complete scan. [`chain`] is that capture, and the
++//! change-0635 tests below re-run every comparison above against the output of
++//! a first commit — the bytes a second commit would actually see.
+ 
+ use std::collections::BTreeMap;
+ 
+@@ -35,6 +42,62 @@
+         .and_then(|(_, facts)| facts)
+ }
+ 
++/// Capture the facts a *rebound* snapshot carries, exactly as
++/// `Snapshot::from_rewritten_source`, `from_rewritten_value_source` and
++/// `from_visibility_rewrite` do: from the validation walk those constructors
++/// already run over the rewritten worksheet (change 0635).
++fn chain(content: &[u8]) -> Option<SourceFacts> {
++    super::validation::worksheet_xml_with_facts(content)
++        .ok()
++        .flatten()
++}
++
++/// Everything a fact set claims about its worksheet, without the allocation it
++/// is bound to, so two captures of the same bytes can be compared directly.
++fn fact_shape(facts: &SourceFacts) -> String {
++    format!(
++        "dimension={:?} sheet_data={:?} tag_end={} close_start={} empty={} rows={:?} cells={:?}",
++        facts.dimension,
++        facts.sheet_data,
++        facts.sheet_data_tag_end,
++        facts.sheet_data_close_start,
++        facts.sheet_data_empty,
++        facts.rows,
++        facts.cells,
++    )
++}
++
++/// Commit one action set and return the rewritten worksheet bytes.
++fn commit(
++    content: &[u8],
++    actions: &BTreeMap<Address, Action>,
++    facts: Option<&SourceFacts>,
++) -> Option<Vec<u8>> {
++    let mut staged = BTreeMap::new();
++    for (address, action) in actions {
++        staged.insert(*address, clone_action(action));
++    }
++    rewrite_value_only_with_provenance(content, "Sheet1", staged, facts)
++        .ok()
++        .map(|rewrite| rewrite.bytes)
++}
++
++/// The addresses a commit could target, taken from the facts when they exist
++/// and from the raw parser otherwise.
++fn addresses_of(content: &[u8], facts: Option<&SourceFacts>) -> Vec<Address> {
++    match facts {
++        Some(facts) => facts.cells.iter().map(|cell| cell.address).collect(),
++        None => match raw::worksheet::parse(content, || Ok(None)) {
++            Ok(store) => store
++                .entries()
++                .iter()
++                .map(|entry| entry.address)
++                .collect::<Vec<_>>(),
++            Err(_) => Vec::new(),
++        },
++    }
++}
++
+ fn actions_for(address: Address, value: u32) -> BTreeMap<Address, Action> {
+     BTreeMap::from([(address, Action::set(value.into()))])
+ }
+@@ -155,24 +218,19 @@
+ 
+ /// Drive one worksheet through every cell the raw parser sees.
+ fn compare(content: &[u8]) -> Tally {
+-    route::reset();
+     let facts = plan(content);
+-    // Enumerate the cells the *scanner* would see. When the planning
+-    // traversal published facts, those are the retained addresses; otherwise
+-    // fall back to the raw parser's own view.
+-    let addresses = match facts.as_ref() {
+-        Some(facts) => facts.cells.iter().map(|cell| cell.address).collect(),
+-        None => match raw::worksheet::parse(content, || Ok(None)) {
+-            Ok(store) => store
+-                .entries()
+-                .iter()
+-                .map(|entry| entry.address)
+-                .collect::<Vec<_>>(),
+-            // A source the parser refuses never reaches a commit, and without
+-            // facts both routes are the same call.
+-            Err(_) => Vec::new(),
+-        },
+-    };
++    compare_using(content, facts)
++}
++
++/// The same sweep against a caller-supplied fact capture, so the planning
++/// capture and the chain capture of change 0635 run through one oracle.
++fn compare_using(content: &[u8], facts: Option<SourceFacts>) -> Tally {
++    route::reset();
++    // Enumerate the cells the *scanner* would see. When the traversal
++    // published facts, those are the retained addresses; otherwise fall back
++    // to the raw parser's own view. A source the parser refuses never reaches
++    // a commit, and without facts both routes are the same call.
++    let addresses = addresses_of(content, facts.as_ref());
+     let total = addresses.len();
+     let stride = if exhaustive() || total <= STRIDE_LIMIT {
+         1
+@@ -539,6 +597,176 @@
+     );
+ }
+ 
++/// The rebinding walk must capture the *same* facts the planning walk does.
++///
++/// The two walks are different drivers over the same bytes — the shared
++/// source traversal of change 0546 and the value-only XML validator — so the
++/// facts they publish are compared field by field wherever both publish.
++#[test]
++fn change_0635_chain_capture_agrees_with_the_planning_capture() {
++    let mut both = 0usize;
++    let mut chain_only = 0usize;
++    for (name, worksheet) in admitted_shapes().into_iter().chain(declined_shapes()) {
++        let content = worksheet.as_bytes();
++        let planned = plan(content);
++        let chained = chain(content);
++        match (planned.as_ref(), chained.as_ref()) {
++            (Some(planned), Some(chained)) => {
++                both += 1;
++                assert_eq!(
++                    fact_shape(planned),
++                    fact_shape(chained),
++                    "shape '{name}' captures different facts on the two walks"
++                );
++            },
++            (Some(_), None) => {
++                panic!("shape '{name}' lost its facts on the rebinding walk");
++            },
++            (None, Some(_)) => chain_only += 1,
++            (None, None) => {},
++        }
++    }
++    assert!(both > 0, "no shape exercised both captures");
++    println!(
++        "change 0635 capture agreement: {both} shapes captured on both walks, \
++         {chain_only} on the rebinding walk only"
++    );
++}
++
++/// The second commit of a chain must produce the scan's bytes, errors and
++/// provenance — the whole 0622 oracle, re-run on a first commit's output.
++#[test]
++fn change_0635_second_commit_of_a_chain_matches_the_scan() {
++    for (name, worksheet) in admitted_shapes() {
++        let content = worksheet.as_bytes();
++        let facts = plan(content);
++        let addresses = addresses_of(content, facts.as_ref());
++        let Some(address) = addresses.first().copied() else {
++            panic!("shape '{name}' has no cell to commit");
++        };
++        let first = commit(content, &actions_for(address, 11), facts.as_ref())
++            .unwrap_or_else(|| panic!("shape '{name}' failed its first commit"));
++        let chained = chain(&first);
++        assert!(
++            chained.is_some(),
++            "shape '{name}' carried no facts into its second commit"
++        );
++        let tally = compare_using(&first, chained);
++        assert!(
++            tally.accepted > 0,
++            "shape '{name}' second commit never took the fact route ({tally:?})"
++        );
++    }
++}
++
++/// The same chain comparison over the dense grid the harness corpora share.
++#[test]
++fn change_0635_dense_grid_chain_matches_the_scan_on_every_cell() {
++    let (rows, columns) = if exhaustive() {
++        (128u32, 100u32)
++    } else {
++        (48u32, 48u32)
++    };
++    let corner = Address::at(rows - 1, columns - 1).expect("grid corner");
++    let mut body = format!(r#"<dimension ref="A1:{}"/><sheetData>"#, corner.a1());
++    for row in 1..=rows {
++        body.push_str(&format!(r#"<row r="{row}" spans="1:{columns}">"#));
++        for column in 0..columns {
++            let address = Address::at(row - 1, column).expect("grid address");
++            body.push_str(&format!(
++                r#"<c r="{}"><v>{}</v></c>"#,
++                address.a1(),
++                row * columns + column
++            ));
++        }
++        body.push_str("</row>");
++    }
++    body.push_str("</sheetData>");
++    let worksheet = scalar_sheet(&body);
++    let content = worksheet.as_bytes();
++    let facts = plan(content);
++    let first = commit(
++        content,
++        &actions_for(Address::from_a1("A1").expect("A1"), 11),
++        facts.as_ref(),
++    )
++    .expect("first commit of the dense grid");
++    let chained = chain(&first);
++    assert!(chained.is_some(), "the dense grid carried no chain facts");
++    let tally = compare_using(&first, chained);
++    assert!(
++        tally.accepted + 6 >= tally.compared && tally.compared > 90,
++        "dense grid chain tally {tally:?}"
++    );
++}
++
++/// The chain capture over every worksheet part of every repository `.xlsx`.
++///
++/// The first commit runs through whichever route the planning traversal
++/// allows; the comparison is then run against the *output* of that commit,
++/// which is the worksheet a second commit would see. Parts whose rewritten
++/// output publishes no facts are counted, not compared: without facts both
++/// routes are literally the same call.
++#[test]
++fn change_0635_chain_oracle_over_test_data_worksheets() {
++    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
++    let Ok(root) = root.canonicalize() else {
++        return;
++    };
++    let mut packages = Vec::new();
++    collect_xlsx(&root, &mut packages);
++    packages.sort();
++    assert!(
++        packages.len() > 50,
++        "the oracle needs the repository .xlsx corpus, found {}",
++        packages.len()
++    );
++    let mut worksheets = 0usize;
++    let mut committed = 0usize;
++    let mut with_chain_facts = 0usize;
++    let mut accepted = 0usize;
++    let mut compared = 0usize;
++    for path in packages {
++        let Ok(bytes) = std::fs::read(&path) else {
++            continue;
++        };
++        let Ok(package) = litchi_opc::OpcPackage::from_bytes(&bytes) else {
++            continue;
++        };
++        for part in package.iter_parts() {
++            let name = part.partname().as_str().to_owned();
++            if !name.starts_with("/xl/worksheets/") || !name.ends_with(".xml") {
++                continue;
++            }
++            let content = part.blob().to_vec();
++            worksheets += 1;
++            let facts = plan(&content);
++            let addresses = addresses_of(&content, facts.as_ref());
++            let Some(address) = addresses.first().copied() else {
++                continue;
++            };
++            let Some(first) = commit(&content, &actions_for(address, 5), facts.as_ref()) else {
++                continue;
++            };
++            committed += 1;
++            let Some(chained) = chain(&first) else {
++                continue;
++            };
++            with_chain_facts += 1;
++            let tally = compare_using(&first, Some(chained));
++            accepted += tally.accepted;
++            compared += tally.compared;
++        }
++    }
++    assert!(worksheets > 100, "worksheet parts swept: {worksheets}");
++    assert!(committed > 25, "first commits taken: {committed}");
++    println!(
++        "change 0635 chain oracle: {worksheets} worksheet parts, {committed} first commits, \
++         {with_chain_facts} rewritten outputs publishing facts, {compared} comparisons, \
++         {accepted} fact-route second commits"
++    );
++}
++
+ fn collect_xlsx(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+     let Ok(entries) = std::fs::read_dir(directory) else {
+         return;
