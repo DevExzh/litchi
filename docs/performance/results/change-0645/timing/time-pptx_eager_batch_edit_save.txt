@@ -1,0 +1,15 @@
+case	pptx_eager_batch_edit_save
+leg	A1	n=30	p50=319.583ms	mean=324.833ms	p95=358.275ms	p99=370.177ms
+leg	B1	n=30	p50=295.580ms	mean=309.793ms	p95=408.581ms	p99=472.023ms
+leg	B2	n=30	p50=297.166ms	mean=298.415ms	p95=301.717ms	p99=322.339ms
+leg	A2	n=30	p50=321.253ms	mean=322.704ms	p95=330.446ms	p99=332.237ms
+pooled	before(A1+A2)	n=60	p50=320.127ms	mean=323.768ms	p95=356.028ms	p99=370.177ms
+pooled	after(B1+B2)	n=60	p50=296.628ms	mean=304.104ms	p95=369.179ms	p99=472.023ms
+delta	p50	after_vs_before=-7.34%	before_vs_after=+7.92%
+delta	p95	after_vs_before=+3.69%	before_vs_after=-3.56%
+delta	p99	after_vs_before=+27.51%	before_vs_after=-21.58%
+delta	mean	after_vs_before=-6.07%	before_vs_after=+6.47%
+floor	A/A_p50	A2_vs_A1=+0.52%
+floor	B/B_p50	B2_vs_B1=+0.54%
+floor	A/A_p95	A2_vs_A1=-7.77%
+floor	A/A_p99	A2_vs_A1=-10.25%

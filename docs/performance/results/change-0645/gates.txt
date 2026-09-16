@@ -1,0 +1,107 @@
+=== SCRATCH-IMPLEMENTATION GATES (A+B, in the measurement worktree; reverted before commit) ===
+--- cargo test -p litchi-pptx ---
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.56s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.37s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+--- totals ---
+total passed=874 failed=0
+--- the verdict-preservation gate, verbose ---
+
+running 1 test
+test opened::tests::revision_v2_preserves_every_pairwise_verdict_of_v1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 565 filtered out; finished in 0.75s
+
+--- the memo invariant and sizing gates, verbose ---
+running 1 test
+test opened::tests::memoized_recapture_equals_a_cold_recapture ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 565 filtered out; finished in 0.04s
+
+0645-memo parts=29 entries=29 resident_bytes=3192 per_entry=110.1
+0645-memo parts=85 entries=85 resident_bytes=6384 per_entry=75.1
+0645-memo parts=221 entries=221 resident_bytes=12768 per_entry=57.8
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 565 filtered out; finished in 0.27s
+--- cargo clippy -p litchi-pptx --all-targets (scratch) ---
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/soapberry-zip)
+    Checking tempfile v3.27.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-core)
+    Checking icu_normalizer v1.5.0
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.12s
+--- cargo doc -p litchi-pptx --no-deps (scratch) ---
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-drawingml)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0645/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.89s
+   Generated /home/zhuhe/code/litchi-worktrees/0645/target/doc/litchi_pptx/index.html
+--- cargo fmt --all --check (scratch) ---
+[m[31m-    Slide, SlideNameIndex, Snapshot, capture, invalid,
+[m[31m-};
+[m[32m+use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
+[m use super::patch::Patch;
+ use crate::{Error, Result};
+ 
+fmt exit=0
+--- cargo test -p litchi --features docx,xlsx,pptx,xls (scratch; consumer of litchi-pptx) ---
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+total passed=266 failed=0
+--- cargo fmt --all --check (scratch, after cargo fmt --all) ---
+fmt exit=0
+--- cargo test -p litchi-pptx (scratch, re-run after fmt) ---
+total passed=874 failed=0
+
+=== DOCUMENTATION GATES (this branch: docs only, no crates/ or tools/ change) ===
+--- git status --short -- crates tools ---
+(empty: the branch carries no production change)
+--- cargo fmt --all --check ---
+exit=0
+--- tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict ---
+OK: 10 performance claims validated (strict)
+--- tools/check_report_claim_classification.py ---
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)

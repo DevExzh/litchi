@@ -1,0 +1,770 @@
+diff --git a/crates/litchi-pptx/src/opened/mod.rs b/crates/litchi-pptx/src/opened/mod.rs
+index 3043b9425..d25767066 100644
+--- a/crates/litchi-pptx/src/opened/mod.rs
++++ b/crates/litchi-pptx/src/opened/mod.rs
+@@ -25,8 +25,8 @@ pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
+ pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
+ pub use transaction::{Commit, Transaction};
+ 
+-pub(crate) use model::{capture_with_provenance, package_fingerprint};
+-pub(crate) use patch::{apply, apply_committed};
++pub(crate) use model::{PartDigests, capture_with_provenance, package_fingerprint};
++pub(crate) use patch::{apply, apply_committed_with_parent};
+ pub(crate) use remove_plan::apply_patch as apply_removal_patch;
+ pub(crate) use xml::{
+     insert_slide_binding, reorder_slide_bindings, stage_shape_texts, validate_slide_bindings,
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+index 15d2a2171..192027128 100644
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -252,6 +252,111 @@ pub struct Snapshot {
+     /// package starts an empty one, because content equality does not imply
+     /// an identical retained archive.
+     pub(crate) physical_revision: Arc<OnceLock<(usize, [u8; 32])>>,
++    /// Per-part payload digests of `package`, keyed by blob `Arc` identity.
++    ///
++    /// SCRATCH (change 0645, design sizing only): every entry names a blob
++    /// this snapshot's own package holds, so the memo pins no bytes the
++    /// snapshot does not already own.
++    pub(crate) part_digests: Arc<PartDigests>,
++}
++
++/// SCRATCH (change 0645): per-part payload digests keyed by blob `Arc`
++/// identity and length, retaining the `Arc` so the key cannot be recycled.
++#[derive(Default)]
++pub(crate) struct PartDigests {
++    entries: HashMap<(usize, usize), (Arc<Vec<u8>>, [u8; 32])>,
++}
++
++impl PartDigests {
++    fn with_capacity(parts: usize) -> Result<Self> {
++        let mut entries = HashMap::new();
++        entries
++            .try_reserve(parts)
++            .map_err(|source| Error::Allocation {
++                resource: "opened-presentation part digests",
++                source,
++            })?;
++        Ok(Self { entries })
++    }
++
++    /// Digest memoized for exactly this allocation, if any.
++    fn get(&self, key: (usize, usize)) -> Option<[u8; 32]> {
++        self.entries.get(&key).map(|(_blob, digest)| *digest)
++    }
++
++    fn insert(&mut self, key: (usize, usize), blob: Arc<Vec<u8>>, digest: [u8; 32]) -> Result<()> {
++        self.entries
++            .try_reserve(1)
++            .map_err(|source| Error::Allocation {
++                resource: "opened-presentation part digests",
++                source,
++            })?;
++        self.entries.insert(key, (blob, digest));
++        Ok(())
++    }
++
++    /// Number of memoized payloads.
++    #[cfg(test)]
++    pub(crate) fn len(&self) -> usize {
++        self.entries.len()
++    }
++
++    /// Memoized allocation keys, for the invariant gate.
++    #[cfg(test)]
++    pub(crate) fn keys(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
++        self.entries.keys().copied()
++    }
++
++    /// Bytes this memo occupies itself, excluding the payloads it names.
++    #[cfg(test)]
++    pub(crate) fn resident_bytes(&self) -> usize {
++        self.entries.capacity()
++            * (size_of::<(usize, usize)>() + size_of::<(Arc<Vec<u8>>, [u8; 32])>() + 1)
++    }
++
++    /// Project `self` onto the blobs `package` currently holds.
++    ///
++    /// An entry survives only when `package` holds the very allocation it
++    /// names, so the projection never pins a payload the package dropped.
++    fn project(&self, package: &OpcPackage) -> Result<Self> {
++        let mut projected = Self::with_capacity(package.part_count())?;
++        for part in package.iter_parts() {
++            let Some((key, blob)) = memo_key(part) else {
++                continue;
++            };
++            if let Some(digest) = self.get(key) {
++                projected.insert(key, blob, digest)?;
++            }
++        }
++        Ok(projected)
++    }
++}
++
++impl fmt::Debug for PartDigests {
++    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
++        formatter
++            .debug_struct("PartDigests")
++            .field("len", &self.entries.len())
++            .finish()
++    }
++}
++
++/// Memo key for `part`, or `None` when its `blob_arc()` does not alias the
++/// bytes `blob()` returns.
++///
++/// `Part` is a public trait: a foreign implementation may return an `Arc`
++/// whose contents differ from its visible payload (`litchi-opc`'s
++/// `from_vec_reusing_payloads` guards the same way at `package.rs:435`). A
++/// part that fails the alias test is simply never memoized, so the digest and
++/// the key always describe the same bytes.
++fn memo_key(part: &dyn litchi_opc::Part) -> Option<((usize, usize), Arc<Vec<u8>>)> {
++    let blob = part.blob_arc();
++    let visible = part.blob();
++    if blob.len() != visible.len() || !std::ptr::eq(blob.as_slice(), visible) {
++        return None;
++    }
++    let key = (blob.as_ptr() as usize, blob.len());
++    Some((key, blob))
+ }
+ 
+ impl fmt::Debug for Snapshot {
+@@ -304,6 +409,13 @@ impl Snapshot {
+             // says nothing about ZIP ordering, compression, or retained source
+             // bytes, so the serialized-archive revision is not carried over.
+             physical_revision: Arc::new(OnceLock::new()),
++            // SCRATCH (0645): the memo is projected onto the rebound
++            // package's own allocations, so it never pins a foreign payload.
++            part_digests: Arc::new(
++                self.part_digests
++                    .project(package)
++                    .unwrap_or_else(|_error| PartDigests::default()),
++            ),
+             ..self.clone()
+         }
+     }
+@@ -343,7 +455,24 @@ pub(crate) fn capture_with_provenance(
+     limits: Limits,
+     physical_source_provenance: bool,
+ ) -> Result<Snapshot> {
+-    capture_internal(package, limits, physical_source_provenance, None)
++    capture_internal(package, limits, physical_source_provenance, None, None)
++}
++
++/// SCRATCH (0645): capture with a parent memo whose entries may be reused for
++/// any payload allocation `package` shares with it.
++pub(crate) fn capture_with_parent_digests(
++    package: &OpcPackage,
++    limits: Limits,
++    physical_source_provenance: bool,
++    parent: &PartDigests,
++) -> Result<Snapshot> {
++    capture_internal(
++        package,
++        limits,
++        physical_source_provenance,
++        None,
++        Some(parent),
++    )
+ }
+ 
+ /// Capture `package` with a complete-package revision the caller already
+@@ -361,7 +490,33 @@ pub(crate) fn capture_with_revision(
+     physical_source_provenance: bool,
+     revision: [u8; 32],
+ ) -> Result<Snapshot> {
+-    capture_internal(package, limits, physical_source_provenance, Some(revision))
++    capture_internal(
++        package,
++        limits,
++        physical_source_provenance,
++        Some(revision),
++        None,
++    )
++}
++
++/// SCRATCH (0645): capture with a revision the caller computed together with
++/// the memo it filled while computing it.
++pub(crate) fn capture_with_revision_and_digests(
++    package: &OpcPackage,
++    limits: Limits,
++    physical_source_provenance: bool,
++    revision: [u8; 32],
++    digests: PartDigests,
++) -> Result<Snapshot> {
++    let mut snapshot = capture_internal(
++        package,
++        limits,
++        physical_source_provenance,
++        Some(revision),
++        None,
++    )?;
++    snapshot.part_digests = Arc::new(digests);
++    Ok(snapshot)
+ }
+ 
+ fn capture_internal(
+@@ -369,6 +524,7 @@ fn capture_internal(
+     limits: Limits,
+     physical_source_provenance: bool,
+     known_revision: Option<[u8; 32]>,
++    parent: Option<&PartDigests>,
+ ) -> Result<Snapshot> {
+     let presentation = PresentationPart::from_package(package)?;
+     let presentation_name = presentation.part().partname().clone();
+@@ -433,15 +589,15 @@ fn capture_internal(
+     }
+     let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
+     let slide_name_index = SlideNameIndex::build(&slides)?;
+-    let revision = match known_revision {
++    let (revision, part_digests) = match known_revision {
+         Some(revision) => {
+             debug_assert!(
+                 package_fingerprint(package).is_ok_and(|fresh| fresh == revision),
+                 "opened-presentation capture reused a stale complete-package revision"
+             );
+-            revision
++            (revision, PartDigests::default())
+         },
+-        None => package_fingerprint(package)?,
++        None => package_fingerprint_with_memo(package, parent)?,
+     };
+     Ok(Snapshot {
+         package: Arc::new(package.clone()),
+@@ -452,10 +608,113 @@ fn capture_internal(
+         limits,
+         physical_source_provenance,
+         physical_revision: Arc::new(OnceLock::new()),
++        part_digests: Arc::new(part_digests),
+     })
+ }
+ 
+ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
++    Ok(package_fingerprint_with_memo(package, None)?.0)
++}
++
++/// SCRATCH (change 0645): the `litchi-pptx-opened-v2` complete-package
++/// revision, computed over sorted per-part digests, plus the memo it filled.
++///
++/// A payload whose allocation `parent` already names is taken from the memo
++/// instead of being hashed again. Every other input — the domain string, the
++/// root relationships, the opaque non-part members, and per part the name, the
++/// content type and the relationships — is fed exactly as v1 fed it.
++pub(crate) fn package_fingerprint_with_memo(
++    package: &OpcPackage,
++    parent: Option<&PartDigests>,
++) -> Result<([u8; 32], PartDigests)> {
++    let mut parts = Vec::new();
++    parts
++        .try_reserve_exact(package.part_count())
++        .map_err(|source| Error::Allocation {
++            resource: "opened-presentation fingerprint parts",
++            source,
++        })?;
++    parts.extend(package.iter_parts());
++    parts.sort_unstable_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
++    let mut digest = Sha256::new();
++    feed(&mut digest, b"litchi-pptx-opened-v2");
++    let mut root_relationships = Vec::new();
++    root_relationships
++        .try_reserve_exact(package.rels().len())
++        .map_err(|source| Error::Allocation {
++            resource: "opened-presentation fingerprint root relationships",
++            source,
++        })?;
++    root_relationships.extend(package.rels().iter());
++    root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
++    feed_relationships(&mut digest, &root_relationships)?;
++    let non_part_count = u32::try_from(package.non_part_members().len())
++        .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
++    feed(&mut digest, b"non-part-members");
++    feed(&mut digest, &non_part_count.to_le_bytes());
++    for member in package.non_part_members() {
++        feed(&mut digest, member.name().as_bytes());
++        feed(&mut digest, member.reason().as_str().as_bytes());
++    }
++    let part_count = u32::try_from(parts.len())
++        .map_err(|_error| invalid("opened-presentation part count exceeds u32"))?;
++    feed(&mut digest, b"parts");
++    digest.update(part_count.to_le_bytes());
++    let mut memo = PartDigests::with_capacity(parts.len())?;
++    for part in parts {
++        let payload = match memo_key(part) {
++            Some((key, blob)) => {
++                let payload = match parent.and_then(|parent| parent.get(key)) {
++                    Some(payload) => payload,
++                    None => payload_digest(&blob),
++                };
++                memo.insert(key, blob, payload)?;
++                payload
++            },
++            None => payload_digest_bytes(part.blob()),
++        };
++        digest.update(part_digest(part, payload)?);
++    }
++    Ok((digest.finalize().into(), memo))
++}
++
++/// Digest of one part payload, under its own domain string.
++fn payload_digest(blob: &Arc<Vec<u8>>) -> [u8; 32] {
++    payload_digest_bytes(blob)
++}
++
++fn payload_digest_bytes(blob: &[u8]) -> [u8; 32] {
++    let mut digest = Sha256::new();
++    feed(&mut digest, b"litchi-pptx-opened-payload-v2");
++    feed(&mut digest, blob);
++    digest.finalize().into()
++}
++
++/// Digest of one part: its name, content type, payload digest and
++/// relationships, under its own domain string.
++fn part_digest(part: &dyn litchi_opc::Part, payload: [u8; 32]) -> Result<[u8; 32]> {
++    let mut digest = Sha256::new();
++    feed(&mut digest, b"litchi-pptx-opened-part-v2");
++    feed(&mut digest, part.partname().as_str().as_bytes());
++    feed(&mut digest, part.content_type().as_bytes());
++    digest.update(payload);
++    let mut relationships = Vec::new();
++    relationships
++        .try_reserve_exact(part.rels().len())
++        .map_err(|source| Error::Allocation {
++            resource: "opened-presentation fingerprint relationships",
++            source,
++        })?;
++    relationships.extend(part.rels().iter());
++    relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
++    feed_relationships(&mut digest, &relationships)?;
++    Ok(digest.finalize().into())
++}
++
++/// The `litchi-pptx-opened-v1` revision, retained for the differential gate
++/// that proves v1 and v2 return the same verdicts.
++#[cfg(test)]
++pub(crate) fn package_fingerprint_v1(package: &OpcPackage) -> Result<[u8; 32]> {
+     let mut parts = Vec::new();
+     parts
+         .try_reserve_exact(package.part_count())
+diff --git a/crates/litchi-pptx/src/opened/patch.rs b/crates/litchi-pptx/src/opened/patch.rs
+index 2a9129d5f..355a22665 100644
+--- a/crates/litchi-pptx/src/opened/patch.rs
++++ b/crates/litchi-pptx/src/opened/patch.rs
+@@ -755,7 +755,7 @@ pub(crate) fn apply(
+     patch: &Patch,
+     physical_source_provenance: bool,
+ ) -> Result<Snapshot> {
+-    apply_with_revision(package, patch, None, None, physical_source_provenance)
++    apply_with_revision(package, patch, None, None, physical_source_provenance, None)
+ }
+ 
+ /// Apply a patch whose committing transaction already captured the staged
+@@ -770,13 +770,23 @@ pub(crate) fn apply(
+ /// physical-source provenance or resource limits differ — the candidate is
+ /// captured from scratch, so no refusal, no snapshot field and no published
+ /// byte depends on the reuse.
+-pub(crate) fn apply_committed(
++/// SCRATCH (0645, design B): as [`apply_committed`], with the facade's
++/// retained memo of the package being patched.
++pub(crate) fn apply_committed_with_parent(
+     package: &mut OpcPackage,
+     patch: &Patch,
+     committed: Option<&Snapshot>,
+     physical_source_provenance: bool,
++    parent: &super::model::PartDigests,
+ ) -> Result<Snapshot> {
+-    apply_with_revision(package, patch, None, committed, physical_source_provenance)
++    apply_with_revision(
++        package,
++        patch,
++        None,
++        committed,
++        physical_source_provenance,
++        Some(parent),
++    )
+ }
+ 
+ pub(crate) fn apply_exact_revision(
+@@ -791,6 +801,7 @@ pub(crate) fn apply_exact_revision(
+         Some(result_revision),
+         None,
+         physical_source_provenance,
++        None,
+     )
+ }
+ 
+@@ -801,6 +812,7 @@ fn capture_candidate(
+     limits: Limits,
+     physical_source_provenance: bool,
+     committed: Option<&Snapshot>,
++    parent: Option<&super::model::PartDigests>,
+ ) -> Result<Snapshot> {
+     if let Some(committed) = committed
+         && committed.limits == limits
+@@ -809,7 +821,21 @@ fn capture_candidate(
+     {
+         return Ok(committed.rebound_to(candidate));
+     }
+-    capture(candidate, limits, physical_source_provenance)
++    // SCRATCH (0645): a candidate that drifted outside the write set still
++    // shares most payload allocations with the committed package, so the
++    // fallback capture consults that memo rather than hashing from cold.
++    match committed
++        .map(|snapshot| snapshot.part_digests.as_ref())
++        .or(parent)
++    {
++        Some(parent) => super::model::capture_with_parent_digests(
++            candidate,
++            limits,
++            physical_source_provenance,
++            parent,
++        ),
++        None => capture(candidate, limits, physical_source_provenance),
++    }
+ }
+ 
+ /// Validate a detached candidate already constructed from a freshly proven
+@@ -848,6 +874,7 @@ fn apply_with_revision(
+     result_revision: Option<[u8; 32]>,
+     committed: Option<&Snapshot>,
+     physical_source_provenance: bool,
++    parent: Option<&super::model::PartDigests>,
+ ) -> Result<Snapshot> {
+     let current_main = crate::parts::PresentationPart::from_package(package)?
+         .part()
+@@ -860,8 +887,13 @@ fn apply_with_revision(
+     }
+     validate_before(package, patch)?;
+     if patch.is_empty() {
+-        let snapshot =
+-            capture_candidate(package, patch.limits, physical_source_provenance, committed)?;
++        let snapshot = capture_candidate(
++            package,
++            patch.limits,
++            physical_source_provenance,
++            committed,
++            parent,
++        )?;
+         if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
+             return Err(invalid(
+                 "opened-presentation candidate has an unexpected complete-package revision",
+@@ -905,6 +937,7 @@ fn apply_with_revision(
+         patch.limits,
+         physical_source_provenance,
+         committed,
++        parent,
+     )?;
+     validate_after(&candidate, patch)?;
+     if result_revision.is_some_and(|expected| snapshot.revision() != expected) {
+diff --git a/crates/litchi-pptx/src/opened/tests.rs b/crates/litchi-pptx/src/opened/tests.rs
+index 74c8f4db4..464d4a5c7 100644
+--- a/crates/litchi-pptx/src/opened/tests.rs
++++ b/crates/litchi-pptx/src/opened/tests.rs
+@@ -4127,3 +4127,189 @@ fn packages_equal_tracks_every_fingerprint_input() -> Result<()> {
+     );
+     Ok(())
+ }
++
++// SCRATCH (change 0645): the verdict-preservation gate for the memoized
++// per-part revision proof. Not production code; retained as a patch in the
++// change-0645 evidence packet.
++
++/// Every pairwise verdict of the v2 revision equals the v1 verdict and the
++/// content oracle's verdict, over a corpus of single-input mutations.
++#[test]
++fn revision_v2_preserves_every_pairwise_verdict_of_v1() -> Result<()> {
++    let package = opened_two_slide_package()?;
++    let base = package.opc.clone();
++    let slide = package.opened_presentation()?.slides()[0]
++        .part_name()
++        .clone();
++    let second = package.opened_presentation()?.slides()[1]
++        .part_name()
++        .clone();
++    let main = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
++    let added = PackURI::new("/docProps/extra.bin").map_err(Error::Invalid)?;
++
++    let mut corpus: Vec<(String, litchi_opc::OpcPackage)> = Vec::new();
++    corpus.push(("base".to_owned(), base.clone()));
++
++    // A re-allocated but byte-identical package: equal content, no shared Arc.
++    let mut rewritten = base.clone();
++    let blob = rewritten.get_part(&main)?.blob().to_vec();
++    rewritten.get_part_mut(&main)?.set_blob(blob);
++    corpus.push(("rewritten in place".to_owned(), rewritten));
++
++    let mutations: Vec<(
++        &str,
++        fn(&mut litchi_opc::OpcPackage, &PackURI, &PackURI, &PackURI) -> Result<()>,
++    )> = vec![
++        ("payload grows", |opc, slide, _second, _added| {
++            let mut blob = opc.get_part(slide)?.blob().to_vec();
++            blob.extend_from_slice(b" ");
++            opc.get_part_mut(slide)?.set_blob(blob);
++            Ok(())
++        }),
++        ("payload shrinks", |opc, slide, _second, _added| {
++            let mut blob = opc.get_part(slide)?.blob().to_vec();
++            blob.pop();
++            opc.get_part_mut(slide)?.set_blob(blob);
++            Ok(())
++        }),
++        ("content type", |opc, slide, _second, _added| {
++            opc.get_part_mut(slide)?
++                .set_content_type("application/octet-stream".into())?;
++            Ok(())
++        }),
++        ("added part", |opc, _slide, _second, added| {
++            opc.try_add_part(Box::new(BlobPart::new(
++                added.clone(),
++                "application/octet-stream".into(),
++                b"extra".to_vec(),
++            )))?;
++            Ok(())
++        }),
++        ("removed part", |opc, slide, _second, _added| {
++            assert!(opc.remove_part(slide));
++            Ok(())
++        }),
++        ("part relationship", |opc, slide, _second, _added| {
++            opc.get_part_mut(slide)?.rels_mut().try_add_relationship(
++                "urn:producer:probe".into(),
++                "../media/probe.bin".into(),
++                "rIdProbe".into(),
++                TargetMode::Internal,
++            )?;
++            Ok(())
++        }),
++        ("root relationship", |opc, _slide, _second, _added| {
++            opc.rels_mut().try_add_relationship(
++                "urn:producer:probe".into(),
++                "docProps/probe.bin".into(),
++                "rIdRootProbe".into(),
++                TargetMode::Internal,
++            )?;
++            Ok(())
++        }),
++        ("external relationship", |opc, _slide, _second, _added| {
++            opc.rels_mut().try_add_relationship(
++                "urn:producer:probe".into(),
++                "https://example.invalid/probe".into(),
++                "rIdExternalProbe".into(),
++                TargetMode::External,
++            )?;
++            Ok(())
++        }),
++        // The transposition case: two parts swap payloads. The per-part
++        // digests are the same multiset; only their binding to names changes.
++        ("payload transposition", |opc, slide, second, _added| {
++            let first_blob = opc.get_part(slide)?.blob().to_vec();
++            let second_blob = opc.get_part(second)?.blob().to_vec();
++            opc.get_part_mut(slide)?.set_blob(second_blob);
++            opc.get_part_mut(second)?.set_blob(first_blob);
++            Ok(())
++        }),
++    ];
++
++    for (label, mutate) in mutations {
++        let mut mutated = base.clone();
++        mutate(&mut mutated, &slide, &second, &added)?;
++        corpus.push(((*label).to_owned(), mutated));
++    }
++
++    let mut compared = 0_usize;
++    for (left_label, left) in &corpus {
++        for (right_label, right) in &corpus {
++            let oracle = super::model::packages_equal(left, right);
++            let v1 = super::model::package_fingerprint_v1(left)?
++                == super::model::package_fingerprint_v1(right)?;
++            let v2 = super::model::package_fingerprint(left)?
++                == super::model::package_fingerprint(right)?;
++            assert_eq!(
++                oracle, v1,
++                "v1 disagreed with the content oracle on ({left_label}, {right_label})"
++            );
++            assert_eq!(
++                v1, v2,
++                "v2 changed the verdict on ({left_label}, {right_label})"
++            );
++            compared += 1;
++        }
++    }
++    assert_eq!(compared, corpus.len() * corpus.len());
++    assert_eq!(corpus.len(), 11);
++    Ok(())
++}
++
++/// A memoized recapture returns exactly the revision a cold one returns, and
++/// the memo it leaves names only allocations the captured package holds.
++#[test]
++fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
++    let mut package = opened_plain_slides_package(8)?;
++    let source = package.opened_presentation()?;
++    assert_eq!(source.part_digests.len(), package.opc.part_count());
++
++    let mut edit = source.edit();
++    edit.set_shape_text(0, crate::shape::Key::Index(0), "memoized")?;
++    let commit = edit.commit()?;
++    let committed = commit.snapshot().revision();
++    assert_eq!(
++        committed,
++        super::model::package_fingerprint(commit.snapshot().package.as_ref())?
++    );
++    assert_ne!(committed, source.revision());
++
++    let published = package.apply_opened_presentation_commit(commit)?;
++    assert_eq!(
++        published.revision(),
++        super::model::package_fingerprint(&package.opc)?
++    );
++
++    // Every memoized key names a payload the snapshot's own package holds.
++    let live: std::collections::HashSet<(usize, usize)> = published
++        .package
++        .iter_parts()
++        .filter_map(|part| {
++            let blob = part.blob_arc();
++            std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
++        })
++        .collect();
++    assert!(published.part_digests.keys().all(|key| live.contains(&key)));
++    Ok(())
++}
++
++/// The memo's own resident cost, reported for the record's memory section.
++#[test]
++fn part_digest_memo_resident_bytes() -> Result<()> {
++    for parts in [8_usize, 64, 200] {
++        let package = opened_plain_slides_package(parts)?;
++        let snapshot = package.opened_presentation()?;
++        let entries = snapshot.part_digests.len();
++        let bytes = snapshot.part_digests.resident_bytes();
++        assert_eq!(entries, package.opc.part_count());
++        println!(
++            "0645-memo parts={} entries={} resident_bytes={} per_entry={:.1}",
++            package.opc.part_count(),
++            entries,
++            bytes,
++            bytes as f64 / entries as f64
++        );
++    }
++    Ok(())
++}
+diff --git a/crates/litchi-pptx/src/opened/transaction.rs b/crates/litchi-pptx/src/opened/transaction.rs
+index 4dc1cdddc..8d964435b 100644
+--- a/crates/litchi-pptx/src/opened/transaction.rs
++++ b/crates/litchi-pptx/src/opened/transaction.rs
+@@ -4,9 +4,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+ 
+ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+ 
+-use super::model::{
+-    Slide, SlideNameIndex, Snapshot, capture, capture_with_revision, invalid, package_fingerprint,
+-};
++use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
+ use super::patch::Patch;
+ use crate::{Error, Result};
+ 
+@@ -54,7 +52,8 @@ impl Transaction {
+     /// Whether any managed resource differs from the source root.
+     #[must_use]
+     pub fn is_changed(&self) -> bool {
+-        package_fingerprint(&self.working).is_ok_and(|revision| revision != self.source.revision)
++        super::model::package_fingerprint_with_memo(&self.working, Some(&self.source.part_digests))
++            .is_ok_and(|(revision, _digests)| revision != self.source.revision)
+     }
+ 
+     /// Move one slide between checked zero-based positions.
+@@ -1197,7 +1196,11 @@ impl Transaction {
+     pub fn commit(self) -> Result<Commit> {
+         let mut working = self.working;
+         compact_changed_slides(&mut working, self.source.package.as_ref(), &self.slides)?;
+-        let mut revision = package_fingerprint(&working)?;
++        // SCRATCH (0645): the staged package shares every untouched payload
++        // allocation with the source snapshot, so the source memo answers
++        // every part the transaction did not rewrite.
++        let (mut revision, mut digests) =
++            super::model::package_fingerprint_with_memo(&working, Some(&self.source.part_digests))?;
+         if revision != self.source.revision {
+             // `unsign` rewrites fingerprint inputs only when signature
+             // infrastructure is present: it strips signature parts and the
+@@ -1208,7 +1211,12 @@ impl Transaction {
+             let signed = working.is_signed();
+             working.unsign();
+             if signed {
+-                revision = package_fingerprint(&working)?;
++                let recomputed = super::model::package_fingerprint_with_memo(
++                    &working,
++                    Some(&self.source.part_digests),
++                )?;
++                revision = recomputed.0;
++                digests = recomputed.1;
+             }
+         }
+         let patch = Patch::capture(
+@@ -1223,11 +1231,12 @@ impl Transaction {
+                 patch,
+             });
+         }
+-        let snapshot = capture_with_revision(
++        let snapshot = super::model::capture_with_revision_and_digests(
+             &working,
+             self.source.limits,
+             self.source.physical_source_provenance,
+             revision,
++            digests,
+         )?;
+         Ok(Commit { snapshot, patch })
+     }
+diff --git a/crates/litchi-pptx/src/package/codec.rs b/crates/litchi-pptx/src/package/codec.rs
+index e9f3faef2..c4f7e3ad7 100644
+--- a/crates/litchi-pptx/src/package/codec.rs
++++ b/crates/litchi-pptx/src/package/codec.rs
+@@ -161,6 +161,7 @@ impl Package {
+         Ok(Self {
+             opc: package,
+             mutable_pres: Some(MutablePresentation::new()),
++            part_digests: std::sync::Arc::default(),
+             physical_source_provenance: false,
+             #[cfg(feature = "encryption")]
+             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
+@@ -271,6 +272,7 @@ impl Package {
+         Ok(Self {
+             opc,
+             mutable_pres: None,
++            part_digests: std::sync::Arc::default(),
+             physical_source_provenance,
+             #[cfg(feature = "encryption")]
+             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
+diff --git a/crates/litchi-pptx/src/package/model.rs b/crates/litchi-pptx/src/package/model.rs
+index 66928e956..4dbcb0e27 100644
+--- a/crates/litchi-pptx/src/package/model.rs
++++ b/crates/litchi-pptx/src/package/model.rs
+@@ -16,6 +16,10 @@ pub struct Package {
+     /// Whether ingress retained the exact source archive needed for physical
+     /// revision authorization of topology-changing cross-package edits.
+     pub(crate) physical_source_provenance: bool,
++    /// SCRATCH (0645, design B): per-part payload digests of `opc`, refreshed
++    /// at every opened-presentation publication. Identity-keyed, so a stale
++    /// memo can only miss, never answer wrongly.
++    pub(crate) part_digests: std::sync::Arc<crate::opened::PartDigests>,
+     #[cfg(feature = "encryption")]
+     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
+     #[cfg(feature = "automatic-fonts")]
+@@ -457,12 +461,16 @@ impl Package {
+         // The opened owner validates and captures a detached complete candidate
+         // before one assignment, so the facade's clone-and-rollback wrapper
+         // would only duplicate the entire OPC graph without adding atomicity.
+-        let snapshot = crate::opened::apply_committed(
++        let snapshot = crate::opened::apply_committed_with_parent(
+             &mut self.opc,
+             patch,
+             committed,
+             self.physical_source_provenance,
++            &self.part_digests,
+         )?;
++        // The published snapshot describes `self.opc`; its memo names exactly
++        // that package's own payload allocations.
++        self.part_digests = std::sync::Arc::clone(&snapshot.part_digests);
+         if changed {
+             self.mutable_pres = None;
+         }

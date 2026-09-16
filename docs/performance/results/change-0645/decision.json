@@ -1,0 +1,64 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0645",
+  "title": "The memoized per-part revision proof, frozen: 26% of an opened PPTX lifecycle, a durable format bump, and one selector made slower",
+  "decision": "retained, design only; no production change",
+  "code_state": "docs/performance only; no file under crates/ or tools/ is modified on the branch. The scratch implementation used for sizing is retained as patches in the evidence packet and exists nowhere else.",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0590 declined part (c) of PPTX-1 because package_fingerprint is serialized into the durable LPRM0001 and LPCP0002 headers, so redefining it is a wire-format change that needs a frozen design first; this is that record",
+    "the design is a two-tier proof: a memoized payload digest keyed by blob Arc identity and length, and a per-part digest over the name, content type, payload digest and relationships, with the revision a hash over the sorted per-part digests under litchi-pptx-opened-v2",
+    "the payload tier is separate on purpose: content type and relationships are not behind the blob Arc, so memoizing the whole per-part digest on that key would return a stale digest for a part whose relationships changed",
+    "the retained Arc in the memo is load-bearing rather than an optimization: without it the (address, length) key is an ABA hazard, because a freed payload's address can be recycled by a different payload",
+    "Part is a public trait and blob_arc() need not agree with blob(); the memo applies the same alias test litchi-opc already applies at package.rs:435 and declines to memoize any part that fails it",
+    "verdicts are preserved: the proof is a function of exactly the v1 input tuple, the new encoding is injective, the part order is canonical, and every in-crate verdict is R(A)==R(B) for two packages in the same build — so a valid application applies, a stale one conflicts identically, and an exact no-op still compares equal",
+    "the cost of tiering is quantified rather than elided: R2 offers 2k+1 hash instances to collide instead of one, about 9 bits of the 128-bit generic margin at k=256",
+    "sized by a scratch implementation on change 0590's four retained selectors: an eager lifecycle falls 26.15% in instructions, and the fingerprint subtree falls 74.33%, which confirms 0590's modelled 2.5 G Ir / 23% estimate at 2.735 G Ir / 26.15%",
+    "the design needs the facade carry to be worth landing: a Snapshot-only memo is -8.63%, the facade-carried memo is -26.15%, because the two remaining fingerprints belong to Package::apply_opened_presentation_patch, the public durable-patch route, which holds no snapshot"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs at --warmup 0 --samples 1 and 3, differenced over the two extra samples, per leg (before, scratch A, scratch A+B) for pptx_eager_batch_edit_save, pptx_eager_multi_slide_batch_edit_save, pptx_slide_move_boundary_save and pptx_slide_remove_boundary_save; whole-sample totals plus inclusive Ir for the fingerprint subtree and sha2::sha256::compress256",
+    "call_site_split": "inclusive Ir per (caller, callee) pair from the callgrind out files, separating capture_internal's cold fingerprint from Transaction::commit's memoized one",
+    "memo_hit_rate": "a probe build with per-fingerprint hit/miss and bytes-fed counters, run once on pptx_eager_batch_edit_save; 228 of 229 parts hit, 3,499 payload bytes hashed against 17,568,429, 93,763 bytes fed against 17,668,953",
+    "memo_resident_bytes": "HashMap::capacity accounting at 29, 85 and 221 parts (3,192 / 6,384 / 12,768 bytes)",
+    "timing": "tools/perf-baseline, --warmup 3 --samples 30, order A1 B1 B2 A2 on CPU 20, before against scratch A+B, with the A/A and B/B floors taken from the repeated legs in the same window",
+    "native_counters": "perf stat -e cycles,instructions,task-clock around the same four legs",
+    "verdict_identity": "a pairwise oracle over an 11-package corpus (base, byte-identical re-allocation, nine single-input mutations including a payload transposition): all 121 ordered pairs agree between packages_equal, the v1 revision and the v2 revision",
+    "suite": "cargo test -p litchi-pptx 874 passed 0 failed and cargo test -p litchi --features docx,xlsx,pptx,xls 266 passed 0 failed, with the scratch implementation in place and the capture debug_assert re-deriving every reused revision"
+  },
+  "accepted_costs": {
+    "durable_format": "LPRM0001 -> LPRM0002 and LPCP0002 -> LPCP0003. Every previously serialized patch of both formats stops applying and must be re-planned; there is no migration and no dual read, because the public revision accessors are untyped [u8; 32] and two algebras behind one type would produce a silent false conflict",
+    "error_identity": "an input that used to parse now returns a new typed Error::DurablePatchRevisionFormat from from_bytes. Error is #[non_exhaustive] so the variant is additive, but the error identity of exactly the previously-accepted inputs moves",
+    "per_part_tier": "two extra SHA-256 initialize/finalize pairs and one hash-map insert per part per fingerprint: +3,100,432 Ir per cold fingerprint of the 229-part eager deck (+0.39%), +305,752 Ir per fingerprint of the 25-member boundary deck, about 13,539 Ir per part",
+    "regression": "pptx_slide_remove_boundary_save issues nine fingerprints per lifecycle and reuses none, so it pays the tier for nothing: +2.41% (A) and +2.45% (A+B) in callgrind instructions per lifecycle, +0.32% native instructions, +0.43% cycles against a -0.85% A/A floor",
+    "memory": "about 57 bytes per part of resident table per snapshot (13 KiB for a 229-part deck), plus one Arc refcount per memoized payload; the retention invariant keeps that at zero extra bytes only while it holds",
+    "ambient_state": "the facade carry (part B) puts a memo field on the mutable Package, refreshed at every opened-presentation publication. A stale memo can only miss, never answer wrongly, but between a non-publishing mutation and the next publication it can pin payloads the package has dropped",
+    "collision_margin": "the tiering offers 2k+1 hash instances instead of one, about 9 bits of the generic 128-bit collision margin at the default max_parts of 256"
+  },
+  "known_gaps": {
+    "no_bump_in_the_scratch": "the scratch implementation does not bump either magic and does not carry the typed refusal, so no measurement here says how an old-format patch behaves; admission gate 1 covers it",
+    "callgrind_pricing": "callgrind runs SHA-256 in software and counts rep movsb per byte, so the 26.15% instruction figure is 2.31-2.45% in native instructions and 4.58-4.93% in cycles",
+    "noisy_window": "the two boundary selectors ran in a window whose own floors (B/B p50 -10.17% on the move selector, A/A p50 -2.14% on the remove selector) are as wide as the effect; their counts are the result and their wall clock is not",
+    "memoized_fingerprint_cost": "the about 7.3 M Ir cost of a memoized fingerprint is derived from the measured per-call-site split and the measured per-cold-fingerprint overhead, not measured in isolation",
+    "corpus_reach": "no real-producer .pptx was measured; the mutation corpus is synthetic and the admission list requires the pairwise oracle to be extended over test-data/",
+    "unmeasured": "no allocation-count, RSS, cold-cache, range-source, concurrency or cross-platform measurement; the memo's resident cost comes from HashMap::capacity rather than an allocator counter"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result",
+    "any statement that this design should land: it is frozen behind nine admission gates"
+  ],
+  "provenance": {
+    "base_commit": "c7326f680",
+    "branch": "perf/0645-pptx-revision-proof-format-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 20",
+    "binaries": {
+      "before/litchi-perf-baseline": "a494c98a7cfd7014dafd201cc079ef4c5f6e7862b1d85d6cbea1f8f9173e618c",
+      "scratch-A/litchi-perf-baseline": "8f048eb0883516471d69cc1ff3087987214b3c84456608ea1a3cd4fdd51eb46c",
+      "scratch-A+B/litchi-perf-baseline": "f82f6b900f4d4078135a4bf5481916f69d90ef354c5564ca80f16151ebe018f2"
+    },
+    "note": "all legs built with cargo build --release --locked --bins from tools/perf-baseline; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR. Every measured binary was copied outside its Cargo target directory before it was run."
+  }
+}

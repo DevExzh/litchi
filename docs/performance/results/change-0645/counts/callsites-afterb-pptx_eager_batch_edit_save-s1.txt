@@ -1,0 +1,2 @@
+   1,923,006,593	     7	   274,715,227	litchi_pptx::opened::model::capture_internal	->	litchi_pptx::opened::model::package_fingerprint_with_memo
+     896,494,631	     3	   298,831,543	litchi_pptx::opened::transaction::Transaction::commit	->	litchi_pptx::opened::model::package_fingerprint_with_memo
