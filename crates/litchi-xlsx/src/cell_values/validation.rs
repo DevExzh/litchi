@@ -201,7 +201,7 @@ pub(super) fn worksheet_xml_and_parse_source(
     admission: raw::worksheet::SourceAdmission,
 ) -> Result<(crate::cell::Store, Option<raw::worksheet::SourceFacts>)> {
     let mut validator = Validator::new(XmlOwner::Worksheet);
-    let mut builder = raw::worksheet::FactsBuilder::new();
+    let mut builder = raw::worksheet::FactsBuilder::new(content);
     let attempt = raw::worksheet::parse_source_with_observer(
         content,
         admission,

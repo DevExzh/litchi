@@ -1,0 +1,275 @@
+{
+ "tool": {
+  "name": "litchi-perf-baseline",
+  "version": "0.1.0",
+  "binary": "litchi-perf-baseline",
+  "profile": "release",
+  "target_os": "linux",
+  "target_arch": "x86_64",
+  "instrumentation": "none"
+ },
+ "binary_identity": {
+  "path": "/home/zhuhe/code/litchi-worktrees/targets/0635-staged/after-litchi-perf-baseline",
+  "binary_sha256": "b2b81e86d6cb26b6b22d6e60c51dcf0758a88b906cd69d53425fd3214610eb99",
+  "binary_bytes": 60482312,
+  "mode_bits": 509,
+  "executable": true,
+  "profile": "release"
+ },
+ "environment": {
+  "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "git_revision": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+  "git_worktree_dirty": true,
+  "logical_cpus_available": 1,
+  "allocator": "Rust system allocator",
+  "rustflags": null,
+  "cargo_build_target": null,
+  "perf_event_paranoid": "1",
+  "os": "linux",
+  "kernel": "Linux 7.0.0-1012-aws",
+  "cpu_model": "AMD EPYC 9R45",
+  "total_memory_bytes": 132553797632,
+  "page_size_bytes": 4096,
+  "filesystem_type": null,
+  "source_destination_same_device": null,
+  "cpu_affinity": "11",
+  "storage_identifier": null
+ },
+ "configuration": {
+  "samples_per_case": 30,
+  "warmup_iterations_per_case": 5,
+  "filesystem_cache_states": [
+   "warm",
+   "cold-requested"
+  ],
+  "filesystem_fresh_child_per_sample": true,
+  "filesystem_process_isolated": true,
+  "filesystem_root_selected": false,
+  "cases": [
+   "xlsx_producer_medium_source_one_edit_save",
+   "xlsx_producer_dense_source_one_edit_save"
+  ],
+  "corpus_shapes": [
+   "tiny",
+   "many-small",
+   "few-large",
+   "wide-root"
+  ],
+  "payload_kinds": [
+   "compressible",
+   "incompressible"
+  ],
+  "writer_shapes": [
+   "tiny",
+   "large",
+   "payload-heavy"
+  ],
+  "xlsx_shapes": [
+   "tiny",
+   "medium",
+   "dense-wide"
+  ],
+  "xlsb_shapes": [
+   "tiny",
+   "medium",
+   "large",
+   "sparse"
+  ],
+  "xlsx_cell_crud_shapes": [
+   "medium",
+   "dense-sparse"
+  ],
+  "xlsx_row_visibility_shapes": [
+   "medium",
+   "large"
+  ],
+  "semantic_shapes": [
+   "tiny",
+   "medium",
+   "large"
+  ],
+  "rtf_variants": [
+   "plain"
+  ],
+  "range_simulation": {
+   "fixed_latency_us": 100,
+   "request_overhead_us": 25,
+   "bandwidth_bytes_per_second": 52428800,
+   "max_physical_range_bytes": 4096
+  },
+  "execution_workers": [
+   1
+  ],
+  "opc_cache_lock_diagnostics": false
+ },
+ "results": [
+  {
+   "case": "xlsx_producer_medium_source_one_edit_save",
+   "shape": "producer-medium-edit",
+   "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+     2005590,
+     2010300,
+     2012650,
+     2014630,
+     2015340,
+     2017430,
+     2017541,
+     2017810,
+     2019551,
+     2020190,
+     2020901,
+     2022130,
+     2024031,
+     2025590,
+     2026210,
+     2027870,
+     2027910,
+     2030491,
+     2031170,
+     2036331,
+     2038180,
+     2039430,
+     2041130,
+     2043631,
+     2044591,
+     2049641,
+     2065470,
+     2092751,
+     2114650,
+     2135941
+    ],
+    "sample_order": [
+     6,
+     26,
+     9,
+     15,
+     5,
+     24,
+     25,
+     29,
+     4,
+     8,
+     7,
+     18,
+     14,
+     1,
+     23,
+     3,
+     16,
+     17,
+     13,
+     22,
+     12,
+     11,
+     27,
+     0,
+     28,
+     10,
+     2,
+     21,
+     19,
+     20
+    ],
+    "min": 2005590,
+    "p50": 2027040,
+    "p95": 2114650,
+    "p99": 2135941,
+    "max": 2135941,
+    "mean": 2036302.7,
+    "standard_deviation": 30014.66048237786,
+    "confidence_interval_95": {
+     "method": "two-sided Student's t interval for the mean",
+     "lower": 2025096.2999995975,
+     "upper": 2047509.1000004024
+    }
+   },
+   "output_sha256": "27becde5c6d909d2e301c8b14da6b5184fe3b9f75a8c9ca8012d62e57ef76aba"
+  },
+  {
+   "case": "xlsx_producer_dense_source_one_edit_save",
+   "shape": "producer-dense-edit",
+   "elapsed_ns": {
+    "unit": "ns",
+    "samples": [
+     25248117,
+     25288318,
+     25328948,
+     25329348,
+     25342368,
+     25346868,
+     25360528,
+     25362498,
+     25364298,
+     25379908,
+     25386408,
+     25389479,
+     25400098,
+     25401998,
+     25403839,
+     25429138,
+     25436278,
+     25438748,
+     25456788,
+     25462878,
+     25471538,
+     25486658,
+     25518369,
+     25527039,
+     25534099,
+     25538489,
+     25546439,
+     25573079,
+     25581779,
+     25608220
+    ],
+    "sample_order": [
+     24,
+     28,
+     27,
+     11,
+     26,
+     21,
+     25,
+     6,
+     3,
+     4,
+     23,
+     29,
+     18,
+     5,
+     7,
+     8,
+     12,
+     9,
+     2,
+     14,
+     19,
+     20,
+     22,
+     16,
+     1,
+     17,
+     13,
+     10,
+     15,
+     0
+    ],
+    "min": 25248117,
+    "p50": 25416488,
+    "p95": 25581779,
+    "p99": 25608220,
+    "max": 25608220,
+    "mean": 25431418.666666664,
+    "standard_deviation": 92036.8972825724,
+    "confidence_interval_95": {
+     "method": "two-sided Student's t interval for the mean",
+     "lower": 25397055.383218896,
+     "upper": 25465781.950114433
+    }
+   },
+   "output_sha256": "e63f0010d453f608a36d1cb6b40817677d8d28e8a1729216312f4616cc2c8f5b"
+  }
+ ]
+}

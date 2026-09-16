@@ -1,5 +1,36 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0635 — queue item 17 and survey item XLSX-5 closed, one by code and one by evidence
+
+Record: [0635](0635-xlsx-facts-builder-and-chains.md).
+
+Change 0635 closes queue item 17 of change 0630 and item XLSX-5 of the 0587 survey.
+Item 17 had three parts and they end differently. The builder's cost is **reduced**:
+the builder falls **35.0-36.2%** on every one of eight scenarios (`FactsBuilder::element` −41.8 to −43.4%, `FactsBuilder::cell` −36.9 to −37.7%, `raw_attribute` −24.6 to −27.4%), planning falls **4.29-5.26%**, and the whole harness iteration falls **0.13-2.19%** — the largest on the 0601 producer-shaped edit selectors, which are not dominated by the cell-CRUD corpora's 4 MB of media. The builder's share of planning goes from 13.2-14.3% to 8.9-9.7%. No scenario got worse, and every admitted and declined worksheet is unchanged. The
+`<f>` decline is **unchanged** and still a design narrowing, not a measured
+rejection. The snapshot chain is **rejected on evidence**: the capture was
+implemented, proved with change 0622's oracle extended to two-commit chains, and then
+measured at **+0.20% to +4.06% of a whole save**, the largest on `producer-dense` and within sight of the 5% review trigger — and no public API seeds a value-only edit
+from a post-commit snapshot, so the facts it would carry are read by nobody.
+`SourceBackedEditor::edit` and `edit_sheets` always load a fresh snapshot from the
+immutable package; `MultiSourceEdit::new` is private; `publish_multi_commit_to_stream`
+consumes the editor; the only way to chain two cumulative value-only commits is
+publish-then-reopen, which re-plans. The implementation and its four oracle tests are
+retained as a patch so a future change that exposes a chained edit can land them.
+XLSX-5 is closed twice over: the traversal's per-event copies are removed
+(−80 allocation calls, −6,457 allocated bytes per planning, exactly), and the
+alternative the survey offered — substituting the existing `styles::stream_count` —
+is **declined and frozen as a design**, because `process_ooxml` short-circuits on
+MCE-free input while the stream path does not, so the two disagree on trailing text,
+DTDs, processing instructions, custom entities, a late declaration, unbound prefixes,
+depth, event count and several stream-only bounds, and the error type and message
+would move as well. The optimization order in `docs/GOAL.md` is respected throughout:
+this removes unnecessary work, parsing and allocation, ahead of layout, algorithms
+and parallelism; nothing was vectorized and no parallelism was introduced. **The
+audit gap this change does not close** is the one change 0622 recorded: the route it
+optimizes is unreachable on real producer files, and this change neither widens nor
+narrows that surface.
+
 ## 0634 — PPT per-slide re-parse borrows the retained stream
 
 Step 2 of the optimization order (unnecessary copying and allocation) applied to the last copying path inside the PPT reader that change 0606 named in its own "Limitations" and change 0630 carried as queue item 16. `Presentation::slides`, `slide_at`, `text` and `extract_text_fast`, the `NotesIndex` whole-document re-parse behind them, `SpeakerNotes` and the source-backed editor's slide resolve now all parse from the `PowerPoint Document` stream the presentation already retains instead of copying each record's payload out of it: 160 fewer allocations and 160 fewer `memcpy` calls per `slides()` on `45543.ppt`, 98 per speaker-notes read on `headers_footers_2007.ppt`, and 561,052 → 416,036 retained live bytes for an open plus slide list. No P1 audit row closes: this is one format's reader, the source-backed PPT path still pays the whole-artifact SHA-256 that 0587 ranked first, the editor paths still copy through the strict entry point, and no RSS, cold-cache, physical-device or producer-corpus measurement was taken. Lossless preservation, typed refusals and every record limit are unchanged — `max_copied_payload_bytes` is still charged per record although nothing is copied — and all 30 `.ppt` fixture reader dumps, including the four encrypted refusals, hash to the digest change 0606 recorded. OLE2/OOXML optimization remains active; ODF is deferred until completion and iWork excluded. [Change and limitations](0634-ppt-slide-factory-borrowed-reparse.md); [retained evidence](results/change-0634/README.md).

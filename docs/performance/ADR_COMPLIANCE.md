@@ -1,5 +1,33 @@
 # Performance optimization ADR-compliance matrix
 
+## 0635 — compliant; two contract questions raised and both answered by declining
+
+Record: [0635](0635-xlsx-facts-builder-and-chains.md).
+
+Change 0635 (`litchi-xlsx`: fact-builder reduction, stylesheet-count traversal) is
+compliant and adds no ADR question. **ADR 0003 (bounded resources):** no retained
+state changed — `change_0622_retained_records_stay_compact` still pins 16 bytes per
+cell and 32 per row — and the styles traversal now allocates strictly less (−80
+calls, −6,457 bytes per planning). No new `unsafe`, no new dependency, no weakened
+limit; `MAX_XML_DEPTH`, `MAX_XML_EVENTS`, `MAX_CELL_FORMATS` and the 256-action
+commit cap are untouched. **ADR 0005 (validation placement):** no validation moved,
+none was added and none was removed. Every replaced test is provably the same test —
+the fused reference parsers are compared against `parse_a1` and `parse_one_based_row`
+over 484 byte strings covering every branch of both; the whole-part ampersand probe
+is the same predicate as the per-tag probe; the two dropped name comparisons compared
+a value with itself. The styles parser reads the same events with the same reader
+configuration and raises the same refusals with the same messages in the same order.
+**ADR 0006 (lossless preservation):** output bytes are unchanged, proved by 34 of 34
+published-package hashes and by change 0622's oracle reporting an identical funnel
+and an identical comparison count. **Contract movement: none — and two proposals to
+move one were declined.** Substituting `raw::styles::stream_count` for
+`raw::styles::parse` would move refusals (trailing text, DTDs, processing
+instructions, custom entities, a late XML declaration, unbound prefixes, depth, event
+count, several stream-only bounds) and would move the error type and message as well;
+it is frozen as a design. Carrying facts across a snapshot chain moves no contract at
+all, and was rejected on cost against an unreachable benefit rather than on
+compliance.
+
 ## 0634 — PPT per-slide re-parse borrows the retained stream
 
 ADR 0003, 0005 and 0006 are satisfied without a fence change. No byte a reader observes changes: `Record::parse_from_store_with_limits` reaches `parse_impl` with the same buffer, offset, window end, strictness, depth and `ParseBudget::new(limits, len)` pair as `Record::parse_with_limits` did, and `parse_with_limits` is now literally that call with `PayloadStore::Owned`; 0606's `RecordPayload` makes the two payload forms indistinguishable through `Deref`, `PartialEq` and `Debug`, and the new `Debug` on `PayloadStore` renders the byte slice it stands in for so `SlideData`'s derived `Debug` is unchanged. The 30-fixture differential over both readers — slide text, shapes, placeholders, speaker notes, the whole metadata surface, the owned editor's no-op and edited commits over 12 targets, the source-backed editor's reads over 6, and a record census — is identical on both legs and hashes to `9cdddef6e870aa35884738c3f1729c9e12b6ca7bc22b2e551a4dad586c236b7c`, the digest change 0606 recorded, so the reader surface is unchanged across both changes. Error identity is preserved exactly, including `max_copied_payload_bytes`: `charge_copy` is still called per record with the same byte count although nothing is copied, and a unit test over four real fixtures asserts both payload sources accept at a slide's exact payload total and refuse one byte below it with the same formatted error. The `NotesIndex` validations (duplicate notes list, null `persistIdRef`, `NotesId` range, `SlidePersistAtom` header and length, `NotesAtom` header, length and `slideIdRef` cross-check), the strict and lenient container loops, the truncated-container recovery, the byte-at-a-time resynchronization and the depth and record-count ceilings are untouched and still read the same bytes; encrypted documents still refuse identically. Mutation cannot reach the shared stream: `to_mut` copies a span before returning `&mut`, with a test that edits a borrowed slide payload and proves the `Arc`'d stream and the sibling records unchanged. No new `unsafe` (`#![forbid(unsafe_code)]` holds), no weakened limit or malformed-input defence, no hidden global pool, no ambient I/O, no public leakage of archive types, raw locks or executors — `PayloadStore` stays `pub(crate)` and no public signature changes. Gates: `cargo fmt --all --check`, `cargo clippy -p litchi-ppt --all-targets` and `--all-features`, `cargo doc -p litchi-ppt --no-deps`, `cargo test -p litchi-ppt` (1,215 passed / 0 failed / 11 ignored across 32 binaries; 1,243 with `--all-features`), `cargo clippy -p litchi -p litchi-pptx --all-targets`, `cargo test -p litchi-pptx`, `cargo test -p litchi --features docx,xlsx,pptx,xls` and `--features ppt,pptx,docx,xlsx,xls`, `cargo test` in `tools/perf-baseline`, and `cargo check --all-targets` in `tools/native-resave` — all clean. `performance_claim: none`. See [Change 0634](0634-ppt-slide-factory-borrowed-reparse.md); [retained evidence](results/change-0634/README.md).

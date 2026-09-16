@@ -1,0 +1,56 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0635",
+  "title": "A fused cell-reference parse and one ampersand probe per part cut the XLSX fact builder; the stylesheet parse stops copying every event; carrying facts across a snapshot chain is rejected as unreachable",
+  "decision": "retained, implemented in litchi-xlsx, with the snapshot-chain part rejected and kept as a patch",
+  "code_state": "crates/litchi-xlsx only; no public API, error type, limit or output byte changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0622 named its own successor: 'the next reduction on this route is the builder's per-cell r parse and per-element ampersand probe, not the writer'. Both are removed, and the builder falls about 40% while admitting and declining exactly the same worksheets",
+    "every replaced test is provably the same test: the fused reference parsers are compared against parse_a1 and parse_one_based_row over 484 byte strings covering every branch of both, the whole-part ampersand probe is the same predicate as the per-tag probe, and the two redundant name comparisons were comparisons of a value with itself",
+    "XLSX-5 is answered without moving a refusal: styles::parse already retains only a count, so what the survey measured is the traversal; removing its per-event Event::into_owned and NamespaceResolver clone removes exactly 80 allocation calls and 6,457 allocated bytes per planning with the same events, checks and messages",
+    "substituting the existing styles::stream_count for styles::parse is declined and frozen as a design: process_ooxml short-circuits on MCE-free input, so parse never runs the MCE validator while stream_count always does, and the two disagree on trailing text, DTDs, processing instructions, custom entities, a late declaration, unbound prefixes, depth, event count and several stream-only bounds; the error type and message would move as well",
+    "carrying facts across a snapshot chain is implemented, tested with change 0622's oracle extended to chains, and then rejected: no public API seeds a value-only edit from a post-commit snapshot, so the capture is paid on every commit and read on none, at a measured 0.07-1.78% of a whole save",
+    "value identity is proved two ways: 34 of 34 (case, shape) published-package sha256 pairs are identical, and change 0622's differential oracle reports the same funnel and the same 2,790 comparisons as it did before the change"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs, N=1 and N=11, differenced and divided by 10, three legs (before, after, after-with-chain) over one_edit_save on medium/dense-sparse/noncompact, one_percent_edit_save on medium/dense-sparse, managed one_edit_save on medium and the 0601 producer-shaped edit selectors; whole-iteration totals plus per-symbol inclusive Ir",
+    "allocations": "litchi-perf-baseline-alloc with the change-0538 phase regions, five samples per leg, maximum per region, two cases over three shapes",
+    "timing": "tools/perf-baseline, --warmup 5 --samples 30, order A1 B1 B2 A2 on CPU 11, followed by four before-only runs F1..F4 for the A/A floor in the same window, over five source-backed cell-value cases and three shapes plus the two producer-shaped edit selectors",
+    "value_identity": "output_sha256 for 34 (case, shape) pairs across eight source-backed edit cases, four shapes including vendor-extension, and the two producer-shaped edit selectors",
+    "differential_oracle": "change 0622's oracle unchanged (five tests, 2,790 corpus comparisons, same funnel), plus LITCHI_0622_FULL_ORACLE=1 in release, plus two new change-0635 tests comparing the fused reference parsers against the shared ones over 484 byte strings",
+    "chain_rejection": "the rejected part measured as its own leg against the retained change, plus a reachability analysis of every public entry point that could seed a second commit"
+  },
+  "accepted_costs": {
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg",
+    "effect_below_floor": "the whole-iteration effect is well under this host's A/A floor, so the paired timing bounds rather than confirms it and the counts carry the result",
+    "styles_scale": "the harness stylesheet is 603 bytes and 26 events, so XLSX-5's instruction saving is inside the symbol's own run-to-run variation; only its allocation saving is exact. A larger, MCE-bearing Excel stylesheet would save proportionally more, and that case is modelled, not measured",
+    "debug_assert": "raw_attribute's colon-free precondition is pinned by debug_assert! in debug builds only; in release it rests on the four literal call sites"
+  },
+  "known_gaps": {
+    "real_producer_reach": "unchanged from change 0622: of 391 real worksheet parts under test-data/, 207 are admitted to the shared traversal, exactly one is accepted by the value-only planning validator, and that one publishes facts; change 0602 established the editor admits none of the 95 real .xlsx fixtures",
+    "second_commit": "still open, and now measured: a snapshot derived from a rewrite drops its facts, and closing that gap costs 0.07-1.78% of a save for a benefit no public caller can reach. The implementation and its oracle are retained as patch/0635-chain-facts.patch",
+    "stream_count": "raw::styles::stream_count is not refusal-equivalent to raw::styles::parse; substituting it is frozen as a design and not implemented",
+    "formulas": "worksheets carrying <f> are still declined by design, not by measurement",
+    "styles_on_real_files": "no corpus in this repository reaches capture_auxiliary_source with a stylesheet that carries the markup-compatibility namespace, so the full tokenising MCE path is unmeasured"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0635-xlsx-facts-builder-and-chains",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 11",
+    "binaries": {
+      "before/litchi-perf-baseline": "066154fa6e31e2b5dded9aeca35944ae2278f4edd17d07433b1b6fb1f0744d9f",
+      "after/litchi-perf-baseline": "b2b81e86d6cb26b6b22d6e60c51dcf0758a88b906cd69d53425fd3214610eb99",
+      "after-with-chain/litchi-perf-baseline": "3fadc0f895b9e8a1db7676016be32a4821a785e3ec1cd6adf0e660557567a1df",
+      "before/litchi-perf-baseline-alloc": "5c3a36ca1e27a04214a89a1a9936d6a035335cad0c14f2017221d91fcc8f982b",
+      "after/litchi-perf-baseline-alloc": "5bd3e861192296ff27393c6ec4e5595bf2f2f84e5f1e407fef943e5f2ddf68e7"
+    },
+    "note": "every leg built with cargo build --release --locked --bins --features allocator-metrics from tools/perf-baseline, each with its own CARGO_TARGET_DIR, and staged outside a Cargo target directory before being timed (change 0627). The before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680"
+  }
+}

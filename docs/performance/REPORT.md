@@ -1,5 +1,29 @@
 # Performance program phase report
 
+## 0635 — a smaller note-taker on the XLSX edit path, and a shortcut that leads nowhere
+
+Record: [0635](0635-xlsx-facts-builder-and-chains.md).
+
+`litchi-xlsx`: the note the source-backed value editor takes while it reads a
+worksheet — the sixteen bytes per cell that let change 0622 delete the commit's
+second read — now costs about a third less to take. Reading a cell's address used to
+sweep its `r="B7"` for legal characters, validate it as UTF-8, parse the column
+letters and the row digits, and then check the row against the one already known;
+it is now one pass that stops at the first disagreement. The question "does this tag
+contain an ampersand?" used to be asked of every tag and is now asked once of the
+whole worksheet. Separately, counting the workbook's cell formats — which the editor
+does on every plan, and which needs only a number — stopped copying every XML event
+twice on its way past: exactly 80 heap allocations and 6.5 KB leave every plan.
+Output is byte-identical: 34 of 34 published packages hash the same on both legs, and
+the differential oracle that compares the two commit routes over every worksheet part
+of every `.xlsx` in the repository reports exactly the numbers it reported before.
+A third idea was built and thrown away: carrying the note forward so a *second* edit
+on the same worksheet would not have to re-read it. It works, and it is useless —
+nothing in the public API can start a second edit from the result of the first, so
+the note would be taken on every save and read on none. The measurement said so — it costs
+0.2% to 4.1% of a save — and the code was reverted; it is kept as a patch for the day
+that changes.
+
 ## 0634 — PPT per-slide re-parse borrows the retained stream
 
 Retained, `performance_claim: none`. `SlideFactory`, `NotesIndex`, `SpeakerNotes` and the source-backed editor's slide resolve stop re-parsing the `PowerPoint Document` stream through the copying entry point and instead span the buffer change 0606 already had the presentation retain; no public API signature, limit, error or output byte changes. Measured on `45543.ppt`: `slides()` −160 allocations, −25.3% allocated bytes, −25.8% retained bytes, −160 `memcpy` calls and −6.09% `Ir`; full text −160 allocations and −4.89% `Ir`; edit-and-save −160 allocations and −1.52% `Ir`; a speaker-notes read on `headers_footers_2007.ppt` −98 allocations and −5.31% `Ir`; both open modes bit-identical. Single-shot native processes: list slides −5.35% instructions / −3.57% cycles, full text −2.40% / −0.93%, notes −2.72% / −1.45%, edit-and-save −7.22% / −5.52%. Paired p50 against an A/A floor of 0.02–1.71%: `ppt_semantic_list_slides` −23.48%, `ppt_semantic_full_text` −3.29%, `ppt_semantic_one_edit_save` −0.58%; real fixture list slides −67.81% (defaults) and −8.29% (thresholds pinned), full text −4.22%, notes −4.99%, edit-and-save −3.80%. The 105.75% `open + list slides` loop regression 0606 reported as a review trigger is eliminated: 171,889 → 667 minor faults, 1.52 G → 552 M instructions. Two results are reported rather than averaged away: the untouched open path drifts +0.25% `Ir` and up to +0.81% p50 with identical call and allocation counts, and `ppt_semantic_full_text` recovers most but not all of 0606's +4.71%, leaving about +1% traceable to `Record`'s extra 8 bytes, which this change does not address. Correctness: change 0606's 30-fixture reader-dump differential — both readers' full semantic surface including speaker notes, 12 owned-editor targets, 6 source-backed targets and a record census — is identical on both legs and reproduces 0606's digest; `cargo test -p litchi-ppt` 1,215 passed / 0 failed / 11 ignored (1,243 with `--all-features`), and eleven gates plus the `tools/native-resave` check are clean. No speedup, RSS, cold-cache, physical-device or cross-platform claim is registered. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0634-ppt-slide-factory-borrowed-reparse.md); [retained evidence](results/change-0634/README.md).

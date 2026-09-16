@@ -1,0 +1,78 @@
+# Change 0635 gates
+
+Run in /home/zhuhe/code/litchi-worktrees/0635 (branch perf/0635-xlsx-facts-builder-and-chains,
+base c7326f680). Every gate below passed; the one pre-existing warning is reproduced
+on the untouched before checkout at the end.
+
+=== $ cargo fmt --all --check
+--- exit=0
+
+=== $ cargo clippy -p litchi-xlsx --all-targets
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0635/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0635/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 32.57s
+--- exit=0 (workspace lints are deny; no warning emitted)
+
+=== $ cargo test -p litchi-xlsx
+60 suites, 1310 passed, 0 failed, 0 ignored
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+--- exit=0
+
+=== $ cargo doc -p litchi-xlsx --no-deps
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0635/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.96s
+   Generated /home/zhuhe/code/litchi-worktrees/0635/target/doc/litchi_xlsx/index.html
+--- exit=0
+
+=== $ cargo test -p litchi --features docx,xlsx,pptx,xls   (consumer crate)
+26 suites, 266 passed, 0 failed, 7 ignored
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+all doctests ran in 1.53s; merged doctests compilation took 1.51s
+--- exit=0
+
+=== $ cargo check -p litchi --all-targets
+
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.31s
+--- exit=0, with three pre-existing dead-code warnings in crates/litchi/tests/unexpected_format.rs
+
+=== $ cargo check -p litchi --all-targets   ON THE UNTOUCHED BEFORE CHECKOUT (before-c7326f680)
+warning: function `fixture` is never used
+  --> crates/litchi/tests/unexpected_format.rs:15:4
+   |
+15 | fn fixture(relative: &str) -> PathBuf {
+--
+warning: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+   |
+22 | fn assert_unexpected(error: &Error, expected: FileFormat) {
+--
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+--- the same three warnings are present at the base commit; they are pre-existing and unrelated to this change
+
+=== $ cargo test -p litchi-xlsx --lib change_0622 -- --nocapture   (change 0622's differential oracle, unchanged)
+change 0622 oracle: 391 worksheet parts, 207 admitted to the shared traversal, 1 accepted by the value-only validator, 1 publishing facts, 2790 comparisons, 3 fact-route commits
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 991 filtered out; finished in 36.16s
+--- exit=0
+
+=== $ LITCHI_0622_FULL_ORACLE=1 cargo test --release -p litchi-xlsx --lib change_0622 -- --nocapture
+change 0622 oracle: 391 worksheet parts, 207 admitted to the shared traversal, 1 accepted by the value-only validator, 1 publishing facts, 2840 comparisons, 3 fact-route commits
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 991 filtered out; finished in 71.99s
+--- exit=0
+
+=== $ cargo test -p litchi-xlsx --lib change_0635 -- --nocapture   (fused-parser equivalence)
+test raw::worksheet::edit::codec::snapshot::facts::tests::change_0635_row_number_agrees_with_the_shared_row_parser ... ok
+test raw::worksheet::edit::codec::snapshot::facts::tests::change_0635_cell_column_agrees_with_the_shared_a1_parser ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 994 filtered out; finished in 0.00s
+--- exit=0
+
+=== $ (in tools/perf-baseline) cargo test   (the harness's own suite)
+the run exited 0; the retained tail below shows the last four test binaries of the run
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- exit=0

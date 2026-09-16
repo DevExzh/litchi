@@ -53,10 +53,16 @@ pub(crate) fn parse(content: &[u8]) -> Result<Catalog> {
         let decoder = reader.decoder();
         let event = reader
             .read_event()
-            .map_err(|error| invalid(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+            .map_err(|error| invalid(error.to_string()))?;
+        // Events borrow the processed input, and `NsReader` defers its
+        // namespace pop until the next read, so the reader's own resolver
+        // answers every event of this iteration. Reading them this way -- the
+        // way change 0546's shared worksheet traversal already does -- drops
+        // an `Event::into_owned()` and a `NamespaceResolver` clone per event:
+        // three heap copies whose results were discarded unread, one of them
+        // of the whole start tag. No event, name, namespace, attribute value
+        // or diagnostic changes.
+        let (namespace, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) if stack.is_empty() => {
                 if closed_root || !is_spreadsheetml_name(&namespace, element.name(), b"styleSheet")
