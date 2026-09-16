@@ -1,0 +1,1340 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-pptx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.34s
+     Running unittests src/lib.rs (target/debug/deps/litchi_pptx-9281d2ffb54b7df6)
+
+running 566 tests
+test actions::tests::classifies_reserved_powerpoint_action_values ... ok
+test actions::tests::rejects_non_slide_roots ... ok
+test actions::tests::rejects_duplicate_relationship_attributes ... ok
+test animations::codec::xml::parser::tests::processed_parser_rejects_doctype ... ok
+test animations::codec::xml::parser::tests::recursive_parser_preserves_strict_timing_snapshot ... ok
+test actions::tests::scans_strict_click_and_hover_namespaces ... ok
+test animations::codec::xml::parser::tests::processed_parser_accepts_transitional_namespace_without_timing ... ok
+test animations::tests::integration_tests::parses_common_time_node_progression_controls ... ok
+test animations::tests::integration_tests::parses_bldp_schema_defaults_and_powerpoint_auto_advance_semantics ... ok
+test animations::tests::integration_tests::parses_exact_normalized_time_filter_pairs ... ok
+test animations::tests::integration_tests::parses_common_time_node_playback_controls ... ok
+test animations::tests::integration_tests::preserves_indefinite_duration ... ok
+test animations::tests::integration_tests::parses_repeat_duration_sync_and_after_effect ... ok
+test animations::tests::integration_tests::rejects_excessive_timing_depth ... ok
+test animations::tests::integration_tests::preserves_unsupported_timing_subtrees_until_typed_data_changes ... ok
+test animations::package::tests::package_layer_validates_chart_build_relationships_in_the_owner ... ok
+test animations::tests::integration_tests::parses_directional_preset_subtypes ... ok
+test animations::tests::integration_tests::parses_and_canonicalizes_contextual_cancel_bubble_filter ... ok
+test animations::tests::integration_tests::parses_typed_timing_metadata_from_slide ... ok
+test animations::tests::integration_tests::parses_preserves_and_writes_complete_diagram_build_grammar ... ok
+test animations::tests::integration_tests::parses_preserves_and_writes_paragraph_build_group_references ... ok
+test animations::tests::integration_tests::parses_preserves_and_writes_complete_ole_chart_build_grammar ... ok
+test animations::tests::integration_tests::parses_preserves_and_canonicalizes_complete_paragraph_template_lists ... ok
+test animations::tests::integration_tests::parses_preserves_and_writes_complete_graphic_chart_build ... ok
+test animations::tests::integration_tests::test_animation_effect_preset ... ok
+test animations::tests::integration_tests::test_animation_sequence ... ok
+test animations::tests::integration_tests::rejects_event_filter_outside_proven_triggered_sequence_context ... ok
+test animations::tests::integration_tests::validates_programmatic_diagram_build_groups_targets_and_duplicates ... ok
+test animations::tests::integration_tests::validates_programmatic_build_group_membership_and_targets ... ok
+test animations::tests::integration_tests::validates_programmatic_graphic_builds_and_combined_build_boundary ... ok
+test animations::tests::integration_tests::validates_programmatic_paragraph_build_cross_field_constraints ... ok
+test animations::tests::integration_tests::validates_programmatic_ole_chart_builds_and_combined_boundary ... ok
+test animations::tests::integration_tests::validates_programmatic_paragraph_template_fragments_and_constraints ... ok
+test animations::tests::integration_tests::rejects_invalid_playback_control_values ... ok
+test animations::tests::recursive_timing_tests::parses_and_writes_preset_bounce_end ... ok
+test animations::tests::recursive_timing_tests::parses_and_writes_media_bookmark_condition_targets ... ok
+test animations::tests::recursive_timing_tests::rejects_malformed_common_time_node_id ... ok
+test animations::tests::recursive_timing_tests::preserves_nested_presets_and_ordered_conditions ... ok
+test backgrounds::tests::malformed_background_xml_is_rejected ... ok
+test backgrounds::tests::gradient_xml_round_trips_inclusive_position_and_angle_bounds ... ok
+test backgrounds::tests::picture_xml_keeps_relationship_and_borrows_image_data ... ok
+test backgrounds::tests::gradient_xml_round_trips_fixed_positions_and_angle ... ok
+test backgrounds::tests::test_solid_background ... ok
+test animations::tests::integration_tests::rejects_invalid_repeat_duration_sync_and_after_effect ... ok
+test backgrounds::tests::test_solid_background_xml ... ok
+test backgrounds::tests::test_gradient_background ... ok
+test animations::tests::integration_tests::rejects_invalid_progression_control_values ... ok
+test animations::tests::recursive_timing_tests::rejects_excessive_recursive_depth ... ok
+test animations::tests::integration_tests::writes_typed_interactive_context_and_validates_trigger_shape ... ok
+test animations::tests::integration_tests::accepts_every_ole_chart_build_token_and_schema_defaults ... ok
+test chart::codec::tests::empty_title_does_not_capture_later_text ... ok
+test animations::tests::integration_tests::rejects_malformed_missing_duplicate_spoofed_and_off_slide_targets ... ok
+test chart::codec::tests::chart_formulas_reference_real_workbook_ranges ... ok
+test animations::tests::integration_tests::round_trips_complete_typed_bldp_optional_attribute_grammar ... ok
+test change_tracking::tests::unknown_extensions_survive_identifier_add_and_remove_byte_exact ... ok
+test chart::codec::tests::chart_info_distinguishes_column_and_decodes_title ... ok
+test chart::codec::tests::bubble_chart_writes_all_three_numeric_dimensions ... ok
+test chart::codec::tests::chart_info_uses_first_plot_in_combination_chart ... ok
+test change_tracking::tests::duplicate_shape_modification_ids_are_refused_before_commit ... ok
+test backgrounds::tests::pattern_xml_tokens_and_colors_round_trip ... ok
+test animations::tests::integration_tests::rejects_malformed_out_of_range_or_unordered_time_filters ... ok
+test chart::codec::tests::surface_chart_writes_its_series_axis ... ok
+test chart::codec::tests::invalid_specialized_chart_data_is_rejected ... ok
+test chart::codec::tests::strict_cached_titles_and_foreign_lookalikes_are_supported ... ok
+test chart::codec::tests::test_encode ... ok
+test chart::codec::tests::doughnut_xml_is_balanced_and_relationship_ids_are_escaped ... ok
+test chart::codec::tests::malformed_chart_info_is_rejected ... ok
+test animations::tests::integration_tests::rejects_malformed_dangling_duplicate_or_off_slide_build_groups ... ok
+test animations::tests::integration_tests::rejects_invalid_bldp_optional_attributes_and_cross_field_combinations ... ok
+test change_tracking::tests::empty_element_expansion_does_not_emit_indentation_or_extra_spaces ... ok
+test chart::codec::tests::declared_chart_types_are_not_downgraded_to_columns ... ok
+test animations::tests::integration_tests::rejects_invalid_diagram_builds_and_non_ole_or_spoofed_targets ... ok
+test animations::tests::integration_tests::rejects_hostile_invalid_and_non_chart_ole_builds ... ok
+test change_tracking::tests::strict_aliases_round_trip_without_transitional_namespace_leakage ... ok
+test change_tracking::tests::malformed_producer_duplicates_remain_readable_and_repairable_by_position ... ok
+test change_tracking::tests::detached_edit_round_trips_compact_identifiers_and_inverse ... ok
+test chart::extension::codec::tests::applies_chart_print_defaults ... ok
+test chart::extension::codec::tests::parses_strict_rich_series_text_as_bounded_inert_drawingml ... ok
+test chart::extension::codec::tests::applies_title_legend_defaults_and_accepts_mp_feature_offsets ... ok
+test animations::tests::integration_tests::accepts_all_graphic_build_modes_tokens_and_schema_defaults ... ok
+test chart::codec::tests::test_chart_data ... ok
+test chart::codec::tests::test_chart_series ... ok
+test comments::package::tests::mce_fallback_is_selected ... ok
+test comments::package::tests::strict_writers_are_deterministic_and_round_trip ... ok
+test comments::package::tests::package_writer_round_trips_strict_graph ... ok
+test comments::package::tests::rejects_graph_and_reference_errors ... ok
+test animations::tests::integration_tests::rejects_hostile_graphic_build_grammar_namespaces_and_host_mismatches ... ok
+test font::tests::fresh_font_containers_are_structurally_checked ... ok
+test font::tests::fs_type_is_compact_and_validated ... ok
+test animations::tests::integration_tests::rejects_invalid_paragraph_template_cardinality_levels_order_and_namespaces ... ok
+test font::tests::descriptor_root_order_and_unicode_relationship_ids_are_checked ... ok
+test font::tests::rejected_collection_edits_leave_indexes_and_order_unchanged ... ok
+test font::tests::malformed_unicode_duplicates_remain_numerically_repairable ... ok
+test animations::tests::integration_tests::accepts_every_diagram_build_enum_and_schema_defaults ... ok
+test font::tests::package_writer_round_trips_strict_graph_and_schema_position ... ok
+test font::tests::rejects_external_orphan_and_outbound_graphs ... ok
+test font::tests::pitch_charset_zero_face_and_mixed_dialects_are_checked ... ok
+test chart::extension::codec::tests::validates_inert_package_relationships_without_opening_targets ... ok
+test font::tests::present_empty_and_loaded_false_flag_round_trip_exactly ... ok
+test font::tests::shared_font_parts_survive_face_removal_and_reject_other_owners ... ok
+test font::tests::generated_crud_allocates_collisions_and_preserves_unknown_xml_atomically ... ok
+test font::tests::typed_metadata_can_be_cleared_without_rebuilding_the_font ... ok
+test format::image::tests::detects_supported_magic_numbers_without_reading_payloads ... ok
+test format::image::tests::exposes_stable_relationship_metadata ... ok
+test hyperlinks::tests::constructors_and_codec_keep_target_contexts_distinct ... ok
+test laser::codec::tests::writer_preserves_the_selected_presentation_dialect ... ok
+test font::tests::strict_xml_round_trip_and_mce_fallback ... ok
+test font::tests::font_list_crud_edits_only_the_active_direct_mce_branch ... ok
+test laser::codec::tests::rejects_malformed_laser_trace_points ... ok
+test laser::package::tests::package_writer_preserves_strict_dialect_and_rejects_replacement ... ok
+test laser::codec::tests::scans_laser_traces_through_markup_compatibility ... ok
+test hyperlinks::tests::parser_rejects_unbounded_target_and_tooltip_inputs ... ok
+test laser::package::tests::package_writer_owns_empty_and_existing_extension_lists ... ok
+test chart::extension::codec::tests::parses_producer_core_and_preserves_round_trip ... ok
+test chart::extension::codec::tests::rejects_auto_update_external_missing_wrong_type_and_ambiguous_targets ... ok
+test font::tests::noncanonical_targets_and_every_main_profile_round_trip ... ok
+test media_parts::tests::bookmark_uniqueness_compares_represented_time ... ok
+test media_parts::tests::escaped_media_output_is_preflighted_against_a_typed_budget ... ok
+test media_parts::tests::mce_fallback_selects_supported_media_picture ... ok
+test font::tests::rejects_malformed_xml_duplicates_and_caps ... ok
+test master_layout::tests::invalid_references_are_rejected ... ok
+test media_parts::tests::media_transform_construction_and_parsing_enforce_boundaries ... ok
+test media_parts::tests::rejects_duplicate_and_misordered_media_children ... ok
+test media_parts::tests::opaque_media_extensions_round_trip_canonically ... ok
+test media_parts::tests::opaque_media_extension_constructor_is_bounded_and_typed ... ok
+test master_layout::tests::remove_layout_rejects_slide_references ... ok
+test media_parts::tests::non_image_resource_requires_typed_media_kind ... ok
+test media_parts::tests::media_transform_round_trips_coordinate_offsets_and_integer_extents ... ok
+test media_parts::tests::media_output_budget_is_aggregate_across_pictures ... ok
+test model3d::tests::data_rejects_an_unbounded_payload ... ok
+test media_parts::tests::strict_xml_round_trip_covers_typed_extension_properties ... ok
+test media_parts::tests::trim_and_fade_preserve_absence_and_explicit_zero ... ok
+test model3d::tests::codec_rejects_an_incomplete_model_sequence ... ok
+test media_parts::tests::transitional_package_writer_round_trips_complete_graph ... ok
+test modern_comments::tests::author_tests::loads_open_xml_sdk_shaped_author_specimen ... ok
+test media_parts::tests::repeated_media_targets_share_one_immutable_payload_allocation ... ok
+test modern_comments::tests::comment_tests::loads_microsoft_open_xml_sdk_documentation_specimen ... ok
+test modern_comments::tests::author_tests::author_and_comment_package_graph_round_trip_and_resolve ... ok
+test modern_comments::tests::author_tests::rejects_author_package_graphs_and_failed_store_is_atomic ... ok
+test chart::extension::codec::tests::rejects_invalid_dimension_choices_points_and_series_references ... ok
+test master_layout::tests::authored_parts_serialize_deterministically ... ok
+test modern_comments::tests::comment_tests::typed_payload_inherits_the_extension_entry_namespace_scope ... ok
+test modern_comments::tests::comment_tests::progress_is_bounded_typed_and_written_in_office_units ... ok
+test modern_comments::tests::comment_tests::rejects_invalid_package_graphs_and_failed_store_is_atomic ... ok
+test media_parts::tests::loads_poi_audio_and_video_resources_without_decoding ... ok
+test modern_comments::tests::comment_tests::package_round_trip_keeps_monikers_replies_and_extensions_inert ... ok
+test modern_comments::tests::author_tests::rejects_hostile_author_grammar_and_unresolved_modeled_references ... ok
+test chart::extension::codec::tests::rejects_hostile_schema_and_resource_cases ... ok
+test modern_comments::tests::comment_tests::rejects_hostile_or_schema_invalid_comment_xml ... ok
+test modern_comments::tests::comment_tests::typed_reaction_extensions_retain_their_namespace_through_comment_reparse ... ok
+test modern_comments::tests::semantic_facade_uses_contextual_names ... ok
+test notes::tests::notes_master_template_is_canonical_and_deterministic ... ok
+test notes::tests::plain_text_writer_escapes_and_rejects_invalid_xml ... ok
+test media_parts::tests::rejects_malformed_markup_caps_and_package_graphs ... ok
+test notes::tests::malformed_graph_rejects_clear_before_mutation ... ok
+test font::tests::loads_libreoffice_and_poi_reference_packages ... ok
+test chart::extension::codec::tests::rejects_invalid_layout_axes_scaling_and_plot_surface_grammar ... ok
+test notes::tests::source_checked_text_edit_preserves_opaque_xml_and_relationships ... ok
+test notes::tests::every_presentation_main_profile_accepts_the_same_notes_graph ... ok
+test notes::tests::consuming_put_moves_changed_xml_and_preserves_signed_no_ops ... ok
+test chart::extension::codec::tests::rejects_invalid_chart_title_legend_and_offset_grammar ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_allows_empty_write_after_reaching_the_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_allows_empty_write_at_zero_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_copies_when_spare_capacity_exists ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_digests_exactly_the_accepted_bytes ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_rejects_before_reserving_and_keeps_prefix ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_allows_an_empty_archive ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_into_bytes_reuses_an_exact_buffer ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_keeps_successful_storage_within_the_limit ... ok
+test opened::cross_copy_plan::bounded_writer_tests::bounded_writer_rejects_an_oversized_first_write_without_allocation ... ok
+test notes::tests::removal_uses_the_actual_stored_part_name_after_case_folded_lookup ... ok
+test notes::tests::unexpected_inbound_edge_rejects_removal_before_mutation ... ok
+test notes::tests::source_bound_removal_rejects_a_stale_bypass_atomically ... ok
+test notes::tests::rejects_external_wrong_root_outbound_orphan_and_caps_before_mutation ... ok
+test notes::tests::strict_text_writer_validates_and_round_trips_replacement ... ok
+test notes::tests::strict_mce_graph_round_trips_and_projects_text ... ok
+test notes::tests::strict_and_transitional_notes_removal_is_idempotent ... ok
+test comments::package::tests::loads_poi_and_libreoffice_reference_packages ... ok
+test notes::tests::source_checked_transaction_no_op_is_byte_stable ... ok
+test notes::tests::source_checked_transaction_inverse_restores_master_and_theme ... ok
+test notes::tests::source_checked_transaction_rejects_stale_source_atomically ... ok
+test chart::extension::codec::tests::rejects_invalid_axis_title_units_gridlines_ticks_and_formatting ... ok
+test chart::extension::codec::tests::rejects_invalid_series_formatting_colors_points_and_labels ... ok
+test chart::extension::codec::tests::rejects_hostile_geography_cache_grammar_and_bounds ... ok
+test master_layout::tests::authored_layout_attaches_to_default_master ... ok
+test master_layout::tests::remove_empty_layout_keeps_graph_consistent ... ok
+test change_tracking::tests::facade_publishes_and_reverses_exact_source_checked_commit ... ok
+test master_layout::tests::master_ids_are_unique_across_multiple_adds ... ok
+test master_layout::tests::authored_master_and_layouts_roundtrip_through_read_side ... ok
+test opened::tests::commit_revision_binds_the_staged_package_without_a_signature_graph ... ok
+test opened::tests::commit_rehashes_a_package_whose_unsign_strips_signature_bytes ... ok
+test opened::tests::atomic_shape_text_batch_composes_in_one_opened_transaction ... ok
+test opened::tests::commit_publication_captures_a_package_that_drifted_outside_the_write_set ... ok
+test notes::tests::poi_and_libreoffice_notes_graphs_load_and_store_deterministically ... ok
+test opened::tests::durable_decoder_and_history_enforce_finite_bounds ... ok
+test change_tracking::tests::real_powerpoint_fixture_exposes_bounded_change_tracking_state ... ok
+test opened::tests::composes_order_shape_and_notes_in_one_durable_inverse_commit ... ok
+test comments::package::tests::rejects_malformed_xml_and_enforces_caps ... ok
+test opened::cross_copy_plan::revision_cache_tests::candidate_physical_revision_without_a_known_value_recomputes ... ok
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_caches_the_freshly_computed_value ... ok
+test opened::tests::disjoint_patches_join_and_same_part_edits_conflict ... ok
+test opened::cross_copy_plan::revision_cache_tests::snapshot_physical_revision_is_keyed_by_the_archive_bound ... ok
+test opened::tests::disjoint_new_shape_and_modern_comment_changes_merge_automatically ... ok
+test opened::cross_copy_plan::revision_cache_tests::rebound_snapshot_starts_an_empty_physical_revision_cache ... ok
+test opened::tests::opened_slide_name_index_preserves_ambiguity ... ok
+test opened::tests::opened_slide_name_index_preserves_identity_after_reorder ... ok
+test opened::tests::packages_equal_tracks_every_fingerprint_input ... ok
+test opened::tests::opened_transaction_does_not_upgrade_borrowed_physical_provenance ... ok
+test opened::tests::slide_copy_application_refuses_result_limit_and_nonempty_slide_id ... ok
+test opened::tests::general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible ... ok
+test opened::tests::slide_copy_application_refuses_stale_complete_graph ... ok
+test opened::tests::slide_copy_plan_is_bounded_deterministic_and_non_publishing ... ok
+test opened::tests::real_complex_chart_deck_survives_transaction_and_full_reopen ... ok
+test opened::tests::published_commit_snapshot_equals_a_fresh_capture ... ok
+test opened::tests::slide_copy_plan_accepts_the_strict_shared_layout_boundary ... ok
+test opened::cross_copy_plan::revision_cache_tests::planned_and_published_revisions_equal_fresh_serializations ... ok
+test opened::cross_copy_plan::retention_scratch_tests::a_plan_retains_the_archive_its_application_publishes ... ok
+test opened::tests::real_powerpoint_fixture_round_trips_an_exact_no_op ... ok
+test package::tests::custom_property_no_ops_preserve_signatures_and_changes_invalidate_them ... ok
+test package::tests::empty_task_pane_patch_preserves_signatures ... ok
+test opened::tests::picture_shape_transfer_copies_relationship_closure_and_remaps_identity ... ok
+test opened::tests::cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions ... ok
+test opened::tests::cross_slide_copy_authorizes_known_noncanonical_source_archives ... ok
+test package::tests::task_panes_facade_publishes_compact_source_checked_reversible_patches ... ok
+test parts::slide::tests::combined_text_and_name_matches_separate_reads_through_mce_and_unusual_text ... ok
+test parts::slide::tests::combined_text_and_name_rejects_the_same_malformed_xml_as_separate_reads ... ok
+test parts::slide::tests::late_reserved_prefix_rebinding_is_rejected_by_text_and_text_and_name ... ok
+test parts::slide::tests::combined_text_and_name_preserves_missing_and_empty_name_semantics ... ok
+test presentation::embedded::content_parts::tests::add_remove_and_inverse_manage_relationships_and_payload_parts ... ok
+test presentation::embedded::content_parts::tests::discovery_is_a_source_preserving_noop ... ok
+test opened::tests::slide_copy_plan_reuses_only_a_registered_layout ... ok
+test opened::cross_copy_plan::retention_scratch_tests::a_substituted_retained_archive_trips_the_debug_assertion - should panic ... ok
+test presentation::embedded::content_parts::tests::enforces_content_part_count_limit ... ok
+test presentation::embedded::content_parts::tests::exact_noop_snapshot_commit_preserves_the_complete_source_graph ... ok
+test presentation::embedded::content_parts::tests::invalid_edits_do_not_mutate_the_staged_snapshot ... ok
+test presentation::embedded::content_parts::tests::loads_opaque_payload_and_relationship_metadata_losslessly ... ok
+test presentation::embedded::content_parts::tests::rejects_anchor_without_relationship_id ... ok
+test presentation::embedded::content_parts::tests::rejects_missing_anchor_relationship ... ok
+test presentation::embedded::content_parts::tests::relationship_and_payload_edits_preserve_unknown_anchor_markup ... ok
+test presentation::embedded::content_parts::tests::relationship_id_edit_rewrites_only_the_anchor_attribute ... ok
+test presentation::embedded::content_parts::tests::removal_collects_orphan_payload_and_inverse_restores_it ... ok
+test presentation::embedded::content_parts::tests::stale_source_rejection_is_atomic ... ok
+test presentation::embedded::controls::package::tests::scans_contextual_control_metadata ... ok
+test presentation::embedded::content_parts::tests::retains_external_target_mode_without_following_it ... ok
+test presentation::embedded::controls::slide::tests::binary_payload_replacement_keeps_the_descriptor_relationship ... ok
+test presentation::embedded::controls::slide::tests::binary_relationship_detach_collects_orphan_and_inverse_restores_it ... ok
+test presentation::embedded::controls::slide::tests::exact_noop_preserves_source_and_package_bytes ... ok
+test presentation::embedded::controls::slide::tests::optional_descriptor_attributes_can_be_authored_without_rewriting_opaque_children ... ok
+test presentation::embedded::controls::slide::tests::stale_source_rejection_is_atomic ... ok
+test presentation::embedded::controls::slide::tests::malformed_edit_fails_before_source_publication ... ok
+test presentation::embedded::controls::slide::tests::typed_edits_preserve_opaque_branches_and_binary_payload ... ok
+test opened::tests::cross_slide_copy_preserves_private_closure_and_inert_external_targets ... ok
+test presentation::embedded::excel::package::tests::generates_a_valid_opaque_workbook ... ok
+test presentation::embedded::excel::package::tests::keeps_categories_in_column_a_and_series_in_following_columns ... ok
+test presentation::embedded::excel::package::tests::rejects_invalid_bubble_shapes ... ok
+test presentation::embedded::excel::package::tests::scatter_charts_use_numeric_categories_when_x_values_are_absent ... ok
+test presentation::embedded::ole::slide::tests::add_remove_and_inverse_manage_payload_ownership ... ok
+test presentation::embedded::ole::slide::tests::exact_noop_is_byte_identical ... ok
+test package::tests::new_writer_round_trips_the_bounded_slide_graph ... ok
+test presentation::embedded::ole::slide::tests::stale_and_invalid_edits_are_failure_atomic ... ok
+test presentation::media::tests::detects_formats_without_copying_the_payload ... ok
+test presentation::media::tests::emits_a_self_contained_media_picture ... ok
+test presentation::media::tests::rejects_unbounded_frames ... ok
+test package::tests::opened_package_refuses_unsafe_mutable_hydration ... ok
+test presentation::embedded::ole::slide::tests::typed_edits_preserve_opaque_xml_and_binary_parts ... ok
+test presentation::source::tests::changed_single_publication_reuses_semantic_snapshot ... ok
+test presentation::source::tests::editor_reuses_one_catalog_across_capture_and_publication ... ok
+test opened::tests::slide_copy_plan_refuses_cycles_and_unknown_internal_relationships ... ok
+test presentation::embedded::ole::slide::tests::linked_target_edits_stay_external_and_inert ... ok
+test presentation::source::tests::editor_reuses_validated_relationship_closures_across_snapshots ... ok
+test presentation::source::tests::external_picture_is_listed_but_never_fetched ... ok
+test opened::tests::grouped_connector_transfer_remaps_identity_closure_and_is_durable ... ok
+test opened::tests::one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen ... ok
+test opened::tests::stale_write_set_still_refuses_a_committed_publication ... ok
+test package::tests::failed_typed_edit_restores_pending_presentation_state ... ok
+test package::tests::owned_presentation_noop_output_preserves_exact_archive ... ok
+test presentation::source::tests::filesystem_listing_keeps_slide_payloads_cold ... ok
+test presentation::source::tests::direct_picture_children_are_finite_ordered_and_complete ... ok
+test opened::tests::slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens ... ok
+test presentation::source::tests::filesystem_managed_cache_releases_after_presentation_drop ... ok
+test presentation::source::tests::filesystem_editor_reports_path_limits_and_version_conflicts ... ok
+test presentation::source::tests::catalog_and_selected_text_leave_unselected_slides_unread ... ok
+test presentation::source::tests::changed_multi_slide_batch_publication_reuses_semantic_snapshots ... ok
+test opened::tests::slide_copy_plan_refuses_global_tables_and_enforces_closure_limits ... ok
+test presentation::source::tests::filesystem_selected_image_loads_only_the_slide_and_media_closure ... ok
+test presentation::source::tests::malformed_markup_compatibility_attribute_is_not_suppressed ... ok
+test presentation::source::tests::managed_presentation_diagnostics_report_cache_mode_and_release_on_drop ... ok
+test presentation::source::tests::managed_source_cancellation_refuses_cached_semantic_reads ... ok
+test presentation::source::tests::foreign_identical_source_recaptures_semantically_before_rejecting ... ok
+test presentation::source::tests::managed_snapshot_edit_and_patch_checks_are_cooperatively_cancelled ... ok
+test opened::tests::cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication ... ok
+test presentation::source::tests::markup_compatibility_and_media_outbound_edges_are_refused ... ok
+test presentation::source::tests::filesystem_path_replacement_does_not_retarget_and_pinned_change_is_detected ... ok
+test presentation::source::tests::managed_editor_exact_noop_keeps_source_bytes_and_budgeted_handles ... ok
+test presentation::source::tests::picture_selection_reports_checked_out_of_range ... ok
+test presentation::source::tests::opening_retains_caller_part_limits_without_reading_slide_payloads ... ok
+test presentation::source::tests::managed_selected_slide_materialization_is_exact_and_one_under_fails_before_io ... ok
+test presentation::source::tests::managed_picture_package_retains_budgeted_payload_handles ... ok
+test presentation::source::tests::identical_foreign_source_closure_is_rejected_by_lineage ... ok
+test presentation::source::tests::filesystem_editor_preserves_exact_noop_and_one_slide_overlay ... ok
+test presentation::source::tests::paired_empty_blip_and_fill_rect_are_semantically_empty_but_content_is_refused ... ok
+test presentation::source::tests::picture_inventory_is_metadata_only_and_read_is_exact_and_cached ... ok
+test presentation::source::tests::source_changes_are_returned_as_typed_opc_errors ... ok
+test presentation::source::tests::picture_source_open_honors_managed_cancellation_before_media_payload ... ok
+test presentation::source::tests::filesystem_path_constructors_keep_the_source_positional ... ok
+test presentation::source::tests::managed_selected_slide_payload_is_evictable_after_view_drop ... ok
+test presentation::source::tests::source_properties_only_materialize_the_selected_core_payload ... ok
+test presentation::source::tests::source_presentation_exposes_root_size_and_single_slide_text_name_projection ... ok
+test presentation::source_cross_copy::tests::precompressed_fallback_is_limited_to_memory_admission_refusal ... ok
+test presentation::tests::rejects_empty_inline_hyperlink_actions ... ok
+test presentation::source_cross_copy::tests::prepared_payload_reuse_requires_exact_metadata_and_bytes ... ok
+test presentation::source::tests::selected_slide_root_is_validated_before_picture_scanning ... ok
+test presentation::source::tests::malformed_picture_grammar_and_graphs_are_refused ... ok
+test presentation::source::tests::strict_picture_graph_is_supported_without_payload_reads ... ok
+test presentation::source::tests::picture_reads_preserve_source_version_and_limits ... ok
+test presentation::source::tests::selected_picture_query_matches_all_without_descriptor_reservation ... ok
+test presentation::tests::scans_inline_hyperlinks_with_tooltips ... ok
+test presentation_properties::codec::tests::accepts_bound_namespace_context_without_conventional_prefixes ... ok
+test presentation_properties::codec::tests::typed_snapshot_validation_rejects_invalid_edits ... ok
+test presentation_properties::codec::tests::rejects_malformed_and_unsafe ... ok
+test presentation_properties::math::tests::empty_math_properties_use_schema_defaults ... ok
+test presentation_properties::codec::tests::browse_mode_extension_round_trips ... ok
+test presentation_properties::codec::tests::parses_local_presentation_properties_fixture ... ok
+test presentation_properties::codec::tests::rejects_mismatched_closing_elements ... ok
+test presentation_properties::math::tests::math_payload_rejects_ambiguous_or_unsafe_grammar ... ok
+test presentation_properties::math::tests::strict_math_payload_accepts_strict_omml_closing_names ... ok
+test presentation_properties::codec::tests::strict_mce_and_typed_roundtrip ... ok
+test presentation_properties::math::tests::typed_payload_round_trips_in_transitional_and_strict_omml ... ok
+test presentation_properties::codec::tests::rejects_hostile_typed_extension_grammar_and_bounds ... ok
+test presentation_properties::math::tests::parent_facade_preserves_opaque_extensions_around_typed_math ... ok
+test presentation_properties::metadata::changes::codec::tests::package_round_trip_keeps_nested_commands_and_extensions_inert ... ok
+test presentation_properties::metadata::changes::codec::tests::rejects_hostile_changes_grammar ... ok
+test presentation::source::tests::selected_picture_query_reports_final_length_and_malformed_before_oob ... ok
+test presentation::source_cross_copy::tests::shared_payload_pins_managed_bytes_across_cache_bypass_and_lazy_fallback ... ok
+test opened::tests::three_way_plan_is_immutable_and_history_supports_redo ... ok
+test presentation_properties::metadata::changes::codec::tests::rejects_invalid_package_graphs_and_failed_store_is_atomic ... ok
+test presentation::source::tests::selected_picture_query_validates_later_grammar_and_targets ... ok
+test presentation_properties::metadata::changes::tests::no_op_commit_and_patch_preserve_exact_source ... ok
+test presentation_properties::codec::tests::typed_extensions_preserve_unknown_entries_without_resolving_relationships ... ok
+test presentation_properties::metadata::color_map::codec::tests::rejects_incomplete_or_duplicate_color_maps ... ok
+test presentation_properties::metadata::color_map::codec::tests::parses_master_map_and_layout_override_by_namespace ... ok
+test presentation_properties::metadata::changes::tests::create_read_update_delete_is_atomic_and_rejects_unexpected_inbound_edges ... ok
+test presentation_properties::metadata::color_map::codec::tests::supports_strict_color_map_namespaces ... ok
+test presentation_properties::metadata::color_map::transaction::tests::no_op_commit_and_patch_preserve_exact_source ... ok
+test presentation_properties::metadata::color_map::transaction::tests::stale_replay_is_atomic_and_inverse_restores_exact_bytes ... ok
+test presentation_properties::metadata::custom_show::codec::tests::test_custom_show_creation ... ok
+test presentation_properties::metadata::custom_show::tests::invalid_slide_references_leave_staged_list_unchanged ... ok
+test presentation_properties::metadata::custom_show::codec::tests::test_custom_show_list ... ok
+test presentation_properties::metadata::custom_show::codec::tests::test_custom_shows_xml ... ok
+test presentation_properties::metadata::custom_show::tests::no_op_commit_is_byte_exact ... ok
+test presentation_properties::metadata::changes::tests::typed_edits_preserve_opaque_commands_and_relationship_looking_xml ... ok
+test presentation_properties::metadata::custom_show::tests::snapshot_crud_preserves_opaque_xml_and_relationships ... ok
+test presentation_properties::metadata::changes::tests::stale_patch_rejection_is_atomic_and_inverse_restores_original_bytes ... ok
+test presentation_properties::metadata::changes::tests::failed_typed_edits_do_not_mutate_the_staged_snapshot ... ok
+test presentation::source::tests::try_cache_diagnostics_for_editor_is_exact_and_releases_selected_budget ... ok
+test presentation_properties::metadata::designer_tags::tests::inventories_absent_empty_duplicates_and_order ... ok
+test presentation_properties::metadata::events::codec::tests::rejects_invalid_show_event_storage ... ok
+test presentation_properties::metadata::designer_tags::tests::rejects_spoofing_forbidden_markup_bad_graph_and_limits ... ok
+test presentation_properties::metadata::custom_show::tests::stale_patch_rejection_is_atomic_and_inverse_restores_bytes ... ok
+test presentation_properties::metadata::events::codec::tests::rejects_malformed_show_events ... ok
+test presentation_properties::metadata::designer_tags::tests::accepts_inherited_default_and_alias_bindings_but_rejects_local_rebinding ... ok
+test presentation_properties::metadata::events::codec::tests::scans_show_events_through_markup_compatibility ... ok
+test presentation_properties::metadata::events::codec::tests::stores_show_events_and_discovers_them_round_trip ... ok
+test presentation_properties::metadata::color_map::transaction::tests::typed_edits_preserve_unknown_xml_and_apply_to_override_sources ... ok
+test presentation_properties::metadata::color_map::transaction::tests::failed_edits_leave_the_staged_value_unchanged ... ok
+test presentation_properties::metadata::events::codec::tests::stores_show_events_into_existing_extension_list ... ok
+test presentation_properties::metadata::color_map::transaction::tests::self_closing_master_maps_are_editable ... ok
+test presentation_properties::metadata::designer_tags::tests::store_validates_default_limits_before_mutating ... ok
+test presentation_properties::metadata::designer_tags::tests::patch_allows_reorder_and_inverse_but_refuses_stale_or_rebound_host ... ok
+test presentation_properties::metadata::designer_tags::tests::duplicate_mutations_and_deleted_host_are_atomic_and_signatures_follow_changes ... ok
+test presentation_properties::metadata::designer_tags::tests::inserts_replaces_and_removes_without_touching_opaque_bytes ... ok
+test presentation_properties::metadata::events::codec::tests::retains_office_none_trigger_and_rejects_non_domain_bookmark_trigger ... ok
+test presentation_properties::metadata::guides::tests::invalid_ids_and_bounds_leave_the_staged_value_unchanged ... ok
+test presentation_properties::metadata::events::tests::failed_edits_leave_the_staged_sequence_unchanged ... ok
+test presentation_properties::metadata::guides::codec::tests::rejects_hostile_extended_guide_grammar ... ok
+test presentation_properties::metadata::events::tests::unknown_event_attributes_and_opaque_extensions_survive_attribute_edits ... ok
+test presentation_properties::metadata::handout::codec::tests::test_handout_layout ... ok
+test presentation_properties::metadata::handout::codec::tests::test_handout_master_builder ... ok
+test presentation_properties::metadata::guides::tests::no_op_commit_keeps_exact_source_and_raw_payloads ... ok
+test presentation_properties::metadata::protection::codec::tests::parses_and_republishes_a_legacy_verifier ... ok
+test presentation_properties::metadata::protection::codec::tests::password_hash_matches_office_password_then_salt_order ... ok
+test presentation_properties::metadata::guides::tests::typed_edits_preserve_opaque_extensions_and_update_only_guides ... ok
+test presentation_properties::metadata::events::tests::create_read_noop_and_typed_update_are_source_checked ... ok
+test presentation_properties::metadata::guides::tests::stale_publication_is_atomic_and_inverse_restores_the_source ... ok
+test presentation_properties::metadata::guides::codec::tests::rejects_programmatic_limits_and_color_mismatch ... ok
+test presentation_properties::metadata::sections::codec::tests::creates_and_round_trips_typed_sections ... ok
+test presentation_properties::metadata::guides::codec::tests::round_trips_slide_notes_and_unknown_extensions_inertly ... ok
+test presentation_properties::metadata::revision::codec::tests::rejects_invalid_package_graphs_and_preserves_failed_store ... ok
+test presentation_properties::metadata::revision::codec::tests::rejects_hostile_revision_grammar ... ok
+test presentation_properties::metadata::revision::codec::tests::package_store_load_round_trip_keeps_extensions_inert ... ok
+test presentation_properties::metadata::sections::codec::tests::preserves_section_extensions_inertly_without_following_relationships ... ok
+test presentation_properties::metadata::guides::tests::absent_extension_lists_are_created_and_xml_inverse_is_exact ... ok
+test opened::tests::slide_removal_and_dependency_transfer_are_durable_and_reversible ... ok
+test presentation_properties::metadata::sections::codec::tests::rejects_hostile_section_grammar_and_resource_cases ... ok
+test presentation_properties::metadata::events::tests::list_crud_inverse_stale_rejection_and_remove_are_atomic ... ok
+test presentation_properties::metadata::slide_patch::codec::tests::rejects_an_unbound_presentation_prefix ... ok
+test presentation_properties::metadata::structure::codec::tests::malformed_xml_is_rejected_and_mce_branches_patch_without_overlap ... ok
+test presentation_properties::metadata::structure::codec::tests::non_empty_slide_ids_are_recorded_once_and_indirect_lookalikes_are_ignored ... ok
+test presentation_properties::metadata::structure::tests::custom_show_and_section_edits_round_trip_as_one_validated_graph ... ok
+test presentation::source::tests::try_cache_diagnostics_for_presentation_is_exact_and_payload_free ... ok
+test presentation_properties::metadata::structure::tests::non_empty_slide_id_is_shared_by_ordering_custom_shows_and_sections ... ok
+test presentation_properties::metadata::structure::tests::non_empty_slide_id_uses_the_same_duplicate_and_relationship_validation ... ok
+test presentation_properties::metadata::structure::tests::no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml ... ok
+test presentation_properties::metadata::structure::tests::presentation_slide_id_enforces_the_full_schema_range ... ok
+test presentation_properties::metadata::structure::tests::structure_names_are_resolved_and_accept_transitional_and_strict_aliases ... ok
+test presentation_properties::metadata::structure::tests::structure_parser_rejects_namespace_lookalikes_and_arbitrary_id_prefixes ... ok
+test presentation_properties::metadata::tracks::codec::tests::external_leaf_orphan_and_atomic_graph_rules ... ok
+test presentation_properties::metadata::tracks::codec::tests::parses_w3c_specimen_and_round_trips ... ok
+test presentation_properties::math::tests::package_facade_edits_math_transactionally ... ok
+test presentation_properties::metadata::slide_patch::codec::tests::rejects_a_patch_that_would_exceed_the_slide_xml_budget ... ok
+test presentation_properties::metadata::tracks::tests::no_op_commit_preserves_exact_slide_source ... ok
+test presentation_properties::metadata::tracks::codec::tests::typed_blocks_and_internal_package_round_trip ... ok
+test presentation_properties::metadata::tracks::tests::invalid_caption_edits_are_staged_atomically ... ok
+test presentation_properties::metadata::tracks::tests::malformed_track_metadata_is_rejected_without_a_partial_snapshot ... ok
+test presentation_properties::metadata::revision::codec::tests::loads_real_powerpoint_and_libreoffice_revision_parts ... ok
+test presentation_properties::metadata::tracks::tests::typed_edits_replace_only_modeled_attributes_and_preserve_unknown_xml ... ok
+test shape::classification::tests::detached_edits_are_atomic_and_keep_opaque_extensions ... ok
+test shape::classification::tests::reads_and_replaces_typed_classification_without_normalizing_the_shape ... ok
+test shape::classification::tests::unknown_extensions_survive_first_class_authoring ... ok
+test shape::designer::model::tests::limits_apply_per_string_count_and_aggregate_bytes ... ok
+test presentation_properties::metadata::structure::tests::stale_source_and_relationship_topology_are_rejected_without_mutation ... ok
+test shape::designer::model::tests::drawing_properties_keep_absence_and_explicit_empty_distinct ... ok
+test shape::designer::properties::tests::no_op_rejects_stale_owner_and_remove_projects_absence ... ok
+test shape::designer::model::tests::tag_rejects_xml_10_forbidden_characters ... ok
+test shape::designer::properties::tests::no_op_stale_and_explicit_false_are_distinct ... ok
+test shape::designer::properties::tests::strict_insertion_uses_selected_host_qname_and_namespace ... ok
+test shape::designer::properties::tests::removal_preserves_annotated_containers_and_comments ... ok
+test shape::designer::model::tests::tags_preserve_empty_values_duplicates_and_order ... ok
+test shape::designer::p202::tests::detached_owner_proof_accepts_aliases_and_default_but_not_rebinding ... ok
+test shape::designer::properties::tests::edits_removes_and_preserves_siblings ... ok
+test presentation_properties::metadata::tracks::codec::tests::rejects_hostile_or_invalid_webvtt ... ok
+test shape::designer::p202::tests::exact_and_over_limits_are_enforced ... ok
+test shape::designer::p202::tests::inner_extension_retains_opaque_character_content_but_rejects_active_markup ... ok
+test shape::designer::p202::tests::properties_preserve_absence_empty_tags_duplicates_and_inner_extensions ... ok
+test shape::designer::properties::tests::wrong_namespace_is_opaque_and_duplicate_guids_are_inventoried ... ok
+test shape::designer::tests::creates_and_removes_extension_lists_without_touching_the_shape_tail ... ok
+test shape::designer::p202::tests::rejects_wrong_namespace_order_missing_attributes_and_forbidden_markup ... ok
+test shape::diagram::tests::relationship_id_is_escaped_without_panicking_on_empty_input ... ok
+test shape::designer::tests::strict_profile_uses_the_strict_presentation_namespace ... ok
+test shape::designer::tests::reads_schema_boolean_forms_and_replaces_only_the_typed_range ... ok
+test shape::designer::p202::tests::tags_escape_attributes_and_round_trip_control_whitespace ... ok
+test shape::designer::tests::unknown_extension_entries_and_known_extension_children_are_lossless ... ok
+test opened::tests::stale_and_unsupported_raw_xml_fail_before_publication ... ok
+test shape::designer::tests::package_operations_are_selector_first_and_atomic ... ok
+test shape::designer::tests::detached_edits_are_atomic_and_preserve_the_snapshot_contract ... ok
+test shape::designer::tests::validation_rejects_invalid_values_and_duplicate_known_extensions ... ok
+test shape::designer::properties::tests::duplicate_outer_extensions_are_readable_but_not_mutable ... ok
+test shape::diagram::tests::contextual_model_and_frame_are_available ... ok
+test shape::tests::duplicate_active_names_and_checked_positions_are_errors ... ok
+test shape::tests::groups_are_hierarchical_while_scene_order_is_preorder ... ok
+test shape::tests::accepts_strict_namespaces_and_classifies_frames ... ok
+test shape::tests::indexes_standard_presentationml_content_parts_as_content_shapes ... ok
+test shape::text::tests::drawingml_paragraph_text_accepts_inherited_conventional_prefix ... ok
+test shape::tests::indexes_transitional_shapes_without_copying_fragments ... ok
+test shape::tests::nested_ole_fallback_picture_is_not_a_scene_shape ... ok
+test shape::text::tests::omml_formulas_accept_strict_and_inherited_conventional_prefixes ... ok
+test shape::text::tests::drawingml_range_scan_rejects_structural_depth_over_bound ... ok
+test shape::text::tests::omml_formulas_preserve_exact_namespaced_elements ... ok
+test shape::text::tests::omml_formulas_reject_malformed_xml ... ok
+test shape::tests::mce_selects_one_branch_and_excludes_inactive_fallback_shapes ... ok
+test shape::theme::part::tests::parses_strict_theme_and_rejects_invalid_colors_or_xml ... ok
+test shape::zoom::tests::constructors_and_typed_mutations_validate_domains ... ok
+test shape::text::tests::drawingml_tracker_matches_nsreader_on_event_and_namespace_adversaries ... ok
+test shape::text::tests::drawingml_text_preserves_runs_whitespace_and_paragraphs ... ok
+test shape::text::tests::drawingml_text_rejects_foreign_lookalikes_and_truncation ... ok
+test shape::theme::part::tests::parses_aliased_theme_fonts_and_colors ... ok
+test slide::tests::key_conversions_keep_name_and_order_selectors_distinct ... ok
+test table::shape::tests::inherited_prefixes_and_foreign_names_are_checked ... ok
+test slide::tests::key_is_copyable_for_checked_graph_queries ... ok
+test shape::text::tests::drawingml_tracker_preserves_depth_limit_and_malformed_errors ... ok
+test table::shape::tests::table_views_borrow_rows_and_cells ... ok
+test table::style::tests::ids_are_typed_case_insensitive_and_canonical ... ok
+test shape::theme::package::tests::add_and_load_theme_uses_direct_opc_graph ... ok
+test shape::zoom::tests::malformed_zoom_content_is_rejected ... ok
+test table::style::tests::parser_rejects_requiredness_duplicates_mixed_dialects_and_forbidden_markup ... ok
+test table::style::tests::orphan_catalog_is_rejected_even_when_another_catalog_is_attached ... ok
+test table::style::tests::root_relationship_must_match_the_presentation_dialect ... ok
+test table::style::tests::semantic_crud_is_checked_and_failure_atomic ... ok
+test table::style::tests::shared_inbound_topology_is_rejected_before_mutation ... ok
+test shape::text::tests::drawingml_scan_ranges_tracker_matches_nsreader_on_namespace_adversaries ... ok
+test shape::zoom::tests::reads_typed_zoom_shapes_and_preserves_fallback_and_unknown_choices ... ok
+test shape::zoom::tests::owner_crud_patches_only_zoom_entries ... ok
+test table::style::tests::source_bytes_duplicate_names_background_and_extensions_are_preserved ... ok
+test tag::package::tests::part_name_conflicts_handles_exact_parent_and_descendant_paths ... ok
+test table::style::tests::semantic_comparison_publishes_changed_opaque_comments ... ok
+test table::style::tests::semantic_noop_keeps_preserved_and_opaque_whitespace_distinct ... ok
+test tag::tests::anchored_crud_is_strict_profiled_and_signature_safe ... ok
+test tag::tests::direct_owner_mutates_active_mce_fallback_and_preserves_inactive_source ... ok
+test presentation_properties::metadata::changes::codec::tests::loads_powerpoint_and_libreoffice_changes_packages ... ok
+test tag::shape::tests::mce_mapping_edits_only_the_active_raw_branch ... ok
+test tag::shape::tests::preserves_customer_data_and_inserts_before_extensions ... ok
+test table::style::tests::package_crud_round_trips_all_main_profiles_and_both_conformances ... ok
+test tag::shape::tests::strict_shape_crud_uses_strict_namespaces_and_relationship_type ... ok
+test tag::tests::customer_data_and_schema_order_are_preserved ... ok
+test opened::tests::slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures ... ok
+test tag::tests::discovery_uses_stable_relationship_id_order ... ok
+test tag::tests::malformed_duplicate_names_have_typed_ambiguity_and_numeric_repair ... ok
+test tag::tests::malformed_owner_order_is_rejected_before_mutation ... ok
+test tag::tests::mce_fallback_is_selected ... ok
+test tag::tests::malformed_markup_and_resource_limits_are_rejected ... ok
+test tag::shape::tests::shape_crud_is_atomic_noop_safe_and_move_based ... ok
+test tag::tests::mce_p14_choice_matches_powerpoint_capabilities ... ok
+test tag::shape::tests::shared_shape_anchor_forks_then_collects_each_orphan ... ok
+test tag::tests::mixed_owner_relationship_profiles_are_rejected_atomically ... ok
+test tag::tests::reorder_rejects_partial_and_duplicate_orders_without_mutating ... ok
+test tag::tests::mixed_profile_preflight_is_atomic ... ok
+test tag::tests::strict_round_trip_preserves_inert_values_and_extensions ... ok
+test tag::tests::unicode_caseless_crud_is_checked_and_move_first ... ok
+test time::tests::duration_conversions_are_exact_and_checked ... ok
+test time::tests::equivalent_units_normalize_for_equality_order_and_hashing ... ok
+test time::tests::extended_unitless_values_keep_only_canonical_spellings ... ok
+test tag::tests::same_owner_reused_anchor_forks_relationship_and_part ... ok
+test time::tests::grammar_and_fractional_precision_are_exact ... ok
+test time::tests::owned_parse_and_display_round_trip_canonical_value ... ok
+test tag::tests::package_shared_target_forks_and_collects_only_orphans ... ok
+test transition::tests::concise_builder_keeps_timing_typed ... ok
+test tag::tests::inactive_same_id_forces_active_fork_and_retains_raw_consumer_graph ... ok
+test opened::tests::cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directions ... ok
+test shape::designer::tests::public_package_and_slide_facades_use_the_same_shape_selector ... ok
+test tag::tests::part_allocation_avoids_ascii_case_and_derived_name_collisions ... ok
+test opened::cross_copy_plan::revision_cache_tests::warm_snapshot_caches_do_not_hide_a_stale_source_or_destination ... ok
+test tag::tests::creation_supports_all_presentationml_tag_owners_and_empty_lists ... ok
+test tag::tests::presentation_customer_data_after_later_children_is_rejected_atomically_under_mce ... ok
+test tag::tests::raw_attributes_require_valid_bound_prefixes ... ok
+test transition::tests::exact_equality_includes_retained_wire_state ... ok
+test transition::tests::input_depth_node_and_retention_limits_are_enforced ... ok
+test tag::tests::namespace_builders_reject_invalid_prospective_bindings ... ok
+test transition::tests::custom_duration_uses_compatibility_markup_and_round_trips ... ok
+test tag::shape::tests::inactive_mce_anchor_forces_replacement_fork_and_removal_retention ... ok
+test transition::tests::inspects_but_does_not_emit_raw_children_with_ancestor_only_prefixes ... ok
+test transition::tests::presets_have_checked_durations ... ok
+test transition::tests::reads_local_standard_fixtures ... ok
+test transition::tests::rejects_doctype_without_expanding_entities ... ok
+test transition::tests::rejects_duplicate_effects ... ok
+test transition::tests::rejects_invalid_directions_spokes_and_timing ... ok
+test transition::tests::rejects_unit_suffix_on_integer_timed_advance ... ok
+test transition::tests::retains_unknown_effect_and_extension_children_inertly ... ok
+test transition::tests::ripple_uses_a_standard_fade_fallback_and_round_trips ... ok
+test validation::tests::accounting_overflow_is_transient_and_not_structural ... ok
+test transition::tests::standard_effect_payloads_are_type_specific ... ok
+test writer::tests::designer_writer_clear_paths_and_limit_changes_are_semantic_noops ... ok
+test view_properties::codec::tests::strict_mce_and_malformed ... ok
+test tag::shape::tests::maps_all_five_families_and_nested_groups_to_raw_source ... ok
+test opened::tests::cross_slide_copy_is_source_exact_reversible_and_reopens ... ok
+test view_properties::codec::tests::libreoffice_ratio_and_sparse_views ... ok
+test writer::tests::shape_designer_properties_round_trip_for_text_and_preset_shapes ... ok
+test writer::tests::slide_designer_tags_follow_reorder_duplicate_delete_and_preserve_empty ... ok
+test view_properties::codec::tests::poi_prprops_guides_grid_and_strict_roundtrip ... ok
+test opened::cross_copy_plan::retention_scratch_tests::retention_changes_no_apply_verdict ... ok
+test shape::zoom::tests::package_context_resolves_targets_and_rejects_dangling_image_relationships ... ok
+test tag::tests::direct_owner_mce_creation_covers_all_owners_branches_profiles_and_container_states ... ok
+test view_properties::codec::tests::poi_outline_and_splitters ... ok
+test opened::tests::cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse ... ok
+test presentation::source_cross_copy::payload_guard_tests::candidate_readback_rejects_same_length_image_and_chart_payloads ... ok
+test opened::tests::slide_copy_plan_validates_owned_xml_and_external_topology ... ok
+test presentation::source_cross_copy::payload_guard_tests::same_length_tampered_plan_payloads_reject_before_output ... ok
+test opened::tests::cross_slide_copy_refuses_policy_surfaces_before_destination_mutation ... ok
+test opened::tests::slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts ... ok
+test chart::extension::codec::tests::rejects_invalid_plot_and_chart_space_formatting_and_print_settings ... ok
+test opened::tests::slide_removal_plan_handles_first_middle_and_last_durably ... ok
+test tag::tests::escaped_size_budget_is_cached_and_failed_edits_are_atomic ... ok
+test opened::tests::slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs ... ok
+test parts::slide::tests::semantic_text_enforces_the_cumulative_decoded_text_ceiling ... ok
+test presentation_properties::metadata::protection::codec::tests::password_generation_is_explicitly_dependency_bound ... ok
+test tag::tests::parsing_rejects_canonical_escape_expansion_past_the_wire_budget ... ok
+test animations::tests::recursive_timing_tests::rejects_excessive_node_count ... ok
+
+test result: ok. 566 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+
+     Running tests/edit_guards.rs (target/debug/deps/edit_guards-7ecc095ce424c783)
+
+running 1 test
+test opened_presentation_rejects_legacy_mutable_hydration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/font_api.rs (target/debug/deps/font_api-dc826da7b9c1462b)
+
+running 1 test
+test semantic_crud_is_concise_checked_and_zero_copy_shared ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_encryption.rs (target/debug/deps/package_encryption-157ccf62e9702d35)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_action_settings.rs (target/debug/deps/pptx_action_settings-be366b03f31397d7)
+
+running 2 tests
+test slide_action_owner_rejects_missing_action_relationships ... ok
+test slide_action_owner_reports_local_action_settings ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_activex_controls.rs (target/debug/deps/pptx_activex_controls-df663e3bd9b6dff2)
+
+running 3 tests
+test slides_without_controls_yield_empty_inventory ... ok
+test package_inventory_reports_activex_controls ... ok
+test presentation_controls_match_package_inventory ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/pptx_activex_relationship_order_determinism.rs (target/debug/deps/pptx_activex_relationship_order_determinism-d38879f60d669daa)
+
+running 4 tests
+test a_genuinely_different_package_is_still_refused ... ok
+test snapshot_revision_is_a_function_of_the_package_not_of_the_hash_seed ... ok
+test a_matching_patch_is_accepted_against_every_build_of_the_same_package ... ok
+test single_relationship_graphs_keep_their_revision_and_accept_their_patch ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/pptx_caption_tracks.rs (target/debug/deps/pptx_caption_tracks-cd4c6ccb15196fdd)
+
+running 2 tests
+test presentation_caption_tracks_reject_invalid_sources ... ok
+test presentation_caption_tracks_load_internal_webvtt ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_chart_inventory.rs (target/debug/deps/pptx_chart_inventory-57e0296b5ea7a27e)
+
+running 3 tests
+test package_inventory_reports_generated_native_chart_with_identity ... ok
+test package_inventory_rejects_missing_chart_targets ... ok
+test package_inventory_accepts_strict_chart_relationships ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_color_maps.rs (target/debug/deps/pptx_color_maps-425984e4977b6612)
+
+running 2 tests
+test master_mapping_is_used_when_a_slide_requests_it ... ok
+test slide_override_wins_and_absent_slide_mapping_uses_layout ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_comment_crud.rs (target/debug/deps/pptx_comment_crud-eec8a8321156f4ef)
+
+running 2 tests
+test legacy_author_and_slide_comment_crud_preserves_shared_target ... ok
+test modern_author_comment_and_reply_crud_is_graph_checked ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/pptx_comments.rs (target/debug/deps/pptx_comments-34f1274cd95dc77e)
+
+running 2 tests
+test presentation_comments_are_typed_and_legacy_adapters_preserve_data ... ok
+test legacy_comment_adapter_rejects_external_comment_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_custom_properties.rs (target/debug/deps/pptx_custom_properties-388621f81b2bd356)
+
+running 3 tests
+test custom_properties_reject_malformed_parts_and_invalid_relationship_graphs ... ok
+test custom_properties_reject_word_only_reserved_metadata ... ok
+test custom_properties_are_absent_round_trip_and_remove_idempotently ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_custom_shows.rs (target/debug/deps/pptx_custom_shows-e8119375d3a42982)
+
+running 2 tests
+test presentation_structure_owner_validates_slide_relationships ... ok
+test presentation_structure_owner_resolves_custom_show_membership ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/pptx_customer_data.rs (target/debug/deps/pptx_customer_data-2648f5f08a5ad550)
+
+running 1 test
+test presentation_customer_data_relationships_are_exposed_by_the_part_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_default_text_style.rs (target/debug/deps/pptx_default_text_style-a5f120dae3851d12)
+
+running 1 test
+test presentation_default_text_style_is_exposed_by_the_part_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_designer_facades.rs (target/debug/deps/pptx_designer_facades-fa96fff228919781)
+
+running 3 tests
+test reopened_facades_support_names_limits_removal_and_stable_slide_ids ... ok
+test slide_designer_tags_follow_stable_id_reorder_and_refuse_broken_binding ... ok
+test package_designer_facades_round_trip_and_retire_only_on_change ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/pptx_effective_backgrounds.rs (target/debug/deps/pptx_effective_backgrounds-09002957deb5a652)
+
+running 3 tests
+test effective_slide_background_prefers_the_layout_over_the_master ... ok
+test effective_slide_background_falls_back_to_the_master ... ok
+test effective_slide_background_prefers_the_slide_over_layout_and_master ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/pptx_effective_transitions.rs (target/debug/deps/pptx_effective_transitions-cea25d2e230de855)
+
+running 3 tests
+test effective_slide_transition_falls_back_to_the_master ... ok
+test effective_slide_transition_prefers_the_slide_over_layout_and_master ... ok
+test effective_slide_transition_prefers_the_layout_over_the_master ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/pptx_embedded_fonts.rs (target/debug/deps/pptx_embedded_fonts-d4b365ccb6a9e262)
+
+running 2 tests
+test presentation_embedded_fonts_resolve_inert_resources ... ok
+test presentation_embedded_fonts_validate_font_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/pptx_extended_guides.rs (target/debug/deps/pptx_extended_guides-abeecbe48aa18efb)
+
+running 2 tests
+test presentation_extended_guides_are_available_at_the_metadata_owner ... ok
+test presentation_extended_guides_preserve_validation_errors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_handout_master.rs (target/debug/deps/pptx_handout_master-d4f808a9cb8fb9b1)
+
+running 4 tests
+test presentation_handout_master_is_resolved_by_the_owner_layers ... ok
+test strict_handout_master_relationship_is_supported ... ok
+test handout_master_root_is_validated ... ok
+test handout_master_relationship_is_validated ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/pptx_header_footer_visibility.rs (target/debug/deps/pptx_header_footer_visibility-def8ed75f2ee23ae)
+
+running 1 test
+test layout_and_master_header_footer_visibility_is_exposed_by_the_part_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/pptx_hyperlinks.rs (target/debug/deps/pptx_hyperlinks-1d64f09669fa05b5)
+
+running 2 tests
+test presentation_hyperlinks_reject_malformed_inline_xml ... ok
+test presentation_hyperlinks_include_strict_relationships_and_inline_actions ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/pptx_inherited_transitions.rs (target/debug/deps/pptx_inherited_transitions-5aa247cfcb6e1806)
+
+running 4 tests
+test layout_master_accessor_rejects_external_master_relationships ... ok
+test master_layout_inventory_rejects_external_layout_relationships ... ok
+test slide_layout_accessor_rejects_external_layout_relationships ... ok
+test layout_and_master_read_local_powerpoint_2010_transition_choices ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/pptx_ink_annotations.rs (target/debug/deps/pptx_ink_annotations-61aba42e8f7a6a60)
+
+running 3 tests
+test package_inventory_reports_local_ink_content_parts ... ok
+test package_inventory_rejects_malformed_inkml ... ok
+test package_inventory_rejects_missing_ink_targets ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/pptx_insert_duplicate_slide.rs (target/debug/deps/pptx_insert_duplicate_slide-7978c2916bbc9ec5)
+
+running 2 tests
+test insert_duplicate_at_end_matches_duplicate_slide ... ok
+test duplicated_slide_takes_requested_position_after_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/pptx_insert_slide.rs (target/debug/deps/pptx_insert_slide-0170f2c77892873e)
+
+running 2 tests
+test insert_slide_into_empty_presentation_is_append ... ok
+test inserted_slides_keep_position_and_ids_after_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/pptx_kinsoku_settings.rs (target/debug/deps/pptx_kinsoku_settings-a803fce0ac945377)
+
+running 1 test
+test presentation_kinsoku_settings_are_exposed_by_the_part_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_laser_traces.rs (target/debug/deps/pptx_laser_traces-bf20642d0fd42b32)
+
+running 2 tests
+test package_inventory_reports_local_laser_traces ... ok
+test package_inventory_rejects_malformed_laser_trace_points ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_layout_metadata.rs (target/debug/deps/pptx_layout_metadata-32cb245ff6d49e59)
+
+running 2 tests
+test omitted_layout_metadata_keeps_wire_defaults_explicit ... ok
+test layout_owner_exposes_name_and_kind_metadata ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_layout_references.rs (target/debug/deps/pptx_layout_references-3b456a3227e9653f)
+
+running 1 test
+test master_layout_relationships_keep_stable_ids ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/pptx_malformed_presentation.rs (target/debug/deps/pptx_malformed_presentation-bd345e89a75bed02)
+
+running 6 tests
+test slide_reference_owner_rejects_case_equivalent_target_parts ... ok
+test malformed_presentation_children_are_reported_by_their_owner ... ok
+test malformed_slide_accessors_do_not_panic ... ok
+test optional_slide_id_list_accepts_missing_and_empty_lists_in_both_namespaces ... ok
+test slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids ... ok
+test malformed_presentation_roots_return_typed_errors ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/pptx_master_animations.rs (target/debug/deps/pptx_master_animations-a6570b3198c3687e)
+
+running 1 test
+test layout_and_master_timing_metadata_is_exposed_by_animation_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_master_retention.rs (target/debug/deps/pptx_master_retention-6e68641b1f69f43d)
+
+running 2 tests
+test omitted_master_preserve_flag_defaults_to_false ... ok
+test retained_master_state_is_exposed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/pptx_master_shapes.rs (target/debug/deps/pptx_master_shapes-5b8d74e312692770)
+
+running 1 test
+test master_and_layout_shape_inventories_are_available ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_master_text_styles.rs (target/debug/deps/pptx_master_text_styles-e6b6ae399243e4b7)
+
+running 1 test
+test master_text_style_inventories_are_exposed_by_the_owner_part ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/pptx_master_themes.rs (target/debug/deps/pptx_master_themes-d96a9f5447d9e9c8)
+
+running 2 tests
+test master_theme_inventory_resolves_through_the_standalone_owner ... ok
+test master_theme_accessor_rejects_external_theme_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/pptx_master_visibility.rs (target/debug/deps/pptx_master_visibility-b34e31f58348a70c)
+
+running 2 tests
+test omitted_master_visibility_flags_default_to_true ... ok
+test slide_and_layout_master_visibility_is_exposed_by_owner_parts ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/pptx_model3d.rs (target/debug/deps/pptx_model3d-35e9d8b19fe66939)
+
+running 4 tests
+test package_model3d_rejects_missing_relationship_and_missing_target ... ok
+test package_model3d_rejects_wrong_payload_content_type ... ok
+test package_model3d_round_trip_preserves_payloads_relationships_and_unknowns ... ok
+test package_model3d_failed_edit_restores_the_snapshot ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/pptx_modern_comments.rs (target/debug/deps/pptx_modern_comments-0a7d3666255dd5d7)
+
+running 2 tests
+test presentation_loads_the_modern_comment_graph ... ok
+test presentation_modern_comments_reject_external_author_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/pptx_modification_verifier.rs (target/debug/deps/pptx_modification_verifier-513b7e990299434e)
+
+running 1 test
+test presentation_modification_verifier_is_exposed_by_protection_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_notes_crud.rs (target/debug/deps/pptx_notes_crud-59e94f3b42180a76)
+
+running 4 tests
+test dirty_writer_is_rejected_before_direct_notes_owner_access ... ok
+test selector_failures_do_not_mutate_the_notes_graph ... ok
+test reopened_deck_clears_all_notes_idempotently ... ok
+test reopened_deck_removes_notes_by_semantic_slide_and_preserves_slide_content ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests/pptx_notes_facade.rs (target/debug/deps/pptx_notes_facade-59603cbb105a6421)
+
+running 7 tests
+test authored_notes_xml_and_referenced_master_are_compact ... ok
+test facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches ... ok
+test unknown_notes_relationship_refuses_deletion_atomically ... ok
+test notes_removal_collects_only_exclusive_descendants_and_preserves_slide_comments ... ok
+test shared_notes_descendant_refuses_deletion_without_partial_mutation ... ok
+test package_notes_crud_uses_semantic_slide_selectors ... ok
+test notes_descendant_limit_rejects_n_plus_one_before_mutation ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.66s
+
+     Running tests/pptx_notes_graph.rs (target/debug/deps/pptx_notes_graph-eb27fbde8cd2e4ca)
+
+running 2 tests
+test presentation_exposes_the_default_notes_graph ... ok
+test default_notes_graph_survives_save_and_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_ole_objects.rs (target/debug/deps/pptx_ole_objects-91dd8e4a99bb5c30)
+
+running 4 tests
+test package_inventory_reports_local_ole_objects ... ok
+test package_inventory_ignores_non_ole_graphic_data ... ok
+test package_inventory_rejects_missing_ole_relationships ... ok
+test package_inventory_rejects_wrong_ole_payload_content_type ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_photo_album.rs (target/debug/deps/pptx_photo_album-5b55d830a7fee526)
+
+running 1 test
+test presentation_photo_album_metadata_is_preserved_as_an_opaque_extension ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_picture_backgrounds.rs (target/debug/deps/pptx_picture_backgrounds-c2571014407654e2)
+
+running 2 tests
+test picture_background_serializes_with_its_image_relationship_slot ... ok
+test picture_background_rejects_external_image_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_placeholders.rs (target/debug/deps/pptx_placeholders-a2e39d99bac7a13d)
+
+running 2 tests
+test slide_shape_placeholders_return_declared_types ... ok
+test slide_shape_placeholders_preserve_type_decoding_errors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_presentation_metadata.rs (target/debug/deps/pptx_presentation_metadata-01d1bc40f26f7930)
+
+running 1 test
+test presentation_root_metadata_is_retained_by_the_main_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_presentation_settings.rs (target/debug/deps/pptx_presentation_settings-a54ec274cd5ed318)
+
+running 3 tests
+test package_readers_report_absent_settings ... ok
+test package_readers_reject_external_settings_relationships ... ok
+test package_loads_local_view_and_presentation_settings ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_presentation_sizes.rs (target/debug/deps/pptx_presentation_sizes-a405e61eb27b55e7)
+
+running 2 tests
+test absent_presentation_surface_sizes_return_typed_absence_or_error ... ok
+test presentation_surface_sizes_are_exposed_by_main_and_wire_owners ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_revision_and_changes_information.rs (target/debug/deps/pptx_revision_and_changes_information-0b98e7484f2b05b7)
+
+running 1 test
+test package_and_presentation_manage_local_revision_and_changes_information ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_ribbon_customization.rs (target/debug/deps/pptx_ribbon_customization-c6a8092489b3ea93)
+
+running 3 tests
+test common_ribbon_loader_rejects_external_relationships ... ok
+test ribbon_storage_exposes_fixed_slots_and_effective_precedence ... ok
+test common_owner_removes_ribbon_families_independently ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_root_relationships.rs (target/debug/deps/pptx_root_relationships-7f3f9a0390cff4eb)
+
+running 4 tests
+test strict_root_slide_and_master_relationships_are_supported ... ok
+test root_slide_and_master_relationships_reject_wrong_types ... ok
+test root_slide_and_master_relationships_reject_wrong_content_types ... ok
+test root_slide_and_master_relationships_reject_external_targets ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/pptx_sections.rs (target/debug/deps/pptx_sections-9ec6b08a1ea73059)
+
+running 1 test
+test presentation_sections_include_slide_membership ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_shape_identity.rs (target/debug/deps/pptx_shape_identity-cb5cbae6bff41335)
+
+running 2 tests
+test slide_shapes_use_names_first_with_checked_numeric_fallback ... ok
+test duplicate_semantic_shape_names_are_typed_errors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_shape_scene_tags.rs (target/debug/deps/pptx_shape_scene_tags-8a616a83181ebd68)
+
+running 2 tests
+test facade_replaces_and_removes_a_real_shape_tag_list ... ok
+test real_libreoffice_scene_keeps_nested_shapes_and_semantic_tag_anchors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+     Running tests/pptx_show_events.rs (target/debug/deps/pptx_show_events-9fc46c1e500d5907)
+
+running 3 tests
+test event_owner_rejects_malformed_existing_show_event_times ... ok
+test event_owner_ignores_events_under_other_extensions ... ok
+test event_owner_stores_the_local_show_event_inventory ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_slide_media.rs (target/debug/deps/pptx_slide_media-350a80bda4ce9666)
+
+running 2 tests
+test slide_loads_inert_audio_resources ... ok
+test slide_rejects_external_media_resources ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_slide_visibility.rs (target/debug/deps/pptx_slide_visibility-61219ba760180b26)
+
+running 2 tests
+test omitted_slide_show_flag_is_not_hidden ... ok
+test hidden_slide_state_is_exposed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pptx_smart_tags.rs (target/debug/deps/pptx_smart_tags-9e44b967038301aa)
+
+running 1 test
+test presentation_smart_tags_relationship_is_retained_by_the_root_owner ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_table_styles.rs (target/debug/deps/pptx_table_styles-a7877888e5c78516)
+
+running 8 tests
+test package_loads_table_styles_part ... ok
+test presentation_styles_match_package_level ... ok
+test slide_tables_report_style_switches_and_references ... ok
+test package_updates_and_removes_catalog_without_legacy_writer_state ... ok
+test style_removal_composes_with_a_new_deck_slide_edit ... ok
+test noncanonical_style_target_survives_transactional_raw_save ... ok
+test style_edit_composes_with_a_new_deck_slide_edit ... ok
+test strict_raw_edit_disables_the_transitional_legacy_writer ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/pptx_tag_lists.rs (target/debug/deps/pptx_tag_lists-f03780a3a65e0db6)
+
+running 10 tests
+test package_tag_edits_reject_a_dirty_legacy_writer ... ok
+test unanchored_relationships_stay_in_the_low_level_inventory ... ok
+test numeric_slide_lookup_does_not_process_unrelated_slides ... ok
+test direct_anchor_rejects_the_wrong_tag_content_type ... ok
+test direct_anchor_rejects_an_external_tag_relationship ... ok
+test package_reads_direct_slide_tag_lists ... ok
+test slide_selectors_report_missing_ambiguous_and_out_of_bounds ... ok
+test package_tag_put_and_remove_are_singleton_and_persistent ... ok
+test package_tag_crud_edits_only_the_active_raw_mce_branch ... ok
+test real_shape_tags_are_not_flattened_into_slide_tags ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/pptx_task_panes.rs (target/debug/deps/pptx_task_panes-41a628d34f6e6489)
+
+running 3 tests
+test common_web_owner_rejects_external_web_extension_relationships ... ok
+test common_web_owner_loads_inert_task_panes ... ok
+test common_web_owner_moves_and_removes_a_validated_task_pane_graph ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_transition_extensions.rs (target/debug/deps/pptx_transition_extensions-922431d115dcfea5)
+
+running 4 tests
+test transition_reader_rejects_invalid_powerpoint_2010_ripple_direction ... ok
+test transition_writer_round_trips_custom_duration_through_compatibility_markup ... ok
+test transition_writer_round_trips_powerpoint_2010_ripple_with_fade_fallback ... ok
+test transition_reader_uses_the_local_powerpoint_2010_choice ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pptx_vba_project.rs (target/debug/deps/pptx_vba_project-acd77b173e37d9b9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/read_limits.rs (target/debug/deps/read_limits-70b7d0e83880549f)
+
+running 1 test
+test direct_pptx_constructors_apply_exact_and_over_input_limits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/sequential_text.rs (target/debug/deps/sequential_text-83f7a55f9db21337)
+
+running 16 tests
+test malformed_later_slide_preserves_only_prior_slide_progress ... ok
+test source_malformed_later_slide_preserves_only_prior_slide_progress ... ok
+test source_cancellation_before_output_is_document_progress ... ok
+test source_stale_after_accepted_output_overrides_sink_result ... ok
+test source_declared_slide_size_limit_precedes_payload_load ... ok
+test source_cancellation_after_sink_acceptance_overrides_sink_result ... ok
+test source_change_overrides_simultaneous_sink_failure ... ok
+test source_output_and_object_limits_report_exact_progress ... ok
+test sink_progress_handles_short_zero_overreporting_interrupted_and_failure_writers ... ok
+test xml_depth_limit_is_document_error ... ok
+test custom_paragraph_separator_has_eager_and_source_parity ... ok
+test eager_and_source_sinks_have_independent_legacy_text_parity ... ok
+test output_and_object_limits_report_exact_progress ... ok
+test empty_objects_and_custom_slide_separator_follow_options ... ok
+test source_stale_before_and_during_parse_is_document_progress ... ok
+test mce_fallback_is_processed_and_foreign_text_is_not_accepted ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/source_backed_cross_copy.rs (target/debug/deps/source_backed_cross_copy-0e10b953e194431b)
+
+running 58 tests
+test source_backed_cross_copy_refuses_mismatched_presentation_end_name ... ok
+test source_backed_cross_copy_refuses_mismatched_relationship_end_name ... ok
+test source_backed_cross_copy_chart_limits_fail_before_materialization ... ok
+test source_backed_cross_copy_chart_cancellation_is_fallible ... ok
+test source_backed_cross_copy_chart_source_version_changes_are_refused ... ok
+test source_backed_cross_copy_aggregates_image_reservation_before_payload_reads ... ok
+test source_backed_cross_copy_refuses_lexical_embed_without_relationship_namespace ... ok
+test source_backed_cross_copy_refuses_mismatched_slide_end_name_before_planning ... ok
+test source_backed_cross_copy_preserves_media_read_errors ... ok
+test source_backed_cross_copy_preserves_noncompact_source_xml_with_checked_splices ... ok
+test source_backed_cross_copy_copies_charts_alongside_images ... ok
+test source_backed_cross_copy_refuses_limits_and_cancellation_before_output ... ok
+test source_backed_cross_copy_keeps_inserted_namespace_bindings_self_contained ... ok
+test source_backed_cross_copy_preserves_untouched_destination_zip_records ... ok
+test source_backed_cross_copy_deduplicates_shared_chart_physical_members ... ok
+test source_backed_cross_copy_refuses_picture_inventory_when_r_is_rebound ... ok
+test source_backed_cross_copy_refuses_name_and_layout_mismatch ... ok
+test source_backed_cross_copy_accepts_picture_on_destination_anchor_and_preserves_anchor_closure ... ok
+test source_backed_cross_copy_observes_post_entry_planning_cancellation ... ok
+test source_backed_cross_copy_preserves_typed_cancellation_during_output ... ok
+test source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_blips ... ok
+test source_backed_cross_copy_chart_publication_is_deterministic_and_source_immutable ... ok
+test source_backed_cross_copy_preserves_multiple_chart_source_order ... ok
+test source_backed_cross_copy_refuses_protection_opaque_and_trailing_data ... ok
+test source_backed_cross_copy_keeps_source_immutable_and_is_deterministic ... ok
+test source_backed_cross_copy_refuses_unbound_foreign_slide_attribute ... ok
+test source_backed_cross_copy_refuses_wrong_type_on_non_selected_source_slide_binding ... ok
+test source_backed_cross_copy_refuses_wrong_type_on_non_anchor_destination_slide_binding ... ok
+test source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collisions ... ok
+test source_backed_cross_copy_copies_multiple_embedded_images_in_source_order ... ok
+test source_backed_cross_copy_reserves_before_reading_picture_media ... ok
+test source_backed_cross_copy_accepts_missing_name_and_refuses_duplicate_ids ... ok
+test source_backed_cross_copy_rejects_actual_source_size_mismatch ... ok
+test source_backed_cross_copy_allocates_case_equivalent_media_collision ... ok
+test source_backed_cross_copy_copies_shared_image_once_with_coherent_relationships ... ok
+test source_backed_cross_copy_rejects_chart_outbound_resource_relationships ... ok
+test source_backed_cross_copy_reopens_through_source_and_eager_facades ... ok
+test source_backed_cross_copy_refuses_unsupported_relationships_and_markup ... ok
+test source_backed_cross_copy_retargets_layout_to_destination_graph ... ok
+test source_backed_cross_copy_rewrites_only_namespace_resolved_picture_embed ... ok
+test source_backed_cross_copy_shared_image_has_exact_physical_media_closure ... ok
+test source_backed_cross_copy_rejects_chart_relationship_and_leaf_variants ... ok
+test source_backed_cross_copy_skips_and_preserves_an_orphan_slide_relationship_member ... ok
+test source_backed_cross_copy_refuses_stale_foreign_and_same_source_plans ... ok
+test source_backed_cross_copy_supports_one_relationship_free_chart_leaf ... ok
+test source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data ... ok
+test source_backed_cross_copy_refuses_unsupported_picture_media_closures ... ok
+test source_backed_cross_copy_reports_source_change_during_output_with_exact_progress ... ok
+test source_backed_cross_copy_copies_one_embedded_picture_closure ... ok
+test source_backed_cross_copy_supports_middle_and_append_positions ... ok
+test source_backed_cross_copy_rewrites_image_layout_relationship_id_collision ... ok
+test source_backed_cross_copy_relationship_id_rewrite_is_source_order_deterministic ... ok
+test source_backed_cross_copy_retains_verified_image_and_chart_captures ... ok
+test source_backed_cross_copy_reports_partial_short_and_zero_sink_progress ... ok
+test source_backed_cross_copy_unnamed_slides_keep_nonempty_name_conflicts ... ok
+test source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusal ... ok
+test source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded ... ok
+test source_backed_cross_copy_preserves_absent_and_empty_slide_names ... ok
+
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+     Running tests/source_backed_cross_copy_adversarial.rs (target/debug/deps/source_backed_cross_copy_adversarial-96ee76f680f1c91e)
+
+running 7 tests
+test borrowed_real_producer_fixture_refuses_cross_copy_authorization ... ok
+test cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation ... ok
+test cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation ... ok
+test cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publication ... ok
+test cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact ... ok
+test cross_copy_replans_after_dirty_destination_for_sequential_copies ... ok
+test cross_copy_preserves_custom_parts_and_save_options_through_forward_and_inverse ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/source_backed_edit.rs (target/debug/deps/source_backed_edit-1534c4df527f009c)
+
+running 21 tests
+test empty_and_all_equal_batch_preserve_signed_source_exactly ... ok
+test batch_expansion_honors_the_source_part_limit_before_allocation ... ok
+test batch_preflight_is_atomic_and_duplicate_identity_is_typed ... ok
+test noop_is_byte_exact_and_signed_change_is_refused ... ok
+test source_slide_order_move_changes_only_root_and_keeps_payloads_lazy ... ok
+test direct_transition_semantic_noop_shares_signed_source_exactly ... ok
+test multi_slide_batch_reports_partial_sink_failure ... ok
+test direct_transition_supports_strict_and_noncanonical_prefixes ... ok
+test stale_foreign_closure_and_changed_source_refuse_before_output ... ok
+test atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part ... ok
+test changed_edit_reopens_and_changes_only_the_selected_logical_part ... ok
+test multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members ... ok
+test multi_slide_batch_noop_signed_source_is_exact_and_changed_signed_is_refused ... ok
+test source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused ... ok
+test direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay ... ok
+test mce_limits_strict_and_partial_sink_are_checked ... ok
+test direct_transition_refuses_extensions_sound_protection_and_unsafe_targets_atomically ... ok
+test direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink ... ok
+test source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output ... ok
+test source_slide_order_rejects_limits_malformed_mce_and_invalid_owners ... ok
+test multi_slide_batch_rejects_empty_duplicate_over_bound_and_stale_sets ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/streaming_authoring.rs (target/debug/deps/streaming_authoring-7329bdbe6d6c37d8)
+
+running 13 tests
+test invalid_global_configuration_does_not_touch_sink ... ok
+test sink_failure_reports_incomplete_output_progress ... ok
+test static_content_types_and_relationships_close_the_one_slide_graph ... ok
+test empty_widescreen_slide_reopens_with_fixed_topology ... ok
+test title_only_slide_is_semantic_text_without_caller_boxes ... ok
+test title_multiple_boxes_have_deterministic_order_and_ids ... ok
+test hostile_text_and_geometry_are_refused_before_box_bytes ... ok
+test streaming_deck_is_deterministic_and_reopens ... ok
+test runtime_output_limit_is_exact_and_one_under_is_incomplete ... ok
+test order_and_limit_refusals_are_checked ... ok
+test slide_xml_limit_reserves_the_final_suffix_before_box_bytes ... ok
+test unicode_text_budget_is_utf8_exact_and_whitespace_is_preserved ... ok
+test post_start_sink_failure_reports_progress_and_poisoning ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/streaming_metadata_spool.rs (target/debug/deps/streaming_metadata_spool-f162a29d06bf35b3)
+
+running 12 tests
+test explicit_spool_refuses_invalid_configuration_before_output ... ok
+test initialization_spool_failure_is_typed_and_leaves_output_empty ... ok
+test scratch_quota_failure_is_typed_and_does_not_become_a_generic_pptx_error ... ok
+test output_failure_reports_accepted_bytes_and_preserves_the_typed_progress_wrapper ... ok
+test appending_spool_failure_is_typed_after_output_progress ... ok
+test replay_spool_failure_reports_exactly_the_output_bytes_accepted ... ok
+test interrupted_output_is_retryable_in_the_explicit_scratch_path ... ok
+test short_and_interrupted_scratch_transfers_preserve_the_deck ... ok
+test output_limit_reports_the_exact_accepted_prefix_in_the_spooled_route ... ok
+test convenience_metadata_spool_matches_the_default_writer ... ok
+test explicit_spool_preserves_validation_for_hostile_content_and_slide_order ... ok
+test explicit_metadata_spool_matches_ordinary_bytes_for_default_and_widescreen_decks ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.36s
+
+     Running tests/validation.rs (target/debug/deps/validation-9d03219e83153fcc)
+
+running 12 tests
+test namespace_attribute_values_and_reader_depth_are_bounded ... ok
+test graph_limit_stops_graph_only_and_keeps_later_catalog_facts ... ok
+test source_backed_limits_are_finite_and_report_owned_xml_ceiling ... ok
+test valid_source_report_reuses_catalog_and_reports_external_presence_only ... ok
+test graph_checks_orphan_manifests_and_agile_vba_signature_presence ... ok
+test signature_and_macro_presence_are_inert_facts ... ok
+test mce_is_reported_without_selecting_a_branch ... ok
+test malformed_slide_is_a_bounded_issue_and_xml_limit_stops_dependents ... ok
+test mce_conclusion_is_order_independent_when_a_slide_cannot_be_inspected ... ok
+test malformed_references_comments_and_depth_block_mce_truthfully ... ok
+test strict_namespaces_and_direct_numeric_slide_owners_are_required ... ok
+test slide_id_schema_bounds_and_direct_list_cardinality_are_enforced ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_pptx
+
+running 7 tests
+test crates/litchi-pptx/src/chart/codec.rs - chart::codec::Part<'_>::chart_info (line 45) ... ignored
+test crates/litchi-pptx/src/shape/theme/part.rs - shape::theme::part::Part<'a>::read (line 80) ... ignored
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::linear_gradient (line 225) ... ok
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.36s; merged doctests compilation took 0.32s

@@ -1,5 +1,45 @@
 # Performance program phase report
 
+## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
+
+Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).
+
+**0646 — the cross-package copy's second deflate can be removed by retaining the
+planned candidate archive, and the price is one whole serialized package held in
+the plan.** Design, retained; **no production code changed**;
+`performance_claim: none`. Scratch implementation measured and kept as a patch in
+the packet. Counts (callgrind isolation pairs, CPU 21): `bounded_package_bytes`
+2 → 1 call per lifecycle, `PackageWriter::write_to_stream` 7 → 6,
+`PreservationIndex::write_to` 2 → 1, `zlib_rs::deflate::deflate` 1,112 → 556
+calls and 5.956 G → 2.978 G `Ir` (**−50.00%**), with every hash, capture, reopen
+and the whole replan unchanged; lifecycle `Ir` 26.80 G → 23.74 G (−11.43%) on
+media-rich and −2.10% on plain. `sha2::sha256::compress256` is unchanged to five
+significant figures, which is the design working: the archive digest is
+recomputed over the retained bytes rather than carried, so the hash is a wash and
+what is removed is the serialization and its deflate. Paired ABBA timing, 30
+samples per leg: `pptx_cross_copy_media_rich` 659.1 → 412.5 ms (**−37.42%**, A/A
+floor −0.15%, B/B +0.22%), its apply phase **339.4 → 94.4 ms (−72.10%)** with
+pair spreads of 0.46% and 0.12% and its plan phase flat at −0.64%;
+`pptx_cross_copy_media_rich_lifecycle` −35.61% against a −3.44% A/A floor; the
+plain selectors −2.99% and −3.46% against floors of −1.34% and +0.31%. Native
+`perf stat` whole child: cycles **−23.10%** (A/A −0.77%, B/B −0.18%). One phase
+is bimodal at ±4× and was chased rather than reported as a result:
+`publication_ns` on the media-rich lifecycle reads, per leg, 1.536 / 1.529 /
+1.527 / **6.545** ms — the outlier is a *before* leg, and in an earlier window on
+a superseded revision it was an *after* leg — while the same phase on the
+non-lifecycle selector is 6.51 / 6.30 / 6.15 / 6.50 ms in the same processes.
+Publication executes no changed code. Memory: the plan's live bytes rise by exactly the archive plus 40 bytes
+(31,583 on plain, 33,599,911 on media-rich) and return to parity when the plan is
+dropped; lifecycle allocated bytes −19.98%, region peak +12.18% on media-rich and
+**−5.45% on plain**, because on a small candidate the removed writer's growth
+buffer outweighs what is retained. Verdicts unchanged: 871 `litchi-pptx` tests
+pass on the untouched base and all 871 pass on the retained path (874 with the
+three binding-proof tests the patch adds), with a `debug_assert` re-serializing
+the candidate on every reuse. Fourteen admission gates are defined; **G2 blocks
+implementation**, because ADR 0005's hierarchical budget does not exist in this
+path and the implementable alternative — a sixth member of `opened::Limits` — is
+a breaking public API change.
+
 ## 0647 — the frozen design that measured its way into an implementation
 
 Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).

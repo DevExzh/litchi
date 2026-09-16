@@ -1,0 +1,43 @@
+change 0646 - allocator retention probe (litchi-perf-baseline-alloc retention --api owned)
+5 samples after 1 warmup per leg; medians reported; allocator counters are deterministic.
+
+################ plain ################
+  expected_output_bytes (= candidate archive) = 31,545
+  destination_archive_bytes                   = 30,539
+
+  checkpoint                        before live     after live          delta
+  baseline_before_inputs                161,388        161,386             -2
+  prepared_inputs_and_sink              352,051        352,049             -2
+  opened_documents                      689,104        689,102             -2
+  planned                               696,934        728,517        +31,583
+  published                             782,847        814,430        +31,583
+  drop_result                           748,924        780,507        +31,583
+  drop_plan                             741,094        741,092             -2
+  drop_document_handles                 290,014        290,012             -2
+  drop_sink                             161,388        161,386             -2
+
+  region peak live bytes              1,339,600      1,266,634         -5.45%
+  allocation calls                       48,096         47,041         -2.19%
+  reallocation calls                      5,659          5,298         -6.38%
+  allocated bytes                    15,581,584     13,175,380        -15.44%
+
+################ media-rich ################
+  expected_output_bytes (= candidate archive) = 33,599,873
+  destination_archive_bytes                   = 16,814,664
+
+  checkpoint                        before live     after live          delta
+  baseline_before_inputs             68,909,261     68,909,259             -2
+  prepared_inputs_and_sink          169,804,828    169,804,826             -2
+  opened_documents                  203,743,965    203,743,963             -2
+  planned                           203,757,827    237,357,738    +33,599,911
+  published                         237,438,832    271,038,743    +33,599,911
+  drop_result                       237,392,085    270,991,996    +33,599,911
+  drop_plan                         237,378,223    237,378,221             -2
+  drop_document_handles             136,174,543    136,174,541             -2
+  drop_sink                          68,909,261     68,909,259             -2
+
+  region peak live bytes            271,884,201    305,008,696        +12.18%
+  allocation calls                       58,250         56,770         -2.54%
+  reallocation calls                      6,765          6,271         -7.30%
+  allocated bytes                   467,072,982    373,765,695        -19.98%
+

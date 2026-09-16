@@ -1,5 +1,36 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
+
+Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).
+
+Change 0646 is a case where the size gate is met by a wide margin and the change
+is still not made, and the reason is worth stating plainly: **the saving is
+large, the mechanism is sound, and the blocker is that ADR 0005's budget does not
+exist in this path.** ADR 0005 says "Every operation charges a hierarchical
+resource budget supplied by an execution context." `litchi-core` provides
+`Budget`, `Resource::Memory` and three finite profiles; the PPTX
+opened-presentation path uses none of them. Its `opened::Limits` bounds the size
+of an operation's *output* (`max_patch_bytes`), not live memory — with one
+exception, `max_history_bytes`, which `History::push` does enforce on retained
+undo patches with a typed `Error::Limit` and eviction. That exception is the
+precedent and the shape to copy, and it is also the measure of how far the crate
+is from ADR 0005: one enforced live-memory ceiling, in one place, reached by no
+budget.
+
+The second lesson is about *where* an optimization's cost lands. Retention costs
+nothing at planning — the allocator probe shows the plan's live bytes rise by the
+archive plus a 40-byte `Arc` header and by nothing else, and fall back exactly
+when the plan is dropped — so it is not "extra work", it is a decision not to
+free. But it moves a bounded transient inside one call into unbounded state on a
+public value the caller holds. **ADR 0005's "cache behavior is semantically
+invisible" clause is the wrong licence for that**, and the record says so:
+change 0598 used that clause correctly for a 32-byte memo on an immutable
+snapshot; a ceiling-bounded 128 MiB hold on a caller-owned plan is a retention
+policy, not a cache, and a retention policy belongs under the budget. The gate
+this yields is not a number. It is: *an optimization that changes how long memory
+lives must be opt-in until something is charging for it.*
+
 ## 0647 — preservation-by-default reaches a case it was already reaching, and the rule-1 ordering holds
 
 Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).

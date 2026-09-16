@@ -1,0 +1,71 @@
+################ pptx_cross_copy_plain ################
+
+--- calls per lifecycle: (s3 - s1) / 2 ---
+callee                                            before      after
+package_fingerprint (semantic)                       8.0        8.0
+physical_package_fingerprint                         4.0        4.0
+snapshot_physical_revision                           4.0        4.0
+bounded_package_bytes                                2.0        1.0
+build_candidate                                      2.0        2.0
+prepare_cross_slide_copy_for_slides                  2.0        2.0
+capture_internal                                     8.0        8.0
+PackageWriter::write_to_stream                       7.0        6.0
+OpcPackage::from_vec_reusing_payloads                2.0        2.0
+zlib_rs::deflate::deflate                           40.0       20.0
+sha2::sha256::compress256                         1709.0     1566.0
+PreservationIndex<R>::write_to                       2.0        1.0
+
+--- instructions per lifecycle: (s3 - s1) / 2 ---
+symbol (inclusive Ir)                                     before              after        delta
+WHOLE LIFECYCLE Ir                                   239,585,652        234,548,824       -2.10%
+package_fingerprint (semantic)                        39,455,467         39,467,050        0.03%
+physical_package_fingerprint                           6,502,294          6,500,121       -0.03%
+snapshot_physical_revision                             3,250,394          3,250,394        0.00%
+bounded_package_bytes                                 14,177,765          7,096,450      -49.95%
+build_candidate                                       45,153,116         39,913,666      -11.60%
+prepare_cross_slide_copy_for_slides                  133,917,304        128,752,209       -3.86%
+capture_internal                                      58,659,408         58,920,598        0.45%
+PackageWriter::write_to_stream                        20,591,086         13,545,970      -34.21%
+OpcPackage::from_vec_reusing_payloads                 12,675,134         12,696,209        0.17%
+zlib_rs::deflate::deflate                              2,492,079          1,246,063      -50.00%
+sha2::sha256::compress256                             50,665,038         50,658,460       -0.01%
+PreservationIndex<R>::write_to                        10,988,511          5,496,190      -49.98%
+
+--- whole child at --samples 1 ---
+  before 4,323,171,238   after 4,313,031,318   -0.23%
+
+################ pptx_cross_copy_media_rich ################
+
+--- calls per lifecycle: (s3 - s1) / 2 ---
+callee                                            before      after
+package_fingerprint (semantic)                       8.0        8.0
+physical_package_fingerprint                         4.0        4.0
+snapshot_physical_revision                           4.0        4.0
+bounded_package_bytes                                2.0        1.0
+build_candidate                                      2.0        2.0
+prepare_cross_slide_copy_for_slides                  2.0        2.0
+capture_internal                                     8.0        8.0
+PackageWriter::write_to_stream                       7.0        6.0
+OpcPackage::from_vec_reusing_payloads                2.0        2.0
+zlib_rs::deflate::deflate                         1112.0      556.0
+sha2::sha256::compress256                         5462.0     4226.0
+PreservationIndex<R>::write_to                       2.0        1.0
+
+--- instructions per lifecycle: (s3 - s1) / 2 ---
+symbol (inclusive Ir)                                     before              after        delta
+WHOLE LIFECYCLE Ir                                26,800,703,086     23,736,065,870      -11.43%
+package_fingerprint (semantic)                    10,525,045,950     10,525,048,555        0.00%
+physical_package_fingerprint                       3,501,940,703      3,501,940,056       -0.00%
+snapshot_physical_revision                         1,750,970,428      1,750,970,428        0.00%
+bounded_package_bytes                              9,634,402,864      4,817,182,700      -50.00%
+build_candidate                                   13,474,961,554     10,409,963,212      -22.75%
+prepare_cross_slide_copy_for_slides               15,315,609,365     12,250,625,815      -20.01%
+capture_internal                                   8,804,515,388      8,804,657,832        0.00%
+PackageWriter::write_to_stream                    13,164,161,022      8,349,845,603      -36.57%
+OpcPackage::from_vec_reusing_payloads                323,126,459        323,252,789        0.04%
+zlib_rs::deflate::deflate                          5,955,603,242      2,977,783,594      -50.00%
+sha2::sha256::compress256                         19,274,528,456     19,274,471,600       -0.00%
+PreservationIndex<R>::write_to                     9,624,120,794      4,812,044,592      -50.00%
+
+--- whole child at --samples 1 ---
+  before 123,572,072,250   after 117,447,329,387   -4.96%

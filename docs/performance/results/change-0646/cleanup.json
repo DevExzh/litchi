@@ -1,0 +1,60 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0646",
+  "scratch_root": "/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0646",
+  "removed": [
+    {
+      "what": "cg-{before,after}-pptx_cross_copy_{plain,media_rich}-s{1,3}.out",
+      "count": 8,
+      "bytes_each": "462-505 KB",
+      "why": "raw callgrind profiles; every number this record cites was extracted into counts/incl-*.txt and counts/calls-*.txt before deletion, following the practice of change 0598 in the same area"
+    },
+    {
+      "what": "cg-*.json and cg-*.runlog.txt beyond the eight retained run logs",
+      "why": "the harness reports written during the callgrind profiles run at --warmup 0 --samples 1 and 3, so their timings are meaningless and the record cites none of them"
+    },
+    {
+      "what": "the entire first and second measurement rounds (counts/, timing/, alloc/ and counts2/, timing2/ before the final rebuild)",
+      "why": "two earlier revisions of the scratch were measured and then superseded: the first tripped clippy::too_many_arguments on build_candidate at 13/12 arguments, and the second used an infallible Vec::clone where the route it replaces returns Error::Allocation. Both were corrected and everything was re-measured from scratch; only the final round is retained, so no number in the record comes from a build that is not the retained patch."
+    },
+    {
+      "what": "timing-{A1,B1,B2,A2}.log and perf-{A1,B1,B2,A2}.{log,json}",
+      "why": "stdout of the timing legs and the perf-stat legs' harness reports; the retained timing-*.json carry the same samples and the retained perf-*.txt carry the counters"
+    },
+    {
+      "what": "rebuild-bench.log, rebuild-alloc.log, gates-scratch.txt, rerun.log, assemble.log and the one-shot driver scripts (rerun.sh, assemble.sh, apply_scratch.py)",
+      "why": "build and driver transcripts; gates.txt retains the tail of every gate this record cites and scripts/ retains every script it used"
+    },
+    {
+      "what": "a copy of results/change-0598/scripts/",
+      "why": "callcounts.py, timing_report.py and perf_report.py are reused verbatim from that packet and are re-retained in this one"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/targets/0646-before-test (about 9.6 GiB)",
+      "why": "the debug cargo target directory used once to run the before checkout's litchi-pptx suite; removed as soon as the 871-test total was recorded"
+    },
+    {
+      "what": "the staged measurement binaries (bench-before, bench-after, alloc-before, alloc-after, about 240 MB)",
+      "why": "copies made outside the cargo target directories so a concurrent build could not relink one mid-run (change 0627); their sha256s are recorded in README.md and decision.json"
+    },
+    {
+      "what": "the whole scratch directory, after the packet was assembled",
+      "why": "session scratchpad on a 62 GiB RAM-backed tmpfs shared with the other agents of this wave"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/0646 (git worktree with its own cargo target)",
+      "why": "removed with `git worktree remove --force` after the commit; the branch perf/0646-pptx-cross-copy-candidate-retention-design is kept"
+    },
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/targets/0646-{before,after,before-alloc,after-alloc}",
+      "why": "the four cargo target directories of the measurement builds"
+    }
+  ],
+  "kept": [
+    {
+      "what": "/home/zhuhe/code/litchi-worktrees/before-c7326f680",
+      "why": "the shared read-only before checkout, used by every agent of this wave; not this change's to remove"
+    }
+  ]
+}

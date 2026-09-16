@@ -1,5 +1,32 @@
 # Performance hotspot inventory
 
+## 0646: the cross-package copy can stop deflating the candidate twice, and the price is a second whole package in the plan
+
+Record: [0646](0646-pptx-cross-copy-candidate-retention-design.md).
+
+**Queue item 8 is measured, and the cross-package copy's remaining hotspot is
+not where callgrind says it is.** 0598 left the second candidate build in place
+and priced its deflate at 5.96 G `Ir` per lifecycle — 22% of a media-rich
+lifecycle's 26.8 G — with SHA-256 at 72%. Natively the ranking inverts: a
+scratch implementation that retains the planned archive and reuses it removes
+exactly one of the two serializations, worth **11.43% of lifecycle instructions**
+but **72.10% of the apply phase's wall clock** (339.4/337.9 ms before,
+94.4/94.5 ms after, pair spreads 0.46% and 0.12%) and **23.10% of whole-child
+native cycles** against a 0.77% A/A floor. The gap is SHA-NI: valgrind masks the
+CPUID bit, so every instruction share this area's records attribute to hashing is
+about five times its native cycle share, and deflate of the copied closure is
+correspondingly under-ranked. **Any further ranking of this path should be read
+off `perf stat`, not off the `Ir` tables.** Everything 0598 left in place stays
+in place — the eight `package_fingerprint` calls, the four
+`physical_package_fingerprint` calls and the eight captures per lifecycle are
+identical in both legs — so what the second serialization was hiding is now
+visible: **planning is the largest remaining native term** at a p50 of 311.5 ms
+against apply's 94.4 ms, and it still builds, deflates and reopens a whole
+candidate. The next item in this
+area is still 0587's PPTX-1(c) — per-part digests with a redefined
+complete-package revision — which needs a magic bump for `LPRM0001` and
+`LPCP0002` and has needed a frozen design record since change 0590.
+
 ## 0647 — the one `litchi-opc` finding 0628 left open, closed: a relationship call that establishes nothing keeps its pristine proof
 
 Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).

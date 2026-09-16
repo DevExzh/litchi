@@ -1,0 +1,24 @@
+litchi_pptx::opened::model::package_fingerprint: 56
+          56  litchi_pptx::opened::model::package_fingerprint
+litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint: 25
+          25  litchi_pptx::opened::cross_copy_plan::physical_package_fingerprint
+litchi_pptx::opened::cross_copy_plan::snapshot_physical_revision: 24
+          24  litchi_pptx::opened::cross_copy_plan::snapshot_physical_revision
+litchi_pptx::opened::cross_copy_plan::bounded_package_bytes: 12
+          12  litchi_pptx::opened::cross_copy_plan::bounded_package_bytes
+litchi_pptx::opened::cross_copy_plan::build_candidate: 12
+          12  litchi_pptx::opened::cross_copy_plan::build_candidate
+litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides: 14
+          14  litchi_pptx::opened::cross_copy_plan::prepare_cross_slide_copy_for_slides
+litchi_pptx::opened::model::capture_internal: 52
+          52  litchi_pptx::opened::model::capture_internal
+litchi_opc::pkgwriter::PackageWriter::write_to_stream: 40
+          40  litchi_opc::pkgwriter::PackageWriter::write_to_stream
+litchi_opc::package::OpcPackage::from_vec_reusing_payloads: 11
+          11  litchi_opc::package::OpcPackage::from_vec_reusing_payloads
+zlib_rs::deflate::deflate: 932
+         932  zlib_rs::deflate::deflate
+sha2::sha256::compress256: 12662
+       12662  sha2::sha256::compress256
+soapberry_zip::preserve::PreservationIndex<R>::write_to: 18
+          18  soapberry_zip::preserve::PreservationIndex<R>::write_to

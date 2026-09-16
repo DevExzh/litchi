@@ -1,0 +1,82 @@
+Gates for change 0646, run in the worktree /home/zhuhe/code/litchi-worktrees/0646
+(branch perf/0646-pptx-cross-copy-candidate-retention-design, base c7326f680).
+
+This change commits DOCUMENTATION ONLY. The Rust gates below were run with the
+scratch patch (results/change-0646/patch/) applied, because the patch is the
+artifact the record's measurements describe; the committed tree contains no
+Rust change at all, so no crate gate is reachable from what is committed.
+
+=================================================================
+=== SCRATCH TREE (patch applied) ================================
+=================================================================
+
+=== cargo fmt --all --check
+(no output)
+[exit 0]
+
+=== cargo clippy -p litchi-pptx -p litchi-opc --all-targets
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.45s
+[exit 0]
+(Workspace lints are deny. Two findings were raised by an earlier revision of
+the scratch and fixed before it was measured: `clippy::too_many_arguments` on
+`build_candidate` at 13/12 arguments, which is why the archive decision is
+passed as one `CandidateArchive` enum, and a `cargo fmt` diff.)
+
+=== cargo doc -p litchi-pptx -p litchi-opc --no-deps
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0646/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.57s
+   Generated /home/zhuhe/code/litchi-worktrees/0646/target/doc/litchi_opc/index.html and 1 other file
+[exit 0]
+(rustdoc lints are deny)
+
+=== cargo test -p litchi-pptx          (debug; the debug_assert re-serializes
+                                        the candidate on every retained reuse)
+874 passed, 0 failed, 2 ignored, across 77 test binaries
+(untouched before checkout of c7326f680: 871 passed, 0 failed, 2 ignored,
+ across 77 test binaries; the difference is the three binding-proof tests the
+ patch adds)
+[exit 0]
+
+=== cargo test -p litchi-pptx --release --lib retention_scratch -- --nocapture
+SCRATCH-0646 substituted-archive outcome: Err(Invalid("cross-slide candidate did not publish the reserved slide identity"))
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 563 filtered out
+[exit 0]
+
+=== cargo test -p litchi-opc
+707 passed, 0 failed, 1 ignored, across 26 test binaries
+[exit 0]
+
+=================================================================
+=== COMMITTED TREE (documentation only) =========================
+=================================================================
+
+=== python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+[exit 0]
+(this record registers no claim: performance_claim: none)
+
+=== python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode structural
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+[exit 2]
+PRE-EXISTING. Reproduced verbatim on the untouched before checkout at
+/home/zhuhe/code/litchi-worktrees/before-c7326f680:
+  INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+  [exit 2]
+Change 0643 recorded the same failure at the same base. This change touches no
+litchi-xlsx file and registers no claim.
+
+=== python3 tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+[exit 0]
+
+=== NOT RUN
+tools/non_iwork_gate.py, cargo test -p litchi --features docx,xlsx,pptx,xls and
+the tools/perf-baseline suite: the committed tree changes no Rust source, so no
+consumer of any crate can be affected by what is committed. The scratch patch
+they would have covered is exercised by the litchi-pptx and litchi-opc suites
+above and by the harness's ten untimed corpus gates, which run before every one
+of the measured selector runs in both legs.
