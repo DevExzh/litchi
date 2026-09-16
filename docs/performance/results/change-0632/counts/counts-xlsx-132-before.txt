@@ -1,0 +1,14 @@
+fixture=test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx bytes=654688 members=132 cd_offset=644942 cd_size=9724 eocd=654666
+  [open] allocs=5338 alloc_bytes=2312260 version_calls=4
+  open: requests=10 bytes=26066 :: eocd/tail=1/22B cd-probe(46)=1/46B central-dir=1/9724B run-span=4/14718B local-window(<=640)=3/1556B
+  [first read of /xl/worksheets/sheet1.xml (4381 B decoded)] allocs=29 alloc_bytes=87659 version_calls=4
+  first read of /xl/worksheets/sheet1.xml (4381 B decoded): requests=1 bytes=1305 :: member-span=1/1305B
+  [second read of same part] allocs=5 alloc_bytes=204 version_calls=2
+  second read of same part: requests=0 bytes=0 :: 
+  [flate2 DeflateDecoder::new alone] allocs=2 alloc_bytes=80320
+  [all 90 parts, physical order (after open)] allocs=6076 alloc_bytes=9338945 version_calls=364
+  all 90 parts, physical order (after open): requests=90 bytes=628668 :: member-span=61/620758B local-window(<=640)=29/7910B
+  [all 90 parts, reverse physical order (after open)] allocs=5899 alloc_bytes=9249282 version_calls=364
+  all 90 parts, reverse physical order (after open): requests=90 bytes=628668 :: local-window(<=640)=29/7910B member-span=61/620758B
+  [stream_to of /xl/worksheets/sheet1.xml (4381 B)] allocs=5211 alloc_bytes=1056699 version_calls=54
+  stream_to of /xl/worksheets/sheet1.xml (4381 B): requests=21 bytes=1875 :: local-window(<=640)=1/54B local-fixed(30)=19/570B payload=1/1251B

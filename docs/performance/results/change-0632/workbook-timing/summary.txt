@@ -1,0 +1,44 @@
+== test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx
+   A1: requests=10..10 bytes=26066 p50=11338.9us mean=11337.5 p95=11371.9 p99=11391.6
+   B1: requests=9..9 bytes=26020 p50=10265.4us mean=10261.8 p95=10291.9 p99=10302.1
+   B2: requests=9..9 bytes=26020 p50=10249.5us mean=10284.6 p95=10293.2 p99=10302.8
+   A2: requests=10..10 bytes=26066 p50=11320.5us mean=11315.8 p95=11353.7 p99=11364.0
+   A3: requests=10..10 bytes=26066 p50=11365.0us mean=11362.9 p95=11413.8 p99=11424.1
+   A4: requests=10..10 bytes=26066 p50=11387.8us mean=11435.4 p95=11426.8 p99=11503.5
+   A1->B1 p50 -9.47%   A2->B2 p50 -9.46%
+   floor A3->A4 p50 +0.20%   floor A1->A2 p50 -0.16%   floor B1->B2 p50 -0.15%
+   saving A1-B1 1.07 ms   A2-B2 1.07 ms
+
+== test-data/ooxml/pptx/shapes.pptx
+   A1: requests=6..6 bytes=11191 p50=6630.9us mean=6630.1 p95=6642.3 p99=6663.3
+   B1: requests=5..5 bytes=11145 p50=5566.6us mean=5626.9 p95=5588.4 p99=6167.1
+   B2: requests=5..5 bytes=11145 p50=5567.6us mean=5563.4 p95=5573.9 p99=5576.0
+   A2: requests=6..6 bytes=11191 p50=6633.3us mean=6634.0 p95=6659.7 p99=6671.0
+   A3: requests=6..6 bytes=11191 p50=6635.7us mean=6636.3 p95=6668.5 p99=6733.7
+   A4: requests=6..6 bytes=11191 p50=6636.6us mean=6634.7 p95=6662.0 p99=6682.7
+   A1->B1 p50 -16.05%   A2->B2 p50 -16.07%
+   floor A3->A4 p50 +0.01%   floor A1->A2 p50 +0.04%   floor B1->B2 p50 +0.02%
+   saving A1-B1 1.06 ms   A2-B2 1.07 ms
+
+== test-data/ooxml/pptx/shape-soft-edges.pptx
+   A1: requests=8..8 bytes=12859 p50=8824.2us mean=8862.4 p95=8854.5 p99=8879.5
+   B1: requests=7..7 bytes=12813 p50=7764.5us mean=7760.5 p95=7783.0 p99=7794.9
+   B2: requests=7..7 bytes=12813 p50=7769.5us mean=7765.2 p95=7789.7 p99=7793.7
+   A2: requests=8..8 bytes=12859 p50=8838.2us mean=8837.0 p95=8865.7 p99=8893.5
+   A3: requests=8..8 bytes=12859 p50=8865.2us mean=8880.6 p95=8950.7 p99=8971.2
+   A4: requests=8..8 bytes=12859 p50=8838.0us mean=8838.7 p95=8888.2 p99=8946.9
+   A1->B1 p50 -12.01%   A2->B2 p50 -12.09%
+   floor A3->A4 p50 -0.31%   floor A1->A2 p50 +0.16%   floor B1->B2 p50 +0.06%
+   saving A1-B1 1.06 ms   A2-B2 1.07 ms
+
+== test-data/ooxml/docx/comment.docx
+   A1: requests=6..6 bytes=1690 p50=6389.2us mean=6380.7 p95=6396.8 p99=6400.8
+   B1: requests=5..5 bytes=1644 p50=5332.7us mean=5331.8 p95=5339.3 p99=5343.5
+   B2: requests=5..5 bytes=1644 p50=5331.5us mean=5398.2 p95=5350.0 p99=6564.9
+   A2: requests=6..6 bytes=1690 p50=6387.8us mean=6379.7 p95=6399.2 p99=6409.6
+   A3: requests=6..6 bytes=1690 p50=6384.8us mean=6378.3 p95=6397.6 p99=6407.8
+   A4: requests=6..6 bytes=1690 p50=6390.4us mean=6381.4 p95=6398.2 p99=6400.3
+   A1->B1 p50 -16.54%   A2->B2 p50 -16.54%
+   floor A3->A4 p50 +0.09%   floor A1->A2 p50 -0.02%   floor B1->B2 p50 -0.02%
+   saving A1-B1 1.06 ms   A2-B2 1.06 ms
+

@@ -1,0 +1,11 @@
+Change 0632 read-grammar differential — corpus and report identity
+
+inputs exercised (from classification-summary.json): 22875
+report lines per leg: 3801502
+member verdicts examined: 2886786
+
+cmp report-before.txt report-after.txt:
+  IDENTICAL (byte for byte)
+
+358e306f37bc5e5e0a400847fa1b258278bd62f1cc365b971a59ef385743c894  report-before.txt
+358e306f37bc5e5e0a400847fa1b258278bd62f1cc365b971a59ef385743c894  report-after.txt

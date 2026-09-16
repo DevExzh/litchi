@@ -1,0 +1,4 @@
+{"fixture":"test-data/ooxml/xlsx/ConditionalFormattingSamples.xlsx","samples":60,"p50_us":10249.5,"mean_us":10284.6,"p95_us":10293.2,"p99_us":10302.8,"requests_min":9,"requests_max":9,"physical_min":9,"physical_max":9,"bytes_min":26020,"bytes_max":26020}
+{"fixture":"test-data/ooxml/pptx/shapes.pptx","samples":60,"p50_us":5567.6,"mean_us":5563.4,"p95_us":5573.9,"p99_us":5576.0,"requests_min":5,"requests_max":5,"physical_min":5,"physical_max":5,"bytes_min":11145,"bytes_max":11145}
+{"fixture":"test-data/ooxml/pptx/shape-soft-edges.pptx","samples":60,"p50_us":7769.5,"mean_us":7765.2,"p95_us":7789.7,"p99_us":7793.7,"requests_min":7,"requests_max":7,"physical_min":7,"physical_max":7,"bytes_min":12813,"bytes_max":12813}
+{"fixture":"test-data/ooxml/docx/comment.docx","samples":60,"p50_us":5331.5,"mean_us":5398.2,"p95_us":5350.0,"p99_us":6564.9,"requests_min":5,"requests_max":5,"physical_min":5,"physical_max":5,"bytes_min":1644,"bytes_max":1644}

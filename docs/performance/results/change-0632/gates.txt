@@ -1,0 +1,292 @@
+
+================================================================
+### cargo fmt --all --check
+================================================================
+--- exit 0 ---
+
+================================================================
+### cargo clippy -p soapberry-zip --all-targets -j 6
+================================================================
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0632/crates/soapberry-zip)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.57s
+--- exit 0 ---
+
+================================================================
+### cargo doc -p soapberry-zip --no-deps -j 6
+================================================================
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0632/crates/soapberry-zip)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.87s
+   Generated /home/zhuhe/code/litchi-worktrees/0632/target/doc/soapberry_zip/index.html
+--- exit 0 ---
+
+================================================================
+### cargo test -p soapberry-zip -j 6
+================================================================
+test crates/soapberry-zip/src/archive.rs - archive::ZipSliceArchive (line 102) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipFileHeaderRecord<'a>::extra_fields (line 3768) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<()>::from_seekable (line 1693) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::eocd_offset (line 1896) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive (line 1644) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_reader (line 624) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 566) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_file (line 574) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriterBuilder::with_offset (line 487) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_dir (line 1697) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::locate_in_slice (line 531) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::new_file (line 1803) ... ok
+test crates/soapberry-zip/src/time.rs - time::ZipDateTime<TZ>::from_components (line 278) ... ok
+test crates/soapberry-zip/src/time.rs - time (line 17) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter<W>::stream_offset (line 892) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipArchiveWriter (line 580) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::extra_field (line 1066) ... ok
+test crates/soapberry-zip/src/locator.rs - locator::ZipLocator::max_search_space (line 388) ... ok
+test crates/soapberry-zip/src/archive.rs - archive::ZipArchive<R>::comment (line 1863) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1195) ... ok
+test crates/soapberry-zip/src/path.rs - path (line 45) ... ok
+test crates/soapberry-zip/src/writer.rs - writer::ZipFileBuilder<'archive,'_,W>::start (line 1182) ... ok
+
+test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-opc -j 6
+================================================================
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 992) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 1054) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 248) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 1080) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 1001) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.40s; merged doctests compilation took 0.40s
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-opc --all-features -j 6
+================================================================
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests litchi_opc
+
+running 5 tests
+test crates/litchi-opc/src/package.rs - package::OpcPackage::next_partname (line 992) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::open (line 248) - compile ... ok
+test crates/litchi-opc/src/pkgwriter.rs - pkgwriter::PackageWriter (line 1001) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::save (line 1054) - compile ... ok
+test crates/litchi-opc/src/package.rs - package::OpcPackage::to_stream (line 1080) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.42s; merged doctests compilation took 0.41s
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-xlsx -p litchi-docx -p litchi-pptx -j 6
+================================================================
+test crates/litchi-pptx/src/shape/theme/part.rs - shape::theme::part::Part<'a>::read (line 80) ... ignored
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::linear_gradient (line 225) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+all doctests ran in 4.04s; merged doctests compilation took 3.75s
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 1.91s; merged doctests compilation took 1.90s
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-ooxml-common -p litchi-core -j 6
+================================================================
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::to_hex (line 175) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::to_inches (line 211) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::hex_encode_lower (line 128) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::new (line 50) ... ok
+test crates/litchi-core/src/unit.rs - unit::Length::from_str (line 283) ... ok
+test crates/litchi-core/src/xml/escape.rs - xml::escape::escape_xml (line 11) ... ok
+test crates/litchi-core/src/xml/escape.rs - xml::escape::unescape_xml (line 74) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_cm (line 79) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor::from_name (line 127) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_inches (line 54) ... ok
+test crates/litchi-core/src/simd/cmp.rs - simd::cmp::is_all_zero (line 2206) ... ok
+test crates/litchi-core/src/simd/fmt.rs - simd::fmt::format_hex_with_separator (line 634) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length::from_emus (line 39) ... ok
+test crates/litchi-core/src/style/color.rs - style::color::RGBColor (line 12) ... ok
+test crates/litchi-core/src/style/len.rs - style::len::Length (line 12) ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 0.30s; merged doctests compilation took 0.29s
+   Doc-tests litchi_ooxml_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi --features docx,xlsx,pptx,xls -j 6
+================================================================
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation (line 87) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::from_bytes (line 740) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::metadata (line 1438) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::open (line 555) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_count (line 1047) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_height (line 1391) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_width (line 1346) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slides (line 1156) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::text (line 988) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::name (line 146) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::number (line 66) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::shape_count (line 115) - compile ... ok
+test crates/litchi/src/sheet/text/mod.rs - sheet::text (line 16) ... ignored
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::text (line 38) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook (line 219) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::from_bytes (line 385) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::metadata (line 849) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::open (line 304) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::text (line 722) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 5.64s; merged doctests compilation took 5.64s
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-odt -p litchi-odf-common -j 6
+================================================================
+test crates/litchi-odt/src/mutable/semantic/mod.rs - mutable::semantic (line 7) - compile ... ok
+test crates/litchi-odt/src/elements/style_builder.rs - elements::style_builder::StyleBuilder (line 16) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::new (line 108) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_int (line 246) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_float (line 294) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_color (line 388) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_bool (line 217) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_paragraph_element (line 902) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_rich_paragraph (line 797) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_list_element (line 953) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_paragraph (line 721) ... ok
+test crates/litchi-odt/src/elements/attr_parser.rs - elements::attr_parser::parse_length (line 324) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_bulleted_list (line 836) ... ok
+test crates/litchi-odt/src/streaming.rs - streaming (line 12) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::extract_local_name (line 433) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::is_namespace (line 490) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::extract_prefix (line 412) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::set_metadata (line 699) ... ok
+test crates/litchi-odt/src/elements/tag_matcher.rs - elements::tag_matcher::match_tag (line 466) ... ok
+test crates/litchi-odt/src/builder/model.rs - builder::model::Builder::add_numbered_list (line 868) ... ok
+test crates/litchi-odt/src/mutable/model.rs - mutable::model::MutableDocument::new (line 46) ... ok
+
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+all doctests ran in 0.82s; merged doctests compilation took 0.79s
+--- exit 0 ---
+
+================================================================
+### cargo test -p litchi-odc -p litchi-odg -p litchi-odp -p litchi-oth -p litchi-odf-formula -p litchi-ppt -p litchi-sign -p litchi-iwa-archive -j 6
+================================================================
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation (line 120) - compile ... ok
+test crates/litchi-ppt/src/shapes/picture.rs - shapes::picture::PictureShape (line 39) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new (line 521) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new_borrowed (line 561) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::set_text_margins (line 647) ... ignored
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::presentation (line 144) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation::images (line 1278) - compile ... ok
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.53s; merged doctests compilation took 0.53s
+   Doc-tests litchi_sign
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- exit 0 ---
+
+================================================================
+### cargo test -j 6
+================================================================
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_filesystem.rs (target/debug/deps/xlsx_filesystem-51522a9b7ae73075)
+
+running 4 tests
+test xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible ... ok
+test xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children ... ok
+test xlsx_repeated_store_reacquisition_controls_report_structural_scope ... ok
+test xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.25s
+
+     Running tests/xlsx_planning_allocations.rs (target/debug/deps/xlsx_planning_allocations-69d3afe3c5b1b9cd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+--- exit 0 ---
+
+all gates done

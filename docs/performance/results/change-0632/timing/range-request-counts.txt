@@ -1,0 +1,41 @@
+Physical request and byte counts per timed iteration, from the transport
+simulator's own counters.  Deterministic: min == max across all 30 samples
+of every leg.
+
+case                                     corpus                    leg   requests        bytes
+opc_range_source_open                    tiny-compressible          A1          4          987
+opc_range_source_open_main_read          tiny-compressible          A1          5         1142
+xlsx_range_source_open                   xlsx-tiny                  A1          6         1875
+xlsx_range_source_first_cell             xlsx-tiny                  A1         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  A1          0            0
+xls_range_source_open                    xls-real-file              A1         16       110242
+opc_range_source_open                    tiny-compressible          B1          3          941
+opc_range_source_open_main_read          tiny-compressible          B1          4         1096
+xlsx_range_source_open                   xlsx-tiny                  B1          5         1829
+xlsx_range_source_first_cell             xlsx-tiny                  B1         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  B1          0            0
+xls_range_source_open                    xls-real-file              B1         16       110242
+opc_range_source_open                    tiny-compressible          B2          3          941
+opc_range_source_open_main_read          tiny-compressible          B2          4         1096
+xlsx_range_source_open                   xlsx-tiny                  B2          5         1829
+xlsx_range_source_first_cell             xlsx-tiny                  B2         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  B2          0            0
+xls_range_source_open                    xls-real-file              B2         16       110242
+opc_range_source_open                    tiny-compressible          A2          4          987
+opc_range_source_open_main_read          tiny-compressible          A2          5         1142
+xlsx_range_source_open                   xlsx-tiny                  A2          6         1875
+xlsx_range_source_first_cell             xlsx-tiny                  A2         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  A2          0            0
+xls_range_source_open                    xls-real-file              A2         16       110242
+opc_range_source_open                    tiny-compressible          A3          4          987
+opc_range_source_open_main_read          tiny-compressible          A3          5         1142
+xlsx_range_source_open                   xlsx-tiny                  A3          6         1875
+xlsx_range_source_first_cell             xlsx-tiny                  A3         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  A3          0            0
+xls_range_source_open                    xls-real-file              A3         16       110242
+opc_range_source_open                    tiny-compressible          A4          4          987
+opc_range_source_open_main_read          tiny-compressible          A4          5         1142
+xlsx_range_source_open                   xlsx-tiny                  A4          6         1875
+xlsx_range_source_first_cell             xlsx-tiny                  A4         10          666
+xlsx_range_source_list_sheets            xlsx-tiny                  A4          0            0
+xls_range_source_open                    xls-real-file              A4         16       110242

@@ -1,0 +1,11 @@
+[package]
+name = "opc-open-oracle"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-core = { path = "@TREE@/crates/litchi-core" }
+litchi-opc = { path = "@TREE@/crates/litchi-opc" }
+
+[workspace]
