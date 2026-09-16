@@ -1,5 +1,38 @@
 # Performance program phase report
 
+## 0647 — the frozen design that measured its way into an implementation
+
+Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).
+
+Change 0628 ended with one unfixed `litchi-opc` finding and an explicit reason:
+making `Relationships::get_or_add` keep change 0593's open-time capture on a
+reuse would turn a reserialized `.rels` member back into a copied one, and
+wherever the source spelling differs from the canonical serialization that is a
+published-byte change. The brief for 0647 asked for a frozen design record and an
+implementation only if the corpus showed zero fixtures whose bytes would move.
+The corpus shows that, but not for the reason anyone expected. **The byte
+consequence does not exist at all**, because the route the capture short-circuits
+does not publish the canonical bytes it builds: `try_write_preserved` compares
+them against the same open-time canonical capture and, when they are equal,
+takes `PreservationAction::Copy` of the source archive entry — the source
+spelling, its compression method and its local framing, verbatim. The pristine
+route takes the identical action. So a non-canonically spelled `.rels` already
+republishes as the source's own bytes today, and the capture only decides whether
+the canonical form is built and audited before that conclusion is reached. The
+full-writer route is symmetric: `materialize_pristine` serializes and audits
+every pristine member before `write` emits a byte, so that route emits the
+canonical form on both legs. The implementation is one `match` in
+`add_relationship`, not in `get_or_add`: the entry now decides both the value and
+the proof, so the collection changes if and only if the capture is dropped, and
+the reuse path stops building and discarding a `Relationship`. The evidence is
+three corpus sweeps with empty cross-leg `diff`s — 6,281 reuse publications over
+334 fixtures, 2,216 spelling comparisons, and the DOCX ordinary route over 63
+fixtures — plus four in-crate integration tests that pin the equality on a fixture
+whose members are *provably* non-canonically spelled, so the tests cannot
+silently stop testing the thing they were written for. The record states what is
+not bought: nothing on a format's ordinary save today, and two refusals skipped
+on a path no fixture reaches. `performance_claim: none`.
+
 ## 0645 — the memoized per-part revision proof, sized and frozen
 
 Change 0645 designs and prices, without implementing, the memoized per-part revision proof that change 0590 deferred. The proof becomes two tiers: `Dᵇ(b) = H("litchi-pptx-opened-payload-v2" ‖ len ‖ b)`, memoized inside `Snapshot` by `(payload address, length)` with the `Arc` retained; `Dᵖ(p) = H("litchi-pptx-opened-part-v2" ‖ name ‖ content type ‖ Dᵇ ‖ relationships)`, recomputed every pass; and the revision `H("litchi-pptx-opened-v2" ‖ root relationships ‖ non-part members ‖ "parts" ‖ u32 count ‖ Dᵖ(p₁) ‖ … )`. The payload tier is separate because content type and relationships are not behind the blob `Arc`; memoizing the whole per-part digest on that key would answer staleley for a part whose relationships changed. The retained `Arc` is load-bearing, not an optimization: without it the address key is an ABA hazard. `Part` is a public trait whose `blob_arc()` need not agree with `blob()` — `litchi-opc` already guards this at `package.rs:435` — so the memo applies the same alias test and simply never memoizes a part that fails it. **Verdicts are preserved and proved so**: the revision is a function of exactly the v1 input tuple, the new encoding is self-delimiting and therefore injective, the part order is canonical because OPC part names are unique, and every in-crate verdict is `R(A) == R(B)` for two packages in one build — so a valid application applies, a stale one conflicts with the identical `Error::UnsafeEdit`, and an exact no-op still compares equal. A pairwise oracle over an 11-package corpus (base, byte-identical re-allocation, nine single-input mutations including a payload transposition) agrees with `packages_equal` and with the v1 revision on all **121 ordered pairs, 0 disagreements**, and the whole crate suite passes under the redefined hash — **874 passed, 0 failed**, plus **266** in the facade — which is itself evidence that nothing but a persisted patch depends on the value. **Measured** by callgrind isolation pair on CPU 20: per lifecycle `pptx_eager_batch_edit_save` **−26.15%**, `pptx_eager_multi_slide_batch_edit_save` −26.03%, `pptx_slide_move_boundary_save` −6.92%, `pptx_slide_remove_boundary_save` **+2.45%**; natively −4.93%/−4.58% cycles on the two eager selectors against A/A floors of −1.11%/−0.81%, with p50 −7.34%/−7.30% against ±0.55% floors. The two boundary selectors ran in a window whose own floors (B/B p50 −10.17% on the move selector) are wider than the effect, so their counts are the result and their wall clock is not. The scratch implementation passed `cargo fmt --all --check`, Clippy and rustdoc on `litchi-pptx` and is retained as a patch; the branch changes documentation only. No speedup, latency, cold-cache, allocation, RSS or real-producer claim follows. See [Change 0645](0645-pptx-memoized-revision-proof-design.md); `performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.

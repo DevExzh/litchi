@@ -1,5 +1,58 @@
 # Performance hotspot inventory
 
+## 0647 — the one `litchi-opc` finding 0628 left open, closed: a relationship call that establishes nothing keeps its pristine proof
+
+Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).
+
+**0628's parting finding is fixed, and the contract question it stopped for
+turns out to have been answered already by the code that fix
+replaces.** `Relationships::get_or_add` reuses an existing relationship by
+handing the established identifier to `add_relationship`, whose first statement
+was `self.invalidate_source_capture()` — so a call that establishes nothing
+destroyed change 0593's open-time proof, and a `.rels` member 0593 would have
+copied verbatim was reserialized, audited and byte-compared instead. 0628
+declined to fix it because keeping the proof looked byte-visible: wherever the
+source spelling of a `.rels` member differs from this crate's canonical
+serialization, the published bytes would move from canonical to source. **The
+corpus says that would be almost everywhere and the code says it happens
+nowhere.** A probe over all 336 OOXML fixtures finds **2,189 of 2,216
+relationships members spelled differently from canonical (98.78%)**, carrying
+6,214 of the corpus's 6,281 internal relationships; and a second probe performs
+all **6,281 reuse calls**, publishes each one and its seam-only baseline through
+the owned-source route, and finds **6,281 of 6,281 byte-identical** with
+**0 differing**, on both legs, with an **empty cross-leg `diff`** over per-fixture
+rolling SHA-256 digests. The reason is in `try_write_preserved`: the
+serialize-and-compare branch compares the canonical bytes it just built against
+the *same* open-time capture and, on equality, takes
+`PreservationAction::Copy` of the **source** archive entry — precisely what the
+pristine branch takes. The fix is one `match`: `add_relationship` destructures
+`self`, and only the vacant arm inserts and only the vacant arm clears the
+capture, which also keeps the argument strings out of the occupied path. Per
+save of the 132-member `ConditionalFormattingSamples.xlsx` with one reusing
+call, `try_to_xml_bytes` falls **42 → 41**, `verify_authored` **1 → 0**, a part
+owner's `rels_uri` **225 → 224**, save allocations **402 → 363** (package owner)
+and **523 → 363** (`drawing1.xml` owner), and the canonical `.rels` bytes built
+and discarded fall **733 → 0** and **2,260 → 0**. Instructions per open + reuse +
+save fall **−0.078%** and **−0.450%** against seam-only controls that move
+−0.030% and −0.008% on recompile alone; the *marginal* cost of the reusing call
+over a bare seam falls **+23,176 → +10,294** and **+109,387 → −7,363**
+instructions. Paired p50 is −0.69% (package) and −1.40% (drawing, second window)
+against A/A floors under 0.09%, but the removed work is only 0.08–0.45% of the
+scenario, so no timing claim is made; the drawing scenario's first window is
+reported with a **+11.70% mean and +230.79% p99 regression** traced to one
+contaminated block at load average 39 and chased by the re-run. **What this does
+*not* buy today** is anything on a format's ordinary save: the DOCX route,
+measured over 63 fixtures, publishes byte-identically on both legs, because its
+save rebuilds `word/document.xml` into a fresh `BlobPart` that never carried a
+capture, and 23 members across 52 published packages — 21 of them
+`word/_rels/document.xml.rels` — are regenerated for that reason both before and
+after. The gain is at the `litchi-opc` seam —
+`Part::relate_to` and `OpcPackage::relate_to` are public — and, per an audit of
+every production call site, at two `litchi-xlsb` "ensure" helpers that guard on
+the part rather than the relationship. `performance_claim: none`. OLE2/OOXML
+remain active; ODF is deferred until completion and iWork excluded.
+[Retained evidence](results/change-0647/README.md).
+
 ## 0645 — the PPTX memoized revision proof, frozen: 26% of a lifecycle, a durable format bump, and one selector made slower
 
 Item 7 of the 0630 queue — part (c) of PPTX-1, the part change 0590 declined because `package_fingerprint` is serialized into the durable `LPRM0001` and `LPCP0002` headers — is now designed and sized, with no production change. The design is a two-tier proof: a payload digest memoized inside `Snapshot` under a `HashMap<(payload address, length), (Arc<Vec<u8>>, [u8; 32])>`, and a per-part digest over the name, content type, payload digest and relationships, with the revision a hash over the sorted per-part digests under `litchi-pptx-opened-v2`. Sized by a scratch implementation in the measurement worktree (retained as patches, never committed), pinned to CPU 20, isolation pairs at `--samples 1` and `3`: a `pptx_eager_batch_edit_save` lifecycle falls **10,458,591,613 → 7,723,437,449 `Ir`, −26.15%**, with its complete-package fingerprint subtree **3,678,478,705 → 944,205,414, −74.33%**, and `pptx_eager_multi_slide_batch_edit_save` −26.03%; that confirms 0590's modelled "about 2.5 G `Ir`, 23%" at **2.735 G `Ir`, 26.15%**. A probe build counts what the memo answers: **228 of 229 parts and 17,564,938 of 17,568,429 payload bytes**, so a memoized fingerprint feeds 93,763 bytes against 17,668,953 — **0.53%**. Natively the same window gives **−4.93% and −4.58% cycles** against A/A floors of −1.11% and −0.81%, and p50 **−7.34%/−7.30%** against ±0.55% floors; callgrind runs SHA-256 in software, so its 26% is 2.3–2.5% of native instructions and the cycles are the number to believe. Two results bound the design. First, the memo is worth this only if the **facade carries it**: with the memo on `Snapshot` alone the same lifecycle falls only **−8.63%**, because two of the four fingerprints belong to `Package::apply_opened_presentation_patch`, the public durable-patch route, which holds no snapshot. Second, the tiering has a **flat per-part cost** — `+3,100,432 Ir` per cold fingerprint of the 229-part deck (+0.39%), `+305,752 Ir` per fingerprint of the 25-member boundary deck, about **13,539 `Ir` per part** — so `pptx_slide_remove_boundary_save`, which issues nine fingerprints per lifecycle and reuses none, is **+2.41%/+2.45%** in instructions (+0.43% cycles, inside its −0.85% A/A floor). The break-even is roughly 280 payload bytes per part at this host's callgrind price. Frozen behind nine admission gates, the first of which is the `LPRM0002`/`LPCP0003` bump and its typed refusal. `performance_claim: none`; no production change. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0645-pptx-memoized-revision-proof-design.md); [retained evidence](results/change-0645/README.md).

@@ -1,0 +1,141 @@
+Gates — change 0647
+===================
+
+All gates run in /home/zhuhe/code/litchi-worktrees/0647 (branch
+perf/0647-opc-get-or-add-noop-reuse-design, base
+c7326f68065edf6f2198ca3cb39c38c48cf00ed9), rustc 1.95.0, cargo 1.95.0, on an
+AMD EPYC 9R45 with eight agents building and testing concurrently.
+
+Only crates/litchi-opc is touched, so every crate that depends on litchi-opc
+was tested (litchi-ooxml-common, litchi-docx, litchi-xlsx, litchi-pptx,
+litchi-xlsb, litchi-ppt, litchi-spreadsheet-drawing, litchi), plus the two gaps
+the first wave identified: a feature-bearing `cargo test -p litchi --features
+docx,xlsx,pptx,xls` and the harness's own suite in tools/perf-baseline.
+
+No pre-existing failure was encountered. The
+source_backed_batch::batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers
+race that change 0628 recorded as pre-existing passed on this run.
+
+====================================================================
+$ cargo fmt --all --check
+exit=0
+
+====================================================================
+$ cargo clippy -p litchi-opc --all-targets    # workspace lints are deny
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0647/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.49s
+exit=0
+
+====================================================================
+$ cargo doc -p litchi-opc --no-deps               # rustdoc lints are deny
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0647/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.27s
+   Generated /home/zhuhe/code/litchi-worktrees/0647/target/doc/litchi_opc/index.html
+exit=0
+
+====================================================================
+$ cargo test -p litchi-opc --no-fail-fast
+  test binaries run : 26
+  tests passed      : 712
+  'FAILED' results  : 0
+all doctests ran in 0.33s; merged doctests compilation took 0.33s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-ooxml-common --no-fail-fast
+  test binaries run : 6
+  tests passed      : 261
+  'FAILED' results  : 0
+
+exit=0
+
+====================================================================
+$ cargo test -p litchi-docx --no-fail-fast
+  test binaries run : 51
+  tests passed      : 1465
+  'FAILED' results  : 0
+all doctests ran in 0.79s; merged doctests compilation took 0.79s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-xlsx --no-fail-fast
+  test binaries run : 59
+  tests passed      : 1308
+  'FAILED' results  : 0
+all doctests ran in 0.27s; merged doctests compilation took 0.27s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-pptx --no-fail-fast
+  test binaries run : 75
+  tests passed      : 871
+  'FAILED' results  : 0
+all doctests ran in 0.39s; merged doctests compilation took 0.31s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-xlsb --no-fail-fast
+  test binaries run : 15
+  tests passed      : 730
+  'FAILED' results  : 0
+all doctests ran in 0.95s; merged doctests compilation took 0.83s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-ppt --no-fail-fast
+  test binaries run : 31
+  tests passed      : 1212
+  'FAILED' results  : 0
+all doctests ran in 0.43s; merged doctests compilation took 0.43s
+exit=0
+
+====================================================================
+$ cargo test -p litchi-spreadsheet-drawing --no-fail-fast
+  test binaries run : 2
+  tests passed      : 24
+  'FAILED' results  : 0
+all doctests ran in 0.07s; merged doctests compilation took 0.07s
+exit=0
+
+====================================================================
+$ cargo test -p litchi --features docx,xlsx,pptx,xls --no-fail-fast
+  test binaries run : 25
+  tests passed      : 266
+  'FAILED' results  : 0
+all doctests ran in 0.53s; merged doctests compilation took 0.53s
+exit=0
+
+====================================================================
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --no-fail-fast
+  test binaries run : 18
+  tests passed      : 531
+  'FAILED' results  : 0
+
+exit=0
+
+====================================================================
+Differential and corpus checks the record cites
+====================================================================
+
+$ diff differential/reuse-before.txt differential/reuse-after.txt
+  empty — 6,281 reuse publications over 334 fixtures, per-fixture rolling
+  SHA-256 digests over every baseline and every reuse outcome, identical.
+  Totals on both legs:
+    owners_probed=2190  pairs_probed=6281  pairs_same=6281  pairs_diff=0
+    reuse_fired=6281    unexpected_growth=0
+    baseline_refusals=96  reuse_refusals=260
+    refusals: PreservationUnavailable 49/133, SignedSourceRequiresExplicitPolicy 47/127
+
+$ diff differential/spelling-before.txt differential/spelling-after.txt
+  empty — 2,216 relationships members, 27 canonical, 2,189 differing,
+  6,281 internal relationships, largest member 43 Relationship elements.
+
+$ diff differential/docx-route-before.txt differential/docx-route-after.txt
+  empty — the documented DOCX open/edit/save route over 63 .docx-family
+  fixtures: 55 opened, 53 edited, 52 published, 141 source relationships
+  members, 118 kept, 23 moved (21 word/_rels/document.xml.rels, 2 _rels/.rels),
+  0 absent, identical publication digests on both legs.
+
+$ diff counts/counts-before.txt counts/counts-after.txt
+  differs only in the allocation columns; every 'published bytes' and every
+  'sha256' is identical on both legs for all five (fixture, owner) pairs.

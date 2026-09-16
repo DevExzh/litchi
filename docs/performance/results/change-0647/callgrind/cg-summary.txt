@@ -1,0 +1,13 @@
+package before n=1 Ir=50912790
+drawing before n=1 Ir=51027816
+seamonly before n=1 Ir=50874757
+package before n=11 Ir=314941387
+drawing before n=11 Ir=315111145
+seamonly before n=11 Ir=314671593
+package after n=1 Ir=50904474
+drawing after n=1 Ir=50904843
+seamonly after n=1 Ir=50877904
+package after n=11 Ir=314726122
+drawing after n=11 Ir=313800501
+seamonly after n=11 Ir=314596612
+DONE

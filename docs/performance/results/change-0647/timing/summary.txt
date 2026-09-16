@@ -1,0 +1,48 @@
+### timing-package
+before     n=1000  p50=   1552.21us mean=   1557.61us p95=   1592.76us p99=   1681.48us
+after      n=1000  p50=   1541.53us mean=   1542.90us p95=   1558.16us p99=   1574.68us
+floor-a    n=1000  p50=   1548.22us mean=   1549.35us p95=   1562.57us p99=   1585.26us
+floor-b    n=1000  p50=   1547.55us mean=   1547.37us p95=   1556.51us p99=   1562.46us
+after relative to before:
+  p50     -0.69% (inverse   +0.69%)
+  mean    -0.95% (inverse   +0.95%)
+  p95     -2.17% (inverse   +2.22%)
+  p99     -6.35% (inverse   +6.78%)
+A/A floor (floor-b relative to floor-a):
+  p50     -0.04% (inverse   +0.04%)
+  mean    -0.13% (inverse   +0.13%)
+  p95     -0.39% (inverse   +0.39%)
+  p99     -1.44% (inverse   +1.46%)
+
+### timing-drawing
+before     n=1000  p50=   1552.77us mean=   1553.32us p95=   1563.34us p99=   1580.22us
+after      n=1000  p50=   1541.12us mean=   1735.06us p95=   1786.47us p99=   5227.22us
+floor-a    n=1000  p50=   1550.56us mean=   1553.99us p95=   1561.61us p99=   1614.40us
+floor-b    n=1000  p50=   1551.99us mean=   1553.04us p95=   1564.02us p99=   1585.90us
+after relative to before:
+  p50     -0.75% (inverse   +0.76%)
+  mean   +11.70% (inverse  -10.47%)
+  p95    +14.27% (inverse  -12.49%)
+  p99   +230.79% (inverse  -69.77%)
+A/A floor (floor-b relative to floor-a):
+  p50     +0.09% (inverse   -0.09%)
+  mean    -0.06% (inverse   +0.06%)
+  p95     +0.15% (inverse   -0.15%)
+  p99     -1.77% (inverse   +1.80%)
+
+### timing-drawing-2
+before     n=1000  p50=   1552.23us mean=   1553.10us p95=   1566.15us p99=   1573.37us
+after      n=1000  p50=   1530.51us mean=   1531.56us p95=   1541.02us p99=   1565.48us
+floor-a    n=1000  p50=   1550.24us mean=   1550.09us p95=   1559.46us p99=   1564.18us
+floor-b    n=1000  p50=   1549.81us mean=   1550.41us p95=   1560.22us p99=   1571.10us
+after relative to before:
+  p50     -1.40% (inverse   +1.42%)
+  mean    -1.39% (inverse   +1.41%)
+  p95     -1.60% (inverse   +1.63%)
+  p99     -0.50% (inverse   +0.50%)
+A/A floor (floor-b relative to floor-a):
+  p50     -0.03% (inverse   +0.03%)
+  mean    +0.02% (inverse   -0.02%)
+  p95     +0.05% (inverse   -0.05%)
+  p99     +0.44% (inverse   -0.44%)
+

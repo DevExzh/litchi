@@ -1,0 +1,62 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0647",
+  "title": "A relationship call that establishes nothing keeps the open-time source capture, and the byte question it was expected to raise turns out to be already answered by the comparison it replaces",
+  "decision": "retained, implemented in litchi-opc",
+  "code_state": "crates/litchi-opc/src/rel.rs only, plus one unit test and one integration test file; no public signature, error type, limit, dependency or output byte changed; no new unsafe",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0628 reported this as the one litchi-opc finding it deliberately did not fix, because keeping the capture looked like it would move published bytes from the canonical serialization to the source spelling",
+    "the corpus measurement shows 2,189 of 2,216 relationships members are spelled differently from canonical, so the byte consequence would fire on 98.78% of the corpus if it existed; it fires on none",
+    "the reason is structural, not a corpus accident: try_write_preserved's non-pristine branch compares the canonical serialization it just built against the same open-time capture and, on equality, takes PreservationAction::Copy of the source archive entry, which is exactly what the pristine branch takes; the full-writer route materializes pristine members before write, so it emits the canonical serialization on both legs",
+    "the call establishes nothing: add_relationship's occupied entry returns the established relationship without replacing it, so the value the capture is a proof of is unchanged, and the relationship built from the arguments was discarded unobserved",
+    "value identity is proved two ways: 6,281 reuse publications over 334 fixtures are byte-identical to their seam-only baselines on both legs with an empty cross-leg diff, and four in-crate integration tests pin the same equality on a fixture whose members are provably non-canonically spelled"
+  ],
+  "accepted_evidence": {
+    "spelling_gap": "probe/src/rels_spelling.rs over 336 OOXML fixtures: 2,216 source relationships members, 27 canonical, 2,189 differing, 6,281 internal relationships, largest member 43 Relationship elements",
+    "value_identity": "probe/src/reuse_publish.rs over 336 fixtures: 2,190 collections, 6,281 reuse calls, each publishing twice through the owned-source route; 6,281/6,281 byte-identical to the seam-only baseline, 0 differing, 0 unexpected growth, 96 baseline and 260 reuse refusals of two typed kinds in identical counts on both legs; per-fixture rolling SHA-256 digests make the cross-leg diff a complete oracle and it is empty",
+    "ordinary_route": "probe/src/docx_route.rs over 63 .docx-family fixtures through the documented Package::open -> document_mut().add_paragraph_with_text -> to_stream route: 52 published, 141 source relationships members, 118 kept and 23 moved on both legs, cross-leg diff empty",
+    "call_counts": "callgrind isolation pairs, N=1 and N=11, differenced and divided by 10, four scenarios per leg on ConditionalFormattingSamples.xlsx; exact-symbol call counts for try_to_xml_bytes, verify_authored, rels_uri, add_relationship, get_or_add and reuse_candidate",
+    "allocations": "probe/src/reuse_counts.rs with a counting global allocator, five (fixture, owner) pairs, per-phase allocation and byte counts, published byte count and SHA-256 identical on both legs",
+    "instructions": "the same isolation pairs' whole-run Ir totals, with two seam-only control scenarios that execute no changed code to quantify code-layout and allocator drift",
+    "timing": "probe/src/reuse_iters.rs --timing, 500 samples per block, 20 warmup, blocks ordered A1 B1 B2 A2 for 1,000 samples per leg, plus four before-only blocks for the A/A floor in the same window; two scenarios and one re-run window, all on CPU 22 with binaries staged outside the Cargo target directories"
+  },
+  "accepted_costs": {
+    "widened_scope": "the change applies to every add_relationship call naming an already-taken identifier, not only to get_or_add's reuse path; that call was already a silent no-op because the occupied arm never replaced anything, but a caller who believed add_relationship always invalidated is now wrong",
+    "skipped_refusals": "on the preservation route a pristine member no longer runs try_to_xml_bytes or verify_authored, so an allocation failure while building a discarded buffer, and an audit failure on a discarded serialization, no longer refuse; this is change 0593's already-recorded behaviour class and needs roughly 62,500 relationships in one member, against a measured corpus maximum of 43",
+    "error_ordering": "on the full-writer route a pristine member is serialized and audited in materialize_pristine rather than in PublicationPlan::from_package, so if two members would both fail the audit the variant is the same but the message may name a different one; no bytes are emitted in either case",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg, with the two control scenarios bounding the recompile drift at 2,018 to 7,813 instructions",
+    "timing_resolution": "the work removed is 0.08% to 0.45% of the scenario's instructions while the measured p50 deltas are 0.69% to 1.40%, so the timing is not fully explained by the work removed and this host's floor cannot separate the two; no timing claim is made"
+  },
+  "known_gaps": {
+    "reported_regression": "the drawing scenario's first timing window shows +11.70% mean and +230.79% p99 on the after leg; the per-block breakdown attributes it to one contaminated block (a 31 ms sample, 9.96 ms p99) while that block's own p50 stayed at 1,543 us and all four A/A blocks stayed under 1,715 us at a host load average of 39; re-running the same scenario in a second window gives -1.40% p50 and -1.39% mean against a floor under 0.05%",
+    "ordinary_format_routes": "measured only for DOCX, where the change saves nothing because the save rebuilds the document part into a fresh BlobPart that never carried a capture; for XLSX, PPTX, XLSB and litchi-ooxml-common the answer is an audit of every production call site, not a measurement: litchi-xlsx has no production get_or_add or relate_to call site, litchi-pptx's materialize_presentation is unreachable from an opened package, and litchi-xlsb's writer authors from OpcPackage::new()",
+    "reachable_but_unmeasured": "litchi-xlsb/src/cell_values/resources.rs:242 (ensure_styles_part) and :337 (the shared-strings attach) guard on the part existing rather than the relationship, so a source carrying a dangling styles.bin or sharedStrings.bin relationship would reach a reusing get_or_add on a capture-bearing collection; neither was measured",
+    "source_backed": "litchi-opc/src/source_backed.rs has its own relationship serialization and publication path; this change touches neither and no source-backed scenario was measured",
+    "corpus_bound": "336 OOXML fixtures, 2,216 relationships members, 6,281 reuse calls; the soundness argument does not depend on the corpus, which is the oracle that it holds in practice"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, concurrency-scaling, real-producer or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0647-opc-get-or-add-noop-reuse-design",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 22",
+    "binaries": {
+      "before/rels_spelling": "4cca923758ef418c8b553aaea7960fbf4d9fa8b690bb95f5acf543a160d9e9c7",
+      "after/rels_spelling": "105418688723dd2a6b6b46648687711106ca82489d150d5084544e16567838f9",
+      "before/reuse_publish": "5e8b5892cb31a566e890764c57ff6a3d05fb63e6e9d1a8903bb70927ef2235c6",
+      "after/reuse_publish": "c8cfd63e47f552201035177626b8cb317dc000357c22fa0a952a38eb3a4a3b76",
+      "before/reuse_counts": "e497bf1ce456ffe985f0a55e9f5aa222aac1b455ed14d0a9bb42ead7b18aac03",
+      "after/reuse_counts": "ff23978f498b248d5665f77af24df35769fc0120685df8a928ec93bc7d5554b6",
+      "before/reuse_iters": "1d90ec93a719477c8d558fbc5137843394104f1ec1111eb1972c396b594631d6",
+      "after/reuse_iters": "1b3d14984d80199b9c3c6a22a63051b10e10beb5e8447f8c4bcc8c97ba555605",
+      "before/docx_route": "740d9416d7fdca2ff8d114ddc2cd5fc60c69d043073ecf53886dbb89b1df7a53",
+      "after/docx_route": "6f6eb6876c8fd8bba8c68767ba179a5d2c2cf0046d22abbc71ca4ca7b228ec3e"
+    },
+    "note": "both legs built with cargo build --release from docs/performance/results/change-0647/probe with the manifest's path dependencies retargeted per leg; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR, and every measured binary was copied out of its target directory before use"
+  }
+}
