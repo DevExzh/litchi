@@ -1,0 +1,11 @@
+source	test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx
+archive_bytes	108164
+target	slide:1/shape:1
+iterations	30
+phase	p50_ns	mean_ns	p95_ns	min_ns
+opened_presentation (capture)	61247254	60940846	61488715	58752492
+Snapshot::edit (working clone)	19490	19508	22570	16220
+set_shape_text	4889673	4871078	4952633	4706182
+Transaction::commit	64212118	63973423	64757310	61470605
+apply_opened_presentation_commit	218931	215772	230291	188921
+edit total	130585306	130020629	131229419	125420372

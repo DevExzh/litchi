@@ -1,0 +1,102 @@
+CHANGE 0649 -- every derived figure the record quotes, recomputed from the raw files
+in this packet. Wall clock is p50 of 30 samples; `med` is the median of the three
+repeats R1/R2/R3; `A/A` is the widest p50 spread across those three repeats.
+
+1. PHASE DECOMPOSITION  (timing/phases-{real,generated,control}-R{1,2,3}.tsv)
+
+phase                                 real ms     gen ms     ctl ms    A/A r    A/A g    A/A c
+opened_presentation (capture)         59.9000     0.7745     3.3750    4.67%    0.93%    0.51%
+Snapshot::edit (working clone)         0.0195     0.0117     0.0154   28.63%    2.17%    2.43%
+set_shape_text                         4.8441     0.1371     0.5474    2.89%    1.01%    1.35%
+Transaction::commit                   62.9279     0.9228     3.8173    3.96%    0.64%    0.41%
+apply_opened_presentation_commit       0.2189     0.0465     0.0757    8.06%    0.52%    3.38%
+edit total                           128.1234     1.8914     7.8224    4.31%    0.67%    0.80%
+
+phase                                  share  real/gen  real/ctl   ctl/gen
+opened_presentation (capture)          46.8%     77.3x     17.7x      4.4x
+Snapshot::edit (working clone)          0.0%      1.7x      1.3x      1.3x
+set_shape_text                          3.8%     35.3x      8.8x      4.0x
+Transaction::commit                    49.1%     68.2x     16.5x      4.1x
+apply_opened_presentation_commit        0.2%      4.7x      2.9x      1.6x
+edit total                                       67.7x     16.4x      4.1x
+
+capture + commit share of the real edit  : 95.9%
+removed by the marker-stripped control  : 120.301 ms of 128.123 ms = 93.9%
+change 0638 reported 133.61 ms and 68.7x; this record 128.123 ms and 67.7x.
+
+
+2. NATIVE CYCLES AND INSTRUCTIONS  (timing/perfstat-isolation-pairs-real-deck.txt)
+   perf stat isolation pairs, N=2 vs N=10, divided by the eight extra iterations.
+
+stage increment            cycles    share     instructions    share
+capture                 260588713   43.55%       1227624628   46.95%
+transaction               1425585    0.24%          3835933    0.15%
+settext                   8292178    1.39%         88827334    3.40%
+commit                  316496675   52.89%       1284705562   49.13%
+apply                    11580240    1.94%          9806020    0.38%
+ONE EDIT                598383390                2614799476
+the open                  2084063                  14888911    (outside the edit)
+capture + commit: 96.44% of cycles, 96.08% of instructions
+
+
+3. DETERMINISTIC COUNTS  (counts/counts-*.tsv), per edit = apply prefix minus open prefix
+
+counter                          real /edit      gen /edit      ctl /edit   |  real /capture   ctl /capture
+MCE_CALLS                                94             91             93   |             44             44
+MCE_INPUT_BYTES                     1726827         308886        1708797   |         819319         819319
+MCE_REWRITES                             94              0              0   |             44              0
+MCE_REWRITE_INPUT_BYTES             1726827              0              0   |         819319              0
+MCE_REWRITE_OUTPUT_BYTES           28064911              0              0   |       13336354              0
+MCE_ELEMENTS                          62181              0              0   |          29550              0
+MCE_NS_EMISSIONS                     373086              0              0   |         177300              0
+PART_DECODES                             59             55             59   |             29             29
+PART_DECODE_BYTES                   1093071         175884        1093071   |         545427         545427
+SCENE_READS                               4              4              4   |              0              0
+SCENE_READ_BYTES                      68012          14014          68012   |              0              0
+CAPTURES                                  2              2              2   |              1              1
+FINGERPRINTS                              2              2              2   |              1              1
+FINGERPRINT_BYTES                   1568820         268444        1568820   |         784445         784445
+PACKAGES_EQUAL                            1              1              1   |              0              0
+SITE_PRES_ROOT                            3              3              3   |              1              1
+SITE_PRES_SLIDE_REFS                      4              4              4   |              2              2
+SITE_SLIDE_ROOT_NAME                     26             24             26   |             13             13
+SITE_SLIDE_CSLD_NAME                     26             24             26   |             13             13
+SITE_NOTES_SNAPSHOT                      30             32             30   |             15             15
+SITE_PRES_ROOT_BYTES                   7071           2928           7071   |           2357           2357
+SITE_PRES_SLIDE_REFS_BYTES             9428           3904           9428   |           4714           4714
+SITE_SLIDE_ROOT_NAME_BYTES           538286          84526         538286   |         269178         269178
+SITE_SLIDE_CSLD_NAME_BYTES           538286          84526         538286   |         269178         269178
+SITE_NOTES_SNAPSHOT_BYTES            547714         118988         547714   |         273892         273892
+
+real deck, per edit : MCE amplification 16.25x ; 6.00 namespace declarations per emitted element
+real deck, per capt.: MCE amplification 16.28x ; input is 1.03x the deck (796,725 uncompressed bytes)
+real deck, per edit : MCE output is 259x the 108,164-byte source archive
+
+allocations per edit : real 359769 over 91012217 bytes (841x the archive), generated 25765 over 1556563 bytes
+
+
+4. ONE CAPTURE, BY CALL SITE  (counts/counts-real-deck.tsv, counts/mce-trace-one-capture-real-deck.txt)
+
+site                                   passes    input bytes callgrind inclusive Ir
+notes::load_snapshot                       15         273892                 38.95%
+SlidePart::name -> c_sld_name              13         269178                 27.88%
+SlidePart::from_part -> root_name          13         269178                 27.72%
+PresentationPart::slide_references          2           4714                      -
+PresentationPart::from_part                 1           2357                      -
+package_fingerprint (revision proof)        -         784445   3.24% (software SHA)
+
+native: sha2::sha256::x86_sha::compress is 0.51% of the capture stage and 0.72% of the edit.
+callgrind overstates the revision proof 6.4x (3.24% against 0.51%).
+
+
+5. WHAT THE GENERATED CORPUS LACKS
+
+                                   real deck    generated    control
+archive bytes                        108,164       40,797    106,536
+members                                  103           61        103
+uncompressed bytes                   796,725      142,110    796,725
+members with the MCE namespace      43 (93.0%)     0 (0.0%)    0 (0.0%)
+MCE rewrites per capture                  44            0          0
+
+capture throughput: real 13.7 MB/s rewriting, generated 189.8 MB/s borrowing (13.9x per byte)
+bytes ratio 5.57x  x  per-byte ratio 13.9x  =  77x   against the measured capture ratio 77.3x

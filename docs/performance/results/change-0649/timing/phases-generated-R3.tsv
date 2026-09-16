@@ -1,0 +1,11 @@
+source	generated:12x8
+archive_bytes	40797
+target	slide:0/shape:0
+iterations	30
+phase	p50_ns	mean_ns	p95_ns	min_ns
+opened_presentation (capture)	774463	777720	807443	765633
+Snapshot::edit (working clone)	11740	11884	12350	10830
+set_shape_text	137060	137410	142841	135590
+Transaction::commit	922824	924624	945514	914024
+apply_opened_presentation_commit	46640	46975	49051	45920
+edit total	1891429	1898615	1925649	1885078

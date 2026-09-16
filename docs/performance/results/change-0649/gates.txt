@@ -1,0 +1,331 @@
+Change 0649 gates.
+
+Run in the worktree at /home/zhuhe/code/litchi-worktrees/0649, branch
+perf/0649-pptx-opened-transaction-real-deck-edit, on a `crates/` tree that
+`git status` reports as identical to base c7326f680: this record changes no file
+under `crates/`. The gates are therefore the base's gates, run to prove that the
+measurement-only instrumentation leg (results/change-0649/instrumentation/) was
+fully reverted before the commit. Host: AMD EPYC 9R45, rustc 1.95.0, seven other
+agents building concurrently.
+
+Summary
+  cargo fmt --all --check                                          exit 0
+  cargo clippy -p litchi-pptx -p litchi-ooxml-common --all-targets  exit 0
+  cargo doc -p litchi-pptx -p litchi-ooxml-common --no-deps         exit 0
+  cargo test -p litchi-ooxml-common                                 exit 0
+  cargo test -p litchi-pptx                                         exit 0  (871 tests, 77 suites, 0 failed)
+
+=== cargo fmt --all --check ===
+exit=0
+
+=== cargo clippy -p litchi-pptx -p litchi-ooxml-common --all-targets ===
+    Checking caseless v0.2.2
+    Checking ryu v1.0.22
+    Checking icu_normalizer v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-core)
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.69s
+exit=0
+
+=== cargo doc -p litchi-pptx -p litchi-ooxml-common --no-deps ===
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0649/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-ooxml-common)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-drawingml)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0649/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.64s
+   Generated /home/zhuhe/code/litchi-worktrees/0649/target/doc/litchi_ooxml_common/index.html and 1 other file
+exit=0
+
+=== cargo test -p litchi-ooxml-common ===
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/web_extension_packages.rs (target/debug/deps/web_extension_packages-9de6e684c103edd5)
+
+running 3 tests
+test package_graph_discovers_local_task_panes_without_activation ... ok
+test package_authoring_and_removal_round_trip_inert_task_panes ... ok
+test public_web_facade_updates_and_round_trips_crud ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests litchi_ooxml_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
+
+=== cargo test -p litchi-pptx ===
+running 7 tests
+test crates/litchi-pptx/src/chart/codec.rs - chart::codec::Part<'_>::chart_info (line 45) ... ignored
+test crates/litchi-pptx/src/shape/theme/part.rs - shape::theme::part::Part<'a>::read (line 80) ... ignored
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::linear_gradient (line 225) ... ok
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/backgrounds/model.rs - backgrounds::model::SlideBackground::solid (line 206) ... ok
+test crates/litchi-pptx/src/tag/mod.rs - tag (line 7) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+all doctests ran in 0.40s; merged doctests compilation took 0.34s
+exit=0
+DONE
+
+=== cargo test -p litchi-pptx, every suite's result line ===
+     Running unittests src/lib.rs (target/debug/deps/litchi_pptx-9281d2ffb54b7df6)
+running 563 tests
+test comments::package::tests::rejects_graph_and_reference_errors ... ok
+test presentation::source::tests::source_changes_are_returned_as_typed_opc_errors ... ok
+test shape::tests::duplicate_active_names_and_checked_positions_are_errors ... ok
+test shape::text::tests::drawingml_tracker_preserves_depth_limit_and_malformed_errors ... ok
+test result: ok. 563 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+     Running tests/edit_guards.rs (target/debug/deps/edit_guards-7ecc095ce424c783)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/font_api.rs (target/debug/deps/font_api-dc826da7b9c1462b)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/package_encryption.rs (target/debug/deps/package_encryption-157ccf62e9702d35)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_action_settings.rs (target/debug/deps/pptx_action_settings-be366b03f31397d7)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_activex_controls.rs (target/debug/deps/pptx_activex_controls-df663e3bd9b6dff2)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/pptx_activex_relationship_order_determinism.rs (target/debug/deps/pptx_activex_relationship_order_determinism-d38879f60d669daa)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/pptx_caption_tracks.rs (target/debug/deps/pptx_caption_tracks-cd4c6ccb15196fdd)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_chart_inventory.rs (target/debug/deps/pptx_chart_inventory-57e0296b5ea7a27e)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/pptx_color_maps.rs (target/debug/deps/pptx_color_maps-425984e4977b6612)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_comment_crud.rs (target/debug/deps/pptx_comment_crud-eec8a8321156f4ef)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/pptx_comments.rs (target/debug/deps/pptx_comments-34f1274cd95dc77e)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_custom_properties.rs (target/debug/deps/pptx_custom_properties-388621f81b2bd356)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_custom_shows.rs (target/debug/deps/pptx_custom_shows-e8119375d3a42982)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_customer_data.rs (target/debug/deps/pptx_customer_data-2648f5f08a5ad550)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_default_text_style.rs (target/debug/deps/pptx_default_text_style-a5f120dae3851d12)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_designer_facades.rs (target/debug/deps/pptx_designer_facades-fa96fff228919781)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_effective_backgrounds.rs (target/debug/deps/pptx_effective_backgrounds-09002957deb5a652)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_effective_transitions.rs (target/debug/deps/pptx_effective_transitions-cea25d2e230de855)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_embedded_fonts.rs (target/debug/deps/pptx_embedded_fonts-d4b365ccb6a9e262)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_extended_guides.rs (target/debug/deps/pptx_extended_guides-abeecbe48aa18efb)
+running 2 tests
+test presentation_extended_guides_preserve_validation_errors ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_handout_master.rs (target/debug/deps/pptx_handout_master-d4f808a9cb8fb9b1)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/pptx_header_footer_visibility.rs (target/debug/deps/pptx_header_footer_visibility-def8ed75f2ee23ae)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_hyperlinks.rs (target/debug/deps/pptx_hyperlinks-1d64f09669fa05b5)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_inherited_transitions.rs (target/debug/deps/pptx_inherited_transitions-5aa247cfcb6e1806)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/pptx_ink_annotations.rs (target/debug/deps/pptx_ink_annotations-61aba42e8f7a6a60)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/pptx_insert_duplicate_slide.rs (target/debug/deps/pptx_insert_duplicate_slide-7978c2916bbc9ec5)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_insert_slide.rs (target/debug/deps/pptx_insert_slide-0170f2c77892873e)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_kinsoku_settings.rs (target/debug/deps/pptx_kinsoku_settings-a803fce0ac945377)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_laser_traces.rs (target/debug/deps/pptx_laser_traces-bf20642d0fd42b32)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_layout_metadata.rs (target/debug/deps/pptx_layout_metadata-32cb245ff6d49e59)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_layout_references.rs (target/debug/deps/pptx_layout_references-3b456a3227e9653f)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_malformed_presentation.rs (target/debug/deps/pptx_malformed_presentation-bd345e89a75bed02)
+running 6 tests
+test malformed_presentation_roots_return_typed_errors ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+     Running tests/pptx_master_animations.rs (target/debug/deps/pptx_master_animations-a6570b3198c3687e)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_master_retention.rs (target/debug/deps/pptx_master_retention-6e68641b1f69f43d)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_master_shapes.rs (target/debug/deps/pptx_master_shapes-5b8d74e312692770)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/pptx_master_text_styles.rs (target/debug/deps/pptx_master_text_styles-e6b6ae399243e4b7)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/pptx_master_themes.rs (target/debug/deps/pptx_master_themes-d96a9f5447d9e9c8)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_master_visibility.rs (target/debug/deps/pptx_master_visibility-b34e31f58348a70c)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_model3d.rs (target/debug/deps/pptx_model3d-35e9d8b19fe66939)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/pptx_modern_comments.rs (target/debug/deps/pptx_modern_comments-0a7d3666255dd5d7)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/pptx_modification_verifier.rs (target/debug/deps/pptx_modification_verifier-513b7e990299434e)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_notes_crud.rs (target/debug/deps/pptx_notes_crud-59e94f3b42180a76)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+     Running tests/pptx_notes_facade.rs (target/debug/deps/pptx_notes_facade-59603cbb105a6421)
+running 7 tests
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.68s
+     Running tests/pptx_notes_graph.rs (target/debug/deps/pptx_notes_graph-eb27fbde8cd2e4ca)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_ole_objects.rs (target/debug/deps/pptx_ole_objects-91dd8e4a99bb5c30)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/pptx_photo_album.rs (target/debug/deps/pptx_photo_album-5b55d830a7fee526)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_picture_backgrounds.rs (target/debug/deps/pptx_picture_backgrounds-c2571014407654e2)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_placeholders.rs (target/debug/deps/pptx_placeholders-a2e39d99bac7a13d)
+running 2 tests
+test slide_shape_placeholders_preserve_type_decoding_errors ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_presentation_metadata.rs (target/debug/deps/pptx_presentation_metadata-01d1bc40f26f7930)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_presentation_settings.rs (target/debug/deps/pptx_presentation_settings-a54ec274cd5ed318)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_presentation_sizes.rs (target/debug/deps/pptx_presentation_sizes-a405e61eb27b55e7)
+running 2 tests
+test absent_presentation_surface_sizes_return_typed_absence_or_error ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_revision_and_changes_information.rs (target/debug/deps/pptx_revision_and_changes_information-0b98e7484f2b05b7)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_ribbon_customization.rs (target/debug/deps/pptx_ribbon_customization-c6a8092489b3ea93)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_root_relationships.rs (target/debug/deps/pptx_root_relationships-7f3f9a0390cff4eb)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/pptx_sections.rs (target/debug/deps/pptx_sections-9ec6b08a1ea73059)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_shape_identity.rs (target/debug/deps/pptx_shape_identity-cb5cbae6bff41335)
+running 2 tests
+test duplicate_semantic_shape_names_are_typed_errors ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_shape_scene_tags.rs (target/debug/deps/pptx_shape_scene_tags-8a616a83181ebd68)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+     Running tests/pptx_show_events.rs (target/debug/deps/pptx_show_events-9fc46c1e500d5907)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_slide_media.rs (target/debug/deps/pptx_slide_media-350a80bda4ce9666)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_slide_visibility.rs (target/debug/deps/pptx_slide_visibility-61219ba760180b26)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/pptx_smart_tags.rs (target/debug/deps/pptx_smart_tags-9e44b967038301aa)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_table_styles.rs (target/debug/deps/pptx_table_styles-a7877888e5c78516)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/pptx_tag_lists.rs (target/debug/deps/pptx_tag_lists-f03780a3a65e0db6)
+running 10 tests
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+     Running tests/pptx_task_panes.rs (target/debug/deps/pptx_task_panes-41a628d34f6e6489)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_transition_extensions.rs (target/debug/deps/pptx_transition_extensions-922431d115dcfea5)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pptx_vba_project.rs (target/debug/deps/pptx_vba_project-acd77b173e37d9b9)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/read_limits.rs (target/debug/deps/read_limits-70b7d0e83880549f)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/sequential_text.rs (target/debug/deps/sequential_text-83f7a55f9db21337)
+running 16 tests
+test xml_depth_limit_is_document_error ... ok
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/source_backed_cross_copy.rs (target/debug/deps/source_backed_cross_copy-0e10b953e194431b)
+running 58 tests
+test source_backed_cross_copy_preserves_media_read_errors ... ok
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+     Running tests/source_backed_cross_copy_adversarial.rs (target/debug/deps/source_backed_cross_copy_adversarial-96ee76f680f1c91e)
+running 7 tests
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+     Running tests/source_backed_edit.rs (target/debug/deps/source_backed_edit-1534c4df527f009c)
+running 21 tests
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/streaming_authoring.rs (target/debug/deps/streaming_authoring-7329bdbe6d6c37d8)
+running 13 tests
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/streaming_metadata_spool.rs (target/debug/deps/streaming_metadata_spool-f162a29d06bf35b3)
+running 12 tests
+test scratch_quota_failure_is_typed_and_does_not_become_a_generic_pptx_error ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.36s
+     Running tests/validation.rs (target/debug/deps/validation-9d03219e83153fcc)
+running 12 tests
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 7 tests
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s

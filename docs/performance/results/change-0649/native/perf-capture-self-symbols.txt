@@ -1,0 +1,42 @@
+# perf record -F 999 --call-graph=dwarf,4096, taskset -c 16, stage: capture (40 iterations)
+# self-cycle shares; total event count 20,538,255,664 cycles, 4,688 samples
+
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 4K of event 'cpu/cycles/P'
+# Event count (approx.): 20538255664
+#
+# Overhead  Command         Shared Object     Symbol                                                                                                                                                                                                                                                                                                                  
+# ........  ..............  ................  ........................................................................................................................................................................................................................................................................................................................
+#
+    38.55%  probe0649-base  probe0649-base    [.] <litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+    18.81%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::mce::codec::esc
+    15.49%  probe0649-base  libc.so.6         [.] __memmove_avx512_unaligned_erms
+     4.51%  probe0649-base  probe0649-base    [.] <quick_xml::events::attributes::IterState>::next
+     2.34%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::mce::codec::start
+     1.86%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::mce::codec::write_start
+     1.56%  probe0649-base  probe0649-base    [.] <litchi_ooxml_common::mce::codec::BoundedOutput>::push
+     1.11%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::mce::codec::close
+     1.11%  probe0649-base  libc.so.6         [.] __memcmp_evex_movbe
+     0.96%  probe0649-base  probe0649-base    [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+     0.81%  probe0649-base  probe0649-base    [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2
+     0.66%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::xml_name::validation::is_ncname
+     0.58%  probe0649-base  probe0649-base    [.] <&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>
+     0.53%  probe0649-base  probe0649-base    [.] <&[u8] as quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>>>::read_with::<quick_xml::parser::element::ElementParser>
+     0.53%  probe0649-base  probe0649-base    [.] <quick_xml::events::attributes::Attribute>::decoded_and_normalized_value_with::<quick_xml::escape::resolve_predefined_entity>
+     0.53%  probe0649-base  libc.so.6         [.] malloc
+     0.51%  probe0649-base  probe0649-base    [.] core::ptr::drop_glue::<litchi_ooxml_common::mce::codec::Ctx>
+     0.51%  probe0649-base  probe0649-base    [.] sha2::sha256::x86_sha::compress
+     0.51%  probe0649-base  probe0649-base    [.] <quick_xml::name::NamespaceResolver>::add
+     0.49%  probe0649-base  probe0649-base    [.] <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+     0.47%  probe0649-base  probe0649-base    [.] <quick_xml::reader::state::ReaderState>::emit_start
+     0.41%  probe0649-base  probe0649-base    [.] <quick_xml::name::NamespaceResolver>::push
+     0.38%  probe0649-base  probe0649-base    [.] litchi_ooxml_common::xml_name::validation::is_name_character
+     0.37%  probe0649-base  probe0649-base    [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     0.36%  probe0649-base  probe0649-base    [.] litchi_pptx::notes::codec::inspect_element
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1,0 +1,64 @@
+# callgrind --tool=callgrind --cache-sim=no --branch-sim=no, taskset -c 18
+# probe0649 prefix <real deck> capture 6   (6 captures + one open each)
+# isolation pair: N=2 -> 2,534,704,412 Ir; N=6 -> 7,609,845,677 Ir; per (open+capture) = 1,268,785,316 Ir
+
+--------------------------------------------------------------------------------
+Profile data file '/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0649/callgrind/capture-6.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+Profiled target:  /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0649/bin/probe0649-base prefix test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx capture 6 (PID 1981239, part 1)
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+7,609,845,677 (100.0%)  PROGRAM TOTALS
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+7,609,521,355 (100.0%)  /home/zhuhe/code/litchi-worktrees/0649-probe/src/main.rs:probe0649::main
+7,488,507,584 (98.41%)  litchi-pptx/src/package/model.rs:<litchi_pptx::package::model::Package>::opened_presentation
+7,488,507,530 (98.41%)  litchi-pptx/src/opened/model.rs:<litchi_pptx::package::model::Package>::opened_presentation
+7,488,507,488 (98.41%)  litchi-pptx/src/opened/model.rs:litchi_pptx::opened::model::capture_internal
+6,405,502,098 (84.17%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_ooxml
+6,400,221,968 (84.10%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_markup_compatibility
+6,212,061,202 (81.63%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::start
+5,607,415,456 (73.69%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::write_start
+5,172,167,733 (67.97%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc
+4,275,108,068 (56.18%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::process_part
+3,908,162,736 (51.36%)  litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+2,964,389,089 (38.95%)  litchi-pptx/src/notes/package.rs:litchi_pptx::notes::package::load_snapshot
+2,964,388,789 (38.95%)  litchi-pptx/src/notes/package.rs:litchi_pptx::notes::package::load_index
+2,963,787,559 (38.95%)  litchi-pptx/src/notes/codec.rs:litchi_pptx::notes::codec::scan_xml
+2,947,317,859 (38.73%)  litchi-pptx/src/notes/codec.rs:litchi_pptx::notes::codec::root_conformance
+2,125,684,216 (27.93%)  litchi-pptx/src/presentation/model.rs:litchi_pptx::opened::model::capture_internal
+2,125,684,162 (27.93%)  litchi-pptx/src/presentation/package.rs:litchi_pptx::presentation::package::slides
+2,121,433,511 (27.88%)  litchi-pptx/src/slide/codec.rs:litchi_pptx::opened::model::capture_internal
+2,121,433,277 (27.88%)  litchi-pptx/src/parts/slide.rs:<litchi_pptx::parts::slide::SlidePart>::name
+2,121,430,781 (27.88%)  litchi-pptx/src/parts/slide.rs:litchi_pptx::parts::slide::c_sld_name
+2,119,548,135 (27.85%)  litchi-pptx/src/parts/mod.rs:litchi_pptx::parts::slide::c_sld_name
+2,109,589,170 (27.72%)  litchi-pptx/src/presentation/package.rs:litchi_pptx::presentation::package::slide_part
+2,109,153,481 (27.72%)  litchi-pptx/src/parts/slide.rs:<litchi_pptx::parts::slide::SlidePart>::from_part
+2,109,142,249 (27.72%)  litchi-pptx/src/parts/slide.rs:litchi_pptx::parts::slide::root_name
+2,108,268,114 (27.70%)  litchi-pptx/src/parts/mod.rs:litchi_pptx::parts::slide::root_name
+1,340,704,098 (17.62%)  library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+  549,826,197 ( 7.23%)  quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::next
+  414,023,316 ( 5.44%)  quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_pptx::notes::codec::scan_xml
+  408,571,018 ( 5.37%)  litchi-pptx/src/notes/codec.rs:litchi_pptx::notes::codec::inspect_element
+  334,631,268 ( 4.40%)  library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+  302,290,618 ( 3.97%)  quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+  301,625,096 ( 3.96%)  library/core/src/iter/traits/iterator.rs:litchi_pptx::notes::codec::inspect_element
+  291,977,766 ( 3.84%)  library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+  287,554,576 ( 3.78%)  quick-xml-0.41.0/src/reader/mod.rs:<quick_xml::reader::Reader<&[u8]>>::read_event_impl::<&mut alloc::vec::Vec<u8>>
+  276,327,542 ( 3.63%)  quick-xml-0.41.0/src/reader/ns_reader.rs:<quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+  272,994,879 ( 3.59%)  litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::expand_parts
+  272,795,294 ( 3.58%)  quick-xml-0.41.0/src/name.rs:<quick_xml::name::NamespaceResolver>::push
+  267,701,328 ( 3.52%)  library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+  251,322,480 ( 3.30%)  library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+  251,322,480 ( 3.30%)  library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+  246,882,907 ( 3.24%)  litchi-pptx/src/opened/model.rs:litchi_pptx::opened::model::package_fingerprint
+  246,490,579 ( 3.24%)  litchi-pptx/src/opened/model.rs:litchi_pptx::opened::model::feed
+  246,397,687 ( 3.24%)  library/core/src/sync/atomic.rs:sha2::sha256::compress256
+  246,395,161 ( 3.24%)  sha2-0.11.0/src/sha256.rs:sha2::sha256::compress256
+  246,382,488 ( 3.24%)  library/core/src/ptr/non_null.rs:sha2::sha256::soft::unroll::compress
+  246,287,989 ( 3.24%)  sha2-0.11.0/src/block_api.rs:litchi_pptx::opened::model::feed
+  213,656,232 ( 2.81%)  quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::name::NamespaceResolver>::push
+  191,008,458 ( 2.51%)  litchi-ooxml-common/src/xml_name/validation.rs:litchi_ooxml_common::xml_name::validation::is_qualified_name
+  188,491,860 ( 2.48%)  library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc

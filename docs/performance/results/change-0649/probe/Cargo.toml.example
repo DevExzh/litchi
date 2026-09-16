@@ -1,0 +1,17 @@
+[package]
+name = "probe0649"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[features]
+# Measurement-only: requires the change 0649 instrumented leg of the crates.
+counts = ["dep:litchi-ooxml-common"]
+
+[dependencies]
+litchi-pptx = { path = "<checkout>/crates/litchi-pptx" }
+litchi-ooxml-common = { path = "<checkout>/crates/litchi-ooxml-common", optional = true }
+
+[profile.release]
+debug = 1

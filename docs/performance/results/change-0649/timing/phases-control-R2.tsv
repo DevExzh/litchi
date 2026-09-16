@@ -1,0 +1,11 @@
+source	/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0649/raw/slide-section-test-marker-stripped.pptx
+archive_bytes	106536
+target	slide:1/shape:1
+iterations	30
+phase	p50_ns	mean_ns	p95_ns	min_ns
+opened_presentation (capture)	3374975	3381941	3561236	3310715
+Snapshot::edit (working clone)	15580	15537	17131	14010
+set_shape_text	547102	547835	557823	537912
+Transaction::commit	3817318	3818196	3868047	3777677
+apply_opened_presentation_commit	75750	77444	91061	71711
+edit total	7822375	7840954	8018507	7730515
