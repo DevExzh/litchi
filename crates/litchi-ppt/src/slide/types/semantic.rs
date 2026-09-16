@@ -292,7 +292,7 @@ impl Slide<'_> {
             .get_or_try_init(|| match &self.notes_descriptor {
                 Ok(None) => Ok(None),
                 Ok(Some(descriptor)) => {
-                    SpeakerNotes::parse_with_limits(*descriptor, self.doc_data, self.record_limits)
+                    SpeakerNotes::parse_with_limits(*descriptor, self.source, self.record_limits)
                         .map(Some)
                 },
                 Err(error) => Err(Error::Corrupted(error.clone())),

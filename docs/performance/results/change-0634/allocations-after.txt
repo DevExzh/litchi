@@ -1,0 +1,6 @@
+eager-open	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt	allocations=304	allocated_bytes=429870	peak_live_delta=392484	retained_live_delta=387876
+eager-slides	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt	allocations=371	allocated_bytes=467494	peak_live_delta=416400	retained_live_delta=416036
+eager-text	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt	allocations=646	allocated_bytes=494542	peak_live_delta=398396	retained_live_delta=391508
+eager-notes	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/headers_footers_2007.ppt	allocations=369	allocated_bytes=205743	peak_live_delta=145057	retained_live_delta=135901
+owned-edit-save	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt	allocations=936	allocated_bytes=3619722	peak_live_delta=1121093	retained_live_delta=16
+source-open	/home/zhuhe/code/litchi/test-data/poi/test-data/slideshow/45543.ppt	allocations=287	allocated_bytes=387395	peak_live_delta=376057	retained_live_delta=349578

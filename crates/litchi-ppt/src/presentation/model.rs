@@ -161,7 +161,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
-        let factory = SlideFactory::new_with_limits(
+        let factory = SlideFactory::new_shared_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
@@ -186,7 +186,7 @@ impl Presentation {
             return Ok(None);
         };
 
-        let factory = SlideFactory::new_with_limits(
+        let factory = SlideFactory::new_shared_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
@@ -1172,7 +1172,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
-        let factory = SlideFactory::new_with_limits(
+        let factory = SlideFactory::new_shared_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
@@ -1221,7 +1221,7 @@ impl Presentation {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
-        let factory = SlideFactory::new_with_limits(
+        let factory = SlideFactory::new_shared_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,

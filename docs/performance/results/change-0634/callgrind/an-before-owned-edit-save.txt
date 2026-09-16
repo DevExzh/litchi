@@ -1,0 +1,97 @@
+== before-owned-edit-save: total s10=72,245,881 s110=725,471,208 per-op Ir=6,532,253
+-- inclusive per-op deltas (top 40)
+    13,064,507 200.00%  (below main)
+    13,064,507 200.00%  std::rt::lang_start_internal
+     6,532,253 100.00%  main
+     6,532,253 100.00%  __libc_start_main@@GLIBC_2.34
+     6,532,253 100.00%  std::rt::lang_start::{{closure}}
+     6,532,253 100.00%  0x0000000000023cc0
+     6,532,253 100.00%  ppt0634::main
+     6,532,253 100.00%  std::sys::backtrace::__rust_begin_short_backtrace
+     6,532,233 100.00%  ppt0634::one_operation
+     4,262,457  65.25%  litchi_ppt::text_edit::Snapshot::edit_text
+     3,864,076  59.15%  __memcpy_avx_unaligned_erms
+     2,989,733  45.77%  litchi_cfb::file::OleFile<R>::open_stream
+     2,961,824  45.34%  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+     2,950,983  45.18%  litchi_ppt::text_edit::presentation
+     1,989,597  30.46%  litchi_ppt::embedded::object::editor::Editor::open_records
+     1,984,510  30.38%  litchi_ppt::presentation::package::<impl litchi_ppt::presentation::model::Presentation>::from_ole_with_options
+     1,883,368  28.83%  litchi_ppt::text_edit::Snapshot::from_bytes
+     1,816,970  27.82%  litchi_ppt::text_edit::resolve_shape_target
+     1,604,154  24.56%  litchi_ppt::embedded::object::editor::lifecycle::open::open_with_limit
+     1,435,364  21.97%  __memset_avx2_unaligned_erms
+     1,421,918  21.77%  litchi_cfb::file::OleFile<R>::read_sectors_batched
+     1,021,237  15.63%  core::iter::adapters::try_process
+     1,020,087  15.62%  alloc::vec::in_place_collect::<impl alloc::vec::spec_from_iter::SpecFromIter<T,I> for alloc::vec::Vec<T>>::from_iter
+       998,050  15.28%  <alloc::vec::into_iter::IntoIter<T,A> as core::iter::traits::iterator::Iterator>::try_fold
+       563,208   8.62%  litchi_ppt::records::record::Record::parse_impl'2
+       501,329   7.67%  litchi_ppt::records::record::Record::parse_impl
+       412,056   6.31%  litchi_ppt::records::record::Record::parse_container_children
+       398,775   6.10%  alloc::sync::Arc<T,A>::from_box_in
+       281,199   4.30%  litchi_ppt::records::record::Record::parse_container_children'2
+       270,783   4.15%  litchi_cfb::file::OleFile<R>::open
+       225,105   3.45%  litchi_ppt::parsers::parser::RecordParser::parse_shared_document_with_limits
+       215,624   3.30%  alloc::raw_vec::RawVecInner<A>::finish_grow
+       215,077   3.29%  __rustc::__rdl_realloc
+       204,105   3.12%  litchi_ppt::presentation::model::Presentation::slides
+       196,052   3.00%  __rustc::__rdl_alloc
+       191,709   2.93%  litchi_ppt::package::codec::<impl litchi_ppt::package::model::Package<R>>::from_reader
+       190,649   2.92%  litchi_ppt::slide::directory::SlideDirectory::build_with_limits
+       180,627   2.77%  litchi_ppt::slide::factory::SlideFactory::parse_slide
+       168,396   2.58%  once_cell::unsync::OnceCell<T>::get_or_try_init
+       163,358   2.50%  litchi_ppt::records::record::PayloadStore::payload
+-- self per-op deltas (top 25)
+     3,864,076  59.15%  __memcpy_avx_unaligned_erms
+     1,435,364  21.97%  __memset_avx2_unaligned_erms
+       119,616   1.83%  litchi_ppt::records::record::Record::parse_impl'2
+        95,750   1.47%  litchi_cfb::file::collect_sector_chain
+        85,085   1.30%  _int_malloc
+        76,824   1.18%  litchi_cfb::file::SectorChainScratch::collect_exact
+        47,344   0.72%  litchi_cfb::directory_name::directory_name_data
+        46,094   0.71%  core::hash::BuildHasher::hash_one
+        44,463   0.68%  _int_free_merge_chunk
+        37,214   0.57%  litchi_cfb::file::OleFile<R>::read_sectors_batched
+        33,760   0.52%  alloc::raw_vec::RawVecInner<A>::finish_grow
+        31,257   0.48%  litchi_ppt::records::record::Record::parse_container_children'2
+        31,052   0.48%  litchi_ppt::records::record::Record::parse_container_children
+        29,100   0.45%  free
+        27,350   0.42%  litchi_ppt::records::record::PayloadStore::payload
+        27,078   0.41%  litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+        25,817   0.40%  core::ptr::drop_in_place<litchi_ppt::records::record::Record>'2
+        23,472   0.36%  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+        23,353   0.36%  malloc
+        18,500   0.28%  litchi_ppt::records::record::ParseBudget::charge_record
+        16,337   0.25%  hashbrown::map::HashMap<K,V,S,A>::insert
+        15,725   0.24%  litchi_ppt::records::record::ParseBudget::charge_visit
+        14,672   0.22%  litchi_ppt::records::record::Record::parse_impl
+        14,373   0.22%  realloc
+        14,220   0.22%  <litchi_ppt::consts::RecordType as core::convert::From<u16>>::from
+-- call counts per op (selected)
+     2,404.9  __memcpy_avx_unaligned_erms
+       896.0  malloc
+       844.0  alloc::raw_vec::RawVecInner<A>::finish_grow
+       831.0  litchi_ppt::records::record::Record::parse_impl'2
+       474.4  _int_malloc
+       123.0  litchi_ppt::records::record::Record::parse_container_children'2
+        96.0  __memset_avx2_unaligned_erms
+        94.0  litchi_ppt::records::record::Record::parse_impl
+        72.0  <alloc::raw_vec::RawVecInner>::finish_grow
+        68.0  litchi_ppt::records::record::Record::parse_container_children
+        22.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectoryEntry>
+        18.0  <alloc::string::String>::from_utf16
+        18.0  <alloc::string::String>::try_reserve
+        13.0  litchi_cfb::file::OleFile<R>::read_stream_from_fat
+        13.0  litchi_cfb::file::OleFile<R>::open_stream
+        13.0  litchi_cfb::file::collect_sector_chain
+         4.0  litchi_ppt::text::extractor::from_utf16le_lossy
+         3.0  litchi_cfb::file::OleFile<R>::validate_stream_allocations
+         3.0  litchi_cfb::file::OleFile<R>::load_directory
+         3.0  litchi_cfb::file::collect_sector_chain_exact
+         3.0  litchi_cfb::file::OleFile<R>::open
+         2.0  alloc::raw_vec::RawVecInner<A>::try_reserve
+         2.0  litchi_ppt::records::record::Record::parse_container_children_strict
+         2.0  litchi_ppt::records::record::Record::parse_container_children_strict'2
+         2.0  litchi_ppt::embedded::object::editor::Editor::inspect_live_mapping
+         2.0  alloc::sync::Arc<T,A>::from_box_in
+         2.0  core::ptr::drop_in_place<litchi_ppt::slide::directory::SlideDirectory>
+         2.0  litchi_ppt::slide::directory::SlideDirectory::build_with_limits

@@ -28,9 +28,17 @@ pub(crate) enum PayloadStore<'a> {
     Shared(&'a Arc<Vec<u8>>),
 }
 
+impl std::fmt::Debug for PayloadStore<'_> {
+    /// Renders as the byte slice this type stands in for, so a `Debug` that
+    /// used to print the document stream prints exactly the same bytes.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.bytes(), formatter)
+    }
+}
+
 impl<'a> PayloadStore<'a> {
     /// The bytes record offsets index into.
-    fn bytes(self) -> &'a [u8] {
+    pub(crate) fn bytes(self) -> &'a [u8] {
         match self {
             Self::Owned(bytes) => bytes,
             Self::Shared(buffer) => buffer.as_slice(),
@@ -101,15 +109,23 @@ impl Record {
         offset: usize,
         limits: RecordLimits,
     ) -> Result<(Self, usize)> {
-        let mut budget = ParseBudget::new(limits, data.len())?;
-        Self::parse_impl(
-            PayloadStore::Owned(data),
-            offset,
-            data.len(),
-            false,
-            0,
-            &mut budget,
-        )
+        Self::parse_from_store_with_limits(PayloadStore::Owned(data), offset, limits)
+    }
+
+    /// Parse one record with explicit limits, taking payloads from `store`.
+    ///
+    /// [`Self::parse_with_limits`] is this with [`PayloadStore::Owned`]; a
+    /// [`PayloadStore::Shared`] store parses the same bytes at the same offsets
+    /// with the same budget and returns a value-identical record whose payloads
+    /// span the shared buffer instead of owning a copy.
+    pub(crate) fn parse_from_store_with_limits(
+        store: PayloadStore<'_>,
+        offset: usize,
+        limits: RecordLimits,
+    ) -> Result<(Self, usize)> {
+        let window_end = store.bytes().len();
+        let mut budget = ParseBudget::new(limits, window_end)?;
+        Self::parse_impl(store, offset, window_end, false, 0, &mut budget)
     }
 
     /// Parse a record without truncation recovery or byte resynchronization.
