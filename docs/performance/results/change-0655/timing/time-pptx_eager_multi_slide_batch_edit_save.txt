@@ -1,0 +1,15 @@
+case	pptx_eager_multi_slide_batch_edit_save
+leg	A1	n=30	p50=320.405ms	mean=320.531ms	p95=323.604ms	p99=323.784ms
+leg	B1	n=30	p50=300.278ms	mean=300.927ms	p95=304.534ms	p99=304.561ms
+leg	B2	n=30	p50=298.855ms	mean=299.081ms	p95=301.178ms	p99=301.921ms
+leg	A2	n=30	p50=318.996ms	mean=319.101ms	p95=322.262ms	p99=323.508ms
+pooled	before(A1+A2)	n=60	p50=319.544ms	mean=319.816ms	p95=323.508ms	p99=323.784ms
+pooled	after(B1+B2)	n=60	p50=299.431ms	mean=300.004ms	p95=304.219ms	p99=304.561ms
+delta	p50	after_vs_before=-6.29%	before_vs_after=+6.72%
+delta	p95	after_vs_before=-5.96%	before_vs_after=+6.34%
+delta	p99	after_vs_before=-5.94%	before_vs_after=+6.31%
+delta	mean	after_vs_before=-6.19%	before_vs_after=+6.60%
+floor	A/A_p50	A2_vs_A1=-0.44%
+floor	B/B_p50	B2_vs_B1=-0.47%
+floor	A/A_p95	A2_vs_A1=-0.41%
+floor	A/A_p99	A2_vs_A1=-0.09%

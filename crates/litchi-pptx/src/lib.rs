@@ -130,7 +130,8 @@ pub use comments::{
     write_slide_comments,
 };
 pub use error::{
-    Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal,
+    DurablePatchFormat, Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal,
+    SlideRemovalRefusal,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;

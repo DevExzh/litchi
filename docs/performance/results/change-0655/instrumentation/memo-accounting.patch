@@ -1,0 +1,111 @@
+diff --git a/crates/litchi-pptx/src/opened/mod.rs b/crates/litchi-pptx/src/opened/mod.rs
+index 133d1e90f..adfb9afdb 100644
+--- a/crates/litchi-pptx/src/opened/mod.rs
++++ b/crates/litchi-pptx/src/opened/mod.rs
+@@ -25,6 +25,7 @@ pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
+ pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
+ pub use transaction::{Commit, Transaction};
+ 
++pub use model::memo_stats;
+ pub(crate) use model::{PartDigests, capture_with_provenance, package_fingerprint};
+ pub(crate) use patch::{apply, apply_committed};
+ pub(crate) use remove_plan::apply_patch as apply_removal_patch;
+diff --git a/crates/litchi-pptx/src/opened/model.rs b/crates/litchi-pptx/src/opened/model.rs
+index 4aaf1f30f..2f3f681b7 100644
+--- a/crates/litchi-pptx/src/opened/model.rs
++++ b/crates/litchi-pptx/src/opened/model.rs
+@@ -755,6 +755,7 @@ pub(crate) fn package_fingerprint_with_memo(
+             Some((key, blob)) => {
+                 let payload = match parent.and_then(|parent| parent.get(key)) {
+                     Some(memoized) => {
++                        memo_stats::record(true, blob.len());
+                         // Test and debug builds re-derive every reused digest,
+                         // so the crate's own suite proves value identity
+                         // rather than only that the memo compiles.
+@@ -765,18 +766,76 @@ pub(crate) fn package_fingerprint_with_memo(
+                         );
+                         memoized
+                     },
+-                    None => payload_digest(&blob),
++                    None => {
++                        memo_stats::record(false, blob.len());
++                        payload_digest(&blob)
++                    },
+                 };
+                 memo.insert(key, blob, payload)?;
+                 payload
+             },
+-            None => payload_digest(part.blob()),
++            None => {
++                memo_stats::record(false, part.blob().len());
++                payload_digest(part.blob())
++            },
+         };
+         digest.update(part_digest(part, payload)?);
+     }
++    if memo_stats::enabled() {
++        let (hits, misses, hit_bytes, miss_bytes) = memo_stats::read();
++        eprintln!(
++            "0655-fp parts={part_count} hits={hits} misses={misses} hit_bytes={hit_bytes} \
++             miss_bytes={miss_bytes} fed_bytes={}",
++            memo_stats::FED_BYTES.load(std::sync::atomic::Ordering::Relaxed)
++        );
++        memo_stats::reset();
++    }
+     Ok((digest.finalize().into(), memo))
+ }
+ 
++/// PROBE BUILD ONLY (change 0655): per-fingerprint memo accounting. This
++/// instrumentation is reverted before any timed binary is built; the timed
++/// binaries' sha256s are recorded in the evidence packet.
++pub mod memo_stats {
++    use std::sync::atomic::{AtomicU64, Ordering};
++    pub static HITS: AtomicU64 = AtomicU64::new(0);
++    pub static MISSES: AtomicU64 = AtomicU64::new(0);
++    pub static HIT_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static MISS_BYTES: AtomicU64 = AtomicU64::new(0);
++    pub static FED_BYTES: AtomicU64 = AtomicU64::new(0);
++
++    /// Whether the probe build should report per-fingerprint statistics.
++    pub fn enabled() -> bool {
++        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++        *ON.get_or_init(|| std::env::var_os("LITCHI_0655_MEMO").is_some())
++    }
++
++    pub fn reset() {
++        for counter in [&HITS, &MISSES, &HIT_BYTES, &MISS_BYTES, &FED_BYTES] {
++            counter.store(0, Ordering::Relaxed);
++        }
++    }
++
++    pub fn read() -> (u64, u64, u64, u64) {
++        (
++            HITS.load(Ordering::Relaxed),
++            MISSES.load(Ordering::Relaxed),
++            HIT_BYTES.load(Ordering::Relaxed),
++            MISS_BYTES.load(Ordering::Relaxed),
++        )
++    }
++
++    pub fn record(hit: bool, bytes: usize) {
++        if hit {
++            HITS.fetch_add(1, Ordering::Relaxed);
++            HIT_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
++        } else {
++            MISSES.fetch_add(1, Ordering::Relaxed);
++            MISS_BYTES.fetch_add(bytes as u64, Ordering::Relaxed);
++        }
++    }
++}
++
+ /// Digest of one part payload, under its own domain string.
+ fn payload_digest(blob: &[u8]) -> [u8; 32] {
+     let mut digest = Sha256::new();
+@@ -931,6 +990,7 @@ fn feed_relationships(
+ }
+ 
+ fn feed(digest: &mut Sha256, value: &[u8]) {
++    memo_stats::FED_BYTES.fetch_add(value.len() as u64 + 8, std::sync::atomic::Ordering::Relaxed);
+     digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+     digest.update(value);
+ }

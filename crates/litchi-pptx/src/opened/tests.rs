@@ -2559,7 +2559,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let source_revision = forged_source.opened_presentation()?.revision();
     let inner_bytes = inner.to_bytes()?;
     let mut forged_bytes = Vec::with_capacity(80 + inner_bytes.len());
-    forged_bytes.extend_from_slice(b"LPRM0001");
+    forged_bytes.extend_from_slice(crate::DurablePatchFormat::SlideRemovalV2.magic());
     forged_bytes.extend_from_slice(&source_revision);
     forged_bytes.extend_from_slice(&target_revision);
     forged_bytes.extend_from_slice(
@@ -4126,4 +4126,670 @@ fn packages_equal_tracks_every_fingerprint_input() -> Result<()> {
         super::model::package_fingerprint(&rewritten)?
     );
     Ok(())
+}
+
+// Change 0655: the admission gates of change 0645's memoized per-part revision
+// proof. Each one is written so that a later change can fail it.
+
+/// One package plus nine single-input mutations of it, the corpus the pairwise
+/// verdict oracle runs over.
+///
+/// The first two members are the base and a byte-identical re-allocation of
+/// it, so the oracle also proves that allocation identity is not an input.
+fn mutation_corpus(base: &litchi_opc::OpcPackage) -> Result<Vec<(String, litchi_opc::OpcPackage)>> {
+    let mut names: Vec<PackURI> = base
+        .iter_parts()
+        .map(|part| part.partname().clone())
+        .collect();
+    names.sort_by(|left, right| left.as_str().cmp(right.as_str()));
+    let Some(first) = names.first().cloned() else {
+        return Ok(vec![("base".to_owned(), base.clone())]);
+    };
+    let second = names.get(1).cloned().unwrap_or_else(|| first.clone());
+    let added = PackURI::new("/docProps/litchi-0655-extra.bin").map_err(Error::Invalid)?;
+
+    let mut corpus = Vec::new();
+    corpus.push(("base".to_owned(), base.clone()));
+
+    // A re-allocated but byte-identical package: equal content, no shared Arc.
+    let mut rewritten = base.clone();
+    let blob = rewritten.get_part(&first)?.blob().to_vec();
+    rewritten.get_part_mut(&first)?.set_blob(blob);
+    corpus.push(("rewritten in place".to_owned(), rewritten));
+
+    let mutations: Vec<(
+        &str,
+        fn(&mut litchi_opc::OpcPackage, &PackURI, &PackURI, &PackURI) -> Result<bool>,
+    )> = vec![
+        ("payload grows", |opc, first, _second, _added| {
+            let mut blob = opc.get_part(first)?.blob().to_vec();
+            blob.extend_from_slice(b" ");
+            opc.get_part_mut(first)?.set_blob(blob);
+            Ok(true)
+        }),
+        ("payload shrinks", |opc, first, _second, _added| {
+            let mut blob = opc.get_part(first)?.blob().to_vec();
+            if blob.pop().is_none() {
+                return Ok(false);
+            }
+            opc.get_part_mut(first)?.set_blob(blob);
+            Ok(true)
+        }),
+        ("content type", |opc, first, _second, _added| {
+            if opc.get_part(first)?.content_type() == "application/octet-stream" {
+                return Ok(false);
+            }
+            Ok(opc
+                .get_part_mut(first)?
+                .set_content_type("application/octet-stream".into())
+                .is_ok())
+        }),
+        ("added part", |opc, _first, _second, added| {
+            opc.try_add_part(Box::new(BlobPart::new(
+                added.clone(),
+                "application/octet-stream".into(),
+                b"extra".to_vec(),
+            )))?;
+            Ok(true)
+        }),
+        ("removed part", |opc, first, _second, _added| {
+            Ok(opc.remove_part(first))
+        }),
+        ("part relationship", |opc, first, _second, _added| {
+            opc.get_part_mut(first)?.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "../media/probe.bin".into(),
+                "rIdProbe0655".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(true)
+        }),
+        ("root relationship", |opc, _first, _second, _added| {
+            opc.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "docProps/probe.bin".into(),
+                "rIdRootProbe0655".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(true)
+        }),
+        ("external relationship", |opc, _first, _second, _added| {
+            opc.rels_mut().try_add_relationship(
+                "urn:producer:probe".into(),
+                "https://example.invalid/probe".into(),
+                "rIdExternalProbe0655".into(),
+                TargetMode::External,
+            )?;
+            Ok(true)
+        }),
+        // The transposition case: two parts swap payloads. The per-part
+        // digests are the same multiset; only their binding to names changes.
+        ("payload transposition", |opc, first, second, _added| {
+            if first == second {
+                return Ok(false);
+            }
+            let first_blob = opc.get_part(first)?.blob().to_vec();
+            let second_blob = opc.get_part(second)?.blob().to_vec();
+            if first_blob == second_blob {
+                return Ok(false);
+            }
+            opc.get_part_mut(first)?.set_blob(second_blob);
+            opc.get_part_mut(second)?.set_blob(first_blob);
+            Ok(true)
+        }),
+    ];
+
+    for (label, mutate) in mutations {
+        let mut mutated = base.clone();
+        if mutate(&mut mutated, &first, &second, &added)? {
+            corpus.push(((*label).to_owned(), mutated));
+        }
+    }
+    Ok(corpus)
+}
+
+/// Assert that `packages_equal`, the superseded `litchi-pptx-opened-v1`
+/// revision and the `litchi-pptx-opened-v2` revision agree on every ordered
+/// pair of `corpus`, and return the number of pairs compared.
+fn assert_pairwise_verdicts_agree(
+    label: &str,
+    corpus: &[(String, litchi_opc::OpcPackage)],
+) -> Result<usize> {
+    let mut revisions = Vec::with_capacity(corpus.len());
+    for (_name, package) in corpus {
+        revisions.push((
+            super::model::package_fingerprint_v1(package)?,
+            super::model::package_fingerprint(package)?,
+        ));
+    }
+    let mut compared = 0_usize;
+    for (left_index, (left_label, left)) in corpus.iter().enumerate() {
+        for (right_index, (right_label, right)) in corpus.iter().enumerate() {
+            let oracle = super::model::packages_equal(left, right);
+            let v1 = revisions[left_index].0 == revisions[right_index].0;
+            let v2 = revisions[left_index].1 == revisions[right_index].1;
+            assert_eq!(
+                oracle, v1,
+                "{label}: v1 disagreed with the content oracle on ({left_label}, {right_label})"
+            );
+            assert_eq!(
+                v1, v2,
+                "{label}: v2 changed the verdict on ({left_label}, {right_label})"
+            );
+            compared += 1;
+        }
+    }
+    Ok(compared)
+}
+
+/// Every pairwise verdict of the v2 revision equals the v1 verdict and the
+/// content oracle's verdict, over change 0645's synthetic mutation corpus.
+#[test]
+fn revision_v2_preserves_every_pairwise_verdict_of_v1() -> Result<()> {
+    let package = opened_two_slide_package()?;
+    let corpus = mutation_corpus(&package.opc)?;
+    assert_eq!(corpus.len(), 11);
+    assert_eq!(assert_pairwise_verdicts_agree("synthetic", &corpus)?, 121);
+    Ok(())
+}
+
+/// The same oracle over every `.pptx` fixture in the repository, which is the
+/// corpus-wide form change 0645's admission gate 2 requires.
+#[test]
+fn revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus() -> Result<()> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+    let mut fixtures = Vec::new();
+    collect_pptx_fixtures(&root, &mut fixtures);
+    fixtures.sort();
+    assert!(
+        fixtures.len() >= 70,
+        "expected the repository PPTX corpus, found {} fixtures",
+        fixtures.len()
+    );
+    let mut packages = 0_usize;
+    let mut pairs = 0_usize;
+    for fixture in &fixtures {
+        let Ok(bytes) = std::fs::read(fixture) else {
+            continue;
+        };
+        let Ok(opc) = litchi_opc::OpcPackage::from_vec(bytes) else {
+            continue;
+        };
+        let corpus = mutation_corpus(&opc)?;
+        packages += corpus.len();
+        pairs += assert_pairwise_verdicts_agree(&fixture.display().to_string(), &corpus)?;
+    }
+    println!(
+        "0655-oracle fixtures={} packages={} ordered_pairs={} disagreements=0",
+        fixtures.len(),
+        packages,
+        pairs
+    );
+    assert!(pairs > 0);
+    Ok(())
+}
+
+fn collect_pptx_fixtures(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_pptx_fixtures(&path, found);
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "pptx")
+        {
+            found.push(path);
+        }
+    }
+}
+
+/// A memoized recapture returns exactly the revision a cold one returns, and
+/// every memo entry names an allocation the owning snapshot's package holds —
+/// after a capture, after a rebind and after a publication.
+#[test]
+fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
+    let mut package = opened_plain_slides_package(8)?;
+    let source = package.opened_presentation()?;
+    assert_eq!(source.part_digests.len(), package.opc.part_count());
+    assert_memo_names_only_its_own_package("capture", &source);
+
+    let mut edit = source.edit();
+    edit.set_shape_text(0, crate::shape::Key::Index(0), "memoized")?;
+    let commit = edit.commit()?;
+    let forward = commit.patch().clone();
+    let committed = commit.snapshot().revision();
+    assert_eq!(
+        committed,
+        super::model::package_fingerprint(commit.snapshot().package.as_ref())?
+    );
+    assert_ne!(committed, source.revision());
+    assert_memo_names_only_its_own_package("commit", commit.snapshot());
+
+    // The publication rebinds the committed capture onto the facade's package.
+    let published = package.apply_opened_presentation_commit(commit)?;
+    assert_eq!(
+        published.revision(),
+        super::model::package_fingerprint(&package.opc)?
+    );
+    assert_memo_names_only_its_own_package("publication", &published);
+    assert!(published.part_digests.len() > 0);
+
+    // A bare durable-patch replay runs through the facade's retained memo: it
+    // holds no snapshot, so without the carry it would hash from cold.
+    let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
+    let replayed = package.apply_opened_presentation_patch(&inverse)?;
+    assert_eq!(replayed.revision(), source.revision());
+    assert_memo_names_only_its_own_package("replay", &replayed);
+    Ok(())
+}
+
+/// The retention gate: every memo entry names a payload allocation the
+/// snapshot's own package holds, so the process retains no payload solely
+/// because a memo names it.
+fn assert_memo_names_only_its_own_package(stage: &str, snapshot: &super::Snapshot) {
+    let live: std::collections::HashSet<(usize, usize)> = snapshot
+        .package
+        .iter_parts()
+        .filter_map(|part| {
+            let blob = part.blob_arc();
+            std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
+        })
+        .collect();
+    for key in snapshot.part_digests.keys() {
+        assert!(
+            live.contains(&key),
+            "{stage}: the part-digest memo names an allocation its snapshot does not hold"
+        );
+    }
+    // Every retained payload has at least one owner besides the memo: the
+    // package's own part. A count of one would mean the memo is the sole
+    // owner, which is the retention this gate exists to exclude.
+    for strong in snapshot.part_digests.strong_counts() {
+        assert!(
+            strong >= 2,
+            "{stage}: the part-digest memo is the only owner of a payload allocation"
+        );
+    }
+}
+
+/// The memo's own resident cost, bounded and reported for the record.
+#[test]
+fn part_digest_memo_resident_bytes() -> Result<()> {
+    for parts in [8_usize, 64, 200] {
+        let package = opened_plain_slides_package(parts)?;
+        let snapshot = package.opened_presentation()?;
+        let entries = snapshot.part_digests.len();
+        let bytes = snapshot.part_digests.resident_bytes();
+        assert_eq!(entries, package.opc.part_count());
+        // One slot is a 16-byte key, a 40-byte value and one control byte, and
+        // `HashMap` keeps its load factor under one, so a memo can never cost
+        // more than 228 bytes per memoized payload.
+        assert!(
+            bytes <= entries * 228,
+            "memo resident bytes {bytes} exceed the stated bound for {entries} entries"
+        );
+        println!(
+            "0655-memo parts={} entries={} resident_bytes={} per_entry={:.1}",
+            package.opc.part_count(),
+            entries,
+            bytes,
+            bytes as f64 / entries as f64
+        );
+    }
+    Ok(())
+}
+
+/// The alias gate: a `Part` whose `blob_arc()` does not alias its `blob()` is
+/// never memoized, and the revision it produces is exactly the revision the
+/// non-memoizing path produces.
+#[test]
+fn a_mismatched_blob_arc_part_is_never_memoized() -> Result<()> {
+    let package = opened_plain_slides_package(2)?;
+    let honest = PackURI::new("/docProps/litchi-0655-honest.bin").map_err(Error::Invalid)?;
+    let liar = PackURI::new("/docProps/litchi-0655-liar.bin").map_err(Error::Invalid)?;
+
+    let mut with_honest = package.opc.clone();
+    with_honest.try_add_part(Box::new(BlobPart::new(
+        honest.clone(),
+        "application/octet-stream".into(),
+        b"visible payload".to_vec(),
+    )))?;
+
+    let mut with_liar = package.opc.clone();
+    with_liar.try_add_part(Box::new(MismatchedBlobArcPart::new(
+        liar.clone(),
+        "application/octet-stream".into(),
+        b"visible payload".to_vec(),
+        std::sync::Arc::new(b"a completely different payload".to_vec()),
+    )))?;
+
+    // The dishonest part is not memoized at all.
+    let (_revision, memo) = super::model::package_fingerprint_with_memo(&with_liar, None)?;
+    assert_eq!(
+        memo.len(),
+        with_liar.part_count() - 1,
+        "the mismatched part must not be memoized"
+    );
+
+    // Its revision is a function of the bytes `blob()` returns, so renaming
+    // the honest part to the dishonest one's name gives the same revision.
+    let mut honest_named_like_liar = package.opc.clone();
+    honest_named_like_liar.try_add_part(Box::new(BlobPart::new(
+        liar.clone(),
+        "application/octet-stream".into(),
+        b"visible payload".to_vec(),
+    )))?;
+    assert_eq!(
+        super::model::package_fingerprint(&with_liar)?,
+        super::model::package_fingerprint(&honest_named_like_liar)?,
+        "a mismatched blob_arc must not change the revision"
+    );
+    assert_eq!(
+        super::model::package_fingerprint_v1(&with_liar)?,
+        super::model::package_fingerprint_v1(&honest_named_like_liar)?
+    );
+    assert_ne!(
+        super::model::package_fingerprint(&with_honest)?,
+        super::model::package_fingerprint(&with_liar)?
+    );
+
+    // A parent memo taken over the dishonest package answers nothing for it.
+    let (with_parent, _memo) =
+        super::model::package_fingerprint_with_memo(&with_liar, Some(&memo))?;
+    assert_eq!(with_parent, super::model::package_fingerprint(&with_liar)?);
+    Ok(())
+}
+
+/// The ABA gate: the memo retains every payload it names, so the allocation a
+/// key names cannot be freed and re-used by a different payload while the
+/// entry lives. A dropped package therefore cannot make a memo answer for
+/// bytes that no longer exist.
+#[test]
+fn the_memo_retains_every_allocation_it_keys() -> Result<()> {
+    let package = opened_plain_slides_package(4)?;
+    let probe = PackURI::new("/docProps/litchi-0655-aba.bin").map_err(Error::Invalid)?;
+    let mut opc = package.opc.clone();
+    opc.try_add_part(Box::new(BlobPart::new(
+        probe.clone(),
+        "application/octet-stream".into(),
+        vec![0xAB_u8; 4096],
+    )))?;
+    let (_revision, memo) = super::model::package_fingerprint_with_memo(&opc, None)?;
+    let key = {
+        let part = opc.get_part(&probe)?;
+        let blob = part.blob_arc();
+        (blob.as_ptr() as usize, blob.len())
+    };
+    let memoized = memo.get_for_test(key).expect("the probe part is memoized");
+
+    // Drop the package that owned the payload, then churn the allocator with
+    // same-sized payloads of different bytes. The memo still holds the
+    // original allocation, so no replacement can occupy its address.
+    drop(opc);
+    let mut churn = Vec::new();
+    for index in 0..64_u8 {
+        churn.push(std::sync::Arc::new(vec![index; 4096]));
+    }
+    for replacement in &churn {
+        let address = (replacement.as_ptr() as usize, replacement.len());
+        if address == key {
+            panic!("a retained memo key was recycled by a different payload");
+        }
+        assert_ne!(
+            memo.get_for_test(address),
+            Some(memoized),
+            "a different payload answered from the memo"
+        );
+    }
+    // The entry still describes the bytes it was taken over.
+    assert_eq!(memo.get_for_test(key), Some(memoized));
+    Ok(())
+}
+
+/// A part whose visible payload differs from the `Arc` it returns.
+///
+/// `litchi-opc` carries the same shape in its payload-reuse tests; this copy
+/// exists so the pptx revision proof can be gated against it directly.
+#[derive(Clone, Debug)]
+struct MismatchedBlobArcPart {
+    inner: BlobPart,
+    arc: std::sync::Arc<Vec<u8>>,
+}
+
+impl MismatchedBlobArcPart {
+    fn new(
+        partname: PackURI,
+        content_type: String,
+        visible: Vec<u8>,
+        arc: std::sync::Arc<Vec<u8>>,
+    ) -> Self {
+        Self {
+            inner: BlobPart::new(partname, content_type, visible),
+            arc,
+        }
+    }
+}
+
+impl litchi_opc::Part for MismatchedBlobArcPart {
+    fn blob(&self) -> &[u8] {
+        self.inner.blob()
+    }
+
+    fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+        std::sync::Arc::clone(&self.arc)
+    }
+
+    fn content_type(&self) -> &str {
+        self.inner.content_type()
+    }
+
+    fn partname(&self) -> &PackURI {
+        self.inner.partname()
+    }
+
+    fn rels(&self) -> &litchi_opc::Relationships {
+        self.inner.rels()
+    }
+
+    fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
+        self.inner.rels_mut()
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.inner.set_blob(blob);
+    }
+
+    fn set_content_type(&mut self, content_type: String) -> litchi_opc::Result<()> {
+        self.inner.set_content_type(content_type)
+    }
+}
+
+/// Rewrite the eight-byte durable magic of `bytes` in place.
+fn with_magic(bytes: &[u8], magic: &[u8; 8]) -> Vec<u8> {
+    let mut rewritten = bytes.to_vec();
+    rewritten[..magic.len()].copy_from_slice(magic);
+    rewritten
+}
+
+/// A durable slide-removal patch serialized under the superseded `LPRM0001`
+/// magic is refused by name, in `from_bytes` and `from_bytes_with_limits`,
+/// before any header field is read and without any package.
+#[test]
+fn a_superseded_slide_removal_patch_is_refused_by_name() -> Result<()> {
+    let package = opened_plain_slides_package(3)?;
+    let plan = package.opened_presentation()?.plan_slide_removal(1_usize)?;
+    let current = plan.patch().to_bytes()?;
+    assert_eq!(
+        &current[..8],
+        crate::DurablePatchFormat::SlideRemovalV2.magic(),
+        "the current durable slide-removal magic must be LPRM0002"
+    );
+    // A v2 patch still round-trips to an equal value.
+    assert_eq!(SlideRemovalPatch::from_bytes(&current)?, *plan.patch());
+
+    let inverse = plan.patch().inverse().to_bytes()?;
+    for (label, encoded) in [("forward", &current), ("inverse", &inverse)] {
+        let superseded = with_magic(encoded, crate::DurablePatchFormat::SlideRemovalV1.magic());
+        for parsed in [
+            SlideRemovalPatch::from_bytes(&superseded),
+            SlideRemovalPatch::from_bytes_with_limits(&superseded, Limits::default()),
+        ] {
+            let error = parsed.expect_err("a superseded durable patch must be refused");
+            assert!(
+                matches!(
+                    error,
+                    Error::DurablePatchRevisionFormat {
+                        found: crate::DurablePatchFormat::SlideRemovalV1,
+                        expected: crate::DurablePatchFormat::SlideRemovalV2,
+                    }
+                ),
+                "{label}: expected the superseded-format refusal, got {error}"
+            );
+            assert!(error.to_string().contains("LPRM0001"));
+            assert!(error.to_string().contains("LPRM0002"));
+        }
+    }
+
+    // An unrecognized magic keeps the refusal it has today.
+    let unknown = with_magic(&current, b"LPRM9999");
+    assert!(matches!(
+        SlideRemovalPatch::from_bytes(&unknown),
+        Err(Error::Invalid(_))
+    ));
+    Ok(())
+}
+
+/// The same for the cross-presentation copy family and its `LPCP0002` magic.
+#[test]
+fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
+    let mut authored_source = Package::new()?;
+    authored_source
+        .presentation_mut()?
+        .add_slide()?
+        .set_title("cross-source");
+    let mut source = Package::from_vec(authored_source.to_bytes()?)?;
+    rename_slide(&mut source, 0, "cross-source")?;
+    let mut destination = opened_plain_slides_package(2)?;
+    rename_slide(&mut destination, 0, "destination-first")?;
+    rename_slide(&mut destination, 1, "destination-second")?;
+    let source = Package::from_vec(source.to_bytes()?)?;
+    let destination = Package::from_vec(destination.to_bytes()?)?;
+    let source_snapshot = source.opened_presentation()?;
+    let destination_snapshot = destination.opened_presentation()?;
+    let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 1, 1)?;
+    let current = plan.patch().to_bytes()?;
+    assert_eq!(
+        &current[..8],
+        crate::DurablePatchFormat::CrossSlideCopyV3.magic(),
+        "the current durable cross-copy magic must be LPCP0003"
+    );
+    assert_eq!(CrossSlideCopyPatch::from_bytes(&current)?, *plan.patch());
+
+    let inverse = plan.patch().inverse().to_bytes()?;
+    for (label, encoded) in [("forward", &current), ("inverse", &inverse)] {
+        let superseded = with_magic(encoded, crate::DurablePatchFormat::CrossSlideCopyV2.magic());
+        for parsed in [
+            CrossSlideCopyPatch::from_bytes(&superseded),
+            CrossSlideCopyPatch::from_bytes_with_limits(&superseded, Limits::default()),
+        ] {
+            let error = parsed.expect_err("a superseded durable patch must be refused");
+            assert!(
+                matches!(
+                    error,
+                    Error::DurablePatchRevisionFormat {
+                        found: crate::DurablePatchFormat::CrossSlideCopyV2,
+                        expected: crate::DurablePatchFormat::CrossSlideCopyV3,
+                    }
+                ),
+                "{label}: expected the superseded-format refusal, got {error}"
+            );
+        }
+    }
+
+    let unknown = with_magic(&current, b"LPCP9999");
+    assert!(matches!(
+        CrossSlideCopyPatch::from_bytes(&unknown),
+        Err(Error::Invalid(_))
+    ));
+    Ok(())
+}
+
+/// A superseded patch is refused before its own limit check can be reached
+/// only when it is within the durable byte bound: the malformed-input defence
+/// still runs first.
+#[test]
+fn the_superseded_refusal_does_not_displace_the_durable_byte_limit() -> Result<()> {
+    let package = opened_plain_slides_package(3)?;
+    let plan = package.opened_presentation()?.plan_slide_removal(1_usize)?;
+    let superseded = with_magic(
+        &plan.patch().to_bytes()?,
+        crate::DurablePatchFormat::SlideRemovalV1.magic(),
+    );
+    let tight = Limits::new(1, 1, 1, 1, 1).expect("a finite nonzero policy");
+    assert!(matches!(
+        SlideRemovalPatch::from_bytes_with_limits(&superseded, tight),
+        Err(Error::Limit {
+            resource: "slide-removal durable patch bytes",
+            ..
+        })
+    ));
+    Ok(())
+}
+
+/// The facade's retained memo names only allocations its own graph holds,
+/// after a publication and after a mutation that publishes no snapshot.
+#[test]
+fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
+    let mut package = opened_plain_slides_package(4)?;
+    assert_eq!(package.part_digests.len(), 0, "a fresh package has no memo");
+
+    let source = package.opened_presentation()?;
+    let mut edit = source.edit();
+    edit.set_shape_text(0, crate::shape::Key::Index(0), "facade memo")?;
+    let commit = edit.commit()?;
+    package.apply_opened_presentation_commit(commit)?;
+    assert!(package.part_digests.len() > 0, "publication fills the memo");
+    assert_facade_memo_names_only_its_own_package("after publication", &package);
+
+    // A typed edit publishes no opened-presentation snapshot, so the memo of
+    // the previous graph is released rather than carried across it.
+    let mut props = package.custom_props()?;
+    props
+        .insert("Litchi0655", "released")
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    package.put_custom_props(props)?;
+    assert_eq!(
+        package.part_digests.len(),
+        0,
+        "a typed edit must release the memo of the graph it replaced"
+    );
+    assert_facade_memo_names_only_its_own_package("after a typed edit", &package);
+
+    // A slide-removal patch publishes a snapshot, so its exact memo is adopted.
+    let plan = package.opened_presentation()?.plan_slide_removal(0_usize)?;
+    let patch = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    package.apply_slide_removal_patch(&patch)?;
+    assert!(package.part_digests.len() > 0);
+    assert_facade_memo_names_only_its_own_package("after a removal patch", &package);
+    Ok(())
+}
+
+fn assert_facade_memo_names_only_its_own_package(stage: &str, package: &Package) {
+    let live: std::collections::HashSet<(usize, usize)> = package
+        .opc
+        .iter_parts()
+        .filter_map(|part| {
+            let blob = part.blob_arc();
+            std::ptr::eq(blob.as_slice(), part.blob()).then(|| (blob.as_ptr() as usize, blob.len()))
+        })
+        .collect();
+    for key in package.part_digests.keys() {
+        assert!(
+            live.contains(&key),
+            "{stage}: the facade's memo names an allocation its own graph does not hold"
+        );
+    }
 }

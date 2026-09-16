@@ -1,0 +1,54 @@
+{
+  "schema": "litchi-perf-change-cleanup",
+  "schema_version": 1,
+  "change_id": "0655",
+  "removed_after_extraction": [
+    {
+      "path": "<scratchpad>/agents/0655/cg-{before,after}-<case>-s{1,3}.out",
+      "what": "24 raw callgrind.out profiles",
+      "bytes": 10066329,
+      "why": "the inclusive annotations (counts/incl-*.txt), the per-callee call counts (counts/calls-*.txt), the per-call-site isolation pairs (counts/callsite-pairs.txt) and the summary table (counts/isolation-pairs.txt) were extracted first and are retained; scripts/cg-run.sh, cg-run-real.sh, callcounts.py, callsites.py, callsite-pairs.py and summarize.py regenerate them"
+    },
+    {
+      "path": "<scratchpad>/agents/0655/stage/{before,after,probe}",
+      "what": "the three staged litchi-perf-baseline binaries (about 61 MB each)",
+      "why": "their sha256s are recorded in binaries.txt and in decision.json; the before leg rebuilds from 70d7768cc, the after leg from this branch, and the probe leg from this branch plus instrumentation/memo-accounting.patch"
+    },
+    {
+      "path": "<scratchpad>/agents/0655/out/cg-*.json, probe-*.json, probe-realedit-std*.txt",
+      "what": "harness JSON reports from the callgrind and probe runs, and one stray probe stdout capture",
+      "why": "not cited; the timing JSONs that are cited are retained under timing/"
+    },
+    {
+      "path": "<scratchpad>/agents/0655/{before,after}-build.txt",
+      "what": "cargo build logs for the two legs and the probe",
+      "why": "not cited; all three builds finished with exit 0"
+    },
+    {
+      "path": "<scratchpad>/agents/0655/out/gate-*.txt",
+      "what": "the raw gate transcripts",
+      "why": "their tails and totals are retained in gates.txt"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0655-harness-tests",
+      "what": "the CARGO_TARGET_DIR for `cargo test` in tools/perf-baseline, 17 GiB",
+      "why": "build output; removed as soon as the gate reported 540 passed, 0 failed, while the measurement legs were still running"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0655-{before,after,probe}",
+      "what": "three CARGO_TARGET_DIRs, about 1.1 GiB each",
+      "why": "build output; removed after the binaries were staged, measured and hashed"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0655",
+      "what": "the branch worktree",
+      "why": "removed after the commit; the branch perf/0655-pptx-memoized-revision-proof carries everything"
+    }
+  ],
+  "retained_in_repository": [
+    "crates/litchi-pptx (the implementation and its gates)",
+    "docs/adr/0005-io-memory-and-performance.md (the 2026-09-16 amendment)",
+    "docs/performance/0655-pptx-memoized-revision-proof.md",
+    "docs/performance/results/change-0655/ (counts, timing, scripts, instrumentation, gates.txt, decision.json, log-sections.md, README.md, binaries.txt)"
+  ]
+}

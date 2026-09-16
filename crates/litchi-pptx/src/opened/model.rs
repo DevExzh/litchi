@@ -252,6 +252,145 @@ pub struct Snapshot {
     /// package starts an empty one, because content equality does not imply
     /// an identical retained archive.
     pub(crate) physical_revision: Arc<OnceLock<(usize, [u8; 32])>>,
+    /// Per-part payload digests of `package`, keyed by payload allocation.
+    ///
+    /// Every entry names an allocation this snapshot's own `package` holds, so
+    /// the memo pins no bytes the snapshot does not already own. It is an
+    /// accelerator for [`package_fingerprint`] and nothing else: a miss is an
+    /// ordinary hash and no value, refusal or published byte depends on a hit.
+    pub(crate) part_digests: Arc<PartDigests>,
+}
+
+/// Memoized per-part payload digests, keyed by payload allocation address and
+/// length, retaining the payload `Arc` so the key cannot be recycled.
+///
+/// An entry asserts *the allocation at address `a` of length `l` has payload
+/// digest `d`*. Retaining the `Arc` is load-bearing rather than an
+/// optimization: without a strong reference the allocation could be freed and
+/// a different payload allocated at the same address, and a lookup would then
+/// answer with the digest of bytes that no longer exist. Holding the `Arc`
+/// makes the address unrecyclable for the entry's lifetime, so a hit proves
+/// allocation identity and therefore byte identity. The one degenerate case,
+/// a zero-length payload, is safe in the other direction: two distinct empty
+/// `Vec`s may share a dangling address and they have the same (empty) payload,
+/// so such a hit still returns the right digest.
+#[derive(Default)]
+pub(crate) struct PartDigests {
+    entries: HashMap<(usize, usize), (Arc<Vec<u8>>, [u8; 32])>,
+}
+
+impl PartDigests {
+    fn with_capacity(parts: usize) -> Result<Self> {
+        let mut entries = HashMap::new();
+        entries
+            .try_reserve(parts)
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation part digests",
+                source,
+            })?;
+        Ok(Self { entries })
+    }
+
+    /// Digest memoized for exactly this allocation, if any.
+    fn get(&self, key: (usize, usize)) -> Option<[u8; 32]> {
+        self.entries.get(&key).map(|(_blob, digest)| *digest)
+    }
+
+    /// [`Self::get`] for the ABA gate, which keys by address directly.
+    #[cfg(test)]
+    pub(crate) fn get_for_test(&self, key: (usize, usize)) -> Option<[u8; 32]> {
+        self.get(key)
+    }
+
+    fn insert(&mut self, key: (usize, usize), blob: Arc<Vec<u8>>, digest: [u8; 32]) -> Result<()> {
+        self.entries
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation part digests",
+                source,
+            })?;
+        self.entries.insert(key, (blob, digest));
+        Ok(())
+    }
+
+    /// Number of memoized payloads.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Memoized allocation keys, for the retention gate.
+    #[cfg(test)]
+    pub(crate) fn keys(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.entries.keys().copied()
+    }
+
+    /// Strong references the memo itself holds on each memoized payload.
+    #[cfg(test)]
+    pub(crate) fn strong_counts(&self) -> impl Iterator<Item = usize> + '_ {
+        self.entries
+            .values()
+            .map(|(blob, _)| Arc::strong_count(blob))
+    }
+
+    /// Bytes this memo occupies itself, excluding the payloads it names.
+    ///
+    /// One `HashMap` slot is a key, a value and one control byte; the map
+    /// grows in capacity steps, so the reported per-entry figure varies while
+    /// the per-slot cost is flat.
+    #[cfg(test)]
+    pub(crate) fn resident_bytes(&self) -> usize {
+        self.entries.capacity()
+            * (size_of::<(usize, usize)>() + size_of::<(Arc<Vec<u8>>, [u8; 32])>() + 1)
+    }
+
+    /// Project `self` onto the blobs `package` currently holds.
+    ///
+    /// An entry survives only when `package` holds the very allocation it
+    /// names, so the projection never pins a payload the package dropped.
+    fn project(&self, package: &OpcPackage) -> Result<Self> {
+        if self.entries.is_empty() {
+            return Ok(Self::default());
+        }
+        let mut projected = Self::with_capacity(package.part_count())?;
+        for part in package.iter_parts() {
+            let Some((key, blob)) = memo_key(part) else {
+                continue;
+            };
+            if let Some(digest) = self.get(key) {
+                projected.insert(key, blob, digest)?;
+            }
+        }
+        Ok(projected)
+    }
+}
+
+impl fmt::Debug for PartDigests {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PartDigests")
+            .field("len", &self.entries.len())
+            .finish()
+    }
+}
+
+/// Memo key for `part`, or `None` when its `blob_arc()` does not alias the
+/// bytes `blob()` returns.
+///
+/// `Part` is a public trait: a foreign implementation may return an `Arc`
+/// whose contents differ from its visible payload, and `litchi-opc`'s
+/// `from_vec_reusing_payloads` guards the same way before reusing a donor
+/// payload. A part that fails this alias test is never memoized and is hashed
+/// exactly as the unmemoized path hashes it, so an inconsistent part can cost
+/// performance and can never change a value.
+fn memo_key(part: &dyn litchi_opc::Part) -> Option<((usize, usize), Arc<Vec<u8>>)> {
+    let blob = part.blob_arc();
+    let visible = part.blob();
+    if blob.len() != visible.len() || !std::ptr::eq(blob.as_slice(), visible) {
+        return None;
+    }
+    let key = (blob.as_ptr() as usize, blob.len());
+    Some((key, blob))
 }
 
 impl fmt::Debug for Snapshot {
@@ -298,12 +437,25 @@ impl Snapshot {
             packages_equal(self.package.as_ref(), package),
             "opened-presentation snapshot rebound to a different package"
         );
+        let owned = Arc::new(package.clone());
         Self {
-            package: Arc::new(package.clone()),
             // `packages_equal` proves the fingerprint inputs are identical; it
             // says nothing about ZIP ordering, compression, or retained source
             // bytes, so the serialized-archive revision is not carried over.
             physical_revision: Arc::new(OnceLock::new()),
+            // The part-digest memo claims only that a given payload
+            // allocation hashes to a given digest, which `packages_equal` does
+            // not disturb, so it is projected onto the rebound package's own
+            // allocations rather than discarded. `project` drops every entry
+            // the new package does not hold, so the memo still pins nothing
+            // the snapshot does not own. A projection that cannot allocate
+            // falls back to an empty memo, which only costs a later hash.
+            part_digests: Arc::new(
+                self.part_digests
+                    .project(owned.as_ref())
+                    .unwrap_or_else(|_error| PartDigests::default()),
+            ),
+            package: owned,
             ..self.clone()
         }
     }
@@ -343,7 +495,27 @@ pub(crate) fn capture_with_provenance(
     limits: Limits,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
-    capture_internal(package, limits, physical_source_provenance, None)
+    capture_internal(package, limits, physical_source_provenance, Revision::Cold)
+}
+
+/// Capture `package`, reusing `parent`'s payload digest for every payload
+/// allocation the two packages share.
+///
+/// The revision is the one [`capture_with_provenance`] would compute: a memo
+/// hit only declines to re-hash bytes whose allocation identity — and
+/// therefore whose content — is already proven.
+pub(crate) fn capture_with_parent_digests(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    parent: &PartDigests,
+) -> Result<Snapshot> {
+    capture_internal(
+        package,
+        limits,
+        physical_source_provenance,
+        Revision::Parent(parent),
+    )
 }
 
 /// Capture `package` with a complete-package revision the caller already
@@ -361,14 +533,51 @@ pub(crate) fn capture_with_revision(
     physical_source_provenance: bool,
     revision: [u8; 32],
 ) -> Result<Snapshot> {
-    capture_internal(package, limits, physical_source_provenance, Some(revision))
+    capture_internal(
+        package,
+        limits,
+        physical_source_provenance,
+        Revision::Known(revision, PartDigests::default()),
+    )
+}
+
+/// Capture `package` with a revision the caller computed from this exact
+/// content, together with the payload digests it filled while computing it.
+///
+/// The memo describes `package`'s own payload allocations, so carrying it onto
+/// the snapshot preserves the invariant that every entry names an allocation
+/// the snapshot holds.
+pub(crate) fn capture_with_revision_and_digests(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    revision: [u8; 32],
+    digests: PartDigests,
+) -> Result<Snapshot> {
+    capture_internal(
+        package,
+        limits,
+        physical_source_provenance,
+        Revision::Known(revision, digests),
+    )
+}
+
+/// How one capture obtains its complete-package revision and its memo.
+enum Revision<'a> {
+    /// Compute it with no memo to consult.
+    Cold,
+    /// Compute it, reusing `parent`'s digest for every shared allocation.
+    Parent(&'a PartDigests),
+    /// Reuse a revision the caller computed from this exact content, with the
+    /// memo it filled while computing it.
+    Known([u8; 32], PartDigests),
 }
 
 fn capture_internal(
     package: &OpcPackage,
     limits: Limits,
     physical_source_provenance: bool,
-    known_revision: Option<[u8; 32]>,
+    revision: Revision<'_>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
@@ -433,18 +642,33 @@ fn capture_internal(
     }
     let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
     let slide_name_index = SlideNameIndex::build(&slides)?;
-    let revision = match known_revision {
-        Some(revision) => {
+    // The snapshot owns its package from here on, and the memo it keeps must
+    // name that package's own payload allocations, so the revision is taken
+    // over the owned clone rather than over the borrowed original.
+    let owned = Arc::new(package.clone());
+    let (revision, part_digests) = match revision {
+        Revision::Known(revision, digests) => {
             debug_assert!(
-                package_fingerprint(package).is_ok_and(|fresh| fresh == revision),
+                package_fingerprint(owned.as_ref()).is_ok_and(|fresh| fresh == revision),
                 "opened-presentation capture reused a stale complete-package revision"
             );
-            revision
+            // The caller's memo was filled over the package it hashed. The
+            // built-in parts share their payload `Arc` when a package is
+            // cloned, so the projection keeps every entry; a foreign part that
+            // copies its payload instead simply loses its entry, which costs a
+            // later hash and can never answer wrongly.
+            (
+                revision,
+                digests
+                    .project(owned.as_ref())
+                    .unwrap_or_else(|_error| PartDigests::default()),
+            )
         },
-        None => package_fingerprint(package)?,
+        Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
+        Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
     Ok(Snapshot {
-        package: Arc::new(package.clone()),
+        package: owned,
         presentation_name,
         slides,
         slide_name_index,
@@ -452,10 +676,143 @@ fn capture_internal(
         limits,
         physical_source_provenance,
         physical_revision: Arc::new(OnceLock::new()),
+        part_digests: Arc::new(part_digests),
     })
 }
 
+/// The `litchi-pptx-opened-v2` complete-package revision of `package`.
+///
+/// This is the complete-package proof every opened-presentation verdict is
+/// taken over, and the value both durable patch families embed. It is a total
+/// function of exactly the content [`packages_equal`] compares — the root
+/// relationships, the opaque non-part members, and per part the name, the
+/// content type, the payload and the relationships — and of nothing else: no
+/// `Arc` identity, no insertion order, no ZIP layout and no compression.
 pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
+    Ok(package_fingerprint_with_memo(package, None)?.0)
+}
+
+/// The `litchi-pptx-opened-v2` complete-package revision, computed over sorted
+/// per-part digests, together with the payload-digest memo it filled.
+///
+/// The proof is tiered. A payload digest covers exactly one part's payload
+/// bytes; a part digest covers the part name, the content type, that payload
+/// digest and the part's relationships; the revision covers the package header
+/// and the sequence of part digests in sorted part-name order. Each tier
+/// carries its own domain string, so a digest of one tier can never be read as
+/// a digest of another.
+///
+/// Only the payload tier is memoized, and deliberately so: a part's content
+/// type and relationships are not behind its payload `Arc`, so memoizing a
+/// whole part digest on payload identity would return a stale digest for a
+/// part whose relationships moved while its payload did not. Keying the memo
+/// and its value over exactly the same bytes removes that trap; the name, the
+/// content type and the relationships are re-fed on every pass.
+///
+/// A payload whose allocation `parent` already names is taken from the memo
+/// instead of being hashed again. A miss is an ordinary hash, so the returned
+/// revision does not depend on which entries `parent` happened to hold.
+pub(crate) fn package_fingerprint_with_memo(
+    package: &OpcPackage,
+    parent: Option<&PartDigests>,
+) -> Result<([u8; 32], PartDigests)> {
+    let mut parts = Vec::new();
+    parts
+        .try_reserve_exact(package.part_count())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint parts",
+            source,
+        })?;
+    parts.extend(package.iter_parts());
+    parts.sort_unstable_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
+    let mut digest = Sha256::new();
+    feed(&mut digest, b"litchi-pptx-opened-v2");
+    let mut root_relationships = Vec::new();
+    root_relationships
+        .try_reserve_exact(package.rels().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint root relationships",
+            source,
+        })?;
+    root_relationships.extend(package.rels().iter());
+    root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+    feed_relationships(&mut digest, &root_relationships)?;
+    let non_part_count = u32::try_from(package.non_part_members().len())
+        .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
+    feed(&mut digest, b"non-part-members");
+    feed(&mut digest, &non_part_count.to_le_bytes());
+    for member in package.non_part_members() {
+        feed(&mut digest, member.name().as_bytes());
+        feed(&mut digest, member.reason().as_str().as_bytes());
+    }
+    let part_count = u32::try_from(parts.len())
+        .map_err(|_error| invalid("opened-presentation part count exceeds u32"))?;
+    feed(&mut digest, b"parts");
+    digest.update(part_count.to_le_bytes());
+    let mut memo = PartDigests::with_capacity(parts.len())?;
+    for part in parts {
+        let payload = match memo_key(part) {
+            Some((key, blob)) => {
+                let payload = match parent.and_then(|parent| parent.get(key)) {
+                    Some(memoized) => {
+                        // Test and debug builds re-derive every reused digest,
+                        // so the crate's own suite proves value identity
+                        // rather than only that the memo compiles.
+                        debug_assert_eq!(
+                            memoized,
+                            payload_digest(&blob),
+                            "opened-presentation part-digest memo answered for different bytes"
+                        );
+                        memoized
+                    },
+                    None => payload_digest(&blob),
+                };
+                memo.insert(key, blob, payload)?;
+                payload
+            },
+            None => payload_digest(part.blob()),
+        };
+        digest.update(part_digest(part, payload)?);
+    }
+    Ok((digest.finalize().into(), memo))
+}
+
+/// Digest of one part payload, under its own domain string.
+fn payload_digest(blob: &[u8]) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    feed(&mut digest, b"litchi-pptx-opened-payload-v2");
+    feed(&mut digest, blob);
+    digest.finalize().into()
+}
+
+/// Digest of one part: its name, content type, payload digest and
+/// relationships, under its own domain string.
+fn part_digest(part: &dyn litchi_opc::Part, payload: [u8; 32]) -> Result<[u8; 32]> {
+    let mut digest = Sha256::new();
+    feed(&mut digest, b"litchi-pptx-opened-part-v2");
+    feed(&mut digest, part.partname().as_str().as_bytes());
+    feed(&mut digest, part.content_type().as_bytes());
+    digest.update(payload);
+    let mut relationships = Vec::new();
+    relationships
+        .try_reserve_exact(part.rels().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint relationships",
+            source,
+        })?;
+    relationships.extend(part.rels().iter());
+    relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+    feed_relationships(&mut digest, &relationships)?;
+    Ok(digest.finalize().into())
+}
+
+/// The superseded `litchi-pptx-opened-v1` revision, retained only for the
+/// differential gate that proves v1 and v2 return the same pairwise verdicts.
+///
+/// No production path computes this value: the durable formats that embedded
+/// it carry superseded magics and are refused at parse.
+#[cfg(test)]
+pub(crate) fn package_fingerprint_v1(package: &OpcPackage) -> Result<[u8; 32]> {
     let mut parts = Vec::new();
     parts
         .try_reserve_exact(package.part_count())

@@ -1,0 +1,20 @@
+## pptx_eager_batch_edit_save: 4 fingerprints per lifecycle
+   x2  parts=229 hits=228 misses=1 hit_bytes=17564938 miss_bytes=3499 fed_bytes=93763
+   x1  parts=229 hits=228 misses=1 hit_bytes=17564938 miss_bytes=3491 fed_bytes=93755
+   x1  parts=229 hits=0 misses=229 hit_bytes=0 miss_bytes=17568429 fed_bytes=17668953
+## pptx_eager_multi_slide_batch_edit_save: 4 fingerprints per lifecycle
+   x2  parts=229 hits=221 misses=8 hit_bytes=17539963 miss_bytes=28530 fed_bytes=119109
+   x1  parts=229 hits=0 misses=229 hit_bytes=0 miss_bytes=17568429 fed_bytes=17668953
+   x1  parts=229 hits=221 misses=8 hit_bytes=17539963 miss_bytes=28466 fed_bytes=119045
+## pptx_slide_move_boundary_save: 3 fingerprints per lifecycle
+   x2  parts=25 hits=0 misses=25 hit_bytes=0 miss_bytes=87003 fed_bytes=97325
+   x1  parts=25 hits=24 misses=1 hit_bytes=86281 miss_bytes=722 fed_bytes=9964
+## pptx_slide_remove_boundary_save: 9 fingerprints per lifecycle
+   x6  parts=24 hits=0 misses=24 hit_bytes=0 miss_bytes=85805 fed_bytes=95683
+   x3  parts=25 hits=0 misses=25 hit_bytes=0 miss_bytes=87003 fed_bytes=97325
+## pptx_real_file_ordinary_save_edit: 2 fingerprints per lifecycle
+   x1  parts=58 hits=0 misses=58 hit_bytes=0 miss_bytes=768905 fed_bytes=792152
+   x1  parts=58 hits=57 misses=1 hit_bytes=751899 miss_bytes=16936 fed_bytes=37618
+## pptx_real_file_ordinary_save_lifecycle: 2 fingerprints per lifecycle
+   x1  parts=58 hits=0 misses=58 hit_bytes=0 miss_bytes=768905 fed_bytes=792152
+   x1  parts=58 hits=57 misses=1 hit_bytes=751899 miss_bytes=16936 fed_bytes=37618

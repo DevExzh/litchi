@@ -161,6 +161,7 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
+            part_digests: std::sync::Arc::default(),
             physical_source_provenance: false,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
@@ -271,6 +272,7 @@ impl Package {
         Ok(Self {
             opc,
             mutable_pres: None,
+            part_digests: std::sync::Arc::default(),
             physical_source_provenance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
@@ -331,6 +333,9 @@ impl Package {
         #[cfg(feature = "automatic-fonts")]
         let font_embedding_dirty_before = self.font_embedding_dirty;
 
+        // A raw edit hands the complete graph to the operation, so no memo of
+        // the previous graph survives it, in either direction.
+        self.release_part_digests();
         let result = (|| {
             self.flush_presentation()?;
             operation(&mut self.opc)
@@ -365,6 +370,9 @@ impl Package {
                 reason: "the lossless facade cannot publish an opened package's mutable graph",
             });
         };
+        // Materializing the mutable presentation rewrites parts of the graph,
+        // so the retained payload-digest memo is released first.
+        self.release_part_digests();
         let before = self.opc.clone();
         let result = (|| {
             if presentation_modified {

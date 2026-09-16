@@ -23,7 +23,15 @@ use super::model::{Limits, Slide, Snapshot, invalid};
 use super::patch::Patch;
 use crate::{Error, Result, SlideCopyRefusal};
 
-const PATCH_MAGIC: &[u8; 8] = b"LPCP0002";
+/// Current durable cross-slide-copy header magic.
+///
+/// Bumped from `LPCP0002` by change 0655: three of the six revisions this
+/// header embeds are complete-package revisions, now `litchi-pptx-opened-v2`.
+/// The other three are physical archive revisions under
+/// `litchi-pptx-cross-physical-v2` and are unchanged.
+const PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::CrossSlideCopyV3.magic();
+/// Recognized but superseded durable cross-slide-copy header magic.
+const SUPERSEDED_PATCH_MAGIC: &[u8; 8] = crate::DurablePatchFormat::CrossSlideCopyV2.magic();
 const PATCH_HEADER_BYTES: usize = PATCH_MAGIC.len() + (6 * 32) + (4 * 4) + 8 + 4 + 8;
 const TRANSITIONAL_PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -265,7 +273,7 @@ impl CrossSlideCopyPatch {
         }
     }
 
-    /// Serialize this patch into the stable `LPCP0002` binary format.
+    /// Serialize this patch into the stable `LPCP0003` binary format.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let payload = self.patch.to_bytes()?;
         let mut output = Vec::new();
@@ -331,11 +339,28 @@ impl CrossSlideCopyPatch {
     }
 
     /// Parse a stable durable patch under conservative finite limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
+    /// under the superseded `LPCP0002` format, and an error for malformed,
+    /// trailing, or unbounded input.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, Limits::default())
     }
 
     /// Parse a stable durable patch under caller-selected finite limits.
+    ///
+    /// A patch whose header carries the superseded `LPCP0002` magic is refused
+    /// here, before any header field is read: three of its six embedded
+    /// revisions come from the `litchi-pptx-opened-v1` algebra. Re-plan the
+    /// copy against the source and destination packages.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
+    /// under the superseded `LPCP0002` format, and an error for malformed,
+    /// trailing, or unbounded input.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
@@ -345,6 +370,15 @@ impl CrossSlideCopyPatch {
             return Err(Error::Limit {
                 resource: "cross-slide durable patch bytes",
                 limit,
+            });
+        }
+        // See `SlideRemovalPatch::from_bytes_with_limits`: a superseded magic
+        // is refused by name before any header field is read, so a semantic
+        // revision from the previous algebra never reaches a caller.
+        if bytes.get(..SUPERSEDED_PATCH_MAGIC.len()) == Some(SUPERSEDED_PATCH_MAGIC.as_slice()) {
+            return Err(Error::DurablePatchRevisionFormat {
+                found: crate::DurablePatchFormat::CrossSlideCopyV2,
+                expected: crate::DurablePatchFormat::CrossSlideCopyV3,
             });
         }
         let mut input = WireInput::new(bytes);

@@ -1,0 +1,56 @@
+Gates for change 0655, run in the branch worktree at
+/home/zhuhe/code/litchi-worktrees/0655 on branch perf/0655-pptx-memoized-revision-proof.
+
+=== cargo fmt --all --check ===
+(no output; exit 0)
+
+=== cargo clippy -p litchi-pptx --all-targets ===
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0655/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.15s
+
+=== cargo doc -p litchi-pptx --no-deps ===
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0655/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.17s
+   Generated /home/zhuhe/code/litchi-worktrees/0655/target/doc/litchi_pptx/index.html
+
+=== cargo test -p litchi-pptx (every target) ===
+totals: 885 passed, 0 failed, 2 ignored, across 78 test binaries
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+all doctests ran in 2.95s; merged doctests compilation took 2.53s
+
+=== the change 0655 admission gates, with their printed evidence ===
+test opened::tests::the_memo_retains_every_allocation_it_keys ... ok
+0655-memo parts=29 entries=29 resident_bytes=3192 per_entry=110.1
+test opened::tests::a_mismatched_blob_arc_part_is_never_memoized ... ok
+test opened::tests::a_superseded_slide_removal_patch_is_refused_by_name ... ok
+test opened::tests::the_superseded_refusal_does_not_displace_the_durable_byte_limit ... ok
+test opened::tests::memoized_recapture_equals_a_cold_recapture ... ok
+test opened::tests::revision_v2_preserves_every_pairwise_verdict_of_v1 ... ok
+test opened::tests::the_facade_memo_never_outlives_the_graph_it_describes ... ok
+0655-memo parts=85 entries=85 resident_bytes=6384 per_entry=75.1
+test opened::tests::a_superseded_cross_slide_copy_patch_is_refused_by_name ... ok
+0655-memo parts=221 entries=221 resident_bytes=12768 per_entry=57.8
+test opened::tests::part_digest_memo_resident_bytes ... ok
+0655-oracle fixtures=78 packages=856 ordered_pairs=9396 disagreements=0
+test opened::tests::revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus ... ok
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 563 filtered out; finished in 35.76s
+
+=== cargo test -p litchi --features docx,xlsx,pptx,xls ===
+totals: 265 passed, 0 failed, 7 ignored, across 29 test binaries
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+all doctests ran in 1.58s; merged doctests compilation took 1.56s
+
+=== cargo test in tools/perf-baseline ===
+totals: 540 passed, 0 failed, 1 ignored, across 19 test binaries
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit=0
+
+=== python3 tools/non_iwork_gate.py verify ===
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
