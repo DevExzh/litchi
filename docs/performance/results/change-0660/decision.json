@@ -1,0 +1,63 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0660",
+  "title": "A committed DOCX edit no longer re-serializes the paragraphs it did not touch, and the ordinary snapshot stops copying the main part",
+  "decision": "retained, implemented in litchi-docx",
+  "code_state": "crates/litchi-docx only: document/transaction.rs, document/mod.rs, package/package/document.rs and package/tests/graph.rs; one new public enum and two new public Edit methods; no signature changed and no item removed; no new unsafe and no new dependency (xml-minifier was already a litchi-docx dependency); no facade change, because litchi::document does not expose the document transaction",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "authority": "change 0652 decision 10 (DOCX half), queue row 10 of change 0651; part (c) of change 0591 and the last of its named limitations",
+  "reason_codes": [
+    "the owner's decision 10 asks for a public compaction policy whose default leaves unmodified paragraphs and parts untouched, with whole-document compaction opt-in, and for the main-part copy in document_snapshot to be removed with it",
+    "the whole-document compaction and the rescan that followed it were 133.2 M of the 572.6 M instructions of one docx_semantic_one_edit_save lifecycle; compacting only the changed paragraphs and deriving the layout through 0591's splice route removes both",
+    "the OPC writer's authored-XML compactness contract refuses preserved bytes for 54 of the 55 openable DOCX fixtures, so the default consults that auditor first and falls back to the unchanged whole-document route; the contract is change 0652's decision 2, a separate record in this wave, and is not moved here",
+    "the fallback's cost is bounded by a short-circuit on the one refusal that holds unconditionally -- character data outside the root element -- which decides 53 of those 54 fixtures from about sixty bytes of prologue",
+    "the corpus census is the oracle: 63 fixtures x ten aspects on both legs, byte-identical on every aspect and every refusal string except the opt-in aspect the base leg cannot run",
+    "sharing the main part's Arc instead of copying it is safe on its face -- Part::set_blob and set_blob_shared replace the Arc rather than mutating through it -- and makes the pointer half of 0591's exact-source proof hit on the eager route"
+  ],
+  "accepted_evidence": {
+    "census": "a scratch probe over every DOCX-family fixture under test-data (63 found, 55 open), ten aspects per fixture covering the ordinary save, the exact no-op, the managed insert-and-publish route, a one-paragraph rewrite under each policy, the source-versus-published byte span and a reopen, on both legs, 630 lines each",
+    "counts": "callgrind isolation pairs at N=1 and N=3 differenced and halved on the three docx_semantic_* selectors, both legs, inclusive Ir and call counts per symbol",
+    "region": "the same probe's commit-only region -- edit(), one replace_paragraph_text and commit() -- as an isolation pair at measured = 1 and 3, for a compact and a line-break-after-declaration source at 24, 200 and 10,000 paragraphs, both legs, 24 runs",
+    "timing": "100 samples per pooled leg, order A1 B1 B2 A2 on CPU 15, nine semantic scenarios plus four docx_ordinary_save_* control scenarios, in three separate windows, with the A/A and B/B floors of each window beside every paired delta",
+    "in_crate_tests": "nine new tests, including a corpus differential over 53 snapshot-able fixtures and 99 accepted rewrites that checks both policies per rewrite, and a check that the cheap short-circuit never refuses what the auditor accepts, run against every corpus fixture"
+  },
+  "accepted_costs": {
+    "default_behaviour_change": "Edit::commit's default output bytes change for a source that satisfies the publication contract and is not invariant under compaction; CompactionPolicy::WholeDocument restores the previous bytes exactly, and no fixture in this repository is in that class",
+    "refusal_narrowing": "a refusal raised only because whole-document compaction re-serialized untouched markup -- an xml:space value other than default or preserve in a paragraph the edit never named is the case -- is not raised under the default policy; the opt-in still raises it with the identical error, and no snapshot-level refusal moved",
+    "fallback_overhead": "a source the publication gate refuses pays the short-circuit on top of everything the base leg did: 1,695 instructions on a 24-paragraph document (+0.59% of the commit region), +0.05% at 200 paragraphs and below measurement at 10,000",
+    "gate_on_the_preserving_route": "a source the short-circuit does not decide pays one whole-document verify_authored pass, 44.9 M Ir per lifecycle on the harness corpora; it is bought back several times over by the 133.2 M the change removes",
+    "declined_shapes": "a commit that changes the paragraph count, or a document whose root or w:body declares xml:space, publishes its projection without compacting any fragment; the authored fragments those operations splice are compact by construction",
+    "aliasing": "document_snapshot's returned Snapshot now aliases the main part's payload allocation; Part has no in-place payload mutator, and a retained package test pins both the aliasing and its survival across a publication",
+    "instruction_counts": "instructions rank work, not latency; callgrind overstates the removed bulk copy, and paired timing does not resolve it either, so the copy is claimed as removed work and not as a speed-up",
+    "measurement_windows": "three paired-timing windows were run and all three are retained; w1 timed the change binary before a no-op refactor that merged two identical match arms and moved three private functions, w2 and w3 timed the committed binary. w2 was heavily contended (B/B floor -27.05% on one scenario, -60.57% on an ordinary-save control) and nothing rests on it; the record quotes w3, whose floors are at most 1.69% at p50, and the large one-edit delta reads -31.82%, -33.76% and -34.14% across the three"
+  },
+  "known_gaps": {
+    "reach_of_the_default": "the preserving route is reachable on 1 of the 55 openable fixtures today because of the publication audit; change 0652's decision 2 lifts that, and publication_accepts_preserved_xml is the single function that then has to change",
+    "no_op_saving_near_the_floor": "the removed main-part copy is not resolved by timing: the no-op scenarios read -1.07% to -2.12% at p50 in the quoted window against an A/A floor reaching 1.69%, and +0.22% to -0.97% in the contended one; the deterministic support is Snapshot::from_xml falling from 3 calls to 0 per lifecycle and no latency figure is claimed",
+    "allocation_profile": "litchi-perf-baseline-alloc reports no metrics for the docx_semantic_* family, so the removed allocation is counted from the call site and not measured by the allocator",
+    "other_rewrite_sites": "the eleven Edit rewrite sites change 0591 left rescanning still rescan; tables, block content controls and the body-final section properties are preserved rather than compacted",
+    "document_mut_route": "MutableDocument::to_xml still compacts whole documents; the docx_ordinary_save_* selectors that use it are a control here, not a target",
+    "real_producer_scale": "no real-producer document larger than 12 KB of main part was measured; the fixture corpus is small"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, peak-RSS, concurrency-scaling or cross-platform result",
+    "any claim that the default policy changes published bytes on this corpus: it does not, on any fixture, on any route"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "branch": "perf/0660-docx-compaction-policy",
+    "commit": "the tip of perf/0660-docx-compaction-policy; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 15",
+    "binaries": {
+      "before/litchi-perf-baseline": "be066f8268e5dafde992fb4c8a6a55cdb67c941b2a1be9d760f9ebadddda5eb5",
+      "after/litchi-perf-baseline": "8a8325b47d58092133dbc81deda484019c7c44055ffa5930ec392e93ccb588b0",
+      "after/litchi-perf-baseline (timing window w1 only)": "963b899b949b636646bda11c4b21b0fdaa0f4f3b37ce5064fb1da2bad803bbfd",
+      "before/docx-compaction-policy-probe": "e0565740b5c6e75699add514d0043cedbbbff632d6a0c812220fc20232399c6c",
+      "after/docx-compaction-policy-probe": "80ee99e095083740ccd9d47dc652e2511e2e45dc60579e7fe69383a98bef013c"
+    },
+    "note": "both legs built with cargo build --release --locked; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-70d7768cc with its own CARGO_TARGET_DIR, and both harness binaries were staged outside their Cargo target directories before any leg ran"
+  }
+}

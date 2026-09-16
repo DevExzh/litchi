@@ -1,5 +1,44 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0660 — preservation by default reaches inside the part it edits, and stops exactly where the writer's contract does
+
+Record: [0660](0660-docx-compaction-policy.md).
+
+`docs/GOAL.md` puts lossless preservation and correctness above speed, and ADR
+0006 makes preservation the default rather than an option. Until this change
+that default stopped at the part boundary: an ordinary DOCX edit preserved every
+part it did not name, and then re-serialized every paragraph of the one part it
+did — stripping whitespace, re-escaping attribute values and normalizing
+attribute spelling in paragraphs the caller never touched. 0591 named that as an
+owner question rather than a defect and froze it; 0652's decision 10 answered
+it. The audit distinction worth recording is that **the change is bounded by a
+contract it deliberately did not move**. Preserved bytes must still satisfy the
+package writer's authored-XML compactness audit, which is change 0652's decision
+2 and another record's work in this wave; rather than widen its own default past
+that, 0660 asks the writer's own auditor first and takes the previous route when
+the answer is no. The consequence is stated plainly and is the record's main
+weakness: **the preserving route is reachable on one of the 55 openable
+fixtures today**, so the contract this change exists to deliver is exercised by
+that fixture and by a constructed witness, while the measured saving comes from
+removing work on documents that already satisfy the writer. Two admissions, both
+stated rather than buried. First, **one refusal class narrows**: a refusal that
+existed only because whole-document compaction re-serialized *untouched* markup
+— an `xml:space` value outside `default`/`preserve` in a paragraph the edit
+never named — is not raised under the default policy. That is inseparable from
+"leaves every unmodified paragraph untouched", the opt-in still raises it with
+the identical error, and every refusal belonging to the snapshot itself — the
+byte, node and depth limits, DTDs, processing instructions, unbalanced nesting —
+is untouched because the snapshot scan is untouched. Second, **a source the gate
+refuses now pays a little more than it did**: the short-circuit, +0.59% of the
+commit region on the smallest shape and below measurement on the largest,
+reported rather than averaged away. The oracle is a corpus census of 63
+fixtures × ten aspects on both legs — the ordinary save, the exact no-op, the
+managed insert-and-publish route, a one-paragraph rewrite, the source-versus-
+published byte span and a reopen — and it is **byte-identical on every aspect
+and every refusal string**, except the opt-in aspect the base leg cannot run.
+No latency claim is registered. OLE2/OOXML remain active; ODF is deferred until
+completion and iWork excluded.
+
 ## 0658 — XLSX selected-cell ineligibility gate, landed
 
 The first optimization rule — eliminate unnecessary work — applied to the whole of an ineligible worksheet's streaming scan, authorized by decision 8 of change 0652 ("XLSX ineligible read: accept the movement of the timing of error returns"). GOAL's decision rules are met in order: BEFORE counts on the two fixtures 0597 priced; a stated mechanism (the verdict is monotone, so no event after the first mark can change the published outcome); the smallest coherent change (two additive public items in `litchi-ooxml-common`, one crate-internal helper and one return type in `litchi-xlsx`, no breaking change); correctness, preservation and adversarial oracles; AFTER counts with the same setup. GOAL's "never trade a typed refusal for a partial result" line holds — the read still returns the materialized parser's complete value or its typed refusal — but its companion, "no weakened malformed-input defence", is where decision 8 does its work: on a 60-package first-error matrix, 210 of 900 rows over 15 packages move, all of them worksheets that are both ineligible and malformed after their mark, and one of the eight distinct witnesses turns a refusal into the acceptance `litchi_xlsx::Workbook::open` already gave for the same bytes. That is disclosed, not absorbed. Against 0597's frozen candidate the landed gate halves that class while acting on 30 of 30 matrix packages rather than 18. 1,316 `litchi-xlsx` tests across 60 suites and 267 `litchi-ooxml-common` tests across 7 suites pass, as do the other six `litchi-ooxml-common` consumers, the facade under `docx,xlsx,pptx,xls`, the perf harness's own suite and `tools/non_iwork_gate.py verify`. The unmeasured XML-1 codec expansion keeps the non-iWork performance goal open. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0658-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0658/README.md).

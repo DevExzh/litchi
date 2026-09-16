@@ -1,0 +1,104 @@
+Gates for change 0660, run in the change worktree
+/home/zhuhe/code/litchi-worktrees/0660 on branch perf/0660-docx-compaction-policy
+(base 70d7768cc6dada420ede063f72c88dc99ad30383). Every command's tail is below,
+in the order it was run.
+
+================================================================================
+$ cargo fmt --all --check
+================================================================================
+(no output; exit 0)
+
+================================================================================
+$ cargo clippy -p litchi-docx --all-targets
+================================================================================
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.53s
+
+
+================================================================================
+$ cargo doc -p litchi-docx --no-deps
+================================================================================
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-drawingml)
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0660/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.10s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0660-after/doc/litchi_docx/index.html
+
+================================================================================
+$ cargo test -p litchi-docx
+================================================================================
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 75 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Totals across the 51 test binaries: 1,480 passed, 0 failed, 31 ignored.
+
+================================================================================
+$ cargo test -p litchi --features docx,xlsx,pptx,xls
+================================================================================
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test non_grid_sheet_returns_typed_not_worksheet_error ... ok
+test selected_handle_preserves_source_change_error ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+Every binary reported 'ok'; no 'FAILED' and no 'error' line appeared.
+The six pre-existing clippy warnings the briefing records for this facade
+under these features are unchanged and were not touched by this change.
+
+================================================================================
+$ cargo test    (in tools/perf-baseline)
+================================================================================
+=== cargo test in tools/perf-baseline ===
+test result: ok. 522 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 717.76s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.85s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+540 passed, 0 failed, 1 ignored. The two flaky allocator tests the briefing
+records in docx_bounded_tail_append_compare did not fail in this run.
+
+================================================================================
+$ python3 tools/non_iwork_gate.py verify
+================================================================================
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+(exit 0)

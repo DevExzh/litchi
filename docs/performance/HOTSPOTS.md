@@ -1,5 +1,55 @@
 # Performance hotspot inventory
 
+## 0660 — the DOCX edit's last whole-document pass is gone, and the thing that now bounds it is the publication audit
+
+Record: [0660](0660-docx-compaction-policy.md).
+
+**Change [0591](0591-docx-edit-single-scan.md)'s part (c) is implemented, and it
+takes the second of the two remaining whole-part scans with it.** 0591 left an
+ordinary one-paragraph edit and save scanning the main document twice: once for
+the snapshot the caller asked for, once for `compact_changed_document_xml` and
+the `with_rewritten_xml` rescan that followed it. Change 0652's decision 10
+authorized the contract that blocked the second one, and it is now a public
+policy: `litchi_docx::document::CompactionPolicy`, carried by `Edit`, defaulting
+to `PreserveUnmodified`, with `WholeDocument` as the opt-in that reproduces the
+base leg byte for byte. Under the default, `compact_changed_paragraphs` walks
+the source and projected paragraph layouts in lockstep, compacts only the
+paragraphs whose bytes differ — each alone, as a single closed root — and
+splices them back through 0591's derived-layout route, so the whole-document
+rescan disappears with the whole-document compaction. Per lifecycle of the three
+harness shapes: `compact_changed_document_xml` **62,549,564 Ir → below the isolation pair's
+own resolution**,
+`scan_document_with_context` **6 calls → 3**, `Edit::commit` **133,165,034 Ir →
+45,397,018**, whole iteration **572,582,252 → 484,151,439 (−15.44%)** on
+`docx_semantic_one_edit_save` and −14.99% on the one-percent case; paired p50
+**−34.14% / −30.00% / −16.61%** (large / medium / tiny) against an A/A floor of
+at most 1.69% in the same window, repeating to within 2.3 points across the
+three windows run. Isolated to the commit region alone, a
+probe puts it at **−56.83% / −66.28% / −67.49%** at 24, 200 and 10,000
+paragraphs. 0591's last named limitation goes in the same change:
+`Package::document_snapshot` now hands `Snapshot::from_shared_xml` the part's
+`Arc` instead of copying the blob, so `Snapshot::from_xml` falls from 3 calls to
+0 per exact-no-op lifecycle; the no-op scenarios move −1.07% to −2.12% at p50
+against an A/A floor reaching 1.69%, so the copy is **not resolved by timing**
+and no latency figure is claimed for it. **The new hotspot is the
+gate, not the compaction.** Preservation republishes the producer's own bytes,
+and the OPC writer's authored-XML compactness contract refuses those bytes for
+**54 of the 55 openable DOCX fixtures in this repository**, 53 of them on a line
+break between the XML declaration and the root element. The default therefore
+consults `xml_minifier::audit::verify_authored` — the writer's own auditor,
+under the writer's limits — and falls back to the unchanged whole-document
+route when it says no. A short-circuit on the one refusal that holds
+unconditionally, character data outside the root element, decides those 53
+fixtures from about sixty bytes of prologue, so the fallback costs **1,695
+instructions on a 24-paragraph document and nothing measurable on a
+10,000-paragraph one** instead of the 44.9 M Ir a full audit would have cost.
+Change 0652's decision 2 (queue row 2) is what moves that contract; when it
+lands, `publication_accepts_preserved_xml` is the single function that has to
+change, and this record's census is the before-picture. OLE2/OOXML remain
+active; ODF is deferred until completion and iWork excluded.
+[Record and limitations](0660-docx-compaction-policy.md);
+[retained evidence](results/change-0660/README.md).
+
 ## 0658 — XLSX selected-cell ineligibility gate, landed
 
 Survey item XML-2 is closed. The selected-cell scan no longer runs an ineligible worksheet to XML EOF: `Scanner::event` answers a new `mce::ActiveFlow::Stop` for the event that records an ineligibility reason, and the MCE driver ends the stream there. `raw::worksheet::selected::scan_stream` falls from 140,956,112 to 292,990 Ir on the marker-stripped control fixture and from 153,241,477 to 353,599 on the real one (−99.8%), taking the whole source-backed one-cell read from 215,630,939 to 76,698,964 (−64.43%) and from 652,726,610 to 501,712,792 (−23.14%); `SourceWorksheet::store`, the mandatory fallback parse, is unchanged to within 0.1% and is now 93% of the control read. The reach is the whole corpus: all 326 worksheet parts of the 180 `.xlsx` fixtures are ineligible (325 `UnsupportedStructure`, one `RichInlineText`), with identical verdicts on both legs, and the bytes the scan pulls from the part reader fall from 9,324,342 to 795,708. Logical source reads and bytes are unchanged — the verified OPC reader still drains and CRC/size-verifies the whole member, so this removes parsing, not I/O. What remains in this read is the mandatory materialized parse, and inside it the MCE byte codec (item XML-1) is 310,161,586 Ir of the real fixture's 501,712,792, unchanged by this batch. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0658-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0658/README.md).

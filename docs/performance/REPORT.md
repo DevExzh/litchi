@@ -1,5 +1,48 @@
 # Performance program phase report
 
+## 0660 — editing one paragraph of a Word document no longer rewrites all the others
+
+Record: [0660](0660-docx-compaction-policy.md).
+
+`litchi-docx`: when Litchi changed a single paragraph of a Word document and
+saved it, it rewrote the document's entire internal XML from scratch —
+squeezing out spacing and re-spelling quotation marks in paragraphs nobody had
+touched. The file still said the same thing, but the bytes of untouched
+paragraphs moved, and every save paid for a full rewrite plus a full re-read of
+the document. The owner's decision for this wave was to make that a setting and
+to default it off. It now is: a new public `CompactionPolicy` on the edit, whose
+default compacts **only the paragraphs the edit actually changed** and
+republishes every other byte exactly as the original program wrote it, and whose
+opt-in (`WholeDocument`) reproduces the old behaviour byte for byte for anyone
+who wants it. Removing that rewrite and the re-read behind it makes a
+one-paragraph edit-and-save **34.1% faster on a 10,000-paragraph document, 30.0%
+on a 200-paragraph one and 16.6% on a small one** (median of 100 samples per
+side, against a same-window noise floor under 1.7%, and repeating to within 2.3
+points across three separate measurement windows); measured on the edit step
+alone the saving is **about two thirds**. A second, smaller change lands with
+it: taking a document snapshot no longer copies the whole main part — worth one
+whole-document copy and one allocation per snapshot, which is too small to
+separate from measurement noise on this machine and is claimed only as removed
+work, not as a speed-up. **Nothing that gets written
+changed.** Over all 63 Word-family test documents in the repository, checked ten
+different ways each — plain save, empty edit, paragraph insert, paragraph
+rewrite, and reopening the result — every single saved file is byte-for-byte
+identical to what the previous version produced, and every refusal message is
+word-for-word the same. The honest limitation is where the new default can
+actually be used today: Litchi's package writer insists that any XML it
+regenerates be written in a strict "compact" form, and **54 of the 55 openable
+test documents fail that check** — almost all of them because their producer put
+a line break after the XML declaration. Until the companion change in this wave
+relaxes that check, Litchi quietly falls back to the old whole-document rewrite
+for those files, at a cost of about 1,700 machine instructions to notice.
+Nine new tests, including one that replays both settings over every fixture in
+the repository; `cargo fmt`, clippy, 1,480 `litchi-docx` tests, rustdoc, the
+feature-bearing facade suite, the 540-test performance harness and the
+non-iWork gate all pass. `performance_claim: none`; the medians above are
+reported as evidence beside their noise floor, not registered as a claim.
+[Change and limitations](0660-docx-compaction-policy.md); [retained
+evidence](results/change-0660/README.md).
+
 ## 0658 — XLSX selected-cell ineligibility gate, landed
 
 Retained, implemented, `performance_claim: none`. The gate change 0597 froze is landed by a different mechanism than the one 0597 designed: instead of a bounded `memmem` pre-gate that skips the stream before opening it, the scan opens the stream as before and stops it at the event that settles an ineligible verdict. That choice is the record's central trade-off — the pre-gate also skips the *prefix*, so it loses refusals the stream reaches before the verdict is decided, and decision 8 authorizes moving where a refusal is raised, not removing one. An ineligible source-backed one-cell read falls 64.43% and 23.14% in instructions on 0597's two fixtures, against 0597's −63.19% and −14.08% for the frozen candidate. The whole-corpus transcript — 180 packages, 4,606 cold reads, every value, refusal, logical read and byte — is **byte-identical** on both legs, sha256 `23abae83…`. The 60-package first-error matrix is where the authorized movement shows: 210 of 900 rows move, over 15 packages, in eight distinct witnesses, tabulated in the record with before and after text; one is a refusal becoming the acceptance the mandatory parser already gave, three change typed variant, four change message. Four established tests that pinned "a later typed error outranks the ineligible verdict" are rewritten to pin the new contract and the materialized parser's answer, and six new tests pin the stop signal itself. Paired timing on CPU 13 corroborates the counts without carrying a claim: the ineligible control read moves +72.58% / +69.19% at p50 against a 0.66% A/A floor, and the ineligible real read +29.91% / +25.95% at p50 against an 8.12% floor that exceeds the 5% threshold, so the magnitude rests on the counts. No speedup, latency, cold-cache, physical-I/O, allocation or RSS claim follows. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Change and limitations](0658-xlsx-selected-cell-ineligibility-gate.md); [retained evidence](results/change-0658/README.md).

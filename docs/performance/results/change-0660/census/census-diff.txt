@@ -1,0 +1,220 @@
+10c10
+< libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit_optin unavailable
+---
+> libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx one_edit_optin refused:no paragraph with text
+20c20
+< libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+30c30
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx one_edit_optin refused:no paragraph with text
+40c40
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+50c50
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx one_edit_optin 4044d618f5cd6da980cba55731382ae771346a8b756065ffa0ad615d94ca370c
+60c60
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx one_edit_optin refused:no paragraph with text
+70c70
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+80c80
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx one_edit_optin refused:paragraph 0 edit refused: selected content has no editable Word text
+90c90
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx one_edit_optin refused:no paragraph with text
+100c100
+< libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx one_edit_optin refused:no paragraph with text
+110c110
+< libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx one_edit_optin 3b2089b6c31977730302bb672d31e639d17ce5afcc18feeff358812d3dc56eee
+120c120
+< libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx one_edit_optin 12d3a9bd71840f165c762e642ae2402b3bb88bc1664018b909f51fbb3fd49241
+130c130
+< libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx one_edit_optin refused:no paragraph with text
+140c140
+< libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+150c150
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx one_edit_optin refused:invalid DOCX format: body-final section properties are not the final body child
+160c160
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx one_edit_optin 7760dc02463c39143ac567dfa4ac02cd9dcbb5bd706e01911f84c91e7955a6b4
+170c170
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx one_edit_optin 312a906f7f5e2e06a9dcc5a6690b7a30982c3455256ee30113a8ae1ae6629960
+180c180
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx one_edit_optin refused:paragraph 1 edit refused: text requires structural WordprocessingML elements
+190c190
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit_optin unavailable
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx one_edit_optin refused:no paragraph with text
+200c200
+< office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit_optin unavailable
+---
+> office-interop/libreoffice-resaved/document-properties-litchi.docx one_edit_optin 470e13a88de497237248cf32f7434487c34a4b5b3641a072fa6ed3e2df2f3bcb
+210c210
+< office-interop/litchi-changed/document-properties-litchi.docx one_edit_optin unavailable
+---
+> office-interop/litchi-changed/document-properties-litchi.docx one_edit_optin b33747c9fee8ab070d97e5791413b85d1e67b1bc16f5e7939f1ad46f2acd9245
+220c220
+< ooxml/docx/ComplexNumberedLists.docx one_edit_optin unavailable
+---
+> ooxml/docx/ComplexNumberedLists.docx one_edit_optin a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+230c230
+< ooxml/docx/FancyFoot.docx one_edit_optin unavailable
+---
+> ooxml/docx/FancyFoot.docx one_edit_optin dbc976ed877ab9d6e8c4dbfda928b4e8949219cd94d1966f547240f1ec05d280
+240c240
+< ooxml/docx/Headers.docx one_edit_optin unavailable
+---
+> ooxml/docx/Headers.docx one_edit_optin refused:no paragraph with text
+250c250
+< ooxml/docx/Hyperlink.docx one_edit_optin unavailable
+---
+> ooxml/docx/Hyperlink.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+260c260
+< ooxml/docx/comment.docx one_edit_optin unavailable
+---
+> ooxml/docx/comment.docx one_edit_optin refused:no paragraph with text
+270c270
+< ooxml/docx/documentProperties.docx one_edit_optin unavailable
+---
+> ooxml/docx/documentProperties.docx one_edit_optin 6fc2123fc08646c50208f315d2a1ad0423fe4ef4b624d1f0a48ab1dc17a6d5dd
+280c280
+< ooxml/docx/documentProtection_comments_no_password.docx one_edit_optin unavailable
+---
+> ooxml/docx/documentProtection_comments_no_password.docx one_edit_optin a9ff01fce3f65c415f9522fa2563b48034520c4b946475bfbc9005504e277c45
+290c290
+< ooxml/docx/documentProtection_forms_no_password.docx one_edit_optin unavailable
+---
+> ooxml/docx/documentProtection_forms_no_password.docx one_edit_optin b2957c99743912c8c40d41e785b9f647af327a02d43f6577dfaaed25ed0de11d
+300c300
+< ooxml/docx/documentProtection_no_protection.docx one_edit_optin unavailable
+---
+> ooxml/docx/documentProtection_no_protection.docx one_edit_optin 84e67e2ad74fb3eed44a57f73bf2f19a714fc1518f2a9cce81fd98dc48d3ff07
+310c310
+< ooxml/docx/documentProtection_readonly_no_password.docx one_edit_optin unavailable
+---
+> ooxml/docx/documentProtection_readonly_no_password.docx one_edit_optin 0b2bb3221f73e3ce8ab92b06205059b9cb4017abd1d04f2c72e92b32b163c792
+320c320
+< ooxml/docx/drawing.docx one_edit_optin unavailable
+---
+> ooxml/docx/drawing.docx one_edit_optin 06e9964fc373d967dffabc9b7c0bd84385bad121ba30e6a29980b6688210edba
+330c330
+< ooxml/docx/endnotes.docx one_edit_optin unavailable
+---
+> ooxml/docx/endnotes.docx one_edit_optin bcd001f76b5f491113b64e0ae6368c81d74d90080fc120e20add089a46ea3314
+340c340
+< ooxml/docx/footnotes.docx one_edit_optin unavailable
+---
+> ooxml/docx/footnotes.docx one_edit_optin fb12bb852d9af64dded445ae88900cbf95ab1f9cf822306d1649259fe137e375
+350c350
+< ooxml/docx/headerFooter.docx one_edit_optin unavailable
+---
+> ooxml/docx/headerFooter.docx one_edit_optin refused:no paragraph with text
+360c360
+< ooxml/docx/headerPic.docx one_edit_optin unavailable
+---
+> ooxml/docx/headerPic.docx one_edit_optin refused:no paragraph with text
+370c370
+< ooxml/docx/table-alignment.docx one_edit_optin unavailable
+---
+> ooxml/docx/table-alignment.docx one_edit_optin refused:no paragraph with text
+390c390
+< ooxml/docx/table_footnotes.docx one_edit_optin unavailable
+---
+> ooxml/docx/table_footnotes.docx one_edit_optin refused:no paragraph with text
+400c400
+< ooxml/docx/testComment.docx one_edit_optin unavailable
+---
+> ooxml/docx/testComment.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+410c410
+< poi/test-data/document/61745.docx one_edit_optin unavailable
+---
+> poi/test-data/document/61745.docx one_edit_optin refused:no paragraph with text
+420c420
+< poi/test-data/document/Bug54849.docx one_edit_optin unavailable
+---
+> poi/test-data/document/Bug54849.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+430c430
+< poi/test-data/document/ComplexNumberedLists.docx one_edit_optin unavailable
+---
+> poi/test-data/document/ComplexNumberedLists.docx one_edit_optin a4ebd4ef34af93b2da502de9515e86b65d2a8216bd9526e135ad2cb1d594839b
+440c440
+< poi/test-data/document/EmbeddedDocument.docx one_edit_optin unavailable
+---
+> poi/test-data/document/EmbeddedDocument.docx one_edit_optin 099a50cfea12724267a53e6de95642bc46c32784940aa2a046d8b73aab0eea5e
+450c450
+< poi/test-data/document/Numbering.docx one_edit_optin unavailable
+---
+> poi/test-data/document/Numbering.docx one_edit_optin adf5c5a06a66c4e211446ecc40284fdfc548439ba3c62e4a696f4a0fdf6d9672
+460c460
+< poi/test-data/document/NumberingWOverrides.docx one_edit_optin unavailable
+---
+> poi/test-data/document/NumberingWOverrides.docx one_edit_optin refused:paragraph 1 edit refused: selected owner contains unsupported structural content
+470c470
+< poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit_optin unavailable
+---
+> poi/test-data/document/NumberingWithOutOfOrderId.docx one_edit_optin e205a42a4d59bb0272e2afdf1dda1eba8190b8aaa4bc4488bf6e2bff00baa04b
+480c480
+< poi/test-data/document/heading123.docx one_edit_optin unavailable
+---
+> poi/test-data/document/heading123.docx one_edit_optin 1d11e1f64cc7bd9336cc7f4d507e9d18df5c81018a5ed54444a15fa45ec9d9bf
+490c490
+< poi/test-data/document/saut_page.docx one_edit_optin unavailable
+---
+> poi/test-data/document/saut_page.docx one_edit_optin refused:paragraph 0 edit refused: text requires structural WordprocessingML elements
+500c500
+< poi/test-data/document/testComment.docx one_edit_optin unavailable
+---
+> poi/test-data/document/testComment.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content
+510c510
+< poi/test-data/integration/test_recursive_embedded.docx one_edit_optin unavailable
+---
+> poi/test-data/integration/test_recursive_embedded.docx one_edit_optin 619ef48c95ce6edaba4391a22e94c310de7742cb0aafc293e43dd13a6c7e85e8
+520c520
+< poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit_optin unavailable
+---
+> poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx one_edit_optin 166ef3e27d6ad805e5c0223ef23621ede09aa7bbca9cb7240d2a117d511be3a1
+580c580
+< poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit_optin unavailable
+---
+> poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx one_edit_optin refused:no paragraph with text
+610c610
+< poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit_optin unavailable
+---
+> poi/test-data/xmldsign/hello-world-signed-twice.docx one_edit_optin 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+620c620
+< poi/test-data/xmldsign/hello-world-signed.docx one_edit_optin unavailable
+---
+> poi/test-data/xmldsign/hello-world-signed.docx one_edit_optin 9ae951694b5447c985223eaebe0ebf73dfcb3be9ec79cbe5eb52754313586efe
+630c630
+< poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit_optin unavailable
+---
+> poi/test-data/xmldsign/ms-office-2010-signed.docx one_edit_optin refused:paragraph 0 edit refused: selected owner contains unsupported structural content

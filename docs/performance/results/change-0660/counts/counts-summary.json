@@ -1,0 +1,264 @@
+{
+ "before": {
+  "docx_semantic_one_edit_save": {
+   "whole_child_ir_n1": 4555742520,
+   "whole_child_ir_n3": 5700907025,
+   "per_lifecycle_ir": 572582252,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 140305126.5,
+     "calls_per_lifecycle": 6.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 140140068.5,
+     "calls_per_lifecycle": 6.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 71229106.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": 62549563.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": 44772027.5,
+     "calls_per_lifecycle": 9.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 133165034.5,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  },
+  "docx_semantic_one_percent_edit_save": {
+   "whole_child_ir_n1": 4564797241,
+   "whole_child_ir_n3": 5725330658,
+   "per_lifecycle_ir": 580266708,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 140210073.0,
+     "calls_per_lifecycle": 6.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 140044842.0,
+     "calls_per_lifecycle": 6.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 71238333.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": 62890031.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": 44640797.5,
+     "calls_per_lifecycle": 9.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 133514192.0,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  },
+  "docx_semantic_noop_edit_save": {
+   "whole_child_ir_n1": 4347662109,
+   "whole_child_ir_n3": 5076007871,
+   "per_lifecycle_ir": 364172881,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 70060775.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 69978249.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 71137705.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": -29550.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": -28278.5,
+     "calls_per_lifecycle": 0.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  }
+ },
+ "after": {
+  "docx_semantic_one_edit_save": {
+   "whole_child_ir_n1": 4466094167,
+   "whole_child_ir_n3": 5434397046,
+   "per_lifecycle_ir": 484151439,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 69960959.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": -50377.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": 89512710.5,
+     "calls_per_lifecycle": 12.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 45397018.5,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  },
+  "docx_semantic_one_percent_edit_save": {
+   "whole_child_ir_n1": 4474909074,
+   "whole_child_ir_n3": 5461447249,
+   "per_lifecycle_ir": 493269087,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 70080935.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": 535703.0,
+     "calls_per_lifecycle": 103.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": 89617863.0,
+     "calls_per_lifecycle": 12.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 46024371.5,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  },
+  "docx_semantic_noop_edit_save": {
+   "whole_child_ir_n1": 4346215376,
+   "whole_child_ir_n3": 5072318610,
+   "per_lifecycle_ir": 363051617,
+   "symbols": {
+    "from_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "scan_document_with_context": {
+     "incl_ir_per_lifecycle": 70157539.5,
+     "calls_per_lifecycle": 3.0
+    },
+    "document_snapshot": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "apply_document_patch": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    },
+    "compact_changed_document_xml": {
+     "incl_ir_per_lifecycle": -12611.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "compact_changed_paragraphs": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "publication_accepts_preserved_xml": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "verify_with_policy": {
+     "incl_ir_per_lifecycle": -12813.0,
+     "calls_per_lifecycle": 0.0
+    },
+    "commit": {
+     "incl_ir_per_lifecycle": 0.0,
+     "calls_per_lifecycle": 3.0
+    }
+   }
+  }
+ }
+}

@@ -1331,6 +1331,7 @@ impl Snapshot {
             replacement_text_bytes: 0,
             operation_admission: None,
             operation_string_admission: None,
+            compaction: CompactionPolicy::default(),
         }
     }
 
@@ -1896,6 +1897,66 @@ impl Operation {
     }
 }
 
+/// How a committed main-document edit compacts the `WordprocessingML` it
+/// publishes.
+///
+/// The main document is the only part a document transaction rewrites, and an
+/// edit changes only the body children it was asked to change. This policy
+/// decides what happens to the *rest* of that part when the edit is committed.
+///
+/// The default is [`Self::PreserveUnmodified`]: preservation by default, the
+/// rule the rest of the library already follows for parts an edit never
+/// names. [`Self::WholeDocument`] is the opt-in that re-serializes the entire
+/// main document, which is what every committed edit did before this policy
+/// existed.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_docx::Package;
+/// use litchi_docx::document::CompactionPolicy;
+///
+/// let mut package = Package::open("input.docx")?;
+/// let mut edit = package
+///     .edit_document()?
+///     .with_compaction_policy(CompactionPolicy::WholeDocument);
+/// edit.replace_paragraph_text(Position::new(0), "hello")?;
+/// package.publish_document_edit(edit)?;
+/// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum CompactionPolicy {
+    /// Compact only the body paragraphs the edit changed, and publish every
+    /// other byte of the main document exactly as it was read.
+    ///
+    /// A paragraph whose bytes differ from the source paragraph at the same
+    /// position is compacted on its own, as a single closed root; a paragraph
+    /// whose bytes are unchanged is never re-serialized, so its whitespace,
+    /// attribute spelling and comments survive the edit. Bytes outside the
+    /// direct-body paragraphs — the document prologue, tables, block content
+    /// controls, the body-final section properties and the epilogue — are
+    /// never re-serialized under this policy.
+    ///
+    /// Because unmodified markup is not re-serialized, the refusals that
+    /// belong to re-serialization are not raised for it: a main document whose
+    /// untouched markup carries, for example, an `xml:space` value other than
+    /// `default` or `preserve` publishes under this policy and is refused
+    /// under [`Self::WholeDocument`]. Every refusal that belongs to the
+    /// snapshot itself — the document byte, node and depth limits, document
+    /// type declarations, unbalanced nesting — is unchanged, because the
+    /// snapshot scan is unchanged.
+    #[default]
+    PreserveUnmodified,
+    /// Re-serialize the whole main document in compact form on every changed
+    /// commit.
+    ///
+    /// This strips compactable inter-element whitespace from every paragraph,
+    /// including paragraphs the edit never touched, and normalizes attribute
+    /// quoting and escaping across the part. It is the behaviour every
+    /// committed edit had before this policy existed.
+    WholeDocument,
+}
+
 /// A staged main-document edit.
 #[derive(Debug)]
 pub struct Edit {
@@ -1905,6 +1966,7 @@ pub struct Edit {
     replacement_text_bytes: usize,
     operation_admission: Option<Arc<OperationAdmission>>,
     operation_string_admission: Option<Arc<StringAdmission>>,
+    compaction: CompactionPolicy,
 }
 
 impl Edit {
@@ -1918,6 +1980,22 @@ impl Edit {
     #[must_use]
     pub const fn projected(&self) -> &Snapshot {
         &self.projected
+    }
+
+    /// Choose how this edit compacts the main document it publishes.
+    ///
+    /// The default is [`CompactionPolicy::PreserveUnmodified`], which leaves
+    /// every paragraph the edit did not change byte for byte as it was read.
+    #[must_use]
+    pub const fn with_compaction_policy(mut self, policy: CompactionPolicy) -> Self {
+        self.compaction = policy;
+        self
+    }
+
+    /// Return the compaction policy this edit will publish under.
+    #[must_use]
+    pub const fn compaction_policy(&self) -> CompactionPolicy {
+        self.compaction
     }
 
     /// Clone a staged edit after admitting the new operation ledger.
@@ -1992,6 +2070,7 @@ impl Edit {
             replacement_text_bytes: self.replacement_text_bytes,
             operation_admission,
             operation_string_admission,
+            compaction: self.compaction,
         })
     }
 
@@ -4621,13 +4700,26 @@ impl Edit {
             // the exact source proof required by publication.
             self.projected
         } else {
-            let source = std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
-                crate::Error::InvalidFormat(format!(
-                    "changed main-document XML is not UTF-8: {error}"
-                ))
-            })?;
-            let compact = crate::writer::doc::compact_changed_document_xml(source)?;
-            self.projected.with_rewritten_xml(compact.into_bytes())?
+            match self.compaction {
+                CompactionPolicy::PreserveUnmodified
+                    if publication_accepts_preserved_xml(self.base.xml_bytes()) =>
+                {
+                    compact_changed_paragraphs(&self.base, &self.projected)?
+                },
+                // The opt-in, and the preserving policy's fallback when the
+                // source cannot publish preserved: byte for byte what every
+                // committed edit published before this policy existed.
+                CompactionPolicy::PreserveUnmodified | CompactionPolicy::WholeDocument => {
+                    let source =
+                        std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
+                            crate::Error::InvalidFormat(format!(
+                                "changed main-document XML is not UTF-8: {error}"
+                            ))
+                        })?;
+                    let compact = crate::writer::doc::compact_changed_document_xml(source)?;
+                    self.projected.with_rewritten_xml(compact.into_bytes())?
+                },
+            }
         };
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
@@ -5204,6 +5296,220 @@ fn shift_sibling_ranges(
 /// Move one layout offset by a signed length change.
 fn shifted_offset(offset: u32, delta: i64) -> Option<u32> {
     u32::try_from(i64::from(offset).checked_add(delta)?).ok()
+}
+
+/// Report whether the package writer would accept preserved main-document
+/// bytes without re-serializing them.
+///
+/// The OPC writer audits every authored XML part against the repository's
+/// compact-output contract before it plans a publication
+/// (`PackageWriter::validate_authored_xml`). Preservation republishes the
+/// producer's own bytes for every paragraph an edit did not change, and a
+/// producer that indents its markup — or writes a line break after the XML
+/// declaration, the witness change 0602 named — does not satisfy that
+/// contract. Publishing those bytes would turn an edit that succeeds today
+/// into a typed publication refusal, so
+/// [`CompactionPolicy::PreserveUnmodified`] declines to preserve such a
+/// document and takes the whole-document route, which publishes byte for byte
+/// what the same edit published before this policy existed.
+///
+/// The gate runs the auditor the writer runs, under the writer's limits, so it
+/// cannot reach a different verdict than the writer. It is asked of the
+/// *source* snapshot rather than the candidate because the compactor's own
+/// output always satisfies the contract — one ASCII space between attributes,
+/// no whitespace before a tag close, no whitespace-only text run outside
+/// `xml:space="preserve"`, no document type declaration — so a compact source
+/// spliced with compacted paragraphs is compact, and a source the writer would
+/// refuse is refused whichever paragraphs the edit touched.
+///
+/// Change 0652's decision 2 loosens that audit for original part bytes (queue
+/// row 2 of change 0651, implemented separately in this wave). When it lands
+/// this function is the one place that has to change.
+fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
+    !carries_character_data_outside_the_root(xml)
+        && xml_minifier::audit::verify_authored(xml, xml_minifier::audit::Limits::default()).is_ok()
+}
+
+/// Report whether the document carries character data outside its root
+/// element.
+///
+/// The publication audit refuses that unconditionally, whatever the rest of the
+/// document looks like: whitespace at depth zero is `FormattingWhitespace` and
+/// anything else outside the document element is malformed. Answering the case
+/// from the first bytes keeps the cost of the audit off the documents that
+/// cannot use its answer. A line break between the XML declaration and the
+/// root element — the shape 53 of this repository's 55 openable DOCX fixtures
+/// have, and the witness change 0602 named — is then decided in about sixty
+/// bytes instead of a whole-document parse.
+///
+/// This is a necessary condition, never a sufficient one: `false` only sends
+/// the document to the real auditor, which remains the verdict.
+fn carries_character_data_outside_the_root(xml: &[u8]) -> bool {
+    // A document whose last byte is not a tag close has trailing character
+    // data after its root element closed.
+    if xml.last() != Some(&b'>') {
+        return true;
+    }
+    let mut cursor = 0usize;
+    loop {
+        let Some(rest) = xml.get(cursor..) else {
+            return true;
+        };
+        match rest.first() {
+            // Anything but markup here is character data at depth zero.
+            Some(b'<') => {},
+            _ => return true,
+        }
+        let (terminator, opening) = match (rest.get(1), rest.get(2..4)) {
+            (Some(b'?'), _) => (b"?>".as_slice(), 2usize),
+            (Some(b'!'), Some(b"--")) => (b"-->".as_slice(), 4),
+            // A document type declaration with an internal subset can close
+            // early here; `scan_document` has already refused one, and the
+            // auditor refuses it again, so an early stop only costs a parse.
+            (Some(b'!'), _) => (b">".as_slice(), 2),
+            // The root element's start tag: nothing preceded it but markup.
+            _ => return false,
+        };
+        let Some(tail) = rest.get(opening..) else {
+            return true;
+        };
+        let Some(end) = tail
+            .windows(terminator.len())
+            .position(|window| window == terminator)
+        else {
+            return true;
+        };
+        cursor += opening + end + terminator.len();
+    }
+}
+
+/// The `xml:space` attribute name, whose inherited value is the only state
+/// [`crate::writer::doc::compact_changed_document_xml`] carries into a body
+/// child from its ancestors.
+const XML_SPACE_ATTRIBUTE: &[u8] = b"xml:space";
+
+/// Compact only the direct-body paragraphs a committed edit changed, leaving
+/// every other byte of the main document exactly as it was read.
+///
+/// This is [`CompactionPolicy::PreserveUnmodified`]. A paragraph is *changed*
+/// when its bytes differ from the bytes of the source snapshot's paragraph at
+/// the same position; a changed paragraph is compacted on its own, as a single
+/// closed root, and spliced back through the derived-layout route so no
+/// whole-document rescan is needed.
+///
+/// **Why a paragraph fragment compacts to the same bytes as its range would
+/// under the whole-document pass.** The compactor is a plain `Reader`: it never
+/// resolves namespace prefixes, so a fragment whose prefixes are declared on an
+/// ancestor compacts exactly as it would in place. Its pending-whitespace and
+/// text-run state is reset at every element boundary, and a direct-body
+/// paragraph begins at one. Its only inherited state is the `xml:space` stack,
+/// whose value at a direct-body paragraph comes from `w:document` and `w:body`
+/// alone; when either of those start tags carries an `xml:space` attribute this
+/// function declines and publishes the projection unchanged, rather than
+/// compact a fragment under an inherited value it cannot see.
+///
+/// Declining is never a refusal: it publishes the bytes the edit produced,
+/// which is what this policy promises for everything it does not compact.
+fn compact_changed_paragraphs(
+    base: &Snapshot,
+    projected: &Snapshot,
+) -> TransactionResult<Snapshot> {
+    if base.paragraphs.len() != projected.paragraphs.len() || inherits_xml_space(projected) {
+        return Ok(projected.clone());
+    }
+    let source = projected.xml_bytes();
+    let original = base.xml_bytes();
+    let mut replacements: Vec<(usize, usize, Vec<u8>)> = Vec::new();
+    for (range, base_range) in projected.paragraphs.iter().zip(base.paragraphs.iter()) {
+        let (Some(candidate), Some(previous)) = (
+            paragraph_slice(source, *range),
+            paragraph_slice(original, *base_range),
+        ) else {
+            return Ok(projected.clone());
+        };
+        if candidate == previous {
+            continue;
+        }
+        let text = std::str::from_utf8(candidate).map_err(|error| {
+            crate::Error::InvalidFormat(format!("changed paragraph XML is not UTF-8: {error}"))
+        })?;
+        let compact = crate::writer::doc::compact_changed_document_xml(text)?;
+        if compact.as_bytes() == candidate {
+            continue;
+        }
+        let (Ok(start), Ok(length)) = (usize::try_from(range.start), usize::try_from(range.length))
+        else {
+            return Ok(projected.clone());
+        };
+        let Some(end) = start.checked_add(length) else {
+            return Ok(projected.clone());
+        };
+        replacements
+            .try_reserve(1)
+            .map_err(|source| crate::Error::Allocation {
+                resource: "changed paragraph compaction plan",
+                source,
+            })?;
+        replacements.push((start, end, compact.into_bytes()));
+    }
+    if replacements.is_empty() {
+        return Ok(projected.clone());
+    }
+    let xml = replace_ranges(source, &replacements)?;
+    let mut splices = Vec::new();
+    splices
+        .try_reserve_exact(replacements.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "changed paragraph compaction splices",
+            source,
+        })?;
+    splices.extend(
+        replacements
+            .iter()
+            .map(|(start, end, replacement)| ParagraphSplice {
+                start: *start,
+                end: *end,
+                replacement,
+            }),
+    );
+    projected.with_spliced_paragraphs(xml, &splices)
+}
+
+/// Borrow one body-child range out of the bytes that carry it.
+fn paragraph_slice(xml: &[u8], range: Range) -> Option<&[u8]> {
+    let start = usize::try_from(range.start).ok()?;
+    let end = start.checked_add(usize::try_from(range.length).ok()?)?;
+    xml.get(start..end)
+}
+
+/// Report whether any ancestor of the direct-body children declares
+/// `xml:space`.
+///
+/// Every direct-body child is a child of `w:body`, whose only ancestor is the
+/// document root, so both start tags lie before the first direct-body child.
+/// Searching those bytes for the attribute name is conservative: a match in an
+/// attribute *value* also declines, which costs a compaction and preserves
+/// bytes.
+fn inherits_xml_space(snapshot: &Snapshot) -> bool {
+    let prologue_end = [
+        snapshot.paragraphs.first().map(|range| range.start),
+        snapshot.tables.first().map(|range| range.start),
+        snapshot.block_controls.first().map(|range| range.start),
+        Some(snapshot.content_end),
+    ]
+    .into_iter()
+    .flatten()
+    .min()
+    .unwrap_or(0);
+    let Ok(prologue_end) = usize::try_from(prologue_end) else {
+        return true;
+    };
+    let Some(prologue) = snapshot.xml_bytes().get(..prologue_end) else {
+        return true;
+    };
+    prologue
+        .windows(XML_SPACE_ATTRIBUTE.len())
+        .any(|window| window == XML_SPACE_ATTRIBUTE)
 }
 
 /// Whether splicing `after` in place of `before` leaves every verdict of
@@ -7829,6 +8135,336 @@ mod tests {
             .unwrap()
             .document_snapshot()
             .unwrap()
+    }
+
+    /// A compact main document whose untouched paragraph carries an attribute
+    /// value the compactor re-escapes.
+    ///
+    /// The document satisfies the publication audit exactly as written — one
+    /// ASCII space between attributes, no whitespace-only text run, no
+    /// whitespace before a tag close — so the preserving policy publishes it
+    /// as it stands, while whole-document compaction rewrites `'` to `&apos;`
+    /// in a paragraph no edit named.
+    fn apostrophe_corpus() -> Vec<u8> {
+        document(concat!(
+            "<w:p><w:pPr><w:pStyle w:val=\"it's\"/></w:pPr><w:r><w:t>first</w:t></w:r></w:p>",
+            "<w:p><w:r><w:t>second</w:t></w:r></w:p>",
+        ))
+    }
+
+    #[test]
+    fn the_default_policy_leaves_an_untouched_paragraph_byte_for_byte() {
+        let base = Snapshot::from_xml(apostrophe_corpus()).unwrap();
+        assert_eq!(
+            base.edit().compaction_policy(),
+            CompactionPolicy::PreserveUnmodified
+        );
+        let untouched = paragraph_bytes(&base, 0);
+        let untouched = base.xml_bytes()[untouched.0..untouched.1].to_vec();
+        assert!(untouched.windows(6).any(|window| window == b"it's\"/"));
+
+        let mut edit = base.edit();
+        edit.replace_paragraph_text(Position::new(1), "second edited")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let published = commit.snapshot();
+        let range = paragraph_bytes(published, 0);
+        assert_eq!(
+            &published.xml_bytes()[range.0..range.1],
+            untouched.as_slice(),
+            "the default policy must republish an untouched paragraph byte for byte"
+        );
+        assert_eq!(
+            published
+                .paragraph(Position::new(1))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "second edited"
+        );
+    }
+
+    #[test]
+    fn the_opt_in_policy_compacts_every_paragraph_including_untouched_ones() {
+        let base = Snapshot::from_xml(apostrophe_corpus()).unwrap();
+        let mut edit = base
+            .edit()
+            .with_compaction_policy(CompactionPolicy::WholeDocument);
+        assert_eq!(edit.compaction_policy(), CompactionPolicy::WholeDocument);
+        edit.replace_paragraph_text(Position::new(1), "second edited")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let published = commit.snapshot();
+        let range = paragraph_bytes(published, 0);
+        let untouched = &published.xml_bytes()[range.0..range.1];
+        assert!(
+            untouched.windows(10).any(|window| window == b"it&apos;s\""),
+            "whole-document compaction re-escapes an untouched paragraph's attributes"
+        );
+        assert_eq!(
+            published
+                .paragraph(Position::new(1))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "second edited"
+        );
+        assert_eq!(published.paragraph_count(), base.paragraph_count());
+    }
+
+    #[test]
+    fn a_source_the_publication_audit_refuses_takes_the_whole_document_route() {
+        // A line break between the XML declaration and the root element is
+        // character data outside the document element, which the publication
+        // audit always refuses. The preserving policy must not hand those
+        // bytes to the writer.
+        let mut xml = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".to_vec();
+        xml.extend_from_slice(&apostrophe_corpus());
+        assert!(!publication_accepts_preserved_xml(&xml));
+        let base = Snapshot::from_xml(xml).unwrap();
+
+        let mut preserving = base.edit();
+        preserving
+            .replace_paragraph_text(Position::new(1), "second edited")
+            .unwrap();
+        let preserved = preserving.commit().unwrap();
+
+        let mut compacting = base
+            .edit()
+            .with_compaction_policy(CompactionPolicy::WholeDocument);
+        compacting
+            .replace_paragraph_text(Position::new(1), "second edited")
+            .unwrap();
+        let compacted = compacting.commit().unwrap();
+
+        assert_eq!(
+            preserved.snapshot().xml_bytes(),
+            compacted.snapshot().xml_bytes(),
+            "the fallback must publish exactly what the whole-document route publishes"
+        );
+        assert!(publication_accepts_preserved_xml(
+            preserved.snapshot().xml_bytes()
+        ));
+    }
+
+    #[test]
+    fn an_exact_no_op_is_untouched_by_either_policy() {
+        let base = Snapshot::from_xml(apostrophe_corpus()).unwrap();
+        for policy in [
+            CompactionPolicy::PreserveUnmodified,
+            CompactionPolicy::WholeDocument,
+        ] {
+            let commit = base.edit().with_compaction_policy(policy).commit().unwrap();
+            assert!(!commit.patch().changed());
+            assert_eq!(commit.snapshot().xml_bytes(), base.xml_bytes());
+        }
+    }
+
+    #[test]
+    fn the_preserving_policy_survives_a_clone_and_an_inherited_ancestor_space() {
+        let base = Snapshot::from_xml(apostrophe_corpus()).unwrap();
+        let edit = base
+            .edit()
+            .with_compaction_policy(CompactionPolicy::WholeDocument);
+        assert_eq!(
+            edit.try_clone().unwrap().compaction_policy(),
+            CompactionPolicy::WholeDocument
+        );
+
+        // `w:body` carrying `xml:space` is state the paragraph fragment cannot
+        // see, so the preserving policy declines to compact fragments at all
+        // and publishes the projection unchanged.
+        let xml = format!(
+            "<w:document xmlns:w=\"{WORD}\"><w:body xml:space=\"preserve\">\
+             <w:p><w:r><w:t>one</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"
+        )
+        .into_bytes();
+        let base = Snapshot::from_xml(xml).unwrap();
+        assert!(inherits_xml_space(&base));
+        let mut edit = base.edit();
+        edit.replace_paragraph_text(Position::new(0), "two")
+            .unwrap();
+        let projected = edit.projected().xml_bytes().to_vec();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.snapshot().xml_bytes(), projected.as_slice());
+    }
+
+    #[test]
+    fn the_cheap_gate_only_refuses_what_the_auditor_refuses() {
+        let compact = apostrophe_corpus();
+        assert!(!carries_character_data_outside_the_root(&compact));
+        assert!(publication_accepts_preserved_xml(&compact));
+
+        let cases: [&[u8]; 6] = [
+            // A line break after the XML declaration.
+            b"<?xml version=\"1.0\"?>\n<w:p/>",
+            // A space before the root element.
+            b" <w:p/>",
+            // Trailing whitespace after the root element.
+            b"<w:p/>\n",
+            // Text before the root element.
+            b"x<w:p/>",
+            // An unterminated processing instruction.
+            b"<?xml version=\"1.0\"",
+            // Nothing at all.
+            b"",
+        ];
+        for case in cases {
+            assert!(
+                carries_character_data_outside_the_root(case),
+                "the cheap gate should refuse {:?}",
+                String::from_utf8_lossy(case)
+            );
+            assert!(
+                xml_minifier::audit::verify_authored(case, xml_minifier::audit::Limits::default())
+                    .is_err(),
+                "the auditor should refuse {:?} too",
+                String::from_utf8_lossy(case)
+            );
+        }
+
+        // A comment or processing instruction around the root is markup, not
+        // character data, so the cheap gate defers to the auditor.
+        let framed = b"<?xml version=\"1.0\"?><!--note--><w:p/><!--after-->".as_slice();
+        assert!(!carries_character_data_outside_the_root(framed));
+
+        // Every fixture the auditor accepts must pass the cheap gate first,
+        // or the gate would send a publishable document down the fallback.
+        let mut audited = 0usize;
+        for path in docx_fixture_paths() {
+            let Ok(archive) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(package) = crate::Package::from_reader(std::io::Cursor::new(archive)) else {
+                continue;
+            };
+            let Ok(base) = package.document_snapshot() else {
+                continue;
+            };
+            audited += 1;
+            let xml = base.xml_bytes();
+            if xml_minifier::audit::verify_authored(xml, xml_minifier::audit::Limits::default())
+                .is_ok()
+            {
+                assert!(
+                    !carries_character_data_outside_the_root(xml),
+                    "the cheap gate contradicted the auditor on {}",
+                    path.display()
+                );
+            }
+        }
+        assert!(
+            audited >= 50,
+            "the corpus should reach this test: {audited}"
+        );
+    }
+
+    #[test]
+    fn both_policies_agree_across_the_docx_fixture_corpus() {
+        let mut fixtures = 0usize;
+        let mut edited = 0usize;
+        let mut preserving = 0usize;
+        let mut identical = 0usize;
+        for path in docx_fixture_paths() {
+            let Ok(archive) = std::fs::read(&path) else {
+                continue;
+            };
+            let Ok(package) = crate::Package::from_reader(std::io::Cursor::new(archive)) else {
+                continue;
+            };
+            let Ok(base) = package.document_snapshot() else {
+                continue;
+            };
+            fixtures += 1;
+            let gate = publication_accepts_preserved_xml(base.xml_bytes());
+            preserving += usize::from(gate);
+            for index in sampled_positions(base.paragraph_count(), 16) {
+                let mut default_edit = base.edit();
+                let Ok(_staged) =
+                    default_edit.replace_paragraph_text(Position::new(index), "litchi 0660")
+                else {
+                    continue;
+                };
+                let mut optin_edit = base
+                    .edit()
+                    .with_compaction_policy(CompactionPolicy::WholeDocument);
+                optin_edit
+                    .replace_paragraph_text(Position::new(index), "litchi 0660")
+                    .expect("the same rewrite is accepted under either policy");
+                let default_commit = default_edit.commit().unwrap();
+                let optin_commit = optin_edit.commit().unwrap();
+                edited += 1;
+
+                // Either policy keeps the document readable and the edit
+                // exactly where it was made.
+                for commit in [&default_commit, &optin_commit] {
+                    assert_eq!(
+                        commit.snapshot().paragraph_count(),
+                        base.paragraph_count(),
+                        "{} paragraph {index}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        commit.snapshot().table_count(),
+                        base.table_count(),
+                        "{} paragraph {index}",
+                        path.display()
+                    );
+                    assert_eq!(
+                        commit
+                            .snapshot()
+                            .paragraph(Position::new(index))
+                            .unwrap()
+                            .text()
+                            .unwrap(),
+                        "litchi 0660",
+                        "{} paragraph {index}",
+                        path.display()
+                    );
+                    assert!(layout_matches_rescan(commit.snapshot()));
+                }
+
+                if gate {
+                    // Preservation: every paragraph the edit did not name is
+                    // republished byte for byte.
+                    for other in 0..base.paragraph_count() {
+                        if other == index {
+                            continue;
+                        }
+                        let before = paragraph_bytes(&base, other);
+                        let after = paragraph_bytes(default_commit.snapshot(), other);
+                        assert_eq!(
+                            &base.xml_bytes()[before.0..before.1],
+                            &default_commit.snapshot().xml_bytes()[after.0..after.1],
+                            "{} paragraph {other} moved under the preserving policy",
+                            path.display()
+                        );
+                    }
+                } else {
+                    // The fallback publishes exactly what the whole-document
+                    // route publishes.
+                    assert_eq!(
+                        default_commit.snapshot().xml_bytes(),
+                        optin_commit.snapshot().xml_bytes(),
+                        "{} paragraph {index} diverged on the fallback",
+                        path.display()
+                    );
+                    identical += 1;
+                }
+            }
+        }
+        assert!(
+            fixtures >= 50 && edited >= 80,
+            "the corpus should reach this test: {fixtures} fixtures, {edited} edits"
+        );
+        assert!(
+            identical >= 70,
+            "the audit fallback should carry most of this corpus today: {identical}/{edited}"
+        );
+        assert!(
+            preserving >= 1,
+            "at least one fixture should take the preserving route: {preserving}/{fixtures}"
+        );
     }
 
     #[test]

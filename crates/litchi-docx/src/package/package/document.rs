@@ -31,6 +31,15 @@ impl Package {
 
     /// Capture an immutable, source-preserving main-document snapshot.
     ///
+    /// The snapshot shares the main part's payload allocation instead of
+    /// copying it. `Part::set_blob` and `set_blob_shared` replace the part's
+    /// `Arc` rather than mutating through it, and no route in the workspace
+    /// mutates a part payload in place, so a snapshot taken here keeps the
+    /// bytes it was built from for as long as it lives even after the package
+    /// publishes a different main document. Sharing also lets
+    /// [`Self::apply_document_patch`]'s exact-source proof settle on pointer
+    /// identity instead of a whole-part byte comparison.
+    ///
     /// # Errors
     ///
     /// Returns a typed transaction error when the package state is stale or
@@ -40,7 +49,7 @@ impl Package {
     ) -> std::result::Result<crate::document::Snapshot, crate::document::TransactionError> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
-        crate::document::Snapshot::from_xml(main.blob().to_vec())
+        crate::document::Snapshot::from_shared_xml(main.blob_arc())
     }
 
     /// Answer `Patch::apply`'s exact-source proof from the retained main part

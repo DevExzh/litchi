@@ -1051,3 +1051,90 @@ fn exact_source_patch_reuse_keeps_noop_arcs_stale_conflicts_and_scan_errors() {
         Err(crate::document::TransactionError::Document(_))
     ));
 }
+
+#[test]
+fn the_document_snapshot_shares_the_main_part_payload_instead_of_copying_it() {
+    let source_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&document_uri)?
+                .set_blob(source_xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
+
+    let retained = package.opc.main_document_part().unwrap().blob_arc();
+    let snapshot = package.document_snapshot().unwrap();
+    assert!(
+        std::ptr::eq(snapshot.xml_bytes().as_ptr(), retained.as_ptr()),
+        "the snapshot must borrow the part's allocation rather than copy it"
+    );
+
+    // Publishing a different main document replaces the part's `Arc` instead of
+    // mutating through it, so the snapshot taken before still reads its own
+    // bytes afterwards.
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(0), "after and longer")
+        .unwrap();
+    package.publish_document_edit(edit).unwrap();
+    assert_eq!(snapshot.xml_bytes(), source_xml);
+    assert!(!std::ptr::eq(
+        package.opc.main_document_part().unwrap().blob().as_ptr(),
+        retained.as_ptr()
+    ));
+}
+
+#[test]
+fn the_compaction_policy_reaches_publication_through_the_package_route() {
+    let source_xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="it's"/></w:pPr><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let build = || {
+        let mut package = Package::new().unwrap();
+        package
+            .edit_opc(|opc| {
+                opc.get_part_mut(&document_uri)?
+                    .set_blob(source_xml.to_vec());
+                Ok(())
+            })
+            .unwrap();
+        package
+    };
+
+    let mut preserving = build();
+    let mut edit = preserving.edit_document().unwrap();
+    edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")
+        .unwrap();
+    preserving.publish_document_edit(edit).unwrap();
+    let preserved = preserving.opc.main_document_part().unwrap().blob().to_vec();
+
+    let mut compacting = build();
+    let mut edit = compacting
+        .edit_document()
+        .unwrap()
+        .with_compaction_policy(crate::document::CompactionPolicy::WholeDocument);
+    edit.replace_paragraph_text(litchi_core::Position::new(1), "two edited")
+        .unwrap();
+    compacting.publish_document_edit(edit).unwrap();
+    let compacted = compacting.opc.main_document_part().unwrap().blob().to_vec();
+
+    assert!(
+        preserved.windows(6).any(|window| window == b"it's\"/"),
+        "the default policy republishes the untouched paragraph's bytes"
+    );
+    assert!(
+        compacted.windows(10).any(|window| window == b"it&apos;s\""),
+        "the opt-in policy re-serializes the untouched paragraph"
+    );
+    assert_ne!(preserved, compacted);
+
+    // Both publish: the preserved bytes satisfy the writer's authored-XML
+    // contract, so neither route is refused at save.
+    let mut published = Vec::new();
+    preserving.to_stream(&mut published).unwrap();
+    assert!(!published.is_empty());
+    let mut published = Vec::new();
+    compacting.to_stream(&mut published).unwrap();
+    assert!(!published.is_empty());
+}

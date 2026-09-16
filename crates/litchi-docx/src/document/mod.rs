@@ -18,10 +18,10 @@ pub(crate) use transaction::{TransferPart, TransferRelationship, durable_transfe
 
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
-    Commit, Composition, CompositionLimits, Diagnostics, Edit, History, HistoryLimits,
-    HyperlinkTextReplacement, JoinError, MergeChoice, Operation, ParagraphHyperlinkAddress,
-    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, RevisionKind,
-    Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError,
-    ThreeWayMergeFailure, ThreeWayPlan, TransactionError, TransactionResult, TransferGraph,
-    TransferRefusal,
+    Commit, CompactionPolicy, Composition, CompositionLimits, Diagnostics, Edit, History,
+    HistoryLimits, HyperlinkTextReplacement, JoinError, MergeChoice, Operation,
+    ParagraphHyperlinkAddress, ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit,
+    Refusal, RevisionKind, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
+    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransactionError, TransactionResult,
+    TransferGraph, TransferRefusal,
 };

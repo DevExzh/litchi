@@ -1,0 +1,12 @@
+==3311808== Callgrind, a call-graph generating cache profiler
+==3311808== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3311808== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==3311808== Command: /home/zhuhe/code/litchi-worktrees/targets/0660-probe/before/target/release/docx-compaction-policy-probe commit 10000 compact 3
+==3311808== 
+==3311808== For interactive control, run 'callgrind_control -h'.
+commit paragraphs=10000 compact=true measured=3 bytes=1710519
+==3311808== 
+==3311808== Events    : Ir
+==3311808== Collected : 518739841
+==3311808== 
+==3311808== I   refs:      518,739,841

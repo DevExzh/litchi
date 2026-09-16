@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-16T07:40:00Z",
+  "batch": [
+    "0660-docx-compaction-policy"
+  ],
+  "removed": [
+    "36 raw callgrind.out files (6.5 MB) written to /home/zhuhe/code/litchi-worktrees/targets/0660-cg, kept on disk rather than in the RAM-backed scratchpad from the first capture onward, and deleted once the inclusive annotations, the valgrind tails and the cfn/calls counts had been extracted into this packet",
+    "the two probe build trees under /home/zhuhe/code/litchi-worktrees/targets/0660-probe (660 MB together), including the per-leg copies of the probe whose REPLACE_WITH_CHECKOUT placeholder had been substituted; the probe source is retained here and both binaries' sha256s are in timing/binaries.txt and census/probe-binaries.txt",
+    "the two harness build trees /home/zhuhe/code/litchi-worktrees/targets/0660-{before,after-harness} (1.2 GB each) and the staged binary copies in /home/zhuhe/code/litchi-worktrees/targets/0660-stage (117 MB); their sha256s are recorded in README.md, in timing/binaries.txt and in each retained timing report's binary_identity block",
+    "the test and gate build trees /home/zhuhe/code/litchi-worktrees/targets/0660-after (24 GB), /home/zhuhe/code/litchi-worktrees/targets/0660-perfbase (16 GB) and /home/zhuhe/code/litchi-worktrees/targets/0660-clippy (900 MB, deleted mid-batch once clippy and rustdoc had been captured), and the filesystem root the ordinary-save selectors published into, /home/zhuhe/code/litchi-worktrees/targets/0660-fsroot",
+    "the change worktree /home/zhuhe/code/litchi-worktrees/0660 with its gitignored target/; the branch perf/0660-docx-compaction-policy is kept",
+    "the session scratchpad directory scratchpad/agents/0660 (about 9 MB): build logs, gate logs, the harness allocation JSON that turned out to carry no metrics for this case family, and the working copies of every script and output this packet retains"
+  ],
+  "retained_in_the_repository": [
+    "docs/performance/0660-docx-compaction-policy.md",
+    "docs/performance/results/change-0660/: the two census legs and their diff, the probe source and its Cargo template, the top-200 inclusive annotations and valgrind tails for both legs at both sample counts with the isolation-pair comparator and its summary, the 24 commit-region tails with their script and summary, the three paired-timing windows with every per-sample value, the timing script, the single-window and multi-window analyzers, paired-summary.json, binaries.txt, gates.txt, log-sections.md, README.md, decision.json and this file"
+  ],
+  "repository_state": "the shared working copy /home/zhuhe/code/litchi was never edited, built or tested by this change; all work happened in the change worktree, and the corpus under /home/zhuhe/code/litchi/test-data was only read",
+  "background_tasks": "no measurement process remains",
+  "notes": [
+    "the scratchpad was swept during the batch, not only at its end: callgrind raw output went to disk rather than to the 62 GiB tmpfs from the first capture onward, the clippy build tree was deleted as soon as its gate tail had been captured, and the scratchpad never exceeded 10 MB",
+    "the annotations are truncated to the top 200 inclusive rows because the full tables are about 200 KB each and every symbol the record cites sits inside them; the head -200 is stated in counts/counts.sh",
+    "the first paired-timing window (timing/w1) measured a change binary that a later no-op refactor replaced -- two identical match arms merged and three private functions moved off the end of another function's doc comment -- so the deterministic counts, the census and two further timing windows were re-run against the committed binary; all three windows are retained and the record quotes the third",
+    "no file was written under /tmp outside the session scratchpad, and no worktree, target directory or fixture copy was ever placed on the tmpfs"
+  ],
+  "revision": "70d7768cc6dada420ede063f72c88dc99ad30383",
+  "revision_note": "the base revision both legs were measured against; this file is committed with the change rather than after it"
+}

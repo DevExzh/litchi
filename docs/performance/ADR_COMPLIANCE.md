@@ -1,5 +1,54 @@
 # Performance optimization ADR-compliance matrix
 
+## 0660 — compliant; ADR 0006 chooses the default, and a contract this record consults rather than moves
+
+Record: [0660](0660-docx-compaction-policy.md).
+
+Change 0660 is compliant and amends no ADR — change 0652 assigns ADR amendments
+to decisions 2, 4 and 5, not to decision 10 — but it is decided by two.
+**ADR 0006 (preserve by default)** chooses which way round the new public
+`CompactionPolicy` points: preservation is the default and whole-document
+compaction the opt-in, because ADR 0006 makes preservation the thing a caller
+gets without asking. It also settles how far preservation reaches: into the
+edited part's untouched paragraphs, not merely to untouched parts. **ADR 0003
+(edits are source-checked and reversible; a refusal is typed, never a partial
+result)** is preserved: `commit()` returns the same `Commit`, the snapshot stays
+immutable and cheaply shared, `Patch::apply`'s `same_source` still gates every
+application, and the semantic readback after each rewrite is untouched. **ADR
+0005 (mandatory validation; no leakage)** is preserved in both halves: no check
+is removed, weakened, reordered or made conditional; `scan_document` runs on
+exactly the inputs it ran on with `MAX_DOCUMENT_XML_BYTES`,
+`MAX_DOCUMENT_NODES` and `MAX_DOCUMENT_DEPTH` at their values, identities and
+enforcement points; every splice still has to satisfy 0591's
+`preserves_body_child_shape`, and anything it declines falls back to the full
+rescan, so no new path exists between unproven bytes and a snapshot. No archive
+type, lock or executor reaches the public API; no new `unsafe` (the crate
+remains `#![forbid(unsafe_code)]`); no new dependency (`xml-minifier` was
+already a `litchi-docx` dependency); no ambient I/O and no global pool. **Two
+rows are stated rather than left implicit.** First, the **breaking change**
+0652's trade-off 1 authorizes: `Edit::commit`'s default output bytes change for
+a source that satisfies the publication contract and is not invariant under
+compaction, and with it **one refusal class narrows** — a refusal raised only
+because whole-document compaction re-serialized untouched markup is not raised
+for markup the default does not re-serialize. The opt-in raises it with the
+identical error, no snapshot-level refusal moved, and the 63-fixture census
+shows no refusal string differing on any route. Second, the **contract this
+record consults but does not move**: the OPC writer's authored-XML compactness
+audit refuses preserved bytes for 54 of 55 openable fixtures, and rather than
+widen the default past it, `CompactionPolicy::PreserveUnmodified` asks that
+auditor — the writer's own, under the writer's limits, so the two cannot
+disagree — and falls back to the base leg's route. That contract is 0652's
+decision 2, row 2 of 0651's queue, and belongs to another record in this wave.
+Change [0629](0629-facade-docx-budget-test-bisect.md)'s managed budget contract
+is unaffected: both splice routes produce `admission: None` and an owned storage
+exactly as `with_rewritten_xml` did, so a compacting commit detached its managed
+admission before this record as it does after it, and no `reserve_managed` call
+site moved. Change [0650](0650-docx-editor-byte-order-mark-admission.md)'s
+byte-order-mark carry is untouched — `compact_changed_document_xml` is not
+modified — and none of 0650's four frozen follow-ups is resolved here.
+`performance_claim: none`. OLE2/OOXML remain active; ODF is deferred until
+completion and iWork excluded.
+
 ## 0658 — XLSX selected-cell ineligibility gate, landed
 
 ADR 0005 places container, relationship/catalog, security and mandatory structural validation at open and loads semantic payloads lazily; it does not state which reader owns a lazily loaded payload's refusal, so it does not contradict the landed behaviour and **is not amended**. Change 0362 already assigned that ownership — "`NotEligible` is not worksheet semantic validity. The caller MUST fall back to the eager parser" — and this change makes the code match: the streaming scan owns only what it observes before the verdict, and the materialized parser owns the worksheet payload's mandatory validation and its first typed error. No fence moved: the XLSX read uses the non-abortable `with_verified_entry_reader`, documented as "a successful callback is still drained and fully verified", so a stopped callback still leaves the member drained and CRC/size-verified, and the part-byte limit, execution-context, memory-reservation and source-version fences around it are untouched. ADR 0003 holds — the read publishes the materialized store's complete answer or a typed refusal, never a partial result — and change 0642's refusal-before-visit guarantee is preserved, `visit_cells` still resolving the whole selection through `finish_result` before the first callback; 0642's *wording* that "the scan still runs to EOF" now describes the eligible branch only. ADR 0001's layering and ADR 0005's no-leakage rules are untouched: `ActiveFlow` is a plain two-variant enum, no archive type, raw lock or executor is exposed, and there are **no breaking changes**. Residual: the stream's `max_event_bytes`, attribute, context-byte and depth bounds now apply only up to the marking event, with the materialized parser's own bounds applying after it — this narrows change 0597's open limit question rather than closing it, and is stated in the record's Limitations. No new `unsafe`, no new dependency, no weakened limit. `cargo fmt --all --check`, `cargo clippy -p litchi-ooxml-common -p litchi-xlsx --all-targets`, `cargo doc --no-deps` and `python3 tools/non_iwork_gate.py verify` are clean. Accepted ADR hashes unchanged. See [Change 0658](0658-xlsx-selected-cell-ineligibility-gate.md); `performance_claim: none`.
