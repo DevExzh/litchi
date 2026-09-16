@@ -1,0 +1,18 @@
+case                                           A1 p50     B1 p50     B2 p50     A2 p50    A/A %   B1-A1 %   B2-A2 %  pooled %
+docx_file_eager_full_text                      211276     129925     129605     214471     1.51    -38.50    -39.57    -39.04
+docx_file_eager_paragraph_count                127591     140021     139856     127291    -0.24      9.74      9.87      9.81
+docx_file_source_full_text                     304681     216051     210061     306187     0.49    -29.09    -31.39    -30.24
+
+case                                      leg           p50          mean         p95         p99         min
+docx_file_eager_full_text                 A1         211276      212452.3      220031      224591      206861
+docx_file_eager_full_text                 B1         129925      131940.0      143831      161561      126361
+docx_file_eager_full_text                 B2         129605      135716.8      143121      388232      126620
+docx_file_eager_full_text                 A2         214471      216732.6      227561      247741      207991
+docx_file_eager_paragraph_count           A1         127591      128611.7      134751      136341      124060
+docx_file_eager_paragraph_count           B1         140021      141321.8      147871      151390      135231
+docx_file_eager_paragraph_count           B2         139856      141359.5      148290      158860      135641
+docx_file_eager_paragraph_count           A2         127291      128718.7      135951      138360      123131
+docx_file_source_full_text                A1         304681      307045.5      320521      334902      294481
+docx_file_source_full_text                B1         216051      220454.5      228751      502893      200201
+docx_file_source_full_text                B2         210061      213516.7      242291      250161      198041
+docx_file_source_full_text                A2         306187      307165.4      321352      344102      293271

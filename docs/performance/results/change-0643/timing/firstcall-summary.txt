@@ -1,0 +1,18 @@
+case                                         A1 p50     B1 p50     B2 p50     A2 p50    A/A %  pooled %
+eager_noprep_paragraph_count-harness         135881     138131     137121     135851    -0.02      1.30
+eager_prepared_paragraph_count-harness       121811     129761     129890     121680    -0.11      6.64
+eager_prepared_warm_paragraph_count-harness     120210     121371     121291     119941    -0.22      1.05
+
+case                                    leg       n         p50          mean         p95         p99         min
+eager_noprep_paragraph_count-harness    A1       60      135881      138737.1      152101      177711      133891
+eager_noprep_paragraph_count-harness    B1       60      138131      141098.9      151921      185641      134810
+eager_noprep_paragraph_count-harness    B2       60      137121      139433.6      148501      196481      135081
+eager_noprep_paragraph_count-harness    A2       60      135851      137027.2      146541      152690      133791
+eager_prepared_paragraph_count-harness  A1       60      121811      124546.8      149101      166391      120901
+eager_prepared_paragraph_count-harness  B1       60      129761      132299.1      146071      165721      128631
+eager_prepared_paragraph_count-harness  B2       60      129890      131583.1      138101      182420      128721
+eager_prepared_paragraph_count-harness  A2       60      121680      124289.3      129751      171461      120780
+eager_prepared_warm_paragraph_count-harnessA1       60      120210      122929.5      132041      164830      119221
+eager_prepared_warm_paragraph_count-harnessB1       60      121371      123612.8      141950      161150      120080
+eager_prepared_warm_paragraph_count-harnessB2       60      121291      122444.1      130961      133510      119831
+eager_prepared_warm_paragraph_count-harnessA2       60      119941      121127.8      128780      173061      118890

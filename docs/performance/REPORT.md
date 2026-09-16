@@ -1,5 +1,35 @@
 # Performance program phase report
 
+## 0643 — a DOCX text export that stops copying, and a mystery from 0592 solved
+
+Record: [0643](0643-docx-paragraph-count-and-sink-text.md).
+
+`litchi-docx`: streaming a document's text into a caller's sink used to copy every
+piece of XML twice on the way past — once into a scratch buffer, once into a fresh
+heap allocation — even though the document was already sitting in memory as a plain
+slice of bytes. It no longer does. On a 10,000-paragraph document the export makes
+**10,045 heap allocations instead of 90,051**, moves **1.2 MB fewer bytes through
+the allocator**, and finishes about **16% sooner**; on a real 200-paragraph file
+with 16 MB of images it finishes about 12% sooner. The text it writes is identical,
+byte for byte, and so is every refusal: 333 documents were exported through five
+different sink policies on both the before and the after build — including 129
+malformed-document refusals, 142 size-limit refusals and 74 sink failures, each
+with the exact amount of output it had already produced — and the two signature
+files match exactly.
+
+The same change settles something an earlier one could not. Change 0592 made the
+paragraph index lazy, which made reading a document's text about 40% faster, but it
+also made one benchmark — counting paragraphs — about 5% *slower*, and that record
+honestly said it did not know why. It is now known, and it is a measurement
+artifact rather than a cost. The benchmark warms up by extracting the document's
+text first, and on the old build that warm-up happened to build and throw away the
+very index the timed step then rebuilt, so the timed step was running warm code;
+on the new build the warm-up does not touch it, so the timed step runs it cold. The
+timed step executes *fewer* instructions on the new build. Give the warm-up one
+paragraph query, so both builds enter the stopwatch equally warm, and the gap
+essentially disappears. It was not "fixed", because the only honest fix is to put
+back the work that made text reading 40% faster.
+
 ## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
 
 Record: [0632](0632-zip-directory-prefill-locate.md).

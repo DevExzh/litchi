@@ -1,0 +1,84 @@
+Gates for change 0643, run in /home/zhuhe/code/litchi-worktrees/0643 (branch
+perf/0643-docx-paragraph-count-and-sink-text, base c7326f680). Tails only.
+
+### cargo fmt --all --check
+exit=0
+
+### cargo clippy -p litchi-docx --all-targets
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0643/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0643/crates/xml-minifier)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.93s
+exit=0
+
+### cargo doc -p litchi-docx --no-deps
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.02s
+   Generated /home/zhuhe/code/litchi-worktrees/0643/target/doc/litchi_docx/index.html
+exit=0
+
+### cargo test -p litchi-docx
+test crates/litchi-docx/src/writer/vml_shape.rs - writer::vml_shape::MutableVmlShape (line 91) - compile ... ok
+test crates/litchi-docx/src/field/model/base.rs - field::model::base::Field::field_type (line 100) ... ok
+
+test result: ok. 74 passed; 0 failed; 31 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.70s; merged doctests compilation took 0.70s
+exit=0
+
+### cargo test -p litchi-docx (aggregate)
+52 test binaries: 1467 passed, 0 failed, 31 ignored
+exit=0
+
+### cargo test -p litchi --features docx,xlsx,pptx,xls
+26 test binaries: 266 passed, 0 failed, 7 ignored
+
+### cargo test in tools/perf-baseline
+19 test binaries: 531 passed, 0 failed, 1 ignored
+
+### python3 tools/non_iwork_gate.py check
+    Checking proptest v1.7.0
+    Checking clap v4.4.18
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0643/crates/litchi)
+    Finished `dev` profile [unoptimized] target(s) in 2m 04s
+exit=0
+
+### python3 tools/check_crate_boundaries.py
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+exit=0
+
+### python3 tools/check_report_claim_classification.py
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+### python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural  (after leg)
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+exit=2
+
+### same gate on the untouched before checkout at c7326f680
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires strict evidence verification
+exit=2
+
+The only failing gate is check_perf_claims.py --mode structural, and it fails
+identically on the untouched before checkout at the same base commit. Change
+0643 registers no claim, does not touch docs/performance/claim-registry-v1.json,
+and modifies no litchi-xlsx file. Change 0592 recorded the same pre-existing
+failure.
+
+Corpus differentials cited by the record (probe binaries in
+docs/performance/results/change-0643/probe, sha256s in decision.json):
+
+  corpus0643 test-data                      62 fixtures, base and after sha256
+                                            b8651f42a2ca5f7493ad03593901e54ae4e0f11a7906f7983001b985ba4eebe9
+  corpus0643 docs/performance/results       270 fixtures, base and after sha256
+                                            53fe11c85c4d5e2c35cf51bbc26593d49e1f5f772332cf84409a172f48cdcc63
+  corpus0643 <harness corpus file>          1 fixture, base and after sha256
+                                            bdf0c7a370fa7ad1ae71db6688493ded33348b498814a4dadf8085b32e655207

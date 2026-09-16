@@ -1,5 +1,44 @@
 # Performance optimization ADR-compliance matrix
 
+## 0643 — compliant; one contract question raised and answered by declining
+
+Record: [0643](0643-docx-paragraph-count-and-sink-text.md).
+
+Change 0643 (`litchi-docx`: the borrowing sink text parser, plus an attribution
+that changed no source) is compliant and adds no ADR question. **ADR 0003
+(snapshots and borrowed views):** "borrowed zero-copy inputs produce scoped views,
+and conversion to owned storage is explicit" is the shape this restores — the
+events now borrow the slice the caller already owns for the whole call (the part's
+cached visible XML on the eager facade, the `Cow` materialized before the loop on
+the source-backed one), and the only owned storage left in the emission loop is
+the bounded paragraph `String` the parser must accumulate. **ADR 0005 (bounded
+resources):** retained memory moves strictly downwards — one heap allocation per
+event and one growable buffer are gone, nothing new is retained, and no limit is
+relaxed. `MAX_SEMANTIC_TEXT_RAW_XML_BYTES`, the processed-XML ceiling,
+`MAX_SEMANTIC_TEXT_EVENTS`, `MAX_SEMANTIC_TEXT_DEPTH`, the name, attribute,
+namespace-binding, namespace-byte, reference, run, paragraph-count,
+paragraph-byte and decoded-document-byte ceilings and every `try_reserve` are
+untouched, and each trips on the same event because `semantic_event_bytes`
+measures the same payload borrowed or copied. No new `unsafe`, no new dependency.
+**ADR 0006 (validation and preservation):** no validation moved, none was added
+and none was removed; `preflight_semantic_xml` still walks the whole part before
+emission begins, and the source-backed route's `check_execution()` and
+`source_version()` fences still run before the payload, before and after every
+read, before each paragraph emission and around every sink write. Because the
+events borrow an owned in-memory buffer rather than the source, no borrow outlives
+a fence it did not outlive before. Error identity is proved two ways: two new
+tests pin end of input in both of its shapes on both facades — a tail ending on a
+token boundary and one ending inside a start tag, each with zero progress and an
+empty sink — **and both tests pass on the unmodified base as well**, and the
+333-document differential reports identical refusals, identical partial output and
+identical progress. This is a read path; no package byte is written, so `Preserve`
+is untouched. **Contract movement: none — and one proposal to move one was
+declined.** Memoizing the DOCX paragraph index across `document()` calls on one
+`Package` would remove the residual measured in part (a), but it extends a cache
+lifetime across view boundaries and would move a `DocumentIndexAdmission` charge
+on the budget-managed source-backed route; it is left to a frozen design record,
+for the same reason change 0592 left the managed branch alone.
+
 ## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
 
 Record: [0632](0632-zip-directory-prefill-locate.md).
