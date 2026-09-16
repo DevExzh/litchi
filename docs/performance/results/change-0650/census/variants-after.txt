@@ -1,0 +1,40 @@
+a0-nomc-nobom.docx open ok
+a0-nomc-nobom.docx reader ok paragraphs=1 text=12bytes
+a0-nomc-nobom.docx reader_bom part=false view=false
+a0-nomc-nobom.docx sections ok count=1
+a0-nomc-nobom.docx document_mut ok
+a0-nomc-nobom.docx noop_save 553de3fb221f46bc2e7f646bd983acb1bc08e332e81ad58c4e4dd690c67a9f89 bytes=10922
+a0-nomc-nobom.docx touch_save 553de3fb221f46bc2e7f646bd983acb1bc08e332e81ad58c4e4dd690c67a9f89 bytes=10922
+a0-nomc-nobom.docx managed_edit 30f80f103d425225d2a42fc4638e43ab4474bc2f6d500734287eb9db5e4d8365 bytes=10964
+a0-nomc-nobom.docx edit_save 48787132755656e51b70ce9e6dbe6eb2c9eac71eff3734e8668c96618267b639 bytes=10977
+a0-nomc-nobom.docx reopen ok paragraphs=2 text=29bytes
+a1-nomc-bom.docx open ok
+a1-nomc-bom.docx reader ok paragraphs=1 text=12bytes
+a1-nomc-bom.docx reader_bom part=true view=false
+a1-nomc-bom.docx sections ok count=1
+a1-nomc-bom.docx document_mut ok
+a1-nomc-bom.docx noop_save 9326225933e197f2abd14bdd39a0a65544f15784327ae64df0cfb26034175302 bytes=10931
+a1-nomc-bom.docx touch_save 9326225933e197f2abd14bdd39a0a65544f15784327ae64df0cfb26034175302 bytes=10931
+a1-nomc-bom.docx managed_edit refused:invalid DOCX XML: ill-formed document: expected `</w:bo<w:p>`, but `</w:p>` was found
+a1-nomc-bom.docx edit_save refused:I/O error: Failed to save package: XML publication rejected for '/word/document.xml': malformed XML at byte 0: invalid XML declaration boundary
+a1-nomc-bom.docx reopen skipped
+b0-mc-nobom.docx open ok
+b0-mc-nobom.docx reader ok paragraphs=2 text=38bytes
+b0-mc-nobom.docx reader_bom part=false view=false
+b0-mc-nobom.docx sections ok count=1
+b0-mc-nobom.docx document_mut ok
+b0-mc-nobom.docx noop_save f8592bc85b70469f80cabebe2d80e1f516ac894093dee6b7784dc4d2c27643fb bytes=9495
+b0-mc-nobom.docx touch_save f8592bc85b70469f80cabebe2d80e1f516ac894093dee6b7784dc4d2c27643fb bytes=9495
+b0-mc-nobom.docx managed_edit f8d9106a7a07d142a3e3bb447d8518c18bb9571883dec1086b770f5c67ea86ed bytes=9537
+b0-mc-nobom.docx edit_save 08fb04359bdfbfbdf8c8410660f6d076eb225329fa64dee1f57b4b9cd48f8b9f bytes=9534
+b0-mc-nobom.docx reopen ok paragraphs=3 text=55bytes
+b1-mc-bom.docx open ok
+b1-mc-bom.docx reader ok paragraphs=2 text=38bytes
+b1-mc-bom.docx reader_bom part=true view=false
+b1-mc-bom.docx sections ok count=1
+b1-mc-bom.docx document_mut ok
+b1-mc-bom.docx noop_save c8b441736b40858021a8b002ba76892e5c337bf3acf28ab9da296e91e4026bde bytes=9504
+b1-mc-bom.docx touch_save c8b441736b40858021a8b002ba76892e5c337bf3acf28ab9da296e91e4026bde bytes=9504
+b1-mc-bom.docx managed_edit refused:invalid DOCX XML: ill-formed document: expected `</w:bo<w:p>`, but `</w:p>` was found
+b1-mc-bom.docx edit_save refused:I/O error: Failed to save package: XML publication rejected for '/word/document.xml': malformed XML at byte 0: invalid XML declaration boundary
+b1-mc-bom.docx reopen skipped

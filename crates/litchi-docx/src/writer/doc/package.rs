@@ -100,6 +100,18 @@ impl DocumentBody {
             Other,
         }
 
+        // `quick-xml` consumes a leading UTF-8 byte order mark before its
+        // first event and never counts it in `buffer_position`, so every
+        // offset it reports would be three bytes short of this buffer and
+        // every preserved range would be cut three bytes early. Split the
+        // mark off once, so the alternative-format scan, the active block
+        // ranges and this loop's own slices all address the same bytes, and
+        // return it at the head of the preserved prefix so a publication
+        // keeps the byte the producer wrote.
+        let (byte_order_mark, xml) = match xml.strip_prefix(super::BYTE_ORDER_MARK) {
+            Some(rest) => (super::BYTE_ORDER_MARK, rest),
+            None => ("", xml),
+        };
         let bytes = xml.as_bytes();
         let mut chunks = scan(bytes)?;
         let mut active_alts = Vec::new();
@@ -300,11 +312,16 @@ impl DocumentBody {
             .ok_or_else(|| Error::InvalidFormat("Word document has no body element".to_string()))?;
         let suffix_start = suffix_start
             .ok_or_else(|| Error::InvalidFormat("Word document body is not closed".to_string()))?;
+        let declared_prefix =
+            ensure_writer_namespace_declarations(xml.get(..prefix_end).ok_or_else(|| {
+                Error::InvalidFormat("invalid Word document prefix range".to_string())
+            })?)?;
+        let mut prefix = String::with_capacity(byte_order_mark.len() + declared_prefix.len());
+        prefix.push_str(byte_order_mark);
+        prefix.push_str(&declared_prefix);
         Ok(ParsedDocumentBody {
             body,
-            prefix: ensure_writer_namespace_declarations(xml.get(..prefix_end).ok_or_else(
-                || Error::InvalidFormat("invalid Word document prefix range".to_string()),
-            )?)?,
+            prefix,
             suffix: xml
                 .get(suffix_start..)
                 .ok_or_else(|| {

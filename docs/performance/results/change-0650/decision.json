@@ -1,0 +1,52 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0650",
+  "title": "The DOCX editor read every offset three bytes low on a byte-order-marked main document, and called the result malformed",
+  "decision": "retained, implemented in litchi-docx as a correctness fix",
+  "code_state": "crates/litchi-docx/src/writer/doc/ only (doc.rs, doc/package.rs, doc/model.rs, doc/tests.rs); no public API signature, error type, limit or defence changed; no new unsafe and no new dependency; the crate remains #![forbid(unsafe_code)]",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0638 reported that Package::document_mut() refuses alt-chunk-header.docx with 'invalid DOCX XML: syntax error: tag not closed' while Package::open admits it and Package::save republishes it, and could not chase it because no file under crates/ could change there",
+    "the mechanism is quick-xml 0.41.0 removing a leading UTF-8 byte order mark from the slice without counting it in Reader::buffer_position, so DocumentBody::from_xml's preserved ranges begin and end three bytes early and every body child is truncated inside its own closing tag",
+    "the reader is unaffected because DocumentPart::from_part parses the markup-compatibility-normalized output, which carries no mark; the probe asserts reader_bom part=true view=false on every marked input",
+    "same bytes, valid document, reader right and editor wrong, so the brief's fix branch applies rather than its freeze branch",
+    "the minimal constructed witness is five elements long: a marked document with one paragraph, refused before and accepted after, its unmarked twin accepted on both legs"
+  ],
+  "accepted_evidence": {
+    "corpus_census": "a retained probe over ten documented aspects of all 63 DOCX-family fixtures under test-data/ on both legs: open, reader text and paragraph count, mark presence in the part and in the reader's view, sections, document_mut, no-op save, document_mut-then-save, the managed edit_document route, one-paragraph edit and save, and reopening the edited artifact",
+    "value_identity": "diff of the two 630-line censuses yields three changed lines, all on alt-chunk-header.docx and all refusal text; all 55 no-op, 53 editor-touched, 54 managed-route and 50 edited published SHA-256 digests are identical between legs, as are the reader's paragraph counts and text lengths",
+    "bom_presence": "a separate census of whether each fixture's word/document.xml starts with EF BB BF: exactly one of 63 does",
+    "witnesses": "fourteen retained XML inputs run through MutableDocument::from_xml on both legs, including a four-step bisection of the fixture's own part and a five-element minimal reproduction",
+    "constructed_packages": "four packages rebuilt from two tracked fixtures by a retained script, differing only in the mark, one pair with markup-compatibility markup in the main document and one without",
+    "unit_tests": "three tests in crates/litchi-docx/src/writer/doc/tests.rs covering range identity, the mark's survival across an appended paragraph, and the frozen body-final section placement refusal with and without the mark"
+  },
+  "accepted_costs": {
+    "no_timing": "no timing was taken; the change adds one three-byte prefix comparison to a path that already parses the whole part and is not shared with the reader, so no paired measurement or A/A floor is reported",
+    "refusal_moves": "on a marked main document document_mut() stops refusing, so a caller that edits and saves now meets a later typed refusal from the OPC publication audit instead of an early false one; the save stays atomic and no partial package is published",
+    "synthetic_reach": "exactly one fixture in the repository is marked, so the newly admitted class is represented by constructed packages rather than by real producer output"
+  },
+  "known_gaps": {
+    "sectpr_placement": "alt-chunk-header.docx places w:altChunk after the body-final w:sectPr; the editor and the managed transaction refuse it, the reader admits it. ECMA-376 CT_Body makes the fixture schema-invalid, so the refusal is defensible, but the two routes disagree. Frozen with witnesses w3-sect-then-altchunk.xml and w4-altchunk-then-sect.xml; not resolved here",
+    "strict_universal_measure": "strict.docx is an ISO Strict document whose w:pgSz is '612pt'; crates/litchi-docx/src/writer/section/codec/xml.rs:409 parses it with parse_u32, which admits only ST_UnsignedDecimalNumber, so document_mut() refuses while the reader opens the file and reads its section. A feature gap in the mutable section model, identical on both legs, frozen for its own record",
+    "publication_audit_bom": "crates/xml-minifier/src/audit.rs:1319 slices input.get(start..end) with Reader::buffer_position offsets, so a regenerated marked part is refused at publication with 'malformed XML at byte 0: invalid XML declaration boundary'. The same crate's streaming auditor handles the mark explicitly; only the slice auditor does not. Out of this change's scope by the brief: reported, not touched",
+    "managed_transaction_bom": "crate::document::Snapshot mixes quick-xml positions with its own buffer the same way, refusing a marked dense body with \"expected '</w:bo<w:p>'\" identically on both legs. Not fixed here: that route carries source-backed splice reservations and exact-source byte proofs and needs its own value-identity argument",
+    "end_to_end": "because of the two gaps above, editing a marked DOCX and saving it still does not work end to end; this change removes the first of four obstacles and makes the diagnosis accurate"
+  },
+  "withheld": [
+    "any timing, allocation, instruction-count, throughput or registered performance result",
+    "any claim that a byte-order-marked DOCX can be edited and republished end to end"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0650-docx-document-mut-admission",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, cargo 1.95.0, quick-xml 0.41.0",
+    "cpu_pin": "taskset -c 18",
+    "binaries": {
+      "before/docx-editor-admission-probe": "cec0c18cb7c8c9c0811993d571824d6e0d067be05034e7e01f93d612f880dbc7",
+      "after/docx-editor-admission-probe": "80f8a7c3ebbbae82c1086c2948e68705d572762e9086c3b479bef1adbb69a740"
+    },
+    "note": "both legs built with cargo build --release from the retained probe source against path dependencies on their own checkout; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680, and both censuses read that checkout's test-data/ so the corpus bytes are identical"
+  }
+}

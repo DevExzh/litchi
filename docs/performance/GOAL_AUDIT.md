@@ -1,5 +1,47 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0650 — a refusal that was wrong rather than conservative, and the three it was hiding
+
+Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
+
+`docs/GOAL.md` puts correctness and lossless preservation above speed and says a
+typed refusal must never be traded for a partial result. The refusal this change
+removes was not a conservative one: it told the caller that well-formed markup
+was malformed, on bytes the same crate's reader parses successfully. The audit
+distinction worth recording is that **removing it admits nothing that was
+previously refused for a reason** — the fixture that prompted the investigation,
+`alt-chunk-header.docx`, is **still refused**, now with the accurate
+`body-final section properties are not the final body child`, and the managed
+document transaction was already giving exactly that message on the same file on
+the unmodified base, so the two routes now agree rather than one of them
+inventing a syntax error. Preservation is served in the same move: the mark is a
+byte the producer wrote, so it is carried into the preserved prefix and back out
+through the serializer rather than discarded, and the `touch_save` census aspect
+— open, acquire `document_mut()`, save, change nothing — publishes **exactly the
+digest the plain no-op publishes** on the newly admitted inputs. Four audit rows
+this change opens rather than closes. First, **the end-to-end route is still
+broken and this record does not claim otherwise**: a *regenerated* marked part is
+refused by the authored-XML publication audit in `xml-minifier`, which has the
+same offset defect in its slice path while its streaming path handles the mark
+explicitly — out of scope by the brief, reported with a witness. Second, the
+managed document transaction has the same defect and is **not** fixed here,
+because that route carries source-backed splice reservations and exact-source
+byte proofs that need their own value-identity argument. Third, the editor and
+the reader genuinely **disagree about `w:sectPr` placement**: ECMA-376's
+`CT_Body` makes `w:altChunk` after the body-final `w:sectPr` schema-invalid, so
+the editor's refusal is defensible, but the reader admits the file and reads its
+text, and which side should move is frozen with two witnesses that differ only in
+the order of the last two body children. Fourth, `strict.docx` shows a second,
+unrelated editor-versus-reader split — the writer's section parse admits only
+`ST_UnsignedDecimalNumber` and so rejects ISO Strict's `612pt`, while the reader
+opens the file, reads its five paragraphs and its one section, and the managed
+route publishes it; that is a feature gap in the mutable section model, identical
+on both legs, and belongs in its own record. **Corpus reach is the honest
+weakness**: one marked fixture in 63, so the newly admitted class is represented
+by constructed packages rather than by real producer output. No latency,
+instruction, allocation or RSS improvement is claimed and no timing was taken.
+OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded.
+
 ## 0644 — a source-identity fence priced per read, with the cheap-token substitution refused again
 
 `docs/GOAL.md` puts correctness, lossless preservation and bounded resources

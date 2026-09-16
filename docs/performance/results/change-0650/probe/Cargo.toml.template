@@ -1,0 +1,13 @@
+[package]
+name = "docx-editor-admission-probe"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+litchi-core = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-core" }
+litchi-docx = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-docx" }
+litchi-opc = { path = "REPLACE_WITH_CHECKOUT/crates/litchi-opc" }
+sha2 = "0.10"
+
+[profile.release]
+lto = true

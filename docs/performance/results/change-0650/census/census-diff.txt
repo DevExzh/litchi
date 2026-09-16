@@ -1,0 +1,12 @@
+145c145
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx document_mut refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx document_mut refused:invalid DOCX format: body-final section properties are not the final body child
+147c147
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx touch_save refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx touch_save refused:invalid DOCX format: body-final section properties are not the final body child
+149c149
+< libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx edit_save refused:invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+---
+> libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx edit_save refused:invalid DOCX format: body-final section properties are not the final body child

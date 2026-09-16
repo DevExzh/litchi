@@ -1,5 +1,49 @@
 # Performance optimization ADR-compliance matrix
 
+## 0650 — compliant; ADR 0006's "preserve by default" decides what to do with three bytes
+
+Record: [0650](0650-docx-editor-byte-order-mark-admission.md).
+
+Change 0650 is compliant and adds no ADR question of its own, but it is decided
+by one. **ADR 0006 (preserve by default; readers preserve real-world quirks)**:
+the leading UTF-8 byte order mark is a byte a real producer wrote, so the fix
+splits it off for the duration of the parse and returns it at the head of the
+preserved prefix, and `MutableDocument::to_xml`/`to_xml_with_rels` carry it
+across the compactor the parser would otherwise have eaten. Discarding it would
+have been one character shorter and would have made the end-to-end save work; it
+is not what ADR 0006 asks for, and the record says plainly that the route
+therefore still stops at a later typed refusal. **ADR 0003 (edits are
+source-checked, reversible; a refusal is typed, never a partial result)** is
+preserved in both directions: no error variant is added, removed or relocated;
+the two refusals that change are `Error::Xml`/`Error::InvalidFormat` before and
+after; the save stays atomic, so where a caller now meets a publication refusal
+instead of a parse refusal, no partial package is written. **Error identity is
+otherwise exact** — over 63 fixtures and ten documented aspects each, the only
+lines that differ between legs are three refusal *texts* on the single marked
+fixture, and that fixture is still refused. **Bounded resources are honoured**:
+`MAX_XML_BYTES` in `alt::codec::validate_xml` and `MAX_SCAN_DEPTH` /
+`MAX_SCAN_NODES` in `namespace::scan_word_element_ranges` are untouched and
+neither is relocated, widened or restated; they now see a buffer three bytes
+shorter on marked input. No new `unsafe` (the crate remains
+`#![forbid(unsafe_code)]`), no weakened malformed-input defence, no ambient I/O,
+no hidden Rayon pool, no executor or lock exposed, no new dependency, no new or
+changed public type or signature, and no allocation added on the unmarked path.
+**Validation still does not mutate**: `validate_section_placement` and
+`final_section_properties` run on every parse as before, on the same elements in
+the same order, and now receive the ranges they were always meant to receive.
+Two compliance rows stay open and are stated plainly. First, the **authored-XML
+publication audit** in `crates/xml-minifier` refuses a regenerated marked part
+(`audit.rs:1319` slices with `Reader::buffer_position` offsets; `check_declaration`
+at `:1542` then rejects the boundary) while the same crate's streaming auditor
+handles the mark explicitly — a contract inconsistency, since a *pristine*
+passthrough member carrying the same bytes is republished without complaint. It
+is out of this change's scope by the brief and is reported, not touched. Second,
+the **editor and the reader disagree about body-final `w:sectPr` placement**;
+ECMA-376's `CT_Body` supports the editor, the reader is the lenient one, and the
+resolution — which would change where an appended paragraph lands — is frozen
+here with witnesses rather than decided. `performance_claim: none`. OLE2/OOXML
+remain active; ODF is deferred until completion and iWork excluded.
+
 ## 0644 — the bracket is what makes the reduction sound, never the token
 
 ADR 0005 requires that a mutation during a read return `SourceChanged`, ADR 0006

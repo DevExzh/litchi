@@ -1,0 +1,24 @@
+15c15
+< a1-nomc-bom.docx document_mut refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-fb450bb9a80af46b-00:0--'
+---
+> a1-nomc-bom.docx document_mut ok
+17c17
+< a1-nomc-bom.docx touch_save refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-fb450bb9a80af46b-00:0--'
+---
+> a1-nomc-bom.docx touch_save 9326225933e197f2abd14bdd39a0a65544f15784327ae64df0cfb26034175302 bytes=10931
+19c19
+< a1-nomc-bom.docx edit_save refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-fb450bb9a80af46b-00:0--'
+---
+> a1-nomc-bom.docx edit_save refused:I/O error: Failed to save package: XML publication rejected for '/word/document.xml': malformed XML at byte 0: invalid XML declaration boundary
+35c35
+< b1-mc-bom.docx document_mut refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-f5357a8ef65d15ee-00:0--'
+---
+> b1-mc-bom.docx document_mut ok
+37c37
+< b1-mc-bom.docx touch_save refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-f5357a8ef65d15ee-00:0--'
+---
+> b1-mc-bom.docx touch_save c8b441736b40858021a8b002ba76892e5c337bf3acf28ab9da296e91e4026bde bytes=9504
+39c39
+< b1-mc-bom.docx edit_save refused:DOCX markup compatibility error: non-conformant markup compatibility XML: invalid QName: invalid XML QName 'w:bo<!--litchi-mce-active-f5357a8ef65d15ee-00:0--'
+---
+> b1-mc-bom.docx edit_save refused:I/O error: Failed to save package: XML publication rejected for '/word/document.xml': malformed XML at byte 0: invalid XML declaration boundary
