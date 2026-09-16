@@ -235,3 +235,45 @@ default matrix and not in the checked default catalog, so neither
 identities measured by change 0627 are recorded in
 [`results/change-0627/`](results/change-0627/README.md) rather than here,
 because the file a caller names is not a repository-fixed corpus.
+
+## Opt-in facade and ordinary-save corpora (change 0638)
+
+Change 0638 adds five further generator identifiers. Two name caller-named OLE2
+files opened through the `litchi` facade; three name caller-named OOXML files
+saved through the documented `Package::save`/`Workbook::save` route. Like
+`litchi-xlsx-real-file-v1` and change 0627's two, none of them generates
+anything:
+
+| Generator | Format | Input | Generated |
+|---|---|---|---|
+| `litchi-doc-facade-real-file-v1` | `doc` | a caller-named file (`--ole2-file`) | nothing: the bytes are the file's |
+| `litchi-ppt-facade-real-file-v1` | `ppt` | a caller-named file (`--ole2-file`) | nothing: the bytes are the file's |
+| `litchi-docx-real-file-v1` | `docx` | a caller-named file (`--ooxml-file`) | nothing: the bytes are the file's |
+| `litchi-xlsx-real-file-save-v1` | `xlsx` | a caller-named file (`--ooxml-file`) | nothing: the bytes are the file's |
+| `litchi-pptx-real-file-v1` | `pptx` | a caller-named file (`--ooxml-file`) | nothing: the bytes are the file's |
+
+`tools/perf-baseline/src/facade_ole2.rs` is the source for the first two and
+`tools/perf-baseline/src/ordinary_save.rs` for the last three. A facade corpus
+is a real OLE2 document, so — exactly as change 0627's are — its manifest
+reports the CFB rather than a ZIP: `archive_member_count` is the CFB stream
+count, `entry_bytes` the sector size, `target_entry` the `WordDocument` or
+`PowerPoint Document` stream path, `compression` is `none`, and `entry_count` is
+the paragraph count or the slide count the facade itself reports. An
+ordinary-save corpus is an OPC package: `archive_member_count` and `entry_count`
+are its ZIP member count, `target_entry` is its main part, and `compression` is
+`deflate`.
+
+The ordinary-save selectors also run over three **existing** harness corpora —
+`build_semantic_docx_corpus(Medium)`, `build_xlsx_cell_crud_corpus(Medium)` and
+`build_semantic_pptx_corpus(Medium)` — whose generator identities and family-map
+entries are unchanged. Those selectors report the corpus manifest the existing
+builder already produces; change 0638 introduces no generated corpus of its own.
+
+None of the five new identifiers is added to the generator family map in
+`tools/generate_corpus_manifest_v2.py` or `corpus_manifest.rs`, for the reason
+changes 0601 and 0627 gave: that map is the source-audited contract for the
+**default** catalog, and a caller-named file's licensing and provenance cannot
+be asserted by a static map. These corpora are not in the default matrix and not
+in the checked default catalog, so neither `catalog_sha256` nor
+`content_set_sha256` moves for them. The archive identities measured by change
+0638 are recorded in [`results/change-0638/`](results/change-0638/README.md).

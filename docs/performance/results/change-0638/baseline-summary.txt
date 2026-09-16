@@ -1,0 +1,77 @@
+== facade selectors
+case                                   fixture                        bytes     p50 ns     p95 ns  p50 spread %  observation
+doc_facade_file_full_text              documentProperties.doc          9728      15735      16630          1.97  text:22:9ce38878231acab7ea9940491d75bab639f9e0b6c7e364fc
+doc_facade_file_full_text              FloatingPictures.doc          335360     275321     285581         47.01  text:9017:c924018a6ba85a968a7cf83d5a84b8f5ee8d642833650c
+doc_facade_file_full_text              duplicate-style-names.doc      64512      14300      14760          1.63  refused:Corrupted file: invalid stylesheet: style names 
+doc_facade_file_one_paragraph          documentProperties.doc          9728      16935      18050          0.62  text:21:4735558bcdf3ddd2e9fce6fa14b9a211cc8734f96955c4ce
+doc_facade_file_one_paragraph          FloatingPictures.doc          335360     538313     561562          6.93  text:55:002bce5e53b27690ce6b463a5fecef6ea3d0b29c92901a8a
+doc_facade_file_one_paragraph          duplicate-style-names.doc      64512      13985      15230          1.12  refused:Corrupted file: invalid stylesheet: style names 
+doc_facade_file_open                   documentProperties.doc          9728      15085      15830          1.39  paragraphs:1
+doc_facade_file_open                   FloatingPictures.doc          335360     178626     186891          1.29  paragraphs:210
+doc_facade_file_open                   duplicate-style-names.doc      64512      14365      15600          2.09  refused:Corrupted file: invalid stylesheet: style names 
+ppt_facade_file_full_text              SampleShow.ppt                125440      31930      33520          1.55  text:236:e8bd000100a58a85c716710a2636065511eeeb5d7aa97e7
+ppt_facade_file_full_text              ppt_with_png.ppt               39424      29615      33520          1.99  text:20:5ccfc260e305587067294937b56670b8602daa0670833ed6
+ppt_facade_file_one_slide_text         SampleShow.ppt                125440      32375      33410          2.06  text:92:db15fbc9135b07ee194205da750d386a6dc289c2ee6532d8
+ppt_facade_file_one_slide_text         ppt_with_png.ppt               39424      32035      32710          0.06  text:20:5ccfc260e305587067294937b56670b8602daa0670833ed6
+ppt_facade_file_open                   SampleShow.ppt                125440      25950      26560          0.62  slides:2
+ppt_facade_file_open                   ppt_with_png.ppt               39424      25545      26680          1.15  slides:1
+
+== ordinary documented save
+case                                           origin           p50 ns       p95 ns  p50 spread %  edit
+docx_ordinary_save_atomic_publish              generated-      5157023      5267934          3.23  admitted
+docx_ordinary_save_counting_publish            generated-       323006       334452          0.36  admitted
+docx_ordinary_save_edit                        generated-       378026       387052          0.82  admitted
+docx_ordinary_save_lifecycle                   generated-      5742951      5821436          1.89  admitted
+docx_real_file_ordinary_save_atomic_publish    caller-nam      5533249      5636145         23.59  refused:invalid DOCX XML: syntax error: tag 
+docx_real_file_ordinary_save_counting_publish  caller-nam        93621       103101          1.64  refused:invalid DOCX XML: syntax error: tag 
+docx_real_file_ordinary_save_edit              caller-nam       511747       518663          1.82  refused:invalid DOCX XML: syntax error: tag 
+docx_real_file_ordinary_save_lifecycle         caller-nam      6597435      8573258         10.62  refused:invalid DOCX XML: syntax error: tag 
+pptx_ordinary_save_atomic_publish              generated-      5252558      7512621          3.56  admitted
+pptx_ordinary_save_counting_publish            generated-        85200        92100          2.14  admitted
+pptx_ordinary_save_edit                        generated-      1945530      1957721          0.48  admitted
+pptx_ordinary_save_lifecycle                   generated-      7662831      7877663          2.11  admitted
+pptx_real_file_ordinary_save_atomic_publish    caller-nam      6887561     17062639         60.36  admitted
+pptx_real_file_ordinary_save_counting_publish  caller-nam       272821       288332          6.66  admitted
+pptx_real_file_ordinary_save_edit              caller-nam    133608963    135104091          3.02  admitted
+pptx_real_file_ordinary_save_lifecycle         caller-nam    139616912    145653228         12.31  admitted
+xlsx_ordinary_save_atomic_publish              generated-     11579588     15259643          2.61  admitted
+xlsx_ordinary_save_counting_publish            generated-      1503418      1597969          4.56  admitted
+xlsx_ordinary_save_edit                        generated-      4209732      4306124          2.45  admitted
+xlsx_ordinary_save_lifecycle                   generated-     17366278     18375692         10.77  admitted
+xlsx_real_file_ordinary_save_atomic_publish    caller-nam      7650217      7829552          3.62  admitted
+xlsx_real_file_ordinary_save_counting_publish  caller-nam       299267       308771          3.53  admitted
+xlsx_real_file_ordinary_save_edit              caller-nam      3736956      3780461          1.91  admitted
+xlsx_real_file_ordinary_save_lifecycle         caller-nam     12964361     13198181          2.76  admitted
+
+== byte split (counting phase, one sample per corpus)
+format/origin                         source    output   deflate    stored  identical    regen  regen in  framing  members
+DOCX/generated-harness-corpus           9051      9070      7510         0       6524      986     21601     1560 11/12    
+DOCX/caller-named-real-file            77621     77370     54993     15161      69883      271       602     7216 36/37    
+PPTX/generated-harness-corpus          40788     40802     31460         0      30926      534      3469     9342 60/61    
+PPTX/caller-named-real-file           108164    108148     91986         0      90279     1707     16936    16162 102/103   
+XLSX/generated-harness-corpus        4226429   4226568   4224110         0    4216929     7181     63894     2458 15/17    
+XLSX/caller-named-real-file           654688    652357    109438    523261     629871     2828     19414    19658 127/131   
+
+== phase attribution (p50 ns)
+format/origin                         lifecycle         edit       atomic     counting  edit+atomic/lifecycle
+DOCX/generated-harness-corpus           5742951       378026      5157023       323006                  96.4%
+DOCX/caller-named-real-file             6597435       511747      5533249        93621                  91.6%
+XLSX/generated-harness-corpus          17366278      4209732     11579588      1503418                  90.9%
+XLSX/caller-named-real-file            12964361      3736956      7650217       299267                  87.8%
+PPTX/generated-harness-corpus           7662831      1945530      5252558        85200                  93.9%
+PPTX/caller-named-real-file           139616912    133608963      6887561       272821                 100.6%
+
+repeats compared: R1, R2, R3
+A/A floor, facade rows:        p50 1.55%, max 47.01% over 15 rows
+A/A floor, ordinary-save rows: p50 3.02%, max 60.36% over 24 rows
+A/A floor, all rows:           p50 2.09%, max 60.36% over 39 rows
+
+rows whose A/A spread exceeds 5% (a review trigger, reported not hidden):
+  pptx_real_file_ordinary_save_atomic_publish       60.36%
+  doc_facade_file_full_text                         47.01%
+  docx_real_file_ordinary_save_atomic_publish       23.59%
+  pptx_real_file_ordinary_save_lifecycle            12.31%
+  xlsx_ordinary_save_lifecycle                      10.77%
+  docx_real_file_ordinary_save_lifecycle            10.62%
+  doc_facade_file_one_paragraph                      6.93%
+  pptx_real_file_ordinary_save_counting_publish      6.66%

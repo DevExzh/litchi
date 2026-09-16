@@ -47,7 +47,7 @@ use std::{
     error::Error,
     fs,
     io::Cursor,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -81,13 +81,18 @@ const REQUEST_SEQUENCE_PREVIEW: usize = 32;
 /// Which OLE2 reader a corpus and a scenario belong to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Format {
+    /// Word 97-2003. No range-source scenario reads it; change 0638's facade
+    /// selectors do, and `--ole2-file` is the single classification authority
+    /// for every family that takes one.
+    Doc,
     Xls,
     Ppt,
 }
 
 impl Format {
-    const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::Doc => "DOC",
             Self::Xls => "XLS",
             Self::Ppt => "PPT",
         }
@@ -95,6 +100,7 @@ impl Format {
 
     const fn package_format(self) -> &'static str {
         match self {
+            Self::Doc => "DOC/CFB/OLE2",
             Self::Xls => "XLS/CFB/OLE2",
             Self::Ppt => "PPT/CFB/OLE2",
         }
@@ -102,6 +108,7 @@ impl Format {
 
     const fn generator(self) -> &'static str {
         match self {
+            Self::Doc => crate::facade_ole2::DOC_FACADE_GENERATOR,
             Self::Xls => XLS_REAL_FILE_GENERATOR,
             Self::Ppt => PPT_REAL_FILE_GENERATOR,
         }
@@ -109,6 +116,7 @@ impl Format {
 
     const fn corpus_name(self) -> &'static str {
         match self {
+            Self::Doc => "doc-real-file",
             Self::Xls => "xls-real-file",
             Self::Ppt => "ppt-real-file",
         }
@@ -294,7 +302,7 @@ pub(crate) struct Ole2RangeSourceSummary {
 // Corpus construction
 // ---------------------------------------------------------------------------
 
-fn read_bounded(path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
     let metadata = fs::metadata(path)
         .map_err(|source| format!("--ole2-file {} is unreadable: {source}", path.display()))?;
     if !metadata.is_file() {
@@ -315,7 +323,7 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>, Box<dyn Error>> {
 
 /// Reads the CFB inventory: the stream paths, the sector size, and the bytes
 /// of the named target stream. Everything here is untimed and happens once.
-fn cfb_inventory(
+pub(crate) fn cfb_inventory(
     archive: &[u8],
     candidates: &[&[&str]],
     label: &str,
@@ -362,7 +370,10 @@ fn manifest_of(
     }
 }
 
-fn provenance_of(path: &Path, archive: &[u8]) -> Result<RealFileProvenance, Box<dyn Error>> {
+pub(crate) fn provenance_of(
+    path: &Path,
+    archive: &[u8],
+) -> Result<RealFileProvenance, Box<dyn Error>> {
     Ok(RealFileProvenance {
         path: path.display().to_string(),
         bytes: u64::try_from(archive.len())
@@ -678,27 +689,74 @@ pub(crate) fn build_ppt_corpus(path: &Path) -> Result<Ole2Corpus, Box<dyn Error>
 
 /// Decides which OLE2 reader a caller-named file belongs to by its CFB
 /// stream inventory, so `--ole2-file` needs no format flag and no extension
-/// heuristic. A file that offers both, or neither, is refused.
+/// heuristic. A file that offers more than one family, or none, is refused.
+///
+/// Change 0638 added the `WordDocument` arm: `--ole2-file` is the single
+/// classification authority for every family that takes one, and the facade
+/// selectors that record adds read `.doc` fixtures through it.
 pub(crate) fn classify(path: &Path) -> Result<Format, Box<dyn Error>> {
     let archive = read_bounded(path)?;
     let ole = litchi_cfb::OleFile::open(Cursor::new(archive.as_slice()))?;
+    let word = ole.exists(&["WordDocument"]);
     let workbook = ole.exists(&["Workbook"]) || ole.exists(&["Book"]);
     let document = ole.exists(&["PowerPoint Document"])
         || ole.exists(&["PP97_DUALSTORAGE", "PowerPoint Document"]);
-    match (workbook, document) {
-        (true, false) => Ok(Format::Xls),
-        (false, true) => Ok(Format::Ppt),
-        (true, true) => Err(format!(
-            "--ole2-file {} holds both a Workbook and a PowerPoint Document stream",
+    let mut matched = Vec::new();
+    if word {
+        matched.push(Format::Doc);
+    }
+    if workbook {
+        matched.push(Format::Xls);
+    }
+    if document {
+        matched.push(Format::Ppt);
+    }
+    match matched.as_slice() {
+        [format] => Ok(*format),
+        [] => Err(format!(
+            "--ole2-file {} holds no WordDocument, Workbook or PowerPoint Document stream",
             path.display()
         )
         .into()),
-        (false, false) => Err(format!(
-            "--ole2-file {} holds neither a Workbook nor a PowerPoint Document stream",
+        _ => Err(format!(
+            "--ole2-file {} holds more than one OLE2 main stream",
             path.display()
         )
         .into()),
     }
+}
+
+/// The caller-named OLE2 fixtures of one run, at most one per format.
+///
+/// Both the range-source family (change 0627) and the facade family (change
+/// 0638) read `--ole2-file`, so the repeated flag is classified once and the
+/// slots are shared. A second file of the same format is refused, exactly as
+/// 0627 refused it.
+#[derive(Debug, Default)]
+pub(crate) struct Ole2Inputs {
+    pub(crate) doc: Option<PathBuf>,
+    pub(crate) xls: Option<PathBuf>,
+    pub(crate) ppt: Option<PathBuf>,
+}
+
+pub(crate) fn classify_inputs(paths: &[PathBuf]) -> Result<Ole2Inputs, Box<dyn Error>> {
+    let mut inputs = Ole2Inputs::default();
+    for path in paths {
+        let slot = match classify(path)? {
+            Format::Doc => &mut inputs.doc,
+            Format::Xls => &mut inputs.xls,
+            Format::Ppt => &mut inputs.ppt,
+        };
+        if slot.is_some() {
+            return Err(format!(
+                "--ole2-file accepts at most one file per format; {} is the second",
+                path.display()
+            )
+            .into());
+        }
+        *slot = Some(path.clone());
+    }
+    Ok(inputs)
 }
 
 // ---------------------------------------------------------------------------

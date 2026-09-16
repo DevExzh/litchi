@@ -20,6 +20,7 @@ pub mod docx_replayable_tail_append;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod docx_streaming_create;
+mod facade_ole2;
 mod filesystem;
 pub mod odp_append_attribution;
 mod odp_buffered_create;
@@ -30,6 +31,7 @@ mod odt_streaming_create;
 mod ole2_range_source;
 mod opc_part_add;
 mod operation_metrics;
+mod ordinary_save;
 mod parallel_metrics;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
@@ -1346,6 +1348,12 @@ enum Case {
     PptRangeSourceOpenOneShapeText,
     PptOwnedSourceControlOpen,
     PptOwnedSourceControlOpenOneShapeText,
+    DocFacadeFileOpen,
+    DocFacadeFileFullText,
+    DocFacadeFileOneParagraph,
+    PptFacadeFileOpen,
+    PptFacadeFileFullText,
+    PptFacadeFileOneSlideText,
     PptSemanticFullText,
     PptSlideOrderSnapshotOpen,
     PptTextEditOneEditSave,
@@ -1406,6 +1414,30 @@ enum Case {
     XlsxRealFileSourceSelectedCell,
     DocxProducerSourceSelectedParagraph,
     PptxProducerSourceSelectedSlide,
+    DocxOrdinarySaveLifecycle,
+    DocxOrdinarySaveEdit,
+    DocxOrdinarySaveAtomicPublish,
+    DocxOrdinarySaveCountingPublish,
+    DocxRealFileOrdinarySaveLifecycle,
+    DocxRealFileOrdinarySaveEdit,
+    DocxRealFileOrdinarySaveAtomicPublish,
+    DocxRealFileOrdinarySaveCountingPublish,
+    XlsxOrdinarySaveLifecycle,
+    XlsxOrdinarySaveEdit,
+    XlsxOrdinarySaveAtomicPublish,
+    XlsxOrdinarySaveCountingPublish,
+    XlsxRealFileOrdinarySaveLifecycle,
+    XlsxRealFileOrdinarySaveEdit,
+    XlsxRealFileOrdinarySaveAtomicPublish,
+    XlsxRealFileOrdinarySaveCountingPublish,
+    PptxOrdinarySaveLifecycle,
+    PptxOrdinarySaveEdit,
+    PptxOrdinarySaveAtomicPublish,
+    PptxOrdinarySaveCountingPublish,
+    PptxRealFileOrdinarySaveLifecycle,
+    PptxRealFileOrdinarySaveEdit,
+    PptxRealFileOrdinarySaveAtomicPublish,
+    PptxRealFileOrdinarySaveCountingPublish,
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
@@ -1966,6 +1998,12 @@ impl Case {
             Self::PptOwnedSourceControlOpenOneShapeText => {
                 "ppt_owned_source_control_open_one_shape_text"
             },
+            Self::DocFacadeFileOpen => "doc_facade_file_open",
+            Self::DocFacadeFileFullText => "doc_facade_file_full_text",
+            Self::DocFacadeFileOneParagraph => "doc_facade_file_one_paragraph",
+            Self::PptFacadeFileOpen => "ppt_facade_file_open",
+            Self::PptFacadeFileFullText => "ppt_facade_file_full_text",
+            Self::PptFacadeFileOneSlideText => "ppt_facade_file_one_slide_text",
             Self::PptSemanticFullText => "ppt_semantic_full_text",
             Self::PptSlideOrderSnapshotOpen => "ppt_slide_order_snapshot_open",
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
@@ -2040,6 +2078,42 @@ impl Case {
             Self::XlsxRealFileSourceSelectedCell => "xlsx_real_file_source_selected_cell",
             Self::DocxProducerSourceSelectedParagraph => "docx_producer_source_selected_paragraph",
             Self::PptxProducerSourceSelectedSlide => "pptx_producer_source_selected_slide",
+            Self::DocxOrdinarySaveLifecycle => "docx_ordinary_save_lifecycle",
+            Self::DocxOrdinarySaveEdit => "docx_ordinary_save_edit",
+            Self::DocxOrdinarySaveAtomicPublish => "docx_ordinary_save_atomic_publish",
+            Self::DocxOrdinarySaveCountingPublish => "docx_ordinary_save_counting_publish",
+            Self::DocxRealFileOrdinarySaveLifecycle => "docx_real_file_ordinary_save_lifecycle",
+            Self::DocxRealFileOrdinarySaveEdit => "docx_real_file_ordinary_save_edit",
+            Self::DocxRealFileOrdinarySaveAtomicPublish => {
+                "docx_real_file_ordinary_save_atomic_publish"
+            },
+            Self::DocxRealFileOrdinarySaveCountingPublish => {
+                "docx_real_file_ordinary_save_counting_publish"
+            },
+            Self::XlsxOrdinarySaveLifecycle => "xlsx_ordinary_save_lifecycle",
+            Self::XlsxOrdinarySaveEdit => "xlsx_ordinary_save_edit",
+            Self::XlsxOrdinarySaveAtomicPublish => "xlsx_ordinary_save_atomic_publish",
+            Self::XlsxOrdinarySaveCountingPublish => "xlsx_ordinary_save_counting_publish",
+            Self::XlsxRealFileOrdinarySaveLifecycle => "xlsx_real_file_ordinary_save_lifecycle",
+            Self::XlsxRealFileOrdinarySaveEdit => "xlsx_real_file_ordinary_save_edit",
+            Self::XlsxRealFileOrdinarySaveAtomicPublish => {
+                "xlsx_real_file_ordinary_save_atomic_publish"
+            },
+            Self::XlsxRealFileOrdinarySaveCountingPublish => {
+                "xlsx_real_file_ordinary_save_counting_publish"
+            },
+            Self::PptxOrdinarySaveLifecycle => "pptx_ordinary_save_lifecycle",
+            Self::PptxOrdinarySaveEdit => "pptx_ordinary_save_edit",
+            Self::PptxOrdinarySaveAtomicPublish => "pptx_ordinary_save_atomic_publish",
+            Self::PptxOrdinarySaveCountingPublish => "pptx_ordinary_save_counting_publish",
+            Self::PptxRealFileOrdinarySaveLifecycle => "pptx_real_file_ordinary_save_lifecycle",
+            Self::PptxRealFileOrdinarySaveEdit => "pptx_real_file_ordinary_save_edit",
+            Self::PptxRealFileOrdinarySaveAtomicPublish => {
+                "pptx_real_file_ordinary_save_atomic_publish"
+            },
+            Self::PptxRealFileOrdinarySaveCountingPublish => {
+                "pptx_real_file_ordinary_save_counting_publish"
+            },
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
@@ -3285,6 +3359,159 @@ impl Case {
         }
     }
 
+    /// Opt-in facade selectors for the OLE2 document and presentation routes
+    /// (change 0638).  Six run `litchi::Document::open` and
+    /// `litchi::Presentation::open` over a caller-named real file, which is
+    /// the first half of change 0587's evidence gap 5.  None is in
+    /// `Case::DEFAULT`, and every one needs `--ole2-file PATH`.
+    const fn is_facade_ole2(self) -> bool {
+        self.facade_ole2_scenario().is_some()
+    }
+
+    const fn facade_ole2_scenario(self) -> Option<facade_ole2::Scenario> {
+        use facade_ole2::Scenario;
+        match self {
+            Self::DocFacadeFileOpen => Some(Scenario::DocOpen),
+            Self::DocFacadeFileFullText => Some(Scenario::DocFullText),
+            Self::DocFacadeFileOneParagraph => Some(Scenario::DocOneParagraph),
+            Self::PptFacadeFileOpen => Some(Scenario::PptOpen),
+            Self::PptFacadeFileFullText => Some(Scenario::PptFullText),
+            Self::PptFacadeFileOneSlideText => Some(Scenario::PptOneSlideText),
+            _ => None,
+        }
+    }
+
+    /// Opt-in selectors for the ordinary documented OOXML save path (change
+    /// 0638), the second half of change 0587's evidence gap 5.  Twenty-four
+    /// run the documented open/edit/save route of DOCX, XLSX and PPTX over an
+    /// existing harness corpus and over a caller-named real file, in four
+    /// separately reported phases.  None is in `Case::DEFAULT`; the real-file
+    /// half needs `--ooxml-file PATH`.
+    const fn is_ordinary_save(self) -> bool {
+        self.ordinary_save_plan().is_some()
+    }
+
+    const fn ordinary_save_plan(
+        self,
+    ) -> Option<(
+        ordinary_save::Format,
+        ordinary_save::Origin,
+        ordinary_save::Phase,
+    )> {
+        use ordinary_save::{Format, Origin, Phase};
+        match self {
+            Self::DocxOrdinarySaveLifecycle => {
+                Some((Format::Docx, Origin::Generated, Phase::Lifecycle))
+            },
+            Self::DocxOrdinarySaveEdit => Some((Format::Docx, Origin::Generated, Phase::Edit)),
+            Self::DocxOrdinarySaveAtomicPublish => {
+                Some((Format::Docx, Origin::Generated, Phase::AtomicPublish))
+            },
+            Self::DocxOrdinarySaveCountingPublish => {
+                Some((Format::Docx, Origin::Generated, Phase::CountingPublish))
+            },
+            Self::DocxRealFileOrdinarySaveLifecycle => {
+                Some((Format::Docx, Origin::RealFile, Phase::Lifecycle))
+            },
+            Self::DocxRealFileOrdinarySaveEdit => {
+                Some((Format::Docx, Origin::RealFile, Phase::Edit))
+            },
+            Self::DocxRealFileOrdinarySaveAtomicPublish => {
+                Some((Format::Docx, Origin::RealFile, Phase::AtomicPublish))
+            },
+            Self::DocxRealFileOrdinarySaveCountingPublish => {
+                Some((Format::Docx, Origin::RealFile, Phase::CountingPublish))
+            },
+            Self::XlsxOrdinarySaveLifecycle => {
+                Some((Format::Xlsx, Origin::Generated, Phase::Lifecycle))
+            },
+            Self::XlsxOrdinarySaveEdit => Some((Format::Xlsx, Origin::Generated, Phase::Edit)),
+            Self::XlsxOrdinarySaveAtomicPublish => {
+                Some((Format::Xlsx, Origin::Generated, Phase::AtomicPublish))
+            },
+            Self::XlsxOrdinarySaveCountingPublish => {
+                Some((Format::Xlsx, Origin::Generated, Phase::CountingPublish))
+            },
+            Self::XlsxRealFileOrdinarySaveLifecycle => {
+                Some((Format::Xlsx, Origin::RealFile, Phase::Lifecycle))
+            },
+            Self::XlsxRealFileOrdinarySaveEdit => {
+                Some((Format::Xlsx, Origin::RealFile, Phase::Edit))
+            },
+            Self::XlsxRealFileOrdinarySaveAtomicPublish => {
+                Some((Format::Xlsx, Origin::RealFile, Phase::AtomicPublish))
+            },
+            Self::XlsxRealFileOrdinarySaveCountingPublish => {
+                Some((Format::Xlsx, Origin::RealFile, Phase::CountingPublish))
+            },
+            Self::PptxOrdinarySaveLifecycle => {
+                Some((Format::Pptx, Origin::Generated, Phase::Lifecycle))
+            },
+            Self::PptxOrdinarySaveEdit => Some((Format::Pptx, Origin::Generated, Phase::Edit)),
+            Self::PptxOrdinarySaveAtomicPublish => {
+                Some((Format::Pptx, Origin::Generated, Phase::AtomicPublish))
+            },
+            Self::PptxOrdinarySaveCountingPublish => {
+                Some((Format::Pptx, Origin::Generated, Phase::CountingPublish))
+            },
+            Self::PptxRealFileOrdinarySaveLifecycle => {
+                Some((Format::Pptx, Origin::RealFile, Phase::Lifecycle))
+            },
+            Self::PptxRealFileOrdinarySaveEdit => {
+                Some((Format::Pptx, Origin::RealFile, Phase::Edit))
+            },
+            Self::PptxRealFileOrdinarySaveAtomicPublish => {
+                Some((Format::Pptx, Origin::RealFile, Phase::AtomicPublish))
+            },
+            Self::PptxRealFileOrdinarySaveCountingPublish => {
+                Some((Format::Pptx, Origin::RealFile, Phase::CountingPublish))
+            },
+            _ => None,
+        }
+    }
+
+    /// The selector for one (format, origin, phase) triple, so a caller can
+    /// enumerate the family without restating its twenty-four names.
+    #[cfg(test)]
+    fn ordinary_save_case(
+        format: ordinary_save::Format,
+        origin: ordinary_save::Origin,
+        phase: ordinary_save::Phase,
+    ) -> Option<Self> {
+        Self::ORDINARY_SAVE
+            .into_iter()
+            .find(|case| case.ordinary_save_plan() == Some((format, origin, phase)))
+    }
+
+    /// Every ordinary-save selector, in registration order.
+    #[cfg(test)]
+    const ORDINARY_SAVE: [Self; 24] = [
+        Self::DocxOrdinarySaveLifecycle,
+        Self::DocxOrdinarySaveEdit,
+        Self::DocxOrdinarySaveAtomicPublish,
+        Self::DocxOrdinarySaveCountingPublish,
+        Self::DocxRealFileOrdinarySaveLifecycle,
+        Self::DocxRealFileOrdinarySaveEdit,
+        Self::DocxRealFileOrdinarySaveAtomicPublish,
+        Self::DocxRealFileOrdinarySaveCountingPublish,
+        Self::XlsxOrdinarySaveLifecycle,
+        Self::XlsxOrdinarySaveEdit,
+        Self::XlsxOrdinarySaveAtomicPublish,
+        Self::XlsxOrdinarySaveCountingPublish,
+        Self::XlsxRealFileOrdinarySaveLifecycle,
+        Self::XlsxRealFileOrdinarySaveEdit,
+        Self::XlsxRealFileOrdinarySaveAtomicPublish,
+        Self::XlsxRealFileOrdinarySaveCountingPublish,
+        Self::PptxOrdinarySaveLifecycle,
+        Self::PptxOrdinarySaveEdit,
+        Self::PptxOrdinarySaveAtomicPublish,
+        Self::PptxOrdinarySaveCountingPublish,
+        Self::PptxRealFileOrdinarySaveLifecycle,
+        Self::PptxRealFileOrdinarySaveEdit,
+        Self::PptxRealFileOrdinarySaveAtomicPublish,
+        Self::PptxRealFileOrdinarySaveCountingPublish,
+    ];
+
     /// Producer-shape selectors whose corpus is a caller-named real file.
     const fn is_producer_real_file(self) -> bool {
         matches!(
@@ -3675,6 +3902,9 @@ struct Options {
     /// repeatable and each file is bound to its format by its CFB stream
     /// inventory, so one run can measure an XLS and a PPT fixture together.
     ole2_files: Vec<PathBuf>,
+    /// Caller-named OOXML files for the opt-in `*_real_file_ordinary_save_*`
+    /// selectors (change 0638). Repeatable, at most one per format.
+    ooxml_files: Vec<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -4625,6 +4855,10 @@ struct SourceSummary {
     simulation: Option<RangeSimulationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ole2_range_source: Option<Box<ole2_range_source::Ole2RangeSourceSummary>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    facade_ole2: Option<Box<facade_ole2::FacadeOle2Summary>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ordinary_save: Option<Box<ordinary_save::OrdinarySaveSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_cache: Option<OpcCacheEvidenceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -9362,6 +9596,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_bytes_root_file()
                     && !case.is_producer_shape()
                     && !case.is_ole2_range_source()
+                    && !case.is_facade_ole2()
+                    && !case.is_ordinary_save()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -11305,22 +11541,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 "the OLE2 range-source selectors require --ole2-file PATH (repeatable)".into(),
             );
         }
-        let mut xls_path = None;
-        let mut ppt_path = None;
-        for path in &options.ole2_files {
-            let slot = match ole2_range_source::classify(path)? {
-                ole2_range_source::Format::Xls => &mut xls_path,
-                ole2_range_source::Format::Ppt => &mut ppt_path,
-            };
-            if slot.is_some() {
-                return Err(format!(
-                    "--ole2-file accepts at most one file per format; {} is the second",
-                    path.display()
-                )
-                .into());
-            }
-            *slot = Some(path.as_path());
-        }
+        let inputs = ole2_range_source::classify_inputs(&options.ole2_files)?;
+        let xls_path = inputs.xls.as_deref();
+        let ppt_path = inputs.ppt.as_deref();
         let mut xls_corpus = None;
         let mut ppt_corpus = None;
         for case in options
@@ -11355,6 +11578,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         .as_ref()
                         .ok_or("PPT range-source corpus is absent")?
                 },
+                // `Scenario::format` never yields `Doc`: change 0627 added no
+                // DOC range-source scenario, and change 0638's DOC classifier
+                // arm exists for the facade family alone.
+                ole2_range_source::Format::Doc => {
+                    return Err("no OLE2 range-source scenario reads a DOC fixture".into());
+                },
             };
             results.push(ole2_range_source::run_case(
                 case,
@@ -11365,6 +11594,107 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 options.samples,
                 options.range_simulation,
             )?);
+        }
+    }
+
+    // Opt-in OLE2 facade selectors (change 0638).  They read the same
+    // `--ole2-file` inputs as change 0627's range-source family, because the
+    // flag is the single classification authority for a caller-named OLE2
+    // fixture, and they hand the path itself to the facade.
+    if options.cases.iter().any(|case| case.is_facade_ole2()) {
+        if options.ole2_files.is_empty() {
+            return Err("the OLE2 facade selectors require --ole2-file PATH (repeatable)".into());
+        }
+        let inputs = ole2_range_source::classify_inputs(&options.ole2_files)?;
+        let mut doc_corpus = None;
+        let mut ppt_corpus = None;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_facade_ole2())
+        {
+            let scenario = case
+                .facade_ole2_scenario()
+                .ok_or("OLE2 facade case has no scenario")?;
+            let corpus =
+                match scenario.route() {
+                    facade_ole2::Route::Document => {
+                        if doc_corpus.is_none() {
+                            let path = inputs.doc.as_deref().ok_or(
+                                "the DOC facade selectors require an --ole2-file DOC fixture",
+                            )?;
+                            doc_corpus = Some(facade_ole2::build_doc_corpus(path)?);
+                        }
+                        doc_corpus.as_ref().ok_or("DOC facade corpus is absent")?
+                    },
+                    facade_ole2::Route::Presentation => {
+                        if ppt_corpus.is_none() {
+                            let path = inputs.ppt.as_deref().ok_or(
+                                "the PPT facade selectors require an --ole2-file PPT fixture",
+                            )?;
+                            ppt_corpus = Some(facade_ole2::build_ppt_corpus(path)?);
+                        }
+                        ppt_corpus.as_ref().ok_or("PPT facade corpus is absent")?
+                    },
+                };
+            results.push(facade_ole2::run_case(
+                case,
+                scenario,
+                corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    // Opt-in ordinary documented OOXML save selectors (change 0638).  Each
+    // (format, origin) pair builds its corpus and its private workspace once;
+    // the real-file half needs `--ooxml-file`.
+    if options.cases.iter().any(|case| case.is_ordinary_save()) {
+        let ooxml_inputs = ordinary_save::classify_inputs(&options.ooxml_files)?;
+        for format in ordinary_save::Format::ALL {
+            for origin in ordinary_save::Origin::ALL {
+                if !options.cases.iter().any(|case| {
+                    case.ordinary_save_plan()
+                        .is_some_and(|(plan_format, plan_origin, _)| {
+                            plan_format == format && plan_origin == origin
+                        })
+                }) {
+                    continue;
+                }
+                let real_file = match origin {
+                    ordinary_save::Origin::Generated => None,
+                    ordinary_save::Origin::RealFile => Some(
+                        ooxml_inputs
+                            .get(format)
+                            .ok_or("the real-file ordinary-save selectors require --ooxml-file")?,
+                    ),
+                };
+                let corpus = ordinary_save::build_corpus(
+                    format,
+                    origin,
+                    real_file,
+                    options.filesystem_root.as_deref(),
+                )?;
+                for case in options.cases.iter().copied().filter(|case| {
+                    case.ordinary_save_plan()
+                        .is_some_and(|(plan_format, plan_origin, _)| {
+                            plan_format == format && plan_origin == origin
+                        })
+                }) {
+                    let (_, _, phase) = case
+                        .ordinary_save_plan()
+                        .ok_or("ordinary-save case has no plan")?;
+                    results.push(ordinary_save::run_case(
+                        case,
+                        phase,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?);
+                }
+            }
         }
     }
 
@@ -11677,6 +12007,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut real_file = None;
     let mut producer_evidence = None;
     let mut ole2_files: Vec<PathBuf> = Vec::new();
+    let mut ooxml_files: Vec<PathBuf> = Vec::new();
     let mut arguments = std::env::args().skip(1);
 
     while let Some(argument) = arguments.next() {
@@ -11796,6 +12127,11 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     arguments.next().ok_or("--ole2-file requires PATH")?,
                 ));
             },
+            "--ooxml-file" => {
+                ooxml_files.push(PathBuf::from(
+                    arguments.next().ok_or("--ooxml-file requires PATH")?,
+                ));
+            },
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -11827,6 +12163,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         real_file,
         producer_evidence,
         ole2_files,
+        ooxml_files,
     })
 }
 
@@ -12263,6 +12600,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_owned_source_control_open_one_shape_text" => {
             Some(Case::PptOwnedSourceControlOpenOneShapeText)
         },
+        "doc_facade_file_open" => Some(Case::DocFacadeFileOpen),
+        "doc_facade_file_full_text" => Some(Case::DocFacadeFileFullText),
+        "doc_facade_file_one_paragraph" => Some(Case::DocFacadeFileOneParagraph),
+        "ppt_facade_file_open" => Some(Case::PptFacadeFileOpen),
+        "ppt_facade_file_full_text" => Some(Case::PptFacadeFileFullText),
+        "ppt_facade_file_one_slide_text" => Some(Case::PptFacadeFileOneSlideText),
         "ppt_semantic_full_text" => Some(Case::PptSemanticFullText),
         "ppt_slide_order_snapshot_open" => Some(Case::PptSlideOrderSnapshotOpen),
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
@@ -12345,6 +12688,42 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::DocxProducerSourceSelectedParagraph)
         },
         "pptx_producer_source_selected_slide" => Some(Case::PptxProducerSourceSelectedSlide),
+        "docx_ordinary_save_lifecycle" => Some(Case::DocxOrdinarySaveLifecycle),
+        "docx_ordinary_save_edit" => Some(Case::DocxOrdinarySaveEdit),
+        "docx_ordinary_save_atomic_publish" => Some(Case::DocxOrdinarySaveAtomicPublish),
+        "docx_ordinary_save_counting_publish" => Some(Case::DocxOrdinarySaveCountingPublish),
+        "docx_real_file_ordinary_save_lifecycle" => Some(Case::DocxRealFileOrdinarySaveLifecycle),
+        "docx_real_file_ordinary_save_edit" => Some(Case::DocxRealFileOrdinarySaveEdit),
+        "docx_real_file_ordinary_save_atomic_publish" => {
+            Some(Case::DocxRealFileOrdinarySaveAtomicPublish)
+        },
+        "docx_real_file_ordinary_save_counting_publish" => {
+            Some(Case::DocxRealFileOrdinarySaveCountingPublish)
+        },
+        "xlsx_ordinary_save_lifecycle" => Some(Case::XlsxOrdinarySaveLifecycle),
+        "xlsx_ordinary_save_edit" => Some(Case::XlsxOrdinarySaveEdit),
+        "xlsx_ordinary_save_atomic_publish" => Some(Case::XlsxOrdinarySaveAtomicPublish),
+        "xlsx_ordinary_save_counting_publish" => Some(Case::XlsxOrdinarySaveCountingPublish),
+        "xlsx_real_file_ordinary_save_lifecycle" => Some(Case::XlsxRealFileOrdinarySaveLifecycle),
+        "xlsx_real_file_ordinary_save_edit" => Some(Case::XlsxRealFileOrdinarySaveEdit),
+        "xlsx_real_file_ordinary_save_atomic_publish" => {
+            Some(Case::XlsxRealFileOrdinarySaveAtomicPublish)
+        },
+        "xlsx_real_file_ordinary_save_counting_publish" => {
+            Some(Case::XlsxRealFileOrdinarySaveCountingPublish)
+        },
+        "pptx_ordinary_save_lifecycle" => Some(Case::PptxOrdinarySaveLifecycle),
+        "pptx_ordinary_save_edit" => Some(Case::PptxOrdinarySaveEdit),
+        "pptx_ordinary_save_atomic_publish" => Some(Case::PptxOrdinarySaveAtomicPublish),
+        "pptx_ordinary_save_counting_publish" => Some(Case::PptxOrdinarySaveCountingPublish),
+        "pptx_real_file_ordinary_save_lifecycle" => Some(Case::PptxRealFileOrdinarySaveLifecycle),
+        "pptx_real_file_ordinary_save_edit" => Some(Case::PptxRealFileOrdinarySaveEdit),
+        "pptx_real_file_ordinary_save_atomic_publish" => {
+            Some(Case::PptxRealFileOrdinarySaveAtomicPublish)
+        },
+        "pptx_real_file_ordinary_save_counting_publish" => {
+            Some(Case::PptxRealFileOrdinarySaveCountingPublish)
+        },
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
@@ -12804,6 +13183,36 @@ fn usage_text() -> String {
                                        ppt_range_source_open_one_shape_text,\n\
                                        ppt_owned_source_control_open,\n\
                                        ppt_owned_source_control_open_one_shape_text,\n\
+                                       doc_facade_file_open,\n\
+                                       doc_facade_file_full_text,\n\
+                                       doc_facade_file_one_paragraph,\n\
+                                       ppt_facade_file_open,\n\
+                                       ppt_facade_file_full_text,\n\
+                                       ppt_facade_file_one_slide_text,\n\
+                                       docx_ordinary_save_lifecycle,\n\
+                                       docx_ordinary_save_edit,\n\
+                                       docx_ordinary_save_atomic_publish,\n\
+                                       docx_ordinary_save_counting_publish,\n\
+                                       docx_real_file_ordinary_save_lifecycle,\n\
+                                       docx_real_file_ordinary_save_edit,\n\
+                                       docx_real_file_ordinary_save_atomic_publish,\n\
+                                       docx_real_file_ordinary_save_counting_publish,\n\
+                                       xlsx_ordinary_save_lifecycle,\n\
+                                       xlsx_ordinary_save_edit,\n\
+                                       xlsx_ordinary_save_atomic_publish,\n\
+                                       xlsx_ordinary_save_counting_publish,\n\
+                                       xlsx_real_file_ordinary_save_lifecycle,\n\
+                                       xlsx_real_file_ordinary_save_edit,\n\
+                                       xlsx_real_file_ordinary_save_atomic_publish,\n\
+                                       xlsx_real_file_ordinary_save_counting_publish,\n\
+                                       pptx_ordinary_save_lifecycle,\n\
+                                       pptx_ordinary_save_edit,\n\
+                                       pptx_ordinary_save_atomic_publish,\n\
+                                       pptx_ordinary_save_counting_publish,\n\
+                                       pptx_real_file_ordinary_save_lifecycle,\n\
+                                       pptx_real_file_ordinary_save_edit,\n\
+                                       pptx_real_file_ordinary_save_atomic_publish,\n\
+                                       pptx_real_file_ordinary_save_counting_publish,\n\
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
@@ -12997,9 +13406,13 @@ fn usage_text() -> String {
                                        include its additive reference in the report\n\
            --real-file PATH            Office file for the opt-in xlsx_real_file_* selectors\n\
            --producer-evidence PATH    Write the producer-shape marker/refusal census\n\
-           --ole2-file PATH            OLE2 file for the opt-in *_range_source_* and\n\
-                                       *_owned_source_control_* selectors; repeatable,\n\
-                                       at most one XLS and one PPT per run\n\
+           --ole2-file PATH            OLE2 file for the opt-in *_range_source_*,\n\
+                                       *_owned_source_control_* and *_facade_file_*\n\
+                                       selectors; repeatable, at most one DOC, one XLS\n\
+                                       and one PPT per run\n\
+           --ooxml-file PATH           OOXML file for the opt-in\n\
+                                       *_real_file_ordinary_save_* selectors; repeatable,\n\
+                                       at most one DOCX, one XLSX and one PPTX per run\n\
            --help                      Show this help"
     )
 }
@@ -23892,6 +24305,40 @@ fn run_case_with_config(
         | Case::PptOwnedSourceControlOpen
         | Case::PptOwnedSourceControlOpenOneShapeText => {
             Err("OLE2 range-source cases use their own corpus runner".into())
+        },
+        Case::DocFacadeFileOpen
+        | Case::DocFacadeFileFullText
+        | Case::DocFacadeFileOneParagraph
+        | Case::PptFacadeFileOpen
+        | Case::PptFacadeFileFullText
+        | Case::PptFacadeFileOneSlideText => {
+            Err("OLE2 facade cases use their own corpus runner".into())
+        },
+        Case::DocxOrdinarySaveLifecycle
+        | Case::DocxOrdinarySaveEdit
+        | Case::DocxOrdinarySaveAtomicPublish
+        | Case::DocxOrdinarySaveCountingPublish
+        | Case::DocxRealFileOrdinarySaveLifecycle
+        | Case::DocxRealFileOrdinarySaveEdit
+        | Case::DocxRealFileOrdinarySaveAtomicPublish
+        | Case::DocxRealFileOrdinarySaveCountingPublish
+        | Case::XlsxOrdinarySaveLifecycle
+        | Case::XlsxOrdinarySaveEdit
+        | Case::XlsxOrdinarySaveAtomicPublish
+        | Case::XlsxOrdinarySaveCountingPublish
+        | Case::XlsxRealFileOrdinarySaveLifecycle
+        | Case::XlsxRealFileOrdinarySaveEdit
+        | Case::XlsxRealFileOrdinarySaveAtomicPublish
+        | Case::XlsxRealFileOrdinarySaveCountingPublish
+        | Case::PptxOrdinarySaveLifecycle
+        | Case::PptxOrdinarySaveEdit
+        | Case::PptxOrdinarySaveAtomicPublish
+        | Case::PptxOrdinarySaveCountingPublish
+        | Case::PptxRealFileOrdinarySaveLifecycle
+        | Case::PptxRealFileOrdinarySaveEdit
+        | Case::PptxRealFileOrdinarySaveAtomicPublish
+        | Case::PptxRealFileOrdinarySaveCountingPublish => {
+            Err("ordinary-save cases use their own corpus runner".into())
         },
         Case::XlsxStreamingCreate
         | Case::RtfStreamingCreate
@@ -59711,7 +60158,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 471);
+        assert_eq!(selectable_count, 501);
         assert_eq!(Case::DEFAULT.len(), 41);
     }
 
