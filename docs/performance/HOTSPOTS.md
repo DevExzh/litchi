@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
+
+Record: [0632](0632-zip-directory-prefill-locate.md).
+
+**0632 — ZIP-6 is closed, and ZIP-8's first half with it.** Change 0623 left the
+132-member workbook's source-backed open at 10 requests and named the three
+locator reads — 30% of them — as the remaining ZIP item. Two of those three
+**begin at the same offset**: `finish_locate_in_reader`'s 46-byte
+first-central-record probe reads the first 46 bytes of what
+`ZipEntries::next_entry`'s first refill is about to read anyway. Merging them is
+not a cache and not a heuristic; it is deleting a duplicated request. The
+locator's probe now reads `min(central_directory_size, 64 KiB)` at the offset it
+was going to probe and hands that buffer to `IndexedArchive` as the scan buffer,
+so the open costs **2 locator requests instead of 3** and **46 bytes fewer**, and
+the second 64 KiB zero-filled central-directory scratch — 0587's ZIP-8, first
+half — disappears entirely. Measured on change 0587's own probe: the workbook
+open 10 → **9** requests and 2,312,260 → **2,256,447** allocated bytes, and
+`comment.docx` 6 → **5** at 430,955 → **366,053**, the allocation saving being
+`RECOMMENDED_BUFFER_SIZE − central_directory_size` to the byte. Across all 533
+ZIP containers under `test-data` the open's requests fall 2,569 → **2,036**
+(−20.7%) with **zero** containers costing more requests and **zero** reading more
+bytes: the saving is exactly one request and exactly 46 bytes on every single
+one. A fresh census says why the window can be the whole directory — the largest
+central directory in the corpus is **9,724 bytes**, the median 1,217, and all 533
+are at or below 16 KiB. What remains of the locate is the locator's own 64 KiB
+scratch, which exists only for the backwards EOCD search that **1 container in
+533** needs; removing it means a two-stage locate that costs that one container
+an extra request, and it is not attempted here.
+
 ## 0638 — the ordinary documented save is publication, not serialization; and the facade's legacy routes finally have selectors
 
 Evidence gap 5 of change [0587](0587-remaining-opportunity-survey.md) had two halves — *"no harness selector opens `.doc` or `.ppt` through the facade"* and *"missing: … the ordinary OOXML save"* — and change [0630](0630-queue-refresh-after-the-first-wave.md) confirmed both were still open after the first wave. Thirty opt-in selectors close them, none in `Case::DEFAULT`: six over `litchi::Document::open` / `litchi::Presentation::open` on a caller-named `--ole2-file` fixture, and twenty-four over the documented `Package::save` / `Workbook::save` route in **four separately reported phases** — lifecycle, semantic edit, atomic save-to-path (change [0497](changes/0497-docx-atomic-publication.md)'s interval: sibling creation, write, permission preservation, `sync_all`, `rename`, parent-directory sync) and documented sequential serialization into a bounded counting sink — over three existing harness corpora and change [0593](0593-opc-publication-pristine-members.md)'s own three real fixtures. **The headline is the phase decomposition.** On six corpora the atomic publication costs **7.7× to 61.7×** the identical serialization: 5.16 ms against 0.32 (DOCX generated), 5.53 against 0.09 (DOCX real), 11.58 against 1.50 (XLSX generated), 7.65 against 0.30 (XLSX real), 5.25 against 0.09 (PPTX generated), 6.89 against 0.27 (PPTX real). A documented save is **publication-bound**, and a compression or layout change on this route is worth at most 0.2–8.7% of a lifecycle. Change 0593 saw this once (*"inside floor; route is fsync-bound"*) and could not act on it; it is now six corpora on registered selectors. **Second finding: one shape-text edit on a real 108 KB deck costs 133.61 ms** — 95.7% of the PPTX real-file lifecycle, **490×** that deck's complete serialization, and **68.7×** the same edit on the 61-member generated corpus — with a 3.02% A/A spread and no explanation; `opened_presentation_transaction()` captures the whole opened presentation and nothing has ever profiled that capture. **Third: the byte split prices 0593's pristine-member preservation in bytes for the first time** — a one-element edit regenerates **0.45%** of the XLSX real file's 632,699 payload bytes, **1.9%** of the PPTX real file's and 13.1% of the generated DOCX's, while ZIP framing alone is 19,658 B (3.0%) of the 131-member XLSX output. **Fourth, on the facade:** a DOC open costs 15.09 µs at 9,728 B and 178.63 µs at 335,360 B while a PPT open is flat (25.55 → 25.95 µs for 3.2× the bytes); a *refused* DOC open still costs 14.37 µs, a complete open; and on the 335 KB fixture `paragraph_text` of a 55-character paragraph costs **1.96× `text()` of all 9,017 characters** (538.31 against 275.32 µs; 3.7× on the marginal query after a shared 178.63 µs open), which is worth an instruction profile. **An admission fact worth a queue row:** `litchi_docx::Package::document_mut()` refuses change 0593's own `alt-chunk-header.docx` with *"invalid DOCX XML: syntax error: tag not closed"* although `Package::open` admits it and `Package::save` republishes it — one fixture, stable over 600 retained samples, uncharacterized, and a `crates/litchi-docx` question rather than a harness one. A/A floor over three full repeats: **p50 2.09%** across 39 rows, with 8 rows above 5% reported by name — five of them carry the atomic publication on a device shared with seven agents, so **every atomic median is an order of magnitude, not a number**; the *ratios* are robust. `performance_claim: none`; no file under `crates/` changed; registry 471 → 501 names, `Case::DEFAULT` stays 41, checked default catalog SHA-256 unmoved. OLE2/OOXML remain active; ODF stays deferred until completion and iWork is excluded. [Record and limitations](0638-facade-and-ordinary-save-selectors.md); [retained evidence](results/change-0638/README.md).

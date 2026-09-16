@@ -1,0 +1,14 @@
+[package]
+name = "workbook-range-timing"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[profile.release]
+opt-level = 3
+
+[dependencies]
+litchi-core = { path = "@TREE@/crates/litchi-core" }
+litchi-opc = { path = "@TREE@/crates/litchi-opc" }
+
+[workspace]

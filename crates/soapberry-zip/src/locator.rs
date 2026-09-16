@@ -321,6 +321,37 @@ fn locate_zip64_record_in_reader<R: ReaderAt>(
 #[derive(Debug)]
 pub struct ZipLocator {
     max_search_space: u64,
+    directory_prefill_bytes: usize,
+}
+
+/// One bounded read of the head of the central directory, taken by the locator.
+///
+/// Change 0632: `finish_locate_in_reader`'s first-central-record probe and the
+/// index's central-directory scan begin at the same offset, so one read serves
+/// both. The buffer is the caller's central-directory scan buffer; `valid` is
+/// how many of its bytes the source actually delivered, starting at `start`.
+#[derive(Debug)]
+pub(crate) struct DirectoryPrefill {
+    start: u64,
+    bytes: Vec<u8>,
+    valid: usize,
+}
+
+impl DirectoryPrefill {
+    /// The source offset the first prefilled byte was read from.
+    pub(crate) fn start(&self) -> u64 {
+        self.start
+    }
+
+    /// How many leading bytes of [`Self::buffer_mut`] hold source bytes.
+    pub(crate) fn valid(&self) -> usize {
+        self.valid
+    }
+
+    /// The buffer itself, for reuse as the central-directory scan buffer.
+    pub(crate) fn buffer_mut(&mut self) -> &mut [u8] {
+        &mut self.bytes
+    }
 }
 
 impl Default for ZipLocator {
@@ -334,7 +365,20 @@ impl ZipLocator {
     pub fn new() -> Self {
         ZipLocator {
             max_search_space: END_OF_CENTRAL_DIR_MAX_OFFSET,
+            directory_prefill_bytes: 0,
         }
+    }
+
+    /// Ask the locator to read up to `bytes` of the central directory while it
+    /// probes the first central record, and hand that buffer back.
+    ///
+    /// Zero, the default, keeps the 46-byte stack probe and yields no prefill.
+    /// The probe reads the same bytes at the same offset either way; the only
+    /// difference is how many of the bytes that follow it come back in the
+    /// same request instead of the scan's first request.
+    pub(crate) fn directory_prefill(mut self, bytes: usize) -> Self {
+        self.directory_prefill_bytes = bytes;
+        self
     }
 
     /// Sets the maximum number of bytes to search for the EOCD signature.
@@ -618,10 +662,25 @@ impl ZipLocator {
     /// ```
     pub fn locate_in_reader<R>(
         &self,
-        mut reader: R,
+        reader: R,
         buffer: &mut [u8],
         end_offset: u64,
     ) -> Result<ZipArchive<R>, (R, Error)>
+    where
+        R: ReaderAt,
+    {
+        self.locate_in_reader_prefilling_directory(reader, buffer, end_offset)
+            .map(|(archive, _prefill)| archive)
+    }
+
+    /// [`Self::locate_in_reader`], also returning the directory prefill when
+    /// [`Self::directory_prefill`] asked for one and the source delivered it.
+    pub(crate) fn locate_in_reader_prefilling_directory<R>(
+        &self,
+        mut reader: R,
+        buffer: &mut [u8],
+        end_offset: u64,
+    ) -> Result<(ZipArchive<R>, Option<DirectoryPrefill>), (R, Error)>
     where
         R: ReaderAt,
     {
@@ -694,39 +753,104 @@ impl ZipLocator {
         reader: R,
         _buffer: &mut [u8],
         mut eocd: EndOfCentralDirectory,
-    ) -> ZipArchive<R>
+    ) -> (ZipArchive<R>, Option<DirectoryPrefill>)
     where
         R: ReaderAt,
     {
         // Check first entry in central directory, see
         // `ZipLocator::locate_in_byte_slice` for more info
-        let mut first_entry_buffer = [0u8; ZipFileHeaderFixed::SIZE];
-        let first_entry = reader
-            .read_exact_at(&mut first_entry_buffer, eocd.central_dir_offset)
-            .ok()
-            .filter(|_| ZipFileHeaderFixed::parse(&first_entry_buffer).is_ok());
-
-        match first_entry {
-            None => {
-                let Some(cd_offset) = eocd.head_eocd_offset().checked_sub(eocd.central_dir_size)
-                else {
-                    return ZipArchive::new(reader, eocd);
-                };
-
-                let first_entry = reader
-                    .read_exact_at(&mut first_entry_buffer, cd_offset)
-                    .ok()
-                    .filter(|_| ZipFileHeaderFixed::parse(&first_entry_buffer).is_ok());
-
-                if first_entry.is_some() {
-                    eocd.base_offset = cd_offset.saturating_sub(eocd.central_dir_offset);
-                    eocd.central_dir_offset = cd_offset;
-                }
-
-                ZipArchive::new(reader, eocd)
-            },
-            _ => ZipArchive::new(reader, eocd),
+        //
+        // Change 0632: when the caller asked for a directory prefill, this
+        // probe reads the head of the central directory instead of just the
+        // fixed record, because the caller's next act is to read exactly those
+        // bytes. The probe itself is unchanged: the same 46 bytes at the same
+        // offset decide the same way, and a read that cannot deliver 46 bytes
+        // fails the probe exactly as `read_exact_at` of 46 bytes does.
+        let central_dir_size = eocd.central_dir_size;
+        let (accepted, prefill) =
+            self.probe_first_central_record(&reader, eocd.central_dir_offset, central_dir_size);
+        if accepted {
+            return (ZipArchive::new(reader, eocd), prefill);
         }
+
+        let Some(cd_offset) = eocd.head_eocd_offset().checked_sub(central_dir_size) else {
+            return (ZipArchive::new(reader, eocd), None);
+        };
+
+        let (accepted, prefill) =
+            self.probe_first_central_record(&reader, cd_offset, central_dir_size);
+        if accepted {
+            eocd.base_offset = cd_offset.saturating_sub(eocd.central_dir_offset);
+            eocd.central_dir_offset = cd_offset;
+            return (ZipArchive::new(reader, eocd), prefill);
+        }
+
+        (ZipArchive::new(reader, eocd), None)
+    }
+
+    /// Whether a valid fixed central record begins at `offset`, plus the
+    /// prefill that decided it when one was taken.
+    fn probe_first_central_record<R>(
+        &self,
+        reader: &R,
+        offset: u64,
+        central_dir_size: u64,
+    ) -> (bool, Option<DirectoryPrefill>)
+    where
+        R: ReaderAt,
+    {
+        if let Some(prefill) = self.prefill_directory(reader, offset, central_dir_size) {
+            let accepted =
+                ZipFileHeaderFixed::parse(&prefill.bytes[..ZipFileHeaderFixed::SIZE]).is_ok();
+            return (accepted, accepted.then_some(prefill));
+        }
+
+        let mut first_entry_buffer = [0u8; ZipFileHeaderFixed::SIZE];
+        let accepted = reader
+            .read_exact_at(&mut first_entry_buffer, offset)
+            .is_ok()
+            && ZipFileHeaderFixed::parse(&first_entry_buffer).is_ok();
+        (accepted, None)
+    }
+
+    /// Read the head of the central directory at `offset` in one request.
+    ///
+    /// Returns `None` — and issues no request — whenever the prefill is not
+    /// configured, the declared directory is shorter than one fixed central
+    /// record, or the buffer cannot be reserved. Returns `None` after the
+    /// request when the source refused it or delivered fewer than the
+    /// `ZipFileHeaderFixed::SIZE` bytes the probe needs, which are the two
+    /// conditions under which the 46-byte probe also fails.
+    fn prefill_directory<R>(
+        &self,
+        reader: &R,
+        offset: u64,
+        central_dir_size: u64,
+    ) -> Option<DirectoryPrefill>
+    where
+        R: ReaderAt,
+    {
+        let want = usize::try_from(central_dir_size)
+            .unwrap_or(usize::MAX)
+            .min(self.directory_prefill_bytes);
+        if want < ZipFileHeaderFixed::SIZE {
+            return None;
+        }
+
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(want).ok()?;
+        bytes.resize(want, 0);
+
+        let valid = reader.try_read_at_least_at(&mut bytes, want, offset).ok()?;
+        if valid < ZipFileHeaderFixed::SIZE {
+            return None;
+        }
+
+        Some(DirectoryPrefill {
+            start: offset,
+            bytes,
+            valid,
+        })
     }
 
     fn locate_in_reader_impl<R>(

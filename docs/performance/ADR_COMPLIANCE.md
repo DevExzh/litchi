@@ -1,5 +1,46 @@
 # Performance optimization ADR-compliance matrix
 
+## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
+
+Record: [0632](0632-zip-directory-prefill-locate.md).
+
+**ADR 0005 (bounded resources, caching semantically invisible).** The window is
+one named ceiling, `RECOMMENDED_BUFFER_SIZE`, set against a measured corpus
+maximum of 9,724 bytes over 533 containers; the buffer is `try_reserve_exact`d,
+is at most the declared directory, and is released with the index construction.
+A reservation failure yields no prefill rather than an error. "Cache behaviour is
+semantically invisible" is met in the strongest available form: the cached bytes
+*are* the bytes the very next read was going to fetch, and the differential's two
+reports are byte-identical. The change also **reduces** bounded resource use —
+two 64 KiB zero-filled scratches become one, released before the scan, plus one
+buffer the size of the directory. **ADR 0006 (validation, fail-closed).** Every
+check keeps its position and its identity: the EOCD fast-path gate, the backwards
+search and its `max_search_space`, ZIP64 locator and record resolution,
+`validate_classic_single_disk`, `EndOfCentralDirectory::create`,
+`physical_entry_bound` and every `ArchiveLimits` ceiling are untouched. The one
+boundary that *could* have moved — which typed error an oversized central record
+reaches — is identified in the frozen design, pinned with an explicit
+`spill_threshold`, and covered by a test that compares the two paths directly.
+No typed refusal was traded for a partial result and no defence was relaxed.
+**ADR 0011 (ownership).** Entirely inside `soapberry-zip`, the ZIP grammar owner;
+nothing new crosses the boundary, and `litchi-opc` sees only one fewer `read_at`
+call. **ADR 0003 (validation must not mutate).** Untouched;
+`ArchiveValidationPolicy` is not read by any changed line. **One accepted movement, stated rather than
+claimed away.** A managed open also loses the request, so it reserves and
+charges `Resource::InputBytes` once for the directory where it charged 46 and
+then the directory, and makes one fewer `ExecutionContext::check` observation.
+That is change 0611's class of movement — the merged read *is* the read the scan
+had to issue, with a strict subset removed — and it is in the direction of less
+work, so a finite input budget can admit an open it refused but can never refuse
+one it admitted. It is not change 0623's case, where a speculative read
+belonging to no member was reserved as a unit; that is why 0623 gated its
+mechanism off the managed path and this one does not. **One stated scope
+limit.** The prefill is a `pub(crate)` locator option that is **off by default**,
+so `locate_in_reader`, `locate_in_file`, `locate_in_slice`, `entries`,
+`entries_with_metadata_limit` and `PreservationIndex` keep their exact grammar;
+only `IndexedArchive::from_reader*`, which always scans the directory it just
+probed, asks for it.
+
 ## 0638 — two new observation axes, one new bounded input, and no boundary moved
 
 Record: [0638](0638-facade-and-ordinary-save-selectors.md).

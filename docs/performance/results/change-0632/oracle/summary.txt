@@ -1,0 +1,24 @@
+Change 0632 open differential — 533 ZIP containers under test-data
+
+Both legs record, per container: the open's verdict, its request, byte and
+source-observation cost, every package and part relationship with its id,
+type, target and mode, every admitted Part with its content type and
+relationship count, every non-part member with its reason, and the decoded
+length and CRC-32 of every Part.  18,494 lines per report.
+
+The two reports differ on 533 lines, and every one of them is an
+`open-cost requests=` line.  No verdict, no error identity, no part, no
+relationship, no non-part member, no decoded payload and no source-observation
+count differs anywhere in the corpus.
+
+                                       before        after
+open requests, 533 containers           2569         2036   (-20.7%)
+open bytes, 533 containers           2391391      2366873   (-24518)
+version() observations                  2132         2132
+containers costing more requests           —            0
+containers costing fewer requests          —          533
+containers reading more bytes              —            0
+containers reading fewer bytes             —          533
+
+Every container saves exactly one request and exactly 46 bytes: the separate
+46-byte first-central-record probe.

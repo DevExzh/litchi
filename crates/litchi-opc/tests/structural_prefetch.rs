@@ -302,12 +302,14 @@ fn one_read_serves_a_contiguous_run_of_structural_members() {
     // Eleven structural members — the content-types member, the package
     // `_rels/.rels`, the document's relationship part and eight child
     // relationship parts — are written consecutively, so one read covers all
-    // of them. The remaining reads are the archive locator's.
+    // of them. The remaining reads are the archive locator's: change 0632
+    // merged its first-central-record probe into the central-directory read,
+    // so there are two of them rather than three.
     assert_eq!(package.iter_parts().count(), 9);
     assert_eq!(
         reads.len(),
-        4,
-        "expected three locator reads and one run read, got {reads:?}"
+        3,
+        "expected two locator reads and one run read, got {reads:?}"
     );
     let run = reads
         .iter()
@@ -557,9 +559,10 @@ fn a_scattered_package_costs_no_more_reads() {
     let source = Recording::new(bytes);
     open(Arc::clone(&source)).expect("open");
     let reads = source.take();
-    // Three locator reads plus one read for each of the seven structural
-    // members: exactly what the same package costs without this mechanism.
-    assert_eq!(reads.len(), 10, "unexpected read shape {reads:?}");
+    // Two locator reads (change 0632 merged the third into the second) plus
+    // one read for each of the seven structural members: exactly what the same
+    // package costs without this mechanism.
+    assert_eq!(reads.len(), 9, "unexpected read shape {reads:?}");
 }
 
 #[test]
@@ -617,7 +620,7 @@ fn a_managed_open_keeps_the_exact_grammar() {
         managed_reads.len(),
         unmanaged_reads.len()
     );
-    assert_eq!(managed_reads.len(), 14, "unexpected managed read shape");
+    assert_eq!(managed_reads.len(), 13, "unexpected managed read shape");
 }
 
 #[test]

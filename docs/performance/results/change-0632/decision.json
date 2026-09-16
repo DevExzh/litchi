@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0632",
+  "title": "The central directory is read once, and the buffer it lands in is sized to it",
+  "decision": "retained, implemented in soapberry-zip",
+  "code_state": "crates/soapberry-zip only (locator.rs, archive.rs, office.rs); no public API added, removed or altered; no error type, limit or output byte changed; no new unsafe and no new dependency; three absolute request-count assertions in change 0623's crates/litchi-opc/tests/structural_prefetch.rs updated from 4/10/14 reads to 3/9/13",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's ZIP-6, re-priced by change 0623: after 0611 and 0623 the 132-member workbook's source-backed open costs 10 requests, three of which are the locate, and two of those three begin at the same offset -- the 46-byte first-central-record probe is the first 46 bytes of the central-directory scan's first read",
+    "one read now serves both: the locator's probe reads min(central_directory_size, 64 KiB) at the offset it was going to probe and hands that buffer to the index as its scan buffer, so requests fall 3 to 2 and bytes fall by 46 rather than rising",
+    "change 0587's ZIP-8 first half is taken in the same edit: the second 64 KiB zero-filled central-directory scratch disappears entirely on the from_reader path, and the public from_zip_archive path sizes its scratch to the declared directory",
+    "the read grammar is unchanged rather than equivalent: change 0611's extended differential over change 0582's 22,875-input corpus, both limit profiles, both directions, 2,886,786 member verdicts, produces two 3,801,502-line reports that are byte-identical",
+    "the 533-container open differential differs on 533 lines, every one an open-cost request count; no verdict, error identity, part, relationship, non-part member, decoded payload or source-version observation moves anywhere in the corpus"
+  ],
+  "accepted_evidence": {
+    "counts": "change 0587's probe as change 0623 left it, both legs, three OOXML fixtures: requests 10->9, 6->5, 6->5; bytes -46 each; open allocated bytes -55,813 / -61,853 / -64,902, which is RECOMMENDED_BUFFER_SIZE minus central_directory_size to the byte; version() observations unchanged on every phase",
+    "corpus_open_differential": "change 0623's open oracle over all 533 ZIP containers under test-data, both legs, 18,494 lines per report: open requests 2,569->2,036 (-20.7%), bytes 2,391,391->2,366,873, version observations unchanged, 0 containers costing more requests, 0 reading more bytes, exactly -1 request and -46 bytes on every container",
+    "read_grammar_differential": "change 0611's extended copy of change 0582's harness, both builds from git archive trees, change 0582's corpus regenerated from RNG_SEED 0x05820580: 22,875 inputs, 2,886,786 member verdicts, class A/B/E divergences 0/0/0, 0 oracle failures, 0 panics, reports byte-identical (sha256 358e306f37bc5e5e0a400847fa1b258278bd62f1cc365b971a59ef385743c894 on both)",
+    "census": "the ZIP tail geometry of all 533 containers computed from the bytes alone: largest central directory 9,724 B, median 1,217 B, p99 7,166 B, all at or below 16 KiB; 0 comment-bearing, 0 ZIP64, 0 prefixed, 1 whose EOCD is not at len-22",
+    "timing_range": "tools/perf-baseline on change 0493/0572's simulated transport (1 ms per physical request, 100 MiB/s, 64 KiB maximum range), --warmup 5 --samples 30, order A1 B1 B2 A2 plus A/A floor A3 A4 and B/B floor B1 B2, taskset -c 8, both binaries staged outside their Cargo target directories: opc_range_source_open -24.82%/-24.91% (4->3 requests), opc_range_source_open_main_read -19.91%/-19.90% (5->4), xlsx_range_source_open -16.68%/-17.02% (6->5), floors at most 0.30% at p50",
+    "timing_real_packages": "change 0623's delayed-transport probe on four real packages, --warmup 10 --samples 60, same leg order: ConditionalFormattingSamples.xlsx 10->9 requests, -9.47%/-9.46%, -1.07 ms; shapes.pptx 6->5, -16.05%/-16.07%; shape-soft-edges.pptx 8->7, -12.01%/-12.09%; comment.docx 6->5, -16.54%/-16.54%; every floor at most 0.31%, every saving 1.06-1.07 ms",
+    "tests": "crates/soapberry-zip/tests/directory_prefill.rs, 11 tests: the two-request index build; member equality against the untouched public locate-then-entries path for 0/1/2/17/64 members; a 1,600-member archive with a 100 KiB directory read in a window plus forward refills with no overlap and no gap; both retained ZIP64 fixtures; a comment-bearing archive; a comment containing a false EOCD signature; a 4,096-byte-prefixed archive reaching the base-offset fallback; a source capped at 1/7/46/64/97/512 bytes per call; a directory shorter than one central record taking no prefill; the oversized-variable-field spill boundary compared directly against the untouched 64 KiB public path; an empty archive"
+  },
+  "accepted_costs": {
+    "spill_threshold_is_now_explicit": "ZipEntries carries a spill_threshold field because sizing the scan buffer to the directory would otherwise move a record declaring central_dir_size < variable_length <= 65,536 from BufferTooSmall to Eof; every caller-facing constructor sets it to buffer.len(), which is today's boundary, and only the index scan pins it at RECOMMENDED_BUFFER_SIZE",
+    "speculative_bytes_on_a_missed_probe": "an archive whose first central record is not at the declared offset pays min(central_directory_size, 64 KiB) bytes for the probe that missed instead of 46; no container in the 533-container corpus reaches that path, and the request count never rises",
+    "simulated_transport": "the latency-bearing result is a fixed service time per physical request, not a network or a real device; what it prices is the request count",
+    "local_sources_unresolvable": "the local in-process timing table's A/A and B/B floors are larger than every delta in it on this host at this load; nothing local is claimed",
+    "existing_assertions_updated": "change 0623's structural_prefetch.rs pins three opens' absolute request counts; each falls by exactly the one locator request this change removes, and the comments naming 'three locator reads' now name two. They are the only assertions in the repository that pin an absolute ZIP open request count",
+    "managed_budget_movement": "a managed open reserves and charges Resource::InputBytes once for central_directory_size where it charged 46 and then central_directory_size, and makes one fewer ExecutionContext::check observation; an open whose finite input budget sat within 46 bytes of the boundary now succeeds where it refused, and none can refuse where it succeeded. This is change 0611's class of movement (the merged read is the read that had to happen, with a strict subset removed), not change 0623's (a speculative read belonging to no member, reserved as a unit), which is why 0623 gated its mechanism off the managed path and this one does not"
+  },
+  "known_gaps": {
+    "locator_scratch": "the locator's own 64 KiB scratch stays: its size is what holds the backwards EOCD search to one request for the 1 container in 533 that needs it, and the directory size is not known before the locate. A two-stage locate would remove that allocation at the cost of one extra request on every archive that does not take the len-22 fast path; it was not attempted and not measured",
+    "preservation_index": "PreservationIndex takes a caller scratch and runs after the locate returns, so it gets no prefill and its request count is unchanged",
+    "from_zip_archive": "the public constructor that takes an already-located archive gets the right-sized scan buffer but no prefill, because its caller's locate has already happened",
+    "eocd_search": "the EOCD search rules, comment handling and ZIP64 locator and record resolution are untouched; a comment-bearing or trailing-byte archive still pays the backwards search's buffer-sized read"
+  },
+  "withheld": [
+    "any registered speedup, cold-cache, physical-I/O, peak-RSS, instruction-count, syscall, concurrency-scaling, real-producer or cross-platform result",
+    "any claim on a local in-process source"
+  ],
+  "provenance": {
+    "base_commit": "c7326f680",
+    "branch": "perf/0632-zip-tail-window-locate",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu_pin": "taskset -c 8 for every measured process; every build pinned to 0-7,9-31",
+    "binaries": {
+      "before/litchi-perf-baseline": "2ad84560e63beef8beb7fc1b12fe390c692f9084b25b6bafe02e4e8d59bd5567",
+      "after/litchi-perf-baseline": "d84f3fa88e95ca55a839ed07e14c39269fbbd9b87d1461af3a74295a9c0ac838",
+      "before/workbook-range-timing": "68821b89d1b45bcafe12d543081e7b43b804e6e765c560c0789e172955eba1e1",
+      "after/workbook-range-timing": "323a4f115f652b26a234ced98286a16efa75274e3d2836fbf074fa809e83ef5a",
+      "before/read_grammar_differential": "a562697d96a239f9f6fbafb71b22e9dc2bc03aee0e9095841c22cc86272134e0",
+      "after/read_grammar_differential": "22ab394633f7d2be49f8c1a528944275eccecfba7808684ae382c99c3a45e1fb",
+      "before/opc-open-oracle": "e7cc0475406b3e8edcc422dc20ac286689f191cf6ba0779a6793e44bc01f5895",
+      "after/opc-open-oracle": "74596c5b9e71be4960a198c1d37bd0fc58dc31942b01ff15a17e2bf143664c9b"
+    },
+    "note": "the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR; both litchi-perf-baseline legs were built with cargo build --release --locked --bin litchi-perf-baseline from tools/perf-baseline against the identical tools/perf-baseline/Cargo.lock"
+  }
+}

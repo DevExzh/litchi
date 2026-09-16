@@ -38,6 +38,7 @@ use crate::accounting::{
     AccountingReadKind, AccountingWriteKind, CountingReader, accounting_overflow, usize_to_u64,
 };
 use crate::crc::crc32_chunk;
+use crate::locator::DirectoryPrefill;
 use crate::path::{RawPath, ZipFilePath};
 use crate::reader_at::{ReaderAtExt, validate_read_count};
 use crate::writer::ReusedDeflateEncoder;
@@ -3508,10 +3509,16 @@ where
                 })
             })?;
         buffer.resize(RECOMMENDED_BUFFER_SIZE, 0);
-        let archive = ZipLocator::new()
-            .locate_in_reader(reader, &mut buffer, end_offset)
+        // Change 0632: the locator's first-central-record probe and this
+        // index's central-directory scan begin at the same offset, so the
+        // locator reads that span once, into a buffer sized to the declared
+        // directory, and hands it over as the scan buffer.
+        let (archive, prefill) = ZipLocator::new()
+            .directory_prefill(RECOMMENDED_BUFFER_SIZE)
+            .locate_in_reader_prefilling_directory(reader, &mut buffer, end_offset)
             .map_err(|(_reader, error)| error)?;
-        Self::from_zip_archive_with_limits_and_policy(archive, limits, policy)
+        drop(buffer);
+        Self::from_zip_archive_with_limits_policy_and_prefill(archive, limits, policy, prefill)
     }
 
     /// Build an index from an already located ZIP archive using default limits.
@@ -3544,6 +3551,17 @@ where
         archive: ZipArchive<R>,
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
+    ) -> Result<Self, Error> {
+        Self::from_zip_archive_with_limits_policy_and_prefill(archive, limits, policy, None)
+    }
+
+    /// [`Self::from_zip_archive_with_limits_and_policy`], reusing the locator's
+    /// central-directory prefill as the scan buffer when it took one.
+    fn from_zip_archive_with_limits_policy_and_prefill(
+        archive: ZipArchive<R>,
+        limits: ArchiveLimits,
+        policy: ArchiveValidationPolicy,
+        prefill: Option<DirectoryPrefill>,
     ) -> Result<Self, Error> {
         let declared_entry_count = archive.entries_hint();
         let declared_central_size = archive.central_directory_size();
@@ -3600,19 +3618,33 @@ where
         let mut has_data_descriptor_entries = false;
         let mut has_zip64_metadata = archive.is_zip64();
         let mut all_local_spans_bounded = true;
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(RECOMMENDED_BUFFER_SIZE)
-            .map_err(|source| {
-                Error::from(ErrorKind::Allocation {
-                    resource: "indexed archive central-directory scratch",
-                    source,
-                })
-            })?;
-        buffer.resize(RECOMMENDED_BUFFER_SIZE, 0);
+        // A prefill taken at the archive's own directory offset already holds
+        // the head of the directory; anything else is discarded and the scan
+        // reads for itself. Either way the buffer is sized to the declared
+        // directory rather than to the 64 KiB recommendation, because that
+        // size is known here exactly.
+        let mut prefill = prefill.filter(|prefill| prefill.start() == archive.directory_offset());
+        let prefilled = prefill.as_ref().map_or(0, DirectoryPrefill::valid);
+        let mut owned_buffer = Vec::new();
+        let buffer: &mut [u8] = match prefill.as_mut() {
+            Some(prefill) => prefill.buffer_mut(),
+            None => {
+                let wanted = usize::try_from(declared_central_size)
+                    .unwrap_or(usize::MAX)
+                    .min(RECOMMENDED_BUFFER_SIZE);
+                owned_buffer.try_reserve_exact(wanted).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "indexed archive central-directory scratch",
+                        source,
+                    })
+                })?;
+                owned_buffer.resize(wanted, 0);
+                &mut owned_buffer
+            },
+        };
 
         {
-            let mut central_entries = archive.entries_with_metadata_limit(&mut buffer, u64::MAX);
+            let mut central_entries = archive.entries_for_index(buffer, u64::MAX, prefilled);
             while let Some(entry) = central_entries.next_entry()? {
                 has_encrypted_entries |= entry.flags() & 1 != 0;
                 has_data_descriptor_entries |= entry.has_data_descriptor();

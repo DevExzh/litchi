@@ -1,5 +1,32 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0632: the central directory is read once, and the buffer it lands in is sized to it — every OOXML open loses a request and a 64 KiB scratch
+
+Record: [0632](0632-zip-directory-prefill-locate.md).
+
+The interesting thing about 0632 is the shape of its proof, and it is worth
+recording because it is available more often than the programme has used it.
+Most read-path changes in this wave argue *equivalence*: the verdicts are the
+same, the bytes are the same, the errors are the same, and a differential is run
+to check. 0632 can argue something stronger — **state identity**. Today's scan,
+after its own first read, sits at `pos = 0`, `end = read`,
+`offset = directory_offset + read` with the directory's head in its buffer. The
+prefilled scan starts in exactly that state, from exactly those bytes, because
+the read that produced them is the read it would have issued. Once that is true,
+every later refill, every metadata charge, every parse and every refusal is
+reached from the same buffer contents at the same logical position, and the only
+way the two can differ is through something that depends on the *buffer's
+length* rather than its contents. There is exactly one such thing — the
+oversized-record spill boundary — and the design names it before any code was
+written, pins it with an explicit `spill_threshold`, and shows that a record
+declaring `central_dir_size < variable_length ≤ 65,536` would otherwise move from
+`BufferTooSmall` to `Eof`. The differential then confirms the argument in the
+strongest form the harness can produce: the two 3,801,502-line reports over
+22,875 inputs are not merely equivalent, they are **byte-identical**, same
+SHA-256. A frozen design that enumerates what the change can possibly perturb,
+and then a differential that finds the file unchanged, is a cheaper and more
+convincing pair than a differential alone.
+
 ## 0638 — the entry points `docs/GOAL.md`'s definition of done is about had never been measured by a selector
 
 Record: [0638](0638-facade-and-ordinary-save-selectors.md).

@@ -1773,6 +1773,7 @@ impl<R> ZipArchive<R> {
         buffer: &'buf mut [u8],
         max_metadata_bytes: u64,
     ) -> ZipEntries<'archive, 'buf, R> {
+        let spill_threshold = buffer.len();
         ZipEntries {
             buffer,
             metadata_buffer: Vec::new(),
@@ -1784,6 +1785,44 @@ impl<R> ZipArchive<R> {
             central_dir_end_pos: self.eocd.directory_end_offset(),
             metadata_bytes: 0,
             max_metadata_bytes,
+            spill_threshold,
+        }
+    }
+
+    /// Scan the central directory from a buffer whose first `prefilled` bytes
+    /// already hold the directory, starting at [`Self::directory_offset`].
+    ///
+    /// Change 0632: the locator's first-central-record probe and this scan's
+    /// first refill begin at the same offset, so the locator reads that span
+    /// once and hands the buffer over. `prefilled` is zero when it did not,
+    /// and the iterator then reads exactly as it does today.
+    ///
+    /// The spill threshold is pinned at [`RECOMMENDED_BUFFER_SIZE`] rather
+    /// than tracking the buffer, so sizing the buffer to the declared
+    /// directory cannot move which typed error an oversized record reaches.
+    pub(crate) fn entries_for_index<'archive, 'buf>(
+        &'archive self,
+        buffer: &'buf mut [u8],
+        max_metadata_bytes: u64,
+        prefilled: usize,
+    ) -> ZipEntries<'archive, 'buf, R> {
+        let prefilled = prefilled.min(buffer.len());
+        let spill_threshold = buffer.len().max(RECOMMENDED_BUFFER_SIZE);
+        ZipEntries {
+            buffer,
+            metadata_buffer: Vec::new(),
+            archive: self,
+            pos: 0,
+            end: prefilled,
+            offset: self
+                .eocd
+                .directory_offset()
+                .saturating_add(prefilled as u64),
+            base_offset: self.eocd.base_offset(),
+            central_dir_end_pos: self.eocd.directory_end_offset(),
+            metadata_bytes: 0,
+            max_metadata_bytes,
+            spill_threshold,
         }
     }
 
@@ -2774,6 +2813,16 @@ pub struct ZipEntries<'archive, 'buf, R> {
     central_dir_end_pos: u64,
     metadata_bytes: u64,
     max_metadata_bytes: u64,
+    /// The variable-field width above which a record is read into the owned
+    /// spill buffer instead of the caller's buffer.
+    ///
+    /// This is `buffer.len()` for every caller-facing constructor, which is
+    /// the boundary this iterator has always used. Change 0632 sizes the
+    /// index's scan buffer to the declared central directory instead of the
+    /// recommended 64 KiB, and pins the boundary here so that a record whose
+    /// variable part exceeds the directory keeps refusing with the same typed
+    /// error rather than moving from the refill path to the spill path.
+    spill_threshold: usize,
 }
 
 impl<R> ZipEntries<'_, '_, R>
@@ -2855,7 +2904,7 @@ where
         // a recommended size, not a validity requirement. Read an oversized
         // record into an owned spill buffer so valid metadata is not rejected
         // merely because it crosses that recommendation.
-        if variable_length > self.buffer.len() {
+        if variable_length > self.spill_threshold {
             let variable_data_offset = central_directory_offset
                 .checked_add(ZipFileHeaderFixed::SIZE as u64)
                 .ok_or_else(|| Error::from(ErrorKind::Eof))?;
