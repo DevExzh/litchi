@@ -1,0 +1,125 @@
+# fixture=/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc mode=doc-open bytes=9728
+# outcome=OK
+# fingerprint_chunk=1048576
+call_ordinal	read_ordinal	kind	offset	len	class
+1		len	0	9728	-
+2		version	0	0	-
+3		version	0	0	-
+4		len	0	9728	-
+5	1	read	0	512	index-or-range
+6	2	read	512	512	index-or-range
+7	3	read	8704	1024	index-or-range
+8	4	read	1536	512	index-or-range
+9		version	0	0	-
+10		version	0	0	-
+11		len	0	9728	-
+12		version	0	0	-
+13		version	0	0	-
+14		version	0	0	-
+15		version	0	0	-
+16		len	0	9728	-
+17		version	0	0	-
+18		version	0	0	-
+19		len	0	9728	-
+20		version	0	0	-
+21		version	0	0	-
+22	5	read	0	9728	scan-chunk
+23		version	0	0	-
+24		version	0	0	-
+25		len	0	9728	-
+26		version	0	0	-
+27		version	0	0	-
+28		len	0	9728	-
+29		version	0	0	-
+30		version	0	0	-
+31		len	0	9728	-
+32		version	0	0	-
+33		version	0	0	-
+34	6	read	0	512	index-or-range
+35		version	0	0	-
+36		version	0	0	-
+37	7	read	512	512	index-or-range
+38		version	0	0	-
+39		version	0	0	-
+40	8	read	8704	1024	index-or-range
+41		version	0	0	-
+42		version	0	0	-
+43	9	read	1536	512	index-or-range
+44		version	0	0	-
+45		version	0	0	-
+46		len	0	9728	-
+47		version	0	0	-
+48		version	0	0	-
+49		len	0	9728	-
+50		version	0	0	-
+51		version	0	0	-
+52		len	0	9728	-
+53	10	read	0	512	index-or-range
+54	11	read	512	512	index-or-range
+55	12	read	8704	1024	index-or-range
+56	13	read	1536	512	index-or-range
+57		version	0	0	-
+58		version	0	0	-
+59		len	0	9728	-
+60		version	0	0	-
+61		version	0	0	-
+62	14	read	4416	154	index-or-range
+63		version	0	0	-
+64	15	read	4416	1242	index-or-range
+65		version	0	0	-
+66	16	read	3399	84	index-or-range
+67		version	0	0	-
+68	17	read	2844	21	index-or-range
+69		version	0	0	-
+70		version	0	0	-
+71		version	0	0	-
+72		len	0	9728	-
+73		version	0	0	-
+74		version	0	0	-
+75		len	0	9728	-
+76		version	0	0	-
+77		version	0	0	-
+78	18	read	0	9728	scan-chunk
+79		version	0	0	-
+80		version	0	0	-
+81		len	0	9728	-
+82		version	0	0	-
+83		version	0	0	-
+84		len	0	9728	-
+85		version	0	0	-
+86		version	0	0	-
+87		len	0	9728	-
+88		version	0	0	-
+89		version	0	0	-
+90	19	read	0	512	index-or-range
+91		version	0	0	-
+92		version	0	0	-
+93	20	read	512	512	index-or-range
+94		version	0	0	-
+95		version	0	0	-
+96	21	read	8704	1024	index-or-range
+97		version	0	0	-
+98		version	0	0	-
+99	22	read	1536	512	index-or-range
+100		version	0	0	-
+101		version	0	0	-
+102		len	0	9728	-
+103		version	0	0	-
+104		version	0	0	-
+105		len	0	9728	-
+106		version	0	0	-
+107		version	0	0	-
+108	23	read	0	9728	scan-chunk
+109		version	0	0	-
+110		version	0	0	-
+111		len	0	9728	-
+112		version	0	0	-
+113		version	0	0	-
+114		len	0	9728	-
+115		version	0	0	-
+116		version	0	0	-
+117		len	0	9728	-
+118		version	0	0	-
+# read_calls=23
+# scan_chunks=3 chunks_per_scan=1
+# complete_scans=3

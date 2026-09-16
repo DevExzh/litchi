@@ -1,0 +1,8 @@
+/home/zhuhe/code/litchi/test-data/office-interop/libreoffice-resaved/noheadfoot-litchi.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/duplicate-style-names.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/endingnote.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/footnote.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/lists-margins.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/picture.doc
+/home/zhuhe/code/litchi/test-data/ole/doc/table-merged-cells.doc

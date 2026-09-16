@@ -1249,3 +1249,151 @@ fn noop_plan_publishes_the_exact_source_bytes() {
     assert_eq!(report.source_fingerprint(), report.target_fingerprint());
     assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&bytes));
 }
+
+// ---------------------------------------------------------------------------
+// Change 0659: the two identity entry points variant B2 of change 0644 needs.
+// ---------------------------------------------------------------------------
+
+/// A generic positional source whose complete reads can be counted, so a test
+/// can assert how many complete artifact scans an entry point takes.
+struct ScanCountingSource {
+    bytes: Vec<u8>,
+    reads: AtomicUsize,
+    complete_reads: AtomicUsize,
+}
+
+impl ScanCountingSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            reads: AtomicUsize::new(0),
+            complete_reads: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl ReadAt for ScanCountingSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        if offset == 0 && output.len() >= self.bytes.len() {
+            self.complete_reads.fetch_add(1, Ordering::SeqCst);
+        }
+        let start = usize::try_from(offset).map_err(io::Error::other)?;
+        let Some(input) = self.bytes.get(start..) else {
+            return Ok(0);
+        };
+        let count = input.len().min(output.len());
+        output[..count].copy_from_slice(&input[..count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(0x0659, 0))
+    }
+}
+
+#[test]
+fn caller_bracketed_identity_is_the_empty_splice_digest_in_one_scan() {
+    let bytes = sample_bytes();
+    let expected = sha256_of(&bytes);
+
+    let counted = Arc::new(ScanCountingSource::new(bytes.clone()));
+    let file = SharedOleFile::open(counted.clone()).unwrap();
+    counted.complete_reads.store(0, Ordering::SeqCst);
+    let single = file.caller_bracketed_identity_fingerprint().unwrap();
+    let single_scans = counted.complete_reads.load(Ordering::SeqCst);
+
+    let counted = Arc::new(ScanCountingSource::new(bytes));
+    let file = SharedOleFile::open(counted.clone()).unwrap();
+    counted.complete_reads.store(0, Ordering::SeqCst);
+    let plan = file
+        .plan_same_length_stream_splices(Vec::new(), crate::StreamSpliceLimits::default())
+        .unwrap();
+    let paired_scans = counted.complete_reads.load(Ordering::SeqCst);
+
+    assert_eq!(single.as_bytes(), &expected);
+    assert_eq!(single, plan.source_fingerprint());
+    assert_eq!(single_scans, 1, "the caller owns the read-twice-compare");
+    assert_eq!(
+        paired_scans, 2,
+        "the self-bracketing entry point is unchanged"
+    );
+}
+
+#[test]
+fn caller_bracketed_identity_still_reopens_the_composed_candidate() {
+    // The composed reopen is ADR 0003's proof that the candidate parses. A
+    // mutation of the CFB header after the planning scan must still be
+    // reported by it, as `Ole`, and not silently accepted.
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    // Byte 30 is the sector shift: flipping it makes every later parse fail.
+    source.mutate_offset.store(30, Ordering::SeqCst);
+    let after_planning_scan = source.reads.load(Ordering::SeqCst) + 1;
+    source
+        .mutate_after_read
+        .store(after_planning_scan, Ordering::SeqCst);
+
+    let error = file.caller_bracketed_identity_fingerprint().unwrap_err();
+    assert!(
+        matches!(error, OverlayError::Ole(_)),
+        "the composed reopen must still report a structural failure: {error:?}"
+    );
+}
+
+#[test]
+fn unbracketed_source_fingerprint_is_the_same_digest_with_no_reopen() {
+    let bytes = sample_bytes();
+    let expected = sha256_of(&bytes);
+
+    let counted = Arc::new(ScanCountingSource::new(bytes));
+    let file = SharedOleFile::open(counted.clone()).unwrap();
+    counted.reads.store(0, Ordering::SeqCst);
+    counted.complete_reads.store(0, Ordering::SeqCst);
+    let digest = file.unbracketed_source_fingerprint().unwrap();
+
+    assert_eq!(digest.as_bytes(), &expected);
+    assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        counted.reads.load(Ordering::SeqCst),
+        1,
+        "a digest-only path parses no index and reopens nothing"
+    );
+}
+
+#[test]
+fn only_the_unbracketed_digest_survives_an_index_damaged_under_the_read() {
+    // This is the property `litchi-doc`'s relocated error precedence depends
+    // on: once the artifact's own CFB metadata has been corrupted under the
+    // read, every entry point that reopens the composed candidate fails on the
+    // damage, and only the digest-only path can still say whether the bytes
+    // moved — which is what makes the caller's writer, not the file, the thing
+    // the reported error blames.
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let clean = file.unbracketed_source_fingerprint().unwrap();
+    assert_eq!(clean.as_bytes(), &sha256_of(&sample_bytes()));
+
+    source.mutate_offset.store(30, Ordering::SeqCst);
+    source.change_bytes_without_version();
+
+    let paired = file
+        .plan_same_length_stream_splices(Vec::new(), crate::StreamSpliceLimits::default())
+        .unwrap_err();
+    assert!(
+        matches!(paired, OverlayError::Ole(_)),
+        "the self-bracketing entry point fails on the damage: {paired:?}"
+    );
+    let single = file.caller_bracketed_identity_fingerprint().unwrap_err();
+    assert!(
+        matches!(single, OverlayError::Ole(_)),
+        "so does the caller-bracketed one: {single:?}"
+    );
+
+    let observed = file.unbracketed_source_fingerprint().unwrap();
+    assert_ne!(observed, clean, "the digest-only path reports the movement");
+}

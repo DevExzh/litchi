@@ -247,12 +247,7 @@ impl SharedOleFile {
             )));
         }
 
-        let source = SourceSnapshot {
-            source: Arc::clone(&self.source),
-            version: self.expected_version,
-            length: self.index.file_size,
-            source_is_owned_immutable: self.source_is_owned_immutable,
-        };
+        let source = self.plan_source_snapshot();
         source.ensure_length()?;
         let sectors = directory_sectors(self, directory_bytes)?;
         let original = read_directory(&source, &sectors, self.index.sector_size, directory_bytes)?;

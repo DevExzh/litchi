@@ -1,0 +1,12 @@
+# fixture=/home/zhuhe/code/litchi/test-data/ole/doc/documentProperties.doc
+policy	UnixMetadata
+byte_before	208
+byte_after	47
+bytes_changed	true
+length_before	9728
+length_after	9728
+length_changed	false
+version_before	SourceVersion { id: 1, revision: 0 }
+version_after	SourceVersion { id: 1, revision: 0 }
+version_changed	false
+verdict	SourceVersion and length are both blind to this mutation

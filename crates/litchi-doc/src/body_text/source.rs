@@ -523,15 +523,33 @@ impl SourceSnapshot {
                 observed: first_shared.source_version()?,
             }));
         }
-        let opening_fingerprint = identity_fingerprint(&first_shared, limits)?;
+        // Variant B2 of change 0644: the opening identity takes one complete
+        // scan, not two.  Its comparison partner is `finish_open`'s own
+        // `final_fingerprint`, which this open already reads and compares, so
+        // the read-twice-compare is still closed — by the caller's outer
+        // bracket instead of by a confirming scan inside the call.
+        let opening_fingerprint = first_shared.caller_bracketed_identity_fingerprint()?;
         ensure_source_identity(&source, version, length)?;
         // Reopen after the first complete fingerprint.  This binds the
         // directory/FAT index used below to the same bytes that supplied the
         // opening identity even when a custom adapter lies about its token.
-        let shared = Arc::new(SharedOleFile::open_with_limits(
-            Arc::clone(&source),
-            shared_limits,
-        )?);
+        //
+        // The confirming scan removed above was also what made a mutation of
+        // this artifact's own CFB index report `SourceFingerprintChanged`
+        // rather than letting this parse blame the file for damage the
+        // caller's writer did (change 0644, cost B-iii).  Change 0621's rule
+        // is to relocate such an observation onto the error branch, which is
+        // what `relocate_structural_cfb_error` does here.
+        let shared = match SharedOleFile::open_with_limits(Arc::clone(&source), shared_limits) {
+            Ok(index) => Arc::new(index),
+            Err(error) => {
+                return Err(relocate_structural_cfb_error(
+                    &first_shared,
+                    opening_fingerprint,
+                    error,
+                ));
+            },
+        };
         ensure_source_identity(&source, version, length)?;
         if shared.source_version()? != version {
             return Err(Error::Overlay(OverlayError::SourceChanged {
@@ -596,21 +614,25 @@ impl SourceSnapshot {
                 observed: final_fingerprint,
             }));
         }
-        let fingerprint = identity_fingerprint(&shared, limits)?;
+        // Option C of change 0644: the third identity call is gone.  Its two
+        // complete scans bracketed one `ensure_source_identity` and nothing
+        // else — no byte of the artifact was consumed between the second
+        // call's confirming scan and the third call's planning scan — so
+        // every mutation it refused is refused instead by `ensure_current`,
+        // with the same `SourceFingerprintChanged`, at the first access that
+        // consumes a byte.  The cheap identity check it bracketed is retained
+        // even though no byte is read between it and the one above: change
+        // 0644's admission gate requires the open's five
+        // `ensure_source_identity` points to be untouched, and a defence is
+        // never dropped on performance grounds.
         ensure_source_identity(&source, version, length)?;
-        if fingerprint != final_fingerprint {
-            return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
-                expected: final_fingerprint,
-                observed: fingerprint,
-            }));
-        }
         Ok(Self {
             inner: Arc::new(SourceInner {
                 source,
                 shared,
                 version,
                 length,
-                fingerprint,
+                fingerprint: final_fingerprint,
                 limits,
                 layout: Layout {
                     table_name,
@@ -657,7 +679,13 @@ impl SourceSnapshot {
                 observed: shared.source_version()?,
             }));
         }
-        let opening_fingerprint = identity_fingerprint(&shared, limits)?;
+        // The same single-scan capture as the generic path above, on the same
+        // rule: this is not the last identity call of the operation, and its
+        // partner is `finish_open`'s `final_fingerprint`.  Here the outer
+        // bracket is belt to the braces of ownership — `OwnedSource` is
+        // constructed in this module and never handed out, so these bytes
+        // cannot change at all.
+        let opening_fingerprint = shared.caller_bracketed_identity_fingerprint()?;
         ensure_source_identity(&source, version, length)?;
         Self::finish_open(source, version, length, opening_fingerprint, shared, limits)
     }
@@ -685,30 +713,55 @@ impl SourceSnapshot {
     }
 
     /// Source version captured at open.
+    ///
+    /// # Retained state, not a fresh observation
+    ///
+    /// This and the four accessors below return values captured when the open
+    /// returned; none of them reads the source, and so none of them can refuse
+    /// a source that changed since.  Since change 0659 the open's identity
+    /// fence ends one identity call earlier (change 0644, Option C), so a
+    /// mutation that first becomes visible between that last comparison and
+    /// the open's return is no longer refused *by the open*: it is refused by
+    /// the first call that consumes a byte.  Every such path — [`Self::paragraph`],
+    /// [`Self::edit_paragraph`], [`Self::edit`] and [`Self::transaction`] —
+    /// goes through the same complete-artifact comparison and returns
+    /// `Overlay(SourceFingerprintChanged)`, so no byte is ever served past a
+    /// fence.  A caller that opens and then reads only these accessors is
+    /// reading what the open saw, which may no longer be what the source
+    /// holds.
     #[must_use]
     pub fn source_version(&self) -> SourceVersion {
         self.inner.version
     }
 
     /// Complete source-artifact fingerprint captured at open.
+    ///
+    /// Retained state; see [`Self::source_version`] for what that means after
+    /// change 0659.
     #[must_use]
     pub fn fingerprint(&self) -> ArtifactFingerprint {
         self.inner.fingerprint
     }
 
     /// Complete source byte length captured at open.
+    ///
+    /// Retained state; see [`Self::source_version`].
     #[must_use]
     pub fn len(&self) -> u64 {
         self.inner.length
     }
 
     /// Whether the source artifact is empty.
+    ///
+    /// Retained state; see [`Self::source_version`].
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.length == 0
     }
 
     /// Returns the configured finite source limits.
+    ///
+    /// Retained state; see [`Self::source_version`].
     #[must_use]
     pub fn limits(&self) -> SourceLimits {
         self.inner.limits
@@ -763,7 +816,11 @@ impl SourceSnapshot {
 
     fn ensure_current(&self) -> Result<()> {
         ensure_source_identity(&self.inner.source, self.inner.version, self.inner.length)?;
-        let observed = identity_fingerprint(&self.inner.shared, self.inner.limits)?;
+        // Variant B of change 0644 again: one complete scan, compared against
+        // the digest this snapshot retained at open and again against
+        // `confirmed` below.  Two outer comparisons, neither of them inside
+        // the call.
+        let observed = self.inner.shared.caller_bracketed_identity_fingerprint()?;
         ensure_source_identity(&self.inner.source, self.inner.version, self.inner.length)?;
         if observed != self.inner.fingerprint {
             return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
@@ -2094,6 +2151,73 @@ fn identity_fingerprint(
     Ok(plan.source_fingerprint())
 }
 
+/// Reports a structural CFB failure of the retained index parse as a source
+/// identity change when the artifact moved after the opening scan.
+///
+/// Change 0644's cost B-iii, relocated by change 0621's rule.  The opening
+/// identity call's confirming scan used to be the first observation to re-read
+/// a mutated CFB allocation table, so a caller whose own writer changed the
+/// artifact under this open was told `SourceFingerprintChanged`.  With that
+/// scan gone the next reader of those bytes is this index parse, which would
+/// report `CorruptedFile` and blame the file for damage the caller did.
+///
+/// The relocation is deliberately narrow.
+///
+/// * It runs only on **this** parse's error, and the scoping — not the digest
+///   — is what keeps it there.  The composed reopen inside an identity call
+///   keeps its own `Overlay(Ole(..))` at every ordinal, including the ordinals
+///   where a mutation landed after that call's planning scan and the digest
+///   therefore *has* moved: reporting the movement there would invert rows
+///   change 0644's admission gate pins, because the reopen's own failure is
+///   the earlier and more specific observation.
+/// * It runs only for the CFB errors that describe the artifact's
+///   *structure*.  A limit refusal, an I/O failure, an allocation failure and
+///   an already-typed `SourceChanged` keep their own error exactly.
+/// * It upgrades only on positive proof.  The digest is recomputed and must
+///   differ from the one captured at the opening scan; if the recomputation
+///   itself fails, or the artifact is unchanged, the original structural error
+///   stands.
+fn relocate_structural_cfb_error(
+    first_shared: &SharedOleFile,
+    opening_fingerprint: ArtifactFingerprint,
+    error: OleError,
+) -> Error {
+    if !is_structural_cfb_error(&error) {
+        return Error::Ole(error);
+    }
+    // A reopen-free digest: `caller_bracketed_identity_fingerprint` and
+    // `plan_same_length_stream_splices` would both reopen the composed
+    // candidate over the same damaged allocation table and fail with a third,
+    // unrelated error instead of reporting whether the bytes moved.
+    match first_shared.unbracketed_source_fingerprint() {
+        Ok(observed) if observed != opening_fingerprint => {
+            Error::Overlay(OverlayError::SourceFingerprintChanged {
+                expected: opening_fingerprint,
+                observed,
+            })
+        },
+        _ => Error::Ole(error),
+    }
+}
+
+/// True for the CFB failures that describe the artifact's structure, and so
+/// may have been caused by a mutation of the artifact under this open.
+const fn is_structural_cfb_error(error: &OleError) -> bool {
+    match error {
+        OleError::InvalidFormat(_)
+        | OleError::InvalidData(_)
+        | OleError::NotOleFile
+        | OleError::CorruptedFile(_) => true,
+        OleError::Io(_)
+        | OleError::Allocation { .. }
+        | OleError::Committed { .. }
+        | OleError::LimitExceeded { .. }
+        | OleError::InvalidLimit { .. }
+        | OleError::StreamNotFound
+        | OleError::SourceChanged { .. } => false,
+    }
+}
+
 fn reserve_pending(
     pending: &mut Vec<u16>,
     pending_bytes: &mut Vec<u8>,
@@ -2312,20 +2436,12 @@ mod tests {
             .join("../../test-data/ole/doc/documentProperties.doc");
         let bytes = std::fs::read(path).expect("DOC fixture");
 
-        let generic_counter = Arc::new(CountingSource {
-            bytes: Arc::from(bytes.clone()),
-            total_bytes: AtomicU64::new(0),
-            max_read: AtomicUsize::new(0),
-        });
+        let generic_counter = Arc::new(CountingSource::new(&bytes));
         let generic_source: Arc<dyn ReadAt> = generic_counter.clone();
         SourceSnapshot::open(generic_source).expect("generic source-backed DOC fixture");
         let generic_reads = generic_counter.total_bytes.load(Ordering::SeqCst);
 
-        let owned_counter = Arc::new(CountingSource {
-            bytes: Arc::from(bytes),
-            total_bytes: AtomicU64::new(0),
-            max_read: AtomicUsize::new(0),
-        });
+        let owned_counter = Arc::new(CountingSource::new(&bytes));
         let owned_source: Arc<dyn ReadAt> = owned_counter.clone();
         SourceSnapshot::open_owned_source(owned_source, SourceBackedOptions::default())
             .expect("owned source-backed DOC fixture");
@@ -2612,11 +2728,7 @@ mod tests {
         writer.add_paragraph(&combined).expect("giant paragraph");
         let mut output = io::Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("DOC fixture");
-        let counted = Arc::new(CountingSource {
-            bytes: Arc::from(output.into_inner()),
-            total_bytes: AtomicU64::new(0),
-            max_read: AtomicUsize::new(0),
-        });
+        let counted = Arc::new(CountingSource::new(&output.into_inner()));
         let source: Arc<dyn ReadAt> = counted.clone();
         let snapshot = SourceSnapshot::open(source).expect("source-backed DOC fixture");
         let scan_chunk_cp = u32::try_from(SCAN_CHUNK_UNITS).expect("scan chunk size");
@@ -2651,6 +2763,12 @@ mod tests {
         reads: AtomicUsize,
         request_sizes: Mutex<Vec<usize>>,
         mutate_after_read: AtomicUsize,
+        /// Byte the hostile mutation flips, and the mask it flips it with.
+        /// `None` means the last byte of the artifact, which is payload on the
+        /// fixture these sweeps use; an explicit offset places the witness in
+        /// the CFB allocation table instead.
+        mutate_offset: Option<usize>,
+        mutate_mask: u8,
         fired: AtomicBool,
     }
 
@@ -2661,7 +2779,19 @@ mod tests {
                 reads: AtomicUsize::new(0),
                 request_sizes: Mutex::new(Vec::new()),
                 mutate_after_read: AtomicUsize::new(mutate_after_read),
+                mutate_offset: None,
+                mutate_mask: 0x01,
                 fired: AtomicBool::new(false),
+            }
+        }
+
+        /// The same adapter with the witness byte placed at `offset`, flipped
+        /// hard enough to break whatever structure covers it.
+        fn with_offset(bytes: Vec<u8>, mutate_after_read: usize, offset: usize) -> Self {
+            Self {
+                mutate_offset: Some(offset),
+                mutate_mask: 0xff,
+                ..Self::new(bytes, mutate_after_read)
             }
         }
 
@@ -2703,9 +2833,13 @@ mod tests {
             output[..count].copy_from_slice(&input[..count]);
             if call == self.mutate_after_read.load(Ordering::SeqCst)
                 && !self.fired.swap(true, Ordering::SeqCst)
-                && let Some(last) = bytes.last_mut()
             {
-                *last ^= 0x01;
+                let target = self
+                    .mutate_offset
+                    .unwrap_or_else(|| bytes.len().saturating_sub(1));
+                if let Some(byte) = bytes.get_mut(target) {
+                    *byte ^= self.mutate_mask;
+                }
             }
             Ok(count)
         }
@@ -2860,6 +2994,20 @@ mod tests {
         bytes: Arc<[u8]>,
         total_bytes: AtomicU64,
         max_read: AtomicUsize,
+        /// Reads that request the whole artifact from offset zero — one
+        /// chunk of a complete identity scan on a fixture below 1 MiB.
+        complete_reads: AtomicUsize,
+    }
+
+    impl CountingSource {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: Arc::from(bytes),
+                total_bytes: AtomicU64::new(0),
+                max_read: AtomicUsize::new(0),
+                complete_reads: AtomicUsize::new(0),
+            }
+        }
     }
 
     impl ReadAt for CountingSource {
@@ -2882,12 +3030,153 @@ mod tests {
                 Ordering::SeqCst,
             );
             self.max_read.fetch_max(count, Ordering::SeqCst);
+            if start == 0 && count == self.bytes.len() {
+                self.complete_reads.fetch_add(1, Ordering::SeqCst);
+            }
             Ok(count)
         }
 
         fn version(&self) -> io::Result<SourceVersion> {
             Ok(SourceVersion::new(0xD0C0_0113, 0))
         }
+    }
+
+    /// Change 0659 (variant B2 of change 0644): the generic DOC open takes
+    /// **three** complete artifact scans, not six, and `open` plus one
+    /// paragraph read takes **nine**, not fourteen.
+    ///
+    /// The count is what the design claims, so it is asserted exactly: a lost
+    /// fence point would shrink it silently otherwise.
+    #[test]
+    fn the_generic_open_takes_three_complete_scans_and_a_paragraph_read_nine() {
+        let bytes = documentproperties_bytes();
+
+        let counted = Arc::new(CountingSource::new(&bytes));
+        let source: Arc<dyn ReadAt> = counted.clone();
+        let snapshot = SourceSnapshot::open(source).expect("generic source-backed DOC fixture");
+        assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 3);
+        snapshot
+            .paragraph(Position::new(0))
+            .expect("first paragraph");
+        assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 9);
+
+        // Each `ensure_current` is three scans: one for the reduced call and
+        // two for the call that keeps its pair.
+        snapshot
+            .paragraph(Position::new(0))
+            .expect("first paragraph again");
+        assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 15);
+    }
+
+    /// Change 0659: a CFB allocation table mutated under the open, after the
+    /// opening identity scan, is still reported as a source identity change
+    /// and not as a corrupt file.
+    ///
+    /// The confirming scan of the opening identity call used to be the first
+    /// observation to re-read those bytes. With it gone the retained index
+    /// parse reaches them first and would report `CorruptedFile`, blaming the
+    /// file for damage the caller's own writer did. Change 0621's rule
+    /// relocates the observation onto that parse's error branch; this is the
+    /// test of the relocation.
+    #[test]
+    fn a_table_mutated_after_the_opening_scan_is_still_an_identity_change() {
+        let bytes = documentproperties_bytes();
+        let clean = SourceSnapshot::from_bytes(bytes.clone()).expect("clean DOC fixture");
+
+        // Reads 7, 8 and 9 are the composed reopen inside the opening identity
+        // call; a mutation of FAT byte 520 after any of them is invisible to
+        // that reopen and reaches the retained index parse first.
+        for ordinal in 7..=10 {
+            let hostile = Arc::new(ScheduledMutationSource::with_offset(
+                bytes.clone(),
+                ordinal,
+                520,
+            ));
+            let source: Arc<dyn ReadAt> = hostile.clone();
+            match SourceSnapshot::open(source) {
+                Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
+                    expected,
+                    observed,
+                })) => {
+                    assert_eq!(expected, clean.fingerprint());
+                    assert_ne!(observed, expected);
+                },
+                other => panic!("read {ordinal} reported {other:?}, not an identity change"),
+            }
+            assert!(hostile.fired.load(Ordering::SeqCst));
+        }
+    }
+
+    /// Change 0659: the relocation is scoped, and these are the two boundaries
+    /// it must not cross.
+    #[test]
+    fn the_relocation_leaves_the_composed_reopen_and_a_clean_artifact_alone() {
+        let bytes = documentproperties_bytes();
+
+        // A file that is malformed before anything is read keeps its own
+        // structural error: the digest has not moved, so nothing is relocated.
+        let mut damaged = bytes.clone();
+        damaged[520] ^= 0xff;
+        match SourceSnapshot::open(Arc::new(OwnedSource::new(damaged))) {
+            Err(Error::Ole(OleError::CorruptedFile(_))) => {},
+            other => panic!("a corrupt file must still be reported as one: {other:?}"),
+        }
+
+        // Reads 5 and 6 land inside the composed reopen of the opening
+        // identity call, which re-reads the table itself. The digest has moved
+        // at these ordinals too — the mutation follows the planning scan — so
+        // what keeps `Overlay(Ole)` here is the relocation's scoping and
+        // nothing else. Change 0644's admission gate fails an implementation
+        // that reports an identity change at either of them.
+        for ordinal in 5..=6 {
+            let hostile = Arc::new(ScheduledMutationSource::with_offset(
+                bytes.clone(),
+                ordinal,
+                520,
+            ));
+            let source: Arc<dyn ReadAt> = hostile.clone();
+            match SourceSnapshot::open(source) {
+                Err(Error::Overlay(OverlayError::Ole(OleError::CorruptedFile(_)))) => {},
+                other => panic!("read {ordinal} reported {other:?}, not the reopen's own error"),
+            }
+        }
+    }
+
+    /// Change 0659 (Option C of change 0644): the open's third identity call
+    /// is gone, so a mutation that first becomes visible after the open's last
+    /// comparison is accepted by `open` and refused by the first access.
+    #[test]
+    fn option_c_relocates_the_trailing_refusal_to_the_first_access() {
+        let bytes = documentproperties_bytes();
+        let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
+        let clean_source: Arc<dyn ReadAt> = clean.clone();
+        let reference = SourceSnapshot::open(clean_source).expect("clean open");
+        let open_reads = clean.reads.load(Ordering::SeqCst);
+
+        let hostile = Arc::new(ScheduledMutationSource::new(bytes, open_reads));
+        let source: Arc<dyn ReadAt> = hostile.clone();
+        let snapshot =
+            SourceSnapshot::open(source).expect("the open's last read is a compared scan");
+        assert!(hostile.fired.load(Ordering::SeqCst));
+
+        // The retained accessors report what the open saw; that is what their
+        // rustdoc now says, and it is the whole of the contract movement.
+        assert_eq!(snapshot.fingerprint(), reference.fingerprint());
+        assert_eq!(snapshot.len(), reference.len());
+
+        // No byte is served past the fence.
+        assert!(matches!(
+            snapshot.paragraph(Position::new(0)),
+            Err(Error::Overlay(
+                OverlayError::SourceFingerprintChanged { .. }
+            ))
+        ));
+        assert!(matches!(
+            snapshot.edit_paragraph(Position::new(0)),
+            Err(Error::Overlay(
+                OverlayError::SourceFingerprintChanged { .. }
+            ))
+        ));
     }
 
     struct StableMutationSource {

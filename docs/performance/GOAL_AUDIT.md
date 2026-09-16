@@ -1,5 +1,50 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0659 — a fence reduced where the caller already brackets it, and an error precedence repaid rather than dropped
+
+`docs/GOAL.md` puts correctness and lossless preservation over speed, and this
+change is the first in the programme to *remove* a complete-artifact scan from an
+ADR 0006 identity fence. What makes it admissible is stated as a property of the
+call site, not of the primitive: a reduced identity call is one whose comparison
+partner is a scan the same operation already takes — the open's first call is
+compared against identity call 2's planning scan, and `ensure_current`'s first is
+compared twice, against the digest retained at open and against `confirmed`. The
+PPT open has no such partner and is therefore untouched, obtained by applying
+B2's rule rather than by special-casing PPT. Change 0644's refusal of Option A
+stands unamended and its witness was rerun: a `SourceVersion` observation cannot
+replace any scan, because an in-place `pwrite` with the modification time
+restored leaves both `version()` and `len()` unchanged. Two contract movements
+are accepted and both are written into the crate documentation rather than left
+in a record. Option C ends the open's fence one identity call earlier, so six
+read ordinals that were refused by `open` now return `Ok` and are refused by the
+first access instead — with `Overlay(SourceFingerprintChanged)` on a payload
+witness and `Overlay(Ole(CorruptedFile))` on a FAT-sector one, which is exactly
+what 0644's gate said to expect — and the five accessors that consume no byte
+(`source_version`, `fingerprint`, `len`, `is_empty`, `limits`) now say in their
+rustdoc that they return state retained at open. The second movement is the one
+0644 avoided by recommending a weaker variant, and the audit should note how it
+was repaid: removing the open's first confirming scan hands the window in which
+a caller's own writer corrupts the artifact's allocation table to the retained
+index parse, which would report `CorruptedFile` and blame the file. Change
+0621's relocation rule is applied there — narrowly, to that parse's error alone,
+to the four `OleError` variants that describe structure, and only on positive
+proof that the digest moved — using a new reopen-free digest entry point,
+because every entry point that reopens the composed candidate fails on the same
+damage instead. The relocated error is the *same value*, not merely the same
+variant: the sweep's rendering after the change is character-for-character the
+before leg's, including the expected digest. One surviving ordinal does change
+its typed error, and the record says so plainly rather than absorbing it: the
+confirming scan was the only observation that distinguished "the mutation
+arrived before the retained parse" from "it arrived after the identity was
+confirmed", so with it gone both are reported as what they are, a change of the
+source. Variant B1 is **refused** on the evidence 0652 asked for: ordinals 45–49
+of the landed `open` plus `paragraph(0)` are refused today and would fall outside
+B1's last scan, so its wider trailing window does admit mutations B2 catches. No
+limit was relaxed, no defence removed and no ADR amended. OLE2 and OOXML remain
+the active priority; ODF stays deferred and iWork excluded.
+[Change and limitations](0659-cfb-single-scan-identity-entry-point.md);
+[evidence](results/change-0659/README.md).
+
 ## 0655 — the four complete-package hashes of an opened PPTX lifecycle are gone, and the contract they cost has been paid
 
 Record: [0655](0655-pptx-memoized-revision-proof.md).

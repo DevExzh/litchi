@@ -641,6 +641,84 @@ impl std::fmt::Debug for ValidatedOverlayPlan {
 }
 
 impl SharedOleFile {
+    /// Captures the complete source-artifact digest of this file with a
+    /// **single** complete scan, leaving the read-twice-compare to the caller.
+    ///
+    /// This is the empty-splice identity capture of
+    /// [`Self::plan_same_length_stream_splices`] with its confirming scan
+    /// removed. It takes no splice list at all, so it can never be used to
+    /// skip the composed reopen for a plan that changes a byte: the composed
+    /// candidate is still built from the digest and reopened through the
+    /// ordinary CFB parser, exactly as a planned overlay is, and a structural
+    /// failure there is still reported as [`OverlayError::Ole`].
+    ///
+    /// # The caller owns the read-twice-compare
+    ///
+    /// A positional adapter may keep a stable [`SourceVersion`] while its
+    /// bytes change, so a digest read once and never compared proves nothing.
+    /// [`Self::plan_same_length_stream_splices`] closes that gap itself by
+    /// scanning a second time and comparing — for a source it does not own;
+    /// bytes opened through [`Self::open_owned`] cannot change, so it elides
+    /// that scan and this entry point is not a reduction over them. This
+    /// entry point never scans a second time, and is
+    /// therefore admissible **only** where the caller's own next complete scan
+    /// compares against the value returned here — for example a snapshot open
+    /// that captures an identity, parses, captures it again and compares the
+    /// two. A caller with no such outer comparison must use
+    /// [`Self::plan_same_length_stream_splices`] instead; with one scan and no
+    /// partner, the digest returned here would be uncompared and the mutation
+    /// it exists to refuse would go undetected.
+    ///
+    /// The returned digest covers every byte of the source artifact, as
+    /// [`ValidatedOverlayPlan::source_fingerprint`] does for an empty splice
+    /// list, and is equal to it byte for byte on an unchanging source.
+    pub fn caller_bracketed_identity_fingerprint(
+        &self,
+    ) -> Result<ArtifactFingerprint, OverlayError> {
+        self.check_source_version()?;
+        let source = self.plan_source_snapshot();
+        source.ensure_length()?;
+        empty_splice_identity(&source)
+    }
+
+    /// Recomputes the complete source-artifact digest **without** reopening a
+    /// composed candidate.
+    ///
+    /// # Failure-path diagnostic only; never an identity capture
+    ///
+    /// The value returned here is unbracketed: nothing reopens the composed
+    /// artifact and nothing compares the digest with a second scan, so it
+    /// cannot establish that a later read saw the same bytes and must never be
+    /// retained as a snapshot's identity. Its one legitimate use is to decide,
+    /// on a failure path that is already returning an error, whether the
+    /// source bytes moved since an identity was captured — so that a caller's
+    /// own writer is blamed for the change rather than the file being blamed
+    /// for structural damage.
+    ///
+    /// It exists because the obvious alternatives cannot serve that purpose:
+    /// [`Self::caller_bracketed_identity_fingerprint`] and
+    /// [`Self::plan_same_length_stream_splices`] both reopen the composed
+    /// candidate, which on a source whose CFB index has just been corrupted
+    /// fails with a third, unrelated error instead of reporting the digest.
+    ///
+    /// Use [`Self::plan_same_length_stream_splices`] for an identity, or
+    /// [`Self::caller_bracketed_identity_fingerprint`] when the caller
+    /// supplies the outer comparison.
+    pub fn unbracketed_source_fingerprint(&self) -> Result<ArtifactFingerprint, OverlayError> {
+        let (source_fingerprint, _target) = fingerprints(&self.plan_source_snapshot(), &[])?;
+        Ok(source_fingerprint)
+    }
+
+    /// The positional view every plan on this file is derived from.
+    pub(crate) fn plan_source_snapshot(&self) -> SourceSnapshot {
+        SourceSnapshot {
+            source: Arc::clone(&self.source),
+            version: self.expected_version,
+            length: self.index.file_size,
+            source_is_owned_immutable: self.source_is_owned_immutable,
+        }
+    }
+
     /// Derives and fully validates physical overlays for existing equal-length
     /// streams.
     ///
@@ -666,12 +744,7 @@ impl SharedOleFile {
             )));
         }
 
-        let source = SourceSnapshot {
-            source: Arc::clone(&self.source),
-            version: self.expected_version,
-            length: self.index.file_size,
-            source_is_owned_immutable: self.source_is_owned_immutable,
-        };
+        let source = self.plan_source_snapshot();
         source.ensure_length()?;
 
         let mut selections = Vec::new();
@@ -1003,6 +1076,29 @@ impl ValidatedOverlayPlan {
             target_fingerprint: self.target_fingerprint,
         })
     }
+}
+
+/// The empty-splice specialization of [`finish_overlay_plan_with_owner`],
+/// stopping before the confirming scan.
+///
+/// With no span the composed target is the source itself, so the target
+/// fingerprint equals the source fingerprint (see [`fingerprints`]) and the
+/// owner callback is never reached (`finish_overlay_plan_with_owner` returns
+/// `owner = None` for an empty span list). What remains of that function on
+/// this path is the planning scan, the composed reopen, and — only for a
+/// source the module does not own — the confirming scan this helper omits.
+fn empty_splice_identity(source: &SourceSnapshot) -> Result<ArtifactFingerprint, OverlayError> {
+    let (source_fingerprint, target_fingerprint) = fingerprints(source, &[])?;
+    let candidate: Arc<dyn ReadAt> = Arc::new(composed_source(
+        source.clone(),
+        Arc::from(Vec::new()),
+        target_fingerprint,
+    ));
+    // ADR 0003's proof that the composed candidate parses. It is retained for
+    // the empty splice list too, because it is the only observation that
+    // re-reads the CFB index against the bytes the scan above covered.
+    SharedOleFile::open(candidate).map_err(OverlayError::from)?;
+    Ok(source_fingerprint)
 }
 
 pub(crate) fn finish_overlay_plan<F>(

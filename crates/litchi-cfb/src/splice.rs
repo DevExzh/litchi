@@ -264,12 +264,7 @@ impl SharedOleFile {
             }
         }
 
-        let source = SourceSnapshot {
-            source: Arc::clone(&self.source),
-            version: self.expected_version,
-            length: self.index.file_size,
-            source_is_owned_immutable: self.source_is_owned_immutable,
-        };
+        let source = self.plan_source_snapshot();
         source.ensure_length()?;
 
         let mut selections: Vec<StreamSelection> = Vec::new();

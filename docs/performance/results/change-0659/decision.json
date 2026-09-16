@@ -1,0 +1,66 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0659",
+  "title": "The DOC snapshot open goes from six complete scans to three, and the confirming scan it gives up is repaid by a reopen-free re-hash that keeps the one error whose name would otherwise change",
+  "decision": "retained, implemented in litchi-cfb and litchi-doc; variant B2 + C of the design change 0644 froze, on the authority of decision 9 of change 0652",
+  "code_state": "two public entry points added to litchi-cfb's SharedOleFile and one private helper factored out of finish_overlay_plan_with_owner; litchi-doc's body_text/source.rs reduces its three non-final identity calls to one complete scan, deletes the open's third identity call, and relocates a structural CFB error onto the retained index parse's error branch; litchi-ppt unchanged; no new unsafe, no new dependency, no limit relaxed, no ADR text amended",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "decision 9 of change 0652 authorizes the second public litchi-cfb entry point and B2 + C, and requires change 0644's four admission gates, every witness of its sweep re-run with the same verdicts, and the mapped error identity preserved by name",
+    "gate G3 is exact on all 38 fixtures: the DOC open takes 6 -> 3 complete scans, open plus paragraph(0) 14 -> 9 where the read is admitted and 10 -> 6 where it is refused, and the PPT open 2 -> 2 with identical read counts",
+    "gate G1's unconditional half passes over 144 sweeps per leg on three witness placements: no interior ordinal became OK, the leading window is identical everywhere, and the trailing window is one ordinal before and after on every DOC sweep",
+    "all 92 PPT sweep files are byte-identical between the legs, which is the test that variant B did not leak into the PPT open",
+    "gate G2 is byte-identical over change 0589's 87-artifact publication differential, and the before leg reproduces 0589's own retained file byte for byte",
+    "the relocated error is the same value, not merely the same variant: the sweep's rendering of the affected band after is character-for-character the before leg's, including the expected digest",
+    "84% of the DOC corpus is refused inside the semantic parse and never reaches identity call 2 or 3, so Option C does nothing for it and variant B2 is the whole of its 42.3% median reduction in bytes read -- the saving change 0644 said the open median would not show",
+    "the review that followed the first measurement window found one factually wrong sentence in the new rustdoc -- it attributed the relocation's exclusion of the composed reopen's error branch to an unmoved digest, when at two of those ordinals the digest has moved and the real reason is the relocation's scoping. The sentence and the matching test comment are corrected; change 0644's own text says the same thing"
+  ],
+  "accepted_evidence": {
+    "counts": "change 0644's recording ReadAt probe, reused verbatim, traced on all 38 fixtures in three modes on both legs: complete scans, read calls, index parses, len and version observations",
+    "censuses": "all 57 .doc in two modes and all 30 .ppt, both legs, with the admitted and refused sets and every outcome string identical and the count columns reconciled",
+    "sweeps": "a held mutation after every read ordinal of a clean run, on three witness placements derived from each artifact's own CFB header, over 8 admitted .doc in two modes and 30 .ppt: 144 sweeps and 3,444 mutated opens on the before leg, 3,009 on the after",
+    "witnesses": "change 0644's four flip-then-revert transients and its FileSource metadata witness on both legs, plus a mapped boundary for each reduced call rather than a sampled pair",
+    "differential": "change 0589's digest probe, reused verbatim: 87 artifacts, the empty-splice identity plan's two fingerprints and is_noop, the published SHA-256, the publish report's fingerprints, an exact no-op and an effective one-byte splice, and each snapshot fingerprint or typed refusal",
+    "cycles": "perf stat -r 3 -e cycles,instructions isolation pairs over the 38-fixture corpus and the four admitted readbacks, legs in the order A1 B1 B2 A2 on CPU 14, with both A/A columns beside every delta",
+    "timing": "change 0589's bench driver, 120 samples per leg, order A1 B1 B2 A2 on CPU 14, nine scenarios, p50/mean/p95/p99 per leg and the paired delta in both directions",
+    "fit": "the measured saving decomposed by OLS into 3 * c * bytes + fixed, giving c = 2.1471 cycles per byte per scan against change 0644's 2.1633, and a fixed term of 53,780 cycles that the readback fit separates into about 9,608 cycles per removed fingerprints call and about 24,956 for the removed composed reopen"
+  },
+  "accepted_costs": {
+    "self_erasing_transient_on_the_open": "a mutation that appears after the open's first planning scan and is fully reverted before the next scan is no longer observed; the unremarked window grows from 4 reads to 12 on documentProperties.doc, measured by mapping the boundary on both legs. Every held mutation from the first complete scan onward is still refused",
+    "error_precedence": "on the FAT-sector witness one surviving ordinal changes its typed error, from Ole(CorruptedFile) to Overlay(SourceFingerprintChanged), because the removed confirming scan was the only observation that distinguished a mutation arriving before the retained index parse from one arriving after the identity was confirmed; the relocation resolves both as a change of the source, which is what happened",
+    "option_c_relocation": "six read ordinals of an open that were refused now return Ok and are refused by the first access instead, with Overlay(SourceFingerprintChanged) on the payload witness and Overlay(Ole(CorruptedFile)) on the FAT witness; the five retained accessors may therefore report state the source no longer holds, which their rustdoc now says",
+    "failure_path_rehash": "the relocation costs one further complete scan, on inputs that are both failing structurally and have changed under the read -- 4 ordinals of one sweep on this corpus, none of them a benign input",
+    "gate_g4_literal_threshold": "the measured DOC open beats change 0644's predicted after-value by up to 19.9%, outside G4's plus or minus 5% band; the count evidence shows no further scan was removed and the excess is one fixed term the prediction omitted, fitting the whole corpus to plus or minus 0.7%",
+    "measurement_windows": "everything was measured twice: a code review after the first window asked for three behaviour-preserving cleanups, so the after binaries were rebuilt and every leg re-run. All 156 deterministic after-leg outputs and the 87-artifact differential are byte-identical between the two builds. The second, quieter window is the one retained and quoted; the first window's medians were -34.73% for the DOC open, -24.34% for the readback and +0.25% for PPT against the quoted -35.41%, -24.96% and -0.12%, agreeing to within 0.7 percentage points"
+  },
+  "known_gaps": {
+    "b1": "B1 was rejected on a witness drawn from the landed B2 sweeps rather than built and measured; nothing here says what it would cost or save",
+    "owned_path_timing": "change 0644's statement that source_is_owned_immutable already elides the owned DOC path's confirming scan is incorrect at this base commit, so the owned path also falls from 6 scans to 3; it was not separately timed",
+    "b_iii_attribution": "the per-ordinal attribution of each sweep band to a named call site is read from the traced read order, as change 0644's was, and the re-typed ordinal is measured on documentProperties.doc only",
+    "transient_boundaries": "mapped on documentProperties.doc only; the classes are structural but no boundary sweep was run on the other seven .doc",
+    "ppt_readback": "litchi-ppt was not edited and its read_text path was not swept; that PPT's ensure_current checks only version and length is still read from the source",
+    "environment": "no cold-cache, physical-device, range-source, remote, cross-platform, allocation or RSS result; warm, local, single-threaded, one host with SHA-NI, eight agents building concurrently",
+    "corpus_ceiling": "1.45 MB for .doc and 1.34 MB for .ppt, with no DIFAT-scale artifact and no 4,096-byte-sector CFB; the per-byte term means the saving grows with size, so the corpus understates it"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, concurrency-scaling or cross-platform result",
+    "any claim about variant B1",
+    "any claim that change 0609's verdict on the facade DOC route is reopened"
+  ],
+  "provenance": {
+    "base_commit": "70d7768cc6dada420ede063f72c88dc99ad30383",
+    "branch": "perf/0659-cfb-single-scan-identity-entry-point",
+    "commit": "the tip of perf/0659-cfb-single-scan-identity-entry-point; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0",
+    "cpu_pin": "taskset -c 14",
+    "binaries": {
+      "before/fence_probe_0644": "9d3f9575d6a7e7835f030e0fd43bd88315c295b38866700293632b0c1f15a60c",
+      "after/fence_probe_0644": "0fafa8677cac149d3cbf8d2c700f9dc687d564891b7c942083dd46d9ddf27c55",
+      "before/snapfence_probe": "06b10086d0ae7a9c319c738d323b7fe3723b5dfd4d0a3a1fc7029dbf04ef5f1f",
+      "after/snapfence_probe": "936b57273b22b8d2f1217d5431840d1b793729c1ce489008b71e191ea259119a"
+    },
+    "note": "both probes are reused verbatim from earlier packets (results/change-0644/probe/main.rs, sha256 35251d10...; results/change-0589/probe/main.rs, sha256 87d17da7...), so the before leg could be checked against their retained outputs -- the traces, the four DOC sweeps, the census, the FileSource witness and the 87-artifact differential all reproduce byte for byte. Every binary was staged outside its Cargo target directory before any leg ran."
+  }
+}
