@@ -1,0 +1,75 @@
+after-cols__post-cols-duplicate-dimension__cols.xlsx
+  before: Err(Invalid("worksheet has duplicate dimension elements"))
+  after : Err(Invalid("worksheet dimension appears after column or cell data"))
+after-sheetdata__dimension-after-sheetdata__cols.xlsx
+  before: Err(Invalid("worksheet has duplicate dimension elements"))
+  after : Err(Invalid("worksheet dimension appears after column or cell data"))
+after-sheetdata__dimension-after-sheetdata__nocols.xlsx
+  before: Err(Invalid("worksheet has duplicate dimension elements"))
+  after : Err(Invalid("worksheet dimension appears after column or cell data"))
+after-sheetdata__second-root__cols.xlsx             
+  before: Err(MarkupCompatibility(NonConformant("multiple roots")))
+  after : Err(Invalid("worksheet XML must have one SpreadsheetML worksheet root"))
+after-sheetdata__second-root__nocols.xlsx           
+  before: Err(MarkupCompatibility(NonConformant("multiple roots")))
+  after : Err(Invalid("worksheet XML must have one SpreadsheetML worksheet root"))
+after-sheetdata__trailing-unclosed-root__cols.xlsx  
+  before: Err(MarkupCompatibility(NonConformant("unterminated XML")))
+  after : Err(Invalid("worksheet extension XML has an unterminated element"))
+after-sheetdata__trailing-unclosed-root__nocols.xlsx
+  before: Err(MarkupCompatibility(NonConformant("unterminated XML")))
+  after : Err(Invalid("worksheet extension XML has an unterminated element"))
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Covered(Rect { start: Cell { row: Row(0), column: Column(1) }, end_row: 2, end_column: 2 }))
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Missing)
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Stored(Value(Number(Number("1")))))
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Stored(Value(Number(Number("2")))))
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok([SourceCell { address: Cell { row: Row(0), column: Column(0) }, cell: Value(Number(Number("1"))) }, SourceCell { address: Cell { row: Row(1), column: Column(0) }, cell: Value(Number(Number("2"))) }])
+before-cols__prefix-bad-entity__cols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok([])
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Covered(Rect { start: Cell { row: Row(0), column: Column(1) }, end_row: 2, end_column: 2 }))
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Missing)
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Stored(Value(Number(Number("1")))))
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok(Stored(Value(Number(Number("2")))))
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok([SourceCell { address: Cell { row: Row(0), column: Column(0) }, cell: Value(Number(Number("1"))) }, SourceCell { address: Cell { row: Row(1), column: Column(0) }, cell: Value(Number(Number("2"))) }])
+before-cols__prefix-bad-entity__nocols.xlsx         
+  before: Err(Invalid("invalid worksheet extension XML: at 2..7: unrecognized entity `bogus`"))
+  after : Ok([])
+before-cols__prefix-stray-lt__cols.xlsx             
+  before: Err(Invalid("invalid worksheet extension XML: position 13: attribute key must be directly followed by `=` or space"))
+  after : Err(Invalid("invalid worksheet extension XML: ill-formed document: expected `</>`, but `</worksheet>` was found"))
+before-cols__prefix-stray-lt__nocols.xlsx           
+  before: Err(Invalid("invalid worksheet extension XML: position 13: attribute key must be directly followed by `=` or space"))
+  after : Err(Invalid("invalid worksheet extension XML: ill-formed document: expected `</>`, but `</worksheet>` was found"))
+in-sheetdata__invalid-utf8__cols.xlsx               
+  before: Err(Invalid("invalid worksheet extension XML: cannot decode input using UTF-8: invalid utf-8 sequence of 1 bytes from index 0"))
+  after : Err(Invalid("worksheet XML is not UTF-8: invalid utf-8 sequence of 1 bytes from index 339"))
+in-sheetdata__invalid-utf8__nocols.xlsx             
+  before: Err(Invalid("invalid worksheet extension XML: cannot decode input using UTF-8: invalid utf-8 sequence of 1 bytes from index 0"))
+  after : Err(Invalid("worksheet XML is not UTF-8: invalid utf-8 sequence of 1 bytes from index 293"))
+in-sheetdata__sheetdata-bad-entity__cols.xlsx       
+  before: Err(MarkupCompatibility(NonConformant("custom entity")))
+  after : Err(Xml(Invalid("unsupported XML entity reference '&nope;'")))
+in-sheetdata__sheetdata-bad-entity__nocols.xlsx     
+  before: Err(MarkupCompatibility(NonConformant("custom entity")))
+  after : Err(Xml(Invalid("unsupported XML entity reference '&nope;'")))

@@ -1,0 +1,40 @@
+--------------------------------------------------------------------------------
+Profile data file 'cg-after-real-1.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 119223622
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0658-staged/probe-after ir /tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0658/fixtures/real.xlsx H680 1 (PID 3293471, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+499,788,545 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+67,365,452 (13.48%)  /home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common/src/mce/codec.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice [/home/zhuhe/code/litchi-worktrees/targets/0658-staged/probe-after]
+54,299,457 (10.86%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+28,119,798 ( 5.63%)  /home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common/src/mce/codec.rs:litchi_ooxml_common::mce::codec::esc [/home/zhuhe/code/litchi-worktrees/targets/0658-staged/probe-after]
+23,261,667 ( 4.65%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::IterState>::next [/home/zhuhe/code/litchi-worktrees/targets/0658-staged/probe-after]
+15,310,378 ( 3.06%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/uint_macros.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+14,990,125 ( 3.00%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/non_null.rs:<quick_xml::events::attributes::IterState>::next
+12,732,136 ( 2.55%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:<quick_xml::events::attributes::IterState>::next
+12,248,468 ( 2.45%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+12,248,264 ( 2.45%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+12,248,264 ( 2.45%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice
+11,468,672 ( 2.29%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/char/methods.rs:litchi_ooxml_common::mce::codec::esc
+11,468,672 ( 2.29%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/validations.rs:litchi_ooxml_common::mce::codec::esc
+10,128,516 ( 2.03%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:<quick_xml::events::attributes::IterState>::next
+ 8,601,504 ( 1.72%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:litchi_ooxml_common::mce::codec::esc
+ 6,124,132 ( 1.23%)  /home/zhuhe/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mut_ptr.rs:<litchi_ooxml_common::mce::codec::BoundedOutput>::extend_from_slice

@@ -1,0 +1,211 @@
+==============================================================================
+$ cargo fmt --all --check
+-- fmt
+-- exit 0
+==============================================================================
+$ cargo clippy -p litchi-ooxml-common -p litchi-xlsx --all-targets --locked
+-- clippy litchi-ooxml-common + litchi-xlsx
+    Checking serde v1.0.229
+    Checking serde_json v1.0.149
+    Checking bitflags v2.13.1
+    Checking digest v0.11.3
+    Checking rustix v1.1.4
+    Checking sha2 v0.11.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0658/crates/xml-minifier)
+    Checking icu_provider v1.5.0
+    Checking chrono v0.4.45
+    Checking icu_locid_transform v1.5.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/soapberry-zip)
+    Checking icu_properties v1.5.1
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-core)
+    Checking tempfile v3.27.0
+    Checking icu_normalizer v1.5.0
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-sheet)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.68s
+-- exit 0
+==============================================================================
+$ cargo test -p litchi-ooxml-common --locked
+-- test litchi-ooxml-common
+     Running tests/ribbon.rs (target/debug/deps/ribbon-2e060497b75ddde0)
+
+running 4 tests
+test keeps_fixed_family_slots_with_modern_precedence ... ok
+test updates_the_modern_family_in_place ... ok
+test rejects_a_root_that_does_not_match_its_relationship_family ... ok
+test stores_borrows_and_roundtrips_local_ribbon_xml ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/web_extension_packages.rs (target/debug/deps/web_extension_packages-83e8e75036f6fd39)
+
+running 3 tests
+test package_graph_discovers_local_task_panes_without_activation ... ok
+test package_authoring_and_removal_round_trip_inert_task_panes ... ok
+test public_web_facade_updates_and_round_trips_crud ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests litchi_ooxml_common
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+-- exit 0
+==============================================================================
+$ cargo test -p litchi-xlsx --locked
+-- test litchi-xlsx
+     Running tests/xlsx_xml_maps_owner.rs (target/debug/deps/xlsx_xml_maps_owner-aa9d88bad01131e0)
+
+running 2 tests
+test xml_maps_removal_is_idempotent ... ok
+test xml_maps_survive_direct_package_publication ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xml_maps_api_compat.rs (target/debug/deps/xml_maps_api_compat-faf2bb0c20af540f)
+
+running 2 tests
+test legacy_types_struct_literals_and_inherent_methods_remain_usable ... ok
+test xlsx_adapters_retain_the_boxed_error_result_surface ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_xlsx
+
+running 2 tests
+test crates/litchi-xlsx/src/style/stylesheet/mod.rs - style::stylesheet::Styles::parse (line 92) - compile ... ok
+test crates/litchi-xlsx/src/style.rs - style::stylesheet (line 26) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.36s; merged doctests compilation took 0.35s
+-- exit 0
+==============================================================================
+$ cargo doc -p litchi-ooxml-common -p litchi-xlsx --no-deps --locked
+-- doc litchi-ooxml-common + litchi-xlsx
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/0658/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/0658/crates/xml-minifier)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-sheet)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0658/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.50s
+   Generated /home/zhuhe/code/litchi-worktrees/0658/target/doc/litchi_ooxml_common/index.html and 1 other file
+-- exit 0
+==============================================================================
+$ cargo test -p litchi-docx -p litchi-pptx -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-xlsb -p litchi-opc --locked
+-- test the other litchi-ooxml-common consumers
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_conditional_formatting (line 1203) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_data_validation (line 1171) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_hyperlink (line 692) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::add_merged_cell (line 677) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::delete_cell (line 479) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::delete_row (line 1307) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::new (line 134) ... ignored
+test crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs - writer::worksheet::model::semantic::MutableWorksheet::set_cell (line 191) ... ignored
+test crates/litchi-xlsb/src/writer/workbook/model.rs - writer::workbook::model::WorkbookWriter (line 30) - compile ... ok
+test crates/litchi-xlsb/src/writer/mod.rs - writer (line 17) - compile ... ok
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 7) ... ok
+test crates/litchi-xlsb/src/writer/workbook/model.rs - writer::workbook::model::WorkbookWriter::add_worksheet (line 172) ... ok
+test crates/litchi-xlsb/src/date_utils.rs - date_utils::excel_serial_to_unix (line 50) ... ok
+test crates/litchi-xlsb/src/date_utils.rs - date_utils::unix_to_excel_serial (line 86) ... ok
+
+test result: ok. 6 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 30) - compile fail ... ok
+test crates/litchi-xlsb/src/calc/mod.rs - calc (line 36) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+all doctests ran in 0.45s; merged doctests compilation took 0.40s
+-- exit 0
+==============================================================================
+$ cargo test -p litchi --features docx,xlsx,pptx,xls --locked
+-- test the facade with docx,xlsx,pptx,xls
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation (line 87) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::from_bytes (line 740) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::metadata (line 1438) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::open (line 555) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_count (line 1047) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_height (line 1391) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slide_width (line 1346) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::slides (line 1156) - compile ... ok
+test crates/litchi/src/presentation/prs.rs - presentation::prs::Presentation::text (line 988) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::name (line 146) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::number (line 66) - compile ... ok
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::shape_count (line 115) - compile ... ok
+test crates/litchi/src/sheet/text/mod.rs - sheet::text (line 16) ... ignored
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::text (line 38) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook (line 219) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::from_bytes (line 385) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::metadata (line 849) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::open (line 304) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::text (line 722) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.48s; merged doctests compilation took 0.48s
+-- exit 0
+==============================================================================
+$ python3 tools/non_iwork_gate.py verify
+-- non-iWork gate
+workspace_packages=64
+excluded_packages=18
+bulk_packages=45
+facade_safe_features=35
+facade_unsafe_features=10
+excluded=litchi-iwa,litchi-iwa-archive,litchi-iwa-cache,litchi-iwa-common,litchi-iwa-core,litchi-iwa-detect,litchi-iwa-graph,litchi-iwa-index,litchi-iwa-package,litchi-iwa-protos,litchi-iwa-structured,litchi-iwa-text,litchi-iwa-text-wire,litchi-keynote,litchi-numbers,litchi-numbers-wire,litchi-pages,litchi-py
+bulk=litchi-biff,litchi-cfb,litchi-codepage,litchi-core,litchi-crypto,litchi-doc,litchi-docx,litchi-drawingml,litchi-eval,litchi-fonts,litchi-formula,litchi-imgconv,litchi-markdown,litchi-odb,litchi-odc,litchi-odf,litchi-odf-common,litchi-odf-formula,litchi-odg,litchi-odi,litchi-odm,litchi-odp,litchi-odraw,litchi-ods,litchi-odt,litchi-ograph,litchi-ole-common,litchi-ooxml-common,litchi-opc,litchi-oth,litchi-ppt,litchi-pptx,litchi-rtf,litchi-sheet,litchi-sign,litchi-slide,litchi-spreadsheet-drawing,litchi-vba,litchi-word,litchi-xls,litchi-xlsb,litchi-xlsx,soapberry-zip,xml-minifier,xml-minifier-macros
+facade-safe=automatic-fonts,cfb,default,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+facade-unsafe=all,all-formats,iwork,keynote,numbers,office,pages,slides,spreadsheets,word
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+-- exit 0
+==============================================================================
+$ cargo test --locked   (cwd tools/perf-baseline, CARGO_TARGET_DIR=…/0658-harness-after)
+-- test the perf harness's own suite
+
+     Running tests/xlsx_filesystem.rs (/home/zhuhe/code/litchi-worktrees/targets/0658-harness-after/debug/deps/xlsx_filesystem-cfe1d48be947700a)
+
+running 4 tests
+test xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible ... ok
+test xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children ... ok
+test xlsx_repeated_store_reacquisition_controls_report_structural_scope ... ok
+test xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.21s
+
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/code/litchi-worktrees/targets/0658-harness-after/debug/deps/xlsx_planning_allocations-425669fbcc5df13a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_perf_baseline
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+-- exit 0

@@ -19,6 +19,30 @@ fn box_stream_result<T>(
     result.map_err(Box::new)
 }
 
+/// What the materialized parser answers for the same worksheet bytes.
+///
+/// Change 0658 stops the selected-cell scan at the event that settles an
+/// ineligible verdict, so from that event on the reader that owns this
+/// worksheet's mandatory validation and its first typed error (ADR 0005;
+/// change 0362) is the materialized parser the caller is required to fall back
+/// to. Tests that used to pin a post-mark refusal raised by the scan pin the
+/// materialized parser's answer instead, which is what the public read now
+/// returns.
+fn materialized_answer(xml: &str) -> Result<(), String> {
+    parse(xml.as_bytes(), || Ok(None))
+        .map(|_store| ())
+        .map_err(|error| error.to_string())
+}
+
+/// Require the materialized parser to refuse `xml` with exactly `expected`.
+#[track_caller]
+fn assert_materialized_refusal(xml: &str, expected: &str) {
+    match materialized_answer(xml) {
+        Err(actual) => assert_eq!(actual, expected),
+        Ok(()) => panic!("expected {expected:?} from the materialized parser, got acceptance"),
+    }
+}
+
 #[test]
 fn plain_worksheets_skip_only_the_unneeded_extension_capture() {
     let plain = format!(
@@ -1696,7 +1720,7 @@ mod streaming_0362_selected_tests {
 mod streaming_0364_dependency_metadata_tests {
     use std::io::Cursor;
 
-    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_ooxml_common::mce::{Capabilities, StreamLimits};
     use litchi_sheet::Cell as Address;
 
     use super::super::selected::{NotEligibleReason, ScanOutcome, scan};
@@ -1817,18 +1841,26 @@ mod streaming_0364_dependency_metadata_tests {
     }
 
     #[test]
-    fn streaming_0364_dependency_metadata_keeps_late_malformed_xml_primary() {
+    fn change_0658_late_malformed_xml_after_the_mark_moves_to_the_materialized_parser() {
+        // Change 0364 pinned this as "late malformed XML stays primary": the
+        // `s="not-a-style"` cell marks the worksheet ineligible and the second
+        // root after it used to be reported by the scan as an MCE failure.
+        // Change 0652 decision 8 accepts the movement of the timing of error
+        // returns for an ineligible read, and change 0658 stops the scan at
+        // the marking event, so the verdict is published and the materialized
+        // parser the caller must fall back to raises the refusal instead. The
+        // read still refuses, with a typed error, before any value.
         let xml = format!(
             r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData></worksheet><tail>"#
         );
-        let error = scan_xml(&xml, "A1").expect_err("late malformed XML");
-        assert!(matches!(
-            error.as_ref(),
-            StreamError::Mce {
-                error: MceError::NonConformant(_) | MceError::Xml(_),
-                ..
-            }
-        ));
+        match scan_xml(&xml, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
+            other => panic!("expected the style fallback verdict, got {other:?}"),
+        }
+        super::assert_materialized_refusal(
+            &xml,
+            "invalid XLSX structure: worksheet extension XML has an unterminated element",
+        );
     }
 }
 
@@ -2381,6 +2413,8 @@ mod streaming_0367_merge_tests {
 
     #[test]
     fn streaming_0367_rejects_invalid_merge_references_and_placement() {
+        // Every case here reaches the scan unmarked, so the scan still raises
+        // the refusal itself; change 0658 moves nothing for them.
         let cases = [
             worksheet(
                 r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/></mergeCells><mergeCells><mergeCell ref="C1:D1"/></mergeCells>"#,
@@ -2393,9 +2427,6 @@ mod streaming_0367_merge_tests {
             ),
             worksheet(r#"<sheetData/><mergeCells><mergeCell ref="A1"/></mergeCells>"#),
             worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#),
-            worksheet(
-                r#"<sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#,
-            ),
             worksheet(r#"<sheetData/><mergeCells><mergeCell ref="XFE1:XFF1"/></mergeCells>"#),
             worksheet(r#"<sheetData/><mergeCells><mergeCell/></mergeCells>"#),
         ];
@@ -2406,6 +2437,22 @@ mod streaming_0367_merge_tests {
                 "accepted invalid merge case {index}"
             );
         }
+
+        // `<hyperlinks/>` marks the worksheet ineligible before the misplaced
+        // `<mergeCells>`, so change 0658 publishes the verdict there and the
+        // materialized parser raises the refusal — with the same message the
+        // scan used to raise.
+        let after_successor = worksheet(
+            r#"<sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+        match scan_xml(&after_successor, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
+            other => panic!("expected the unsupported-structure verdict, got {other:?}"),
+        }
+        super::assert_materialized_refusal(
+            &after_successor,
+            "invalid XLSX structure: worksheet mergeCells appears after a schema successor",
+        );
     }
 
     #[test]
@@ -2430,32 +2477,49 @@ mod streaming_0367_merge_tests {
     }
 
     #[test]
-    fn change_0597_marked_worksheet_still_refuses_misplaced_merge_markup() {
-        // The two placement clauses that read state completed before the mark
-        // stay exact: a `<mergeCells>` after a schema successor and a second
-        // `<mergeCells>` are still refused with their established messages.
+    fn change_0658_marked_worksheet_hands_merge_placement_to_the_materialized_parser() {
+        // Change 0597 kept two post-mark placement clauses in the scanner.
+        // Change 0658 stops the scan at the mark, so those clauses can no
+        // longer fire and were removed; the materialized parser the caller
+        // must fall back to answers the same questions. For the first case it
+        // answers with the identical message, so the public read is unchanged;
+        // for the second it names the misplaced `<cols>` that marked the
+        // worksheet instead, which is the earlier structural error. Both
+        // remain typed refusals raised before any value is returned.
         let after_successor = worksheet(
             r#"<sheetData/><hyperlinks/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
         );
-        assert_scanner_message(
-            scan_xml(&after_successor, "A1"),
-            "worksheet mergeCells appears after a schema successor",
+        match scan_xml(&after_successor, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
+            other => panic!("expected the unsupported-structure verdict, got {other:?}"),
+        }
+        super::assert_materialized_refusal(
+            &after_successor,
+            "invalid XLSX structure: worksheet mergeCells appears after a schema successor",
         );
 
         let duplicate = worksheet(
             r#"<sheetData/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><cols><col min="1" max="1" width="4"/></cols><mergeCells count="1"><mergeCell ref="C1:D1"/></mergeCells>"#,
         );
-        assert_scanner_message(
-            scan_xml(&duplicate, "A1"),
-            "worksheet has duplicate mergeCells elements",
+        match scan_xml(&duplicate, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::Styles)) => {},
+            other => panic!("expected the style fallback verdict, got {other:?}"),
+        }
+        super::assert_materialized_refusal(
+            &duplicate,
+            "invalid XLSX structure: worksheet cols appears after sheetData",
         );
 
-        // A genuinely early `<mergeCells>` on an unmarked worksheet keeps the
-        // original message; only the post-mark question was removed.
+        // A genuinely early `<mergeCells>` on an unmarked worksheet is still
+        // refused by the scan itself, with its established message.
         let early = worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#);
         assert_scanner_message(
             scan_xml(&early, "A1"),
             "worksheet mergeCells appears before sheetData",
+        );
+        super::assert_materialized_refusal(
+            &early,
+            "invalid XLSX structure: worksheet mergeCells appears before sheetData",
         );
     }
 
@@ -2759,10 +2823,33 @@ mod streaming_0366_general_reference_tests {
             "A1",
         ));
 
+        // Change 0658: `<future>` is an unmodelled worksheet child, so it
+        // marks the worksheet ineligible and the scan stops there; the invalid
+        // character reference after it is no longer seen by this stream. The
+        // materialized parser — the reader that owns this payload's mandatory
+        // validation — accepts the same bytes, and accepted them before this
+        // change too, so `litchi_xlsx::Workbook::open` already returned a value
+        // for this worksheet. The change converges the source-backed read onto
+        // that answer instead of keeping a refusal only this path raised; the
+        // witness is recorded in change 0658.
         let late_tail = worksheet(
             r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><future>&#xZZ;</future>"#,
         );
-        assert_mce_error(scan_xml(&late_tail, "A1"));
+        match scan_xml(&late_tail, "A1") {
+            Ok(ScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
+            other => panic!("expected the unsupported-structure verdict, got {other:?}"),
+        }
+        assert!(
+            super::materialized_answer(&late_tail).is_ok(),
+            "the materialized parser's answer for this worksheet is the published one"
+        );
+
+        // An invalid reference the scan reaches *before* the mark is still a
+        // typed stream error: only the bytes after the verdict move.
+        let early_reference = worksheet(
+            r#"<sheetData><row r="1"><c r="A1" t="str"><v>bad &#xZZ;</v></c></row></sheetData><future/>"#,
+        );
+        assert_mce_error(scan_xml(&early_reference, "A1"));
     }
 }
 
@@ -3136,5 +3223,243 @@ mod streaming_0400_numeric_scratch_tests {
 
         let text = worksheet(r#"<dimension ref="A1">payload</dimension><sheetData/>"#);
         assert_not_eligible(&text, NotEligibleReason::UnsupportedStructure);
+    }
+}
+
+#[cfg(test)]
+mod change_0658_ineligibility_gate_tests {
+    use std::io::{self, BufRead, Read};
+
+    use litchi_ooxml_common::mce::{Capabilities, StreamLimits};
+    use litchi_sheet::Cell as Address;
+
+    use super::super::selected::{
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, scan, scan_range,
+    };
+    use litchi_sheet::Rect;
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    /// A `BufRead` that reports how many worksheet bytes the stream consumed.
+    struct CountingReader<'a> {
+        bytes: &'a [u8],
+        position: usize,
+    }
+
+    impl<'a> CountingReader<'a> {
+        fn new(bytes: &'a [u8]) -> Self {
+            Self { bytes, position: 0 }
+        }
+    }
+
+    impl Read for CountingReader<'_> {
+        fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+            let available = &self.bytes[self.position..];
+            let take = available.len().min(out.len());
+            out[..take].copy_from_slice(&available[..take]);
+            self.position += take;
+            Ok(take)
+        }
+    }
+
+    impl BufRead for CountingReader<'_> {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            Ok(&self.bytes[self.position..])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    /// One worksheet followed by a long, well-formed, inert tail.
+    ///
+    /// The tail is comments, so it changes no verdict and is accepted by both
+    /// parsers; its only role is to make "did the stream stop?" observable as
+    /// a byte count.
+    fn padded(body: &str) -> String {
+        let tail = "<!-- inert padding for the ineligibility gate -->".repeat(500);
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}{tail}</worksheet>"#)
+    }
+
+    fn scan_counting(xml: &str, target: &str) -> (super::BoxedStreamResult<ScanOutcome>, usize) {
+        let bytes = xml.as_bytes();
+        let mut input = CountingReader::new(bytes);
+        let outcome = super::box_stream_result(scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Address::from_a1(target).expect("valid address"),
+        ));
+        (outcome, input.position)
+    }
+
+    fn range_counting(
+        xml: &str,
+        reference: &str,
+    ) -> (super::BoxedStreamResult<RangeScanOutcome>, usize) {
+        let bytes = xml.as_bytes();
+        let mut input = CountingReader::new(bytes);
+        let outcome = super::box_stream_result(scan_range(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Rect::from_a1(reference).expect("valid range"),
+        ));
+        (outcome, input.position)
+    }
+
+    /// Every way a worksheet can become ineligible, and what each costs.
+    ///
+    /// Change 0658: the scan stops at the event that settles the verdict, so
+    /// the inert tail is never read. The verdict itself, and the answer the
+    /// materialized parser gives for the same bytes, are unchanged.
+    #[test]
+    fn every_ineligibility_reason_stops_the_stream_at_its_mark() {
+        // Each row: label, worksheet, the verdict, and the answer the
+        // materialized parser gives for the same bytes (`None` = accepted).
+        let cases: [(&str, String, NotEligibleReason, Option<&str>); 9] = [
+            (
+                "unsupported-structure",
+                padded(r#"<sheetData/><hyperlinks/>"#),
+                NotEligibleReason::UnsupportedStructure,
+                None,
+            ),
+            (
+                "merge-semantics",
+                padded(
+                    r#"<sheetData/><mergeCells count="1"><mergeCell ref="A1:B1"/><future/></mergeCells>"#,
+                ),
+                NotEligibleReason::MergeSemantics,
+                Some("invalid XLSX structure: worksheet mergeCells has an unmodeled child"),
+            ),
+            (
+                "shared-strings",
+                padded(
+                    r#"<sheetData><row r="1"><c r="A1" t="s"><v>not-an-index</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::SharedStrings,
+                Some("invalid XLSX structure: invalid shared-string index 'not-an-index'"),
+            ),
+            (
+                "styles",
+                padded(r#"<cols><col min="1" max="1" width="10"/></cols><sheetData/>"#),
+                NotEligibleReason::Styles,
+                None,
+            ),
+            (
+                "formula-semantics",
+                padded(
+                    r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0">A2</f><v>1</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::FormulaSemantics,
+                Some("invalid XLSX structure: shared formula master at (1, 1) is missing ref"),
+            ),
+            (
+                "rich-inline-text",
+                padded(
+                    r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><t>rich</t></r></is></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::RichInlineText,
+                None,
+            ),
+            (
+                "unsupported-cell-type",
+                padded(
+                    r#"<sheetData><row r="1"><c r="A1" t="d"><v>2026-09-16</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::UnsupportedCellType,
+                None,
+            ),
+            (
+                "ordering",
+                padded(
+                    r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::Ordering,
+                Some("invalid XLSX structure: worksheet row 1 appears after row 2"),
+            ),
+            (
+                "general-reference",
+                padded(
+                    r#"<sheetData><row r="1"><c r="A1" t="str"><v>prefix&#x000000041;suffix</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::GeneralReference,
+                None,
+            ),
+        ];
+
+        for (name, xml, expected, fallback) in &cases {
+            let (outcome, consumed) = scan_counting(xml, "A1");
+            match outcome {
+                Ok(ScanOutcome::NotEligible(actual)) => assert_eq!(&actual, expected, "{name}"),
+                other => panic!("{name}: expected {expected:?}, got {other:?}"),
+            }
+            assert!(
+                consumed < xml.len() / 2,
+                "{name}: the gate read {consumed} of {} bytes",
+                xml.len()
+            );
+
+            // The rectangular scanner takes the same gate.
+            let (range_outcome, range_consumed) = range_counting(xml, "A1:B2");
+            match range_outcome {
+                Ok(RangeScanOutcome::NotEligible(actual)) => {
+                    assert_eq!(&actual, expected, "{name} range");
+                },
+                other => panic!("{name} range: expected {expected:?}, got {other:?}"),
+            }
+            assert!(
+                range_consumed < xml.len() / 2,
+                "{name} range: the gate read {range_consumed} of {} bytes",
+                xml.len()
+            );
+
+            // The fallback answer for the same bytes is the published one.
+            assert_eq!(
+                super::materialized_answer(xml),
+                fallback.map_or(Ok(()), |message| Err(message.to_owned())),
+                "{name}: the materialized parser's answer must not move"
+            );
+        }
+    }
+
+    /// The eligible path is untouched: it still reaches XML EOF.
+    #[test]
+    fn an_eligible_worksheet_still_reads_the_whole_part() {
+        let xml = padded(r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#);
+        let (outcome, consumed) = scan_counting(&xml, "A1");
+        assert!(
+            matches!(outcome, Ok(ScanOutcome::Eligible(_))),
+            "expected an eligible scan, got {outcome:?}"
+        );
+        assert_eq!(consumed, xml.len(), "an eligible scan still reaches EOF");
+
+        let (range_outcome, range_consumed) = range_counting(&xml, "A1:B2");
+        assert!(
+            matches!(range_outcome, Ok(RangeScanOutcome::Eligible(_))),
+            "expected an eligible range scan, got {range_outcome:?}"
+        );
+        assert_eq!(range_consumed, xml.len());
+    }
+
+    /// A refusal raised while the marking event is processed still wins.
+    #[test]
+    fn a_refusal_on_the_marking_event_outranks_the_verdict() {
+        // `<dimension>` carries an unmodelled attribute, which marks the
+        // worksheet, and an invalid `ref`, which the same call refuses. The
+        // refusal is returned, not the verdict.
+        let xml = padded(r#"<dimension ref="not-a-range" futureAttr="1"/><sheetData/>"#);
+        let (outcome, _) = scan_counting(&xml, "A1");
+        match outcome {
+            Err(error) => {
+                let text = format!("{error}");
+                assert!(
+                    text.contains("invalid worksheet dimension 'not-a-range'"),
+                    "unexpected refusal: {text}"
+                );
+            },
+            other => panic!("expected the dimension refusal, got {other:?}"),
+        }
     }
 }

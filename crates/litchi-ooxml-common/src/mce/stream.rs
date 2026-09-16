@@ -770,6 +770,35 @@ impl<RawE: std::error::Error + 'static, ActiveE: std::error::Error + 'static> st
     }
 }
 
+/// What an active observer wants the MCE stream to do after the event it has
+/// just received.
+///
+/// Returned by the active observer of
+/// [`process_markup_compatibility_stream_with_stoppable_observers`].  Every
+/// other stream entry point keeps the `Result<(), ActiveE>` observer contract
+/// and behaves exactly as if every event returned [`ActiveFlow::Continue`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub enum ActiveFlow {
+    /// Keep reading the stream and keep delivering selected semantic events.
+    #[default]
+    Continue,
+    /// Stop reading the stream now and report success for the prefix that was
+    /// already processed.
+    ///
+    /// Every byte up to and including the event that returned this flow is
+    /// parsed and validated exactly as it is for a stream that runs to EOF, so
+    /// every typed XML, MCE, raw-observer, limit and active-observer failure
+    /// located there is still reported with its own identity, and a failure
+    /// raised while finishing that same event still outranks this flow.  The
+    /// bytes after it are not read by this stream at all: the caller owns
+    /// whatever validation they would otherwise have received, and the
+    /// returned [`StreamReport`] counts only the events that were processed.
+    /// The end-of-document checks do not run either, so a stopped stream never
+    /// reports a missing or unterminated document root.
+    Stop,
+}
+
 /// Process MCE and invoke an active observer for selected semantic events.
 ///
 /// The callback receives a borrowed event whose lifetime is tied to the call;
@@ -824,12 +853,51 @@ pub fn process_markup_compatibility_stream_with_observers<RawE, ActiveE, Raw, Ac
     input: &mut dyn BufRead,
     capabilities: &Capabilities,
     limits: &StreamLimits,
-    mut raw: Raw,
+    raw: Raw,
     mut active: Active,
 ) -> Result<StreamReport, StreamError<RawE, ActiveE>>
 where
     Raw: for<'a> FnMut(RawElement<'a>) -> Result<(), RawE>,
     Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<(), ActiveE>,
+{
+    process_markup_compatibility_stream_with_stoppable_observers(
+        input,
+        capabilities,
+        limits,
+        raw,
+        move |event| active(event).map(|()| ActiveFlow::Continue),
+    )
+}
+
+/// Process MCE with observers whose active side may stop the stream early.
+///
+/// This is [`process_markup_compatibility_stream_with_observers`] with one
+/// difference: the active observer returns an [`ActiveFlow`], and
+/// [`ActiveFlow::Stop`] ends the stream successfully at that event instead of
+/// running it to EOF.  Everything else — raw observation, MCE selection, the
+/// recovery drain, error precedence, and the independent disabling of a
+/// failing observer — is unchanged, and an observer that always returns
+/// [`ActiveFlow::Continue`] is indistinguishable from one written against the
+/// `Result<(), ActiveE>` contract.
+///
+/// A stop is a statement by the caller that it no longer needs this stream,
+/// not a verdict about the unread bytes.  It suppresses nothing that the
+/// stream has already observed: a typed failure raised while finishing the
+/// stopping event is still returned, and a raw- or active-observer error
+/// recorded earlier still surfaces through [`StreamError::Callback`].  What it
+/// does drop is every check the unread remainder would have produced,
+/// including the end-of-document checks, so the caller must own or re-derive
+/// that validation.
+pub fn process_markup_compatibility_stream_with_stoppable_observers<RawE, ActiveE, Raw, Active>(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    mut raw: Raw,
+    mut active: Active,
+) -> Result<StreamReport, StreamError<RawE, ActiveE>>
+where
+    Raw: for<'a> FnMut(RawElement<'a>) -> Result<(), RawE>,
+    Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<ActiveFlow, ActiveE>,
 {
     limits.validate().map_err(|error| StreamError::Mce {
         error,
@@ -899,6 +967,7 @@ where
     let mut active_error = None;
     let mut raw_enabled = true;
     let mut active_enabled = true;
+    let mut active_stop = false;
     let mut recovering = false;
     let mut recovery_error = None;
 
@@ -985,6 +1054,7 @@ where
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
+                    &mut active_stop,
                 ),
                 Event::Empty(element) => state.start(
                     &element,
@@ -996,12 +1066,14 @@ where
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
+                    &mut active_stop,
                 ),
                 Event::End(element) => state.end(
                     &element,
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
+                    &mut active_stop,
                 ),
                 Event::Text(text) => match text.decode().map_err(xml_error) {
                     Ok(decoded) => state.text(
@@ -1011,6 +1083,7 @@ where
                         &mut active,
                         &mut active_enabled,
                         &mut active_error,
+                        &mut active_stop,
                     ),
                     Err(error) => Err(error),
                 },
@@ -1022,6 +1095,7 @@ where
                         &mut active,
                         &mut active_enabled,
                         &mut active_error,
+                        &mut active_stop,
                     ),
                     Err(error) => Err(error),
                 },
@@ -1033,6 +1107,7 @@ where
                         &mut active,
                         &mut active_enabled,
                         &mut active_error,
+                        &mut active_stop,
                     ),
                     Err(error) => Err(error),
                 },
@@ -1041,12 +1116,14 @@ where
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
+                    &mut active_stop,
                 ),
                 Event::GeneralRef(reference) => state.reference(
                     &reference,
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
+                    &mut active_stop,
                 ),
                 Event::DocType(_) | Event::PI(_) => {
                     Err(bad("DTD and processing instructions are rejected"))
@@ -1095,7 +1172,11 @@ where
             }
             continue;
         }
-        if state.finished {
+        // The stop is honoured only after the stopping event has been fully
+        // processed and after every failure path above, so a typed XML, MCE,
+        // limit or observer failure raised by that same event still outranks
+        // it and still reaches the caller with its own identity.
+        if active_stop || state.finished {
             return finish_callbacks(raw_error, active_error, state.report.clone());
         }
     }
@@ -1706,10 +1787,11 @@ impl<'a> Processor<'a> {
         active_callback: &mut Active,
         active_enabled: &mut bool,
         active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
     ) -> Result<(), Error>
     where
         Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
-        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         if self.raw_stack.len() >= self.limits.processing.max_depth {
             return Err(limit("depth"));
@@ -1784,7 +1866,13 @@ impl<'a> Processor<'a> {
                     )?,
                     self.limits,
                 )?;
-                invoke_active(active_callback, active_enabled, active_error, event);
+                invoke_active(
+                    active_callback,
+                    active_enabled,
+                    active_error,
+                    active_stop,
+                    event,
+                );
             }
             return self.close_start(context, mode, parent_active, data, empty);
         }
@@ -1958,7 +2046,13 @@ impl<'a> Processor<'a> {
                 )?,
                 self.limits,
             )?;
-            invoke_active(active_callback, active_enabled, active_error, event);
+            invoke_active(
+                active_callback,
+                active_enabled,
+                active_error,
+                active_stop,
+                event,
+            );
         }
         self.close_start(context, mode, active, data, empty)
     }
@@ -2018,9 +2112,10 @@ impl<'a> Processor<'a> {
         active_callback: &mut Active,
         active_enabled: &mut bool,
         active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
     ) -> Result<(), Error>
     where
-        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         self.raw_end(element)?;
         self.raw_state_valid = true;
@@ -2038,7 +2133,13 @@ impl<'a> Processor<'a> {
                 qualified_name: Cow::Borrowed(frame.qualified_name.as_bytes()),
                 expanded_name: frame.expanded_name,
             });
-            invoke_active(active_callback, active_enabled, active_error, event);
+            invoke_active(
+                active_callback,
+                active_enabled,
+                active_error,
+                active_stop,
+                event,
+            );
         }
         if let Mode::Alt {
             choices,
@@ -2053,6 +2154,7 @@ impl<'a> Processor<'a> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn text<ActiveE, Active>(
         &mut self,
         raw: &[u8],
@@ -2061,9 +2163,10 @@ impl<'a> Processor<'a> {
         active_callback: &mut Active,
         active_enabled: &mut bool,
         active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
     ) -> Result<(), Error>
     where
-        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         self.raw_text(raw, kind)?;
         self.raw_state_valid = true;
@@ -2113,7 +2216,13 @@ impl<'a> Processor<'a> {
                     decoded,
                 }),
             };
-            invoke_active(active_callback, active_enabled, active_error, event);
+            invoke_active(
+                active_callback,
+                active_enabled,
+                active_error,
+                active_stop,
+                event,
+            );
         }
         Ok(())
     }
@@ -2124,9 +2233,10 @@ impl<'a> Processor<'a> {
         active_callback: &mut Active,
         active_enabled: &mut bool,
         active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
     ) -> Result<(), Error>
     where
-        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         self.raw_decl(declaration)?;
         self.raw_state_valid = true;
@@ -2141,6 +2251,7 @@ impl<'a> Processor<'a> {
                 active_callback,
                 active_enabled,
                 active_error,
+                active_stop,
                 SemanticEvent::Decl(SemanticDecl {
                     raw: Cow::Borrowed(declaration),
                 }),
@@ -2155,9 +2266,10 @@ impl<'a> Processor<'a> {
         active_callback: &mut Active,
         active_enabled: &mut bool,
         active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
     ) -> Result<(), Error>
     where
-        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         self.raw_reference(reference)?;
         self.raw_state_valid = true;
@@ -2183,6 +2295,7 @@ impl<'a> Processor<'a> {
                 active_callback,
                 active_enabled,
                 active_error,
+                active_stop,
                 SemanticEvent::GeneralRef(SemanticGeneralRef {
                     name: Cow::Borrowed(reference.as_ref()),
                 }),
@@ -2582,13 +2695,25 @@ fn invoke_active<ActiveE, Active>(
     callback: &mut Active,
     enabled: &mut bool,
     error: &mut Option<ActiveE>,
+    stop: &mut bool,
     event: SemanticEvent<'_>,
 ) where
-    Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<(), ActiveE>,
+    Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<ActiveFlow, ActiveE>,
 {
-    if let Err(callback_error) = callback(event) {
-        *error = Some(callback_error);
-        *enabled = false;
+    match callback(event) {
+        Ok(ActiveFlow::Continue) => {},
+        // A stop disables the observer for the same reason an error does: the
+        // events that remain in this element must not reach a callback that
+        // has asked to stop seeing them. The stream itself ends after the
+        // current event has been finished.
+        Ok(ActiveFlow::Stop) => {
+            *stop = true;
+            *enabled = false;
+        },
+        Err(callback_error) => {
+            *error = Some(callback_error);
+            *enabled = false;
+        },
     }
 }
 

@@ -1,0 +1,22 @@
+
+### control: Ir per source-backed one-cell read ((N=11) - (N=1)) / 10
+symbol (inclusive)                         before          after      delta
+PROGRAM TOTALS                        215,630,939     76,698,964    -64.43%
+selected::scan_stream (incl.)         140,956,112        292,990    -99.79%
+MCE stream driver                     140,955,510        292,689    -99.79%
+Processor::start                      101,740,971         37,841    -99.96%
+clone_bounded_name_part                16,527,952          8,068    -99.95%
+invoke_active                           8,662,363              0   -100.00%
+SourceWorksheet::store                 71,545,278     71,596,784      0.07%
+worksheet::parse (materialized)        64,802,861     64,862,314      0.09%
+
+### real: Ir per source-backed one-cell read ((N=11) - (N=1)) / 10
+symbol (inclusive)                         before          after      delta
+PROGRAM TOTALS                        652,726,610    501,712,792    -23.14%
+selected::scan_stream (incl.)         153,241,477        353,599    -99.77%
+MCE stream driver                     153,240,850        353,083    -99.77%
+Processor::start                      113,502,154              0   -100.00%
+clone_bounded_name_part                17,128,561              0   -100.00%
+invoke_active                           9,034,926              0   -100.00%
+SourceWorksheet::store                496,335,518    496,171,167     -0.03%
+worksheet::parse (materialized)       489,176,298    489,003,869     -0.04%
