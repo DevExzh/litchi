@@ -1,5 +1,37 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0647 — preservation-by-default reaches a case it was already reaching, and the rule-1 ordering holds
+
+Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).
+
+`docs/GOAL.md` puts correctness and lossless preservation above speed and orders
+optimization as *eliminate unnecessary work first*. Change 0647 is that first
+rung with nothing traded for it: the work removed is a canonical `.rels`
+serialization and its publication audit that were built, compared against an
+identical copy of themselves, and thrown away. The audit question the change
+raises is whether preservation moved, and the answer measured over 336 OOXML
+fixtures is that it did not and could not: 6,281 reuse publications are
+byte-identical to their no-op baselines on both legs, and all 96 baseline and 260
+reuse refusals are the same two typed kinds (`PreservationUnavailable`,
+`SignedSourceRequiresExplicitPolicy`) in the same counts. That matters for the
+goal because the premise under which change 0628 declined the fix — that keeping
+the proof would publish the source spelling in place of the canonical one —
+would have been a *preservation improvement* that nonetheless changed bytes, and
+the rule is that a byte change is a contract change whichever direction it moves
+in. The design was therefore written frozen and only implemented once the
+measurement proved the question moot; the record states the rule, the byte
+consequence, the admission gates and the count that satisfied them, so a future
+reader can see the design that would have been frozen had the count come out the
+other way. Two residual gaps are recorded rather than closed: a pristine member
+no longer runs `try_to_xml_bytes` or `verify_authored` on the preservation route,
+which is change 0593's already-recorded behaviour class and needs roughly 62,500
+relationships in one member against a **measured corpus maximum of 43**; and the
+ordinary format routes gain nothing today, measured for DOCX and audited for
+XLSX, PPTX, XLSB and `litchi-ooxml-common`. Every crate depending on
+`litchi-opc` was tested, plus the feature-bearing `litchi` suite and the
+harness's own. `performance_claim: none`. OLE2 and OOXML remain the active
+priority; ODF stays deferred; iWork is excluded.
+
 ## 0645 — the last four complete-package hashes of an opened PPTX lifecycle, priced against the contract they cost
 
 Record: [0645](0645-pptx-memoized-revision-proof-design.md).

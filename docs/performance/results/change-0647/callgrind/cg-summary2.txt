@@ -1,0 +1,5 @@
+seamdrawing before n=1 Ir=50836215
+seamdrawing before n=11 Ir=313825677
+seamdrawing after n=1 Ir=50824766
+seamdrawing after n=11 Ir=313794053
+DONE

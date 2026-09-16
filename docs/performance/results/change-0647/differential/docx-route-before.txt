@@ -1,0 +1,95 @@
+libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=25711	sha256=61c52b97c4ced3e8cf3f7178932f83991493072076dc379e10d708543a0ae095
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	source_rels=4	kept=3	moved=1	absent=0	out_bytes=20567	sha256=e4c9c30b1e104988e9647f4052f8de6524af3ce9d9315925edec5f341314d971
+libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx	source_rels=4	kept=3	moved=1	absent=0	out_bytes=55114	sha256=5f29b21b569bfed0f7e9ab0f50545f379a7335d9d7847b840912be5c4048d0dc
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=13533	sha256=15be111c2f3b6663895505ff3a6ecef81e749a99167fb4ea7a09c90364d70a3a
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=3048	sha256=66ed9825e397080c9f63263d85ffdee72037c50c2364c5f9eaceec872de5f4ed
+libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx	source_rels=5	kept=4	moved=1	absent=0	out_bytes=31656	sha256=b173664e67a14a2dbe0b23ab7004f8171063b6c48b452a02253e534827545651
+libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=17341	sha256=5e470211609e5fc524d23d5f8be092c6d50c3f628116426fc9e0061ff5da4ecd
+libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	EDIT-REFUSED	invalid DOCX format: invalid page width value '612pt'
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	source_rels=3	kept=3	moved=0	absent=0	out_bytes=25636	sha256=6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	source_rels=7	kept=7	moved=0	absent=0	out_bytes=37401	sha256=ab095cd4d4b0b796030e7e43a7d9d954b876d164943c5f4f3dff03e2b8dc52c1
+libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	source_rels=4	kept=3	moved=1	absent=0	out_bytes=25408	sha256=85fe0cd9497043c178e928509d969976db9f39011803bac2fe82d3dcd1d7bb2c
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=4999	sha256=3a334ae9dd448d1be3c93159d0f594fa25346f08c12865ea9f9d5b1f66481f30
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=28594	sha256=e1d64a338fc2c04db485f370b5922531a1387470faf4947a094080e89eb98ef5
+libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=13646	sha256=6e6c2cd0fc5ac8afeeb6b6c912c442daca4fb9371b9f6495502b914443f8bb3c
+#FIXTURE	libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx	source_rels=3	kept=3	moved=0	absent=0	out_bytes=18513	sha256=e62df69303c03716b890ca198dccf6520459420b5fb743df201e220058f9adc5
+libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	EDIT-REFUSED	invalid DOCX XML: syntax error: tag not closed: `>` not found before end of input
+#FIXTURE	libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx	source_rels=8	kept=8	moved=0	absent=0	out_bytes=77370	sha256=8c863dfeed9dab56ee84f2a339c39598b6096ac0a4d7867a4d1ad448f2e90122
+#FIXTURE	libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=2437	sha256=a100586a6294d44694c8154b91d1ec47a996f627d0cac4037902c249575e852b
+#FIXTURE	libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=21980	sha256=5e7ca548620e473d7b622f1db3294f7aa7cdc6219feb0e86c6af6f1f65a2376f
+libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	source_rels=4	kept=3	moved=1	absent=0	out_bytes=65945	sha256=5065d09cc359dfc0c5eecb78215b5a093c7b246ba86a2c2c134e0f8918e2ac02
+#FIXTURE	libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=17671	sha256=7b2060e60f6a6aa7731ae460545ecb46e59891d1bf440414c27fc13d72a7ffd1
+office-interop/libreoffice-resaved/document-properties-litchi.docx	_rels/.rels	moved
+#FIXTURE	office-interop/libreoffice-resaved/document-properties-litchi.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=6557	sha256=6be4edbd33466002049b4e5de549b768b3d42aa73c15eb435f6571563c7a7491
+#FIXTURE	office-interop/litchi-changed/document-properties-litchi.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=11179	sha256=f00dcf59b3a3608e7e760aa35f73e39feb53c8dd9fa010f0942f4806f6df99e7
+#FIXTURE	ooxml/docx/ComplexNumberedLists.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=14411	sha256=c1f3c0800a64c76124b79c774bfa1862cfa86dc9431be785494d7bfd6ffb3812
+ooxml/docx/FancyFoot.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/FancyFoot.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=12567	sha256=0833f3dceb4a65ea79434d4c4b6a8bb1ffc594d530ec19684381d57f12448e55
+ooxml/docx/Headers.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/Headers.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=12796	sha256=67b4fbc81863818d7b52ad0faa4de3862012c6e104091af8bd58724fd3ebcbed
+ooxml/docx/Hyperlink.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/Hyperlink.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=11239	sha256=968fcfbaf21c847d8516330369e1ac68b5b0da594e49166d99939b8ab28f55b8
+#FIXTURE	ooxml/docx/comment.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=4973	sha256=71e64c7ce2cd386888e9927d080c0c9a679d346f2820480f27cc29160f6ec329
+#FIXTURE	ooxml/docx/documentProperties.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=23527	sha256=9e7ac6815e4374f35ed14c717e47aaf90453541f41851956b113bcd5fb34709c
+#FIXTURE	ooxml/docx/documentProtection_comments_no_password.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=9902	sha256=9932a0acc1008cf5506dc125b8387eb715435430b9d35738032c2c4ad49cf757
+#FIXTURE	ooxml/docx/documentProtection_forms_no_password.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=9957	sha256=4e38ba563395704a02b67fb13490125348d02650538a0f75f733e6a19c264a54
+#FIXTURE	ooxml/docx/documentProtection_no_protection.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=9917	sha256=4dae8ab07b37b4ae00767362c9af289d6c6ed41ce164cd0d5a2d6ae3a5c083f4
+#FIXTURE	ooxml/docx/documentProtection_readonly_no_password.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=9890	sha256=e1046d453967bce8a5e31a345770e8b2b32bc7443899172f80d8262b59ec70a2
+ooxml/docx/drawing.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/drawing.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=76032	sha256=c15e8094eca0c4320c8008b601c2b76ae0f14337c2683bdf6659788d69853807
+ooxml/docx/endnotes.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/endnotes.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=13225	sha256=a4a28617613412d10f504b5a5eba2bb37da0275c3616caace1a34c88bc5e1878
+ooxml/docx/footnotes.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/footnotes.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=12555	sha256=051a83d61ecff3329d4615fb1891fb6876243e2f32be6931b5c9bf5b7d053615
+#FIXTURE	ooxml/docx/headerFooter.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=28462	sha256=b58dd223fd4640b6fed271ccb2790b385fab63c893bb0bee0dc46426f7f23860
+ooxml/docx/headerPic.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/headerPic.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=15966	sha256=2a8ef857c58af093114156c5bc12c296b0440a45436de6cfb38213b56afd0ecb
+#FIXTURE	ooxml/docx/table-alignment.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=15195	sha256=ea572d28b96818b5c14cea2915d5e2de636b9ad4dec8f1fab4496e14c5ffd86d
+ooxml/docx/table-indent.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML relationship: core-properties part '/docProps/core.xml' is orphaned
+ooxml/docx/table_footnotes.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	ooxml/docx/table_footnotes.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=12871	sha256=6babaee6f689744f094eaa080ddbb421880c1d098f4893ee667ac1e8ad665940
+#FIXTURE	ooxml/docx/testComment.docx	source_rels=3	kept=3	moved=0	absent=0	out_bytes=65322	sha256=dab38015a025b38646d14f05eb8dae719d8f2c8b33e15efd8633cdf940befeca
+#FIXTURE	poi/test-data/document/61745.docx	source_rels=4	kept=4	moved=0	absent=0	out_bytes=37071	sha256=8e1a1b51a1a71390cdc581d285bfe35f04045a22488941e91efe1be77bead7ad
+poi/test-data/document/Bug54849.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	poi/test-data/document/Bug54849.docx	source_rels=4	kept=3	moved=1	absent=0	out_bytes=26915	sha256=c48e72bd67b46433ebac2e6611098060f8b15e10a7fd0e2f055e729a2cc5e754
+#FIXTURE	poi/test-data/document/ComplexNumberedLists.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=14411	sha256=c1f3c0800a64c76124b79c774bfa1862cfa86dc9431be785494d7bfd6ffb3812
+poi/test-data/document/EmbeddedDocument.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	poi/test-data/document/EmbeddedDocument.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=13296	sha256=4f4d2a2244ba029c2988f21fbef42d66b237469bb9d4d22610475e0c84aecc46
+#FIXTURE	poi/test-data/document/Numbering.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=13831	sha256=171531673f48ef010c80d58078ee8d6798efd045f06925032c0ac91065e1ca61
+#FIXTURE	poi/test-data/document/NumberingWOverrides.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=15223	sha256=e0acfb1de58cd38c10c2ddd228aae211587707dcca80bb8f136b5ff083ce70fe
+#FIXTURE	poi/test-data/document/NumberingWithOutOfOrderId.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=12970	sha256=bee3c8d07d0b1b0bff33dcd2d6dfbe164ebc7538408f913821269816baeea476
+#FIXTURE	poi/test-data/document/heading123.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=74194	sha256=9342a07efb60694c23270bcebb8cc4569f3a91c0f789eaa474b979eaec2663ec
+poi/test-data/document/saut_page.docx	_rels/.rels	moved
+#FIXTURE	poi/test-data/document/saut_page.docx	source_rels=3	kept=2	moved=1	absent=0	out_bytes=2959291	sha256=81861988051f113543a3b2bd7152492eeceb0dfd1c4ecca4bd5cd2169b354960
+#FIXTURE	poi/test-data/document/testComment.docx	source_rels=3	kept=3	moved=0	absent=0	out_bytes=65322	sha256=dab38015a025b38646d14f05eb8dae719d8f2c8b33e15efd8633cdf940befeca
+poi/test-data/integration/test_recursive_embedded.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	poi/test-data/integration/test_recursive_embedded.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=26824	sha256=688b4233616de02e26349de3f279fd8f7b6a7d6ecb56db0aee2b57490cebe417
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx	word/_rels/document.xml.rels	moved
+#FIXTURE	poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx	source_rels=2	kept=1	moved=1	absent=0	out_bytes=13089	sha256=2d0d54cb03a80327f17c82081605ae98ba06efa5f2e082632cb0616190338083
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML data: OPC M4.3 permits only dcterms:created and dcterms:modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type on created and modified
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type="dcterms:W3CDTF"
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx	OPEN-REFUSED	OPC error: A package cannot contain more than one core-properties relationship
+#FIXTURE	poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	source_rels=2	kept=2	moved=0	absent=0	out_bytes=10102	sha256=0591e0ac87acf19abc21a1bc6f21ef90fe22043d3bb8c181a8c71e13dfac3a5e
+poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	OPEN-REFUSED	shared OOXML error: invalid OOXML data: OPC M4.4 forbids xml:lang in core properties
+poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx	OPEN-REFUSED	OPC error: Derived OPC part names coexist: '/word/document.xml' and '/word/document.xml/image1.gif'
+poi/test-data/xmldsign/hello-world-signed-twice.docx	SAVE-REFUSED	I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+poi/test-data/xmldsign/hello-world-signed.docx	SAVE-REFUSED	I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+poi/test-data/xmldsign/ms-office-2010-signed.docx	SAVE-REFUSED	I/O error: Failed to save package: signed OPC source requires an explicit signature edit policy
+#TOTAL files=63
+#TOTAL opened=55
+#TOTAL edited=53
+#TOTAL published=52
+#TOTAL rels_members_kept=118
+#TOTAL rels_members_moved=23
+#TOTAL rels_members_absent=0

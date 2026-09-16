@@ -1,0 +1,56 @@
+### package before
+  try_to_xml_bytes       n=1:     83 n=11:    503 per-scenario:     42.0
+  verify_authored        n=1:      1 n=11:     11 per-scenario:      1.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      1 n=11:     11 per-scenario:      1.0
+  get_or_add             n=1:      1 n=11:     11 per-scenario:      1.0
+  reuse_candidate        n=1:      1 n=11:     11 per-scenario:      1.0
+### package after
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      1 n=11:     11 per-scenario:      1.0
+  get_or_add             n=1:      1 n=11:     11 per-scenario:      1.0
+  reuse_candidate        n=1:      1 n=11:     11 per-scenario:      1.0
+### drawing before
+  try_to_xml_bytes       n=1:     83 n=11:    503 per-scenario:     42.0
+  verify_authored        n=1:      1 n=11:     11 per-scenario:      1.0
+  rels_uri               n=1:    407 n=11:   2657 per-scenario:    225.0
+  add_relationship       n=1:      1 n=11:     11 per-scenario:      1.0
+  get_or_add             n=1:      1 n=11:     11 per-scenario:      1.0
+  reuse_candidate        n=1:      1 n=11:     11 per-scenario:      1.0
+### drawing after
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      1 n=11:     11 per-scenario:      1.0
+  get_or_add             n=1:      1 n=11:     11 per-scenario:      1.0
+  reuse_candidate        n=1:      1 n=11:     11 per-scenario:      1.0
+### seamonly before
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      0 n=11:      0 per-scenario:      0.0
+  get_or_add             n=1:      0 n=11:      0 per-scenario:      0.0
+  reuse_candidate        n=1:      0 n=11:      0 per-scenario:      0.0
+### seamonly after
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      0 n=11:      0 per-scenario:      0.0
+  get_or_add             n=1:      0 n=11:      0 per-scenario:      0.0
+  reuse_candidate        n=1:      0 n=11:      0 per-scenario:      0.0
+### seamdrawing before
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      0 n=11:      0 per-scenario:      0.0
+  get_or_add             n=1:      0 n=11:      0 per-scenario:      0.0
+  reuse_candidate        n=1:      0 n=11:      0 per-scenario:      0.0
+### seamdrawing after
+  try_to_xml_bytes       n=1:     82 n=11:    492 per-scenario:     41.0
+  verify_authored        n=1:      0 n=11:      0 per-scenario:      0.0
+  rels_uri               n=1:    406 n=11:   2646 per-scenario:    224.0
+  add_relationship       n=1:      0 n=11:      0 per-scenario:      0.0
+  get_or_add             n=1:      0 n=11:      0 per-scenario:      0.0
+  reuse_candidate        n=1:      0 n=11:      0 per-scenario:      0.0

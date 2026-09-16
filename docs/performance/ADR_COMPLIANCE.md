@@ -1,5 +1,44 @@
 # Performance optimization ADR-compliance matrix
 
+## 0647 — no boundary moved; the preservation proof is narrowed to exactly the operations that can invalidate it
+
+Record: [0647](0647-opc-get-or-add-noop-reuse-design.md).
+
+**ADR 0006** requires preservation by default — untouched entries, ordering,
+compression, timestamps and lexical details retained when possible — and
+deterministic serialization absent an explicit `Clock`, actor identity or
+cryptographic RNG. Change 0647 removes a generate-and-discard step and publishes
+the same bytes; the published output remains a function of the package, proved
+over 6,281 reuse publications across 334 fixtures with an empty cross-leg `diff`
+and identical SHA-256s in the counts probe. **ADR 0005's** 2026-08-21 amendment
+makes preservation provenance planning evidence only, never authorization for
+exact passthrough: the capture is used here exactly as change 0593 uses it, to
+choose `Copy` for one member inside an already-proven preservation plan, and
+`exact_source_authorized` is untouched — every seam that reaches the changed
+method (`OpcPackage::get_part_mut`, `OpcPackage::rels_mut`,
+`OpcPackage::relate_to`) still revokes it first, so nothing widens who may take
+the whole-archive passthrough. **ADR 0003** is untouched: no snapshot, patch or
+source-preservation proof changes. The compliance statement to record is about
+the *proof's* scope rather than any boundary: the invariant was "every mutating
+method clears the handle", and it is now stated precisely — every method that
+*changes the collection* clears it, and a call that establishes nothing does not,
+because the handle's contract is that it describes the collection's value. The
+conservative direction is preserved: the handle is cleared on every path that
+could have changed the value, and a cleared handle costs only the
+serialize-and-compare route. Three fallible steps sit behind the proof;
+`PackURI::rels_uri` → `InvalidPackUri` does **not** move (the preservation route
+still derives it in its final-member-name loop and the full writer in
+`materialize_pristine`), while `try_to_xml_bytes` allocation failure and
+`verify_authored` on a discarded serialization are skipped, which is change
+0593's already-recorded intentional behaviour class, reachable only above roughly
+62,500 relationships in one member against a measured corpus maximum of 43.
+No new `unsafe` (the crate is `#![forbid(unsafe_code)]`), no limit relocated or
+weakened, no malformed-input defence removed, no ambient I/O, no global state or
+executor, no public type added, and no archive type, raw lock or executor leaked.
+The one widening is recorded: the rule applies to any `add_relationship` call
+naming an already-taken identifier, which was already a silent no-op because the
+occupied arm never replaced anything.
+
 ## 0645 — the one boundary this design would move, stated in advance
 
 Record: [0645](0645-pptx-memoized-revision-proof-design.md).

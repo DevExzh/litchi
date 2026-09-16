@@ -232,9 +232,19 @@ pub struct Relationships {
     /// the preservation provenance that produced it. A match proves the
     /// collection still holds the value that was serialized at open, so the
     /// source member can be copied without reserializing or auditing bytes
-    /// that would be discarded. Every mutating method clears the handle, and a
-    /// handle moved into a different collection cannot match another part's
-    /// provenance, so the proof never outlives the value it describes.
+    /// that would be discarded. Every method that changes the collection
+    /// clears the handle, and a handle moved into a different collection
+    /// cannot match another part's provenance, so the proof never outlives the
+    /// value it describes.
+    ///
+    /// A call that establishes nothing does not clear it. [`Self::get_or_add`]
+    /// reusing a relationship the collection already carries, and
+    /// [`Self::add_relationship`] naming an identifier that is already taken,
+    /// both return the established relationship without replacing it: the
+    /// value is the value that was serialized at open, so the proof still
+    /// holds. The conservative direction is preserved — the handle is cleared
+    /// on every path that could have changed the value, and a cleared handle
+    /// only costs the serialize-and-compare route.
     source_capture: Option<Arc<CanonicalRelationshipsXml>>,
 }
 
@@ -321,6 +331,10 @@ impl Relationships {
     ///
     /// # Returns
     /// Reference to the newly added relationship
+    ///
+    /// An established identifier is returned unchanged — this method never
+    /// replaces one — so such a call leaves the collection's value, and the
+    /// open-time proof that describes it, exactly as they were.
     pub fn add_relationship(
         &mut self,
         reltype: String,
@@ -328,25 +342,41 @@ impl Relationships {
         r_id: String,
         is_external: bool,
     ) -> &Relationship {
-        self.invalidate_source_capture();
         // Preserve compatibility for existing writer call sites without ever
         // replacing an established relationship. New code that needs duplicate
         // diagnostics should use `try_add_relationship`.
-        let relationship = Relationship::new_with_source(
-            r_id.clone(),
-            reltype,
-            target_ref,
-            self.base_uri.clone(),
-            self.source_uri.clone(),
-            if is_external {
-                TargetMode::External
-            } else {
-                TargetMode::Internal
-            },
-        );
-        match self.rels.entry(r_id) {
+        //
+        // The entry decides both the value and the proof. An occupied entry is
+        // returned as it stands, so the collection is not modified and the
+        // open-time capture still describes it; only the vacant arm inserts,
+        // and only the vacant arm drops the capture. Building the relationship
+        // inside that arm also keeps the argument strings out of the occupied
+        // path, where they were previously copied into a value that was then
+        // discarded.
+        let Self {
+            base_uri,
+            source_uri,
+            rels,
+            source_capture,
+        } = self;
+        match rels.entry(r_id) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(relationship),
+            Entry::Vacant(entry) => {
+                *source_capture = None;
+                let id = entry.key().clone();
+                entry.insert(Relationship::new_with_source(
+                    id,
+                    reltype,
+                    target_ref,
+                    base_uri.clone(),
+                    source_uri.clone(),
+                    if is_external {
+                        TargetMode::External
+                    } else {
+                        TargetMode::Internal
+                    },
+                ))
+            },
         }
     }
 
@@ -444,6 +474,10 @@ impl Relationships {
     /// exists, returns that relationship; when several match, the one with the
     /// smallest rId in byte order is reused. Otherwise, creates a new one with
     /// the next available rId.
+    ///
+    /// Reuse changes nothing, so it keeps the open-time source capture and the
+    /// collection's `.rels` member is still published from the source archive
+    /// rather than reserialized into the same decision.
     ///
     /// # Arguments
     /// * `reltype` - Relationship type URI
@@ -877,6 +911,77 @@ mod tests {
         relationships.set_source_capture(capture());
         assert!(relationships.remove("rIdAbsent").is_none());
         assert!(relationships.source_capture().is_none());
+    }
+
+    #[test]
+    fn establishing_nothing_keeps_the_open_time_capture() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let capture = || Arc::new(CanonicalRelationshipsXml::Empty);
+
+        let mut relationships = Relationships::for_source(&source);
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "styles.xml".to_owned(),
+            "rId1".to_owned(),
+            false,
+        );
+        relationships.add_relationship(
+            "urn:link".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId2".to_owned(),
+            true,
+        );
+        let established = relationships.to_xml();
+
+        // `get_or_add` reusing an internal relationship the collection already
+        // carries returns the established identifier and leaves the value, so
+        // the proof still describes the collection.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add("urn:test", "styles.xml").r_id(),
+            "rId1"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // `get_or_add_ext_rel` already returned early on reuse; it is asserted
+        // here so the two reuse paths are covered by one test.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add_ext_rel("urn:link", "https://example.com/first"),
+            "rId2"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // `add_relationship` never replaces an established identifier, so an
+        // occupied identifier leaves both the value and the proof alone, even
+        // when the arguments describe something else entirely.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships
+                .add_relationship(
+                    "urn:other".to_owned(),
+                    "other.xml".to_owned(),
+                    "rId1".to_owned(),
+                    true,
+                )
+                .target_ref(),
+            "styles.xml"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // Nothing above changed the collection, so the serialization the proof
+        // stands for is still the serialization publication would write.
+        assert_eq!(relationships.to_xml(), established);
+        assert_eq!(relationships.len(), 2);
+
+        // A fresh target still establishes a relationship, and still drops it.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add("urn:test", "numbering.xml").r_id(),
+            "rId3"
+        );
+        assert!(relationships.source_capture().is_none());
+        assert_eq!(relationships.len(), 3);
     }
 
     #[test]

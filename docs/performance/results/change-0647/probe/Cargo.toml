@@ -1,0 +1,38 @@
+[package]
+name = "opc-get-or-add-reuse-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# The crate path is rewritten per leg by `scripts/run-probe.sh`, which points
+# it at `/home/zhuhe/code/litchi-worktrees/before-c7326f680/crates/litchi-opc`
+# for the before leg and at `/home/zhuhe/code/litchi-worktrees/0647/crates/...`
+# for the after leg. The shape follows change 0628's probe manifest.
+[dependencies]
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0647/crates/litchi-opc" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0647/crates/litchi-core" }
+litchi-docx = { path = "/home/zhuhe/code/litchi-worktrees/0647/crates/litchi-docx" }
+sha2 = "0.10"
+
+[[bin]]
+name = "rels_spelling"
+path = "src/rels_spelling.rs"
+
+[[bin]]
+name = "reuse_publish"
+path = "src/reuse_publish.rs"
+
+[[bin]]
+name = "reuse_counts"
+path = "src/reuse_counts.rs"
+
+[[bin]]
+name = "docx_route"
+path = "src/docx_route.rs"
+
+[[bin]]
+name = "reuse_iters"
+path = "src/reuse_iters.rs"
+
+[profile.release]
+debug = false
