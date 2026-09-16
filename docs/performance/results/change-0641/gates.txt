@@ -1,0 +1,159 @@
+Gates for change 0641, run in /home/zhuhe/code/litchi-worktrees/0641 on the
+merged tree at branch perf/0641-xls-scan-measure-only-cells-and-sheet-hint,
+base c7326f68065edf6f2198ca3cb39c38c48cf00ed9.
+
+=====================================================================
+cargo fmt --all --check
+=====================================================================
+(no output)
+exit=0
+
+=====================================================================
+cargo clippy -p litchi-xls --all-features --all-targets
+=====================================================================
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0641/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.02s
+exit=0   (workspace lints are deny; no warning emitted)
+
+=====================================================================
+cargo doc -p litchi-xls --no-deps
+=====================================================================
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0641/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.31s
+   Generated /home/zhuhe/code/litchi-worktrees/0641/target/doc/litchi_xls/index.html
+exit=0   (rustdoc lints are deny; no warning emitted)
+
+=====================================================================
+cargo test -p litchi-xls --all-features
+=====================================================================
+72 test binaries, 1,409 tests passed, 0 failed.
+(1,399 before this change; the 10 added are the 7 in
+ records.rs::cell_measure_tests and the 3 in tests/source_backed.rs.)
+exit=0
+
+The two corpus sweeps this record cites, with --nocapture:
+
+  cell-differential: fixtures=126 walked=124 records=67422 refused=142
+  cell-differential: kind 0x0006 = 14854
+  cell-differential: kind 0x00fd = 30318
+  cell-differential: kind 0x0201 = 14150
+  cell-differential: kind 0x0203 = 3235
+  cell-differential: kind 0x0204 = 6
+  cell-differential: kind 0x0205 = 500
+  cell-differential: kind 0x027e = 4359
+  cell-differential: skipped poi/test-data/spreadsheet/1900DateWindowing.xls: container: Corrupted file: FAT sector 10 is not marked FATSECT
+  cell-differential: skipped poi/test-data/spreadsheet/1904DateWindowing.xls: container: Corrupted file: FAT sector 10 is not marked FATSECT
+  cell-mutation: mutations=32884 refusals=9240 kinds=7
+
+The twelve mutation checks, re-run against the committed tree
+(mutations.txt and mutations-scan.txt in this packet):
+
+  M1 measure_label drops the string refusal instead of reporting it      caught by 4 tests
+  M2 the refusal is reported with decode_utf16's wording                 caught by 2 tests
+  M3 measure_formula skips validate_formula_extra                        caught by 2 tests
+  M4 measure_formula skips decode_flags                                  caught by 3 tests
+  M5 measure_formula skips the empty-token checks                        caught by 1 test
+  M6 LabelSst measures against the wrong minimum length                  caught by 1 test
+  M7 wants_record answers false for a payload too short to carry a position  SURVIVED (equivalent)
+  M8 measure_label reports the wrong column                              caught by 4 tests
+  N1 the position peek reads the XF index where the column is            caught by 10 tests
+  N2 accept_measured skips the XF validation                             caught by 1 test
+  N3 the measure path skips validation entirely                          caught by 1 test
+  N4 one chain hint serves both the resolver and the worksheet cursor    SURVIVED (a
+     performance property; the chain-link counter is what measures it)
+
+=====================================================================
+cargo test -p litchi --features docx,xlsx,pptx,xls
+=====================================================================
+26 test binaries, 266 tests passed, 0 failed.
+exit=0
+
+=====================================================================
+cargo test -p litchi-xlsx -p litchi-xlsb -p litchi-cfb
+(the three other crates that depend on litchi-xls or that it depends on)
+=====================================================================
+82 test binaries, 2,400 tests passed, 0 failed.
+exit=0
+
+=====================================================================
+cargo test --all-features   (in tools/perf-baseline)
+=====================================================================
+513 passed, 0 failed, 1 ignored in the library suite.
+TWO FAILURES, PRE-EXISTING, UNRELATED AND FLAKY, in the binary
+docx_bounded_tail_append_compare. cargo stops on them (fail-fast), so that
+invocation did not reach the remaining binary targets; they were run separately
+and all pass:
+
+  cargo test --all-features --bins --no-fail-fast
+  -> 19 binary targets, 71 tests passed, 0 failed
+     (including docx_bounded_tail_append_compare, which passed in that run)
+
+The failures as they appear in the combined invocation:
+
+  failures:
+      allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak
+      allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory
+  test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
+
+  thread '...global_allocator_records_successful_alloc_and_dealloc_with_live_peak'
+  panicked at src/bin/support/counting_allocator.rs:88:9:
+  assertion failed: during.live_bytes >= before.live_bytes + 256
+
+They are a DOCX harness binary's `#[global_allocator]` counter tests observing
+allocations made by other tests running in parallel in the same process. They
+are NOT this change's: the identical two failures reproduce on the untouched
+before checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680,
+
+  cargo test --all-features --bin docx_bounded_tail_append_compare
+  -> test result: FAILED. 3 passed; 2 failed   (exit 101)
+
+and both pass on that same untouched checkout when the binary is run serially,
+
+  cargo test --all-features --bin docx_bounded_tail_append_compare -- --test-threads=1
+  -> test result: ok. 5 passed; 0 failed
+
+which identifies the cause as test parallelism over a process-global allocator
+counter rather than anything in the code under test. No file this change touches
+is an input to that binary.
+
+The same binary run on its own is flaky rather than deterministic in either
+tree, which is the signature of a timing-dependent counter rather than a broken
+assertion: on the untouched before checkout an isolated parallel run FAILED the
+same two tests (exit 101), and on this branch an isolated run passed both
+parallel and serial:
+
+  before checkout, isolated, parallel  -> FAILED. 3 passed; 2 failed
+  before checkout, isolated, serial    -> ok. 5 passed; 0 failed
+  this branch,     isolated, serial    -> ok. 5 passed; 0 failed
+  this branch,     isolated, parallel  -> ok. 5 passed; 0 failed
+  this branch,     whole suite         -> FAILED. 3 passed; 2 failed
+  this branch,     --bins --no-fail-fast -> ok. 5 passed; 0 failed
+
+A full serial run of the whole harness suite was started and abandoned: the
+library suite alone takes 676 s in parallel and the serial run had not finished
+it after 40 minutes on a host at load 12-30. The targeted runs above establish
+the same fact at a fraction of the cost.
+
+=====================================================================
+python3 -B tools/check_crate_boundaries.py
+=====================================================================
+exit=0
+
+=====================================================================
+python3 -B tools/check_report_claim_classification.py
+=====================================================================
+OK: 167 REPORT rows classified across 2 tables
+    (strict_claim=0, historical=145, descriptive=14, withheld=8)
+exit=0
+
+=====================================================================
+python3 -B tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json
+                                      --repo-root . --mode structural
+=====================================================================
+INVALID CLAIM REGISTRY: landed claim 'claim-0251-xlsx-xml-borrowed' requires
+strict evidence verification
+
+PRE-EXISTING: the identical line is produced by the untouched before checkout at
+/home/zhuhe/code/litchi-worktrees/before-c7326f680. This change adds no
+claim-registry entry (`performance_claim: none`) and does not touch the
+registry.

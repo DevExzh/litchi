@@ -1,0 +1,8 @@
+M1 measure_label drops the string refusal instead of reporting it      caught by a_compressed_label_measures_without_decoding, a_lone_surrogate_label_keeps_the_from_utf16_message, every_two_unit_label_agrees_with_the_materializing_parse, mutated_cell_payloads_are_refused_identically
+M2 the refusal is reported with decode_utf16's wording, not from_utf16's caught by a_lone_surrogate_label_keeps_the_from_utf16_message, every_two_unit_label_agrees_with_the_materializing_parse
+M3 measure_formula skips validate_formula_extra                        caught by formula_refusals_keep_their_position_on_the_measure_path, mutated_cell_payloads_are_refused_identically
+M4 measure_formula skips decode_flags                                  caught by every_fixture_cell_record_measures_identically, formula_refusals_keep_their_position_on_the_measure_path, mutated_cell_payloads_are_refused_identically
+M5 measure_formula skips the empty-token checks                        caught by formula_refusals_keep_their_position_on_the_measure_path
+M6 LabelSst measures against the wrong minimum length                  caught by mutated_cell_payloads_are_refused_identically
+M7 wants_record answers false for a payload too short to carry a position SURVIVED
+M8 measure_label reports the wrong column                              caught by a_compressed_label_measures_without_decoding, every_fixture_cell_record_measures_identically, every_two_unit_label_agrees_with_the_materializing_parse, mutated_cell_payloads_are_refused_identically

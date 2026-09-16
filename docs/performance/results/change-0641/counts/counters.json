@@ -1,0 +1,546 @@
+[
+ {
+  "scenario": "54016-one-cell",
+  "before": {
+   "read_calls": 65,
+   "read_bytes": 932993,
+   "version_calls": 40,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "float:4024000000000000",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 65,
+   "read_bytes": 932993,
+   "version_calls": 40,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "float:4024000000000000",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "54016-second-cell",
+  "before": {
+   "read_calls": 90,
+   "read_bytes": 1548815,
+   "version_calls": 59,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=float:4024000000000000|b=float:408f400000000000",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 90,
+   "read_bytes": 1548815,
+   "version_calls": 59,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=float:4024000000000000|b=float:408f400000000000",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "54016-all-cells",
+  "before": {
+   "read_calls": 16145,
+   "read_bytes": 1256139,
+   "version_calls": 16117,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b",
+    "cells_reported": 38950
+   }
+  },
+  "after": {
+   "read_calls": 16145,
+   "read_bytes": 1256139,
+   "version_calls": 16117,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e8761e1faee7b3b0e7c6d604665a07b",
+    "cells_reported": 38950
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "54016-full-text",
+  "before": {
+   "read_calls": 16145,
+   "read_bytes": 1256139,
+   "version_calls": 36503,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 16145,
+   "read_bytes": 1256139,
+   "version_calls": 36503,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:840804:d88d103e72b84b430a75ed4c0da59ccbb67590f4407487f3b17ad62aa3d960c0",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "flagship-one-cell",
+  "before": {
+   "read_calls": 62,
+   "read_bytes": 633337,
+   "version_calls": 37,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "string:8:Mountain",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 62,
+   "read_bytes": 633337,
+   "version_calls": 37,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "string:8:Mountain",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "flagship-second-cell",
+  "before": {
+   "read_calls": 71,
+   "read_bytes": 701474,
+   "version_calls": 49,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=string:8:Mountain|b=string:9:Aconcagua",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 71,
+   "read_bytes": 701474,
+   "version_calls": 49,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=string:8:Mountain|b=string:9:Aconcagua",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "flagship-all-cells",
+  "before": {
+   "read_calls": 113,
+   "read_bytes": 633974,
+   "version_calls": 88,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:253:38dd12fadaedd863937d53d5ac281338e31ad466bdba420e38226cb210ebd9b3",
+    "cells_reported": 253
+   }
+  },
+  "after": {
+   "read_calls": 113,
+   "read_bytes": 633974,
+   "version_calls": 88,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:253:38dd12fadaedd863937d53d5ac281338e31ad466bdba420e38226cb210ebd9b3",
+    "cells_reported": 253
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "flagship-full-text",
+  "before": {
+   "read_calls": 394,
+   "read_bytes": 790147,
+   "version_calls": 916,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 394,
+   "read_bytes": 790147,
+   "version_calls": 916,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "refused:source XLS parse error: Invalid record 0x0006: shared Formula metadata requires a leading PtgExp token",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "customviews-one-cell",
+  "before": {
+   "read_calls": 24,
+   "read_bytes": 150821,
+   "version_calls": 29,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "string:28:Meta Financeira / Econ\u00f4mica",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 24,
+   "read_bytes": 150821,
+   "version_calls": 29,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "string:28:Meta Financeira / Econ\u00f4mica",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "customviews-second-cell",
+  "before": {
+   "read_calls": 31,
+   "read_bytes": 191370,
+   "version_calls": 39,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=string:28:Meta Financeira / Econ\u00f4mica|b=float:409f540000000000",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 31,
+   "read_bytes": 191370,
+   "version_calls": 39,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=string:28:Meta Financeira / Econ\u00f4mica|b=float:409f540000000000",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "customviews-full-text",
+  "before": {
+   "read_calls": 898,
+   "read_bytes": 257894,
+   "version_calls": 2121,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:107420:bdd9a79ef483a767ac8cd118a46ca2a59ecadf84d461042ab1420f04f7b71ed5",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 898,
+   "read_bytes": 257894,
+   "version_calls": 2121,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:107420:bdd9a79ef483a767ac8cd118a46ca2a59ecadf84d461042ab1420f04f7b71ed5",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "15228-one-cell",
+  "before": {
+   "read_calls": 50,
+   "read_bytes": 179952,
+   "version_calls": 28,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "empty",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 50,
+   "read_bytes": 179952,
+   "version_calls": 28,
+   "len_calls": 1,
+   "observation": {
+    "kind": "one-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": "empty",
+    "outcome": null,
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "15228-second-cell",
+  "before": {
+   "read_calls": 61,
+   "read_bytes": 317384,
+   "version_calls": 40,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=empty|b=empty",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 61,
+   "read_bytes": 317384,
+   "version_calls": 40,
+   "len_calls": 1,
+   "observation": {
+    "kind": "second-cell",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "a=empty|b=empty",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "15228-all-cells",
+  "before": {
+   "read_calls": 66,
+   "read_bytes": 180738,
+   "version_calls": 44,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:4305:575be094eee9d89ba5ea474e593fbd0a0b482196bc55964a83240f005207d887",
+    "cells_reported": 4305
+   }
+  },
+  "after": {
+   "read_calls": 66,
+   "read_bytes": 180738,
+   "version_calls": 44,
+   "len_calls": 1,
+   "observation": {
+    "kind": "all-cells",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "cells:4305:575be094eee9d89ba5ea474e593fbd0a0b482196bc55964a83240f005207d887",
+    "cells_reported": 4305
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "15228-full-text",
+  "before": {
+   "read_calls": 595,
+   "read_bytes": 631201,
+   "version_calls": 4571,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:81306:1dddcac954971323aa0ffa88087438ad6c2362560bd276f8eefb22d45d412676",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 595,
+   "read_bytes": 631201,
+   "version_calls": 4571,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:81306:1dddcac954971323aa0ffa88087438ad6c2362560bd276f8eefb22d45d412676",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ },
+ {
+  "scenario": "hyperlinks-full-text",
+  "before": {
+   "read_calls": 32,
+   "read_bytes": 5900,
+   "version_calls": 111,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:300:ddac5523144bc5a9fbb1b367352d8e02dd6bf3af4909db4fa4dcf8d2f05283c3",
+    "cells_reported": null
+   }
+  },
+  "after": {
+   "read_calls": 32,
+   "read_bytes": 5900,
+   "version_calls": 111,
+   "len_calls": 1,
+   "observation": {
+    "kind": "full-text",
+    "worksheet_count": null,
+    "worksheet_names": null,
+    "cell": null,
+    "outcome": "text:300:ddac5523144bc5a9fbb1b367352d8e02dd6bf3af4909db4fa4dcf8d2f05283c3",
+    "cells_reported": null
+   }
+  },
+  "identical": true,
+  "samples": 5,
+  "warmups": 1
+ }
+]

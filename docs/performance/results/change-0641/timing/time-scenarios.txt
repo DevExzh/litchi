@@ -1,0 +1,11 @@
+54016-one-cell|test-data/poi/test-data/spreadsheet/54016.xls|0|one-cell
+54016-second-cell|test-data/poi/test-data/spreadsheet/54016.xls|0|second-cell
+flagship-one-cell|test-data/ole/xls/ConditionalFormattingSamples.xls|10|one-cell
+customviews-one-cell|test-data/ole/xls/WithCustomViews.xls|0|one-cell
+15228-one-cell|test-data/poi/test-data/spreadsheet/15228.xls|8|one-cell
+15228-second-cell|test-data/poi/test-data/spreadsheet/15228.xls|8|second-cell
+15228-all-cells|test-data/poi/test-data/spreadsheet/15228.xls|8|all-cells
+15228-full-text|test-data/poi/test-data/spreadsheet/15228.xls|8|full-text
+customviews-full-text|test-data/ole/xls/WithCustomViews.xls|0|full-text
+hyperlinks-full-text|test-data/ole/xls/HyperlinksOnManySheets.xls|0|full-text
+flagship-full-text|test-data/ole/xls/ConditionalFormattingSamples.xls|10|full-text

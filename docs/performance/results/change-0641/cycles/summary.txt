@@ -1,0 +1,28 @@
+perf stat isolation pairs, cycles per operation (median of 5 repetitions, CPU 24)
+scenario                        before         after     delta A/A floor
+54016-one-cell                 3678522       2649083   -27.99%    -0.06%
+54016-second-cell              6498129       4438293   -31.70%    -0.16%
+flagship-one-cell               433893        424723    -2.11%    -1.63%
+customviews-one-cell            331451        298061   -10.07%     0.48%
+15228-one-cell                  894507        565954   -36.73%     2.24%
+15228-second-cell              1546420        912396   -41.00%    -1.25%
+15228-all-cells                6545500       6472548    -1.11%    -0.89%
+15228-full-text               19186474      19346884     0.84%    -0.09%
+customviews-full-text          5710906       5582339    -2.25%     0.02%
+hyperlinks-full-text            112524         96146   -14.56%    -3.10%
+flagship-full-text             2156870       2070203    -4.02%    -0.28%
+
+perf stat isolation pairs, instructions per operation (median of 5 repetitions, CPU 24)
+scenario                        before         after     delta A/A floor
+54016-one-cell                16045893      13664675   -14.84%     0.00%
+54016-second-cell             28058923      23278591   -17.04%    -0.00%
+flagship-one-cell              1479896       1441214    -2.61%     0.04%
+customviews-one-cell           1337493       1240072    -7.28%     0.02%
+15228-one-cell                 3634677       2540721   -30.10%     1.56%
+15228-second-cell              6121153       4176601   -31.77%     0.21%
+15228-all-cells               27128785      27144755     0.06%     0.05%
+15228-full-text               71687771      71739475     0.07%    -0.01%
+customviews-full-text         17887559      17940267     0.29%    -0.00%
+hyperlinks-full-text            326165        325782    -0.12%    -0.00%
+flagship-full-text             7798527       7507225    -3.74%    -0.00%
+

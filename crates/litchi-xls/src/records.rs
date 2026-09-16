@@ -1835,11 +1835,11 @@ mod sst_measure_tests {
         assert_eq!(scan_payloads(&[first, second]), "ok [(8, 19), (19, 24)]");
     }
 
-    fn test_data_root() -> PathBuf {
+    pub(super) fn test_data_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
     }
 
-    fn collect_xls_fixtures(root: &Path, found: &mut Vec<PathBuf>) {
+    pub(super) fn collect_xls_fixtures(root: &Path, found: &mut Vec<PathBuf>) {
         let Ok(entries) = std::fs::read_dir(root) else {
             return;
         };
@@ -1890,7 +1890,7 @@ mod sst_measure_tests {
         start.map(|begin| (begin, stream.len()))
     }
 
-    fn workbook_stream(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+    pub(super) fn workbook_stream(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
         let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
             .map_err(|error| format!("container: {error}"))?;
         let mut last = String::from("no workbook stream name matched");
@@ -2415,6 +2415,21 @@ pub enum CellRecord {
     },
 }
 
+/// What a validated cell record a scan is not keeping still tells its caller.
+///
+/// A worksheet scan must validate every record it frames, whatever it does with
+/// it, but a selected-cell query reads only two things out of a record that is
+/// not the target: where it sits, and which `XF` it names — validated for every
+/// record, so that a malformed cell format is refused wherever it is. Six bytes
+/// and no drop glue, against an 88-byte [`CellRecord`] that may own a `String`
+/// and a `Vec<u8>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MeasuredCell {
+    pub(crate) row: u16,
+    pub(crate) col: u16,
+    pub(crate) xf_index: u16,
+}
+
 #[derive(Debug, Clone)]
 pub enum BoolErrValue {
     Bool(bool),
@@ -2471,6 +2486,41 @@ impl CellRecord {
             0x027E => Self::parse_rk(data),              // RK
             0x00FD => Self::parse_label_sst(data),       // LabelSst
             0x0006 => Self::parse_formula(data),         // Formula
+            _ => Err(Error::InvalidRecord {
+                record_type,
+                message: "Unknown cell record type".to_string(),
+            }),
+        }
+    }
+
+    /// Run every check [`CellRecord::parse`] runs, without building the record.
+    ///
+    /// A selected-cell query frames every cell record on the worksheet and
+    /// keeps one. For the others it needs only a position and an XF index to
+    /// validate, yet the `String` a `Label` transcodes and the `Vec<u8>` a
+    /// `Formula` copies are allocated, moved through an 88-byte enum and freed.
+    /// This is change 0576's measure-only instantiation applied to those
+    /// records: the same refusals, in the same order, with the same messages,
+    /// and no allocation.
+    ///
+    /// It is not a second parser. Each kind's checks are the *same* code the
+    /// materializing parse runs — [`Self::cell_head`] for the five fixed-width
+    /// kinds, `utils::measure_string_record` and `parse_string_record` over one
+    /// shared framing for `Label`, and `formula_metadata::measure_record` over
+    /// `frame_record`/`check_token_stream` for `Formula`.
+    pub(crate) fn measure(
+        record_type: u16,
+        data: &[u8],
+        encoding: &Encoding,
+    ) -> Result<MeasuredCell> {
+        match record_type {
+            0x0201 => Self::measure_fixed(data, 6),        // Blank
+            0x0203 => Self::measure_fixed(data, 14),       // Number
+            0x0204 => Self::measure_label(data, encoding), // Label
+            0x0205 => Self::measure_fixed(data, 8),        // BoolErr
+            0x027E => Self::measure_fixed(data, 10),       // RK
+            0x00FD => Self::measure_fixed(data, 10),       // LabelSst
+            0x0006 => Self::measure_formula(data),         // Formula
             _ => Err(Error::InvalidRecord {
                 record_type,
                 message: "Unknown cell record type".to_string(),
@@ -2555,48 +2605,67 @@ impl CellRecord {
         Ok((row, first_col, count))
     }
 
-    fn parse_blank(data: &[u8]) -> Result<Self> {
-        if data.len() < 6 {
+    /// The `(row, col, ixfe)` header every fixed-width cell record opens with,
+    /// behind the one length check that makes the three reads infallible.
+    ///
+    /// `expected` is the record kind's own minimum payload, so this is the
+    /// complete set of checks for `Blank`, `Number`, `BoolErr`, `RK` and
+    /// `LabelSst`: everything after it is an in-bounds read of a fixed field.
+    /// Both the materializing parse and [`CellRecord::measure`] reach it, so
+    /// neither can drift from the other in which payload lengths it refuses.
+    #[inline]
+    fn cell_head(data: &[u8], expected: usize) -> Result<(u16, u16, u16)> {
+        if data.len() < expected {
             return Err(Error::InvalidLength {
-                expected: 6,
+                expected,
                 found: data.len(),
             });
         }
 
-        Ok(CellRecord::Blank {
-            row: binary::read_u16_le_at(data, 0)?,
-            col: binary::read_u16_le_at(data, 2)?,
-            xf_index: binary::read_u16_le_at(data, 4)?,
-        })
+        Ok((
+            binary::read_u16_le_at(data, 0)?,
+            binary::read_u16_le_at(data, 2)?,
+            binary::read_u16_le_at(data, 4)?,
+        ))
+    }
+
+    #[inline]
+    fn measure_fixed(data: &[u8], expected: usize) -> Result<MeasuredCell> {
+        let (row, col, xf_index) = Self::cell_head(data, expected)?;
+        Ok(MeasuredCell { row, col, xf_index })
+    }
+
+    fn measure_label(data: &[u8], encoding: &Encoding) -> Result<MeasuredCell> {
+        let (row, col, xf_index) = Self::cell_head(data, 8)?;
+        utils::measure_string_record(&data[6..], encoding)?;
+
+        Ok(MeasuredCell { row, col, xf_index })
+    }
+
+    fn measure_formula(data: &[u8]) -> Result<MeasuredCell> {
+        let (row, col, xf_index) = crate::formula_metadata::measure_record(data)?;
+        Ok(MeasuredCell { row, col, xf_index })
+    }
+
+    fn parse_blank(data: &[u8]) -> Result<Self> {
+        let (row, col, xf_index) = Self::cell_head(data, 6)?;
+
+        Ok(CellRecord::Blank { row, col, xf_index })
     }
 
     fn parse_number(data: &[u8]) -> Result<Self> {
-        if data.len() < 14 {
-            return Err(Error::InvalidLength {
-                expected: 14,
-                found: data.len(),
-            });
-        }
+        let (row, col, xf_index) = Self::cell_head(data, 14)?;
 
         Ok(CellRecord::Number {
-            row: binary::read_u16_le_at(data, 0)?,
-            col: binary::read_u16_le_at(data, 2)?,
-            xf_index: binary::read_u16_le_at(data, 4)?,
+            row,
+            col,
+            xf_index,
             value: binary::read_f64_le_at(data, 6)?,
         })
     }
 
     fn parse_label(data: &[u8], encoding: &Encoding) -> Result<Self> {
-        if data.len() < 8 {
-            return Err(Error::InvalidLength {
-                expected: 8,
-                found: data.len(),
-            });
-        }
-
-        let row = binary::read_u16_le_at(data, 0)?;
-        let col = binary::read_u16_le_at(data, 2)?;
-        let xf_index = binary::read_u16_le_at(data, 4)?;
+        let (row, col, xf_index) = Self::cell_head(data, 8)?;
         let value = utils::parse_string_record(&data[6..], encoding)?;
 
         Ok(CellRecord::Label {
@@ -2608,16 +2677,7 @@ impl CellRecord {
     }
 
     fn parse_bool_err(data: &[u8]) -> Result<Self> {
-        if data.len() < 8 {
-            return Err(Error::InvalidLength {
-                expected: 8,
-                found: data.len(),
-            });
-        }
-
-        let row = binary::read_u16_le_at(data, 0)?;
-        let col = binary::read_u16_le_at(data, 2)?;
-        let xf_index = binary::read_u16_le_at(data, 4)?;
+        let (row, col, xf_index) = Self::cell_head(data, 8)?;
         let value = if data[7] == 0 {
             BoolErrValue::Bool(data[6] != 0)
         } else {
@@ -2633,16 +2693,7 @@ impl CellRecord {
     }
 
     fn parse_rk(data: &[u8]) -> Result<Self> {
-        if data.len() < 10 {
-            return Err(Error::InvalidLength {
-                expected: 10,
-                found: data.len(),
-            });
-        }
-
-        let row = binary::read_u16_le_at(data, 0)?;
-        let col = binary::read_u16_le_at(data, 2)?;
-        let xf_index = binary::read_u16_le_at(data, 4)?;
+        let (row, col, xf_index) = Self::cell_head(data, 10)?;
         let rk_value = binary::read_u32_le_at(data, 6)?;
         let value = utils::rk_to_f64(rk_value);
 
@@ -2655,17 +2706,12 @@ impl CellRecord {
     }
 
     fn parse_label_sst(data: &[u8]) -> Result<Self> {
-        if data.len() < 10 {
-            return Err(Error::InvalidLength {
-                expected: 10,
-                found: data.len(),
-            });
-        }
+        let (row, col, xf_index) = Self::cell_head(data, 10)?;
 
         Ok(CellRecord::LabelSst {
-            row: binary::read_u16_le_at(data, 0)?,
-            col: binary::read_u16_le_at(data, 2)?,
-            xf_index: binary::read_u16_le_at(data, 4)?,
+            row,
+            col,
+            xf_index,
             sst_index: binary::read_u32_le_at(data, 6)?,
         })
     }
@@ -2790,5 +2836,374 @@ mod packed_cell_tests {
                 ..
             } if formula == [0x1E, 0x2A, 0x00]
         ));
+    }
+}
+
+/// The measure-only cell walk against the materializing parse.
+///
+/// Change 0641 (item XLS-5 of change 0587). Every test here prices one property
+/// of [`CellRecord::measure`]: it refuses exactly what [`CellRecord::parse`]
+/// refuses, with the same message, in the same order, and it agrees on the
+/// position, the XF index and the pending-`String` flag of everything it
+/// accepts. The corpus differential is the oracle change 0576 established for
+/// the same pattern on the shared-string table.
+#[cfg(test)]
+mod cell_measure_tests {
+    use super::sst_measure_tests::{collect_xls_fixtures, test_data_root, workbook_stream};
+    use super::*;
+
+    /// The seven single-cell record kinds a source-backed scan routes through
+    /// `CellRecord::parse`, which are exactly the kinds `CellRecord::measure`
+    /// accepts. `MulRk` and `MulBlank` are not here: they expand through
+    /// `visit_mul_*` and never reach either function.
+    const CELL_KINDS: [u16; 7] = [0x0006, 0x0201, 0x0203, 0x0204, 0x0205, 0x027E, 0x00FD];
+
+    /// How the two paths describe one payload, so that agreement is compared as
+    /// strings and a divergence names itself.
+    fn describe_parse(result: &Result<CellRecord>) -> String {
+        match result {
+            Ok(record) => format!(
+                "ok row={} col={} xf={}",
+                record.row(),
+                record.col(),
+                cell_xf(record),
+            ),
+            Err(error) => format!("err {error}"),
+        }
+    }
+
+    fn describe_measure(result: &Result<MeasuredCell>) -> String {
+        match result {
+            Ok(measured) => format!(
+                "ok row={} col={} xf={}",
+                measured.row, measured.col, measured.xf_index
+            ),
+            Err(error) => format!("err {error}"),
+        }
+    }
+
+    fn cell_xf(record: &CellRecord) -> u16 {
+        match record {
+            CellRecord::Blank { xf_index, .. }
+            | CellRecord::Number { xf_index, .. }
+            | CellRecord::Label { xf_index, .. }
+            | CellRecord::BoolErr { xf_index, .. }
+            | CellRecord::Rk { xf_index, .. }
+            | CellRecord::LabelSst { xf_index, .. }
+            | CellRecord::Formula { xf_index, .. } => *xf_index,
+        }
+    }
+
+    /// Runs both paths over one payload and asserts they agree.
+    fn agree(kind: u16, payload: &[u8], context: &str) {
+        let encoding = Encoding::Utf16Le;
+        let parsed = CellRecord::parse(kind, payload, &encoding);
+        let measured = CellRecord::measure(kind, payload, &encoding);
+        assert_eq!(
+            describe_measure(&measured),
+            describe_parse(&parsed),
+            "{context}: kind {kind:#06x} diverges on {payload:02x?}"
+        );
+    }
+
+    /// The falsification criterion for this change: over every cell record in
+    /// every worksheet substream of every fixture, the measure-only walk has to
+    /// reach the same verdict as the materializing parse.
+    #[test]
+    fn every_fixture_cell_record_measures_identically() {
+        let root = test_data_root();
+        let mut fixtures = Vec::new();
+        collect_xls_fixtures(&root, &mut fixtures);
+        assert!(
+            fixtures.len() > 100,
+            "the XLS corpus should be present, found {}",
+            fixtures.len()
+        );
+
+        let mut walked = 0usize;
+        let mut compared = 0usize;
+        let mut refused = 0usize;
+        let mut skipped = Vec::new();
+        let mut by_kind = std::collections::BTreeMap::new();
+
+        for fixture in &fixtures {
+            let relative = fixture
+                .strip_prefix(&root)
+                .unwrap_or(fixture)
+                .to_string_lossy()
+                .into_owned();
+            let Ok(bytes) = std::fs::read(fixture) else {
+                skipped.push(format!("{relative}: unreadable"));
+                continue;
+            };
+            let stream = match workbook_stream(bytes) {
+                Ok(stream) => stream,
+                Err(reason) => {
+                    skipped.push(format!("{relative}: {reason}"));
+                    continue;
+                },
+            };
+            walked += 1;
+
+            // Framed by hand, so the harness shares no code with the scan it
+            // checks. Every substream is walked, not only the worksheets: a
+            // cell record is a cell record wherever it sits.
+            let mut offset = 0usize;
+            while offset + 4 <= stream.len() {
+                let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+                let length =
+                    usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+                let Some(end) = offset.checked_add(4).and_then(|at| at.checked_add(length)) else {
+                    break;
+                };
+                if end > stream.len() {
+                    break;
+                }
+                if CELL_KINDS.contains(&kind) {
+                    let payload = &stream[offset + 4..end];
+                    let encoding = Encoding::Utf16Le;
+                    let parsed = CellRecord::parse(kind, payload, &encoding);
+                    if parsed.is_err() {
+                        refused += 1;
+                    }
+                    agree(kind, payload, &relative);
+                    compared += 1;
+                    *by_kind.entry(kind).or_insert(0usize) += 1;
+                }
+                offset = end;
+            }
+        }
+
+        println!(
+            "cell-differential: fixtures={} walked={walked} records={compared} refused={refused}",
+            fixtures.len()
+        );
+        for (kind, count) in &by_kind {
+            println!("cell-differential: kind {kind:#06x} = {count}");
+        }
+        for line in &skipped {
+            println!("cell-differential: skipped {line}");
+        }
+        // 67,422 at the time of writing. The corpus census in change 0641's
+        // packet counts the same records from outside this crate and agrees
+        // exactly on the four kinds that live only in worksheet substreams:
+        // 14,854 `Formula`, 6 `Label`, 500 `BoolErr` and 4,359 `RK`.
+        assert!(
+            compared > 60_000,
+            "expected the corpus to carry more than 60,000 cell records, compared {compared}"
+        );
+        // Every kind the scan routes must actually be exercised, or the
+        // differential is silently narrower than it claims.
+        for kind in CELL_KINDS {
+            assert!(
+                by_kind.contains_key(&kind),
+                "no fixture carries a {kind:#06x} record; the differential does not cover it"
+            );
+        }
+    }
+
+    /// Mutating one byte at a time inside real payloads is what change 0576's
+    /// harness used to reach refusals the corpus does not contain on its own.
+    #[test]
+    fn mutated_cell_payloads_are_refused_identically() {
+        let root = test_data_root();
+        let mut fixtures = Vec::new();
+        collect_xls_fixtures(&root, &mut fixtures);
+
+        let mut mutations = 0usize;
+        let mut refusals = 0usize;
+        let mut kinds = std::collections::BTreeSet::new();
+
+        for fixture in fixtures.iter().take(40) {
+            let Ok(bytes) = std::fs::read(fixture) else {
+                continue;
+            };
+            let Ok(stream) = workbook_stream(bytes) else {
+                continue;
+            };
+            let mut offset = 0usize;
+            let mut seen = 0usize;
+            while offset + 4 <= stream.len() && seen < 64 {
+                let kind = u16::from_le_bytes([stream[offset], stream[offset + 1]]);
+                let length =
+                    usize::from(u16::from_le_bytes([stream[offset + 2], stream[offset + 3]]));
+                let Some(end) = offset.checked_add(4).and_then(|at| at.checked_add(length)) else {
+                    break;
+                };
+                if end > stream.len() {
+                    break;
+                }
+                if CELL_KINDS.contains(&kind) {
+                    seen += 1;
+                    let _ = kinds.insert(kind);
+                    let payload = stream[offset + 4..end].to_vec();
+                    // Truncation reaches every length check.
+                    for keep in 0..payload.len().min(28) {
+                        agree(kind, &payload[..keep], "truncated");
+                        if CellRecord::parse(kind, &payload[..keep], &Encoding::Utf16Le).is_err() {
+                            refusals += 1;
+                        }
+                        mutations += 1;
+                    }
+                    // Byte flips reach the flag, count and token checks.
+                    for at in 0..payload.len().min(28) {
+                        for bit in [0x01u8, 0x80, 0xFF] {
+                            let mut mutated = payload.clone();
+                            mutated[at] ^= bit;
+                            agree(kind, &mutated, "flipped");
+                            if CellRecord::parse(kind, &mutated, &Encoding::Utf16Le).is_err() {
+                                refusals += 1;
+                            }
+                            mutations += 1;
+                        }
+                    }
+                }
+                offset = end;
+            }
+        }
+
+        println!(
+            "cell-mutation: mutations={mutations} refusals={refusals} kinds={}",
+            kinds.len()
+        );
+        assert!(mutations > 10_000, "too few mutations: {mutations}");
+        assert!(
+            refusals > 1_000,
+            "the mutations should reach real refusals, reached {refusals}"
+        );
+    }
+
+    /// A `Label` whose characters are UTF-16 with an unpaired high surrogate.
+    /// The measure path decides malformedness without allocating and then
+    /// rebuilds the refusal through `parse_string_record`, so the message must
+    /// be `String::from_utf16`'s and not `char::decode_utf16`'s.
+    #[test]
+    fn a_lone_surrogate_label_keeps_the_from_utf16_message() {
+        let mut payload = vec![1, 0, 2, 0, 3, 0]; // row, col, ixfe
+        payload.extend_from_slice(&1u16.to_le_bytes()); // cch
+        payload.push(0x01); // fHighByte
+        payload.extend_from_slice(&0xD800u16.to_le_bytes());
+
+        let measured = CellRecord::measure(0x0204, &payload, &Encoding::Utf16Le)
+            .expect_err("a lone high surrogate is refused");
+        let parsed = CellRecord::parse(0x0204, &payload, &Encoding::Utf16Le)
+            .expect_err("a lone high surrogate is refused");
+
+        assert_eq!(measured.to_string(), parsed.to_string());
+        assert!(
+            measured.to_string().contains("invalid utf-16"),
+            "expected String::from_utf16's wording, got {measured}"
+        );
+        assert!(
+            !measured.to_string().contains("unpaired surrogate"),
+            "char::decode_utf16's wording leaked into the refusal: {measured}"
+        );
+    }
+
+    /// Every surrogate-pair shape, so that neither path accepts a string the
+    /// other refuses. A high half must be followed by a low half; a low half
+    /// alone is unpaired; a valid pair is accepted.
+    #[test]
+    fn every_two_unit_label_agrees_with_the_materializing_parse() {
+        let interesting = [
+            0x0041u16, 0x00FF, 0xD7FF, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0xE000, 0xFFFD,
+        ];
+        let mut cases = 0usize;
+        for first in interesting {
+            for second in interesting {
+                let mut payload = vec![7, 0, 9, 0, 11, 0];
+                payload.extend_from_slice(&2u16.to_le_bytes());
+                payload.push(0x01);
+                payload.extend_from_slice(&first.to_le_bytes());
+                payload.extend_from_slice(&second.to_le_bytes());
+                agree(0x0204, &payload, "two-unit label");
+                cases += 1;
+            }
+        }
+        assert_eq!(cases, interesting.len() * interesting.len());
+    }
+
+    /// A compressed `Label` never fails the decode, so the measure path must
+    /// accept exactly what the framing accepts.
+    #[test]
+    fn a_compressed_label_measures_without_decoding() {
+        let mut payload = vec![0, 0, 0, 0, 0, 0];
+        payload.extend_from_slice(&3u16.to_le_bytes());
+        payload.push(0x00);
+        payload.extend_from_slice(b"abc");
+        agree(0x0204, &payload, "compressed label");
+
+        // One byte short of the declared characters.
+        agree(
+            0x0204,
+            &payload[..payload.len() - 1],
+            "compressed label short",
+        );
+    }
+
+    /// Six `Formula` refusals that live at or past the token bounds, each
+    /// reached by a payload built for it, plus the two payload shapes that are
+    /// accepted — a one-token stream, and the empty token stream a
+    /// string-valued `Formula` is allowed. This pins the measure path's
+    /// substitution of `validate_formula_extra` for `retain_formula_extra` to
+    /// produce the same verdict in the same position.
+    #[test]
+    fn formula_refusals_keep_their_position_on_the_measure_path() {
+        fn formula(tokens: &[u8], flags: u16, extra: &[u8], value: [u8; 8]) -> Vec<u8> {
+            let mut payload = vec![4, 0, 5, 0, 6, 0];
+            payload.extend_from_slice(&value);
+            payload.extend_from_slice(&flags.to_le_bytes());
+            payload.extend_from_slice(&0u32.to_le_bytes());
+            payload.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
+            payload.extend_from_slice(tokens);
+            payload.extend_from_slice(extra);
+            payload
+        }
+        let number = [0u8, 0, 0, 0, 0, 0, 0xF0, 0x3F];
+        let pending = [0u8, 0, 0, 0, 0, 0, 0xFF, 0xFF];
+
+        // Accepted: a one-token stream with no suffix.
+        agree(0x0006, &formula(&[0x1E, 0x2A, 0x00], 0, &[], number), "ok");
+        // `Formula token stream cannot be empty`.
+        agree(0x0006, &formula(&[], 0, &[], number), "empty tokens");
+        // A string-valued Formula with no tokens is the one legal empty stream.
+        agree(0x0006, &formula(&[], 0, &[], pending), "pending");
+        // `Formula ancillary bytes require a token stream`.
+        agree(
+            0x0006,
+            &formula(&[], 0, &[0xAA], pending),
+            "extra without tokens",
+        );
+        // `Formula flags contain reserved bits`.
+        agree(
+            0x0006,
+            &formula(&[0x1E, 0x2A, 0x00], 0xFFFF, &[], number),
+            "reserved flags",
+        );
+        // `shared Formula metadata requires a leading PtgExp token`.
+        agree(
+            0x0006,
+            &formula(&[0x1E, 0x2A, 0x00], 0x0008, &[], number),
+            "shared without PtgExp",
+        );
+        // `Formula RgbExtra has trailing or unowned bytes`.
+        agree(
+            0x0006,
+            &formula(&[0x1E, 0x2A, 0x00], 0, &[0xAA, 0xBB], number),
+            "unowned extra",
+        );
+        // Token length past the payload.
+        let mut truncated = formula(&[0x1E, 0x2A, 0x00], 0, &[], number);
+        truncated[20] = 0xFF;
+        agree(0x0006, &truncated, "token length past the payload");
+    }
+
+    /// An unknown record kind is refused identically, which is what keeps the
+    /// scan's `_ =>` arm honest if a kind is ever added to one match and not
+    /// the other.
+    #[test]
+    fn an_unknown_kind_is_refused_identically() {
+        agree(0x00BD, &[0; 32], "MulRk is not a single-cell kind");
+        agree(0x0000, &[0; 32], "kind zero");
     }
 }

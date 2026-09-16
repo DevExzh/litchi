@@ -1,0 +1,16 @@
+base	one-cell	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=2920	scenario=1810	cell:Ok(Some(Float(10.0)))
+hint	one-cell	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=2920	scenario=1810	cell:Ok(Some(Float(10.0)))
+base	all-cells	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=1671048	scenario=1669938	cells:9d870e4e0e4f3dab
+hint	all-cells	test-data/poi/test-data/spreadsheet/54016.xls	0	open=1110	total=1671048	scenario=1669938	cells:9d870e4e0e4f3dab
+base	one-cell	test-data/ole/xls/ConditionalFormattingSamples.xls	10	open=2099	total=5286	scenario=3187	cell:Ok(Some(String("Mountain")))
+hint	one-cell	test-data/ole/xls/ConditionalFormattingSamples.xls	10	open=2099	total=5286	scenario=3187	cell:Ok(Some(String("Mountain")))
+base	all-cells	test-data/ole/xls/ConditionalFormattingSamples.xls	10	open=2099	total=15986	scenario=13887	cells:23f98e79b1c27f09
+hint	all-cells	test-data/ole/xls/ConditionalFormattingSamples.xls	10	open=2099	total=15986	scenario=13887	cells:23f98e79b1c27f09
+base	one-cell	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=680	scenario=344	cell:Ok(Some(String("Meta Financeira / Econômica")))
+hint	one-cell	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=680	scenario=344	cell:Ok(Some(String("Meta Financeira / Econômica")))
+base	all-cells	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=54965	scenario=54629	cells:8f65d4c53dd1dac1
+hint	all-cells	test-data/ole/xls/WithCustomViews.xls	0	open=336	total=54965	scenario=54629	cells:8f65d4c53dd1dac1
+base	one-cell	test-data/poi/test-data/spreadsheet/15228.xls	8	open=86	total=765	scenario=679	cell:Ok(Some(Empty))
+hint	one-cell	test-data/poi/test-data/spreadsheet/15228.xls	8	open=86	total=765	scenario=679	cell:Ok(Some(Empty))
+base	all-cells	test-data/poi/test-data/spreadsheet/15228.xls	8	open=86	total=963	scenario=877	cells:7f3264160e27e149
+hint	all-cells	test-data/poi/test-data/spreadsheet/15228.xls	8	open=86	total=963	scenario=877	cells:7f3264160e27e149
