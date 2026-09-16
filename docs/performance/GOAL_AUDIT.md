@@ -1,5 +1,28 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0636 — a range-source entry point priced and fixed, and a queue item re-aimed
+
+`docs/GOAL.md` names caller-supplied remote and range sources as a benchmarked
+dimension, and change 0627 opened that axis for OLE2. This change is the first
+production change measured on it, and it moves a P1 row rather than closing one:
+`litchi_xls::validation::validate_source` takes an `Arc<dyn ReadAt>` and was
+costing 82,727 positional requests on a 984,576-byte workbook — modelled at 82.7
+seconds of fixed service at change 0627's transport — and now costs 60,
+modelled at 69 ms. It also corrects the audit's working picture of where the XLS
+range-source cost sits: the whole-sheet walk 0627 flagged is dominated by
+per-shared-string cursor constructions at random offsets, not by the framing
+loop, so the "finish source-backed CRUD adoption across formats" row still owns
+that work and it is a different mechanism. What this change does **not** supply
+is an observed range-source measurement for validation: no selector exists for
+it, and building one before the change would have cost 82.7 s per sample, so the
+counts carry the argument and the 0627 model only prices it. The read path is
+unchanged on every axis measured — identical reads, bytes and observations over
+113 fixtures, and identical request-sequence digests over 0627's five
+range-source selectors — so no existing coverage row changes status. OLE2 and
+OOXML remain the active priority; ODF stays deferred and iWork excluded.
+[Change and limitations](0636-cfb-cursor-bounded-window.md);
+[evidence](results/change-0636/README.md).
+
 ## 0635 — queue item 17 and survey item XLSX-5 closed, one by code and one by evidence
 
 Record: [0635](0635-xlsx-facts-builder-and-chains.md).

@@ -1,0 +1,48 @@
+### cargo fmt --all --check
+exit=0
+
+### cargo clippy -p litchi-cfb -p litchi-xls --all-targets
+exit=0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+### cargo doc -p litchi-cfb -p litchi-xls --no-deps
+exit=0
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0636/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.91s
+   Generated /home/zhuhe/code/litchi-worktrees/0636/target/doc/litchi_cfb/index.html and 1 other file
+
+### cargo test -p litchi-cfb
+exit=0
+aggregate: 375 passed, 0 failed, 1 ignored across 5 suites
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+
+### cargo test -p litchi-xls
+exit=0
+aggregate: 1401 passed, 0 failed, 1 ignored across 72 suites
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.32s; merged doctests compilation took 0.31s
+
+### cargo test -p litchi-doc -p litchi-ppt -p litchi-ole-common -p litchi-vba -p litchi-sign -p litchi-crypto -p litchi-ograph
+exit=0
+aggregate: 2701 passed, 0 failed, 24 ignored across 94 suites
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+### cargo test -p litchi --features docx,xlsx,pptx,xls
+exit=0
+aggregate: 266 passed, 0 failed, 7 ignored across 26 suites
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 1.07s; merged doctests compilation took 1.06s
+
+### cargo test --release --locked (tools/perf-baseline)
+exit=0
+aggregate: 531 passed, 0 failed, 1 ignored across 19 suites
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+

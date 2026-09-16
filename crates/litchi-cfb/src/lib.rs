@@ -32,7 +32,10 @@ pub use overlay::{
     OverlayOperationShape, OverlaySourceMode, PublishReport, SameLengthStreamOverlay,
     ValidatedOverlayPlan,
 };
-pub use shared::{SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint};
+pub use shared::{
+    BufferedOleStreamCursor, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor,
+    StreamChainHint,
+};
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
 pub use stream_move::{ExistingStreamMove, StreamMoveLimits, ValidatedStreamMovePlan};

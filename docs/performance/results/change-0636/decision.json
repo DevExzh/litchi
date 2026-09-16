@@ -1,0 +1,57 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0636",
+  "title": "A bounded window over the CFB stream cursor takes the XLS validation walk from 82,727 positional reads to 60",
+  "decision": "retained, implemented in litchi-cfb (new public wrapper type BufferedOleStreamCursor) and litchi-xls (one caller, the validation record walk)",
+  "code_state": "crates/litchi-cfb/src/shared.rs, crates/litchi-cfb/src/lib.rs (one export), crates/litchi-xls/src/validation.rs, crates/litchi-xls/tests/validation.rs; SharedOleStreamCursor is byte-for-byte the type it was; no existing public API, error type, limit or refusal identity changed; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0630 item 18 aimed the read-ahead at the whole-sheet walk; an attribution probe found that walk's 16,105 reads are per-shared-string cursor constructions at random offsets, which a cursor read-ahead cannot serve, and found the header-then-payload loop the brief describes in the XLS validation record walk instead, at 82,727 reads on the same fixture",
+    "litchi_xls::validation::validate_source takes an Arc<dyn ReadAt>, so it is a range-source entry point; on 54016.xls it costs five times the requests of the walk change 0627 called the most expensive thing a range-source caller can ask an XLS reader for",
+    "validation reads fall 99.30% and source observations 99.38% across 113 XLS fixtures, for 35 more bytes in total and a maximum per-fixture over-read of 3 bytes; all 565 frozen outcome digests are identical",
+    "the four read operations are identical read for read, byte for byte and observation for observation over the whole corpus, and identical request-sequence SHA-256 over change 0627's five range-source selectors",
+    "the window is a wrapper rather than a field on the cursor because the field version cost the whole-sheet walk +1.41% cycles and +6.20% p50, measured, through the shared-string resolver's 16,105 per-string cursors; the wrapper makes that zero by construction and measures +0.00% instructions"
+  ],
+  "accepted_evidence": {
+    "counts": "a retained attribution probe over the public litchi_xls APIs with a counting in-process ReadAt; 126 .xls fixtures under test-data, 113 of which open, 565 operation rows per leg covering validate, open, list, all-cells and full-text; reads, read bytes, reads at or below 512 bytes, source-version observations, len calls and a frozen outcome digest per row",
+    "differential": "the same 565 rows are the oracle: worksheet-name lists, one worksheet's complete cell-value list, the workbook text projection, the validation report and every typed refusal, each hashed and compared between legs",
+    "range_source": "change 0627's five XLS range-source selectors on 54016.xls at 1 ms per request, no overhead term, 100 MiB/s, 64 KiB maximum range, three retained samples per leg; physical request counts, bytes and the complete ordered request-sequence SHA-256 compared",
+    "cycles": "perf stat -r 5 isolation pairs, N=20 and N=120 iterations of one operation differenced and divided by 100, cycles and instructions, seven scenarios per leg, taskset -c 12",
+    "instructions": "callgrind isolation pairs, N=2 and N=6 differenced and divided by 4, four scenarios per leg",
+    "timing": "the probe's own timing mode, one complete fresh lifecycle per sample, 120 samples per leg, order A1 B1 B2 A2, taskset -c 12, nine scenarios over two source kinds (an in-process ReadAt and litchi_core::FileSource), plus two further 150-sample runs of the two scenarios whose sign was unstable in an earlier window",
+    "tests": "twelve new unit tests in litchi-cfb covering the unbuffered baseline, the zero-ceiling passthrough, the exact request list of a framed walk, the stream-end clamp, the over-read bound, both halves of change 0621's change-under-read sweep at fill boundaries, failed-fill atomicity, fragmented-FAT and MiniFAT parity, the ceiling-bypass read, in-window skipping and the ceiling clamp; two new integration tests in litchi-xls covering the framed walk's read count and the FILEPASS boundary"
+  },
+  "accepted_costs": {
+    "bytes": "validation reads 35 more bytes across 113 fixtures (+0.0005%); the largest per-fixture over-read is 3 bytes, a tail fill clamped by the stream end; the three fixtures that walk their whole stream read exactly the same bytes",
+    "observation_granularity": "a read the window covers takes no source observation of its own, so a mutation between two served reads is reported by the next fill rather than by the read after it. The operation-level bracket is unchanged: validate_source_with_limits ends every exit path with an observation that refuses SourceChanged. A mutation reverted before the next fill is not observed, which litchi_core::FileVersionPolicy already documents for reverted transitions; what widens is that interval, from one read to one fill",
+    "late_filepass": "a FILEPASS placed later than MS-XLS allows is a placement violation that already marks the report invalid, and the walk may read up to one growth step past it, bounded by what it already consumed and by the 64 KiB ceiling, inside a stream max_workbook_stream_bytes already bounds",
+    "memory": "one window of at most 64 KiB per wrapper, allocated fallibly",
+    "callgrind_disagreement": "callgrind reports +26.54% instructions for validating ConditionalFormattingSamples.xls where perf stat reports -45.85% and the clock -41.89%; callgrind counts rep movsb per byte and the window copies that fixture's 1,328,049-byte stream once more",
+    "host_noise": "two read-path timing rows moved the wrong way at p50 in an earlier, busier window (all-cells +2.88%, full-text +6.92%) on paths whose instruction count is +0.00% and -0.54%; two independent 150-sample repeats and the final window put them at +2.78%/+0.62%/+3.12% and -4.36%/-1.70%/+1.02% against A/A floors reaching 11.43%. The read-path cycle column is likewise unstable across three perf stat windows (full-text 54016.xls: -10.82%, -7.44%, +12.60%) while its instruction column repeats to within 0.54%, so the read path is read from instructions and paired medians, and the whole history is retained"
+  },
+  "known_gaps": {
+    "shared_string_cursors": "the 16,061 small requests change 0627 measured on the 54016.xls whole-sheet walk are per-shared-string cursor constructions at random offsets, 4,444 of them jumping backwards; this change does not touch them and no mechanism for them is proposed here",
+    "range_source_for_validation": "no range-source selector exists for validate_source and none was added; running one on the before leg would cost 82.7 s per sample on the flagship fixture, so the range-source figures for validation are model arithmetic over deterministic counts, not observed service",
+    "one_caller": "litchi-doc and litchi-ppt build no stream cursors, so the wrapper has exactly one user",
+    "ceiling_not_re_derived": "the 64 KiB ceiling and the 512-byte first growth step are change 0568's numbers, adopted rather than swept",
+    "cold_cache": "the FileSource legs run over a warm page cache and measure pread/fstat call counts, not physical I/O"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, observed-network, concurrency-scaling or cross-platform result"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0636-cfb-cursor-range-read-ahead",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 12",
+    "binaries": {
+      "before/cursor-probe": "2ac3d8e0167182cccdc67220fbcc8e3fb5e8ea5fa31aee203ae58250ac94156c",
+      "after/cursor-probe": "a544e603468d8f8f06def2f35144fb5cb6ba4a0184c80616eecffad91367479d",
+      "before/litchi-perf-baseline": "9f71894a538132d5ab28e8d3ab9dd934fde348212ddb73104f61d340fff206ed",
+      "after/litchi-perf-baseline": "998df37971964180746074fd54afd25723f6deed98bb0c5955651d7bdbd1b22d"
+    },
+    "note": "the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR; every measured binary was staged outside its Cargo target directory before any leg ran"
+  }
+}

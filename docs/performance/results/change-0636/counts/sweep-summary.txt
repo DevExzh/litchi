@@ -1,0 +1,8 @@
+op             n reads_before  reads_after   bytes_before    bytes_after   obs_before    obs_after
+all-cells    113        26655        26655        2108161        2108161        27019        27019
+open         113         1666         1666        3693129        3693129         1567         1567
+list         113         1666         1666        3693129        3693129         1673         1673
+full-text    113        29708        29708        3210676        3210676        79061        79061
+validate     113       264622         1842        7511925        7511960       275925         1699
+max over-read 3 bytes on test-data/ole/xls/DateFormats.xls
+rows compared: 565 (every outcome digest identical unless listed above)

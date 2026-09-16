@@ -1,5 +1,40 @@
 # Performance program phase report
 
+## 0636 — a bounded window over the CFB stream cursor, priced on two source kinds
+
+`litchi_cfb::BufferedOleStreamCursor` wraps one `SharedOleStreamCursor` with a
+window of at most 64 KiB, filled on change 0568's `512 → 64 KiB` doubling
+schedule through the cursor's own validated chain walk, and the XLS validation
+record walk is its one caller. Deterministic counts over every `.xls` fixture
+under `test-data` (126 files, 113 of which open, 565 operation rows per leg):
+validation falls from **264,622 positional reads to 1,842** and from **275,925
+source observations to 1,699**, for **35 more bytes in total** and a maximum
+per-fixture over-read of **3 bytes**; `open`, `list`, `all-cells` and
+`full-text` are identical read for read, byte for byte and observation for
+observation, and all 565 frozen outcome digests match. Change 0627's five XLS
+range-source selectors reproduce identical request counts, bytes and complete
+ordered request-sequence SHA-256 on both legs. `perf stat` isolation pairs put
+validation at **−73.84% cycles / −63.29% instructions** on `54016.xls`,
+**−65.68% / −58.26%** on `WithCustomViews.xls` and **−43.23% / −45.85%** on
+`ConditionalFormattingSamples.xls`, with the read-path controls at **+0.00%**
+instructions. Paired timing, 120 samples per leg, order A1 B1 B2 A2 on CPU 12:
+**−98.31% p50** validating `54016.xls` over `litchi_core::FileSource` (27.96 ms
+→ 0.47 ms), −94.12% on `ConditionalFormattingSamples.xls`, and −73.89%, −66.45%
+and −41.89% on the owned-source legs, against A/A floors of at most 1.20% at
+p50. Two read-path rows moved the wrong way in an earlier, busier window —
+`all-cells` +2.88% and `full-text` +6.92% p50 on `54016.xls` — on paths whose
+instruction delta is +0.00% and −0.54%; two independent 150-sample repeats and
+the final window put them at +2.78%/+0.62%/+3.12% and −4.36%/−1.70%/+1.02%
+against floors reaching 11.43%, so they are reported as host spread rather than
+an effect. One instrument disagrees with the others and is
+reported anyway: callgrind scores `ConditionalFormattingSamples.xls` validation
+at **+26.54%** instructions where `perf stat` scores it −45.85% and the clock
+−41.89%, because callgrind counts `rep movsb` per byte (change 0604's 35×
+overstatement) and the window copies that fixture's 1,328,049-byte stream once
+more. No claim-registry entry; `performance_claim: none`.
+[Change and limitations](0636-cfb-cursor-bounded-window.md);
+[evidence](results/change-0636/README.md).
+
 ## 0635 — a smaller note-taker on the XLSX edit path, and a shortcut that leads nowhere
 
 Record: [0635](0635-xlsx-facts-builder-and-chains.md).

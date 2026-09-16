@@ -969,6 +969,73 @@ fn streaming_validation_stops_before_large_ciphertext_tail() {
     );
 }
 
+/// The record walk frames a header and then a payload, so before change 0636
+/// it cost two positional reads per record whatever the record's size. Once a
+/// FILEPASS can no longer appear the walk opens a bounded window, and a stream
+/// of small records costs a handful of reads instead of two per record. The
+/// bytes the walk reads do not grow: the window is clamped by the stream, and
+/// this stream is framed to its end.
+#[test]
+fn streaming_validation_frames_many_records_without_a_read_each() {
+    let filler: Vec<Vec<u8>> = (0_u16..2_000)
+        .map(|index| frame(0x00FF, &index.to_le_bytes()))
+        .collect();
+    let stream = minimal_workbook(&[], &[], &bof_payload(0x0010, 16), &filler, &[]);
+    let framed = stream.len();
+    let source = Arc::new(ReadWidthSource::new(
+        cfb_with_streams(&[("Workbook", stream)], &[]),
+        64 * 1024,
+    ));
+
+    let report = validate_source(source.clone()).expect("validation report");
+    assert!(!report.has_errors());
+    let ranges = source.ranges();
+    assert!(
+        ranges.len() < 64,
+        "2,000 framed records cost {} reads",
+        ranges.len()
+    );
+    assert!(
+        ranges.iter().all(|(_offset, length)| *length <= 64 * 1024),
+        "no read exceeds the published window ceiling"
+    );
+    let read_bytes: usize = ranges.iter().map(|(_offset, length)| *length).sum();
+    assert!(
+        read_bytes < framed * 2,
+        "the window reads the stream, not the stream twice"
+    );
+}
+
+/// The window is opened only once a FILEPASS can no longer legitimately
+/// appear, so an encrypted workbook is still stopped at its FILEPASS having
+/// read none of the ciphertext behind it. This is the counting form of
+/// `streaming_validation_stops_before_large_ciphertext_tail`.
+#[test]
+fn streaming_validation_opens_no_window_before_a_filepass() {
+    let mut stream = frame(0x0809, &bof_payload(0x0005, 16));
+    let filepass_end = stream.len() + 4 + 6;
+    stream.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
+    stream.extend(std::iter::repeat_n(0xFF, 64 * 1024));
+    let cfb = cfb_with_streams(&[("Workbook", stream)], &[]);
+    let source = Arc::new(ReadWidthSource::new(cfb, 64 * 1024));
+
+    let report = validate_source(source.clone()).expect("validation report");
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::Complete
+    ));
+    let read_bytes: usize = source
+        .ranges()
+        .into_iter()
+        .map(|(_offset, length)| length)
+        .sum();
+    assert!(
+        read_bytes < 16 * 1024,
+        "a {filepass_end}-byte encrypted prefix cost {read_bytes} bytes, so some of \
+         the 64 KiB ciphertext tail was read"
+    );
+}
+
 #[test]
 fn streaming_validation_propagates_read_and_source_change_errors() {
     let marker: Vec<u8> = (0_u8..64)

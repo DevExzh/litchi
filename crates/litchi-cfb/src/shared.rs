@@ -3095,6 +3095,298 @@ impl SharedOleStreamCursor<'_> {
     }
 }
 
+/// A bounded forward read-ahead over one [`SharedOleStreamCursor`].
+///
+/// A plain cursor issues one positional request, and takes one source-version
+/// observation, per [`SharedOleStreamCursor::read_exact`] call. A caller that
+/// frames a record stream as a four-byte header followed by a payload
+/// therefore pays two requests and two observations per record, whatever the
+/// records weigh: on a caller-supplied range source that is two round trips
+/// per record. This wrapper reads a bounded span of the stream once -- through
+/// the cursor's own validated chain walk, which coalesces physically
+/// contiguous sectors, so a fill costs one request per contiguous run -- and
+/// serves the reads it covers out of memory.
+///
+/// It is a wrapper rather than a mode of the cursor on purpose. Every byte it
+/// moves goes through the public cursor API, so a caller that does not build
+/// one cannot pay for it: the cursor keeps its size, its layout, its drop
+/// glue and its read path exactly as they were. The XLS worksheet scan and the
+/// shared-string resolver build cursors in their inner loops, and measurement
+/// showed a field added to the cursor itself costing them about 6% of a
+/// whole-sheet walk.
+///
+/// # What a caller trades
+///
+/// **Bytes.** A fill may read bytes the caller never consumes -- at most what
+/// it has already consumed, because fills start at
+/// [`Self::FIRST_FILL_BYTES`] and double to the declared ceiling, and never
+/// more than that ceiling. A caller that walks a stream to its end reads
+/// exactly the bytes it would have read; a caller that stops early reads at
+/// most one growth step further. Fills never cross the declared stream length,
+/// so no byte outside the selected stream is ever read.
+///
+/// **When a mutation is reported.** The source observation that follows every
+/// cursor read still happens, once per fill. A read the window already covers
+/// publishes bytes that fill bracketed, and takes no observation of its own,
+/// so a mutation between two served reads is reported by the next fill rather
+/// than by the read that follows it. The operation-level bracket is unchanged:
+/// a caller that closes with its own observation -- as
+/// `SharedOleFile::source_version` does -- still refuses a source that moved
+/// at any point. A caller that needs a per-read mutation fence must leave the
+/// ceiling at zero, which makes every read a plain cursor read again.
+///
+/// # Memory
+///
+/// One window of at most the declared ceiling, allocated fallibly and grown
+/// only to what a fill needs.
+pub struct BufferedOleStreamCursor<'a> {
+    cursor: SharedOleStreamCursor<'a>,
+    /// Largest number of stream bytes one fill may leave resident. Zero
+    /// disables read-ahead, making every read a plain cursor read.
+    ceiling: usize,
+    /// Size of the next fill before it is clamped by the ceiling, by the bytes
+    /// the current read needs and by the remaining stream.
+    target: usize,
+    /// Stream bytes `[position, cursor.position())`.
+    window: Vec<u8>,
+    /// Bytes of `window` the caller has already been served.
+    consumed: usize,
+}
+
+impl std::fmt::Debug for BufferedOleStreamCursor<'_> {
+    /// Reports the shape of the window, never the stream bytes in it, which is
+    /// what [`SharedOleStreamCursor`]'s own `Debug` does for the same reason.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BufferedOleStreamCursor")
+            .field("position", &self.position())
+            .field("length", &self.cursor.len())
+            .field("ceiling", &self.ceiling)
+            .field("buffered", &self.buffered())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> BufferedOleStreamCursor<'a> {
+    /// Largest window one wrapper may be asked to hold.
+    ///
+    /// A caller may declare less. This is the 64 KiB the XLS worksheet window
+    /// took in change 0568, and it bounds the memory one wrapper retains as
+    /// well as the bytes one fill may read beyond the current request.
+    pub const MAX_READ_AHEAD_BYTES: usize = 64 * 1024;
+
+    /// Size of the first fill that reads beyond what the current read needs,
+    /// which then doubles to the declared ceiling.
+    ///
+    /// This is change 0568's worksheet-window schedule, for the same reason:
+    /// it bounds what a caller that stops after a few records reads beyond
+    /// them by what it has already consumed, instead of paying one
+    /// ceiling-sized read for a stream it abandons.
+    pub const FIRST_FILL_BYTES: usize = 512;
+
+    /// Wraps `cursor` with a window of at most `ceiling` bytes.
+    ///
+    /// `ceiling` is clamped to [`Self::MAX_READ_AHEAD_BYTES`]. Zero produces a
+    /// wrapper that reads exactly as the bare cursor does, request for request
+    /// and observation for observation, which is what a caller wants until it
+    /// has established that reading ahead is safe.
+    #[must_use]
+    pub fn new(cursor: SharedOleStreamCursor<'a>, ceiling: usize) -> Self {
+        Self {
+            cursor,
+            ceiling: ceiling.min(Self::MAX_READ_AHEAD_BYTES),
+            target: 0,
+            window: Vec::new(),
+            consumed: 0,
+        }
+    }
+
+    /// Changes the ceiling of a wrapper already in use.
+    ///
+    /// This is [`Self::new`] for a caller that can only decide how far ahead it
+    /// may read after it has read something -- a record walk that must not read
+    /// past the point where the stream declares itself encrypted, for instance,
+    /// opens its window once that declaration can no longer appear. Bytes
+    /// already resident stay resident and stay serveable; the new ceiling
+    /// governs the fills that follow.
+    pub fn set_read_ahead(&mut self, ceiling: usize) {
+        self.ceiling = ceiling.min(Self::MAX_READ_AHEAD_BYTES);
+        self.target = 0;
+    }
+
+    /// Declared logical stream length.
+    #[must_use]
+    pub fn len(&self) -> u64 {
+        self.cursor.len()
+    }
+
+    /// Whether the selected stream is logically empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.cursor.is_empty()
+    }
+
+    /// Logical stream position of the next byte the caller will be served.
+    ///
+    /// This is the wrapped cursor's position less the bytes a fill has made
+    /// resident but the caller has not consumed.
+    #[must_use]
+    pub fn position(&self) -> u64 {
+        self.cursor.position() - self.buffered() as u64
+    }
+
+    /// Resident bytes the caller has not been served yet.
+    const fn buffered(&self) -> usize {
+        self.window.len() - self.consumed
+    }
+
+    /// Reads exactly `output.len()` logical bytes and advances the position.
+    ///
+    /// Nothing is committed before the step that could fail has succeeded, so
+    /// a failed read leaves the position and the window as it found them and a
+    /// stable source may be retried. As with
+    /// [`SharedOleStreamCursor::read_exact`], the destination may hold a prefix
+    /// when a later step fails and callers must discard it on any error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error when the requested bytes exceed the
+    /// remaining logical stream, a bounded allocation failure when the window
+    /// cannot be grown, or any error the wrapped cursor reports.
+    pub fn read_exact(&mut self, output: &mut [u8]) -> Result<(), OleError> {
+        let position = self.position();
+        let end = position
+            .checked_add(output.len() as u64)
+            .ok_or_else(|| OleError::InvalidData("stream cursor read end overflow".to_string()))?;
+        if end > self.cursor.len() {
+            return Err(OleError::InvalidData(format!(
+                "stream cursor read {position}..{end} exceeds length {}",
+                self.cursor.len()
+            )));
+        }
+
+        if self.ceiling != 0 && output.len() <= self.buffered() {
+            self.serve(output);
+            return Ok(());
+        }
+        if self.ceiling != 0 && output.len() <= self.ceiling {
+            self.fill(output.len())?;
+            if output.len() > self.buffered() {
+                return Err(OleError::CorruptedFile(
+                    "stream cursor window is shorter than the read it serves".to_string(),
+                ));
+            }
+            self.serve(output);
+            return Ok(());
+        }
+
+        // A read the window could never hold, and every read of a wrapper with
+        // no ceiling: drain what is resident and let the cursor read the
+        // remainder straight into the destination. With no ceiling nothing is
+        // ever resident, so this is exactly the request and exactly the
+        // observation the bare cursor would have taken, for an empty read as
+        // much as for a full one.
+        let served = self.buffered().min(output.len());
+        let (resident, rest) = output.split_at_mut(served);
+        if served != 0 {
+            resident.copy_from_slice(&self.window[self.consumed..self.consumed + served]);
+        }
+        self.cursor.read_exact(rest)?;
+        self.consumed += served;
+        if self.consumed == self.window.len() {
+            self.window.clear();
+            self.consumed = 0;
+        }
+        Ok(())
+    }
+
+    /// Advances by `bytes` without publishing them.
+    ///
+    /// Bytes a fill already made resident are passed in memory; the rest is
+    /// passed to [`SharedOleStreamCursor::skip_forward`], which reads nothing
+    /// and takes no observation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error when the movement exceeds the stream,
+    /// or a corruption error when the chain cannot be traversed consistently.
+    pub fn skip_forward(&mut self, bytes: u64) -> Result<(), OleError> {
+        if bytes <= self.buffered() as u64 {
+            // The chain links under these bytes were walked and checked by the
+            // fill that made them resident.
+            self.consumed += bytes as usize;
+            return Ok(());
+        }
+        let beyond = bytes - self.buffered() as u64;
+        self.cursor.skip_forward(beyond)?;
+        self.window.clear();
+        self.consumed = 0;
+        Ok(())
+    }
+
+    /// Moves to a later logical position without publishing bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error for backward or out-of-bounds
+    /// movement, or a corruption error when the chain cannot be traversed
+    /// consistently.
+    pub fn skip_to(&mut self, position: u64) -> Result<(), OleError> {
+        let current = self.position();
+        if position < current {
+            return Err(OleError::InvalidData(
+                "stream cursor cannot move backwards".to_string(),
+            ));
+        }
+        self.skip_forward(position - current)
+    }
+
+    /// Copies `output.len()` resident bytes out of the window.
+    fn serve(&mut self, output: &mut [u8]) {
+        let from = self.consumed;
+        output.copy_from_slice(&self.window[from..from + output.len()]);
+        self.consumed = from + output.len();
+    }
+
+    /// Makes at least `need` bytes resident with one cursor read.
+    ///
+    /// A failed fill leaves the window holding exactly what it held before:
+    /// the cursor does not commit a failed read, and the appended tail is
+    /// dropped here.
+    fn fill(&mut self, need: usize) -> Result<(), OleError> {
+        let resident = self.buffered();
+        let remaining = self.cursor.len() - self.cursor.position();
+        let headroom = self.ceiling.saturating_sub(resident);
+        let reach = usize::try_from(remaining).unwrap_or(usize::MAX);
+        let wanted = need
+            .saturating_sub(resident)
+            .max(self.target.min(reach))
+            .min(headroom)
+            .min(reach);
+
+        self.window.drain(..self.consumed);
+        self.consumed = 0;
+        self.window
+            .try_reserve_exact(wanted)
+            .map_err(|source| OleError::allocation("CFB stream cursor window", source))?;
+        self.window.resize(resident + wanted, 0);
+        if let Err(error) = self.cursor.read_exact(&mut self.window[resident..]) {
+            // A failed cursor read leaves its destination undefined, so the
+            // window keeps only the bytes earlier fills published.
+            self.window.truncate(resident);
+            return Err(error);
+        }
+        // `max` then `min`, never `clamp`: a caller may declare a ceiling below
+        // the first growth step, and `clamp` panics when its bounds cross.
+        self.target = self
+            .target
+            .saturating_mul(2)
+            .max(Self::FIRST_FILL_BYTES)
+            .min(self.ceiling);
+        Ok(())
+    }
+}
+
 /// Walks a validated allocation chain to `ordinal`, starting from `resume`.
 ///
 /// `resume` is the `(sector, walked)` pair a [`StreamChainHint`] retains: the
@@ -6944,6 +7236,367 @@ mod tests {
             cursor.read_exact(&mut output),
             Err(OleError::SourceChanged { .. })
         ));
+    }
+
+    /// The frozen baseline the read-ahead is measured against: without it a
+    /// cursor issues one positional request, and takes one source observation,
+    /// per `read_exact` call, however small the call is.
+    #[test]
+    fn a_cursor_without_read_ahead_reads_and_fences_once_per_call() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.reset_observation_counts();
+
+        let mut frame = [0u8; 4];
+        for _ in 0..64 {
+            cursor.read_exact(&mut frame).unwrap();
+        }
+
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(reads, 64, "one positional request per read");
+        assert_eq!(versions, 64, "one source observation per read");
+        assert_eq!(cursor.position(), 256);
+        assert_eq!(frame, [0xA5; 4]);
+    }
+
+    /// A wrapper with no ceiling is the bare cursor: same requests, same
+    /// sizes, same observations. This is what a caller holds until it has
+    /// established that reading ahead is safe, so it has to cost nothing.
+    #[test]
+    fn a_window_with_no_ceiling_reads_exactly_as_the_bare_cursor_does() {
+        let plain_source = Arc::new(TestSource::new(sample_bytes()));
+        let plain_file = shared(Arc::clone(&plain_source));
+        let mut plain = plain_file.stream_cursor_at(&["Large"], 0).unwrap();
+        plain_source.reset_observation_counts();
+        let mut frame = [0u8; 4];
+        for _ in 0..64 {
+            plain.read_exact(&mut frame).unwrap();
+        }
+        plain.skip_forward(16).unwrap();
+        plain.read_exact(&mut frame).unwrap();
+        plain.read_exact(&mut []).unwrap();
+
+        let window_source = Arc::new(TestSource::new(sample_bytes()));
+        let window_file = shared(Arc::clone(&window_source));
+        let mut windowed =
+            BufferedOleStreamCursor::new(window_file.stream_cursor_at(&["Large"], 0).unwrap(), 0);
+        window_source.reset_observation_counts();
+        for _ in 0..64 {
+            windowed.read_exact(&mut frame).unwrap();
+        }
+        windowed.skip_forward(16).unwrap();
+        windowed.read_exact(&mut frame).unwrap();
+        // An empty read is a read: without a ceiling it must still take the
+        // observation the bare cursor takes for it.
+        windowed.read_exact(&mut []).unwrap();
+
+        assert_eq!(plain_source.read_ranges(), window_source.read_ranges());
+        assert_eq!(
+            plain_source.observation_counts(),
+            window_source.observation_counts()
+        );
+        assert_eq!(plain.position(), windowed.position());
+    }
+
+    /// One fill per contiguous run, on change 0568's doubling schedule, and one
+    /// observation per fill rather than one per served read. The request list
+    /// is asserted exactly: it is the whole claim.
+    #[test]
+    fn read_ahead_serves_a_framed_walk_from_one_fill_per_run() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        source.reset_observation_counts();
+
+        let mut observed = Vec::new();
+        let mut frame = [0u8; 4];
+        for _ in 0..2048 {
+            cursor.read_exact(&mut frame).unwrap();
+            observed.extend_from_slice(&frame);
+        }
+
+        assert_eq!(observed, vec![0xA5; 8192]);
+        assert_eq!(cursor.position(), 8192);
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(reads, 6, "2,048 four-byte reads cost six fills");
+        assert_eq!(versions, 6, "one observation per fill, not one per read");
+        assert_eq!(
+            source.read_ranges(),
+            vec![
+                (512, 4),
+                (516, 512),
+                (1028, 1024),
+                (2052, 2048),
+                (4100, 4096),
+                (8196, 508),
+            ],
+            "the first fill is exact and later fills double to the ceiling"
+        );
+    }
+
+    /// A fill never crosses the declared stream length, so read-ahead moves
+    /// when bytes are read, never which bytes exist to be read.
+    #[test]
+    fn read_ahead_never_reads_past_the_declared_stream() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 8192 - 6).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        source.reset_observation_counts();
+
+        let mut frame = [0u8; 3];
+        cursor.read_exact(&mut frame).unwrap();
+        cursor.read_exact(&mut frame).unwrap();
+
+        assert_eq!(cursor.position(), 8192);
+        let ranges = source.read_ranges();
+        let read_bytes: usize = ranges.iter().map(|(_offset, length)| *length).sum();
+        assert_eq!(read_bytes, 6, "the tail fill is clamped by the stream end");
+        assert!(matches!(
+            cursor.read_exact(&mut frame),
+            Err(OleError::InvalidData(message)) if message.contains("exceeds length")
+        ));
+    }
+
+    /// A caller that abandons a stream early reads at most one growth step
+    /// beyond what it consumed, which is what change 0568's schedule buys.
+    #[test]
+    fn read_ahead_over_reads_at_most_one_growth_step() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        source.reset_observation_counts();
+
+        let mut frame = [0u8; 4];
+        cursor.read_exact(&mut frame).unwrap();
+        cursor.read_exact(&mut frame).unwrap();
+        drop(cursor);
+
+        let read_bytes: usize = source
+            .read_ranges()
+            .iter()
+            .map(|(_offset, length)| *length)
+            .sum();
+        assert_eq!(
+            read_bytes,
+            4 + BufferedOleStreamCursor::FIRST_FILL_BYTES,
+            "eight consumed bytes cost 516 read bytes, not a ceiling-sized fill"
+        );
+    }
+
+    /// The change-under-read sweep of change 0621, extended to fill boundaries:
+    /// a read the window covers does not observe the source, so a mutation
+    /// between two served reads is reported by the next fill.
+    #[test]
+    fn read_ahead_reports_a_mutation_at_the_next_fill_not_at_a_served_read() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::FIRST_FILL_BYTES);
+        let mut frame = [0u8; 4];
+        // Two reads: the first fills four bytes, the second fills 512 and
+        // leaves 508 of them resident.
+        cursor.read_exact(&mut frame).unwrap();
+        cursor.read_exact(&mut frame).unwrap();
+
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        for _ in 0..127 {
+            cursor
+                .read_exact(&mut frame)
+                .expect("a read the window covers publishes bytes the last fill fenced");
+        }
+        assert_eq!(cursor.position(), 516);
+        assert!(
+            matches!(
+                cursor.read_exact(&mut frame),
+                Err(OleError::SourceChanged { .. })
+            ),
+            "the first read that has to fill refuses the changed source"
+        );
+        assert_eq!(cursor.position(), 516, "a failed read does not commit");
+    }
+
+    /// The other half of the sweep: a mutation before the first fill is
+    /// refused by that fill, exactly as it was refused by the first read
+    /// before read-ahead existed.
+    #[test]
+    fn read_ahead_reports_a_mutation_taken_before_its_first_fill() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        source.revision.store(1, AtomicOrdering::SeqCst);
+
+        let mut frame = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut frame),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert_eq!(cursor.position(), 0);
+    }
+
+    /// A failed fill leaves the logical position, the frontier and the window
+    /// exactly as it found them, so a stable source may be retried and serves
+    /// the same bytes.
+    #[test]
+    fn a_failed_fill_does_not_commit_the_cursor() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+
+        let mut frame = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut frame),
+            Err(OleError::Io(_))
+        ));
+        assert_eq!(cursor.position(), 0);
+
+        cursor.read_exact(&mut frame).unwrap();
+        assert_eq!(frame, [0xA5; 4]);
+        assert_eq!(cursor.position(), 4);
+    }
+
+    /// Read-ahead moves requests, never bytes: over a chain whose sectors are
+    /// stored out of logical order the window serves exactly what a plain
+    /// cursor serves.
+    #[test]
+    fn read_ahead_matches_a_plain_cursor_on_a_fragmented_chain() {
+        let bytes = fragmented_large_bytes();
+        let payload = fragmented_payload();
+
+        let plain_source = Arc::new(TestSource::new(bytes.clone()));
+        let plain_file = shared(Arc::clone(&plain_source));
+        let mut plain_cursor = plain_file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut plain = vec![0u8; payload.len()];
+        for chunk in plain.chunks_mut(7) {
+            plain_cursor.read_exact(chunk).unwrap();
+        }
+
+        let windowed_source = Arc::new(TestSource::new(bytes));
+        let windowed_file = shared(Arc::clone(&windowed_source));
+        let mut windowed_cursor = BufferedOleStreamCursor::new(
+            windowed_file.stream_cursor_at(&["Large"], 0).unwrap(),
+            BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES,
+        );
+        let mut windowed = vec![0u8; payload.len()];
+        for chunk in windowed.chunks_mut(7) {
+            windowed_cursor.read_exact(chunk).unwrap();
+        }
+
+        assert_eq!(plain, payload);
+        assert_eq!(windowed, payload);
+        assert!(
+            windowed_source.read_ranges().len() < plain_source.read_ranges().len(),
+            "the window still costs fewer requests on a fragmented chain"
+        );
+    }
+
+    /// The same parity over a MiniFAT stream, which resolves its physical
+    /// ranges through the root entry rather than the FAT.
+    #[test]
+    fn read_ahead_matches_a_plain_cursor_on_a_minifat_stream() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Small"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        let mut observed = [0u8; 11];
+        for chunk in observed.chunks_mut(3) {
+            cursor.read_exact(chunk).unwrap();
+        }
+
+        assert_eq!(&observed, b"mini stream");
+        assert_eq!(cursor.position(), 11);
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    /// A read the window could never hold drains what is resident and takes
+    /// the rest straight into the destination.
+    #[test]
+    fn a_read_larger_than_the_ceiling_bypasses_the_window() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor = BufferedOleStreamCursor::new(cursor, 64);
+        let mut frame = [0u8; 4];
+        cursor.read_exact(&mut frame).unwrap();
+        let mut bulk = vec![0u8; 4096];
+        cursor.read_exact(&mut bulk).unwrap();
+
+        assert_eq!(bulk, vec![0xA5; 4096]);
+        assert_eq!(cursor.position(), 4100);
+        let mut tail = vec![0u8; 8192 - 4100];
+        cursor.read_exact(&mut tail).unwrap();
+        assert_eq!(tail, vec![0xA5; 8192 - 4100]);
+    }
+
+    /// A skip inside the window passes bytes the last fill already walked and
+    /// fenced; a skip past it drops the window and walks the chain.
+    #[test]
+    fn read_ahead_skips_inside_the_window_without_reading() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut cursor =
+            BufferedOleStreamCursor::new(cursor, BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+        let mut frame = [0u8; 4];
+        cursor.read_exact(&mut frame).unwrap();
+        cursor.read_exact(&mut frame).unwrap();
+        source.reset_observation_counts();
+
+        cursor.skip_forward(64).unwrap();
+        assert_eq!(cursor.position(), 72);
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(reads, 0, "a skip inside the window reads nothing");
+        assert_eq!(versions, 0, "and takes no observation, as skips never did");
+
+        cursor.skip_forward(4096).unwrap();
+        assert_eq!(cursor.position(), 4168);
+        assert_eq!(
+            source.observation_counts().0,
+            0,
+            "a skip past it reads nothing either"
+        );
+        cursor.read_exact(&mut frame).unwrap();
+        assert_eq!(frame, [0xA5; 4]);
+    }
+
+    /// The declared ceiling is clamped to the bound the type publishes, so no
+    /// caller can ask one cursor to hold an unbounded window.
+    #[test]
+    fn the_read_ahead_ceiling_is_clamped_to_the_published_bound() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(Arc::clone(&source));
+        let unbounded = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut unbounded = BufferedOleStreamCursor::new(unbounded, usize::MAX);
+        let mut bounded = BufferedOleStreamCursor::new(
+            file.stream_cursor_at(&["Large"], 0).unwrap(),
+            BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES,
+        );
+        let mut left = [0u8; 4];
+        let mut right = [0u8; 4];
+        for _ in 0..2048 {
+            unbounded.read_exact(&mut left).unwrap();
+            bounded.read_exact(&mut right).unwrap();
+            assert_eq!(left, right);
+        }
+        assert_eq!(unbounded.position(), bounded.position());
+        assert_eq!(
+            BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES,
+            64 * 1024,
+            "the published bound is the worksheet window's 64 KiB"
+        );
     }
 
     #[test]

@@ -1,0 +1,10 @@
+scenario               before Ir/op      after Ir/op     delta
+validate-54016           28,798,952       12,375,122   -57.03%
+validate-cfs              4,161,600        5,265,886   +26.54%
+allcells-54016          151,737,990      151,737,968    -0.00%
+fulltext-wcv             16,947,404       16,931,303    -0.10%
+
+Isolation pairs: N=2 and N=6 iterations of one operation, differenced and divided by 4.
+Callgrind counts rep movsb per byte (change 0604 measured a 35x overstatement), so the
+window's extra copy of the stream is priced here at one instruction per byte; perf stat
+cycles in ../cycles/cycles-summary.txt are the metric for that copy.

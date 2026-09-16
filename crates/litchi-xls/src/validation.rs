@@ -16,7 +16,7 @@ use std::{
     sync::Arc,
 };
 
-use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
+use litchi_cfb::{BufferedOleStreamCursor, OleError, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{
     CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceValue, IssueEvidence,
     IssueLocation, IssueSeverity, ReadAt, RepairAvailability, ValidateReport, ValidationCheck,
@@ -1847,7 +1847,7 @@ enum StreamingRecordStep<'a> {
 }
 
 struct StreamingRecordReader<'a> {
-    cursor: SharedOleStreamCursor<'a>,
+    cursor: BufferedOleStreamCursor<'a>,
     max_records: usize,
     record_count: usize,
     header: [u8; 4],
@@ -1860,9 +1860,19 @@ impl<'a> StreamingRecordReader<'a> {
         workbook_name: &str,
         max_records: usize,
     ) -> Result<Self, XlsValidationError> {
-        let cursor = shared
-            .stream_cursor_at(&[workbook_name], 0)
-            .map_err(XlsValidationError::Ingress)?;
+        // The reader starts without read-ahead. MS-XLS admits FILEPASS only
+        // immediately after the workbook-global BOF, optionally behind
+        // WRITEPROTECT records, and the walk stops there without reading the
+        // ciphertext that follows. A window filled before that point would
+        // read some of that ciphertext, so `open_window` is called by
+        // `analyze_workbook` only once a FILEPASS can no longer legitimately
+        // appear.
+        let cursor = BufferedOleStreamCursor::new(
+            shared
+                .stream_cursor_at(&[workbook_name], 0)
+                .map_err(XlsValidationError::Ingress)?,
+            0,
+        );
         Ok(Self {
             cursor,
             max_records,
@@ -1870,6 +1880,21 @@ impl<'a> StreamingRecordReader<'a> {
             header: [0; 4],
             payload: [0; MAX_RECORD_BYTES],
         })
+    }
+
+    /// Turns on the cursor's bounded read-ahead for the rest of the walk.
+    ///
+    /// Every record is framed here as a four-byte header and then a payload,
+    /// so without a window this walk costs two positional requests and two
+    /// source observations per record. With one, those two reads are memory
+    /// copies and the walk pays one request per contiguous run of the
+    /// allocation chain. The closing `SharedOleFile::source_version` that
+    /// every exit of `validate_source_with_limits` already takes still
+    /// brackets the whole analysis, so a mutation during it is refused as
+    /// before; what moves is which read reports it.
+    fn open_window(&mut self) {
+        self.cursor
+            .set_read_ahead(BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
     }
 
     fn read_next(&mut self) -> Result<StreamingRecordStep<'_>, XlsValidationError> {
@@ -1966,7 +1991,16 @@ fn analyze_workbook(
     let mut active_sheet: Option<ActiveSheet> = None;
     let mut scan_interrupted = false;
 
+    let mut window_open = false;
     loop {
+        // A FILEPASS can only follow the global BOF and its WRITEPROTECT
+        // records, so once the slot has closed the rest of the stream is
+        // ordinary BIFF and may be read ahead. Opening the window earlier
+        // would read ciphertext an encrypted workbook stops the walk before.
+        if !filepass_slot_open && !window_open {
+            records.open_window();
+            window_open = true;
+        }
         let record = match records.read_next()? {
             StreamingRecordStep::End => break,
             StreamingRecordStep::Limit { kind } => {
