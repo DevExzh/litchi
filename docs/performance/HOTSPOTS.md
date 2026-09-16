@@ -1,5 +1,37 @@
 # Performance hotspot inventory
 
+## 0657 — the XLSX value editor's hot path was its own door, and the door was a name list
+
+Change [0602](0602-xlsx-real-producer-admission-design.md) measured change
+0525's reduced readback at **15.4-43.5% of a plan-and-commit p50** and the
+complete candidate parse it removes at **32.9-85.3% of the commit that pays
+it** — and then measured the population that receives any of it at **0 of 95**
+real packages. The mechanism was not slow; it was unreachable. The reason was
+five allow-lists in `cell_values`: sixteen worksheet element names, eight
+workbook names, a per-element attribute list, and three relationship type
+lists. Every one of them was a proxy for a property the rewrite already has —
+`rewrite_value_only_with_provenance` composes the `<dimension>` `ref`
+attribute and the `<sheetData>` span and copies every other byte with one
+`extend_from_slice` — so an element outside those spans could be admitted
+without the editor learning anything about it. Replacing the lists with that
+property takes the corpus from **0 of 95 packages and 0 of 208 worksheet parts
+admitted to 10 and 15**, and the whole remaining refusal set is four messages:
+**64 shared-string workbooks, 8 pivot caches, 2 Strict-namespace shared-string
+workbooks**, and the single-worksheet door. The gate behind it was not in `litchi-xlsx` at all. On the first
+measured leg **0 of 95 still published**, all ten newly admitted packages
+stopping in `litchi-opc`'s compactness audit at the newline their producer
+wrote after the XML declaration — change 0602's D0. Change
+[0654](0654-opc-original-bytes-audit-loosened.md) loosened that audit for the
+*original* bytes and its finding 5 recorded that the value editor's
+*replacement* then raised the byte-identical refusal, because the replacement
+is a splice carrying the source's own formatting. This change closes it: the
+seven paired replacement-audit sites audit the replacement with `verify_source`
+too, and the corpus publishes: **9 of the 10 admitted packages complete a plan,
+commit and publication**, against 0 on both earlier legs, each changing exactly
+two members and reopening with the edited cell readable and no neighbour lost.
+[Change and limitations](0657-xlsx-value-editor-d4-admission.md);
+[evidence](results/change-0657/README.md).
+
 ## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
 
 Record: [0656](0656-pptx-cross-copy-candidate-budget.md).

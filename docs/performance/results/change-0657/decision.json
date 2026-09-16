@@ -1,0 +1,73 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0657",
+  "title": "The XLSX value-only editor's element, attribute and relationship allow-lists become one dependency rule, and the source-backed publication audit stops refusing a replacement that carries its source's formatting",
+  "decision": "retained, implemented in litchi-xlsx and litchi-opc",
+  "code_state": "crates/litchi-xlsx and seven paired replacement-audit call sites in crates/litchi-opc/src/source_backed.rs; no public API item added, removed or changed; no new unsafe and no new dependency; MAX_XML_DEPTH's visibility widened to pub(crate) with its value unchanged; xml-minifier untouched (change 0654's verify_source is reused)",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "decision 7 of change 0652 authorizes 0602's D4: unfamiliar elements and attributes are copied through unchanged, and the dependency rule decides which constructs an edit must understand",
+    "the allow-lists were a proxy for a property the rewrite already has: it composes the dimension ref attribute and the sheetData span and copies every other byte, so an element outside those spans can be admitted without the editor learning anything about it",
+    "attributes need no list at all, because write_tag re-emits the source tag of every element the writer touches and replaces only the attributes it owns; the one exception, a relationship reference inside sheetData, is refused directly because a removed cell record would orphan it",
+    "the corpus census is the measurement: 0 of 95 packages and 0 of 208 worksheet parts admitted before, 10 and 15 after, twelve fixtures changing verdict and none regressing",
+    "four dependency verdicts (protected sheet, covering data validation, covering group formula, covered merge) were already implemented in the raw editor's layout scan and had never been reachable through this door",
+    "D2 (the shared-string table) is deliberately not implemented: it is a construct the editor would have to model rather than an unfamiliar element copied through, decision 7 does not name it, and it carries 0602's F3 resource falsification",
+    "change 0654's finding 5 recorded that loosening the original-bytes audit alone leaves the value editor refused, because its replacement carries the source's formatting verbatim; the wave's reading of decision 2 is that compactness is not a publication refusal on any route, only a test-time property of this library's serializers",
+    "the row-visibility editor keeps its own narrower admission, because a protected sheet, an autofilter, a sort state, a custom sheet view and markup-compatibility content are dependencies of a visibility edit even though they are not dependencies of a value edit",
+    "the four producer-shaped source scenarios beat a 2.31% A/A floor at p50 while the two marker-free controls stay at a quarter of it or less, which is what distinguishes the effect from binary layout; it does not appear in the instruction counts, so it is reported as evidence and not registered"
+  ],
+  "accepted_evidence": {
+    "admission_census": "a scratch probe, change 0602's xlsx-admission-probe with parts and roundtrip subcommands added, over the 95 real .xlsx fixtures under test-data/ooxml/xlsx and test-data/office-interop on both legs, reporting the editor's verdict per package through both doors and per worksheet part",
+    "second_gate_census": "all 95 fixtures re-censused on the base checkout with the package-root relationships reduced to the officeDocument owner alone, which still admits 0, establishing that the gates behind the first one are what refuse the corpus",
+    "republication": "probe roundtrip comparing the published archive against the source member by member on uncompressed bytes; on the real corpus nothing publishes, and on a whitespace-compacted derivation of the ten admitted packages 8 of 8 differ in exactly xl/workbook.xml and xl/worksheets/sheet1.xml with 0 added and 0 removed",
+    "edited_part_shape": "per published package, the edited worksheet part's common prefix and suffix and its differing middle: exactly one contiguous range on all eight",
+    "determinism": "five packages republished by two separate probe processes, byte-identical",
+    "witnesses": "23 tests in crates/litchi-xlsx/src/cell_values/admission_tests.rs, one per construct of the rule, each building the smallest package carrying exactly that construct",
+    "differential": "the frozen owned-reference validator loop in validation_borrow_tests.rs, carrying the same copied-subtree state, compared against the borrowed traversal on every fixture including a full truncation sweep",
+    "corpus_oracles": "change 0603's marker-admission oracle and change 0622's facts oracle, both over every real worksheet part, both unchanged",
+    "instructions": "callgrind isolation pairs at --samples 2 and 42 differenced and divided by 40, on change 0601's producer-shaped corpora, both legs at ceb0571a8; the changed module's inclusive Ir per operation beside the whole-operation count; and the publication audit attributed separately",
+    "timing": "paired A1 B1 B2 A2 legs, 20 warm-ups and 30 samples per leg, four windows, every process pinned to CPU 12, with a pre-declared per-leg admission rule (a leg counts only if p95/p50 <= 1.05, a pair only when both its legs are clean) and an A/A floor of 2.31% over 37 clean same-binary comparisons in the same windows; two rounds, the quoted one having a byte-identical harness in both legs"
+  },
+  "accepted_costs": {
+    "admission_is_wider": "this change is not value-identical: inputs that were refused are now admitted, which is the point of the decision it implements; every input admitted before is admitted after with the same output bytes, and every input refused after is refused with a typed error named in the record",
+    "moved_refusal_points": "three refusals move without changing type: cell metadata refuses at validate_scalar_cells instead of the attribute list, merge markup before sheetData refuses in the raw parser instead of the element list, and a refused worksheet relationship names its type instead of refusing all of them at once; each has a witness",
+    "new_depth_bound": "the validator now carries the raw parser's own MAX_XML_DEPTH, because a copied subtree may nest as deeply as the input says where the old vocabulary admitted five levels; the parser refuses on the same input, so nothing the pipeline would accept is refused",
+    "merge_guard_duplication": "require_unmerged_target repeats at staging a refusal the raw layout scan already makes at commit, so the merge verdict is observable at the same phase as the insert verdict; both produce the identical typed error",
+    "not_byte_minimal_inside_the_edited_tag": "write_cell re-orders the edited cell's attributes and drops an explicit t=\"n\"; pre-existing behaviour in code this change does not touch, semantically identical, and visible for the first time because real packages are now admitted",
+    "publication_contract": "the source-backed topology and overlay routes no longer refuse a replacement for non-compact XML; every other check stays on both sides, and two tests that pinned the old behaviour are rewritten to pin the new one",
+    "error_order_fixtures": "five of change 0541's frozen fixtures used constructs this change admits as their validator-error marker; each is re-pointed at a construct the validator still owns so the property stays tested, and the three moved refusals are pinned at their new point",
+    "timed_binary_predates_two_edits": "the timed after binary is commit 3e95c7fa2; the two changes made after it are a module documentation comment in row_visibility and the harness census fix, neither of which runs on the measured path, and the second round measured the census fix explicitly"
+  },
+  "known_gaps": {
+    "publication": "resolved with change 0654 rather than deferred; the remaining refusals on the corpus are the value-dependent constructs, not the audit",
+    "shared_strings": "66 of the 95 refuse on the shared-string relationship; admitting them is 0602's D2 and needs its own record with a bounded, lazily materialized table, index identity as an invariant, and F3 measured on a large table",
+    "tables_and_pivot_caches": "refused wholesale rather than per-address; a table whose header row the edit does not touch could in principle be admitted, which needs the table part modelled",
+    "calcchain_branch_on_the_corpus": "no package in the compacted corpus carries an xl/calcChain.xml, so the chain-removal branch of the republication expectation is exercised by a unit witness and not by the corpus",
+    "single_worksheet_door": "0602's D5 is untouched; the edit and snapshot doors still require exactly one worksheet",
+    "corpus_scope": "the admission counts are of this corpus on this host; nothing is claimed for producer files outside it",
+    "eager_route": "the eager PackageWriter route's authored-part audit is change 0665's and is untouched here"
+  },
+  "withheld": [
+    "any registered speedup, throughput, allocation, peak-RSS, cold-cache, concurrency or cross-platform result",
+    "any claim that a real producer package round-trips through publication today",
+    "any claim about shared-string workbooks, pivot workbooks, table-bearing worksheets or multi-sheet single-door edits"
+  ],
+  "provenance": {
+    "base_commit": "ceb0571a8 (the merged head after changes 0654, 0658, 0660, 0664 and 0655)",
+    "branch": "perf/0657-xlsx-value-editor-d4-admission",
+    "commit": "the tip of perf/0657-xlsx-value-editor-d4-admission; a commit cannot record its own hash",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 12",
+    "binaries": {
+      "before/xlsx-admission-probe": "49d8d9d0037556d2b9535ee9c2e126b3e6f6c8a88fe025e4a0e6c115f35e8260",
+      "after/xlsx-admission-probe": "58b0e95ada72d8d9fccca9a0a7f9e29de6f7431aedf81a6334f6a66c9e59434e",
+      "after2/xlsx-admission-probe": "8613e98bbf1ecca41a1bb11398f495e6e9ab7006fdcf3bc5943aa410d1c31ee5",
+      "before/litchi-perf-baseline": "f38bf3c867875d02441b88f7bc5887cd1eae839edaf0f0edcac10c0551caa1c9",
+      "after/litchi-perf-baseline": "53c05e2dcafc13b42cddf0c519360398ec28b35e0357a912e4969d8aac1d5bef",
+      "after-with-census-fix/litchi-perf-baseline": "5c09c5db5d2038af281856ef8bedbeba49adbc931361490dbc5949ee6806e67f"
+    },
+    "note": "both probe legs built --release --locked with a CARGO_TARGET_DIR outside either worktree and staged before any run; the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-70d7768cc, whose test-data was verified byte-identical to this worktree's over all 95 fixtures by SHA-256; the branch was rebased twice as the wave merged, first onto ab07e2a47 (change 0654) and then onto ceb0571a8, and the census was re-taken after the publication change; the harness binaries the timing legs used are recorded in bench/summary.txt"
+  }
+}

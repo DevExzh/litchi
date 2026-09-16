@@ -166,7 +166,13 @@ fn source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment()
 }
 
 #[test]
-fn ordinary_authored_xml_keeps_the_compactness_gate() {
+fn the_authored_classifier_still_separates_compact_from_formatted_xml() {
+    // Change 0657 stopped making compactness a publication refusal on the
+    // source-backed replacement route: a replacement there is a splice of the
+    // Part's own source, so it carries the producer's formatting and the
+    // contract is now a property of this library's serializers, asserted by
+    // their own tests. The classifier that tells the two apart is unchanged,
+    // and so is its refusal of malformed input.
     let uri = document_uri();
     assert!(
         !authored_xml_requires_source_proof(
@@ -182,19 +188,29 @@ fn ordinary_authored_xml_keeps_the_compactness_gate() {
     );
     assert!(authored_xml_requires_source_proof(&uri, "application/xml", b"<document>").is_err());
 
+    // The same formatted replacement now publishes, and every other member
+    // stays byte-exact.
     let package = open(b"<document/>");
     let mut plan = SourceTopologyPlan::new();
-    plan.try_replace_part(uri, FORMATTED_DOCUMENT.to_vec())
-        .expect("topology plan may stage an authored replacement");
+    plan.try_replace_part(uri.clone(), FORMATTED_DOCUMENT.to_vec())
+        .expect("topology plan may stage a replacement");
+    let mut output = Vec::new();
+    package
+        .write_topology_to_stream(&mut output, plan)
+        .expect("a formatted replacement publishes since change 0657");
+    assert!(!output.is_empty());
+
+    // Malformed input is still refused, and still emits no archive.
+    let package = open(b"<document/>");
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_part(uri, b"<document>".to_vec())
+        .expect("topology plan may stage a replacement");
     let mut output = Vec::new();
     let error = package
         .write_topology_to_stream(&mut output, plan)
-        .expect_err("ordinary formatted authored XML must retain its refusal");
+        .expect_err("an unterminated replacement must be refused");
     assert!(matches!(error, OpcError::XmlPublication { .. }));
-    assert!(
-        output.is_empty(),
-        "refused authored XML must emit no archive"
-    );
+    assert!(output.is_empty(), "refused XML must emit no archive");
 }
 
 #[test]
@@ -548,7 +564,7 @@ fn archive_bytes_with_sibling(document: &[u8], styles: &[u8]) -> Vec<u8> {
 /// The original bytes of a replaced Part are audited for structure and finite
 /// budgets, never for this repository's compact output contract. The
 /// replacement keeps the authored contract, which
-/// `ordinary_authored_xml_keeps_the_compactness_gate` above pins.
+/// `the_authored_classifier_still_separates_compact_from_formatted_xml` above pins.
 #[test]
 fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
     for (label, original) in [

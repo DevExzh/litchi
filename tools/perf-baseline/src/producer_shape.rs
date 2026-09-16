@@ -1115,15 +1115,22 @@ fn prove_edit_variant_is_admitted(archive: &[u8]) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-/// Prove, once and untimed, each typed refusal the complete producer
-/// signature draws from the value-only editor.
+/// Record, once and untimed, the value-only editor's verdict on each producer
+/// fact the complete signature carries.
 ///
 /// Each row is the admitted package plus exactly one producer fact, because
 /// the gates fire in package-then-part order and an archive carrying several
-/// facts can only witness the first.  This is the first-class refusal census
-/// the 0587 survey's evidence gap 3 asks for: the reach of the value-only
-/// editor on Excel output is not "reduced", it is zero, and the census names
-/// every reason.
+/// facts can only witness the first.  This is the first-class census the 0587
+/// survey's evidence gap 3 asks for.
+///
+/// Change 0601 wrote this as a *refusal* census and treated an admitted row as
+/// a corpus-build failure, because at the time the editor refused all five
+/// facts and its reach on Excel output was zero.  Change 0657 replaced the
+/// editor's allow-lists with a dependency rule, and four of the five are now
+/// admitted and copied through; only the shared-string relationship still
+/// refuses.  So the census records the verdict rather than asserting it: an
+/// admitted row carries [`ADMITTED_VERDICT`] as its message, and the corpus
+/// still builds.  The schema is unchanged.
 fn prove_value_editor_refusals(
     shape: XlsxProducerShape,
     read_archive: &[u8],
@@ -1190,6 +1197,9 @@ fn prove_value_editor_refusals(
     Ok(refusals)
 }
 
+/// The message recorded for a producer fact the value-only editor admits.
+pub(crate) const ADMITTED_VERDICT: &str = "admitted by the value-only editor";
+
 fn refuse(
     scenario: &'static str,
     role: &'static str,
@@ -1199,15 +1209,16 @@ fn refuse(
     let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
         OwnedSource::new(archive.to_vec()),
     ))?;
-    match editor.edit_sheets([litchi_xlsx::Selector::from(sheet)]) {
-        Ok(_) => Err(format!("producer XLSX {role} was admitted by the value-only editor").into()),
-        Err(error) => Ok(ProvenRefusal {
-            scenario,
-            sheet,
-            role,
-            message: error.to_string(),
-        }),
-    }
+    let message = match editor.edit_sheets([litchi_xlsx::Selector::from(sheet)]) {
+        Ok(_) => ADMITTED_VERDICT.to_owned(),
+        Err(error) => error.to_string(),
+    };
+    Ok(ProvenRefusal {
+        scenario,
+        sheet,
+        role,
+        message,
+    })
 }
 
 /// Address the selected-cell selector reads.
@@ -2106,25 +2117,20 @@ mod tests {
     }
 
     #[test]
-    fn xlsx_producer_read_variant_proves_every_value_editor_refusal() {
+    fn xlsx_producer_read_variant_records_the_value_editor_verdict_on_every_fact() {
         let corpus = xlsx_medium(XlsxProducerVariant::Read);
         let refusals = &corpus.evidence.proven_refusals;
         assert_eq!(refusals.len(), 6);
-        // Each producer fact draws its own typed refusal, and the complete
-        // signature is refused by the first gate that fires.
+        // Change 0657 replaced the value-only editor's allow-lists with a
+        // dependency rule. Four of these five producer facts are outside every
+        // span the rewrite composes, so they are copied through and the
+        // package is admitted; the shared-string relationship is the one whose
+        // meaning depends on the edited value, so it still refuses, with its
+        // message unchanged.
         assert_eq!(refusals[0].role, "producer-worksheet-mc-attributes");
-        assert!(
-            refusals[0].message.contains("mc:Ignorable")
-                && refusals[0].message.contains("worksheet"),
-            "{:?}",
-            refusals[0]
-        );
+        assert_eq!(refusals[0].message, ADMITTED_VERDICT);
         assert_eq!(refusals[1].role, "producer-page-setup");
-        assert!(
-            refusals[1].message.contains("pageMargins"),
-            "{:?}",
-            refusals[1]
-        );
+        assert_eq!(refusals[1].message, ADMITTED_VERDICT);
         assert_eq!(refusals[2].role, "producer-shared-strings");
         assert!(
             refusals[2].message.contains("workbook relationship")
@@ -2133,20 +2139,17 @@ mod tests {
             refusals[2]
         );
         assert_eq!(refusals[3].role, "producer-worksheet-relationship");
-        assert!(
-            refusals[3].message.contains("worksheet relationships"),
-            "{:?}",
-            refusals[3]
-        );
+        assert_eq!(refusals[3].message, ADMITTED_VERDICT);
         assert_eq!(refusals[4].role, "producer-workbook-root");
-        assert!(
-            refusals[4].message.contains("mc:Ignorable")
-                && refusals[4].message.contains("workbook"),
-            "{:?}",
-            refusals[4]
-        );
+        assert_eq!(refusals[4].message, ADMITTED_VERDICT);
+        // The complete signature still refuses, because it carries the
+        // shared-string relationship together with everything else.
         assert_eq!(refusals[5].role, "producer-complete");
-        assert!(!refusals[5].message.is_empty());
+        assert!(
+            refusals[5].message.contains("sharedStrings"),
+            "{:?}",
+            refusals[5]
+        );
     }
 
     #[test]

@@ -1,0 +1,122 @@
+=== change 0657 - deterministic instruction counts (valgrind callgrind, Ir) ===
+
+Method: whole-process Ir at --samples 2 and --samples 42 with --warmup 0;
+        Ir/op = (T42 - T2) / 40. Process start, corpus construction and all
+        one-time setup cancel exactly in the difference. One 'op' is one
+        harness sample iteration, which also carries the harness's own
+        per-sample verification outside its timer, so Ir/op is an upper
+        bound on the timed operation. taskset -c 12; callgrind with
+        --separate-callers=1 --cache-sim=no --branch-sim=no.
+
+============================================================================
+SELECTOR: xlsx_producer_medium_source_planning
+============================================================================
+leg               Ir @ N=2          Ir @ N=42          Ir / op
+before       3,427,396,889      4,079,877,486       16,312,015
+after        3,425,440,074      4,074,154,217       16,217,854
+  --> after/before Ir per operation = 0.99423   (-0.577%)
+
+  Inclusive Ir of litchi_xlsx::cell_values::validation (the changed module).
+  Sum of every context entered from outside the module, EXCLUDING the
+  Validator::observe callback invoked by raw::worksheet::codec (that call
+  is already inside worksheet_xml_and_parse_source's inclusive cost).
+  leg           incl @ N=2      incl @ N=42      incl / op
+  before        40,048,515      574,205,752     13,353,931
+  after         39,841,446      570,184,909     13,258,587
+  --> after/before validation inclusive Ir per operation = 0.99286   (-0.71%)
+
+  Module entry contexts at N=42 (these are the summed rows above):
+    [before]
+         572,784,273  validation::worksheet_xml_and_parse_source  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected
+           1,421,479  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::load_source_catalog
+    [after]
+         568,818,351  validation::worksheet_xml_and_parse_source  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected
+           1,366,558  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::load_source_catalog
+
+  Nested observer callback (already counted inside the entries above):
+    [before]    100,640,505  validation::Validator::observe  <=  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer
+    [after]     97,078,610  validation::Validator::observe  <=  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer
+
+  Per-function inclusive Ir at N=42, summed over caller contexts.
+  NOTE: inlining moved work between these names, so only the module
+  total above is comparable leg to leg; these are a breakdown, not a claim.
+  function                                           before            after     ratio
+  worksheet_xml_and_parse_source                572,784,273      568,818,351    0.9931
+  validate_xml                                    1,421,479        1,366,558    0.9614
+  Validator::observe                            100,640,505       97,625,813    0.9700
+  validate_element                               45,181,223       46,436,498    1.0278
+  validate_attributes                            32,790,874                0    0.0000
+  bind_dialect                                    6,673,084        6,650,810    0.9967
+  allowed_unqualified_attribute                   1,094,092                0    0.0000
+
+============================================================================
+SELECTOR: xlsx_producer_medium_source_one_edit_save
+============================================================================
+leg               Ir @ N=2          Ir @ N=42          Ir / op
+before       3,472,867,712      5,027,262,032       38,859,858
+after        3,471,338,145      5,026,316,606       38,874,462
+  --> after/before Ir per operation = 1.00038   (+0.038%)
+
+  Inclusive Ir of litchi_xlsx::cell_values::validation (the changed module).
+  Sum of every context entered from outside the module, EXCLUDING the
+  Validator::observe callback invoked by raw::worksheet::codec (that call
+  is already inside worksheet_xml_and_parse_source's inclusive cost).
+  leg           incl @ N=2      incl @ N=42      incl / op
+  before        50,846,845      799,857,005     18,725,254
+  after         51,051,294      802,597,417     18,788,653
+  --> after/before validation inclusive Ir per operation = 1.00339   (+0.34%)
+
+  Module entry contexts at N=42 (these are the summed rows above):
+    [before]
+         568,656,278  validation::worksheet_xml_and_parse_source  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected
+         227,017,000  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source
+           1,440,428  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::load_source_catalog
+           1,391,965  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook
+           1,351,334  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml
+    [after]
+         565,380,272  validation::worksheet_xml_and_parse_source  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected
+         233,203,924  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_value_source
+           1,372,914  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::load_source_catalog
+           1,341,707  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook
+           1,298,600  validation::validate_xml  <=  litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml
+
+  Nested observer callback (already counted inside the entries above):
+    [before]    100,632,067  validation::Validator::observe  <=  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer
+    [after]     97,071,603  validation::Validator::observe  <=  litchi_xlsx::raw::worksheet::codec::parse_source_with_observer
+
+  Per-function inclusive Ir at N=42, summed over caller contexts.
+  NOTE: inlining moved work between these names, so only the module
+  total above is comparable leg to leg; these are a breakdown, not a claim.
+  function                                           before            after     ratio
+  worksheet_xml_and_parse_source                568,656,278      565,380,272    0.9942
+  validate_xml                                  231,200,727      237,217,145    1.0260
+  Validator::observe                            100,632,067      193,511,680    1.9230
+  validate_element                               89,770,710       92,199,966    1.0271
+  validate_attributes                            65,231,221                0    0.0000
+  bind_dialect                                   13,214,500       13,167,362    0.9964
+  allowed_unqualified_attribute                   2,175,340                0    0.0000
+
+
+============================================================================
+PUBLICATION AUDIT (the 0657 opc change), xlsx_producer_medium_source_one_edit_save
+============================================================================
+Inclusive Ir per operation of the xml_minifier audit entry points called from
+litchi_opc::source_backed, differenced between N=42 and N=2 exactly as above.
+
+  context                                          before/op     after/op
+  xm::audit::verify_source   <= litchi_opc          2,904,051    5,808,154
+  xm::audit::verify_authored <= litchi_opc          2,949,780            0
+  ------------------------------------------------------------------------
+  the two paired replacement-audit sites             5,853,831    5,808,154
+                                                     delta      -45,677/op
+
+  SUM over every audit/verify context               13,849,400   13,749,227
+                                                     delta     -100,172/op
+
+Reading: before, the pair audited the source with verify_source and the
+replacement with verify_authored; after, both go through verify_source and
+verify_authored disappears from the profile entirely.  The audit did get
+cheaper, by 100,172 Ir per operation -- but that is only 0.26% of the
+38.86M Ir the whole one_edit_save operation costs, and the validation module
+grew by about 63,000 Ir/op over the same interval (+0.34%), so the two
+roughly cancel and the whole-operation count lands at +0.038%.

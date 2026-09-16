@@ -6659,8 +6659,14 @@ struct XlsxRowVisibilityGateSummary {
     markup_compatibility_source_refusal_verified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     macro_source_refusal_verified: Option<bool>,
+    /// Change 0657: the row-visibility editor now *admits* a worksheet
+    /// relationship, because the rewrite copies every byte but the row tags
+    /// it owns and nothing about a hyperlink, drawing or printer-settings
+    /// part depends on which rows are hidden. The gate verifies that
+    /// admission rather than a refusal, so the field is named for what it
+    /// checks.
     #[serde(skip_serializing_if = "Option::is_none")]
-    relationship_source_refusal_verified: Option<bool>,
+    relationship_source_admission_verified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     signed_source_refusal_verified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22524,16 +22530,24 @@ fn xlsx_row_visibility_lifecycle_gates(
         xlsx_row_visibility_variant_refused(corpus, "markup-compatibility", initially_hidden)?;
     let macro_source_refusal_verified =
         xlsx_row_visibility_variant_refused(corpus, "macro", initially_hidden)?;
-    let relationship_source_refusal_verified =
-        xlsx_row_visibility_variant_refused(corpus, "relationship", initially_hidden)?;
+    // Change 0657: a worksheet relationship is admitted. The rewrite copies
+    // the whole part except the row tags it owns, and a hyperlink, drawing or
+    // printer-settings part is anchored by address, so nothing about it
+    // depends on which rows are hidden. The four gates that remain are the
+    // ones that do: a sheet protection forbids the edit, a formula makes the
+    // lexical rewrite unsafe, markup-compatibility content makes the
+    // preprocessed and lexical views disagree, and a macro workbook is not an
+    // ordinary XLSX.
+    let relationship_source_admitted =
+        !xlsx_row_visibility_variant_refused(corpus, "relationship", initially_hidden)?;
     if !protected_source_refusal_verified
         || !formula_source_refusal_verified
         || !markup_compatibility_source_refusal_verified
         || !macro_source_refusal_verified
-        || !relationship_source_refusal_verified
+        || !relationship_source_admitted
     {
         return Err(format!(
-            "XLSX row-visibility semantic refusal gates failed: protected={protected_source_refusal_verified}, formula={formula_source_refusal_verified}, markup_compatibility={markup_compatibility_source_refusal_verified}, macro={macro_source_refusal_verified}, relationship={relationship_source_refusal_verified}"
+            "XLSX row-visibility semantic refusal gates failed: protected={protected_source_refusal_verified}, formula={formula_source_refusal_verified}, markup_compatibility={markup_compatibility_source_refusal_verified}, macro={macro_source_refusal_verified}, relationship_admitted={relationship_source_admitted}"
         ).into());
     }
 
@@ -22614,7 +22628,7 @@ fn xlsx_row_visibility_lifecycle_gates(
             markup_compatibility_source_refusal_verified,
         ),
         macro_source_refusal_verified: Some(macro_source_refusal_verified),
-        relationship_source_refusal_verified: Some(relationship_source_refusal_verified),
+        relationship_source_admission_verified: Some(relationship_source_admitted),
         signed_source_refusal_verified: Some(signed_source_refusal_verified),
         partial_sink_verified: Some(partial_sink_verified),
         zero_output_on_refusal_verified: Some(zero_output_on_refusal_verified),
@@ -43166,8 +43180,8 @@ fn run_xlsx_row_visibility_edit_save(
             } else {
                 None
             },
-            relationship_source_refusal_verified: if source_backed {
-                gates.relationship_source_refusal_verified
+            relationship_source_admission_verified: if source_backed {
+                gates.relationship_source_admission_verified
             } else {
                 None
             },
@@ -67761,7 +67775,7 @@ mod tests {
                 evidence.gates.formula_source_refusal_verified,
                 evidence.gates.markup_compatibility_source_refusal_verified,
                 evidence.gates.macro_source_refusal_verified,
-                evidence.gates.relationship_source_refusal_verified,
+                evidence.gates.relationship_source_admission_verified,
                 evidence.gates.signed_source_refusal_verified,
                 evidence.gates.partial_sink_verified,
                 evidence.gates.zero_output_on_refusal_verified,

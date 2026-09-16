@@ -1,5 +1,43 @@
 # Performance optimization ADR-compliance matrix
 
+## 0657 — preservation proved by construction instead of by refusal
+
+Record: [0657](0657-xlsx-value-editor-d4-admission.md).
+
+ADR 0006's preservation default is what this change is *about*, on both of its
+halves. The old allow-lists refused a package because it carried `docProps/app.xml`, a printer
+setting, a `<pageMargins>` or an `mc:Ignorable` — every one of which
+`litchi-opc` already transfers verbatim and the worksheet rewrite already
+copies with one `extend_from_slice`. Refusing them was refusing to preserve
+what was already preserved. The rule that replaces them is a preservation proof:
+an element is admitted precisely because the rewrite reproduces its bytes and
+never reads them, and the corpus evidence is the check — **9 of 9 published
+packages touch exactly the two members the topology plan names**, 0 added, 0
+removed, every other member byte-identical, and all nine reopen with the edited
+cell readable and the same cell count as their source. The publication half is
+the same argument one layer down: a source-backed *replacement* is a splice of
+the part's own bytes, so auditing it as this library's authored output refused
+the producer's own indentation. Compactness stops being a publication refusal
+on that route and stays a property of this library's serializers; every other
+audit — UTF-8, well-formedness, one document element, no DTD, every budget —
+holds on both sides, and a refusal still precedes any output. ADR 0005's mandatory validation is untouched: the complete traversal
+still runs over the complete output before any snapshot is published and over
+the source on every planning path, only its vocabulary widens, no traversal is
+skipped and no boundary moves. ADR 0003's readback gate is *strengthened*: the
+assertion that a readback worksheet part carries no relationship becomes the
+assertion that it carries the same relationships as the source, which is what
+makes a relationship-bearing worksheet checkable at all. Two defences the old
+vocabulary was maintaining as a side effect are made explicit rather than lost:
+a copied subtree is bounded by the raw parser's own `MAX_XML_DEPTH`, and an
+element whose prefix no declaration binds stays refused even where it would be
+copied. No `unsafe`, no new dependency, no weakened limit, no ambient I/O, no public
+API item added or changed, and no refusal traded for a partial result: three
+refusal *points* move — cell metadata to `validate_scalar_cells`, misplaced merge
+markup to the raw parser, a worksheet relationship to a per-type message — and
+each has a witness naming the new point. Change 0541's six frozen
+error-precedence properties are unaffected, because widening a vocabulary
+changes which inputs refuse, never which error wins when two compete.
+
 ## 0656: the cross-package copy retains its planned candidate archive under a declared budget, and stops deflating it twice
 
 Record: [0656](0656-pptx-cross-copy-candidate-budget.md).

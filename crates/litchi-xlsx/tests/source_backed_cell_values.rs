@@ -943,6 +943,9 @@ fn insert_holes_inside_merge_array_data_table_and_shared_ranges_refuse_atomicall
 
 #[test]
 fn merge_markup_is_refused_at_source_open() {
+    // Change 0657 admits `<mergeCells>` to the value-only vocabulary, because
+    // the rewrite copies it verbatim. The refusal of a malformed one did not
+    // disappear: it belongs to the module that models merged ranges.
     let bytes = fixture(
         format!(
             r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetData/><mergeCells count="1"><mergeCell ref="A1:B2"/><future/></mergeCells></worksheet>"#
@@ -954,8 +957,26 @@ fn merge_markup_is_refused_at_source_open() {
     assert!(matches!(
         result,
         Err(Error::Invalid(message))
-            if message == "value-only edits refuse dependency-bearing or unknown element 'mergeCells'"
+            if message == "worksheet mergeCells has an unmodeled child"
     ));
+
+    // A well-formed one is admitted, and its bytes survive an edit.
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#
+        ),
+        false,
+    );
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let commit = {
+        let mut edit = editor.edit("Sheet1").unwrap();
+        edit.set(address("A1"), 42u32).unwrap();
+        edit.commit().unwrap()
+    };
+    assert!(
+        String::from_utf8_lossy(commit.snapshot().source_xml())
+            .contains(r#"<mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells>"#)
+    );
 }
 
 #[test]
@@ -1802,7 +1823,11 @@ fn mce_shared_strings_relationships_and_signed_changes_are_refused() {
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><mc:AlternateContent/></worksheet>"#
         ),
-        format!(r#"<worksheet xmlns="{SML}" future="unknown"><sheetData/></worksheet>"#),
+        // An unfamiliar attribute on the root is copied through since change
+        // 0657; a relationship reference inside `<sheetData>` is not.
+        format!(
+            r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData><row r="1"><c r="A1" r:id="rIdSheet"><v>1</v></c></row></sheetData></worksheet>"#
+        ),
         format!(r#"<worksheet xmlns="{SML}"><sheetData>payload</sheetData></worksheet>"#),
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetData><s:row r="1"><s:c r="A1"><s:v>1</s:v></s:c></s:row></sheetData></worksheet>"#

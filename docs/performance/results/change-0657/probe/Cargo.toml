@@ -1,0 +1,13 @@
+[package]
+name = "xlsx-admission-probe"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+litchi-xlsx = { path = "/home/zhuhe/code/litchi-worktrees/0657/crates/litchi-xlsx" }
+litchi-sheet = { path = "/home/zhuhe/code/litchi-worktrees/0657/crates/litchi-sheet" }
+xml-minifier = { path = "/home/zhuhe/code/litchi-worktrees/0657/crates/xml-minifier" }
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[profile.release]
+debug = true

@@ -6,14 +6,14 @@
 //! without copying the policy tables into a second implementation.
 
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
+
 use quick_xml::reader::NsReader;
 
 use crate::error::Result;
 
 use super::{
-    STRICT_SML, TRANSITIONAL_SML, XmlOwner, bind_dialect, text_allowed, text_context_allowed,
-    validate_element,
+    Admission, STRICT_SML, TRANSITIONAL_SML, XmlOwner, text_allowed, text_context_allowed,
+    validate_close, validate_element,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -508,13 +508,26 @@ fn workbook_invalid_inputs_are_checked_against_the_same_owned_loop() {
         false,
     );
 
-    let invalid_attribute =
+    // Change 0657: `<fileVersion>` is not a span the rewrite composes, so it
+    // and every attribute on it are copied through unread.
+    let unfamiliar_attribute =
         format!(r#"<workbook xmlns="{sml}"><fileVersion unknown="1"/></workbook>"#);
     assert_differential(
-        "unknown workbook attribute",
-        invalid_attribute.as_bytes(),
+        "unfamiliar workbook attribute",
+        unfamiliar_attribute.as_bytes(),
         XmlOwner::Workbook,
-        false,
+        true,
+    );
+
+    // A child of the catalog is composed, and is still held to the modelled
+    // vocabulary.
+    let unknown_catalog_child =
+        format!(r#"<workbook xmlns="{sml}"><sheets><future/></sheets></workbook>"#);
+    assert_differential_error(
+        "unknown catalog child",
+        unknown_catalog_child.as_bytes(),
+        XmlOwner::Workbook,
+        "value-only edits refuse dependency-bearing or unknown element 'future'",
     );
 
     let invalid_text = format!(r#"<workbook xmlns="{sml}">text</workbook>"#);
@@ -533,6 +546,7 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
     let mut depth = 0usize;
     let mut elements = Vec::<Box<[u8]>>::new();
     let mut dialect = None::<Box<[u8]>>;
+    let mut copied_from = None::<usize>;
     let mut saw_root = false;
     loop {
         let event = reader
@@ -543,29 +557,32 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                bind_dialect(&namespace, &mut dialect)?;
                 let local = element
                     .name()
                     .local_name()
                     .as_ref()
                     .to_vec()
                     .into_boxed_slice();
-                validate_element(
+                let admission = validate_element(
                     owner,
                     &namespace,
                     &element,
                     &local,
                     elements.last().map(AsRef::as_ref),
                     depth,
+                    &mut dialect,
+                    copied_from.is_some(),
                 )?;
                 saw_root = true;
+                if admission == Admission::Copied && copied_from.is_none() {
+                    copied_from = Some(depth);
+                }
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| crate::error::invalid("value-only XML depth overflow"))?;
                 elements.push(local);
             },
             Event::Empty(element) => {
-                bind_dialect(&namespace, &mut dialect)?;
                 let local = element.name().local_name().as_ref().to_vec();
                 validate_element(
                     owner,
@@ -574,6 +591,8 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
                     &local,
                     elements.last().map(AsRef::as_ref),
                     depth,
+                    &mut dialect,
+                    copied_from.is_some(),
                 )?;
                 saw_root = true;
             },
@@ -584,13 +603,11 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
                 let expected = elements.pop().ok_or_else(|| {
                     crate::error::invalid("value-only XML has no open element to close")
                 })?;
-                if element.local_name().as_ref() != expected.as_ref()
-                    || !matches!((&namespace, dialect.as_deref()), (ResolveResult::Bound(Namespace(value)), Some(expected)) if *value == expected)
-                {
-                    return Err(crate::error::invalid(
-                        "value-only XML has a mismatched or foreign closing element",
-                    ));
+                let modeled = copied_from.is_none();
+                if copied_from == Some(depth) {
+                    copied_from = None;
                 }
+                validate_close(&namespace, &element, &expected, dialect.as_deref(), modeled)?;
             },
             Event::DocType(_) => {
                 return Err(crate::error::invalid(
@@ -602,7 +619,12 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
                 let decoded = value.decode().map_err(|error| {
                     crate::error::invalid(format!("invalid value-only XML text: {error}"))
                 })?;
-                if !text_allowed(owner, elements.last().map(AsRef::as_ref), &decoded) {
+                if !text_allowed(
+                    owner,
+                    elements.last().map(AsRef::as_ref),
+                    copied_from.is_some(),
+                    &decoded,
+                ) {
                     return Err(crate::error::invalid(
                         "value-only XML has text outside a scalar value element",
                     ));
@@ -612,14 +634,23 @@ fn validate_xml_owned_reference(content: &[u8], owner: XmlOwner) -> Result<()> {
                 let decoded = value.decode().map_err(|error| {
                     crate::error::invalid(format!("invalid value-only XML text: {error}"))
                 })?;
-                if !text_allowed(owner, elements.last().map(AsRef::as_ref), &decoded) {
+                if !text_allowed(
+                    owner,
+                    elements.last().map(AsRef::as_ref),
+                    copied_from.is_some(),
+                    &decoded,
+                ) {
                     return Err(crate::error::invalid(
                         "value-only XML has text outside a scalar value element",
                     ));
                 }
             },
             Event::GeneralRef(_) => {
-                if !text_context_allowed(owner, elements.last().map(AsRef::as_ref)) {
+                if !text_context_allowed(
+                    owner,
+                    elements.last().map(AsRef::as_ref),
+                    copied_from.is_some(),
+                ) {
                     return Err(crate::error::invalid(
                         "value-only XML has a reference outside a scalar value element",
                     ));

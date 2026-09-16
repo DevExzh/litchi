@@ -14,6 +14,24 @@ use crate::error::{Result, allocation, invalid};
 const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 
+/// Worksheet elements whose meaning depends on which rows are hidden.
+///
+/// Change 0657 widened the shared value-only closure so that a worksheet
+/// child outside `<sheetData>` is copied through rather than refused. That
+/// rule is sound for a *cell value* edit, which these constructs address by
+/// coordinate. It is not sound for a *visibility* edit: a sheet protection
+/// forbids one, and an autofilter, a sort state or a custom sheet view
+/// expresses its own state through exactly the `hidden` attribute this module
+/// owns. This module keeps refusing them, which is the contract its own
+/// documentation states, and which was previously enforced for it by the
+/// shared vocabulary.
+const VISIBILITY_DEPENDENT: [&[u8]; 4] = [
+    b"sheetProtection",
+    b"autoFilter",
+    b"sortState",
+    b"customSheetViews",
+];
+
 #[derive(Debug)]
 struct RowTag {
     row: Row,
@@ -133,6 +151,17 @@ fn write_tag(output: &mut Vec<u8>, xml: &[u8], tag: &RowTag, hidden: bool) {
 }
 
 fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
+    // Markup-compatibility content is refused before a single tag is read.
+    // The cell store this module reuses is built from the *preprocessed*
+    // bytes while the rewrite is lexical over the *source* bytes, so the two
+    // views must be the same bytes. The shared closure used to refuse the
+    // marker as a foreign attribute; since change 0657 it copies it through,
+    // so the refusal belongs here.
+    if memchr::memmem::find(xml, litchi_ooxml_common::mce::NAMESPACE.as_bytes()).is_some() {
+        return Err(invalid(
+            "row-visibility edits refuse markup-compatibility content",
+        ));
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
@@ -159,6 +188,16 @@ fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
                 ) =>
             {
                 return Err(invalid("row-visibility edits refuse formulas"));
+            },
+            Event::Start(element) | Event::Empty(element)
+                if VISIBILITY_DEPENDENT.iter().any(|name| {
+                    is_spreadsheetml_local(&namespace, element.name().local_name().as_ref(), name)
+                }) =>
+            {
+                return Err(invalid(format!(
+                    "row-visibility edits refuse worksheet element '{}'",
+                    String::from_utf8_lossy(element.name().local_name().as_ref())
+                )));
             },
             Event::Start(element) if is_sheet_data(&namespace, &element) => {
                 if inside_sheet_data {

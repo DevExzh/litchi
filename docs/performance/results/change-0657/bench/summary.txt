@@ -1,0 +1,393 @@
+############################################################################
+# change 0657 - measurement at base ceb0571a8   (generated 2026-09-16T08:15:06-04:00)
+############################################################################
+
+LEGS AND BINARIES
+  BEFORE  detached checkout of ceb0571a8
+          sha256 f38bf3c867875d02441b88f7bc5887cd1eae839edaf0f0edcac10c0551caa1c9
+  AFTER-A worktree 0657 at commit 3e95c7fa2 (parent = ceb0571a8), no uncommitted
+          production or harness code at build time
+          sha256 53c05e2dcafc13b42cddf0c519360398ec28b35e0357a912e4969d8aac1d5bef
+  AFTER-B the same commit PLUS the uncommitted harness census fix in
+          tools/perf-baseline/src/{lib,producer_shape}.rs
+          sha256 5c09c5db5d2038af281856ef8bedbeba49adbc931361490dbc5949ee6806e67f
+
+BUILD COMMANDS (all three succeeded with --locked; no fallback needed)
+  cd <worktree>/tools/perf-baseline && CARGO_TARGET_DIR=<target> \
+      cargo build --release --locked --bin litchi-perf-baseline
+  BEFORE  <worktree>=/home/zhuhe/code/litchi-worktrees/before-ceb0571a8
+          <target>=/home/zhuhe/code/litchi-worktrees/targets/0657-bench-before2
+  AFTER-A/B <worktree>=/home/zhuhe/code/litchi-worktrees/0657
+          <target>=.../0657-bench-after (A, since swept) and .../0657-bench-after3 (B)
+
+WHY TWO AFTER BINARIES
+  ROUND A is the isolating comparison: tools/perf-baseline is byte-identical in
+  both legs, so the only difference is 0657's own production code.  ROUND B adds
+  the harness census fix to the AFTER leg only, so the two legs no longer share a
+  harness; it is reported as a confirmation run, not as the isolating measurement.
+  Cite ROUND A.  Both rounds ran the same six selectors under the same names.
+
+SELECTORS - change 0664 (merged, in BOTH legs) did NOT rename, re-shape or
+  re-default any of the six.  Their README section at ceb0571a8 is byte-identical
+  to the one at the old base 70d7768cc, and all six resolve in the registry.
+
+SEE ALSO counts2.txt (callgrind), legs2/ (ROUND A), legs3/ (ROUND B)
+
+========================================================================================================
+ROUND A - BEFORE ceb0571a8 (f38bf3c8) vs AFTER 3e95c7fa2 (53c05e2d), harness IDENTICAL in both legs
+========================================================================================================
+Cleanliness rule: a leg counts only if p95/p50 <= 1.05. Disturbed legs are listed and excluded.
+
+--- per-leg detail (us); FLAGGED = tail blown, excluded from the estimator ---
+window selector                                     leg        p50       mean        p95        p99  p95/p50
+w1   xlsx_producer_medium_source_planning         A1      806.57     811.89     822.90    1082.44    1.020
+w1   xlsx_producer_medium_source_planning         B1      784.69     785.17     794.25     799.60    1.012
+w1   xlsx_producer_medium_source_planning         B2      787.02     787.60     796.91     812.41    1.013
+w1   xlsx_producer_medium_source_planning         A2      805.89     811.06     828.34     934.96    1.028
+w1   xlsx_producer_dense_source_planning          A1    11693.26   11718.07   11865.48   12018.06    1.015
+w1   xlsx_producer_dense_source_planning          B1    11366.97   11380.84   11521.16   11618.57    1.014
+w1   xlsx_producer_dense_source_planning          B2    11432.74   11443.00   11536.96   11750.43    1.009
+w1   xlsx_producer_dense_source_planning          A2    11760.02   11768.21   11852.51   11883.88    1.008
+w1   xlsx_producer_medium_source_one_edit_save    A1     2044.79    2047.84    2077.93    2114.51    1.016
+w1   xlsx_producer_medium_source_one_edit_save    B1     1972.27    1975.33    1998.02    2041.73    1.013
+w1   xlsx_producer_medium_source_one_edit_save    B2     1968.11    1969.44    1985.62    2036.74    1.009
+w1   xlsx_producer_medium_source_one_edit_save    A2     2042.33    2041.04    2050.14    2053.13    1.004
+w1   xlsx_producer_dense_source_one_edit_save     A1    25803.23   25821.07   26093.45   26205.73    1.011
+w1   xlsx_producer_dense_source_one_edit_save     B1    25096.16   25138.93   25373.33   25613.33    1.011
+w1   xlsx_producer_dense_source_one_edit_save     B2    24729.30   24832.14   25487.33   25662.45    1.031
+w1   xlsx_producer_dense_source_one_edit_save     A2    25301.64   25449.16   26105.93   27101.07    1.032
+w1   xlsx_producer_medium_control_planning        A1      696.43     696.12     702.82     705.55    1.009
+w1   xlsx_producer_medium_control_planning        B1      699.55     698.83     705.41     729.88    1.008
+w1   xlsx_producer_medium_control_planning        B2      696.58     695.49     700.92     703.53    1.006
+w1   xlsx_producer_medium_control_planning        A2      697.14     696.56     702.60     721.29    1.008
+w1   xlsx_producer_dense_control_planning         A1    10506.47   10500.62   10583.00   10623.98    1.007
+w1   xlsx_producer_dense_control_planning         B1    10413.18   10411.15   10500.57   10531.40    1.008
+w1   xlsx_producer_dense_control_planning         B2    10400.89   10408.98   10471.51   10513.42    1.007
+w1   xlsx_producer_dense_control_planning         A2    10252.85   10286.00   10541.08   10672.54    1.028
+w2   xlsx_producer_medium_source_planning         A1      818.55     818.62     823.27     849.61    1.006
+w2   xlsx_producer_medium_source_planning         B1      782.75     782.19     788.62     792.08    1.007
+w2   xlsx_producer_medium_source_planning         B2      782.89     782.53     789.16     818.50    1.008
+w2   xlsx_producer_medium_source_planning         A2      807.34     807.17     815.01     818.36    1.010
+w2   xlsx_producer_dense_source_planning          A1    12056.04   12045.20   12171.06   12195.41    1.010
+w2   xlsx_producer_dense_source_planning          B1    11858.26   14028.23   21668.90   23920.80    1.827  FLAGGED
+w2   xlsx_producer_dense_source_planning          B2    11592.45   11609.39   11829.77   11874.67    1.020
+w2   xlsx_producer_dense_source_planning          A2    11610.01   11635.10   11837.61   11905.35    1.020
+w2   xlsx_producer_medium_source_one_edit_save    A1     2036.56    2035.73    2051.28    2055.51    1.007
+w2   xlsx_producer_medium_source_one_edit_save    B1     1966.62    1966.37    1974.57    1987.51    1.004
+w2   xlsx_producer_medium_source_one_edit_save    B2     1970.29    1972.65    1992.69    2027.43    1.011
+w2   xlsx_producer_medium_source_one_edit_save    A2     2035.46    2032.84    2046.93    2084.42    1.006
+w2   xlsx_producer_dense_source_one_edit_save     A1    25534.21   25535.63   26003.75   26288.38    1.018
+w2   xlsx_producer_dense_source_one_edit_save     B1    24427.88   24468.66   24803.08   24958.40    1.015
+w2   xlsx_producer_dense_source_one_edit_save     B2    24683.07   24694.99   24852.98   25060.28    1.007
+w2   xlsx_producer_dense_source_one_edit_save     A2    24916.96   24952.75   25335.06   25504.76    1.017
+w2   xlsx_producer_medium_control_planning        A1      688.85     690.30     698.78     710.12    1.014
+w2   xlsx_producer_medium_control_planning        B1      731.68     983.22    3727.85    3751.61    5.095  FLAGGED
+w2   xlsx_producer_medium_control_planning        B2      693.43     692.48     698.82     703.42    1.008
+w2   xlsx_producer_medium_control_planning        A2      692.03     691.44     696.97     700.89    1.007
+w2   xlsx_producer_dense_control_planning         A1    10270.61   10287.79   10374.99   10566.96    1.010
+w2   xlsx_producer_dense_control_planning         B1    10173.12   10190.66   10272.74   10430.11    1.010
+w2   xlsx_producer_dense_control_planning         B2    10134.87   10134.36   10196.80   10496.16    1.006
+w2   xlsx_producer_dense_control_planning         A2    10444.84   10456.91   10561.12   10732.46    1.011
+w3   xlsx_producer_medium_source_planning         A1      837.72    1156.04    3847.94    4165.56    4.593  FLAGGED
+w3   xlsx_producer_medium_source_planning         B1      820.37    1137.65    2661.24    3499.23    3.244  FLAGGED
+w3   xlsx_producer_medium_source_planning         B2      820.71    1798.03    3830.78   11823.49    4.668  FLAGGED
+w3   xlsx_producer_medium_source_planning         A2      828.04     833.30     839.34    1124.08    1.014
+w3   xlsx_producer_dense_source_planning          A1    24195.04   24690.51   27414.84   30999.74    1.133  FLAGGED
+w3   xlsx_producer_dense_source_planning          B1    12138.80   18835.10   35804.50   35976.46    2.950  FLAGGED
+w3   xlsx_producer_dense_source_planning          B2    23899.61   24067.74   26850.97   28849.46    1.123  FLAGGED
+w3   xlsx_producer_dense_source_planning          A2    12468.52   15171.66   24322.49   27229.90    1.951  FLAGGED
+w3   xlsx_producer_medium_source_one_edit_save    A1     5135.83    4548.52    6136.71   11127.72    1.195  FLAGGED
+w3   xlsx_producer_medium_source_one_edit_save    B1     2049.37    2252.42    5057.15    5070.27    2.468  FLAGGED
+w3   xlsx_producer_medium_source_one_edit_save    B2     5060.00    4191.10    5120.97    6099.23    1.012
+w3   xlsx_producer_medium_source_one_edit_save    A2     2125.08    2316.10    2317.75    7566.16    1.091  FLAGGED
+w3   xlsx_producer_dense_source_one_edit_save     A1    26652.94   27719.75   36148.58   50429.28    1.356  FLAGGED
+w3   xlsx_producer_dense_source_one_edit_save     B1    25785.21   27807.77   34491.44   34983.21    1.338  FLAGGED
+w3   xlsx_producer_dense_source_one_edit_save     B2    25003.24   25005.01   25377.08   25802.15    1.015
+w3   xlsx_producer_dense_source_one_edit_save     A2    26083.47   26147.49   26595.36   28534.76    1.020
+w3   xlsx_producer_medium_control_planning        A1      699.99     699.81     710.44     712.38    1.015
+w3   xlsx_producer_medium_control_planning        B1      694.52     698.54     708.89     873.09    1.021
+w3   xlsx_producer_medium_control_planning        B2      691.22     691.09     697.54     698.90    1.009
+w3   xlsx_producer_medium_control_planning        A2      702.17     701.75     708.41     711.63    1.009
+w3   xlsx_producer_dense_control_planning         A1    10326.88   10346.11   10562.25   10752.68    1.023
+w3   xlsx_producer_dense_control_planning         B1    10406.84   10414.98   10555.20   10639.00    1.014
+w3   xlsx_producer_dense_control_planning         B2    10452.83   10457.84   10586.47   10661.46    1.013
+w3   xlsx_producer_dense_control_planning         A2    10354.90   10350.66   10400.09   10414.28    1.004
+w4   xlsx_producer_medium_source_planning         A1      818.98     816.21     829.75     831.12    1.013
+w4   xlsx_producer_medium_source_planning         B1      783.55     783.41     789.49     794.66    1.008
+w4   xlsx_producer_medium_source_planning         B2      783.69     784.13     792.74     797.22    1.012
+w4   xlsx_producer_medium_source_planning         A2      802.42     801.99     808.99     811.81    1.008
+w4   xlsx_producer_dense_source_planning          A1    11754.62   11760.19   11837.72   11947.05    1.007
+w4   xlsx_producer_dense_source_planning          B1    11434.96   11446.11   11546.63   11610.44    1.010
+w4   xlsx_producer_dense_source_planning          B2    11392.83   11410.47   11467.30   11716.65    1.007
+w4   xlsx_producer_dense_source_planning          A2    11814.09   11828.68   11910.01   12003.85    1.008
+w4   xlsx_producer_medium_source_one_edit_save    A1     2045.39    2043.92    2051.74    2056.32    1.003
+w4   xlsx_producer_medium_source_one_edit_save    B1     1982.85    1982.55    1993.80    1999.51    1.006
+w4   xlsx_producer_medium_source_one_edit_save    B2     1984.98    1985.53    1996.12    2020.49    1.006
+w4   xlsx_producer_medium_source_one_edit_save    A2     2057.06    2059.80    2080.77    2097.94    1.012
+w4   xlsx_producer_dense_source_one_edit_save     A1    25299.82   25328.63   25552.25   25812.27    1.010
+w4   xlsx_producer_dense_source_one_edit_save     B1    24803.73   24820.85   25056.55   25284.30    1.010
+w4   xlsx_producer_dense_source_one_edit_save     B2    24704.05   24725.70   24908.46   25224.88    1.008
+w4   xlsx_producer_dense_source_one_edit_save     A2    25176.46   25267.15   25677.50   25700.11    1.020
+w4   xlsx_producer_medium_control_planning        A1      690.90     690.14     695.45     698.15    1.007
+w4   xlsx_producer_medium_control_planning        B1      689.62     688.59     693.90     704.69    1.006
+w4   xlsx_producer_medium_control_planning        B2      695.50     694.78     700.86     714.93    1.008
+w4   xlsx_producer_medium_control_planning        A2      694.14     693.28     698.83     700.89    1.007
+w4   xlsx_producer_dense_control_planning         A1    10226.35   10240.63   10264.24   10532.19    1.004
+w4   xlsx_producer_dense_control_planning         B1    10299.75   10325.37   10492.66   10732.26    1.019
+w4   xlsx_producer_dense_control_planning         B2    10281.80   10288.89   10369.82   10402.42    1.009
+w4   xlsx_producer_dense_control_planning         A2    10676.79   10688.86   10762.22   10906.75    1.008
+
+Disturbed legs excluded: 14 of 96
+   w2 xlsx_producer_dense_source_planning B1  p95/p50=1.83
+   w2 xlsx_producer_medium_control_planning B1  p95/p50=5.09
+   w3 xlsx_producer_medium_source_planning A1  p95/p50=4.59
+   w3 xlsx_producer_medium_source_planning B1  p95/p50=3.24
+   w3 xlsx_producer_medium_source_planning B2  p95/p50=4.67
+   w3 xlsx_producer_dense_source_planning A1  p95/p50=1.13
+   w3 xlsx_producer_dense_source_planning B1  p95/p50=2.95
+   w3 xlsx_producer_dense_source_planning B2  p95/p50=1.12
+   w3 xlsx_producer_dense_source_planning A2  p95/p50=1.95
+   w3 xlsx_producer_medium_source_one_edit_save A1  p95/p50=1.19
+   w3 xlsx_producer_medium_source_one_edit_save B1  p95/p50=2.47
+   w3 xlsx_producer_medium_source_one_edit_save A2  p95/p50=1.09
+   w3 xlsx_producer_dense_source_one_edit_save A1  p95/p50=1.36
+   w3 xlsx_producer_dense_source_one_edit_save B1  p95/p50=1.34
+
+--- A/A floor from CLEAN same-binary legs only ---
+   w1 xlsx_producer_medium_source_planning       S1->S2   +1.60%
+   w1 xlsx_producer_medium_source_planning       S1->S3   +0.36%
+   w1 xlsx_producer_medium_source_planning       S1->S4   +0.50%
+   w1 xlsx_producer_medium_source_planning       S2->S3   -1.22%
+   w1 xlsx_producer_medium_source_planning       S2->S4   -1.08%
+   w1 xlsx_producer_medium_source_planning       S3->S4   +0.15%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S2   +0.22%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S3   -0.59%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S4   -0.63%
+   w1 xlsx_producer_dense_source_one_edit_save   S2->S3   -0.81%
+   w1 xlsx_producer_dense_source_one_edit_save   S2->S4   -0.86%
+   w1 xlsx_producer_dense_source_one_edit_save   S3->S4   -0.05%
+   w2 xlsx_producer_medium_source_planning       S1->S2   +0.40%
+   w2 xlsx_producer_medium_source_planning       S1->S3   +0.95%
+   w2 xlsx_producer_medium_source_planning       S1->S4   +0.15%
+   w2 xlsx_producer_medium_source_planning       S2->S3   +0.56%
+   w2 xlsx_producer_medium_source_planning       S2->S4   -0.25%
+   w2 xlsx_producer_medium_source_planning       S3->S4   -0.80%
+   w3 xlsx_producer_medium_source_planning       S1->S2   -0.85%
+   w3 xlsx_producer_medium_source_planning       S1->S3   -0.62%
+   w3 xlsx_producer_medium_source_planning       S1->S4   +0.72%
+   w3 xlsx_producer_medium_source_planning       S2->S3   +0.23%
+   w3 xlsx_producer_medium_source_planning       S2->S4   +1.59%
+   w3 xlsx_producer_medium_source_planning       S3->S4   +1.36%
+   w3 xlsx_producer_dense_source_one_edit_save   S1->S4   -1.16%
+   w4 xlsx_producer_medium_source_planning       S1->S2   +0.80%
+   w4 xlsx_producer_medium_source_planning       S1->S3   +1.09%
+   w4 xlsx_producer_medium_source_planning       S1->S4   -0.09%
+   w4 xlsx_producer_medium_source_planning       S2->S3   +0.28%
+   w4 xlsx_producer_medium_source_planning       S2->S4   -0.88%
+   w4 xlsx_producer_medium_source_planning       S3->S4   -1.16%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S2   +2.31%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S3   +0.33%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S4   +1.04%
+   w4 xlsx_producer_dense_source_one_edit_save   S2->S3   -1.94%
+   w4 xlsx_producer_dense_source_one_edit_save   S2->S4   -1.24%
+   w4 xlsx_producer_dense_source_one_edit_save   S3->S4   +0.71%
+
+A/A FLOOR (max |drift| between clean same-binary legs) = 2.31%  over 37 comparisons
+
+--- PAIRED p50 DELTAS, both directions, clean pairs only ---
+selector                                     pairs  A->B mean      min      max  B->A mean  verdict
+xlsx_producer_medium_source_planning             6     -3.19%   -4.37%   -2.33%     +3.30%  faster than the floor
+xlsx_producer_dense_source_planning              5     -2.40%   -3.57%   -0.15%     +2.48%  faster than the floor
+xlsx_producer_medium_source_one_edit_save        6     -3.40%   -3.63%   -3.06%     +3.52%  faster than the floor
+xlsx_producer_dense_source_one_edit_save         7     -2.61%   -4.33%   -0.94%     +2.69%  faster than the floor
+xlsx_producer_medium_control_planning            7     -0.25%   -1.56%   +0.45%     +0.26%  within the A/A floor
+xlsx_producer_dense_control_planning             8     -0.58%   -3.70%   +1.44%     +0.61%  within the A/A floor
+
+(A->B negative = AFTER faster. B->A is the same pairs measured the other way.)
+
+No scenario is worse by more than 5% at p50 on clean pairs.
+
+
+========================================================================================================
+ROUND B - BEFORE ceb0571a8 (f38bf3c8) vs AFTER 3e95c7fa2 + uncommitted harness census fix (5c09c5db)
+========================================================================================================
+Cleanliness rule: a leg counts only if p95/p50 <= 1.05. Disturbed legs are listed and excluded.
+
+--- per-leg detail (us); FLAGGED = tail blown, excluded from the estimator ---
+window selector                                     leg        p50       mean        p95        p99  p95/p50
+w1   xlsx_producer_medium_source_planning         A1      804.16     805.23     814.75     820.76    1.013
+w1   xlsx_producer_medium_source_planning         B1      789.34     789.59     795.53     797.76    1.008
+w1   xlsx_producer_medium_source_planning         B2      789.01     788.84     794.90     796.78    1.007
+w1   xlsx_producer_medium_source_planning         A2      806.27     805.68     811.10     812.24    1.006
+w1   xlsx_producer_dense_source_planning          A1    11831.54   11853.55   12063.32   12102.58    1.020
+w1   xlsx_producer_dense_source_planning          B1    11672.15   11672.87   11704.17   11729.08    1.003
+w1   xlsx_producer_dense_source_planning          B2    11451.07   11471.10   11595.36   11689.28    1.013
+w1   xlsx_producer_dense_source_planning          A2    11716.97   11724.23   11845.97   11997.48    1.011
+w1   xlsx_producer_medium_source_one_edit_save    A1     2058.78    2058.14    2068.30    2075.72    1.005
+w1   xlsx_producer_medium_source_one_edit_save    B1     2010.90    2011.77    2024.18    2050.80    1.007
+w1   xlsx_producer_medium_source_one_edit_save    B2     2013.15    2013.18    2021.22    2027.40    1.004
+w1   xlsx_producer_medium_source_one_edit_save    A2     2052.80    2052.96    2064.90    2070.07    1.006
+w1   xlsx_producer_dense_source_one_edit_save     A1    25209.36   25223.36   25347.66   25454.70    1.005
+w1   xlsx_producer_dense_source_one_edit_save     B1    24742.67   24765.11   24941.81   25012.90    1.008
+w1   xlsx_producer_dense_source_one_edit_save     B2    24955.17   24972.51   25158.25   25208.49    1.008
+w1   xlsx_producer_dense_source_one_edit_save     A2    25156.57   25178.19   25466.25   25652.54    1.012
+w1   xlsx_producer_medium_control_planning        A1      700.55     699.80     705.20     712.20    1.007
+w1   xlsx_producer_medium_control_planning        B1      721.50     720.93     726.50     730.93    1.007
+w1   xlsx_producer_medium_control_planning        B2      745.93     748.70     763.09     766.24    1.023
+w1   xlsx_producer_medium_control_planning        A2      696.86     696.35     701.53     707.79    1.007
+w1   xlsx_producer_dense_control_planning         A1    10250.05   10269.20   10418.65   10516.24    1.016
+w1   xlsx_producer_dense_control_planning         B1    10277.11   10277.35   10326.61   10557.70    1.005
+w1   xlsx_producer_dense_control_planning         B2    10191.20   10192.67   10218.08   10524.83    1.003
+w1   xlsx_producer_dense_control_planning         A2    10338.09   10343.98   10383.34   10554.10    1.004
+w2   xlsx_producer_medium_source_planning         A1      807.32     809.39     824.65     837.32    1.021
+w2   xlsx_producer_medium_source_planning         B1      792.12     791.98     802.05     804.71    1.013
+w2   xlsx_producer_medium_source_planning         B2      797.66     797.97     802.74     829.29    1.006
+w2   xlsx_producer_medium_source_planning         A2      856.24    1657.11    3856.42    3862.61    4.504  FLAGGED
+w2   xlsx_producer_dense_source_planning          A1    12296.27   16238.94   24663.32   27855.92    2.006  FLAGGED
+w2   xlsx_producer_dense_source_planning          B1    11902.15   14181.78   23816.43   24029.63    2.001  FLAGGED
+w2   xlsx_producer_dense_source_planning          B2    12003.67   17026.49   24170.98   26098.10    2.014  FLAGGED
+w2   xlsx_producer_dense_source_planning          A2    12111.39   14079.21   18689.24   21171.93    1.543  FLAGGED
+w2   xlsx_producer_medium_source_one_edit_save    A1     5127.91    4338.89    5183.71    5232.66    1.011
+w2   xlsx_producer_medium_source_one_edit_save    B1     5086.31    4171.26    5141.70    9133.66    1.011
+w2   xlsx_producer_medium_source_one_edit_save    B2     2044.08    2058.07    2108.29    2397.82    1.031
+w2   xlsx_producer_medium_source_one_edit_save    A2     5098.15    4387.11    6086.14    8120.04    1.194  FLAGGED
+w2   xlsx_producer_dense_source_one_edit_save     A1    51032.49   45852.34   53790.99   56267.57    1.054  FLAGGED
+w2   xlsx_producer_dense_source_one_edit_save     B1    52422.65   51693.88   53110.19   67980.14    1.013
+w2   xlsx_producer_dense_source_one_edit_save     B2    49750.21   45437.56   53119.89   73509.54    1.068  FLAGGED
+w2   xlsx_producer_dense_source_one_edit_save     A2    25861.99   30539.78   50721.96   53650.62    1.961  FLAGGED
+w2   xlsx_producer_medium_control_planning        A1      720.70     910.60     827.26    9082.19    1.148  FLAGGED
+w2   xlsx_producer_medium_control_planning        B1      751.19    1447.79    3753.08    3756.59    4.996  FLAGGED
+w2   xlsx_producer_medium_control_planning        B2      731.87    1430.72    3735.80    4751.19    5.104  FLAGGED
+w2   xlsx_producer_medium_control_planning        A2      721.91     725.97     729.37    1005.05    1.010
+w2   xlsx_producer_dense_control_planning         A1    10579.26   10643.18   10777.65   13707.97    1.019
+w2   xlsx_producer_dense_control_planning         B1    10742.92   12851.34   22763.53   24691.06    2.119  FLAGGED
+w2   xlsx_producer_dense_control_planning         B2    10713.22   10714.46   10858.92   11033.73    1.014
+w2   xlsx_producer_dense_control_planning         A2    10446.17   10504.84   10796.55   10872.61    1.034
+w3   xlsx_producer_medium_source_planning         A1      809.81     809.83     816.60     819.96    1.008
+w3   xlsx_producer_medium_source_planning         B1      831.66     830.99     835.97     841.09    1.005
+w3   xlsx_producer_medium_source_planning         B2      780.04     780.23     785.79     808.35    1.007
+w3   xlsx_producer_medium_source_planning         A2      803.62     803.08     809.10     814.77    1.007
+w3   xlsx_producer_dense_source_planning          A1    11762.12   11775.47   11900.33   11931.41    1.012
+w3   xlsx_producer_dense_source_planning          B1    11432.57   11462.92   11625.83   11720.31    1.017
+w3   xlsx_producer_dense_source_planning          B2    11462.78   11472.14   11549.56   11625.00    1.008
+w3   xlsx_producer_dense_source_planning          A2    11869.37   11873.88   11958.04   12046.08    1.007
+w3   xlsx_producer_medium_source_one_edit_save    A1     2047.89    2050.14    2062.40    2070.35    1.007
+w3   xlsx_producer_medium_source_one_edit_save    B1     2040.54    2040.07    2050.10    2059.53    1.005
+w3   xlsx_producer_medium_source_one_edit_save    B2     2029.75    2030.41    2043.17    2049.33    1.007
+w3   xlsx_producer_medium_source_one_edit_save    A2     2055.97    2057.39    2074.26    2085.60    1.009
+w3   xlsx_producer_dense_source_one_edit_save     A1    25409.12   25437.22   25797.46   26035.37    1.015
+w3   xlsx_producer_dense_source_one_edit_save     B1    24780.94   24805.35   24969.78   25368.65    1.008
+w3   xlsx_producer_dense_source_one_edit_save     B2    24821.38   24819.54   24923.80   24983.30    1.004
+w3   xlsx_producer_dense_source_one_edit_save     A2    25184.12   25197.50   25414.22   25692.93    1.009
+w3   xlsx_producer_medium_control_planning        A1      693.65     692.76     697.27     702.01    1.005
+w3   xlsx_producer_medium_control_planning        B1      702.92     702.16     706.80     708.10    1.006
+w3   xlsx_producer_medium_control_planning        B2      706.39     705.90     711.78     714.73    1.008
+w3   xlsx_producer_medium_control_planning        A2      697.18     696.55     701.58     703.21    1.006
+w3   xlsx_producer_dense_control_planning         A1    10243.04   10252.32   10353.47   10450.56    1.011
+w3   xlsx_producer_dense_control_planning         B1    10658.23   10644.93   10711.67   11008.79    1.005
+w3   xlsx_producer_dense_control_planning         B2    10301.35   10330.31   10484.17   10651.87    1.018
+w3   xlsx_producer_dense_control_planning         A2    10242.30   10237.67   10329.01   10333.04    1.008
+w4   xlsx_producer_medium_source_planning         A1      801.09     800.69     806.51     808.53    1.007
+w4   xlsx_producer_medium_source_planning         B1      795.54     794.92     799.65     801.92    1.005
+w4   xlsx_producer_medium_source_planning         B2      784.88     784.56     789.82     793.47    1.006
+w4   xlsx_producer_medium_source_planning         A2      805.08     804.64     809.88     812.67    1.006
+w4   xlsx_producer_dense_source_planning          A1    11742.19   11760.79   11856.08   11944.40    1.010
+w4   xlsx_producer_dense_source_planning          B1    11454.65   11468.25   11510.29   11765.71    1.005
+w4   xlsx_producer_dense_source_planning          B2    11579.52   11580.67   11656.36   11727.41    1.007
+w4   xlsx_producer_dense_source_planning          A2    11701.26   11722.10   11847.49   11935.88    1.012
+w4   xlsx_producer_medium_source_one_edit_save    A1     2038.71    2038.91    2047.01    2051.41    1.004
+w4   xlsx_producer_medium_source_one_edit_save    B1     1999.18    1999.97    2007.89    2024.39    1.004
+w4   xlsx_producer_medium_source_one_edit_save    B2     2010.73    2010.76    2021.82    2039.99    1.006
+w4   xlsx_producer_medium_source_one_edit_save    A2     2037.16    2037.90    2050.14    2056.71    1.006
+w4   xlsx_producer_dense_source_one_edit_save     A1    25299.70   25322.44   25446.00   25655.98    1.006
+w4   xlsx_producer_dense_source_one_edit_save     B1    24919.76   24921.43   25069.92   25102.81    1.006
+w4   xlsx_producer_dense_source_one_edit_save     B2    24931.48   24961.56   25228.04   25691.69    1.012
+w4   xlsx_producer_dense_source_one_edit_save     A2    25064.36   25081.45   25244.43   25451.91    1.007
+w4   xlsx_producer_medium_control_planning        A1      696.51     696.23     700.73     703.39    1.006
+w4   xlsx_producer_medium_control_planning        B1      708.02     707.31     712.59     713.55    1.006
+w4   xlsx_producer_medium_control_planning        B2      698.45     697.36     702.31     703.20    1.006
+w4   xlsx_producer_medium_control_planning        A2      691.94     691.02     696.97     698.58    1.007
+w4   xlsx_producer_dense_control_planning         A1    10168.22   10172.67   10234.19   10271.16    1.006
+w4   xlsx_producer_dense_control_planning         B1    10342.39   10380.28   10560.60   10585.52    1.021
+w4   xlsx_producer_dense_control_planning         B2    10241.09   10245.47   10282.87   10319.89    1.004
+w4   xlsx_producer_dense_control_planning         A2    10193.08   10194.73   10221.37   10280.52    1.003
+
+Disturbed legs excluded: 13 of 96
+   w2 xlsx_producer_medium_source_planning A2  p95/p50=4.50
+   w2 xlsx_producer_dense_source_planning A1  p95/p50=2.01
+   w2 xlsx_producer_dense_source_planning B1  p95/p50=2.00
+   w2 xlsx_producer_dense_source_planning B2  p95/p50=2.01
+   w2 xlsx_producer_dense_source_planning A2  p95/p50=1.54
+   w2 xlsx_producer_medium_source_one_edit_save A2  p95/p50=1.19
+   w2 xlsx_producer_dense_source_one_edit_save A1  p95/p50=1.05
+   w2 xlsx_producer_dense_source_one_edit_save B2  p95/p50=1.07
+   w2 xlsx_producer_dense_source_one_edit_save A2  p95/p50=1.96
+   w2 xlsx_producer_medium_control_planning A1  p95/p50=1.15
+   w2 xlsx_producer_medium_control_planning B1  p95/p50=5.00
+   w2 xlsx_producer_medium_control_planning B2  p95/p50=5.10
+   w2 xlsx_producer_dense_control_planning B1  p95/p50=2.12
+
+--- A/A floor from CLEAN same-binary legs only ---
+   w1 xlsx_producer_medium_source_planning       S1->S2   +1.19%
+   w1 xlsx_producer_medium_source_planning       S1->S3   +0.16%
+   w1 xlsx_producer_medium_source_planning       S1->S4   +0.26%
+   w1 xlsx_producer_medium_source_planning       S2->S3   -1.02%
+   w1 xlsx_producer_medium_source_planning       S2->S4   -0.92%
+   w1 xlsx_producer_medium_source_planning       S3->S4   +0.10%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S2   -0.40%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S3   +1.72%
+   w1 xlsx_producer_dense_source_one_edit_save   S1->S4   +2.12%
+   w1 xlsx_producer_dense_source_one_edit_save   S2->S3   +2.13%
+   w1 xlsx_producer_dense_source_one_edit_save   S2->S4   +2.54%
+   w1 xlsx_producer_dense_source_one_edit_save   S3->S4   +0.40%
+   w2 xlsx_producer_medium_source_planning       S1->S2   -0.83%
+   w2 xlsx_producer_medium_source_planning       S1->S3   +0.60%
+   w2 xlsx_producer_medium_source_planning       S1->S4   +2.64%
+   w2 xlsx_producer_medium_source_planning       S2->S3   +1.44%
+   w2 xlsx_producer_medium_source_planning       S2->S4   +3.50%
+   w2 xlsx_producer_medium_source_planning       S3->S4   +2.03%
+   w2 xlsx_producer_dense_source_one_edit_save   S1->S2   +0.11%
+   w2 xlsx_producer_dense_source_one_edit_save   S1->S3   +0.63%
+   w2 xlsx_producer_dense_source_one_edit_save   S1->S4   -0.20%
+   w2 xlsx_producer_dense_source_one_edit_save   S2->S3   +0.51%
+   w2 xlsx_producer_dense_source_one_edit_save   S2->S4   -0.32%
+   w2 xlsx_producer_dense_source_one_edit_save   S3->S4   -0.83%
+   w3 xlsx_producer_medium_source_planning       S1->S2   +0.03%
+   w3 xlsx_producer_medium_source_planning       S1->S3   +0.44%
+   w3 xlsx_producer_medium_source_planning       S1->S4   +0.83%
+   w3 xlsx_producer_medium_source_planning       S2->S3   +0.41%
+   w3 xlsx_producer_medium_source_planning       S2->S4   +0.80%
+   w3 xlsx_producer_medium_source_planning       S3->S4   +0.39%
+   w3 xlsx_producer_dense_source_one_edit_save   S1->S2   +0.11%
+   w3 xlsx_producer_dense_source_one_edit_save   S1->S3   +0.68%
+   w3 xlsx_producer_dense_source_one_edit_save   S1->S4   +0.13%
+   w3 xlsx_producer_dense_source_one_edit_save   S2->S3   +0.56%
+   w3 xlsx_producer_dense_source_one_edit_save   S2->S4   +0.02%
+   w3 xlsx_producer_dense_source_one_edit_save   S3->S4   -0.54%
+   w4 xlsx_producer_medium_source_planning       S1->S2   -0.14%
+   w4 xlsx_producer_medium_source_planning       S1->S3   +1.13%
+   w4 xlsx_producer_medium_source_planning       S1->S4   -0.35%
+   w4 xlsx_producer_medium_source_planning       S2->S3   +1.28%
+   w4 xlsx_producer_medium_source_planning       S2->S4   -0.22%
+   w4 xlsx_producer_medium_source_planning       S3->S4   -1.47%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S2   +0.06%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S3   -0.24%
+   w4 xlsx_producer_dense_source_one_edit_save   S1->S4   +0.57%
+   w4 xlsx_producer_dense_source_one_edit_save   S2->S3   -0.30%
+   w4 xlsx_producer_dense_source_one_edit_save   S2->S4   +0.51%
+   w4 xlsx_producer_dense_source_one_edit_save   S3->S4   +0.81%
+
+A/A FLOOR (max |drift| between clean same-binary legs) = 3.50%  over 48 comparisons
+
+--- PAIRED p50 DELTAS, both directions, clean pairs only ---
+selector                                     pairs  A->B mean      min      max  B->A mean  verdict
+xlsx_producer_medium_source_planning             7     -1.33%   -2.93%   +2.70%     +1.38%  within the A/A floor
+xlsx_producer_dense_source_planning              6     -2.22%   -3.43%   -1.04%     +2.28%  within the A/A floor
+xlsx_producer_medium_source_one_edit_save        7     -1.42%   -2.33%   -0.36%     +1.44%  within the A/A floor
+xlsx_producer_dense_source_one_edit_save         6     -1.43%   -2.47%   -0.53%     +1.46%  within the A/A floor
+xlsx_producer_medium_control_planning            6     +2.55%   +0.94%   +7.04%     -2.44%  within the A/A floor
+xlsx_producer_dense_control_planning             7     +1.17%   -1.42%   +4.05%     -1.13%  within the A/A floor
+
+(A->B negative = AFTER faster. B->A is the same pairs measured the other way.)
+
+No scenario is worse by more than 5% at p50 on clean pairs.

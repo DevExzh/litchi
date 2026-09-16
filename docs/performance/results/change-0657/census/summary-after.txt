@@ -1,0 +1,96 @@
+change 0657 - XLSX value-only editor admission census, AFTER leg
+after:  /home/zhuhe/code/litchi-worktrees/0657 (70d7768cc + working-tree change)
+before: /home/zhuhe/code/litchi-worktrees/before-70d7768cc (70d7768cc)
+95 fixtures, verified byte-identical between the two checkouts (sha256, all 95).
+All measured processes pinned with `taskset -c 12`.
+
+== HEADLINE ==
+The change WIDENS ADMISSION but DELIVERS NO PUBLISHED FILE.
+  snapshot door   : 0/95 -> 3/95 admitted
+  edit_many door  : 0/95 -> 10/95 admitted
+  worksheet parts : 0/208 -> 15/208 admitted
+  complete cycle  : 0/95 -> 0/95   <-- unchanged
+All 10 newly admitted packages fail at publication, downstream of the doors the
+change touches, in litchi-opc's publication compactness audit.
+
+== census-after.tsv ==
+total packages                         : 95
+reader-level failures (never reach door): 2
+admitted, single-sheet door (snapshot) : 3  (before 0)
+admitted, multi-sheet door (edit_many) : 10  (before 0)
+  first sheet stores no value cell     : 9
+complete plan+commit+publish cycle     : 0  (before 0)
+
+== roundtrip-after.tsv (real fixtures) ==
+refused         : 74
+error           : 11
+publish-failed  : 10
+
+publish-failed messages, verbatim:
+   9  OPC package error: XML publication rejected for '/xl/workbook.xml': noncompact XML FormattingWhitespace at byte 55
+   1  OPC package error: source-backed OPC Part overlay is unavailable: existing relationships member 'xl/_rels/workbook.xml.rels' is not canonical
+
+The 9 workbook.xml rejections are NOT caused by bytes the editor authors: the
+probe's `compact` subcommand run over the SOURCE xl/workbook.xml of all 10
+admitted packages reports the identical violation at the identical offset
+(FormattingWhitespace at byte 55 - the newline after the XML declaration).
+These fixtures are pretty-printed, and litchi-opc audits the original bytes of
+every replaced part as well as the replacement.
+
+== parts-after.tsv ==
+worksheet parts examined : 208
+admitted                 : 15  (before 0)
+refused                  : 139  (before 154)
+no stored value cell     : 54  (before 54)
+
+== refusal-message frequency, VERBATIM (multi door, snapshot fallback) ==
+CAVEAT unchanged from the before leg: the package-relationship message names
+whichever refused relationship a hash-seeded HashMap walk reaches first, so
+this table is run-dependent. The deterministic table follows.
+  64  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'
+   8  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition'
+   7  invalid XLSX structure: value-only edits currently require exactly one worksheet
+   2  invalid XLSX structure: value-only edits refuse workbook relationship 'http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings'
+
+== refusal-message frequency, DETERMINISTIC ==
+  64  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings'
+   8  invalid XLSX structure: value-only edits refuse workbook relationship 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition'
+   7  invalid XLSX structure: value-only edits currently require exactly one worksheet
+   2  invalid XLSX structure: value-only edits refuse workbook relationship 'http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings'
+
+== fixtures whose door verdict CHANGED between the legs (12) ==
+NewlineInFormulas.xlsx           edit_many refused -> yes
+SimpleMultiCell.xlsx             edit_many refused -> yes
+Sparklines.xlsx                  edit_many refused -> yes
+chart_hyperlink.xlsx             edit_many refused -> yes
+column_style.xlsx                snapshot refused -> yes
+condFormat_cellis.xlsx           edit_many refused -> yes
+condformat_databar.xlsx          snapshot refused -> yes
+condformat_theme_color.xlsx      edit_many refused -> yes
+decimal-format.xlsx              edit_many refused -> yes
+empty.xlsx                       edit_many refused -> yes
+named-ranges-global.xlsx         edit_many refused -> yes
+noSharedStringTable.xlsx         snapshot refused -> yes; edit_many refused -> yes
+
+== member-diff evidence ==
+Real fixtures: none publish, so roundtrip-after.tsv carries no member columns.
+To exercise the evidence anyway, the 10 admitted packages were copied with
+whitespace-only text nodes dropped from every XML member (honouring
+xml:space="preserve" exactly as xml_minifier::audit does). SCRATCH ONLY.
+  published            : 8 of 10
+  expected_only = yes  : 8 of 8   (no violations)
+  still failing        : 2  (1 noncompact workbook.xml at byte 939;
+                             1 non-canonical xl/_rels/workbook.xml.rels)
+Every published package differed in exactly 2 members: xl/workbook.xml and
+xl/worksheets/sheet1.xml. 0 added, 0 removed. No package among the 8 carries
+xl/calcChain.xml, so the calcChain-removal branch of the expectation is NOT
+exercised by this corpus (only NewlineInFormulas.xlsx has one, and it is the
+package that fails on non-canonical rels).
+
+edited worksheet part: 8 of 8 had EXACTLY ONE differing middle range.
+3 of the 8 show the editor re-ordering cell attributes (r/s -> s/r) and
+named-ranges-global.xlsx also drops an explicit t="n". Semantically neutral,
+but the output is not byte-minimal against the source.
+
+determinism: 5 of 5 packages produced byte-identical published archives across
+two separate probe processes.

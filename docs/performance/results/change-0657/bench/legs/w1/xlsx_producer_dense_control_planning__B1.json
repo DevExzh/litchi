@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/tmp/claude-1001/-home-zhuhe-code-litchi/709d31e6-bf68-4968-8b5c-9a2af1c22cc8/scratchpad/agents/0657/bench/bin/after-litchi-perf-baseline",
+    "binary_sha256": "53c05e2dcafc13b42cddf0c519360398ec28b35e0357a912e4969d8aac1d5bef",
+    "binary_bytes": 61543512,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "3e95c7fa2d8d37b41f6d445ef2c1add4072a0061",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 60,
+    "warmup_iterations_per_case": 20,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_producer_dense_control_planning"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_producer_dense_control_planning",
+        "corpus_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_producer_dense_control_planning",
+      "corpus": {
+        "name": "xlsx-producer-dense-control",
+        "generator": "litchi-xlsx-producer-shape-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "producer-dense-control",
+        "payload_kind": "producer-shape-markup-compatibility-grid",
+        "compression": "deflate",
+        "entry_count": 49152,
+        "archive_member_count": 8,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 1455169,
+        "archive_bytes": 197093,
+        "archive_sha256": "5c5fd4520e809c0b2a68b829115db8b6ad58db37477ad5dc3c555ffc04c4065d",
+        "target_entry": "Bench01!A65",
+        "target_payload_bytes": 14,
+        "target_payload_sha256": "5eb3b5e8b315def42b3d3fcd0d082201ea276f97fe7b8dc72b529dee8009ae02",
+        "xlsx": {
+          "sheet_count": 3,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10241867,
+          10310438,
+          10313497,
+          10314318,
+          10325747,
+          10330978,
+          10331678,
+          10336438,
+          10342218,
+          10352668,
+          10353178,
+          10354158,
+          10356438,
+          10358918,
+          10365748,
+          10371818,
+          10374639,
+          10375348,
+          10378268,
+          10378518,
+          10386478,
+          10388288,
+          10392978,
+          10400828,
+          10401558,
+          10402978,
+          10407669,
+          10408598,
+          10412578,
+          10413048,
+          10413309,
+          10414509,
+          10418358,
+          10418488,
+          10425819,
+          10427029,
+          10429609,
+          10430299,
+          10436519,
+          10439299,
+          10440359,
+          10448898,
+          10449729,
+          10450969,
+          10454338,
+          10455858,
+          10462519,
+          10466058,
+          10471978,
+          10472219,
+          10473399,
+          10477498,
+          10478169,
+          10487329,
+          10491179,
+          10496159,
+          10500569,
+          10509219,
+          10515979,
+          10531399
+        ],
+        "sample_order": [
+          23,
+          2,
+          1,
+          3,
+          7,
+          0,
+          19,
+          12,
+          56,
+          6,
+          21,
+          13,
+          14,
+          28,
+          26,
+          59,
+          48,
+          41,
+          58,
+          22,
+          57,
+          34,
+          27,
+          33,
+          40,
+          36,
+          30,
+          37,
+          45,
+          35,
+          43,
+          42,
+          55,
+          44,
+          38,
+          18,
+          54,
+          51,
+          47,
+          53,
+          32,
+          52,
+          24,
+          50,
+          9,
+          46,
+          8,
+          4,
+          17,
+          5,
+          29,
+          31,
+          16,
+          49,
+          10,
+          20,
+          15,
+          39,
+          11,
+          25
+        ],
+        "min": 10241867,
+        "p50": 10413178,
+        "p95": 10500569,
+        "p99": 10531399,
+        "max": 10531399,
+        "mean": 10411149.016666666,
+        "standard_deviation": 60260.79885852445,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10395582.002655838,
+          "upper": 10426716.030677494
+        }
+      },
+      "sink": null
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+change 0657 - member-diff violations
+
+Real fixtures: 0 of 95 publish, so there is nothing to check. See summary-after.txt.
+Whitespace-normalized scratch corpus (10 admitted packages, xml_minifier-compatible
+compaction applied to every XML member so the OPC publication compactness audit
+cannot fire): 8 published, 2 still failed.
+
+VIOLATIONS: none. All 8 published packages touched only the allowed members.

@@ -16,7 +16,7 @@ mod x14ac;
 mod tests;
 
 pub(crate) use edit::{EventSpan, FactsBuilder, SourceFacts};
-pub(crate) use model::merge_successor;
+pub(crate) use model::{MAX_XML_DEPTH, merge_successor};
 pub(crate) use validation::{
     optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32,
 };

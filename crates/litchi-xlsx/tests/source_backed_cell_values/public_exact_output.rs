@@ -68,10 +68,16 @@ fn source_with_worksheet_xml(source_xml: &str) -> Vec<u8> {
 }
 
 #[test]
-fn public_multi_edit_preserves_formatting_whitespace_publication_refusal() {
+fn public_multi_edit_publishes_a_producer_formatted_worksheet_verbatim() {
+    // Change 0654 loosened the audit of the *original* bytes and recorded
+    // that this test still refused, because the value editor's replacement
+    // carries the source's own formatting and the replacement audit then
+    // raised the byte-identical refusal. Change 0657 declares that
+    // replacement source-derived, so the producer's indentation is published
+    // rather than refused, and only the edited cell changes.
     let xml = format!(
         r#"<worksheet xmlns="{SML}"><sheetData>
-  <row r="1"><c r="A1"><v>1</v></c></row>
+  <row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row>
 </sheetData></worksheet>"#
     );
     let bytes = source_with_worksheet_xml(&xml);
@@ -83,17 +89,62 @@ fn public_multi_edit_preserves_formatting_whitespace_publication_refusal() {
         let commit = edit.commit().unwrap();
         assert!(commit.changed());
         let mut published = Vec::new();
-        let error = editor
+        editor
             .publish_multi_commit_to_stream(&mut published, &commit)
-            .unwrap_err();
-        assert!(matches!(
-            &error,
-            Error::Package(OpcError::XmlPublication { .. })
-        ));
-        assert_eq!(
-            format!("{error:?}"),
-            r#"Package(XmlPublication { part: "/xl/worksheets/sheet1.xml", source: NotCompact(Violation { kind: FormattingWhitespace, offset: 88 }) })"#,
+            .expect("a source-derived replacement publishes");
+        let package = OpcPackage::from_bytes(&published).expect("published package");
+        let worksheet = package
+            .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
+            .expect("published worksheet");
+        let text = String::from_utf8(worksheet.blob().to_vec()).expect("UTF-8 worksheet");
+        assert!(
+            text.contains("<sheetData>\n  <row r=\"1\">"),
+            "the producer's indentation is preserved verbatim: {text}"
         );
+        assert!(
+            text.contains(r#"<c r="B1"><v>2</v></c>"#),
+            "an unedited neighbour is preserved verbatim: {text}"
+        );
+        assert!(text.contains("<v>10</v>"), "the edited value is published");
         assert_eq!(source.bytes.as_slice(), bytes.as_slice());
+    }
+}
+
+/// Every non-compactness check the publication audit makes still refuses.
+#[test]
+fn a_source_backed_replacement_still_fails_closed_on_malformed_xml() {
+    use litchi_opc::{SourceBackedPackage, SourceTopologyPlan};
+
+    let compact = format!(
+        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+    );
+    let bytes = source_with_worksheet_xml(&compact);
+    let target = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    for (label, replacement) in [
+        ("unterminated element", "<worksheet>".to_string()),
+        (
+            "two document elements",
+            format!("<worksheet xmlns=\"{SML}\"/><worksheet xmlns=\"{SML}\"/>"),
+        ),
+        (
+            "document type declaration",
+            format!("<!DOCTYPE worksheet><worksheet xmlns=\"{SML}\"/>"),
+        ),
+    ] {
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(VersionedSource::new(bytes.clone())))
+                .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part(target.clone(), replacement.into_bytes())
+            .unwrap();
+        let mut published = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut published, plan)
+            .unwrap_err();
+        assert!(
+            matches!(error, OpcError::XmlPublication { .. }),
+            "{label} must still be refused: {error:?}"
+        );
+        assert!(published.is_empty(), "{label} must emit no archive");
     }
 }

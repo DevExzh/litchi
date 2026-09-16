@@ -351,9 +351,14 @@ impl FactsBuilder {
                 Some(Kind::SheetData)
             },
             b"sheetViews" => Some(Kind::Other),
-            // Any other direct worksheet child is a container the value-only
-            // validator does not admit, or one whose presence changes where
-            // the scanner would place a merged-range insertion point.
+            // Any other direct worksheet child is one whose presence changes
+            // where the scanner would place a merged-range insertion point,
+            // or one that carries a dependency the commit's own
+            // `validate_actions` has to weigh — a sheet protection, a data
+            // validation range, a merged range. Change 0657 admitted those
+            // containers to the value-only validator; this route still
+            // declines them, so every worksheet that carries one takes the
+            // complete scan and reaches those guards.
             _ => None,
         }
     }
