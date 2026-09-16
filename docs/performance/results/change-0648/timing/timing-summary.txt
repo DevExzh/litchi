@@ -1,0 +1,50 @@
+scenario                               leg      p50 us    mean us     p95 us     p99 us
+file-allcells-54016                    A1    16022.225  16036.315  16182.476  16212.407
+file-allcells-54016                    B1     3171.995   3174.327   3191.675   3200.635
+file-allcells-54016                    B2     3193.055   3194.293   3211.285   3230.335
+file-allcells-54016                    A2    15938.015  15963.978  16205.586  16305.417
+file-allcells-54016                    A/A  floor p50   -0.53%   B/B   +0.66%
+file-allcells-54016                    A→B  p50  -80.10%  p95  -80.17%  p99  -80.20%
+
+owned-allcells-54016                   A1     9716.057   9718.935   9759.727   9772.727
+owned-allcells-54016                   B1     3138.005   3139.501   3150.925   3192.885
+owned-allcells-54016                   B2     3169.616   3171.596   3183.905   3224.756
+owned-allcells-54016                   A2     9800.617   9798.780   9823.187   9828.727
+owned-allcells-54016                   A/A  floor p50   +0.87%   B/B   +1.01%
+owned-allcells-54016                   A→B  p50  -67.64%  p95  -67.61%  p99  -67.22%
+
+owned-allcells-59858                   A1      154.171    155.927    164.050    167.981
+owned-allcells-59858                   B1      127.931    129.421    137.310    140.640
+owned-allcells-59858                   B2      128.490    130.418    138.541    152.491
+owned-allcells-59858                   A2      154.440    156.168    164.150    169.990
+owned-allcells-59858                   A/A  floor p50   +0.17%   B/B   +0.44%
+owned-allcells-59858                   A→B  p50  -16.86%  p95  -15.62%  p99  -10.29%
+
+owned-allcells-cfs                     A1      128.901    130.552    138.760    146.500
+owned-allcells-cfs                     B1       89.560     90.738     97.370    102.821
+owned-allcells-cfs                     B2       96.871     97.224    106.451    112.361
+owned-allcells-cfs                     A2      128.931    130.752    138.891    154.441
+owned-allcells-cfs                     A/A  floor p50   +0.02%   B/B   +8.16%
+owned-allcells-cfs                     A→B  p50  -28.15%  p95  -25.89%  p99  -28.22%
+
+owned-allcells-wcv                     A1      688.723    689.234    698.373    714.543
+owned-allcells-wcv                     B1      387.251    388.073    396.042    403.762
+owned-allcells-wcv                     B2      386.842    387.389    397.752    400.291
+owned-allcells-wcv                     A2      688.644    689.391    703.844    719.953
+owned-allcells-wcv                     A/A  floor p50   -0.01%   B/B   -0.11%
+owned-allcells-wcv                     A→B  p50  -43.82%  p95  -43.37%  p99  -43.92%
+
+owned-fulltext-54016                   A1    20010.756  20194.401  21650.624  22650.519
+owned-fulltext-54016                   B1    12998.562  13039.555  13391.004  13567.525
+owned-fulltext-54016                   B2    13057.803  13103.463  13469.375  14233.268
+owned-fulltext-54016                   A2    19972.956  20055.546  20620.059  21058.811
+owned-fulltext-54016                   A/A  floor p50   -0.19%   B/B   +0.46%
+owned-fulltext-54016                   A→B  p50  -34.89%  p95  -36.50%  p99  -37.83%
+
+owned-open-54016                       A1      179.501    181.347    187.671    190.851
+owned-open-54016                       B1      178.491    180.365    186.831    192.821
+owned-open-54016                       B2      179.351    181.215    187.741    191.510
+owned-open-54016                       A2      179.411    181.344    188.790    192.831
+owned-open-54016                       A/A  floor p50   -0.05%   B/B   +0.48%
+owned-open-54016                       A→B  p50   -0.22%  p95   -0.24%  p99   -0.01%
+

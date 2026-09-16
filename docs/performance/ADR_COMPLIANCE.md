@@ -1,5 +1,38 @@
 # Performance optimization ADR-compliance matrix
 
+## 0648 — a cache whose ceiling is the region it caches, and whose region the open already read
+
+The window is **all or nothing**, and that is the compliance argument as much as
+the performance one. It holds the string table's whole source extent or holds
+nothing, so ADR 0003's bounded-resource rule is met by a ceiling that is a named
+256 KiB constant *and* by the region itself: one window per resolver, grown with
+`try_reserve_exact` and reported as `SourceBackedError::Allocation { resource:
+"retained SST window" }` on failure, released when the scan ends, and refused
+outright rather than truncated when a table is larger. The window is exactly the
+extent the open's own segment table describes, so it can read **no byte the open
+did not already read** to build the entry locators; a segment table that reached
+past the declared workbook stream length would disable it rather than be clamped
+into a region that could leave a late entry outside. ADR 0005's lazy-payload
+contract is observed: the table is read on demand, through the cursor's own
+validated chain walk, by a scan that has shown it will use it, and no stream is materialized —
+change 0576's rule that the owner retains locators and not text is untouched,
+because nothing here outlives the resolver. ADR 0006 is untouched: no execution
+context, no worker pool, no ambient I/O, no lock, and the cancellation checks are
+taken in the same places and the same numbers. No new `unsafe`, no new
+dependency, no public API change and no weakened limit; `max_sst_entries`,
+`max_global_bytes`, `max_text_cells` and `max_text_bytes` all run where they
+ran. The one contract that moves is change 0621's observation width, and it
+moves exactly as change 0636 moved it for the validation walk: a resolve served
+from retained bytes takes no read and so no observation, which reports a
+mutation at the next **fill** rather than at the next resolve, bounded by the
+`SourceInner::ensure_current` bracket every operation still ends with. Change
+0621's change-under-read sweep is extended to that boundary and requires the
+same typed refusal from every observation window of a walk that crosses it. An
+entry is never assembled from two reads, because the table is read whole or not
+at all.
+[Change and limitations](0648-xls-shared-string-resolver-window.md);
+[evidence](results/change-0648/README.md).
+
 ## 0649 — no boundary moved, and the ADR 0003 revision binding is priced at 0.51% of the path it was suspected of owning
 
 Record: [0649](0649-pptx-opened-transaction-real-deck-edit.md).

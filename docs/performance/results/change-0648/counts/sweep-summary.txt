@@ -1,0 +1,10 @@
+operation    reads.before  reads.after         d%   bytes.before    bytes.after         d%   obs.before    obs.after
+open                 1666         1666      0.00%        3693129        3693129      0.00%         1567         1567
+list                 1666         1666      0.00%        3693129        3693129      0.00%         1673         1673
+all-cells           26655          959    -96.40%        2108161        2023242     -4.03%        27019         1323
+full-text           29708         1226    -95.87%        3210676        3065552     -4.52%        79061        50579
+validate             1842         1842      0.00%        7511960        7511960      0.00%         1699         1699
+
+largest per-fixture byte increase: 15630 (test-data/poi/test-data/spreadsheet/59858.xls all-cells)
+largest per-fixture byte decrease: -98048 (test-data/poi/test-data/spreadsheet/54016.xls all-cells)
+largest per-fixture read increase: 0 ()

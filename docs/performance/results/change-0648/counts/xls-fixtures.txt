@@ -1,0 +1,126 @@
+test-data/libreoffice-core/chart2/qa/extras/data/xls/chart.xls
+test-data/libreoffice-core/sc/qa/extras/testdocuments/NamesSheetLocal.xls
+test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/cell-borders.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/embedded-chart.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_bool_field_filter.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_dates_grouping.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_empty_item.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/pivottable_number_grouping.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/tdf170189.xls
+test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls
+test-data/office-interop/libreoffice-resaved/tdf78897-litchi.xls
+test-data/office-interop/litchi-changed/tdf78897-litchi.xls
+test-data/ole/xls/ComplexFunctionTestCaseData.xls
+test-data/ole/xls/ConditionalFormattingSamples copy.xls
+test-data/ole/xls/ConditionalFormattingSamples.xls
+test-data/ole/xls/DateFormats.xls
+test-data/ole/xls/DateTimeToNumberTestCases.xls
+test-data/ole/xls/FormulaEvalTestData.xls
+test-data/ole/xls/FormulaRefs.xls
+test-data/ole/xls/FormulaSheetRange.xls
+test-data/ole/xls/HyperlinksOnManySheets.xls
+test-data/ole/xls/Simple.xls
+test-data/ole/xls/SimpleChart.xls
+test-data/ole/xls/SimpleMacro.xls
+test-data/ole/xls/SimpleMultiCell.xls
+test-data/ole/xls/SimpleScatterChart.xls
+test-data/ole/xls/SimpleWithAutofilter copy.xls
+test-data/ole/xls/SimpleWithAutofilter.xls
+test-data/ole/xls/SimpleWithChoose copy.xls
+test-data/ole/xls/SimpleWithChoose.xls
+test-data/ole/xls/SimpleWithColours copy.xls
+test-data/ole/xls/SimpleWithColours.xls
+test-data/ole/xls/SimpleWithComments copy.xls
+test-data/ole/xls/SimpleWithComments.xls
+test-data/ole/xls/SimpleWithDataFormat copy.xls
+test-data/ole/xls/SimpleWithDataFormat.xls
+test-data/ole/xls/SimpleWithFormula copy.xls
+test-data/ole/xls/SimpleWithFormula.xls
+test-data/ole/xls/SimpleWithImages copy.xls
+test-data/ole/xls/SimpleWithImages-mac copy.xls
+test-data/ole/xls/SimpleWithImages-mac.xls
+test-data/ole/xls/SimpleWithImages.xls
+test-data/ole/xls/SimpleWithPageBreaks copy.xls
+test-data/ole/xls/SimpleWithPageBreaks.xls
+test-data/ole/xls/SimpleWithPrintArea copy.xls
+test-data/ole/xls/SimpleWithPrintArea.xls
+test-data/ole/xls/SimpleWithSkip copy.xls
+test-data/ole/xls/SimpleWithSkip.xls
+test-data/ole/xls/SimpleWithStyling copy.xls
+test-data/ole/xls/SimpleWithStyling.xls
+test-data/ole/xls/SingleLetterRanges.xls
+test-data/ole/xls/WeekNumFunctionTestCaseData.xls
+test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls
+test-data/ole/xls/WithChart.xls
+test-data/ole/xls/WithCheckBoxes.xls
+test-data/ole/xls/WithConditionalFormatting.xls
+test-data/ole/xls/WithCustomViews.xls
+test-data/ole/xls/WithEmbeddedObjects.xls
+test-data/ole/xls/WithExtendedStyles.xls
+test-data/ole/xls/WithFormattedGraphTitle.xls
+test-data/ole/xls/WithHyperlink.xls
+test-data/ole/xls/WithThreeCharts.xls
+test-data/ole/xls/WithTwoCharts.xls
+test-data/ole/xls/WithTwoHyperLinks.xls
+test-data/ole/xls/empty.xls
+test-data/ole/xls/password.xls
+test-data/poi/test-data/hpsf/TestUnicode.xls
+test-data/poi/test-data/spreadsheet/15228.xls
+test-data/poi/test-data/spreadsheet/1900DateWindowing.xls
+test-data/poi/test-data/spreadsheet/1904DateWindowing.xls
+test-data/poi/test-data/spreadsheet/24207.xls
+test-data/poi/test-data/spreadsheet/29942.xls
+test-data/poi/test-data/spreadsheet/35897-type4.xls
+test-data/poi/test-data/spreadsheet/41139.xls
+test-data/poi/test-data/spreadsheet/44010-TwoCharts.xls
+test-data/poi/test-data/spreadsheet/45365-2.xls
+test-data/poi/test-data/spreadsheet/45365.xls
+test-data/poi/test-data/spreadsheet/45492.xls
+test-data/poi/test-data/spreadsheet/45761.xls
+test-data/poi/test-data/spreadsheet/46136-NoWarnings.xls
+test-data/poi/test-data/spreadsheet/48968.xls
+test-data/poi/test-data/spreadsheet/50939.xls
+test-data/poi/test-data/spreadsheet/53109.xls
+test-data/poi/test-data/spreadsheet/54016.xls
+test-data/poi/test-data/spreadsheet/55341_CellStyleBorder.xls
+test-data/poi/test-data/spreadsheet/57456.xls
+test-data/poi/test-data/spreadsheet/59858.xls
+test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls
+test-data/poi/test-data/spreadsheet/DBCSHeader.xls
+test-data/poi/test-data/spreadsheet/DateFormats.xls
+test-data/poi/test-data/spreadsheet/DrawingAndComments.xls
+test-data/poi/test-data/spreadsheet/Formatting.xls
+test-data/poi/test-data/spreadsheet/HyperlinksOnManySheets.xls
+test-data/poi/test-data/spreadsheet/MRExtraLines.xls
+test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls
+test-data/poi/test-data/spreadsheet/SharedFormulaTest.xls
+test-data/poi/test-data/spreadsheet/ShrinkToFit.xls
+test-data/poi/test-data/spreadsheet/Simple.xls
+test-data/poi/test-data/spreadsheet/SimpleMacro.xls
+test-data/poi/test-data/spreadsheet/SimpleScatterChart.xls
+test-data/poi/test-data/spreadsheet/SimpleWithColours.xls
+test-data/poi/test-data/spreadsheet/SimpleWithComments.xls
+test-data/poi/test-data/spreadsheet/SimpleWithPageBreaks.xls
+test-data/poi/test-data/spreadsheet/SimpleWithPrintArea.xls
+test-data/poi/test-data/spreadsheet/TwoSheetsOneHidden.xls
+test-data/poi/test-data/spreadsheet/UncalcedRecord.xls
+test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls
+test-data/poi/test-data/spreadsheet/WithTwoHyperLinks.xls
+test-data/poi/test-data/spreadsheet/XRefCalc.xls
+test-data/poi/test-data/spreadsheet/colwidth.xls
+test-data/poi/test-data/spreadsheet/comments.xls
+test-data/poi/test-data/spreadsheet/duprich1.xls
+test-data/poi/test-data/spreadsheet/duprich2.xls
+test-data/poi/test-data/spreadsheet/dvEmpty.xls
+test-data/poi/test-data/spreadsheet/externalFunctionExample.xls
+test-data/poi/test-data/spreadsheet/external_name.xls
+test-data/poi/test-data/spreadsheet/named-cell-in-formula-test.xls
+test-data/poi/test-data/spreadsheet/named-cell-test.xls
+test-data/poi/test-data/spreadsheet/namedinput.xls
+test-data/poi/test-data/spreadsheet/testNames.xls
+test-data/poi/test-data/spreadsheet/unicodeNameRecord.xls
+test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls

@@ -1,0 +1,12 @@
+[package]
+name = "cursor-probe"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+litchi-core = { path = "__TREE__/crates/litchi-core" }
+litchi-xls = { path = "__TREE__/crates/litchi-xls" }
+litchi-cfb = { path = "__TREE__/crates/litchi-cfb" }
+
+[profile.release]
+debug = false

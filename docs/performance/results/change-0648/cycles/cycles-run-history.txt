@@ -1,0 +1,35 @@
+Three perf stat windows were run for change 0648. All three are recorded here
+because their cycle columns disagree where their instruction columns do not.
+
+Windows 1 and 2 ran against earlier after-probe builds: window 1 before a
+defensive edit to sst_region (a segment table reaching past the declared stream
+now disables the window rather than being clamped into it), and window 2 before
+the review fixes (an OOM on the window falls back to the per-entry path, a
+checked_sub in place of a saturating_sub, and one cancellation check moved
+earlier in the multi-segment branch). None of those can change what these
+scenarios execute -- the corpus sweep and the allocation counts were re-run
+against every build and are byte-identical -- but each changed the binary, so
+each window was re-taken. WINDOW 3 is the retained one: it is the build whose
+SHA-256 is in binaries.sha256, and its raw files are the perf-*.txt here.
+
+scenario          metric        window 1    window 2    window 3
+allcells-54016    cycles        -67.78%     -67.69%     -67.85%
+allcells-54016    instructions  -68.43%     -68.43%     -68.46%
+allcells-wcv      cycles        -40.63%     -42.98%     -43.72%
+allcells-wcv      instructions  -37.67%     -37.71%     -37.73%
+fulltext-54016    cycles        -28.62%     -43.50%     -37.61%
+fulltext-54016    instructions  -30.73%     -30.76%     -30.78%
+allcells-cfs      cycles        -28.90%     -28.92%     -27.35%
+allcells-cfs      instructions  -24.14%     -23.61%     -23.67%
+allcells-59858    cycles        -16.21%     -18.25%     -18.73%
+allcells-59858    instructions   -8.86%      -8.86%      -8.90%
+open-54016        cycles         -0.06%      -0.12%      +0.10%
+open-54016        instructions   +0.01%      +0.00%      +0.02%
+
+The instruction column repeats to within 0.53 points on every scenario across
+all three windows, and to within 0.06 on four of six. The cycle column repeats
+to within 3.1 points on five and moves 14.9 points on fulltext-54016, which is
+host state on a machine carrying seven other agents -- the same effect change
+0636 documented across its three windows. Every window puts every scenario in
+the same direction, and the record reads the size of each effect from the
+instruction column and the paired medians.

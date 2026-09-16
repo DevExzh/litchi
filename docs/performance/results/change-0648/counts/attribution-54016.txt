@@ -1,0 +1,8 @@
+before  owned-readat all-cells  reads=16145  bytes=1256139  versions=16117  p50=18.176 ms outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e
+before  owned-readat full-text  reads=16145  bytes=1256139  versions=36503  p50=27.364 ms outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb6
+before  file-source  all-cells  reads=16145  bytes=1256139  versions=16117  p50=24.236 ms outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e
+before  file-source  full-text  reads=16145  bytes=1256139  versions=36503  p50=33.194 ms outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb6
+after   owned-readat all-cells  reads=77     bytes=1158091  versions=49     p50=10.599 ms outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e
+after   owned-readat full-text  reads=77     bytes=1158091  versions=20435  p50=16.587 ms outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb6
+after   file-source  all-cells  reads=77     bytes=1158091  versions=49     p50=10.652 ms outcome=cells:38950:cc68b88da7bdea28644aeb4801cb41fc6e
+after   file-source  full-text  reads=77     bytes=1158091  versions=20435  p50=19.316 ms outcome=text:840804:d88d103e72b84b430a75ed4c0da59ccbb6

@@ -1,0 +1,21 @@
+Three paired-timing windows were run for change 0648, 120 samples per leg in
+each, order A1 B1 B2 A2, CPU 23. Windows 1 and 2 ran against earlier after-probe
+builds, for the reasons cycles-run-history.txt gives; WINDOW 3 is the retained
+one, and its raw legs are the t-*.txt files here.
+
+scenario                  window 1   window 2   window 3   w3 A/A   w3 B/B
+file-allcells-54016        -78.42%    -80.17%    -80.10%   -0.53%   +0.66%
+owned-allcells-54016       -67.70%    -68.10%    -67.64%   +0.87%   +1.01%
+owned-allcells-wcv         -41.11%    -40.54%    -43.82%   -0.01%   -0.11%
+owned-fulltext-54016       -33.08%    -34.98%    -34.89%   -0.19%   +0.46%
+owned-allcells-cfs         -30.59%    -31.06%    -28.15%   +0.02%   +8.16%
+owned-allcells-59858       -16.45%    -17.97%    -16.86%   +0.17%   +0.44%
+owned-open-54016            -0.15%     -0.30%     -0.22%   -0.05%   +0.48%
+
+Every scenario repeats to within 3.3 points at p50 across all three windows and
+to within 1.9 on six of seven, against effects of 17 to 80 points. Window 3's
+A/A floors are at most 0.87% in absolute value. Its one loud B/B is
+owned-allcells-cfs at +8.16%: that after leg runs in 89-96 microseconds and its
+two halves differ by about 7, which is host state, not a property of the change
+-- its A/A floor in the same window is +0.02% and its instruction delta is
+-23.67%. Nothing in the record is read from a single leg.

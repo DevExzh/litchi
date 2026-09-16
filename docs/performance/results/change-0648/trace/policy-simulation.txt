@@ -1,0 +1,56 @@
+
+=== 54016.all-cells.raw  region=225003  resolves=16055  baseline reads=16055 bytes=323234
+  ceiling=   4096  grow512: reads=  8450 bytes= 34540295   flat: reads=  8450 bytes= 34548999
+  ceiling=   8192  grow512: reads=  8262 bytes= 67161879   flat: reads=  8262 bytes= 67186967
+  ceiling=  16384  grow512: reads=  7799 bytes=125755490   flat: reads=  7798 bytes=125805154
+  ceiling=  32768  grow512: reads=  6989 bytes=221629991   flat: reads=  6986 bytes=221696039
+  ceiling=  65536  grow512: reads=  5539 bytes=341656514   flat: reads=  5536 bytes=341848960
+  ceiling= 131072  grow512: reads=  2840 bytes=275301486   flat: reads=  2835 bytes=275398434
+  ceiling= 262144  grow512: reads=    10 bytes=   486635   flat: reads=     1 bytes=   225003
+  ceiling= 524288  grow512: reads=    10 bytes=   486635   flat: reads=     1 bytes=   225003
+  exact-span window       : reads= 11906 bytes=   310560
+  region-only c=65536: reads=16055 bytes=323234 (disabled)
+  region-only c=262144: reads=1 bytes=225003
+  region-only c=524288: reads=1 bytes=225003
+
+=== WithCustomViews.all-cells.raw  region=101121  resolves=862  baseline reads=862 bytes=106319
+  ceiling=   4096  grow512: reads=   770 bytes=  3138889   flat: reads=   770 bytes=  3147593
+  ceiling=   8192  grow512: reads=   726 bytes=  5891959   flat: reads=   726 bytes=  5917047
+  ceiling=  16384  grow512: reads=   683 bytes= 10990581   flat: reads=   682 bytes= 11040245
+  ceiling=  32768  grow512: reads=   525 bytes= 15806829   flat: reads=   524 bytes= 15921862
+  ceiling=  65536  grow512: reads=   225 bytes= 11210996   flat: reads=   217 bytes= 11102829
+  ceiling= 131072  grow512: reads=     9 bytes=   217782   flat: reads=     1 bytes=   101121
+  ceiling= 262144  grow512: reads=     9 bytes=   217782   flat: reads=     1 bytes=   101121
+  ceiling= 524288  grow512: reads=     9 bytes=   217782   flat: reads=     1 bytes=   101121
+  exact-span window       : reads=   838 bytes=   105927
+  region-only c=65536: reads=862 bytes=106319 (disabled)
+  region-only c=262144: reads=1 bytes=101121
+  region-only c=524288: reads=1 bytes=101121
+
+=== ConditionalFormattingSamples.full-text.raw  region=4599  resolves=294  baseline reads=294 bytes=4413
+  ceiling=   4096  grow512: reads=    10 bytes=    26506   flat: reads=     8 bytes=    25611
+  ceiling=   8192  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling=  16384  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling=  32768  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling=  65536  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling= 131072  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling= 262144  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  ceiling= 524288  grow512: reads=     5 bytes=    11203   flat: reads=     1 bytes=     4599
+  exact-span window       : reads=   294 bytes=     4413
+  region-only c=65536: reads=1 bytes=4599
+  region-only c=262144: reads=1 bytes=4599
+  region-only c=524288: reads=1 bytes=4599
+
+=== 54016.full-text.raw  region=225003  resolves=16055  baseline reads=16055 bytes=323234
+  ceiling=   4096  grow512: reads=  8450 bytes= 34540295   flat: reads=  8450 bytes= 34548999
+  ceiling=   8192  grow512: reads=  8262 bytes= 67161879   flat: reads=  8262 bytes= 67186967
+  ceiling=  16384  grow512: reads=  7799 bytes=125755490   flat: reads=  7798 bytes=125805154
+  ceiling=  32768  grow512: reads=  6989 bytes=221629991   flat: reads=  6986 bytes=221696039
+  ceiling=  65536  grow512: reads=  5539 bytes=341656514   flat: reads=  5536 bytes=341848960
+  ceiling= 131072  grow512: reads=  2840 bytes=275301486   flat: reads=  2835 bytes=275398434
+  ceiling= 262144  grow512: reads=    10 bytes=   486635   flat: reads=     1 bytes=   225003
+  ceiling= 524288  grow512: reads=    10 bytes=   486635   flat: reads=     1 bytes=   225003
+  exact-span window       : reads= 11906 bytes=   310560
+  region-only c=65536: reads=16055 bytes=323234 (disabled)
+  region-only c=262144: reads=1 bytes=225003
+  region-only c=524288: reads=1 bytes=225003

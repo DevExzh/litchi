@@ -1,0 +1,11 @@
+case                                         req.b   req.a    bytes.b    bytes.a  digest
+xls_range_source_open                           40      40     317171     317171  identical
+                                           obs same: True  floor 43.02 ms -> 43.02 ms
+xls_range_source_open_list_worksheets           40      40     317171     317171  identical
+                                           obs same: True  floor 43.02 ms -> 43.02 ms
+xls_range_source_open_one_cell                  66      66     933004     933004  identical
+                                           obs same: True  floor 74.90 ms -> 74.90 ms
+xls_range_source_open_all_cells              16145      77    1256139    1158091  CHANGED
+                                           obs same: True  floor 16156.99 ms -> 88.04 ms
+xls_range_source_open_full_text              16145      77    1256139    1158091  CHANGED
+                                           obs same: True  floor 16156.99 ms -> 88.04 ms

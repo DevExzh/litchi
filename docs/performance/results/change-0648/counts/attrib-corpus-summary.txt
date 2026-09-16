@@ -1,0 +1,5 @@
+all-cells  rows=112  reads 23683 -> 2477 (-89.54%)  bytes 6116989 -> 6035372 (-1.33%)  observations 23892 -> 2686 (-88.76%)
+full-text  rows=117  reads 27311 -> 3052 (-88.83%)  bytes 7650840 -> 7506090 (-1.89%)  observations 76890 -> 52631 (-31.55%)
+rows with more reads after: 0
+largest per-row byte increase: 15630 (test-data/poi/test-data/spreadsheet/59858.xls all-cells)
+rows the tool declines: 23
