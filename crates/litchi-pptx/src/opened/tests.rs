@@ -4736,7 +4736,7 @@ fn the_superseded_refusal_does_not_displace_the_durable_byte_limit() -> Result<(
         &plan.patch().to_bytes()?,
         crate::DurablePatchFormat::SlideRemovalV1.magic(),
     );
-    let tight = Limits::new(1, 1, 1, 1, 1).expect("a finite nonzero policy");
+    let tight = Limits::new(1, 1, 1, 1, 1, 1).expect("a finite nonzero policy");
     assert!(matches!(
         SlideRemovalPatch::from_bytes_with_limits(&superseded, tight),
         Err(Error::Limit {
