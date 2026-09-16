@@ -1,0 +1,58 @@
+{
+  "schema": "litchi-perf-change-decision",
+  "schema_version": 1,
+  "change_id": "0637",
+  "title": "The eager PPTX slide catalog is parsed once per borrowed presentation, not once per catalog query",
+  "decision": "retained, implemented in litchi-pptx; PPTX-4 measured and frozen as a design, not implemented",
+  "code_state": "crates/litchi-pptx/src/presentation/{model.rs,package.rs} only; no public API, error type, limit or output byte changed; PresentationPart keeps Copy; no new unsafe and no new dependency",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "change 0587's PPTX-3 measured Presentation::slide(i) at 2.95 M Ir per call on a 200-slide deck because each call re-parses presentation.xml; this reproduces 2.83 M on the same shape and takes a 200-slide by-index walk from 566.0 M to 26.9 M Ir (-95.25%) and from 30.94 ms to 1.54 ms at p50 against a -0.39% A/A floor",
+    "the memo is value-identical by construction: the package and the main part are borrowed for the view's lifetime, so their bytes cannot change while the memo lives, and only successful parses and successful validations are memoized",
+    "the base's asymmetry is preserved, not repaired: slide() and slides() use the unvalidated catalog and slide_count()/slide_references()/write_text_to use the validated one, so no refusal moves; a test pins both fill orders",
+    "78 .pptx fixtures x every catalog-dependent public projection = 1,229 oracle rows per leg are byte-identical, including 11 AmbiguousSlideName refusals and 156 None results",
+    "PPTX-4's size gate is met by 4.6x to 9x (the raw budget scan is 15.4-37.1% of Presentation::text() instructions and 18.6-36.0% of its p50), but fusing the passes relocates two raw-byte limits, moves two refusals and weakens one defence, so it stops at a frozen design"
+  ],
+  "accepted_evidence": {
+    "counts": "callgrind isolation pairs on a retained scratch probe, N=4 and N=24 on shapes.pptx and N=1 and N=4 on the 200-slide deck, differenced and divided, per leg, over thirteen operations",
+    "timing": "paired ABBA (A1 B1 B2 A2), 40 samples per leg-run, taskset -c 13, over eight probe operations and the three selectors change 0587 named; a second 100-sample window re-ran the two eager filesystem selectors beside two controls this change cannot reach",
+    "value_identity": "78 .pptx fixtures under test-data, 1,229 rows per leg covering slide_references, slide_count, slide_size, slide(i) for i in 0..=count with partname, name and text sha256, slides(), find_slide by every observed name plus an impossible one, text() sha256, write_text_to length/sha256/report, content_parts, hyperlinks and slide_masters, each as a value or as the Debug form of the typed error; both legs sha256 11cecb07bdd63262536ad935db7b38dfb117231bbd498edb1b78277e3c088d70",
+    "tests": "four new tests in crates/litchi-pptx/tests/pptx_slide_catalog_memo.rs, all four of which also pass on the unmodified base",
+    "reachability": "callgrind of the filesystem child plus the facade source reading, showing that pptx_file_eager_slide_count and pptx_file_eager_selected_slide time the source-backed facade route, not the eager borrowed view this change edits",
+    "pptx4": "a measurement-only checkout with scan_raw_semantic_text_xml removed, profiled and timed against the base on four decks, with callgrind_annotate inclusive attribution splitting semantic_text_from_part into scan, MCE and parse"
+  },
+  "accepted_costs": {
+    "slide_references_clone": "the public slide_references() returns an owned Vec, so it now clones the memoized catalog instead of moving the freshly parsed one: +46,971 Ir for 200 references (+785 for 6), about 235 Ir per reference",
+    "single_query_timing": "a borrowed view that makes exactly one catalog query is +0.78% to +1.98% at p50 against A/A floors of +0.59% to +2.80%, on paths whose instruction counts did not rise",
+    "retention": "the parsed catalog is held for the life of the borrowed view instead of for the life of each query; bounded by the existing MAX_SLIDES = 100,000 as one u32 and one relationship-ID String per slide",
+    "instruction_counts": "instructions rank work, not latency; callgrind counts rep movsb per byte and runs SHA-256 in software; one deterministic run per leg",
+    "binary_layout": "the two legs are separately linked binaries, and this corpus shows a +/-0.7% instruction spread between them that is not stable in sign"
+  },
+  "known_gaps": {
+    "named_selectors_unreachable": "pptx_file_eager_slide_count and pptx_file_eager_selected_slide, the two scenarios 0587 named for PPTX-3, route their timed query through PresentationImpl::PptxSource and never execute the changed code; both show a shift above the 5% review trigger that this change cannot have caused, reported and chased in a second window rather than averaged away",
+    "facade_reach": "litchi::Presentation builds a fresh package.presentation() per method call, so a facade caller still pays one parse per query; lifting the memo to litchi_pptx::Package needs invalidation at every mutation door and is a separate design",
+    "find_slide_by_name": "unchanged at +0.01% Ir; its cost is the per-slide c_sld_name MCE-plus-parse, which is PPTX-4 territory",
+    "real_producer_reach": "no real 200-slide deck exists under test-data; the large deck is the harness's authored media-rich corpus, and the real fixtures carry 6, 11 and 19 slides",
+    "pptx4_not_implemented": "the fused pass is frozen as a design with four admission conditions, including measuring what fraction of the corpus takes the MCE codec's presence fast path, which decides whether the saving transfers at all"
+  },
+  "withheld": [
+    "any registered speedup, throughput, cold-cache, physical-I/O, range-source, allocation, RSS, concurrency-scaling, real-producer or cross-platform result",
+    "any claim that this change moves pptx_file_eager_slide_count, pptx_file_eager_selected_slide or pptx_semantic_full_text",
+    "any claim that the PPTX-4 prototype is shippable: it deletes an adversarial-input defence and is retained only as an upper bound"
+  ],
+  "provenance": {
+    "base_commit": "c7326f68065edf6f2198ca3cb39c38c48cf00ed9",
+    "branch": "perf/0637-pptx-eager-slide-catalog-memo",
+    "host": "AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, rustc 1.95.0, valgrind 3.26.0",
+    "cpu_pin": "taskset -c 13",
+    "binaries": {
+      "before/litchi-perf-baseline": "2d7421fad0cee46ed59c3dc61895ac7db64d710f240716aafc64e86fb4baa43e",
+      "after/litchi-perf-baseline": "5abbc4669a1f9faaa394fd82b8409b57302cb5c471204d79acf162b2c0d0506c",
+      "before/probe0637-pptx": "9dd79eb475e2beae216581290a4fde15cfc42aa73948b5f5815f85d67861ac91",
+      "after/probe0637-pptx": "dc271313f26410d06ae33426ae74816e1cf79cc5d9487d81e40a560659425195",
+      "prototype/probe0637-pptx": "66efd60a53790db9a25c56759ae15ffd4c1009dee8562ff41ac469a38428faff"
+    },
+    "note": "the before leg is the shared read-only checkout at /home/zhuhe/code/litchi-worktrees/before-c7326f680 with its own CARGO_TARGET_DIR; every timed binary was staged outside a Cargo target directory before being run"
+  }
+}

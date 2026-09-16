@@ -1,0 +1,16 @@
+before-shapes-text-4	55688843
+before-shapes-text-24	288040100
+before-bug62513-text-4	257209074
+before-bug62513-text-24	1330314446
+before-comment45545-text-4	90540055
+before-comment45545-text-24	393784774
+before-deck200-text-1	358449703
+before-deck200-text-4	957438072
+proto-shapes-text-4	38451354
+proto-shapes-text-24	184592202
+proto-bug62513-text-4	224158003
+proto-bug62513-text-24	1131646734
+proto-comment45545-text-4	68683610
+proto-comment45545-text-24	262761721
+proto-deck200-text-1	286116957
+proto-deck200-text-4	667567147

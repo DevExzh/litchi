@@ -1,0 +1,30 @@
+# Which litchi-pptx presentation route the two eager filesystem selectors take
+# (change 0637). Profiled with the AFTER binary on the 200-slide harness deck.
+## pptx_file_eager_selected_slide
+-- symbols from presentation::model (the eager borrowed view this change edits):
+6
+-- symbols from presentation::source (the source-backed catalog, untouched):
+19
+-- named source-backed symbols observed:
+(1364) litchi_pptx::presentation::source::SourceBackedPresentation::from_source_backed_package
+(1366) litchi_pptx::presentation::source::source_catalog
+(1406) litchi_pptx::presentation::source::SourcePart::from_view
+(1408) litchi_pptx::presentation::source::clone_relationship_text
+(1412) litchi_pptx::presentation::source::part_binding
+(1414) litchi_pptx::presentation::source::relationship_bindings
+(1416) litchi_pptx::presentation::source::relationship_binding
+(1430) <litchi_pptx::presentation::source::SourcePart
+## pptx_file_eager_slide_count
+-- symbols from presentation::model (the eager borrowed view this change edits):
+6
+-- symbols from presentation::source (the source-backed catalog, untouched):
+19
+-- named source-backed symbols observed:
+(1364) litchi_pptx::presentation::source::SourceBackedPresentation::from_source_backed_package
+(1366) litchi_pptx::presentation::source::source_catalog
+(1406) litchi_pptx::presentation::source::SourcePart::from_view
+(1408) litchi_pptx::presentation::source::clone_relationship_text
+(1412) litchi_pptx::presentation::source::part_binding
+(1414) litchi_pptx::presentation::source::relationship_bindings
+(1416) litchi_pptx::presentation::source::relationship_binding
+(1430) <litchi_pptx::presentation::source::SourcePart

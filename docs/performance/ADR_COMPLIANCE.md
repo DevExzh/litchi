@@ -1,5 +1,41 @@
 # Performance optimization ADR-compliance matrix
 
+## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
+
+Record: [0637](0637-pptx-eager-slide-catalog-memo.md).
+
+**ADR 0005 (bounded resources; caching semantically invisible).** The memo is
+per-view state on a borrowed value, created by `Presentation::new` and dropped
+with the view — not a process cache and not ambient state. What it retains is
+the catalog itself, one `u32` and one relationship-ID `String` per slide,
+bounded by the existing `MAX_SLIDES` = 100,000; before this change the same
+`Vec` was allocated and freed inside each query, so the change is in lifetime,
+not in ceiling. No limit is relocated, weakened or renamed: `MAX_SLIDES`,
+`MAX_PART_XML_BYTES` and the semantic MCE limits are enforced by the same parse
+on the same bytes at the same point. "Semantically invisible" is measured rather
+than asserted: 1,229 oracle rows over 78 fixtures — catalogs, counts, slide
+sizes, per-index partnames, names and text digests, by-name lookups, whole-deck
+text, sink length, digest and report, content parts, hyperlinks and masters —
+are byte-identical between the legs, values and typed errors alike. **ADR 0006
+(validation, fail-closed, preservation by default).** Every mandatory validation
+still runs; it runs once per borrowed view instead of once per query. The
+whole-catalog preflight `write_text_to` performs before its first sink byte is
+kept deliberately, including the per-reference resolution it duplicates, and a
+test proves zero bytes escape a refused catalog even when the unvalidated memo
+was filled first. Only successful parses and successful validations are
+memoized, so a refusal is recomputed from immutable bytes and is identical every
+time. **ADR 0003 (no hidden global state, no ambient I/O).** `OnceLock` keeps
+`Presentation: Sync`; a race stores one of two value-identical catalogs. No
+lock, executor or archive type appears in any public signature; no new `unsafe`
+(the crate is `#![forbid(unsafe_code)]`); no new dependency. `PresentationPart`
+keeps `Copy` and its public API, which is why the memo lives on `Presentation`.
+**One contract finding, not fixed.** PPTX-4's fusion would move
+`MAX_SEMANTIC_TEXT_RAW_XML_BYTES` and `MAX_SEMANTIC_TEXT_EVENT_BYTES` from raw
+bytes onto MCE-processed bytes, move the DTD and processing-instruction
+refusals behind the codec, and stop refusing malformed comments inside
+discarded `mc:Fallback` branches. It is frozen as a design with four admission
+conditions rather than implemented, although its size gate is met by 4.6× to 9×.
+
 ## 0639 — one unbounded ingress removed, one refusal respected instead of provoked, no boundary moved
 
 Record: [0639](0639-gate-list-gaps-and-two-dead-paths.md).

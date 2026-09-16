@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0637: the eager PPTX slide catalog is parsed once per borrowed presentation, not once per query — a 200-slide by-index walk loses 95% of its instructions
+
+Record: [0637](0637-pptx-eager-slide-catalog-memo.md).
+
+**PPTX-3 is closed, and it closed with a correction to its own scenario list.**
+`Presentation::slide(i)` re-parsed `presentation.xml` on every call, so an
+ordinary by-index walk of a deck was quadratic: change 0587 measured 2.95 M Ir
+per call on 200 slides and this batch reproduces 2.83 M. One `OnceLock` on the
+borrowed view takes the whole walk from **566.0 M to 26.9 M Ir (−95.25%)** and
+from **30.94 ms to 1.54 ms at p50** against a −0.39% A/A floor; eight repeated
+`slide_count()` calls fall 86.9%, and a three-query session 16.5%. The
+correction matters more than the number. 0587 named
+`pptx_file_eager_slide_count` and `pptx_file_eager_selected_slide` as this
+item's scenarios, and **neither reaches the eager view**: both build their root
+with `litchi::Presentation::from_bytes`, which for a valid `.pptx` returns
+`PresentationImpl::PptxSource`, the source-backed catalog of changes 0120 and
+0375. The names are wrong by a factor of a hundred — those selectors time a
+`slide_count()` at 2.13 µs where the eager call costs 202 µs on the same deck.
+Every "eager" PPTX and DOCX filesystem selector should be re-read with that in
+mind before it is cited again, and the queue needs a selector that actually
+drives the eager borrowed facade. What remains in this area is **PPTX-4**, now
+measured for the first time: the raw budget scan is **41.7% of the instructions
+`semantic_text_from_part` spends per slide** (MCE 21.8%, parse 36.5%), worth
+15.4-37.1% of a whole `text()` — but fusing it is a contract change and is
+frozen as a design, not implemented. The next eager-PPTX item after that is the
+facade itself: `litchi::Presentation` constructs a fresh `package.presentation()`
+on every method call, so a facade caller still pays one parse per query even
+after this change.
+
 ## 0639 — the two suites the standing gate list could not see, the demo step that could never succeed, and one unbounded ingress deleted
 
 Three leftovers from the first wave, none of them a performance measurement. **(a)** Changes [0619](0619-harness-xls-lifecycle-assertion.md) and [0629](0629-facade-docx-budget-test-bisect.md) each found a test red for tens of records — 54 and 94 respectively — for the same structural reason, and 0629's own audit paragraph named the fix: "A feature-bearing `cargo test -p litchi` belongs in the standing gate list." `tools/non_iwork_gate.py` now has two single-command modes and `.github/workflows/rust-ci.yml`'s existing `non-iwork-release-gate` job runs both with a `--record-file`, placed before the 45-root `check` sweep so a stale expectation fails in minutes. `facade-format-tests` is `cargo test --package litchi --no-default-features --features docx,pptx,xls,xlsx --lib --tests --no-fail-fast -- --test-threads=1`: `litchi`'s `default = []`, so a bare `cargo test -p litchi` compiles almost none of the facade's tests — **20 targets, 0 passed, 0 failed on this branch** — and those four leaves are the smallest closure that compiles the DOCX, XLSX, PPTX and XLS ones, since each pulls its own substrate (`opc`, `ooxml-common`, `drawingml`, `sheet`, `cfb`, `ole`) through Cargo's feature graph; together they account for **998 of the 2,331** `feature = "…"` `cfg` sites under `crates/litchi`. `harness-tests` is the same shape over `--manifest-path tools/perf-baseline/Cargo.toml`, a separate Cargo project with its own `[workspace]` table that no `--workspace`, `--package` or exclusion selection in this gate reaches; it does **not** serialize its test threads, because a standalone project has none of the 45-root link fan-out the bulk modes serialize against and serializing it measured 1,869.73 s of test execution against 581.14 s for the same 531 passing tests. `--no-fail-fast` is on both, for the reason the workflow's own `cargo test` job already documents: Cargo otherwise stops at the first failing target and silently skips every later test binary. Six unit tests (51 → 57) pin the two modes' exact argv, their determinism, the sorted four-feature selection and its membership in the plan's **safe** facade closure, the relative manifest path, the `GateError` raised when the manifest is absent, the harness manifest's freedom from any iWork dependency, and `rust-ci.yml` invoking both with a `--record-file` before `check`. **Both modes are green at the base** — 231/0/0 over 25 targets and 531/0/1 over 18 — so neither reveals a pre-existing failure to attribute. **(b)** Change [0607](0607-pptx-authored-slide-regeneration-design.md) recorded as report-only that `crates/litchi/examples/office_crud_demo.rs` performs its PPTX UPDATE as `Package::open` then `presentation_mut()`, which its census refuses on all 78 corpus decks and on litchi's own output; that is reproduced here exactly, the example exiting **1** with `UnsafeEdit { operation: "presentation_mut" }` after writing five of its six promised files. The step now uses `opened_presentation_transaction` → `set_shape_text`/`add_text_box` → `commit` → `apply_opened_presentation_commit`, the route changes 0590 and 0598 own, and the example exits **0**. The save is a per-part delta, measured member by member: **43 members before and after, order identical, 42 byte-identical, one changed** (`ppt/slides/slide3.xml`, 1,584 → 2,154 bytes), none added, none removed. **(c)** `refine_workbook_format` (`crates/litchi/src/sheet/workbook_types.rs`), which change [0587](0587-remaining-opportunity-survey.md)'s CORE section called "a public, dead, whole-input slurp of any `Read` — a latent GOAL-hypothesis-1 ingress if it is ever wired", is deleted with its one test and its sole import: **66 lines out, 0 in, 0 callers**, and it was never public — `sheet/mod.rs` declares `mod workbook_types;` with no visibility modifier and re-exports nothing from it, which the rustdoc comparison confirms at **8,086 documented item pages before and after, empty diff**. `crates/litchi/src` now has **no production `read_to_end` site at all**. `performance_claim: none`; no production read path changed and no library operation was timed, so no A/A floor applies. OLE2/OOXML remain active; ODF is deferred until completion and iWork excluded. [Record and limitations](0639-gate-list-gaps-and-two-dead-paths.md); [retained evidence](results/change-0639/README.md).

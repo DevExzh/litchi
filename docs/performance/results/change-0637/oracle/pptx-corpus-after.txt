@@ -1,0 +1,1229 @@
+import-mce.pptx	slide_references	ok	1
+import-mce.pptx	reference[0]	ok	id=256 rid=rId2
+import-mce.pptx	slide_count	ok	1
+import-mce.pptx	slide_size	ok	9144000x6858000
+import-mce.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=2 sha=abfbd10daf8965c8860b3582af942d7a7cac972b31d1c50f382b67d9b6c07365
+import-mce.pptx	slide[1]	none	-
+import-mce.pptx	slides	ok	1
+import-mce.pptx	find[]	ok	/ppt/slides/slide1.xml
+import-mce.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+import-mce.pptx	text	ok	len=2 sha=abfbd10daf8965c8860b3582af942d7a7cac972b31d1c50f382b67d9b6c07365
+import-mce.pptx	write_text_to	ok	len=2 sha=abfbd10daf8965c8860b3582af942d7a7cac972b31d1c50f382b67d9b6c07365 report=TextOutputReport { bytes_written: 2, objects_written: 1 }
+import-mce.pptx	content_parts	ok	0
+import-mce.pptx	hyperlinks	ok	0
+import-mce.pptx	slide_masters	ok	1
+shape-text-alignment.pptx	slide_references	ok	1
+shape-text-alignment.pptx	reference[0]	ok	id=256 rid=rId2
+shape-text-alignment.pptx	slide_count	ok	1
+shape-text-alignment.pptx	slide_size	ok	9144000x6858000
+shape-text-alignment.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=60 sha=ddbc63783474890c4cd91787378b2b8692326902feb4874582685830d8434bf4
+shape-text-alignment.pptx	slide[1]	none	-
+shape-text-alignment.pptx	slides	ok	1
+shape-text-alignment.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-text-alignment.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-text-alignment.pptx	text	ok	len=60 sha=ddbc63783474890c4cd91787378b2b8692326902feb4874582685830d8434bf4
+shape-text-alignment.pptx	write_text_to	ok	len=60 sha=ddbc63783474890c4cd91787378b2b8692326902feb4874582685830d8434bf4 report=TextOutputReport { bytes_written: 60, objects_written: 1 }
+shape-text-alignment.pptx	content_parts	ok	0
+shape-text-alignment.pptx	hyperlinks	ok	0
+shape-text-alignment.pptx	slide_masters	ok	1
+tdf131082.pptx	slide_references	ok	1
+tdf131082.pptx	reference[0]	ok	id=2777 rid=rId2
+tdf131082.pptx	slide_count	ok	1
+tdf131082.pptx	slide_size	ok	12858750x7232650
+tdf131082.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=6 sha=bb206082bca8e3ffffba3b4ef394518db800a1fec4b3ba19f7461e35ab664fc5
+tdf131082.pptx	slide[1]	none	-
+tdf131082.pptx	slides	ok	1
+tdf131082.pptx	find[]	ok	/ppt/slides/slide1.xml
+tdf131082.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+tdf131082.pptx	text	ok	len=6 sha=bb206082bca8e3ffffba3b4ef394518db800a1fec4b3ba19f7461e35ab664fc5
+tdf131082.pptx	write_text_to	ok	len=6 sha=bb206082bca8e3ffffba3b4ef394518db800a1fec4b3ba19f7461e35ab664fc5 report=TextOutputReport { bytes_written: 6, objects_written: 1 }
+tdf131082.pptx	content_parts	ok	0
+tdf131082.pptx	hyperlinks	ok	0
+tdf131082.pptx	slide_masters	ok	1
+BoldonseFontEmbedded.pptx	slide_references	ok	1
+BoldonseFontEmbedded.pptx	reference[0]	ok	id=256 rid=rId2
+BoldonseFontEmbedded.pptx	slide_count	ok	1
+BoldonseFontEmbedded.pptx	slide_size	ok	12192000x6858000
+BoldonseFontEmbedded.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=4 sha=532eaabd9574880dbf76b9b8cc00832c20a6ec113d682299550d7a6e0f345e25
+BoldonseFontEmbedded.pptx	slide[1]	none	-
+BoldonseFontEmbedded.pptx	slides	ok	1
+BoldonseFontEmbedded.pptx	find[]	ok	/ppt/slides/slide1.xml
+BoldonseFontEmbedded.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+BoldonseFontEmbedded.pptx	text	ok	len=4 sha=532eaabd9574880dbf76b9b8cc00832c20a6ec113d682299550d7a6e0f345e25
+BoldonseFontEmbedded.pptx	write_text_to	ok	len=4 sha=532eaabd9574880dbf76b9b8cc00832c20a6ec113d682299550d7a6e0f345e25 report=TextOutputReport { bytes_written: 4, objects_written: 1 }
+BoldonseFontEmbedded.pptx	content_parts	ok	0
+BoldonseFontEmbedded.pptx	hyperlinks	ok	0
+BoldonseFontEmbedded.pptx	slide_masters	ok	1
+ole.pptx	slide_references	ok	1
+ole.pptx	reference[0]	ok	id=256 rid=rId2
+ole.pptx	slide_count	ok	1
+ole.pptx	slide_size	ok	12192000x6858000
+ole.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+ole.pptx	slide[1]	none	-
+ole.pptx	slides	ok	1
+ole.pptx	find[]	ok	/ppt/slides/slide1.xml
+ole.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+ole.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+ole.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+ole.pptx	content_parts	ok	0
+ole.pptx	hyperlinks	ok	0
+ole.pptx	slide_masters	ok	1
+slide-section-test.pptx	slide_references	ok	13
+slide-section-test.pptx	reference[0]	ok	id=256 rid=rId13
+slide-section-test.pptx	reference[1]	ok	id=257 rid=rId14
+slide-section-test.pptx	reference[2]	ok	id=258 rid=rId15
+slide-section-test.pptx	reference[3]	ok	id=259 rid=rId16
+slide-section-test.pptx	reference[4]	ok	id=260 rid=rId17
+slide-section-test.pptx	reference[5]	ok	id=261 rid=rId18
+slide-section-test.pptx	reference[6]	ok	id=262 rid=rId19
+slide-section-test.pptx	reference[7]	ok	id=263 rid=rId20
+slide-section-test.pptx	reference[8]	ok	id=264 rid=rId21
+slide-section-test.pptx	reference[9]	ok	id=265 rid=rId22
+slide-section-test.pptx	reference[10]	ok	id=266 rid=rId23
+slide-section-test.pptx	reference[11]	ok	id=267 rid=rId24
+slide-section-test.pptx	reference[12]	ok	id=268 rid=rId25
+slide-section-test.pptx	slide_count	ok	13
+slide-section-test.pptx	slide_size	ok	10077450x5668963
+slide-section-test.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=9 sha=b5584a1464119498204d2bffb86944984de652acb277cb0d2a6810944ee13350
+slide-section-test.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=1 sha=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+slide-section-test.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=1 sha=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+slide-section-test.pptx	slide[6]	ok	part=/ppt/slides/slide7.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[7]	ok	part=/ppt/slides/slide8.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[8]	ok	part=/ppt/slides/slide9.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[9]	ok	part=/ppt/slides/slide10.xml name= text=len=1 sha=4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+slide-section-test.pptx	slide[10]	ok	part=/ppt/slides/slide11.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[11]	ok	part=/ppt/slides/slide12.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[12]	ok	part=/ppt/slides/slide13.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+slide-section-test.pptx	slide[13]	none	-
+slide-section-test.pptx	slides	ok	13
+slide-section-test.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 13 }
+slide-section-test.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+slide-section-test.pptx	text	ok	len=15 sha=2c681b175d1ebcef3bb8560637400b31e7e0e556c64488b0abd44f93816dbb67
+slide-section-test.pptx	write_text_to	ok	len=36 sha=96148edef74d6224575acc8f487373e7c5d43b94f5ec2247314eba5d947d806c report=TextOutputReport { bytes_written: 36, objects_written: 13 }
+slide-section-test.pptx	content_parts	ok	0
+slide-section-test.pptx	hyperlinks	ok	0
+slide-section-test.pptx	slide_masters	ok	11
+slide-sections.pptx	slide_references	ok	7
+slide-sections.pptx	reference[0]	ok	id=401 rid=rId4
+slide-sections.pptx	reference[1]	ok	id=377 rid=rId5
+slide-sections.pptx	reference[2]	ok	id=366 rid=rId6
+slide-sections.pptx	reference[3]	ok	id=402 rid=rId7
+slide-sections.pptx	reference[4]	ok	id=403 rid=rId8
+slide-sections.pptx	reference[5]	ok	id=404 rid=rId9
+slide-sections.pptx	reference[6]	ok	id=309 rid=rId10
+slide-sections.pptx	slide_count	ok	7
+slide-sections.pptx	slide_size	ok	12192000x6858000
+slide-sections.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=374 sha=605c0528c1ccc93610992046ec66b84d7252e9311f51987127fa1858bd4c2a1c
+slide-sections.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=374 sha=f2c0839625c61df65bad8830849ea98124a78d7466bc9ac3fef92a1cd48ee662
+slide-sections.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=374 sha=fa25c44d8556dda65d0f8385f1761a29e9506a25ad6dd220c016a0083a69407e
+slide-sections.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=374 sha=605c0528c1ccc93610992046ec66b84d7252e9311f51987127fa1858bd4c2a1c
+slide-sections.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=374 sha=f2c0839625c61df65bad8830849ea98124a78d7466bc9ac3fef92a1cd48ee662
+slide-sections.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=374 sha=fa25c44d8556dda65d0f8385f1761a29e9506a25ad6dd220c016a0083a69407e
+slide-sections.pptx	slide[6]	ok	part=/ppt/slides/slide7.xml name= text=len=46 sha=a19816858b6dceaaa74e633a195ac23179fe61474b28590ac3ec60f91e3d397b
+slide-sections.pptx	slide[7]	none	-
+slide-sections.pptx	slides	ok	7
+slide-sections.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 7 }
+slide-sections.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+slide-sections.pptx	text	ok	len=2296 sha=41bdecc7b143273101efa87c338395c95e72f585c811aca225b4f6ec8abc3403
+slide-sections.pptx	write_text_to	ok	len=2302 sha=443f44cb3defb22cf288520f7d9f5b04673fa0fac0eecb71cf2999a85dedb055 report=TextOutputReport { bytes_written: 2302, objects_written: 7 }
+slide-sections.pptx	content_parts	ok	0
+slide-sections.pptx	hyperlinks	ok	1
+slide-sections.pptx	slide_masters	ok	3
+tdf103477.pptx	slide_references	ok	1
+tdf103477.pptx	reference[0]	ok	id=376 rid=rId2
+tdf103477.pptx	slide_count	ok	1
+tdf103477.pptx	slide_size	ok	9144000x6858000
+tdf103477.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=48 sha=2790e5609a2f02124e5acbf0a00df4c6e786f90ce5479ca629e9aaebea0f48a3
+tdf103477.pptx	slide[1]	none	-
+tdf103477.pptx	slides	ok	1
+tdf103477.pptx	find[]	ok	/ppt/slides/slide1.xml
+tdf103477.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+tdf103477.pptx	text	ok	len=48 sha=2790e5609a2f02124e5acbf0a00df4c6e786f90ce5479ca629e9aaebea0f48a3
+tdf103477.pptx	write_text_to	ok	len=48 sha=2790e5609a2f02124e5acbf0a00df4c6e786f90ce5479ca629e9aaebea0f48a3 report=TextOutputReport { bytes_written: 48, objects_written: 1 }
+tdf103477.pptx	content_parts	ok	0
+tdf103477.pptx	hyperlinks	ok	0
+tdf103477.pptx	slide_masters	ok	1
+tdf114821.pptx	slide_references	ok	1
+tdf114821.pptx	reference[0]	ok	id=256 rid=rId2
+tdf114821.pptx	slide_count	ok	1
+tdf114821.pptx	slide_size	ok	12192000x6858000
+tdf114821.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+tdf114821.pptx	slide[1]	none	-
+tdf114821.pptx	slides	ok	1
+tdf114821.pptx	find[]	ok	/ppt/slides/slide1.xml
+tdf114821.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+tdf114821.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+tdf114821.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+tdf114821.pptx	content_parts	ok	0
+tdf114821.pptx	hyperlinks	ok	0
+tdf114821.pptx	slide_masters	ok	1
+tdf89064.pptx	slide_references	ok	1
+tdf89064.pptx	reference[0]	ok	id=256 rid=rId4
+tdf89064.pptx	slide_count	ok	1
+tdf89064.pptx	slide_size	ok	10080625x7559675
+tdf89064.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+tdf89064.pptx	slide[1]	none	-
+tdf89064.pptx	slides	ok	1
+tdf89064.pptx	find[]	ok	/ppt/slides/slide1.xml
+tdf89064.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+tdf89064.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+tdf89064.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+tdf89064.pptx	content_parts	ok	0
+tdf89064.pptx	hyperlinks	ok	0
+tdf89064.pptx	slide_masters	ok	1
+shapes-litchi.pptx	slide_references	ok	6
+shapes-litchi.pptx	reference[0]	ok	id=256 rid=rId3
+shapes-litchi.pptx	reference[1]	ok	id=257 rid=rId4
+shapes-litchi.pptx	reference[2]	ok	id=258 rid=rId5
+shapes-litchi.pptx	reference[3]	ok	id=259 rid=rId6
+shapes-litchi.pptx	reference[4]	ok	id=260 rid=rId7
+shapes-litchi.pptx	reference[5]	ok	id=261 rid=rId8
+shapes-litchi.pptx	slide_count	ok	6
+shapes-litchi.pptx	slide_size	ok	9144000x6858000
+shapes-litchi.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=79 sha=37bd162a8d560aefdaf9605be6a5b63020d61f1720f526978b19f16d559cc975
+shapes-litchi.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=36 sha=0a82bd9fa567ad30598b3aa49cba9c8ab2596a0de4f2e0a165bf4253438b4318
+shapes-litchi.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes-litchi.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=65 sha=de27f3915cc08e5bb18c54841db1b27a32850405ef84dfbe40810d8d852e4ce1
+shapes-litchi.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=160 sha=40a5b4a8ecaf31ba3468e4892c07d6842d145a713d53c2e1b0e8aa421c9bac1a
+shapes-litchi.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes-litchi.pptx	slide[6]	none	-
+shapes-litchi.pptx	slides	ok	6
+shapes-litchi.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 6 }
+shapes-litchi.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shapes-litchi.pptx	text	ok	len=343 sha=7eefc4404b937f7a8f991bd2b70960acf832580dcdafe909a666060ac3d4a0ef
+shapes-litchi.pptx	write_text_to	ok	len=350 sha=9a065f6cb7989ebdbb5c181ec452ea84a398e6f6b799c71490ffad6462ba124b report=TextOutputReport { bytes_written: 350, objects_written: 6 }
+shapes-litchi.pptx	content_parts	ok	0
+shapes-litchi.pptx	hyperlinks	ok	3
+shapes-litchi.pptx	slide_masters	ok	1
+shapes-litchi.pptx	slide_references	ok	6
+shapes-litchi.pptx	reference[0]	ok	id=256 rid=rId2
+shapes-litchi.pptx	reference[1]	ok	id=258 rid=rId3
+shapes-litchi.pptx	reference[2]	ok	id=257 rid=rId4
+shapes-litchi.pptx	reference[3]	ok	id=259 rid=rId5
+shapes-litchi.pptx	reference[4]	ok	id=260 rid=rId6
+shapes-litchi.pptx	reference[5]	ok	id=261 rid=rId7
+shapes-litchi.pptx	slide_count	ok	6
+shapes-litchi.pptx	slide_size	ok	9144000x6858000
+shapes-litchi.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=79 sha=37bd162a8d560aefdaf9605be6a5b63020d61f1720f526978b19f16d559cc975
+shapes-litchi.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=36 sha=0a82bd9fa567ad30598b3aa49cba9c8ab2596a0de4f2e0a165bf4253438b4318
+shapes-litchi.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes-litchi.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=65 sha=de27f3915cc08e5bb18c54841db1b27a32850405ef84dfbe40810d8d852e4ce1
+shapes-litchi.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=162 sha=adb6245a0853d09340cddfc51c255e660f0efe714b3a7d1cd226153a985aee50
+shapes-litchi.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes-litchi.pptx	slide[6]	none	-
+shapes-litchi.pptx	slides	ok	6
+shapes-litchi.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 6 }
+shapes-litchi.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shapes-litchi.pptx	text	ok	len=345 sha=a0f09fc9399e7cc699dba8e86dc99f6d3d0b971ae970fcf5ff50582f4c8964ec
+shapes-litchi.pptx	write_text_to	ok	len=352 sha=06c7ca7e2f2f2106dd7c0d69ef496696b8fe1e1eb16e6cde9d7fc44cae85ff60 report=TextOutputReport { bytes_written: 352, objects_written: 6 }
+shapes-litchi.pptx	content_parts	ok	0
+shapes-litchi.pptx	hyperlinks	ok	3
+shapes-litchi.pptx	slide_masters	ok	1
+SmartArt.pptx	slide_references	ok	1
+SmartArt.pptx	reference[0]	ok	id=256 rid=rId2
+SmartArt.pptx	slide_count	ok	1
+SmartArt.pptx	slide_size	ok	12192000x6858000
+SmartArt.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SmartArt.pptx	slide[1]	none	-
+SmartArt.pptx	slides	ok	1
+SmartArt.pptx	find[]	ok	/ppt/slides/slide1.xml
+SmartArt.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+SmartArt.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SmartArt.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+SmartArt.pptx	content_parts	ok	0
+SmartArt.pptx	hyperlinks	ok	0
+SmartArt.pptx	slide_masters	ok	1
+activex_checkbox.pptx	slide_references	ok	1
+activex_checkbox.pptx	reference[0]	ok	id=256 rid=rId2
+activex_checkbox.pptx	slide_count	ok	1
+activex_checkbox.pptx	slide_size	ok	12192000x6858000
+activex_checkbox.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+activex_checkbox.pptx	slide[1]	none	-
+activex_checkbox.pptx	slides	ok	1
+activex_checkbox.pptx	find[]	ok	/ppt/slides/slide1.xml
+activex_checkbox.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+activex_checkbox.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+activex_checkbox.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+activex_checkbox.pptx	content_parts	ok	0
+activex_checkbox.pptx	hyperlinks	ok	0
+activex_checkbox.pptx	slide_masters	ok	1
+backgrounds.pptx	slide_references	ok	4
+backgrounds.pptx	reference[0]	ok	id=256 rid=rId2
+backgrounds.pptx	reference[1]	ok	id=257 rid=rId3
+backgrounds.pptx	reference[2]	ok	id=259 rid=rId4
+backgrounds.pptx	reference[3]	ok	id=258 rid=rId5
+backgrounds.pptx	slide_count	ok	4
+backgrounds.pptx	slide_size	ok	9144000x6858000
+backgrounds.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=55 sha=f65bf77de325db707be03e6e0672cb6b2655765a0a2965f67d688355b4ec4919
+backgrounds.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=28 sha=dbf1bac3aadbe0f3be9b028f84c75e44ee896a898f49d5443bf54af8126a8736
+backgrounds.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=26 sha=02ead1aa6798410b7e0e87e87c060abfdbda907fa69d536af324a718cfd9c832
+backgrounds.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=44 sha=88303ed193781bcdbfd398d86b1c59eb1b527bfcd606a701805e120094b65c0d
+backgrounds.pptx	slide[4]	none	-
+backgrounds.pptx	slides	ok	4
+backgrounds.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 4 }
+backgrounds.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+backgrounds.pptx	text	ok	len=156 sha=2344ff762944af6cc86e61d6ab768a67fc959620cde833df0fda30e1b7603c30
+backgrounds.pptx	write_text_to	ok	len=159 sha=58c0b200cbfbab5d30c3f466761fbf245a7141c66aa787148f2bb593dbba4f8f report=TextOutputReport { bytes_written: 159, objects_written: 4 }
+backgrounds.pptx	content_parts	ok	0
+backgrounds.pptx	hyperlinks	ok	0
+backgrounds.pptx	slide_masters	ok	1
+connectorConnection.pptx	slide_references	ok	1
+connectorConnection.pptx	reference[0]	ok	id=256 rid=rId2
+connectorConnection.pptx	slide_count	ok	1
+connectorConnection.pptx	slide_size	ok	12192000x6858000
+connectorConnection.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+connectorConnection.pptx	slide[1]	none	-
+connectorConnection.pptx	slides	ok	1
+connectorConnection.pptx	find[]	ok	/ppt/slides/slide1.xml
+connectorConnection.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+connectorConnection.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+connectorConnection.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+connectorConnection.pptx	content_parts	ok	0
+connectorConnection.pptx	hyperlinks	ok	0
+connectorConnection.pptx	slide_masters	ok	1
+curvedConnectors.pptx	slide_references	ok	1
+curvedConnectors.pptx	reference[0]	ok	id=256 rid=rId2
+curvedConnectors.pptx	slide_count	ok	1
+curvedConnectors.pptx	slide_size	ok	12192000x6858000
+curvedConnectors.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+curvedConnectors.pptx	slide[1]	none	-
+curvedConnectors.pptx	slides	ok	1
+curvedConnectors.pptx	find[]	ok	/ppt/slides/slide1.xml
+curvedConnectors.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+curvedConnectors.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+curvedConnectors.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+curvedConnectors.pptx	content_parts	ok	0
+curvedConnectors.pptx	hyperlinks	ok	0
+curvedConnectors.pptx	slide_masters	ok	1
+elbowConnectors.pptx	slide_references	ok	1
+elbowConnectors.pptx	reference[0]	ok	id=256 rid=rId2
+elbowConnectors.pptx	slide_count	ok	1
+elbowConnectors.pptx	slide_size	ok	12192000x6858000
+elbowConnectors.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+elbowConnectors.pptx	slide[1]	none	-
+elbowConnectors.pptx	slides	ok	1
+elbowConnectors.pptx	find[]	ok	/ppt/slides/slide1.xml
+elbowConnectors.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+elbowConnectors.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+elbowConnectors.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+elbowConnectors.pptx	content_parts	ok	0
+elbowConnectors.pptx	hyperlinks	ok	0
+elbowConnectors.pptx	slide_masters	ok	1
+line-chart.pptx	slide_references	ok	1
+line-chart.pptx	reference[0]	ok	id=256 rid=rId2
+line-chart.pptx	slide_count	ok	1
+line-chart.pptx	slide_size	ok	9144000x6858000
+line-chart.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=16 sha=388dcdb3e57f432074738af734076f7d2c14f64d4de0a0485d4b77896f3e7b1f
+line-chart.pptx	slide[1]	none	-
+line-chart.pptx	slides	ok	1
+line-chart.pptx	find[]	ok	/ppt/slides/slide1.xml
+line-chart.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+line-chart.pptx	text	ok	len=16 sha=388dcdb3e57f432074738af734076f7d2c14f64d4de0a0485d4b77896f3e7b1f
+line-chart.pptx	write_text_to	ok	len=16 sha=388dcdb3e57f432074738af734076f7d2c14f64d4de0a0485d4b77896f3e7b1f report=TextOutputReport { bytes_written: 16, objects_written: 1 }
+line-chart.pptx	content_parts	ok	0
+line-chart.pptx	hyperlinks	ok	0
+line-chart.pptx	slide_masters	ok	1
+pie-chart.pptx	slide_references	ok	1
+pie-chart.pptx	reference[0]	ok	id=256 rid=rId2
+pie-chart.pptx	slide_count	ok	1
+pie-chart.pptx	slide_size	ok	9144000x6858000
+pie-chart.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=12 sha=e639fa5692febe873f4e65846516e84f4c0c3ed59e720d9d58e3f2dd301bdfa8
+pie-chart.pptx	slide[1]	none	-
+pie-chart.pptx	slides	ok	1
+pie-chart.pptx	find[]	ok	/ppt/slides/slide1.xml
+pie-chart.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+pie-chart.pptx	text	ok	len=12 sha=e639fa5692febe873f4e65846516e84f4c0c3ed59e720d9d58e3f2dd301bdfa8
+pie-chart.pptx	write_text_to	ok	len=12 sha=e639fa5692febe873f4e65846516e84f4c0c3ed59e720d9d58e3f2dd301bdfa8 report=TextOutputReport { bytes_written: 12, objects_written: 1 }
+pie-chart.pptx	content_parts	ok	0
+pie-chart.pptx	hyperlinks	ok	0
+pie-chart.pptx	slide_masters	ok	1
+radar-chart.pptx	slide_references	ok	1
+radar-chart.pptx	reference[0]	ok	id=256 rid=rId2
+radar-chart.pptx	slide_count	ok	1
+radar-chart.pptx	slide_size	ok	9144000x6858000
+radar-chart.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=16 sha=26283a085b22f85f22e6bc0679495aca15d9dcc036161647dce175731d531b28
+radar-chart.pptx	slide[1]	none	-
+radar-chart.pptx	slides	ok	1
+radar-chart.pptx	find[]	ok	/ppt/slides/slide1.xml
+radar-chart.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+radar-chart.pptx	text	ok	len=16 sha=26283a085b22f85f22e6bc0679495aca15d9dcc036161647dce175731d531b28
+radar-chart.pptx	write_text_to	ok	len=16 sha=26283a085b22f85f22e6bc0679495aca15d9dcc036161647dce175731d531b28 report=TextOutputReport { bytes_written: 16, objects_written: 1 }
+radar-chart.pptx	content_parts	ok	0
+radar-chart.pptx	hyperlinks	ok	0
+radar-chart.pptx	slide_masters	ok	1
+sample.pptx	slide_references	ok	2
+sample.pptx	reference[0]	ok	id=256 rid=rId2
+sample.pptx	reference[1]	ok	id=257 rid=rId3
+sample.pptx	slide_count	ok	2
+sample.pptx	slide_size	ok	9144000x6858000
+sample.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=82 sha=ab73ca11e2679a2a9c5a16e5f58e23f65097b9df0c36301b30adb38bef556fbe
+sample.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=53 sha=ae560e549eac9fdbceb9a85fb666e1d395d09883f588dd1adbb678172682f819
+sample.pptx	slide[2]	none	-
+sample.pptx	slides	ok	2
+sample.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 2 }
+sample.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+sample.pptx	text	ok	len=136 sha=b3c71c88fdf20bfba61d5b31a9f827f5d12cf3056bd88eea9206f163b2b0617b
+sample.pptx	write_text_to	ok	len=137 sha=b922932d559e3c41b10e0710d9b07b487d3ec5b00e0ba069fc1b918ef3a93d44 report=TextOutputReport { bytes_written: 137, objects_written: 2 }
+sample.pptx	content_parts	ok	0
+sample.pptx	hyperlinks	ok	0
+sample.pptx	slide_masters	ok	1
+scatter-chart.pptx	slide_references	ok	1
+scatter-chart.pptx	reference[0]	ok	id=256 rid=rId2
+scatter-chart.pptx	slide_count	ok	1
+scatter-chart.pptx	slide_size	ok	9144000x6858000
+scatter-chart.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=18 sha=d3ba0110ea50d7db0e7086305043c52352ddd033ea14d214a75116f4471382f6
+scatter-chart.pptx	slide[1]	none	-
+scatter-chart.pptx	slides	ok	1
+scatter-chart.pptx	find[]	ok	/ppt/slides/slide1.xml
+scatter-chart.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+scatter-chart.pptx	text	ok	len=18 sha=d3ba0110ea50d7db0e7086305043c52352ddd033ea14d214a75116f4471382f6
+scatter-chart.pptx	write_text_to	ok	len=18 sha=d3ba0110ea50d7db0e7086305043c52352ddd033ea14d214a75116f4471382f6 report=TextOutputReport { bytes_written: 18, objects_written: 1 }
+scatter-chart.pptx	content_parts	ok	0
+scatter-chart.pptx	hyperlinks	ok	0
+scatter-chart.pptx	slide_masters	ok	1
+shape-blur-effect.pptx	slide_references	ok	1
+shape-blur-effect.pptx	reference[0]	ok	id=256 rid=rId2
+shape-blur-effect.pptx	slide_count	ok	1
+shape-blur-effect.pptx	slide_size	ok	12192000x6858000
+shape-blur-effect.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shape-blur-effect.pptx	slide[1]	none	-
+shape-blur-effect.pptx	slides	ok	1
+shape-blur-effect.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-blur-effect.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-blur-effect.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shape-blur-effect.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+shape-blur-effect.pptx	content_parts	ok	0
+shape-blur-effect.pptx	hyperlinks	ok	0
+shape-blur-effect.pptx	slide_masters	ok	1
+shape-glow-effect.pptx	slide_references	ok	1
+shape-glow-effect.pptx	reference[0]	ok	id=256 rid=rId2
+shape-glow-effect.pptx	slide_count	ok	1
+shape-glow-effect.pptx	slide_size	ok	12192000x6858000
+shape-glow-effect.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shape-glow-effect.pptx	slide[1]	none	-
+shape-glow-effect.pptx	slides	ok	1
+shape-glow-effect.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-glow-effect.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-glow-effect.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shape-glow-effect.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+shape-glow-effect.pptx	content_parts	ok	0
+shape-glow-effect.pptx	hyperlinks	ok	0
+shape-glow-effect.pptx	slide_masters	ok	1
+shape-soft-edges.pptx	slide_references	ok	1
+shape-soft-edges.pptx	reference[0]	ok	id=256 rid=rId13
+shape-soft-edges.pptx	slide_count	ok	1
+shape-soft-edges.pptx	slide_size	ok	12192000x6858000
+shape-soft-edges.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=9 sha=1ed6ba2a4d1f2c11f37814b4553d507cf415d5bf4853b366ac6f1cf52869583c
+shape-soft-edges.pptx	slide[1]	none	-
+shape-soft-edges.pptx	slides	ok	1
+shape-soft-edges.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-soft-edges.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-soft-edges.pptx	text	ok	len=9 sha=1ed6ba2a4d1f2c11f37814b4553d507cf415d5bf4853b366ac6f1cf52869583c
+shape-soft-edges.pptx	write_text_to	ok	len=9 sha=1ed6ba2a4d1f2c11f37814b4553d507cf415d5bf4853b366ac6f1cf52869583c report=TextOutputReport { bytes_written: 9, objects_written: 1 }
+shape-soft-edges.pptx	content_parts	ok	0
+shape-soft-edges.pptx	hyperlinks	ok	0
+shape-soft-edges.pptx	slide_masters	ok	11
+shape-text-glow-effect.pptx	slide_references	ok	1
+shape-text-glow-effect.pptx	reference[0]	ok	id=256 rid=rId2
+shape-text-glow-effect.pptx	slide_count	ok	1
+shape-text-glow-effect.pptx	slide_size	ok	12192000x6858000
+shape-text-glow-effect.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=18 sha=b6e49329fb774b56fb7d72d7a1364d7ec270c943e7a21852abaeef22e94233d5
+shape-text-glow-effect.pptx	slide[1]	none	-
+shape-text-glow-effect.pptx	slides	ok	1
+shape-text-glow-effect.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-text-glow-effect.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-text-glow-effect.pptx	text	ok	len=18 sha=b6e49329fb774b56fb7d72d7a1364d7ec270c943e7a21852abaeef22e94233d5
+shape-text-glow-effect.pptx	write_text_to	ok	len=18 sha=b6e49329fb774b56fb7d72d7a1364d7ec270c943e7a21852abaeef22e94233d5 report=TextOutputReport { bytes_written: 18, objects_written: 1 }
+shape-text-glow-effect.pptx	content_parts	ok	0
+shape-text-glow-effect.pptx	hyperlinks	ok	0
+shape-text-glow-effect.pptx	slide_masters	ok	1
+shape-text-rotate.pptx	slide_references	ok	1
+shape-text-rotate.pptx	reference[0]	ok	id=256 rid=rId2
+shape-text-rotate.pptx	slide_count	ok	1
+shape-text-rotate.pptx	slide_size	ok	12192000x6858000
+shape-text-rotate.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=4 sha=982d9e3eb996f559e633f4d194def3761d909f5a3b647d1a851fead67c32c9d1
+shape-text-rotate.pptx	slide[1]	none	-
+shape-text-rotate.pptx	slides	ok	1
+shape-text-rotate.pptx	find[]	ok	/ppt/slides/slide1.xml
+shape-text-rotate.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shape-text-rotate.pptx	text	ok	len=4 sha=982d9e3eb996f559e633f4d194def3761d909f5a3b647d1a851fead67c32c9d1
+shape-text-rotate.pptx	write_text_to	ok	len=4 sha=982d9e3eb996f559e633f4d194def3761d909f5a3b647d1a851fead67c32c9d1 report=TextOutputReport { bytes_written: 4, objects_written: 1 }
+shape-text-rotate.pptx	content_parts	ok	0
+shape-text-rotate.pptx	hyperlinks	ok	0
+shape-text-rotate.pptx	slide_masters	ok	1
+shapes.pptx	slide_references	ok	6
+shapes.pptx	reference[0]	ok	id=256 rid=rId2
+shapes.pptx	reference[1]	ok	id=258 rid=rId3
+shapes.pptx	reference[2]	ok	id=257 rid=rId4
+shapes.pptx	reference[3]	ok	id=259 rid=rId5
+shapes.pptx	reference[4]	ok	id=260 rid=rId6
+shapes.pptx	reference[5]	ok	id=261 rid=rId7
+shapes.pptx	slide_count	ok	6
+shapes.pptx	slide_size	ok	9144000x6858000
+shapes.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=61 sha=afab5b969bf1607e358705444347a211feedfc35fc46feefe24e282d397b422f
+shapes.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=36 sha=0a82bd9fa567ad30598b3aa49cba9c8ab2596a0de4f2e0a165bf4253438b4318
+shapes.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=65 sha=de27f3915cc08e5bb18c54841db1b27a32850405ef84dfbe40810d8d852e4ce1
+shapes.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=162 sha=adb6245a0853d09340cddfc51c255e660f0efe714b3a7d1cd226153a985aee50
+shapes.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+shapes.pptx	slide[6]	none	-
+shapes.pptx	slides	ok	6
+shapes.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 6 }
+shapes.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+shapes.pptx	text	ok	len=327 sha=57b09777bb96792b5880958b41f16c54492004a5b6645340b9e5892fd553ef41
+shapes.pptx	write_text_to	ok	len=334 sha=12ec36431a6a05e12ba485bc8a586e34cd48e84950d3a80068ed941290132313 report=TextOutputReport { bytes_written: 334, objects_written: 6 }
+shapes.pptx	content_parts	ok	0
+shapes.pptx	hyperlinks	ok	3
+shapes.pptx	slide_masters	ok	1
+smartart-accent-process.pptx	slide_references	ok	1
+smartart-accent-process.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-accent-process.pptx	slide_count	ok	1
+smartart-accent-process.pptx	slide_size	ok	9144000x6858000
+smartart-accent-process.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-accent-process.pptx	slide[1]	none	-
+smartart-accent-process.pptx	slides	ok	1
+smartart-accent-process.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-accent-process.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-accent-process.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-accent-process.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-accent-process.pptx	content_parts	ok	0
+smartart-accent-process.pptx	hyperlinks	ok	0
+smartart-accent-process.pptx	slide_masters	ok	1
+smartart-autoTxRot.pptx	slide_references	ok	3
+smartart-autoTxRot.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-autoTxRot.pptx	reference[1]	ok	id=257 rid=rId3
+smartart-autoTxRot.pptx	reference[2]	ok	id=258 rid=rId4
+smartart-autoTxRot.pptx	slide_count	ok	3
+smartart-autoTxRot.pptx	slide_size	ok	9144000x6858000
+smartart-autoTxRot.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autoTxRot.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autoTxRot.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autoTxRot.pptx	slide[3]	none	-
+smartart-autoTxRot.pptx	slides	ok	3
+smartart-autoTxRot.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 3 }
+smartart-autoTxRot.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-autoTxRot.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autoTxRot.pptx	write_text_to	ok	len=4 sha=545c38b0922de19734fbffde62792c37c2aef6a3216cfa472449173165220f7d report=TextOutputReport { bytes_written: 4, objects_written: 3 }
+smartart-autoTxRot.pptx	content_parts	ok	0
+smartart-autoTxRot.pptx	hyperlinks	ok	0
+smartart-autoTxRot.pptx	slide_masters	ok	1
+smartart-autofit-sync.pptx	slide_references	ok	1
+smartart-autofit-sync.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-autofit-sync.pptx	slide_count	ok	1
+smartart-autofit-sync.pptx	slide_size	ok	12192000x6858000
+smartart-autofit-sync.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autofit-sync.pptx	slide[1]	none	-
+smartart-autofit-sync.pptx	slides	ok	1
+smartart-autofit-sync.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-autofit-sync.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-autofit-sync.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-autofit-sync.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-autofit-sync.pptx	content_parts	ok	0
+smartart-autofit-sync.pptx	hyperlinks	ok	0
+smartart-autofit-sync.pptx	slide_masters	ok	1
+smartart-background-drawingml-fallback.pptx	slide_references	ok	1
+smartart-background-drawingml-fallback.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-background-drawingml-fallback.pptx	slide_count	ok	1
+smartart-background-drawingml-fallback.pptx	slide_size	ok	9144000x6858000
+smartart-background-drawingml-fallback.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-background-drawingml-fallback.pptx	slide[1]	none	-
+smartart-background-drawingml-fallback.pptx	slides	ok	1
+smartart-background-drawingml-fallback.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-background-drawingml-fallback.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-background-drawingml-fallback.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-background-drawingml-fallback.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-background-drawingml-fallback.pptx	content_parts	ok	0
+smartart-background-drawingml-fallback.pptx	hyperlinks	ok	0
+smartart-background-drawingml-fallback.pptx	slide_masters	ok	1
+smartart-background.pptx	slide_references	ok	1
+smartart-background.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-background.pptx	slide_count	ok	1
+smartart-background.pptx	slide_size	ok	9144000x6858000
+smartart-background.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-background.pptx	slide[1]	none	-
+smartart-background.pptx	slides	ok	1
+smartart-background.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-background.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-background.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-background.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-background.pptx	content_parts	ok	0
+smartart-background.pptx	hyperlinks	ok	0
+smartart-background.pptx	slide_masters	ok	1
+smartart-bullet-list.pptx	slide_references	ok	1
+smartart-bullet-list.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-bullet-list.pptx	slide_count	ok	1
+smartart-bullet-list.pptx	slide_size	ok	9144000x6858000
+smartart-bullet-list.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-bullet-list.pptx	slide[1]	none	-
+smartart-bullet-list.pptx	slides	ok	1
+smartart-bullet-list.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-bullet-list.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-bullet-list.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-bullet-list.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-bullet-list.pptx	content_parts	ok	0
+smartart-bullet-list.pptx	hyperlinks	ok	0
+smartart-bullet-list.pptx	slide_masters	ok	1
+smartart-center-cycle.pptx	slide_references	ok	1
+smartart-center-cycle.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-center-cycle.pptx	slide_count	ok	1
+smartart-center-cycle.pptx	slide_size	ok	9144000x6858000
+smartart-center-cycle.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-center-cycle.pptx	slide[1]	none	-
+smartart-center-cycle.pptx	slides	ok	1
+smartart-center-cycle.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-center-cycle.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-center-cycle.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-center-cycle.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-center-cycle.pptx	content_parts	ok	0
+smartart-center-cycle.pptx	hyperlinks	ok	0
+smartart-center-cycle.pptx	slide_masters	ok	1
+smartart-chevron.pptx	slide_references	ok	1
+smartart-chevron.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-chevron.pptx	slide_count	ok	1
+smartart-chevron.pptx	slide_size	ok	9144000x6858000
+smartart-chevron.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-chevron.pptx	slide[1]	none	-
+smartart-chevron.pptx	slides	ok	1
+smartart-chevron.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-chevron.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-chevron.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-chevron.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-chevron.pptx	content_parts	ok	0
+smartart-chevron.pptx	hyperlinks	ok	0
+smartart-chevron.pptx	slide_masters	ok	1
+smartart-children.pptx	slide_references	ok	1
+smartart-children.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-children.pptx	slide_count	ok	1
+smartart-children.pptx	slide_size	ok	9144000x6858000
+smartart-children.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-children.pptx	slide[1]	none	-
+smartart-children.pptx	slides	ok	1
+smartart-children.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-children.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-children.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-children.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-children.pptx	content_parts	ok	0
+smartart-children.pptx	hyperlinks	ok	0
+smartart-children.pptx	slide_masters	ok	1
+smartart-cnt.pptx	slide_references	ok	1
+smartart-cnt.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-cnt.pptx	slide_count	ok	1
+smartart-cnt.pptx	slide_size	ok	9144000x6858000
+smartart-cnt.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cnt.pptx	slide[1]	none	-
+smartart-cnt.pptx	slides	ok	1
+smartart-cnt.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-cnt.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-cnt.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cnt.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-cnt.pptx	content_parts	ok	0
+smartart-cnt.pptx	hyperlinks	ok	0
+smartart-cnt.pptx	slide_masters	ok	1
+smartart-composite-infer-right.pptx	slide_references	ok	1
+smartart-composite-infer-right.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-composite-infer-right.pptx	slide_count	ok	1
+smartart-composite-infer-right.pptx	slide_size	ok	12192000x6858000
+smartart-composite-infer-right.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-composite-infer-right.pptx	slide[1]	none	-
+smartart-composite-infer-right.pptx	slides	ok	1
+smartart-composite-infer-right.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-composite-infer-right.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-composite-infer-right.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-composite-infer-right.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-composite-infer-right.pptx	content_parts	ok	0
+smartart-composite-infer-right.pptx	hyperlinks	ok	0
+smartart-composite-infer-right.pptx	slide_masters	ok	1
+smartart-continuous-block-process.pptx	slide_references	ok	1
+smartart-continuous-block-process.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-continuous-block-process.pptx	slide_count	ok	1
+smartart-continuous-block-process.pptx	slide_size	ok	9144000x6858000
+smartart-continuous-block-process.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-continuous-block-process.pptx	slide[1]	none	-
+smartart-continuous-block-process.pptx	slides	ok	1
+smartart-continuous-block-process.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-continuous-block-process.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-continuous-block-process.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-continuous-block-process.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-continuous-block-process.pptx	content_parts	ok	0
+smartart-continuous-block-process.pptx	hyperlinks	ok	0
+smartart-continuous-block-process.pptx	slide_masters	ok	1
+smartart-cycle-matrix.pptx	slide_references	ok	1
+smartart-cycle-matrix.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-cycle-matrix.pptx	slide_count	ok	1
+smartart-cycle-matrix.pptx	slide_size	ok	9144000x6858000
+smartart-cycle-matrix.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cycle-matrix.pptx	slide[1]	none	-
+smartart-cycle-matrix.pptx	slides	ok	1
+smartart-cycle-matrix.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-cycle-matrix.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-cycle-matrix.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cycle-matrix.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-cycle-matrix.pptx	content_parts	ok	0
+smartart-cycle-matrix.pptx	hyperlinks	ok	0
+smartart-cycle-matrix.pptx	slide_masters	ok	1
+smartart-cycle.pptx	slide_references	ok	1
+smartart-cycle.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-cycle.pptx	slide_count	ok	1
+smartart-cycle.pptx	slide_size	ok	9144000x6858000
+smartart-cycle.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cycle.pptx	slide[1]	none	-
+smartart-cycle.pptx	slides	ok	1
+smartart-cycle.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-cycle.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-cycle.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-cycle.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-cycle.pptx	content_parts	ok	0
+smartart-cycle.pptx	hyperlinks	ok	0
+smartart-cycle.pptx	slide_masters	ok	1
+smartart-data-follow.pptx	slide_references	ok	1
+smartart-data-follow.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-data-follow.pptx	slide_count	ok	1
+smartart-data-follow.pptx	slide_size	ok	9144000x6858000
+smartart-data-follow.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-data-follow.pptx	slide[1]	none	-
+smartart-data-follow.pptx	slides	ok	1
+smartart-data-follow.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-data-follow.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-data-follow.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-data-follow.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-data-follow.pptx	content_parts	ok	0
+smartart-data-follow.pptx	hyperlinks	ok	0
+smartart-data-follow.pptx	slide_masters	ok	1
+smartart-dir.pptx	slide_references	ok	1
+smartart-dir.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-dir.pptx	slide_count	ok	1
+smartart-dir.pptx	slide_size	ok	9144000x6858000
+smartart-dir.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-dir.pptx	slide[1]	none	-
+smartart-dir.pptx	slides	ok	1
+smartart-dir.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-dir.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-dir.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-dir.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-dir.pptx	content_parts	ok	0
+smartart-dir.pptx	hyperlinks	ok	0
+smartart-dir.pptx	slide_masters	ok	1
+smartart-font-size.pptx	slide_references	ok	1
+smartart-font-size.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-font-size.pptx	slide_count	ok	1
+smartart-font-size.pptx	slide_size	ok	9144000x6858000
+smartart-font-size.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-font-size.pptx	slide[1]	none	-
+smartart-font-size.pptx	slides	ok	1
+smartart-font-size.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-font-size.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-font-size.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-font-size.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-font-size.pptx	content_parts	ok	0
+smartart-font-size.pptx	hyperlinks	ok	0
+smartart-font-size.pptx	slide_masters	ok	1
+smartart-interopgrabbag.pptx	slide_references	ok	1
+smartart-interopgrabbag.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-interopgrabbag.pptx	slide_count	ok	1
+smartart-interopgrabbag.pptx	slide_size	ok	12192000x6858000
+smartart-interopgrabbag.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-interopgrabbag.pptx	slide[1]	none	-
+smartart-interopgrabbag.pptx	slides	ok	1
+smartart-interopgrabbag.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-interopgrabbag.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-interopgrabbag.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-interopgrabbag.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-interopgrabbag.pptx	content_parts	ok	0
+smartart-interopgrabbag.pptx	hyperlinks	ok	0
+smartart-interopgrabbag.pptx	slide_masters	ok	1
+smartart-linear-rule-vert.pptx	slide_references	ok	1
+smartart-linear-rule-vert.pptx	reference[0]	ok	id=286 rid=rId2
+smartart-linear-rule-vert.pptx	slide_count	ok	1
+smartart-linear-rule-vert.pptx	slide_size	ok	9144000x6858000
+smartart-linear-rule-vert.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-linear-rule-vert.pptx	slide[1]	none	-
+smartart-linear-rule-vert.pptx	slides	ok	1
+smartart-linear-rule-vert.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-linear-rule-vert.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-linear-rule-vert.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-linear-rule-vert.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-linear-rule-vert.pptx	content_parts	ok	0
+smartart-linear-rule-vert.pptx	hyperlinks	ok	0
+smartart-linear-rule-vert.pptx	slide_masters	ok	1
+smartart-linear-rule.pptx	slide_references	ok	1
+smartart-linear-rule.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-linear-rule.pptx	slide_count	ok	1
+smartart-linear-rule.pptx	slide_size	ok	9144000x5143500
+smartart-linear-rule.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-linear-rule.pptx	slide[1]	none	-
+smartart-linear-rule.pptx	slides	ok	1
+smartart-linear-rule.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-linear-rule.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-linear-rule.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-linear-rule.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-linear-rule.pptx	content_parts	ok	0
+smartart-linear-rule.pptx	hyperlinks	ok	0
+smartart-linear-rule.pptx	slide_masters	ok	1
+smartart-maxdepth.pptx	slide_references	ok	1
+smartart-maxdepth.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-maxdepth.pptx	slide_count	ok	1
+smartart-maxdepth.pptx	slide_size	ok	9144000x6858000
+smartart-maxdepth.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-maxdepth.pptx	slide[1]	none	-
+smartart-maxdepth.pptx	slides	ok	1
+smartart-maxdepth.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-maxdepth.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-maxdepth.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-maxdepth.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-maxdepth.pptx	content_parts	ok	0
+smartart-maxdepth.pptx	hyperlinks	ok	0
+smartart-maxdepth.pptx	slide_masters	ok	1
+smartart-missing-bullet.pptx	slide_references	ok	1
+smartart-missing-bullet.pptx	reference[0]	ok	id=514 rid=rId2
+smartart-missing-bullet.pptx	slide_count	ok	1
+smartart-missing-bullet.pptx	slide_size	ok	9144000x5143500
+smartart-missing-bullet.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-missing-bullet.pptx	slide[1]	none	-
+smartart-missing-bullet.pptx	slides	ok	1
+smartart-missing-bullet.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-missing-bullet.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-missing-bullet.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-missing-bullet.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-missing-bullet.pptx	content_parts	ok	0
+smartart-missing-bullet.pptx	hyperlinks	ok	0
+smartart-missing-bullet.pptx	slide_masters	ok	1
+smartart-multidirectional.pptx	slide_references	ok	1
+smartart-multidirectional.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-multidirectional.pptx	slide_count	ok	1
+smartart-multidirectional.pptx	slide_size	ok	9144000x6858000
+smartart-multidirectional.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-multidirectional.pptx	slide[1]	none	-
+smartart-multidirectional.pptx	slides	ok	1
+smartart-multidirectional.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-multidirectional.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-multidirectional.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-multidirectional.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-multidirectional.pptx	content_parts	ok	0
+smartart-multidirectional.pptx	hyperlinks	ok	0
+smartart-multidirectional.pptx	slide_masters	ok	1
+smartart-org-chart.pptx	slide_references	ok	1
+smartart-org-chart.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-org-chart.pptx	slide_count	ok	1
+smartart-org-chart.pptx	slide_size	ok	9144000x6858000
+smartart-org-chart.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-org-chart.pptx	slide[1]	none	-
+smartart-org-chart.pptx	slides	ok	1
+smartart-org-chart.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-org-chart.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-org-chart.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-org-chart.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-org-chart.pptx	content_parts	ok	0
+smartart-org-chart.pptx	hyperlinks	ok	0
+smartart-org-chart.pptx	slide_masters	ok	1
+smartart-org-chart2.pptx	slide_references	ok	1
+smartart-org-chart2.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-org-chart2.pptx	slide_count	ok	1
+smartart-org-chart2.pptx	slide_size	ok	9144000x6858000
+smartart-org-chart2.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-org-chart2.pptx	slide[1]	none	-
+smartart-org-chart2.pptx	slides	ok	1
+smartart-org-chart2.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-org-chart2.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-org-chart2.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-org-chart2.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-org-chart2.pptx	content_parts	ok	0
+smartart-org-chart2.pptx	hyperlinks	ok	0
+smartart-org-chart2.pptx	slide_masters	ok	1
+smartart-picture-strip.pptx	slide_references	ok	1
+smartart-picture-strip.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-picture-strip.pptx	slide_count	ok	1
+smartart-picture-strip.pptx	slide_size	ok	9144000x6858000
+smartart-picture-strip.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=17 sha=b122c9e595b198f3f87468a20aab91ce01f3a4273540fb449e292fcfa700658d
+smartart-picture-strip.pptx	slide[1]	none	-
+smartart-picture-strip.pptx	slides	ok	1
+smartart-picture-strip.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-picture-strip.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-picture-strip.pptx	text	ok	len=17 sha=b122c9e595b198f3f87468a20aab91ce01f3a4273540fb449e292fcfa700658d
+smartart-picture-strip.pptx	write_text_to	ok	len=17 sha=b122c9e595b198f3f87468a20aab91ce01f3a4273540fb449e292fcfa700658d report=TextOutputReport { bytes_written: 17, objects_written: 1 }
+smartart-picture-strip.pptx	content_parts	ok	0
+smartart-picture-strip.pptx	hyperlinks	ok	0
+smartart-picture-strip.pptx	slide_masters	ok	1
+smartart-preserve.pptx	slide_references	ok	1
+smartart-preserve.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-preserve.pptx	slide_count	ok	1
+smartart-preserve.pptx	slide_size	ok	12192000x6858000
+smartart-preserve.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-preserve.pptx	slide[1]	none	-
+smartart-preserve.pptx	slides	ok	1
+smartart-preserve.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-preserve.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-preserve.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-preserve.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-preserve.pptx	content_parts	ok	0
+smartart-preserve.pptx	hyperlinks	ok	0
+smartart-preserve.pptx	slide_masters	ok	1
+smartart-pyramid-1child.pptx	slide_references	ok	1
+smartart-pyramid-1child.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-pyramid-1child.pptx	slide_count	ok	1
+smartart-pyramid-1child.pptx	slide_size	ok	12192000x6858000
+smartart-pyramid-1child.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-pyramid-1child.pptx	slide[1]	none	-
+smartart-pyramid-1child.pptx	slides	ok	1
+smartart-pyramid-1child.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-pyramid-1child.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-pyramid-1child.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-pyramid-1child.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-pyramid-1child.pptx	content_parts	ok	0
+smartart-pyramid-1child.pptx	hyperlinks	ok	0
+smartart-pyramid-1child.pptx	slide_masters	ok	1
+smartart-recursion.pptx	slide_references	ok	1
+smartart-recursion.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-recursion.pptx	slide_count	ok	1
+smartart-recursion.pptx	slide_size	ok	9144000x6858000
+smartart-recursion.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-recursion.pptx	slide[1]	none	-
+smartart-recursion.pptx	slides	ok	1
+smartart-recursion.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-recursion.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-recursion.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-recursion.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-recursion.pptx	content_parts	ok	0
+smartart-recursion.pptx	hyperlinks	ok	0
+smartart-recursion.pptx	slide_masters	ok	1
+smartart-rightoleftblockdiagram.pptx	slide_references	ok	1
+smartart-rightoleftblockdiagram.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-rightoleftblockdiagram.pptx	slide_count	ok	1
+smartart-rightoleftblockdiagram.pptx	slide_size	ok	9144000x6858000
+smartart-rightoleftblockdiagram.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rightoleftblockdiagram.pptx	slide[1]	none	-
+smartart-rightoleftblockdiagram.pptx	slides	ok	1
+smartart-rightoleftblockdiagram.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-rightoleftblockdiagram.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-rightoleftblockdiagram.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rightoleftblockdiagram.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-rightoleftblockdiagram.pptx	content_parts	ok	0
+smartart-rightoleftblockdiagram.pptx	hyperlinks	ok	0
+smartart-rightoleftblockdiagram.pptx	slide_masters	ok	1
+smartart-rotation.pptx	slide_references	ok	1
+smartart-rotation.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-rotation.pptx	slide_count	ok	1
+smartart-rotation.pptx	slide_size	ok	9144000x6858000
+smartart-rotation.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rotation.pptx	slide[1]	none	-
+smartart-rotation.pptx	slides	ok	1
+smartart-rotation.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-rotation.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-rotation.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rotation.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-rotation.pptx	content_parts	ok	0
+smartart-rotation.pptx	hyperlinks	ok	0
+smartart-rotation.pptx	slide_masters	ok	1
+smartart-rotation2.pptx	slide_references	ok	1
+smartart-rotation2.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-rotation2.pptx	slide_count	ok	1
+smartart-rotation2.pptx	slide_size	ok	12192000x6858000
+smartart-rotation2.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rotation2.pptx	slide[1]	none	-
+smartart-rotation2.pptx	slides	ok	1
+smartart-rotation2.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-rotation2.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-rotation2.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-rotation2.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-rotation2.pptx	content_parts	ok	0
+smartart-rotation2.pptx	hyperlinks	ok	0
+smartart-rotation2.pptx	slide_masters	ok	1
+smartart-simple.pptx	slide_references	ok	1
+smartart-simple.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-simple.pptx	slide_count	ok	1
+smartart-simple.pptx	slide_size	ok	1800225x1079500
+smartart-simple.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=280 sha=0b9a5ff1bbcba660a81b17508e6e0aa731a20aefe9ebfdebfc4fff22c1daea69
+smartart-simple.pptx	slide[1]	none	-
+smartart-simple.pptx	slides	ok	1
+smartart-simple.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-simple.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-simple.pptx	text	ok	len=280 sha=0b9a5ff1bbcba660a81b17508e6e0aa731a20aefe9ebfdebfc4fff22c1daea69
+smartart-simple.pptx	write_text_to	ok	len=280 sha=0b9a5ff1bbcba660a81b17508e6e0aa731a20aefe9ebfdebfc4fff22c1daea69 report=TextOutputReport { bytes_written: 280, objects_written: 1 }
+smartart-simple.pptx	content_parts	ok	0
+smartart-simple.pptx	hyperlinks	ok	0
+smartart-simple.pptx	slide_masters	ok	1
+smartart-snake-rows.pptx	slide_references	ok	1
+smartart-snake-rows.pptx	reference[0]	ok	id=1563 rid=rId2
+smartart-snake-rows.pptx	slide_count	ok	1
+smartart-snake-rows.pptx	slide_size	ok	12192000x6858000
+smartart-snake-rows.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-snake-rows.pptx	slide[1]	none	-
+smartart-snake-rows.pptx	slides	ok	1
+smartart-snake-rows.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-snake-rows.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-snake-rows.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-snake-rows.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-snake-rows.pptx	content_parts	ok	0
+smartart-snake-rows.pptx	hyperlinks	ok	0
+smartart-snake-rows.pptx	slide_masters	ok	1
+smartart-tdf134221.pptx	slide_references	ok	1
+smartart-tdf134221.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-tdf134221.pptx	slide_count	ok	1
+smartart-tdf134221.pptx	slide_size	ok	9144000x6858000
+smartart-tdf134221.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-tdf134221.pptx	slide[1]	none	-
+smartart-tdf134221.pptx	slides	ok	1
+smartart-tdf134221.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-tdf134221.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-tdf134221.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-tdf134221.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-tdf134221.pptx	content_parts	ok	0
+smartart-tdf134221.pptx	hyperlinks	ok	0
+smartart-tdf134221.pptx	slide_masters	ok	1
+smartart-text.pptx	slide_references	ok	1
+smartart-text.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-text.pptx	slide_count	ok	1
+smartart-text.pptx	slide_size	ok	9144000x6858000
+smartart-text.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-text.pptx	slide[1]	none	-
+smartart-text.pptx	slides	ok	1
+smartart-text.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-text.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-text.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-text.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-text.pptx	content_parts	ok	0
+smartart-text.pptx	hyperlinks	ok	0
+smartart-text.pptx	slide_masters	ok	1
+smartart-vertical-block-list.pptx	slide_references	ok	1
+smartart-vertical-block-list.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-vertical-block-list.pptx	slide_count	ok	1
+smartart-vertical-block-list.pptx	slide_size	ok	9144000x6858000
+smartart-vertical-block-list.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-vertical-block-list.pptx	slide[1]	none	-
+smartart-vertical-block-list.pptx	slides	ok	1
+smartart-vertical-block-list.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-vertical-block-list.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-vertical-block-list.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-vertical-block-list.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-vertical-block-list.pptx	content_parts	ok	0
+smartart-vertical-block-list.pptx	hyperlinks	ok	0
+smartart-vertical-block-list.pptx	slide_masters	ok	1
+smartart-vertical-box-list.pptx	slide_references	ok	1
+smartart-vertical-box-list.pptx	reference[0]	ok	id=256 rid=rId2
+smartart-vertical-box-list.pptx	slide_count	ok	1
+smartart-vertical-box-list.pptx	slide_size	ok	9144000x6858000
+smartart-vertical-box-list.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-vertical-box-list.pptx	slide[1]	none	-
+smartart-vertical-box-list.pptx	slides	ok	1
+smartart-vertical-box-list.pptx	find[]	ok	/ppt/slides/slide1.xml
+smartart-vertical-box-list.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+smartart-vertical-box-list.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+smartart-vertical-box-list.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+smartart-vertical-box-list.pptx	content_parts	ok	0
+smartart-vertical-box-list.pptx	hyperlinks	ok	0
+smartart-vertical-box-list.pptx	slide_masters	ok	1
+trigger.pptx	slide_references	ok	1
+trigger.pptx	reference[0]	ok	id=256 rid=rId2
+trigger.pptx	slide_count	ok	1
+trigger.pptx	slide_size	ok	12192000x6858000
+trigger.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+trigger.pptx	slide[1]	none	-
+trigger.pptx	slides	ok	1
+trigger.pptx	find[]	ok	/ppt/slides/slide1.xml
+trigger.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+trigger.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+trigger.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+trigger.pptx	content_parts	ok	0
+trigger.pptx	hyperlinks	ok	0
+trigger.pptx	slide_masters	ok	1
+45545_Comment.pptx	slide_references	ok	11
+45545_Comment.pptx	reference[0]	ok	id=499 rid=rId2
+45545_Comment.pptx	reference[1]	ok	id=472 rid=rId3
+45545_Comment.pptx	reference[2]	ok	id=542 rid=rId4
+45545_Comment.pptx	reference[3]	ok	id=541 rid=rId5
+45545_Comment.pptx	reference[4]	ok	id=543 rid=rId6
+45545_Comment.pptx	reference[5]	ok	id=544 rid=rId7
+45545_Comment.pptx	reference[6]	ok	id=550 rid=rId8
+45545_Comment.pptx	reference[7]	ok	id=547 rid=rId9
+45545_Comment.pptx	reference[8]	ok	id=551 rid=rId10
+45545_Comment.pptx	reference[9]	ok	id=548 rid=rId11
+45545_Comment.pptx	reference[10]	ok	id=545 rid=rId12
+45545_Comment.pptx	slide_count	ok	11
+45545_Comment.pptx	slide_size	ok	9144000x6858000
+45545_Comment.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=246 sha=408f5ede1062a69254aaddf83873eacd1b1af26f502d8f40294a7d5cda2b2956
+45545_Comment.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=69 sha=fd0da036627af43cd0b2cad0b31edc7503cb2db4102084cf0be6f295a6e5ca9f
+45545_Comment.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=61 sha=dfb96c53d0a2093fc22a1c1777698fe9b0ccd4e71bf64c7061d61dee305080a2
+45545_Comment.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=337 sha=bed71338f6bf4bafbb05d3fffe0f42c41083315d31274bcaea83ad5d111885a1
+45545_Comment.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=414 sha=e90c352e9d63af1afe2803c0bc5ab3ebba7833bd4036407fa59d88fa34533199
+45545_Comment.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=417 sha=878c62feab484ae014fcc25925fddc3eba99ab928b42c30804e2e0ef38e714b3
+45545_Comment.pptx	slide[6]	ok	part=/ppt/slides/slide7.xml name= text=len=200 sha=ccc013577c6ef509cdcdbb815eea1f018c2ecb4c0f1f940f752fb852448fdc4d
+45545_Comment.pptx	slide[7]	ok	part=/ppt/slides/slide8.xml name= text=len=16 sha=68a41bcd5894d7126aac756959900f3f2c97933d89a12767b84a09a646f5e241
+45545_Comment.pptx	slide[8]	ok	part=/ppt/slides/slide9.xml name= text=len=75 sha=3376dfe8f4d36df7b5b084d29514b00bdd179bf3ba6037c841fc6833c26d2946
+45545_Comment.pptx	slide[9]	ok	part=/ppt/slides/slide10.xml name= text=len=217 sha=b1e09cb352a531ef34c85b6be1073f2741c23f6d18083d1e42698644625c36cb
+45545_Comment.pptx	slide[10]	ok	part=/ppt/slides/slide11.xml name= text=len=233 sha=0d531396a179335e5b2bb6b90b094086ea74993ca65112f9747f35d75bb0f7ee
+45545_Comment.pptx	slide[11]	none	-
+45545_Comment.pptx	slides	ok	11
+45545_Comment.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 11 }
+45545_Comment.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+45545_Comment.pptx	text	ok	len=2295 sha=2083ffb35c23f1749b700e81843d9a1f603881543d6a8fa87d406701eca5d501
+45545_Comment.pptx	write_text_to	ok	len=2305 sha=d036cd1f7fce9ee2ed6192990d08fd28cf409c7ff9979d9542117e1cae097e14 report=TextOutputReport { bytes_written: 2305, objects_written: 11 }
+45545_Comment.pptx	content_parts	ok	0
+45545_Comment.pptx	hyperlinks	ok	0
+45545_Comment.pptx	slide_masters	ok	1
+ArtisticEffectSample.pptx	slide_references	ok	2
+ArtisticEffectSample.pptx	reference[0]	ok	id=1032 rid=rId5
+ArtisticEffectSample.pptx	reference[1]	ok	id=1022 rid=rId6
+ArtisticEffectSample.pptx	slide_count	ok	2
+ArtisticEffectSample.pptx	slide_size	ok	9144000x5143500
+ArtisticEffectSample.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=100 sha=01f703f4683bf58206be674510509b2e1db6ac1be3cc106b8a56fa5c32ae7464
+ArtisticEffectSample.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=22 sha=df094dc32859450959aef6c476d550c4986f064c362a975709c046fbbbdfddb4
+ArtisticEffectSample.pptx	slide[2]	none	-
+ArtisticEffectSample.pptx	slides	ok	2
+ArtisticEffectSample.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 2 }
+ArtisticEffectSample.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+ArtisticEffectSample.pptx	text	ok	len=123 sha=e6ec17ab9695977fe753477d002cebfeca94cd15081298f5a5deee734313db9c
+ArtisticEffectSample.pptx	write_text_to	ok	len=124 sha=cd83eb84aa0ea8cadc30e6035f57aeb62b7382102d8c40563716901424435bbf report=TextOutputReport { bytes_written: 124, objects_written: 2 }
+ArtisticEffectSample.pptx	content_parts	ok	0
+ArtisticEffectSample.pptx	hyperlinks	ok	0
+ArtisticEffectSample.pptx	slide_masters	ok	1
+EmbeddedAudio.pptx	slide_references	ok	1
+EmbeddedAudio.pptx	reference[0]	ok	id=256 rid=rId2
+EmbeddedAudio.pptx	slide_count	ok	1
+EmbeddedAudio.pptx	slide_size	ok	12192000x6858000
+EmbeddedAudio.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+EmbeddedAudio.pptx	slide[1]	none	-
+EmbeddedAudio.pptx	slides	ok	1
+EmbeddedAudio.pptx	find[]	ok	/ppt/slides/slide1.xml
+EmbeddedAudio.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+EmbeddedAudio.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+EmbeddedAudio.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+EmbeddedAudio.pptx	content_parts	ok	0
+EmbeddedAudio.pptx	hyperlinks	ok	1
+EmbeddedAudio.pptx	slide_masters	ok	1
+EmbeddedVideo.pptx	slide_references	ok	1
+EmbeddedVideo.pptx	reference[0]	ok	id=256 rid=rId2
+EmbeddedVideo.pptx	slide_count	ok	1
+EmbeddedVideo.pptx	slide_size	ok	12192000x6858000
+EmbeddedVideo.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+EmbeddedVideo.pptx	slide[1]	none	-
+EmbeddedVideo.pptx	slides	ok	1
+EmbeddedVideo.pptx	find[]	ok	/ppt/slides/slide1.xml
+EmbeddedVideo.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+EmbeddedVideo.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+EmbeddedVideo.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+EmbeddedVideo.pptx	content_parts	ok	0
+EmbeddedVideo.pptx	hyperlinks	ok	1
+EmbeddedVideo.pptx	slide_masters	ok	1
+bug62513.pptx	slide_references	ok	19
+bug62513.pptx	reference[0]	ok	id=258 rid=rId2
+bug62513.pptx	reference[1]	ok	id=289 rid=rId3
+bug62513.pptx	reference[2]	ok	id=291 rid=rId4
+bug62513.pptx	reference[3]	ok	id=290 rid=rId5
+bug62513.pptx	reference[4]	ok	id=304 rid=rId6
+bug62513.pptx	reference[5]	ok	id=306 rid=rId7
+bug62513.pptx	reference[6]	ok	id=307 rid=rId8
+bug62513.pptx	reference[7]	ok	id=308 rid=rId9
+bug62513.pptx	reference[8]	ok	id=309 rid=rId10
+bug62513.pptx	reference[9]	ok	id=310 rid=rId11
+bug62513.pptx	reference[10]	ok	id=305 rid=rId12
+bug62513.pptx	reference[11]	ok	id=302 rid=rId13
+bug62513.pptx	reference[12]	ok	id=295 rid=rId14
+bug62513.pptx	reference[13]	ok	id=297 rid=rId15
+bug62513.pptx	reference[14]	ok	id=299 rid=rId16
+bug62513.pptx	reference[15]	ok	id=311 rid=rId17
+bug62513.pptx	reference[16]	ok	id=293 rid=rId18
+bug62513.pptx	reference[17]	ok	id=300 rid=rId19
+bug62513.pptx	reference[18]	ok	id=301 rid=rId20
+bug62513.pptx	slide_count	ok	19
+bug62513.pptx	slide_size	ok	9144000x6858000
+bug62513.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=45 sha=00ae436c8048ece0e83732206cda9a0d2e8ad2e661ad4b013bf99e6be13aa95b
+bug62513.pptx	slide[1]	ok	part=/ppt/slides/slide2.xml name= text=len=636 sha=cfbcecd105ad8e030173766ffa7a7d95183a9a70a1261de7d44e5fe04a69b871
+bug62513.pptx	slide[2]	ok	part=/ppt/slides/slide3.xml name= text=len=167 sha=f7ed0239436f46be1ff973f88ed993374735e9dc4940543c81706f851518ab01
+bug62513.pptx	slide[3]	ok	part=/ppt/slides/slide4.xml name= text=len=274 sha=621863626ea37c67289f9cba40e03cde46b0f4a4c941964f84d01075f8475e20
+bug62513.pptx	slide[4]	ok	part=/ppt/slides/slide5.xml name= text=len=10 sha=9feceb9333b5ff626aabf80e4c544e2b7efca00f0f8438d895d87921e87d9b81
+bug62513.pptx	slide[5]	ok	part=/ppt/slides/slide6.xml name= text=len=158 sha=43389e60915e5c32d9fa6b56970ce9ea1147e58e2644f6ca56d806baec21d05e
+bug62513.pptx	slide[6]	ok	part=/ppt/slides/slide7.xml name= text=len=344 sha=3bae2297202b16bc23aa7ce395ee6527465c7adab83c562736d12402675913ae
+bug62513.pptx	slide[7]	ok	part=/ppt/slides/slide8.xml name= text=len=570 sha=750f0fddf3d4626e86414c4fffef47c14171a7556f81bba15a355deeba500aba
+bug62513.pptx	slide[8]	ok	part=/ppt/slides/slide9.xml name= text=len=562 sha=f9e18719ee308401ce37f9f0c0e18ba65f8ba6319e88bdf33339d7b12e941a30
+bug62513.pptx	slide[9]	ok	part=/ppt/slides/slide10.xml name= text=len=196 sha=f17fa0ee97dec56ff9f2b46a3d6718b413e2940558b51a91f944293c0c39da96
+bug62513.pptx	slide[10]	ok	part=/ppt/slides/slide11.xml name= text=len=16 sha=fbff3f29bd440398c9fd75c678ff71ceb0a16e78d6e83662ea56d379789ab3e7
+bug62513.pptx	slide[11]	ok	part=/ppt/slides/slide12.xml name= text=len=492 sha=04abba61870ab2360fdb78508a6fc9463806b021bd83dec4a57a548b9f960d1b
+bug62513.pptx	slide[12]	ok	part=/ppt/slides/slide13.xml name= text=len=17 sha=447a611ccd2054ad9a997776e70659229f38ca7ba5365b77271c68b31e9d1ea9
+bug62513.pptx	slide[13]	ok	part=/ppt/slides/slide14.xml name= text=len=16 sha=7745a51520e5020b462600fe89c326e9c0bc9506e3ec7fc163da23f369441bfc
+bug62513.pptx	slide[14]	ok	part=/ppt/slides/slide15.xml name= text=len=13 sha=3981a2b9c1ef7fce8dbf5e3d44fefc58746dee11b3de35655e166c25142612ba
+bug62513.pptx	slide[15]	ok	part=/ppt/slides/slide16.xml name= text=len=8 sha=04e2a9728af7584043c5d58ae29e7cd811883e8dab15fc6287675270669a3ada
+bug62513.pptx	slide[16]	ok	part=/ppt/slides/slide17.xml name= text=len=323 sha=f9ec6f4d12e93850fa65bac8eab596bd1dc67a1bb88ff86dcf8aa3458e3cd1a8
+bug62513.pptx	slide[17]	ok	part=/ppt/slides/slide18.xml name= text=len=61 sha=06afa699df9a183aa79f9cc29f8343f8af7a496966c2461183857c034a7f63fd
+bug62513.pptx	slide[18]	ok	part=/ppt/slides/slide19.xml name= text=len=324 sha=cf5f4a739160ae471da3fbe8a7272db8592940c4ad146f92edb194e94ab95152
+bug62513.pptx	slide[19]	none	-
+bug62513.pptx	slides	ok	19
+bug62513.pptx	find[]	ERR	AmbiguousSlideName { name: "", matches: 19 }
+bug62513.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+bug62513.pptx	text	ok	len=4250 sha=e9c4cb7d77578502a076c5afd11791c4f31fb4b5485a6a1060224c513be261b9
+bug62513.pptx	write_text_to	ok	len=4268 sha=e595d41d0209b2cc6341d9a9a5b0d785ac6d4cd157abecf603471cd42480a9a1 report=TextOutputReport { bytes_written: 4268, objects_written: 19 }
+bug62513.pptx	content_parts	ok	0
+bug62513.pptx	hyperlinks	ok	0
+bug62513.pptx	slide_masters	ok	1
+bug65551.pptx	slide_references	ok	1
+bug65551.pptx	reference[0]	ok	id=2147138269 rid=rId5
+bug65551.pptx	slide_count	ok	1
+bug65551.pptx	slide_size	ok	12192000x6858000
+bug65551.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+bug65551.pptx	slide[1]	none	-
+bug65551.pptx	slides	ok	1
+bug65551.pptx	find[]	ok	/ppt/slides/slide1.xml
+bug65551.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+bug65551.pptx	text	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+bug65551.pptx	write_text_to	ok	len=0 sha=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 report=TextOutputReport { bytes_written: 0, objects_written: 1 }
+bug65551.pptx	content_parts	ok	0
+bug65551.pptx	hyperlinks	ok	0
+bug65551.pptx	slide_masters	ok	1
+placeholder-layout-color.pptx	slide_references	ok	1
+placeholder-layout-color.pptx	reference[0]	ok	id=269 rid=rId2
+placeholder-layout-color.pptx	slide_count	ok	1
+placeholder-layout-color.pptx	slide_size	ok	9144000x5143500
+placeholder-layout-color.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=9 sha=56c8e8dd871a9b2a6236517c770e125da0344c9164f5b286c8aaf26738f82f8a
+placeholder-layout-color.pptx	slide[1]	none	-
+placeholder-layout-color.pptx	slides	ok	1
+placeholder-layout-color.pptx	find[]	ok	/ppt/slides/slide1.xml
+placeholder-layout-color.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+placeholder-layout-color.pptx	text	ok	len=9 sha=56c8e8dd871a9b2a6236517c770e125da0344c9164f5b286c8aaf26738f82f8a
+placeholder-layout-color.pptx	write_text_to	ok	len=9 sha=56c8e8dd871a9b2a6236517c770e125da0344c9164f5b286c8aaf26738f82f8a report=TextOutputReport { bytes_written: 9, objects_written: 1 }
+placeholder-layout-color.pptx	content_parts	ok	0
+placeholder-layout-color.pptx	hyperlinks	ok	0
+placeholder-layout-color.pptx	slide_masters	ok	1
+prProps.pptx	slide_references	ok	1
+prProps.pptx	reference[0]	ok	id=570 rid=rId2
+prProps.pptx	slide_count	ok	1
+prProps.pptx	slide_size	ok	9144000x6858000
+prProps.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=26 sha=82d9ed31c5dbcc35712d82cdb73f8e4f6045e72554c205d6d2e1a2ec95245b92
+prProps.pptx	slide[1]	none	-
+prProps.pptx	slides	ok	1
+prProps.pptx	find[]	ok	/ppt/slides/slide1.xml
+prProps.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+prProps.pptx	text	ok	len=26 sha=82d9ed31c5dbcc35712d82cdb73f8e4f6045e72554c205d6d2e1a2ec95245b92
+prProps.pptx	write_text_to	ok	len=26 sha=82d9ed31c5dbcc35712d82cdb73f8e4f6045e72554c205d6d2e1a2ec95245b92 report=TextOutputReport { bytes_written: 26, objects_written: 1 }
+prProps.pptx	content_parts	ok	0
+prProps.pptx	hyperlinks	ok	0
+prProps.pptx	slide_masters	ok	1
+hello-world-signed.pptx	slide_references	ok	1
+hello-world-signed.pptx	reference[0]	ok	id=256 rid=rId2
+hello-world-signed.pptx	slide_count	ok	1
+hello-world-signed.pptx	slide_size	ok	9144000x6858000
+hello-world-signed.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=11 sha=35c6b9f66dceb6cf8f733d08689564e420e18eb40250d9435352617c027f36d6
+hello-world-signed.pptx	slide[1]	none	-
+hello-world-signed.pptx	slides	ok	1
+hello-world-signed.pptx	find[]	ok	/ppt/slides/slide1.xml
+hello-world-signed.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+hello-world-signed.pptx	text	ok	len=11 sha=35c6b9f66dceb6cf8f733d08689564e420e18eb40250d9435352617c027f36d6
+hello-world-signed.pptx	write_text_to	ok	len=11 sha=35c6b9f66dceb6cf8f733d08689564e420e18eb40250d9435352617c027f36d6 report=TextOutputReport { bytes_written: 11, objects_written: 1 }
+hello-world-signed.pptx	content_parts	ok	0
+hello-world-signed.pptx	hyperlinks	ok	0
+hello-world-signed.pptx	slide_masters	ok	1
+ms-office-2010-signed.pptx	slide_references	ok	1
+ms-office-2010-signed.pptx	reference[0]	ok	id=256 rid=rId2
+ms-office-2010-signed.pptx	slide_count	ok	1
+ms-office-2010-signed.pptx	slide_size	ok	9144000x6858000
+ms-office-2010-signed.pptx	slide[0]	ok	part=/ppt/slides/slide1.xml name= text=len=11 sha=a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e
+ms-office-2010-signed.pptx	slide[1]	none	-
+ms-office-2010-signed.pptx	slides	ok	1
+ms-office-2010-signed.pptx	find[]	ok	/ppt/slides/slide1.xml
+ms-office-2010-signed.pptx	find[litchi-0637-name-that-cannot-exist]	none	-
+ms-office-2010-signed.pptx	text	ok	len=11 sha=a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e
+ms-office-2010-signed.pptx	write_text_to	ok	len=11 sha=a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e report=TextOutputReport { bytes_written: 11, objects_written: 1 }
+ms-office-2010-signed.pptx	content_parts	ok	0
+ms-office-2010-signed.pptx	hyperlinks	ok	0
+ms-office-2010-signed.pptx	slide_masters	ok	1
+# fixtures=78
