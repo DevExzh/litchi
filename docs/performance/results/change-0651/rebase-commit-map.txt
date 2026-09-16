@@ -1,0 +1,155 @@
+# Rebase commit map for the wave closed by change 0651
+#
+# The branch feat/office-format-completeness was rebased onto
+# origin/feat/office-format-completeness (6 upstream commits, merge base
+# a9d0ded5ac483a7fb9e6899279bce732e851652e) after change 0651 was committed.
+# Every change record of this programme cites commit hashes as they were
+# before the rebase. This file maps each of the 144 rebased commits, oldest
+# first: pre-rebase hash, post-rebase hash, subject. Subjects and patch order
+# are unchanged; only the hashes moved.
+#
+# pre-rebase  post-rebase  subject
+aeb9e229ae71  20a43e1163f0  docs(perf): reconcile current evidence and regression priorities
+df2e73fa3b26  1958617c995d  perf(odg): reuse direct transition values during page resolution
+56e396d05c46  d8e0f41e7b51  perf(odg): filter attribute names before namespace resolution
+4c6c63718542  455972786b52  perf(odg): batch checked shape attribute span discovery
+40a44b44e1d5  627f41bea182  perf(odg): batch contiguous attribute value requests
+0455d9abe479  a9e2d85dc610  perf: add semantic text export to default baseline
+869bbc3ed470  b1aaf13acdda  perf: reuse bounded ODT sink paragraph buffers
+b0b9ebb577d6  f0a9869bae68  perf: fast-path ODT decoded length before OLE2 and OOXML focus
+18d4d7fe1452  3e44fcf7caa7  perf: decode CFB FAT sectors within exact reservation
+53a7c4a523e8  1e8b939f0e07  perf: isolate current dense XLSX commit attribution
+33a21e0f087b  7b63df30d369  perf: measure XLSX operation allocations and save scope
+b69873236325  8d73d20f4d74  perf: reject speculative XLSX parser layout fusion
+c5abaef129f5  72a63c7a7526  perf: isolate XLSX output validation and compaction costs
+201f65094ff0  a241029f257c  test: repair XLSX no-op budgets and archive fusion evaluation
+afb62ab7a708  202ed8b16b9f  perf(opc): avoid duplicate source XML publication validation
+45d71cb6f0cd  61aa2fbc26b6  perf(docx): reuse validated source snapshots during publication
+b776ccb2a55c  53db9a47a0d0  perf(opc): reuse immutable XML proofs at publication
+672b8468ac56  27585c9b4cbb  perf(xlsx): attribute source-backed cell edit and save costs
+96fe51a3a70d  ea4c89c31d0c  perf(xlsx): borrow XML validation events and namespaces
+0e6379307c51  8805d1f434a1  test(xlsx): add cell reference guards and record scanner evaluation
+477281a2f83c  e9aa98873f3b  perf(cfb): add open allocation metrics and refresh OLE2 attribution
+f08daf397671  2be30f35ff5b  test(cfb): strengthen chain and temporary identity guards
+67028ab6037a  8fbb49a23c5e  perf(xlsx): reuse unchanged cells during rewrite readback
+b6e0b05e6c01  ccf95f33b83b  perf(xlsx): audit scanner costs and prepare row span arena
+11a14d2043f6  d34306037431  perf(xlsx): reject row arena pilot and retain regression coverage
+3f4c7be06159  f8ad65d9871f  perf(xlsx): attribute publication costs to authored XML audit
+655410c7b657  fd355c1cd560  perf(xml): reject attribute probe and retain publication metrics
+b2dffa3d7565  2f7f1a5a18a4  perf(xlsx): attribute planning costs to worksheet parsing
+70e04d901818  0b8dd13a705c  perf(ooxml): reject MCE search candidate after final timing gate
+0dd079b95982  b936a7e7a920  perf(ole2): attribute CFB sector claim success-path cost
+7c1d3911da28  76c3f447f312  perf(ole2): inline checked sector claims with cold errors
+bb5bfaa7be4f  b8f5cd9f46aa  test(ole2): retain physical layout guards after rejected loop experiment
+8876e87b8dbc  9ff9c89d4252  perf(ole2): attribute exact chain collector instructions
+97b75c24c4a9  204d79cbd783  perf(ole2): reject collector cold-error layout after matched gates
+9862e92b0f30  aff3c0383ad8  perf(ooxml): attribute transient worksheet decoding ownership
+59982bdaceb8  0fd273fce299  perf(ooxml): measure source-backed XLSX planning allocations
+49ad30bcaf8d  0ce5e5ec350f  perf(ooxml): reject transient attribute borrowing after matched gates
+cf15a9a209cb  071bc35ba935  perf(ooxml): attribute worksheet validation and parser traversal
+a157eaf17f49  233b251e3e0e  docs: review XLSX first-error test matrix
+50bbf53d1c5e  020a12a22136  test(ooxml): guard source-backed worksheet planning error order
+9c0b36a82e5b  aaf6401d4c1b  perf(ooxml): retain XLSX planning refusal guard and rejected traversal evidence
+670194ae887c  2cc3bf7550a8  test(xlsx): guard post-EOF errors and reject shared traversal cap cliff
+9025de3170c4  a4281ba34c3d  perf(xlsx): retain cap benchmark and reject event preflight overhead
+6b8667324894  d306ff6f4899  perf(xlsx): reject chunked event scanner on sparse inputs
+2118c6fb1d02  e69ee013caa2  perf(xlsx): retain shared worksheet traversal with exact event admission
+dbe847aba2be  6956c3ae52ec  perf(ole2): attribute collector work and prove bounded cycle design
+6d9fbb740172  55dd9a3d92fb  perf(ole2): reject checkpoint collector and retain corruption guards
+090b15b64ae5  ded2114846ba  perf(ole2): reject slower checked bitset fusion
+41b55e8e8783  2ac0ae8d7dfe  perf(xlsx): attribute current source-backed commit costs
+3d84cf64cd3f  2e071babce01  perf(xlsx): audit compact layout handoff prerequisites
+8aa0c5baf061  2d9adb67fbb2  perf(xlsx): record rejected compact source proof experiment
+53330ff6745d  1efe512ec08b  perf: close rejected XLSX compact-proof experiment 0553
+d3c62f19a763  9c8f22cb3f26  perf(ole2): reject name handoff after matched XLS regressions
+3210f07ac7a9  5692a81daf95  perf(ole2): reject pending-role accounting after XLS regressions
+0d812aca92b6  92a64333cac0  perf(xlsx): prepare and validate sorted provenance merge candidate
+5dc90f31a97e  cc7dd5a319cd  perf(xlsx): add split allocation evidence and retain unstable pilot
+fa09abec6926  69254a831f2c  perf(ole2): keep one source fence per shared CFB read
+7c70779e9883  bffc28622444  perf(ole2): fold CFB directory names without the Unicode tables
+01e25364c8d7  e95082aeb563  docs(perf): record the 0558/0559 evidence cleanup
+a8ada83c1e4c  3ff315af10d9  perf(xls): observe the source once per XLS freshness check
+c845978d5b88  3af6f60d821b  perf(opc): attribute repeated positional reads on file-backed OOXML
+1de7e52dd42c  ae5b9586ff5b  perf(zip): resolve each data descriptor once per verified entry read
+e1cedcf4bb6e  5519451a6a6b  docs(perf): record the 0560-0562 evidence cleanup
+72ceec32d1e4  40e16ffdfd94  docs(perf): correct what the 0561 syscall isolation isolates
+dd985c53b4cb  f8cb4846827d  docs(perf): retract the 0561 per-entry memo projection
+5005e8f4b081  81cfeb4b52ba  perf(opc): one fewer source observation per warm part read
+210c5241ead7  989793ed7b15  docs(perf): record the 0563 evidence cleanup
+ac80c2a3a9ad  2b2694997cd2  perf(xls): attribute 95% of a source-backed XLS open to a four-byte header scan
+6b13261e5472  4264a6153fd3  docs(perf): record the 0564 evidence cleanup
+c1d2caf856fd  cba0383f375f  perf(xls): read the BIFF globals once, in one windowed pass
+2b294d928b97  77178534c1fd  docs(perf): record the 0565-0567 evidence cleanup
+2391a346254c  554f323ef5de  perf(xls,cfb,opc): window the worksheet scan, batch FAT runs, prepare OOXML sources
+163ac1bd67f2  d462af00edc3  docs(perf): record the 0568-0571 evidence cleanup
+8c665ee6717b  77547772f343  docs(perf): attribute OOXML source-backed reads to ZIP regions (0572)
+39f36c192b8e  d7c772b143d0  perf(zip,xls): one read per ZIP local header, and an XLS open that stops decoding
+32d25e08806d  c4066c4ff681  docs(perf): record the 0572-0576 evidence cleanup
+93a610ded563  fe4c82b9de26  perf(cfb): resume the FAT chain walk, and refute two hypotheses
+3649e294bc83  5939a62bf03a  perf(zip): scope the strict-layout proof to the member being read
+e927e139c0ed  99f947eb0715  docs(perf): record the 0577-0583 evidence cleanup
+57b25a820cb9  33c77b455d20  perf(cfb,xls): resume the cursor's chain walk, and reject the DOC twin
+2fc5fc6572ac  3892ca9c369a  docs(perf): record the 0584-0586 evidence cleanup
+08d968f8ec7d  4f396d14765e  docs(perf): survey what remains across the OLE2 and OOXML path (0587)
+06eddc74a1de  6c5e1a2b8710  perf(cfb): hash an empty overlay once, not twice (0589)
+20ef130f7e02  7b9c6fe6ef43  perf(pptx): reuse the revision and the snapshot an opened commit already produced
+1f4319da3ea0  439d01e36616  perf(docx): answer the patch's byte proof from the part, and splice the layout
+f22f9393598d  7b4714e9e05c  perf(docx): build the paragraph index on the first paragraph query (0592)
+c1503db2b722  3bf253b8133f  perf(xls): stop building errors the frame loop never returns, and cut the SST walk
+f8cf7d2a1d15  7261f64474a2  perf(opc): prove unchanged relationships at open, and buffer the atomic tempfile
+01a5f57315df  cc90f3531804  perf(xlsb): parse the workbook once per cell-value commit (0599)
+c8e856414834  e2f808e27167  perf(doc): decode DOC text once, resolve each PAPX once, share the stream (0596)
+10067930a85d  c3330b8bc894  perf(ooxml-common): borrow the MCE codec's attributes and names, and freeze its namespace emission
+6c4c1469beda  31c196d3b191  docs(perf): the XLSX value editor admits no real producer file (0602)
+7e766cbc3b96  9437bc89332e  perf(pptx): reuse the revisions the cross-package copy has already proven (0598)
+818e58bee9dd  07fd411edf03  perf(xlsx): stop refusing merges the ineligible scan can no longer place, and freeze the gate that skips the scan (0597)
+0744b19760f3  b813743168d3  docs(perf): price the OLE2 zero-fill natively and freeze the appending design (0604)
+8fe9efa55728  bb47fa6e55ba  perf(zip,opc): share one Deflate decoder across an OOXML open's structural reads
+117bdf4c34f8  1940cc66c2bc  perf(xls): walk a whole XLS worksheet in one validated scan (0605)
+2611ac8c42b6  7c4c1f30273b  docs(perf): no opened deck can reach the PPTX slide regeneration (0607)
+8040896f3bad  9416be95a0ca  perf(xlsx): parse declaration-only compatibility worksheets without the MCE rewrite (0603)
+0f116946cbf7  1ac487318a18  perf(harness): give the corpora the shape real producers write, and price it
+1e41983213dc  8f85327d3ab0  perf(ppt): span the retained stream instead of copying every record payload (0606)
+c6df09bd377e  d32463daa5a5  docs(perf): price the XLS shared-string walk and freeze the lazy-index design (0608)
+1c0bcb92eaf0  962193cd244a  docs(perf): an XLSX open-edit-save reads one part of ninety, and the proposed ADR for lazy OPC part decode (0610)
+b2543d18287a  5f93256d3c87  docs(perf): the facade's .doc slurp is cheaper than the source-backed DOC route (0609)
+4e6a923aa446  c1a50dae89be  docs(perf): baseline the length-changing OLE2 save and freeze the copy-through design (0617)
+3a88d75b3c03  0ec4a4e52aed  docs(perf): the execution context bounds one session at a time (0615)
+344ed0298fda  250992f26bee  perf(harness): attribute the standing XLS lifecycle failure to 0565, not 0595 (0619)
+aba3f943d606  a72c2eb04647  perf(zip): drive one Deflate compressor per authored save, not one per member (0618)
+7082a1a3f480  8061ed36c46e  docs(perf): price the XLS globals skip and decline it on a measured regression (0612)
+2d6fbeaed208  9522763a631c  perf(zip,opc): stop re-normalizing OOXML member names and bound the monitored-read scope
+1b0554c24321  79c67c28c48e  perf(xls): price the edit-and-save path and stop re-parsing the source at commit (0620)
+aa8012f8277d  e46ce52db481  fix(cfb): serialize explicitly created storages in a canonical order (0625)
+1946b964e852  fff7a1e19c0c  perf(xls): observe the source once per read on the text path, not four times per shared string (0621)
+2a12bd19eb75  28b7024406ee  perf(xlsx): carry sixteen bytes per cell from planning and delete the commit's second scan (0622)
+b559859adaa3  3bd61907b4ac  docs(perf): deflate is the largest term in a save and SAVE-6's threshold is wrong (0624)
+53846b93b372  501d33c2ebad  docs(perf): price the original-bytes publication audit and decline its memo (0613)
+732cf44ae0d1  7da70f54c77e  fix(opc): choose relationship reuse by rId, not by hash order (0628)
+9083a693457f  a70e4b73132b  perf(ci): fetch the last successful full run as the smoke baseline (0626)
+87bf89a165de  9bde520fc319  perf(harness): give the OLE2 readers a range source, and price one (0627)
+2595967c5afb  e320e20bafda  test(litchi): attribute the managed DOCX facade budget failure to 0495, not the 0588-0594 wave (0629)
+3156bff3bd37  69a03fadb027  perf(zip): read one bounded span per OOXML member first-read (0611)
+b71d7442a82b  a734d31c5a46  fix(xlsx,pptx,docx): order relationships by rId where a verdict reads them (0631)
+8b07b45dcfc1  d8bb6f4134d4  perf(opc): read one bounded span per contiguous run of structural members (0623)
+c7326f68065e  49d71a871cb3  docs(perf): close the first wave on the 0587 queue and refresh it (0630)
+c912583a54f5  2e74f1090afd  perf(ppt): the per-slide re-parse spans the retained document stream (0634)
+68ced2acd0f5  ce31571c1d06  perf(xlsx): cut the value-only fact builder by a third and stop copying every styles event (0635)
+9f28ea621bc2  eba69d117c27  perf(cfb,xls): serve the XLS validation record walk from a bounded stream window (0636)
+ab9c6549d835  926a01a29c0a  fix(litchi,tools): close two gate-list gaps, the CRUD demo's PPTX update, and a dead whole-input slurp (0639)
+0bf8a8b0eeb8  bdf25754f72f  perf(pptx): parse the eager slide catalog once per borrowed presentation (0637)
+655e952f6d65  48d11a0f0124  perf(xls): verify a source-backed numeric target on the parse its own reopen already ran (0633)
+15363b3a83c1  b6cddc98030c  perf(harness): register the facade's .doc and .ppt routes and the ordinary OOXML save (0638)
+e3f3c1ba643b  c64d3062e504  perf(zip): read the central directory once, into a buffer sized to it (0632)
+64a096f86fa9  5f3f08a1d87b  perf(docx): borrow the sink text events, and attribute 0592's open regression (0643)
+23bc1bdf79d1  4a902869a29d  fix(doc): two field-table refusals read a redundant grffldEnd bit as structure (0640)
+cfcb3eb12cdf  b56978f4093c  perf(xlsx): the range visitor stops building the range it is about to visit (0642)
+09d9fb150563  db3e05925342  docs(perf): freeze the memoized per-part PPTX revision proof and price it (0645)
+27f31d743f37  0bcace6cffe7  perf(opc): keep the open-time source capture when a relationship call establishes nothing (0647)
+58a14ef0e341  6ce26547ea8c  docs(perf): freeze the PPTX cross-copy candidate retention and size it (0646)
+5d784f3c6469  9ee2c7e63c4f  perf(xls): a query validates the cells it is not looking for without building them (0641)
+c59ef12bb8b2  b5d6a3dda2a9  docs(perf): attribute the 133.61 ms real-deck PPTX opened-transaction edit (0649)
+ba9b5d8a1195  412eec79b1af  perf(xls): read the shared-string table once, not one cursor per string cell (0648)
+abd7b655c2c6  25b41590a602  docs(perf): design the OLE2 snapshot source-identity fence, and find four of its six reads load-bearing (0644)
+f0fc20178a94  42d58f899d4a  fix(docx): parse a byte-order-marked main document at the right offsets (0650)
+442a5fe8c2b8  a51d563e1203  docs(perf): close the second wave on the 0630 queue and refresh it (0651)
