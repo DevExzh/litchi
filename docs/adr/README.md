@@ -61,6 +61,7 @@ the table.
 | ADR | Proposal | Raised by |
 |---|---|---|
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors | [change 0610](../performance/0610-opc-lazy-part-decode-design.md), satisfying gate 1 of [change 0581](../performance/0581-opc-package-retention.md) |
+| [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context | [change 0615](../performance/0615-execution-context-completeness-design.md), the ADR 0005 amendment [change 0587](../performance/0587-remaining-opportunity-survey.md) item CORE-3 named |
 
 ## Decision hierarchy
 

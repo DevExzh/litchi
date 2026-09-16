@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0630 — one wave, 41 records, and what it moved
+
+Change [0630](0630-queue-refresh-after-the-first-wave.md) is the coordination record of the wave that worked change 0587's queue. It quotes, per item, the number that decided the outcome, with each record's own tier and floor, and it refreshes the ranked queue. The pattern of the wave is worth stating: the items ranked on instruction counts fell (CFB-1 at 35× overstatement, XLS-6 slower with 85% fewer bytes, 0574's opportunity 3 slower on its own), the items ranked on counted duplicate work landed (hashes, scans, parses, audits, decoders, fences, each removed with byte-identical output), and the items ranked on a survey mechanism the survey had not verified were corrected before they were worked (XLSX-2, XML-3, SAVE-3, CORE-1). Two session usage caps terminated agents mid-work and each was resumed from its transcript and worktree; no evidence was lost. The coordinator merged each branch by cherry-pick in completion order, inserted each packet's log sections, and ran the fourteen in-scope crates' fmt, clippy and test gates on the merged head (fmt clean, clippy clean, 436 test binaries all passing, exit 0, at 8b07b45dc).
+
 ## 0623: one read per contiguous run of structural members — the OOXML open's request count falls again, for no extra bytes
 
 Record: [0623](0623-zip-structural-span-accessor-and-prefetch.md).
