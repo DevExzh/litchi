@@ -1,0 +1,8 @@
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/poi/test-data/document/test.doc
+fib.nFib=0x00c1 (Word 97)
+
+## story Main/fcPlcfFldMom (pointer 16) fc=538 lcb=16 markers=2
+#0    cp=0        fld=[0x13,0x0c] ch=0x13 begin reserved=0 text=U+0013  flt=0x0c depth_after_push=1
+#1    cp=21       fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=false AGREE   fHasSep=true separator_present=false DISAGREE   begin=#0@cp0 flt=0x0c
+terminal_cp=495 residual_open=0
+field #0..#1 cp 0..21 depth=0 text="␓ SEQ CHAPTER \\h \\r 1␕"

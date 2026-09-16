@@ -1,0 +1,31 @@
+# Change 0640: digest-before.tsv against digest-after.tsv
+#
+# Both digests are the change-0596 'digest-doc' oracle over all 57 .doc
+# fixtures under test-data/. The absolute test-data prefix, which differs
+# between the two checkouts, is normalized to TESTDATA before diffing;
+# nothing else is touched.
+#
+# Result: two changed records. Both are fixtures that were refused before
+# and are refused after, with a different refusal. All 42 admitted fixtures
+# are identical in every column, and no fixture changed admission status.
+#
+--- digest-before.tsv
++++ digest-after.tsv
+@@ -41,7 +41,7 @@
+ TESTDATA/ole/doc/table-merged-cells.doc	OK	85	17904917538891143860	85	85	453727753031210199	1	4149384976081372939	6845345479440342633	10276	441951244428146177
+ TESTDATA/ole/doc/tdf71749_with_footnote.doc	OK	558	11520092011198541669	37	37	13399946202480495261	1	4934239039397048972	6610885216612625795	4654	17792266225699737457
+ TESTDATA/ole/doc/testPictures.doc	OK	218	11256474680611760724	40	40	6705244408527822271	1	16412815104688946145	16278673159797320505	5678	14509629196688199823
+-TESTDATA/ole/doc/watermark.doc	DOCERR Corrupted("grffldEnd.fNested disagrees with field containment")										
++TESTDATA/ole/doc/watermark.doc	DOCERR Corrupted("bookmark ibkl values must be unique and in range")										
+ TESTDATA/ole/doc/word6-no-table-stream.doc	DOCERR UnsupportedVersion { nfib: 101, name: "Word 6.0" }										
+ TESTDATA/poi/test-data/document/47950_normal.doc	OK	31	4900867821389221230	1	1	380064830777197288	1	674191610334628433	9256530319831568678	4096	18265575509567210311
+ TESTDATA/poi/test-data/document/Bug53453Section.doc	OK	19	15297331363635960660	2	2	11637671587180841459	2	17044255830160111151	2930802366359010852	4096	18395448995102290985
+@@ -50,7 +50,7 @@
+ TESTDATA/poi/test-data/document/password_password_cryptoapi.doc	DOCERR PasswordRequired										
+ TESTDATA/poi/test-data/document/password_tika_binaryrc4.doc	DOCERR PasswordRequired										
+ TESTDATA/poi/test-data/document/saved-by-table.doc	OK	27316	16661383637977437166	443	443	13357688222762754854	2	7683219339174873501	5920680301333037279	39996	6373820773368443776
+-TESTDATA/poi/test-data/document/test.doc	DOCERR Corrupted("grffldEnd.fHasSep disagrees with the FieldList")										
++TESTDATA/poi/test-data/document/test.doc	DOCERR Corrupted("malformed SPRM sequence: truncated SPRM opcode at byte 3: 1 byte(s) remain")										
+ TESTDATA/poi/test-data/document/word_with_embeded.doc	OK	152	11689453656244250994	5	5	11452569697077860281	1	18263153195329030823	18364932310262526766	4096	5309795507564765375
+ TESTDATA/poi/test-data/hpsf/TestBug52117.doc	DOCERR UnsupportedVersion { nfib: 101, name: "Word 6.0" }										
+ TESTDATA/poi/test-data/hpsf/TestGermanWord90.doc	OK	114	2049442953015394128	3	3	14849255683667203801	1	15861025563441712274	16627281866992659212	4096	7595275316915977516

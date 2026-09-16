@@ -1,0 +1,31 @@
+Change 0640 - deterministic counts for the eager DOC open
+
+Method: callgrind isolation pair per leg (profile 10 and 110 eager opens of
+the same fixture, difference the `summary:` totals, divide by 100).
+RAYON_NUM_THREADS=1, taskset -c 16, --cache-sim=no --branch-sim=no.
+Binaries staged outside any Cargo target directory; see binaries.sha256.
+
+fixture     end markers   before Ir/open    after Ir/open   delta Ir   delta %
+utas                 67        4,153,320        4,150,518     -2,802  -0.0675%
+floating              9        2,967,375        2,955,382    -11,992  -0.4041%
+
+utas     = poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_
+           154335_International-Travel-Approval-Request-Form.doc (86.5 KB, 67
+           field end markers, the most field-bearing fixture that opens)
+floating = ole/doc/FloatingPictures.doc (9 field end markers)
+
+The change removes two boolean comparisons per field end marker, i.e. at most
+about 300 instructions on the 67-marker fixture. Both deltas above exceed that,
+so they are code-layout drift rather than the removed work. An earlier pass of
+this same pair, taken with a probe binary that differed only by one unused
+extra subcommand, gave utas -1,518 Ir on the before leg alone and put the
+after-minus-before delta at +339 Ir (+0.0082%) instead of -2,802 Ir: the same
+litchi-doc change, measured through a differently laid-out driver, changes the
+sign. The removed work is below this measurement's layout floor. No
+instruction-count claim is made in either direction, and no timing was taken:
+this change is a correctness fix, not an optimization.
+
+Syscall census (strace -c, one eager open, before vs after): identical on both
+fixtures. utas: 5 openat, 14 read, 14 lseek, 2 pread64, 5 close, 16 mmap.
+FloatingPictures: 5 openat, 19 read, 19 lseek, 2 pread64, 5 close, 16 mmap.
+See strace-{before,after}-{utas,floating}.txt.

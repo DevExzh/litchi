@@ -1,0 +1,331 @@
+Gates for change 0640, run in the candidate worktree
+/home/zhuhe/code/litchi-worktrees/0640 (branch
+perf/0640-doc-facade-field-table-refusals, base c7326f680) against the final
+committed code. Host: AMD EPYC 9R45, 32 cores, Linux 7.0.0-1012-aws,
+rustc 1.95.0. Seven other agents were building on the same host throughout.
+
+Summary
+
+  cargo fmt --all --check                                        pass
+  cargo clippy -p litchi-doc --all-targets                        pass, 0 warnings
+  cargo test -p litchi-doc                                        pass, 41 binaries, 1178 passed, 0 failed, 13 ignored
+  cargo doc -p litchi-doc --no-deps                               pass
+  cargo clippy -p litchi --features docx,xlsx,pptx,xls --all-targets   pass, 6 pre-existing warnings
+  cargo test -p litchi --features docx,xlsx,pptx,xls              pass, 26 binaries, 266 passed, 0 failed, 7 ignored
+  cargo test --locked  (tools/perf-baseline)                      pass, 19 binaries, 531 passed, 0 failed, 1 ignored
+
+The six `litchi` clippy warnings are pre-existing and none is in litchi-doc.
+The identical six are emitted by the same invocation on the untouched
+before-c7326f680 checkout:
+
+  warning: function `missing_ooxml_catalog_part_error` is never used
+  warning: passing a unit value to a function
+  warning: passing a unit value to a function
+  warning: `litchi` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p litchi -- ` to apply 2 suggestions)
+  warning: variable does not need to be mutable
+  warning: passing a unit value to a function
+  warning: passing a unit value to a function
+  warning: `litchi` (lib test) generated 6 warnings (3 duplicates) (run `cargo clippy --fix --lib -p litchi --tests -- ` to apply 3 suggestions)
+  exit=0
+
+================================================================================
+litchi-doc gates (final code)
+================================================================================
+===== cargo fmt --all --check =====
+exit=0
+
+===== cargo clippy -p litchi-doc --all-targets =====
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0640/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.89s
+exit=0
+
+===== cargo test -p litchi-doc =====
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/litchi_doc-4494ecbe9f998f2b)
+running 1002 tests
+test result: ok. 1000 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 4.00s
+     Running tests/binary_digital_signatures.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/binary_digital_signatures-2c38b6adc44c6475)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_associated_strings.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_associated_strings-ee02fb4c5044c3e3)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_auto_summary.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_auto_summary-173880eca319ca45)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/doc_body_transaction.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_body_transaction-bb0fc34c41bdd2c3)
+running 6 tests
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+     Running tests/doc_captions.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_captions-9f1a58949bff7ab2)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_embedded_fonts.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_embedded_fonts-fad3b32370644bf4)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_embedded_object_writer.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_embedded_object_writer-cce58fde5879d931)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/doc_fields.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_fields-e6f04304fb739ce0)
+running 7 tests
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_form_fields.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_form_fields-14771edec8fd7561)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_leniency.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_leniency-1494fad582676dc1)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_mail_merge.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_mail_merge-fa79cec9cff048a3)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_mtef_equation_writer.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_mtef_equation_writer-c8870ec2d9342017)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_open_limits.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_open_limits-bc209a2f06564aaa)
+running 10 tests
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+     Running tests/doc_paragraph_count.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_paragraph_count-d9209ae601a52f27)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_protection.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_protection-913532043807f321)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_rmd_threading.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_rmd_threading-202591b66e82ffea)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_route_slip.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_route_slip-25005507e565fef4)
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_rsids.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_rsids-f2ec9c23b995a258)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_saved_by.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_saved_by-0789b4b4c20a967d)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_section_columns.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_section_columns-701e00037d8fbb6d)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_section_page_borders.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_section_page_borders-7b7ffd3664758041)
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_semantic_paragraph_at.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_semantic_paragraph_at-69515141406220ce)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_stories.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_stories-0b50acd981f0a2e7)
+running 14 tests
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_subdocuments.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_subdocuments-fcd2da52bd4ed2f0)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_tracked_revision_editor.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_tracked_revision_editor-ec99110e0dc22696)
+running 5 tests
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_vba_writer.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_vba_writer-8bfca818355b32a4)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_auxiliary_strings.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_auxiliary_strings-c46b44bbf8fe8576)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/doc_writer_encryption.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_encryption-d18c96f5093aefa6)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/doc_writer_glossary.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_glossary-60ed345217aead41)
+running 12 tests
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+     Running tests/doc_writer_header_kinds.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_header_kinds-f20dbb3b5052f108)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/doc_writer_header_textboxes.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_header_textboxes-87a67f08acfdda0c)
+running 3 tests
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_headers.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_headers-b320ea60126f9793)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_images.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_images-e83b3adda8a3754c)
+running 7 tests
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running tests/doc_writer_proofing.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_proofing-03d7e8d35c0e8666)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/doc_writer_shapes.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_shapes-1c2cc59fade24ca4)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/doc_writer_textboxes.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/doc_writer_textboxes-810259738984f522)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+     Running tests/ole_controls.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/ole_controls-1611789f3617c08b)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/ole_property_set_editor.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/ole_property_set_editor-f48cada44b6fbb90)
+running 1 test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/user_defined_hyperlinks.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/user_defined_hyperlinks-9628464ce95190b9)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+   Doc-tests litchi_doc
+running 25 tests
+test result: ok. 14 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0
+
+===== cargo doc -p litchi-doc --no-deps =====
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0640/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.95s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0640-work/doc/litchi_doc/index.html
+exit=0
+FINAL_DOC_GATES_DONE
+
+================================================================================
+Consumer crate: litchi with the docx,xlsx,pptx,xls features
+================================================================================
+===== cargo test -p litchi --features docx,xlsx,pptx,xls =====
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/litchi-7bf7b177e121813e)
+running 206 tests
+test result: ok. 206 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s
+     Running tests/catalog_detection_arbitration.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/catalog_detection_arbitration-baf83a273c7d481b)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/catalog_first_detection.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/catalog_first_detection-4eceb0ca9cb045f7)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/encryption_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/encryption_facade-dd284c3eae268b16)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/eval_xlsx_integration/main.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/eval_xlsx_integration-c50e341a3ec6ff88)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iwork_error_model.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/iwork_error_model-b8361dcf398ab7ac)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iwork_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/iwork_facade-07753dd3b5a68040)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iwork_numbers_compatibility.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/iwork_numbers_compatibility-49a9f8f3566dec16)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iwork_path.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/iwork_path-b65c8e511f36e6e0)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/iwork_source_errors.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/iwork_source_errors-162af24e0725a136)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/keynote_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/keynote_facade-972c9b49bbe6daa4)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/markdown_docx_lists.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/markdown_docx_lists-3964b402d10229e4)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/markdown_docx_semantics.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/markdown_docx_semantics-d3d9b5cb17ffdf54)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/markdown_real_fixtures.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/markdown_real_fixtures-e7d8211bfd0f6b08)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/numbers_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/numbers_facade-f8aa5964e827d968)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/numbers_semantic_values.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/numbers_semantic_values-2bfadd01af43d9bf)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/numbers_semantic_view.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/numbers_semantic_view-77fe8d3aa51a331a)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/pages_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/pages_facade-233bb3e72271a7dd)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/read_limits_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/read_limits_facade-8cf0dc49b6000a73)
+running 7 tests
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+     Running tests/semantic_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/semantic_facade-9826a60d5da7dae6)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/semantic_reader_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/semantic_reader_facade-c1c1e0aea724a92e)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/unexpected_format.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/unexpected_format-cbcae5c8c7f188b2)
+running 8 tests
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+     Running tests/unified_sheet_selectors.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/unified_sheet_selectors-b536e4e282cad644)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+     Running tests/vba_inspection_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/vba_inspection_facade-67eaed901855a916)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xlsb_facade.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-work/debug/deps/xlsb_facade-434e198b1a44c698)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi
+running 42 tests
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0
+===== cargo clippy -p litchi --features docx,xlsx,pptx,xls --all-targets =====
+2666 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+2666 +             inner: DocumentImpl::DocxSource(package, ()),
+     |
+
+warning: `litchi` (lib test) generated 6 warnings (3 duplicates) (run `cargo clippy --fix --lib -p litchi --tests -- ` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 17s
+exit=0
+
+================================================================================
+Harness: cargo test --locked in tools/perf-baseline
+================================================================================
+A first attempt at this gate was pinned to CPU 16 with taskset, which serialized
+all 514 tests onto one core; it was terminated after 30 minutes and re-run
+unpinned with -j 6. Only the scheduling changed.
+
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/litchi_perf_baseline-854d3d8480cb4325)
+running 514 tests
+test result: ok. 513 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 701.77s
+     Running unittests src/bin/docx_bounded_tail_append_compare.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/docx_bounded_tail_append_compare-8a66bb28270f11f8)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/docx_plain_paragraph_tail_append.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/docx_plain_paragraph_tail_append-30ef3d63bc3c2bb6)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/docx_replayable_tail_append.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/docx_replayable_tail_append-66fb6d6d05210005)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/docx_source_selected_paragraph.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/docx_source_selected_paragraph-bc975cf55d3059ba)
+running 12 tests
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/litchi_perf_baseline-6241d2f55c48bb50)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/odp_native_tail_append_probe.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/odp_native_tail_append_probe-44838a8da748996d)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/pptx_external_cross_copy.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/pptx_external_cross_copy-ad5c3b0170d1ffb7)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/pptx_metadata_spool.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/pptx_metadata_spool-6f636129eefbe011)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/pptx_native_copy_probe.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/pptx_native_copy_probe-e54e2ba479b93966)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/pptx_semantic_inventory.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/pptx_semantic_inventory-d60305bcd65aab28)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/xlsx_cell_values_abba.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xlsx_cell_values_abba-f870c40ddb250f76)
+running 2 tests
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/xlsx_merge_source_abba.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xlsx_merge_source_abba-a4d1bb822230c91f)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/xlsx_planning_guard.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xlsx_planning_guard-332890a6ef092a9d)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/xml_stream_audit.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xml_stream_audit-56aca4e775e9ada7)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running unittests src/bin/zip_directory_spool.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/zip_directory_spool-6fa363ec3097a0b5)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+     Running tests/xlsx_filesystem.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xlsx_filesystem-a2d86e4408077ff1)
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.35s
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/code/litchi-worktrees/targets/0640-harness/debug/deps/xlsx_planning_allocations-091fd53b6d2289e9)
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+   Doc-tests litchi_perf_baseline
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+exit=0

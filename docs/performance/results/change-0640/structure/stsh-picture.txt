@@ -1,0 +1,17 @@
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/picture.doc
+strict parse: ERR Corrupted("invalid stylesheet: style names and aliases must be unique")
+tolerant parse: OK, cstd=25 tolerance_report=ToleranceReport { defects: [ToleratedDefect { defect: DuplicateStyleName, style_index: 15 }], unrecorded: 0 }
+istd=0    sti=0     kind=Paragraph name="Базовый" aliases=[] base=None next=0 
+istd=10   sti=65    kind=Character name="Absatz-Standardschriftart" aliases=[] base=None next=10 DUP "Absatz-Standardschriftart" on styles [10, 15]
+istd=15   sti=4094  kind=Character name="Absatz-Standardschriftart" aliases=[] base=None next=15 DUP "Absatz-Standardschriftart" on styles [10, 15]
+istd=16   sti=4094  kind=Character name="WW-Absatz-Standardschriftart" aliases=[] base=None next=16 
+istd=17   sti=4094  kind=Paragraph name="Заголовок" aliases=[] base=Some(0) next=18 
+istd=18   sti=66    kind=Paragraph name="Основной текст" aliases=[] base=Some(0) next=18 
+istd=19   sti=47    kind=Paragraph name="Список" aliases=[] base=Some(18) next=19 
+istd=20   sti=4094  kind=Paragraph name="Название" aliases=[] base=Some(0) next=20 
+istd=21   sti=4094  kind=Paragraph name="Указатель" aliases=[] base=Some(0) next=21 
+istd=22   sti=4094  kind=Paragraph name="?????????" aliases=[] base=Some(0) next=18 
+istd=23   sti=4094  kind=Paragraph name="????????" aliases=[] base=Some(0) next=23 
+istd=24   sti=4094  kind=Paragraph name="WW-?????????" aliases=[] base=Some(0) next=24 
+duplicate name count = 1
+DUPLICATE "Absatz-Standardschriftart" -> istds [10, 15]

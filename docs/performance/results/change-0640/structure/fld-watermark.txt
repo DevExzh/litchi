@@ -1,0 +1,29 @@
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/watermark.doc
+fib.nFib=0x0101 (Word 2002/2003)
+
+## story Main/fcPlcfFldMom (pointer 16) fc=4554 lcb=112 markers=18
+#0    cp=66       fld=[0x13,0x0d] ch=0x13 begin reserved=0 text=U+0013  flt=0x0d depth_after_push=1
+#1    cp=72       fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=1
+#2    cp=73       fld=[0x13,0x58] ch=0x13 begin reserved=0 text=U+0013  flt=0x58 depth_after_push=2
+#3    cp=117      fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=2
+#4    cp=128      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=true DISAGREE   fHasSep=true separator_present=true AGREE   begin=#2@cp73 flt=0x58
+#5    cp=130      fld=[0x13,0x58] ch=0x13 begin reserved=0 text=U+0013  flt=0x58 depth_after_push=2
+#6    cp=175      fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=2
+#7    cp=197      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=true DISAGREE   fHasSep=true separator_present=true AGREE   begin=#5@cp130 flt=0x58
+#8    cp=199      fld=[0x13,0x58] ch=0x13 begin reserved=0 text=U+0013  flt=0x58 depth_after_push=2
+#9    cp=244      fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=2
+#10   cp=262      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=true DISAGREE   fHasSep=true separator_present=true AGREE   begin=#8@cp199 flt=0x58
+#11   cp=264      fld=[0x13,0x58] ch=0x13 begin reserved=0 text=U+0013  flt=0x58 depth_after_push=2
+#12   cp=309      fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=2
+#13   cp=336      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=true DISAGREE   fHasSep=true separator_present=true AGREE   begin=#11@cp264 flt=0x58
+#14   cp=338      fld=[0x13,0x58] ch=0x13 begin reserved=0 text=U+0013  flt=0x58 depth_after_push=2
+#15   cp=383      fld=[0x14,0xff] ch=0x14 separator reserved=0 text=U+0014  ignored=0xff depth=2
+#16   cp=412      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=true DISAGREE   fHasSep=true separator_present=true AGREE   begin=#14@cp338 flt=0x58
+#17   cp=413      fld=[0x15,0x80] ch=0x15 end   reserved=0 text=U+0015  grffldEnd=0x80 [fHasSep] fNested=false enclosing_field=false AGREE   fHasSep=true separator_present=true AGREE   begin=#0@cp66 flt=0x0d
+terminal_cp=1466 residual_open=0
+field #2..#4 cp 73..128 depth=1 text="␓ HYPERLINK  \\l \"__RefHeading__8_476954814\"␁␔␋1. TERM␉1␕"
+field #5..#7 cp 130..197 depth=1 text="␓ HYPERLINK  \\l \"__RefHeading__10_476954814\"␁␔ 1.1 Termination.  ␉1␕"
+field #8..#10 cp 199..262 depth=1 text="␓ HYPERLINK  \\l \"__RefHeading__12_476954814\"␁␔ 1.2 Renewal.  ␉1␕"
+field #11..#13 cp 264..336 depth=1 text="␓ HYPERLINK  \\l \"__RefHeading__14_476954814\"␁␔2.  CRITICAL OBLIGATIONS␉1␕"
+field #14..#16 cp 338..412 depth=1 text="␓ HYPERLINK  \\l \"__RefHeading__16_476954814\"␁␔ 2.1 Appearance at site.  ␉1␕"
+field #0..#17 cp 66..413 depth=0 text="␓ TOC ␔␓ HYPERLINK  \\l \"__RefHeading__8_476954814\"␁␔␋1. TERM␉1␕␍␓ HYPERLINK  \\l \"__RefHeading__10_476954814\"␁␔ 1.1 Termination.  ␉1␕␍␓ HYPERLINK  \\l \"__RefHeading__12_476954814\"␁␔ 1.2 Renewal.  ␉1␕␍␓ HYPERLINK  \\l \"__RefHeading__14_47695481"

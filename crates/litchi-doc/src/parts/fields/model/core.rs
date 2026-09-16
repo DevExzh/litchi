@@ -471,6 +471,13 @@ pub enum FieldBoundary {
 }
 
 /// Flags stored on a field end marker (`grffldEnd`).
+///
+/// Every bit is retained exactly as the file stores it, including the two that
+/// restate structure. Producers do leave `nested` and `has_separator` stale, so
+/// they are the file's annotation and not a fact about the document: read
+/// [`Field::nesting_depth`] and [`Field::has_separator`], which the reader
+/// derives from the `FieldList` grammar, and compare against these when the
+/// producer's own claim matters.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct FieldEndFlags {
     pub differ: bool,
@@ -479,7 +486,9 @@ pub struct FieldEndFlags {
     pub results_edited: bool,
     pub locked: bool,
     pub private_result: bool,
+    /// `fNested` as written. May disagree with [`Field::nesting_depth`].
     pub nested: bool,
+    /// `fHasSep` as written. May disagree with [`Field::has_separator`].
     pub has_separator: bool,
 }
 
@@ -598,8 +607,12 @@ pub struct Field {
     pub separator_cp: Option<u32>,
     pub end_cp: u32,
     pub field_type: FieldType,
+    /// The end marker's `grffldEnd` byte as written, stale bits included.
     pub end_flags: FieldEndFlags,
+    /// How many fields enclose this one, derived from the `FieldList` grammar.
     pub nesting_depth: usize,
+    /// Whether a separator character was seen inside this field, derived from
+    /// the `FieldList` grammar rather than read from `end_flags`.
     pub has_separator: bool,
 }
 

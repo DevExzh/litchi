@@ -1,0 +1,19 @@
+[package]
+name = "doc0640"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "doc0640"
+path = "main.rs"
+
+[dependencies]
+litchi-core = { path = "/home/zhuhe/code/litchi/crates/litchi-core" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi/crates/litchi-cfb" }
+litchi-doc = { path = "/home/zhuhe/code/litchi/crates/litchi-doc" }
+
+[profile.release]
+debug = false
+strip = false

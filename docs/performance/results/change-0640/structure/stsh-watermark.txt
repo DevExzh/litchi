@@ -1,0 +1,66 @@
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/watermark.doc
+strict parse: OK
+tolerant parse: OK, cstd=66 tolerance_report=ToleranceReport { defects: [], unrecorded: 0 }
+istd=0    sti=0     kind=Paragraph name="Normal" aliases=[] base=None next=0 
+istd=1    sti=1     kind=Paragraph name="Heading 1" aliases=[] base=Some(0) next=0 
+istd=2    sti=2     kind=Paragraph name="Heading 2" aliases=[] base=Some(0) next=0 
+istd=3    sti=3     kind=Paragraph name="Heading 3" aliases=[] base=Some(0) next=43 
+istd=4    sti=4     kind=Paragraph name="Heading 4" aliases=[] base=Some(0) next=43 
+istd=5    sti=5     kind=Paragraph name="Heading 5" aliases=[] base=Some(0) next=43 
+istd=6    sti=6     kind=Paragraph name="Heading 6" aliases=[] base=Some(0) next=43 
+istd=7    sti=7     kind=Paragraph name="Heading 7" aliases=[] base=Some(0) next=43 
+istd=8    sti=8     kind=Paragraph name="Heading 8" aliases=[] base=Some(0) next=43 
+istd=9    sti=9     kind=Paragraph name="Heading 9" aliases=[] base=Some(0) next=43 
+istd=10   sti=65    kind=Character name="Absatz-Standardschriftart" aliases=[] base=None next=10 
+istd=15   sti=4094  kind=Character name="WW8Num2z0" aliases=[] base=None next=15 
+istd=16   sti=4094  kind=Character name="WW8Num2z1" aliases=[] base=None next=16 
+istd=17   sti=4094  kind=Character name="WW8Num2z2" aliases=[] base=None next=17 
+istd=18   sti=4094  kind=Character name="WW8Num2z3" aliases=[] base=None next=18 
+istd=19   sti=4094  kind=Character name="WW8Num2z4" aliases=[] base=None next=19 
+istd=20   sti=4094  kind=Character name="WW8Num3z0" aliases=[] base=None next=20 
+istd=21   sti=4094  kind=Character name="WW8Num3z1" aliases=[] base=None next=21 
+istd=22   sti=4094  kind=Character name="WW8Num3z2" aliases=[] base=None next=22 
+istd=23   sti=4094  kind=Character name="WW8Num3z7" aliases=[] base=None next=23 
+istd=24   sti=4094  kind=Character name="WW8Num3z8" aliases=[] base=None next=24 
+istd=25   sti=4094  kind=Character name="Default Paragraph Font" aliases=[] base=None next=25 
+istd=26   sti=4094  kind=Character name="Heading 1 Char" aliases=[] base=None next=26 
+istd=27   sti=4094  kind=Character name="Heading 2 Char" aliases=[] base=None next=27 
+istd=28   sti=85    kind=Character name="Internet Link" aliases=[] base=None next=28 
+istd=29   sti=4094  kind=Character name="Balloon Text Char" aliases=[] base=None next=29 
+istd=30   sti=4094  kind=Character name="Heading 3 Char" aliases=[] base=None next=30 
+istd=31   sti=4094  kind=Character name="Heading 4 Char" aliases=[] base=None next=31 
+istd=32   sti=4094  kind=Character name="Heading 5 Char" aliases=[] base=None next=32 
+istd=33   sti=4094  kind=Character name="Heading 6 Char" aliases=[] base=None next=33 
+istd=34   sti=4094  kind=Character name="Heading 7 Char" aliases=[] base=None next=34 
+istd=35   sti=4094  kind=Character name="Heading 8 Char" aliases=[] base=None next=35 
+istd=36   sti=4094  kind=Character name="Heading 9 Char" aliases=[] base=None next=36 
+istd=37   sti=4094  kind=Character name="~LW Head 3 Char Char" aliases=[] base=None next=37 
+istd=38   sti=4094  kind=Character name="~LW Head 4 Char" aliases=[] base=None next=38 
+istd=39   sti=4094  kind=Character name="~LW Head 5 Char" aliases=[] base=None next=39 
+istd=40   sti=4094  kind=Character name="Header Char" aliases=[] base=Some(25) next=40 
+istd=41   sti=4094  kind=Character name="Footer Char" aliases=[] base=Some(25) next=41 
+istd=42   sti=4094  kind=Paragraph name="Heading" aliases=[] base=Some(0) next=43 
+istd=43   sti=66    kind=Paragraph name="Text body" aliases=[] base=Some(0) next=43 
+istd=44   sti=47    kind=Paragraph name="List" aliases=[] base=Some(43) next=44 
+istd=45   sti=4094  kind=Paragraph name="Caption" aliases=[] base=Some(0) next=45 
+istd=46   sti=4094  kind=Paragraph name="Index" aliases=[] base=Some(0) next=46 
+istd=47   sti=4094  kind=Paragraph name="TOC Heading" aliases=[] base=Some(1) next=0 
+istd=48   sti=19    kind=Paragraph name="Contents 1" aliases=[] base=Some(0) next=0 
+istd=49   sti=20    kind=Paragraph name="Contents 2" aliases=[] base=Some(0) next=0 
+istd=50   sti=4094  kind=Paragraph name="Balloon Text" aliases=[] base=Some(0) next=50 
+istd=51   sti=4094  kind=Paragraph name="~LW Head 7" aliases=[] base=Some(7) next=51 
+istd=52   sti=4094  kind=Paragraph name="~LW Head 6" aliases=[] base=Some(6) next=52 
+istd=53   sti=4094  kind=Paragraph name="~LW Head 5" aliases=[] base=Some(5) next=53 
+istd=54   sti=4094  kind=Paragraph name="~LW Head 4" aliases=[] base=Some(4) next=54 
+istd=55   sti=4094  kind=Paragraph name="~LW Head 3" aliases=[] base=Some(3) next=55 
+istd=56   sti=31    kind=Paragraph name="Header" aliases=[] base=Some(0) next=56 
+istd=57   sti=32    kind=Paragraph name="Footer" aliases=[] base=Some(0) next=57 
+istd=58   sti=21    kind=Paragraph name="Contents 3" aliases=[] base=Some(0) next=0 
+istd=59   sti=22    kind=Paragraph name="Contents 4" aliases=[] base=Some(46) next=59 
+istd=60   sti=23    kind=Paragraph name="Contents 5" aliases=[] base=Some(46) next=60 
+istd=61   sti=24    kind=Paragraph name="Contents 6" aliases=[] base=Some(46) next=61 
+istd=62   sti=25    kind=Paragraph name="Contents 7" aliases=[] base=Some(46) next=62 
+istd=63   sti=26    kind=Paragraph name="Contents 8" aliases=[] base=Some(46) next=63 
+istd=64   sti=27    kind=Paragraph name="Contents 9" aliases=[] base=Some(46) next=64 
+istd=65   sti=4094  kind=Paragraph name="Contents 10" aliases=[] base=Some(46) next=65 
+duplicate name count = 0

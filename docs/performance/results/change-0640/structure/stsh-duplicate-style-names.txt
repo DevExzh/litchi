@@ -1,0 +1,22 @@
+# /home/zhuhe/code/litchi-worktrees/0640/test-data/ole/doc/duplicate-style-names.doc
+strict parse: ERR Corrupted("invalid stylesheet: style names and aliases must be unique")
+tolerant parse: OK, cstd=30 tolerance_report=ToleranceReport { defects: [ToleratedDefect { defect: DuplicateStyleName, style_index: 15 }], unrecorded: 0 }
+istd=0    sti=0     kind=Paragraph name="Padrão" aliases=[] base=None next=0 
+istd=10   sti=65    kind=Character name="Absatz-Standardschriftart" aliases=[] base=None next=10 DUP "Absatz-Standardschriftart" on styles [10, 15]
+istd=15   sti=4094  kind=Character name="Absatz-Standardschriftart" aliases=[] base=None next=15 DUP "Absatz-Standardschriftart" on styles [10, 15]
+istd=16   sti=4094  kind=Character name="WW-Absatz-Standardschriftart" aliases=[] base=None next=16 
+istd=17   sti=4094  kind=Character name="WW-Absatz-Standardschriftart1" aliases=[] base=None next=17 
+istd=18   sti=4094  kind=Character name="WW-Absatz-Standardschriftart11" aliases=[] base=None next=18 
+istd=19   sti=4094  kind=Character name="WW-Absatz-Standardschriftart111" aliases=[] base=None next=19 
+istd=20   sti=4094  kind=Character name="WW-Absatz-Standardschriftart1111" aliases=[] base=None next=20 
+istd=21   sti=4094  kind=Character name="WW-Absatz-Standardschriftart11111" aliases=[] base=None next=21 
+istd=22   sti=4094  kind=Character name="WW-Absatz-Standardschriftart111111" aliases=[] base=None next=22 
+istd=23   sti=4094  kind=Character name="WW-Absatz-Standardschriftart1111111" aliases=[] base=None next=23 
+istd=24   sti=4094  kind=Character name="WW-Absatz-Standardschriftart11111111" aliases=[] base=None next=24 
+istd=25   sti=4094  kind=Paragraph name="Capítulo" aliases=[] base=Some(0) next=26 
+istd=26   sti=66    kind=Paragraph name="Corpo de texto" aliases=[] base=Some(0) next=26 
+istd=27   sti=47    kind=Paragraph name="Lista" aliases=[] base=Some(26) next=27 
+istd=28   sti=4094  kind=Paragraph name="Legenda" aliases=[] base=Some(0) next=28 
+istd=29   sti=4094  kind=Paragraph name="Índice" aliases=[] base=Some(0) next=29 
+duplicate name count = 1
+DUPLICATE "Absatz-Standardschriftart" -> istds [10, 15]
